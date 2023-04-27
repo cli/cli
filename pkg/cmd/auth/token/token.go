@@ -38,7 +38,7 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance authenticated with")
 	cmd.Flags().BoolVarP(&opts.SecureStorage, "secure-storage", "", false, "Search only secure credential store for authentication token")
-	_ = cmd.Flags().MarkHidden("secure-storeage")
+	_ = cmd.Flags().MarkHidden("secure-storage")
 
 	return cmd
 }

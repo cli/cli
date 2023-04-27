@@ -92,6 +92,38 @@ func TestNewCmdCreate(t *testing.T) {
 				Interactive: false,
 			},
 		},
+		{
+			name:     "template from name tty",
+			tty:      true,
+			cli:      `-t mytitle --template "bug report"`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				Template:    "bug report",
+				Interactive: true,
+			},
+		},
+		{
+			name:     "template from name non-tty",
+			tty:      false,
+			cli:      `-t mytitle --template "bug report"`,
+			wantsErr: true,
+		},
+		{
+			name:     "template and body",
+			tty:      false,
+			cli:      `-t mytitle --template "bug report" --body "issue body"`,
+			wantsErr: true,
+		},
+		{
+			name:     "template and body file",
+			tty:      false,
+			cli:      `-t mytitle --template "bug report" --body-file "body_file.md"`,
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -134,6 +166,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
 			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
 			assert.Equal(t, tt.wantsOpts.Interactive, opts.Interactive)
+			assert.Equal(t, tt.wantsOpts.Template, opts.Template)
 		})
 	}
 }

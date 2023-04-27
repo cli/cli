@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -29,8 +30,26 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 	}
 
 	cmd := &cobra.Command{
-		Short: "Configure git to use GitHub CLI as a credential helper",
 		Use:   "setup-git",
+		Short: "Setup git with GitHub CLI",
+		Long: heredoc.Docf(`
+			This command configures git to use GitHub CLI as a credential helper.
+			For more information on git credential helpers please reference:
+			https://git-scm.com/docs/gitcredentials.
+
+			By default, GitHub CLI will be set as the credential helper for all authenticated hosts.
+			If there is no authenticated hosts the command fails with an error.
+
+			Alternatively, use the %[1]s--hostname%[1]s flag to specify a single host to be configured.
+			If the host is not authenticated with, the command fails with an error.
+		`, "`"),
+		Example: heredoc.Doc(`
+			# Configure git to use GitHub CLI as the credential helper for all authenticated hosts
+			$ gh auth setup-git
+
+			# Configure git to use GitHub CLI as the credential helper for enterprise.internal host
+			$ gh auth setup-git --hostname enterprise.internal
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.gitConfigure = &shared.GitCredentialFlow{
 				Executable: f.Executable(),

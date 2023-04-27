@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -41,8 +42,8 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "issue number argument",
 			input: "23",
 			output: EditOptions{
-				SelectorArg: "23",
-				Interactive: true,
+				SelectorArgs: []string{"23"},
+				Interactive:  true,
 			},
 			wantsErr: false,
 		},
@@ -50,7 +51,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "title flag",
 			input: "23 --title test",
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Title: prShared.EditableString{
 						Value:  "test",
@@ -64,7 +65,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "body flag",
 			input: "23 --body test",
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Body: prShared.EditableString{
 						Value:  "test",
@@ -79,7 +80,7 @@ func TestNewCmdEdit(t *testing.T) {
 			input: "23 --body-file -",
 			stdin: "this is on standard input",
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Body: prShared.EditableString{
 						Value:  "this is on standard input",
@@ -93,7 +94,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "body from file",
 			input: fmt.Sprintf("23 --body-file '%s'", tmpFile),
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Body: prShared.EditableString{
 						Value:  "a body from file",
@@ -107,7 +108,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "add-assignee flag",
 			input: "23 --add-assignee monalisa,hubot",
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Assignees: prShared.EditableSlice{
 						Add:    []string{"monalisa", "hubot"},
@@ -121,7 +122,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "remove-assignee flag",
 			input: "23 --remove-assignee monalisa,hubot",
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Assignees: prShared.EditableSlice{
 						Remove: []string{"monalisa", "hubot"},
@@ -135,7 +136,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "add-label flag",
 			input: "23 --add-label feature,TODO,bug",
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Labels: prShared.EditableSlice{
 						Add:    []string{"feature", "TODO", "bug"},
@@ -149,7 +150,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "remove-label flag",
 			input: "23 --remove-label feature,TODO,bug",
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Labels: prShared.EditableSlice{
 						Remove: []string{"feature", "TODO", "bug"},
@@ -163,7 +164,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "add-project flag",
 			input: "23 --add-project Cleanup,Roadmap",
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Projects: prShared.EditableProjects{
 						EditableSlice: prShared.EditableSlice{
@@ -179,7 +180,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "remove-project flag",
 			input: "23 --remove-project Cleanup,Roadmap",
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Projects: prShared.EditableProjects{
 						EditableSlice: prShared.EditableSlice{
@@ -195,7 +196,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "milestone flag",
 			input: "23 --milestone GA",
 			output: EditOptions{
-				SelectorArg: "23",
+				SelectorArgs: []string{"23"},
 				Editable: prShared.Editable{
 					Milestone: prShared.EditableString{
 						Value:  "GA",
@@ -204,6 +205,34 @@ func TestNewCmdEdit(t *testing.T) {
 				},
 			},
 			wantsErr: false,
+		},
+		{
+			name:  "add label to multiple issues",
+			input: "23 34 --add-label bug",
+			output: EditOptions{
+				SelectorArgs: []string{"23", "34"},
+				Editable: prShared.Editable{
+					Labels: prShared.EditableSlice{
+						Add:    []string{"bug"},
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "interactive multiple issues",
+			input: "23 34",
+			output: EditOptions{
+				SelectorArgs: []string{"23", "34"},
+				Editable: prShared.Editable{
+					Labels: prShared.EditableSlice{
+						Add:    []string{"bug"},
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -243,7 +272,7 @@ func TestNewCmdEdit(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.output.SelectorArg, gotOpts.SelectorArg)
+			assert.Equal(t, tt.output.SelectorArgs, gotOpts.SelectorArgs)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.Editable, gotOpts.Editable)
 		})
@@ -257,12 +286,13 @@ func Test_editRun(t *testing.T) {
 		httpStubs func(*testing.T, *httpmock.Registry)
 		stdout    string
 		stderr    string
+		wantErr   bool
 	}{
 		{
 			name: "non-interactive",
 			input: &EditOptions{
-				SelectorArg: "123",
-				Interactive: false,
+				SelectorArgs: []string{"123"},
+				Interactive:  false,
 				Editable: prShared.Editable{
 					Title: prShared.EditableString{
 						Value:  "new title",
@@ -312,10 +342,175 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
 		{
+			name: "non-interactive multiple issues",
+			input: &EditOptions{
+				SelectorArgs: []string{"456", "123"},
+				Interactive:  false,
+				Editable: prShared.Editable{
+					Assignees: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
+						Edited: true,
+					},
+					Labels: prShared.EditableSlice{
+						Add:    []string{"feature", "TODO", "bug"},
+						Remove: []string{"docs"},
+						Edited: true,
+					},
+					Projects: prShared.EditableProjects{
+						EditableSlice: prShared.EditableSlice{
+							Add:    []string{"Cleanup", "CleanupV2"},
+							Remove: []string{"Roadmap", "RoadmapV2"},
+							Edited: true,
+						},
+					},
+					Milestone: prShared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				// Should only be one fetch of metadata.
+				mockRepoMetadata(t, reg)
+				// All other queries and mutations should be doubled.
+				mockIssueNumberGet(t, reg, 123)
+				mockIssueNumberGet(t, reg, 456)
+				mockIssueProjectItemsGet(t, reg)
+				mockIssueProjectItemsGet(t, reg)
+				mockIssueUpdate(t, reg)
+				mockIssueUpdate(t, reg)
+				mockIssueUpdateLabels(t, reg)
+				mockIssueUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
+			},
+			stdout: heredoc.Doc(`
+				https://github.com/OWNER/REPO/issue/123
+				https://github.com/OWNER/REPO/issue/456
+			`),
+		},
+		{
+			name: "non-interactive multiple issues with fetch failures",
+			input: &EditOptions{
+				SelectorArgs: []string{"123", "9999"},
+				Interactive:  false,
+				Editable: prShared.Editable{
+					Assignees: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
+						Edited: true,
+					},
+					Labels: prShared.EditableSlice{
+						Add:    []string{"feature", "TODO", "bug"},
+						Remove: []string{"docs"},
+						Edited: true,
+					},
+					Projects: prShared.EditableProjects{
+						EditableSlice: prShared.EditableSlice{
+							Add:    []string{"Cleanup", "CleanupV2"},
+							Remove: []string{"Roadmap", "RoadmapV2"},
+							Edited: true,
+						},
+					},
+					Milestone: prShared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueNumberGet(t, reg, 123)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`
+						{ "errors": [
+							{
+								"type": "NOT_FOUND",
+								"message": "Could not resolve to an Issue with the number of 9999."
+							}
+						] }`),
+				)
+			},
+			wantErr: true,
+		},
+		{
+			name: "non-interactive multiple issues with update failures",
+			input: &EditOptions{
+				SelectorArgs: []string{"123", "456"},
+				Interactive:  false,
+				Editable: prShared.Editable{
+					Assignees: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
+						Edited: true,
+					},
+					Milestone: prShared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				// Should only be one fetch of metadata.
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "assignableUsers": {
+						"nodes": [
+							{ "login": "hubot", "id": "HUBOTID" },
+							{ "login": "MonaLisa", "id": "MONAID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "milestones": {
+						"nodes": [
+							{ "title": "GA", "id": "GAID" },
+							{ "title": "Big One.oh", "id": "BIGONEID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				// All other queries should be doubled.
+				mockIssueNumberGet(t, reg, 123)
+				mockIssueNumberGet(t, reg, 456)
+				// Updating 123 should succeed.
+				reg.Register(
+					httpmock.GraphQLMutationMatcher(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
+						return m["id"] == "123"
+					}),
+					httpmock.GraphQLMutation(`
+							{ "data": { "updateIssue": { "__typename": "" } } }`,
+						func(inputs map[string]interface{}) {}),
+				)
+				// Updating 456 should fail.
+				reg.Register(
+					httpmock.GraphQLMutationMatcher(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
+						return m["id"] == "456"
+					}),
+					httpmock.GraphQLMutation(`
+							{ "errors": [ { "message": "test error" } ] }`,
+						func(inputs map[string]interface{}) {}),
+				)
+			},
+			stdout: heredoc.Doc(`
+				https://github.com/OWNER/REPO/issue/123
+			`),
+			stderr:  `failed to update https://github.com/OWNER/REPO/issue/456:.*test error`,
+			wantErr: true,
+		},
+		{
 			name: "interactive",
 			input: &EditOptions{
-				SelectorArg: "123",
-				Interactive: true,
+				SelectorArgs: []string{"123"},
+				Interactive:  true,
 				FieldsToEditSurvey: func(eo *prShared.Editable) error {
 					eo.Title.Edited = true
 					eo.Body.Edited = true
@@ -351,38 +546,48 @@ func Test_editRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		ios, _, stdout, stderr := iostreams.Test()
-		ios.SetStdoutTTY(true)
-		ios.SetStdinTTY(true)
-		ios.SetStderrTTY(true)
-
-		reg := &httpmock.Registry{}
-		defer reg.Verify(t)
-		tt.httpStubs(t, reg)
-
-		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
-		baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
-
-		tt.input.IO = ios
-		tt.input.HttpClient = httpClient
-		tt.input.BaseRepo = baseRepo
-
 		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			tt.httpStubs(t, reg)
+
+			httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
+			baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
+
+			tt.input.IO = ios
+			tt.input.HttpClient = httpClient
+			tt.input.BaseRepo = baseRepo
+
 			err := editRun(tt.input)
-			assert.NoError(t, err)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, tt.stdout, stdout.String())
-			assert.Equal(t, tt.stderr, stderr.String())
+			// Use regex match since mock errors and service errors will differ.
+			assert.Regexp(t, tt.stderr, stderr.String())
 		})
 	}
 }
 
 func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {
+	mockIssueNumberGet(nil, reg, 123)
+}
+
+func mockIssueNumberGet(_ *testing.T, reg *httpmock.Registry, number int) {
 	reg.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
-		httpmock.StringResponse(`
+		httpmock.StringResponse(fmt.Sprintf(`
 			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
-				"number": 123,
-				"url": "https://github.com/OWNER/REPO/issue/123",
+				"id": "%[1]d",
+				"number": %[1]d,
+				"url": "https://github.com/OWNER/REPO/issue/%[1]d",
 				"labels": {
 					"nodes": [
 						{ "id": "DOCSID", "name": "docs" }
@@ -393,7 +598,7 @@ func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {
 						{ "project": { "name": "Roadmap" } }
 					], "totalCount": 1
 				}
-			} } } }`),
+			} } } }`, number)),
 	)
 }
 

@@ -2,7 +2,7 @@ package markdown
 
 import (
 	"github.com/charmbracelet/glamour"
-	ghMarkdown "github.com/cli/go-gh/pkg/markdown"
+	ghMarkdown "github.com/cli/go-gh/v2/pkg/markdown"
 )
 
 func WithoutIndentation() glamour.TermRendererOption {
@@ -10,7 +10,7 @@ func WithoutIndentation() glamour.TermRendererOption {
 }
 
 // WithoutWrap is a rendering option that set the character limit for soft
-// wraping the markdown rendering. There is a max limit of 120 characters.
+// wrapping the markdown rendering. There is a max limit of 120 characters.
 // If 0 is passed then wrapping is disabled.
 func WithWrap(w int) glamour.TermRendererOption {
 	if w > 120 {

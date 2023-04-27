@@ -19,7 +19,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/pkg/template"
+	"github.com/cli/go-gh/v2/pkg/template"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -378,6 +378,7 @@ func Test_apiRun(t *testing.T) {
 		err          error
 		stdout       string
 		stderr       string
+		isatty       bool
 	}{
 		{
 			name: "success",
@@ -388,6 +389,7 @@ func Test_apiRun(t *testing.T) {
 			err:    nil,
 			stdout: `bam!`,
 			stderr: ``,
+			isatty: false,
 		},
 		{
 			name: "show response headers",
@@ -404,6 +406,7 @@ func Test_apiRun(t *testing.T) {
 			err:    nil,
 			stdout: "HTTP/1.1 200 Okey-dokey\nContent-Type: text/plain\r\n\r\nbody",
 			stderr: ``,
+			isatty: false,
 		},
 		{
 			name: "success 204",
@@ -414,6 +417,7 @@ func Test_apiRun(t *testing.T) {
 			err:    nil,
 			stdout: ``,
 			stderr: ``,
+			isatty: false,
 		},
 		{
 			name: "REST error",
@@ -425,6 +429,7 @@ func Test_apiRun(t *testing.T) {
 			err:    cmdutil.SilentError,
 			stdout: `{"message": "THIS IS FINE"}`,
 			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+			isatty: false,
 		},
 		{
 			name: "REST string errors",
@@ -436,6 +441,7 @@ func Test_apiRun(t *testing.T) {
 			err:    cmdutil.SilentError,
 			stdout: `{"errors": ["ALSO", "FINE"]}`,
 			stderr: "gh: ALSO\nFINE\n",
+			isatty: false,
 		},
 		{
 			name: "GraphQL error",
@@ -450,6 +456,7 @@ func Test_apiRun(t *testing.T) {
 			err:    cmdutil.SilentError,
 			stdout: `{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`,
 			stderr: "gh: AGAIN\nFINE\n",
+			isatty: false,
 		},
 		{
 			name: "failure",
@@ -460,6 +467,7 @@ func Test_apiRun(t *testing.T) {
 			err:    cmdutil.SilentError,
 			stdout: `gateway timeout`,
 			stderr: "gh: HTTP 502\n",
+			isatty: false,
 		},
 		{
 			name: "silent",
@@ -473,6 +481,7 @@ func Test_apiRun(t *testing.T) {
 			err:    nil,
 			stdout: ``,
 			stderr: ``,
+			isatty: false,
 		},
 		{
 			name: "show response headers even when silent",
@@ -490,6 +499,7 @@ func Test_apiRun(t *testing.T) {
 			err:    nil,
 			stdout: "HTTP/1.1 200 Okey-dokey\nContent-Type: text/plain\r\n\r\n",
 			stderr: ``,
+			isatty: false,
 		},
 		{
 			name: "output template",
@@ -504,6 +514,7 @@ func Test_apiRun(t *testing.T) {
 			err:    nil,
 			stdout: "not a cat",
 			stderr: ``,
+			isatty: false,
 		},
 		{
 			name: "output template when REST error",
@@ -518,6 +529,7 @@ func Test_apiRun(t *testing.T) {
 			err:    cmdutil.SilentError,
 			stdout: `{"message": "THIS IS FINE"}`,
 			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+			isatty: false,
 		},
 		{
 			name: "jq filter",
@@ -532,6 +544,7 @@ func Test_apiRun(t *testing.T) {
 			err:    nil,
 			stdout: "Mona\nHubot\n",
 			stderr: ``,
+			isatty: false,
 		},
 		{
 			name: "jq filter when REST error",
@@ -546,12 +559,29 @@ func Test_apiRun(t *testing.T) {
 			err:    cmdutil.SilentError,
 			stdout: `{"message": "THIS IS FINE"}`,
 			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+			isatty: false,
+		},
+		{
+			name: "jq filter outputting JSON to a TTY",
+			options: ApiOptions{
+				FilterOutput: `.`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(`[{"name":"Mona"},{"name":"Hubot"}]`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			err:    nil,
+			stdout: "[\n  {\n    \"name\": \"Mona\"\n  },\n  {\n    \"name\": \"Hubot\"\n  }\n]\n",
+			stderr: ``,
+			isatty: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isatty)
 
 			tt.options.IO = ios
 			tt.options.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
@@ -1206,7 +1236,7 @@ func Test_processResponse_template(t *testing.T) {
 	tmpl := template.New(ios.Out, ios.TerminalWidth(), ios.ColorEnabled())
 	err := tmpl.Parse(opts.Template)
 	require.NoError(t, err)
-	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, &tmpl)
+	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, tmpl)
 	require.NoError(t, err)
 	err = tmpl.Flush()
 	require.NoError(t, err)

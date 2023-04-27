@@ -214,7 +214,7 @@ func getDevContainer(ctx context.Context, apiClient apiClient, codespace *api.Co
 
 		var container devContainer
 		if err := json.Unmarshal(convertedJSON, &container); err != nil {
-			ch <- devContainerResult{nil, fmt.Errorf("error unmarshaling: %w", err)}
+			ch <- devContainerResult{nil, fmt.Errorf("error unmarshalling: %w", err)}
 			return
 		}
 
@@ -379,7 +379,7 @@ func (a *App) ForwardPorts(ctx context.Context, selector *CodespaceSelector, por
 	for _, pair := range portPairs {
 		pair := pair
 		group.Go(func() error {
-			listen, _, err := codespaces.ListenTCP(pair.local)
+			listen, _, err := codespaces.ListenTCP(pair.local, true)
 			if err != nil {
 				return err
 			}

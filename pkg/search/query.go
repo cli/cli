@@ -83,7 +83,7 @@ type Qualifiers struct {
 	Tree                string
 	Type                string
 	Updated             string
-	User                string
+	User                []string
 }
 
 func (q Query) String() string {
