@@ -153,7 +153,6 @@ func displayResults(io *iostreams.IOStreams, results search.CodeResult, limit in
 		row := 0
 		for _, textMatch := range code.TextMatches {
 			out, shouldPrint := buildOutput(textMatch, cs)
-
 			for i, line := range strings.Split(out, "\n") {
 				if !shouldPrint[i] {
 					continue
