@@ -162,7 +162,7 @@ func displayResults(io *iostreams.IOStreams, results search.CodeResult, limit in
 					break
 				}
 				if io.IsStdoutTTY() {
-					tp.AddField(fmt.Sprintf("%s: %s", cs.YellowBold(strconv.Itoa(row+1)), line))
+					tp.AddField(fmt.Sprintf("%s: %s", cs.CyanBold(strconv.Itoa(row+1)), line))
 				} else {
 					tp.AddField(fmt.Sprintf("%s %s: %s", code.Repo.FullName, code.Path, line))
 				}
@@ -186,7 +186,7 @@ func buildOutput(tm search.TextMatch, cs *iostreams.ColorScheme) (string, map[in
 	var out strings.Builder
 	for i, c := range tm.Fragment {
 		if shouldHighlight[i] {
-			out.WriteString(cs.Yellow(string(c)))
+			out.WriteString(cs.CyanBold(string(c)))
 			linesToPrint[line] = true
 		} else {
 			out.WriteRune(c)
