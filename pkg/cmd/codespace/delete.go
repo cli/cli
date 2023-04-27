@@ -193,17 +193,13 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		}
 
 		if err := g.Wait(); err != nil {
-			return errors.New("some codespaces failed to delete")
+			return fmt.Errorf("%d codespace(s) failed to delete", len(codespacesToDelete)-int(deletedCodespaces))
 		}
 		return nil
 	})
 
 	if a.io.IsStdoutTTY() && deletedCodespaces > 0 {
-		cs := a.io.ColorScheme()
-		successMsg := fmt.Sprintf("%s Successfully deleted %d codespaces\n", cs.SuccessIcon(), deletedCodespaces)
-		if len(codespacesToDelete) == 1 {
-			successMsg = fmt.Sprintf("%s Successfully deleted %s\n", cs.SuccessIcon(), codespacesToDelete[0].Name)
-		}
+		successMsg := fmt.Sprintf("%d codespace(s) deleted successfully\n", deletedCodespaces)
 		fmt.Fprint(a.io.Out, successMsg)
 	}
 
