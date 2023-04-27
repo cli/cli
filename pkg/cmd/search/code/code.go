@@ -102,7 +102,7 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Query.Qualifiers.Language, "language", "l", "", "Filter results by language")
 	cmd.Flags().StringSliceVar(&opts.Query.Qualifiers.Repo, "repo", nil, "Filter on repository")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Size, "size", "", "Filter on size range, in kilobytes")
-	cmd.Flags().StringVar(&opts.Query.Qualifiers.User, "owner", "", "Filter on owner")
+	cmd.Flags().StringSliceVar(&opts.Query.Qualifiers.User, "owner", nil, "Filter on owner")
 
 	return cmd
 }

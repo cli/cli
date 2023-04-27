@@ -94,7 +94,7 @@ func TestNewCmdCode(t *testing.T) {
 						Language:  "language",
 						Repo:      []string{"owner/repo"},
 						Size:      "5",
-						User:      "owner",
+						User:      []string{"owner"},
 					},
 				},
 			},

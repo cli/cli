@@ -42,7 +42,7 @@ func TestCodeExportData(t *testing.T) {
 					},
 				},
 			},
-			output: `{"name":"name","path":"path","textMatches":[{"object_url":"","object_type":"","property":"","fragment":"fragment","matches":[{"text":"fr","indices":[0,1]}]}]}`,
+			output: `{"name":"name","path":"path","textMatches":[{"fragment":"fragment","matches":[{"indices":[0,1],"text":"fr"}],"object_url":"","object_type":"","property":""}]}`,
 		},
 	}
 	for _, tt := range tests {
