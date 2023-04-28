@@ -13,6 +13,7 @@ import (
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
+	cacheCmd "github.com/cli/cli/v2/pkg/cmd/cache"
 	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
@@ -123,6 +124,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
 	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
 	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
+	cmd.AddCommand(cacheCmd.NewCmdCache(&repoResolvingCmdFactory))
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic(f.IOStreams, "environment"))
