@@ -18,6 +18,7 @@ import (
 	"github.com/google/shlex"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
+	"github.com/schollz/progressbar/v3"
 )
 
 const DefaultWidth = 80
@@ -54,6 +55,9 @@ type IOStreams struct {
 	ErrOut io.Writer
 
 	terminalTheme string
+
+	progressBarEnabled bool
+	progressBar        *progressbar.ProgressBar
 
 	progressIndicatorEnabled bool
 	progressIndicator        *spinner.Spinner
@@ -263,6 +267,38 @@ func (s *IOStreams) SetNeverPrompt(v bool) {
 	s.neverPrompt = v
 }
 
+func (s *IOStreams) StartProgressBar(total int) {
+	s.StartProgressBarWithLabel("", total)
+}
+
+func (s *IOStreams) StartProgressBarWithLabel(label string, total int) {
+	if !s.progressBarEnabled {
+		return
+	}
+
+	pb := progressbar.NewOptions(total,
+		progressbar.OptionSetWriter(s.ErrOut),
+		progressbar.OptionSetDescription(label),
+	)
+
+	s.progressBar = pb
+}
+
+func (s *IOStreams) UpdateProgressBar(num int) {
+	if s.progressBar == nil {
+		return
+	}
+	_ = s.progressBar.Add(num)
+}
+
+func (s *IOStreams) StopProgressBar() {
+	if s.progressBar == nil {
+		return
+	}
+	_ = s.progressBar.Finish()
+	s.progressBar = nil
+}
+
 func (s *IOStreams) StartProgressIndicator() {
 	s.StartProgressIndicatorWithLabel("")
 }
@@ -418,6 +454,7 @@ func System() *IOStreams {
 
 	if stdoutIsTTY && stderrIsTTY {
 		io.progressIndicatorEnabled = true
+		io.progressBarEnabled = true
 	}
 
 	if stdoutIsTTY && hasAlternateScreenBuffer(terminal.IsTrueColorSupported()) {
