@@ -155,6 +155,15 @@ func cloneRun(opts *CloneOptions) error {
 		canonicalCloneURL = strings.TrimSuffix(canonicalCloneURL, ".git") + ".wiki.git"
 	}
 
+	create_owner_dir, err := cfg.GetOrDefault(repo.RepoHost(), "clone_create_owner_dir")
+	if err != nil {
+		return err
+	}
+
+	if create_owner_dir == "yes" {
+		opts.GitArgs = append(opts.GitArgs, repo.RepoOwner()+"/"+repo.RepoName())
+	}
+
 	gitClient := opts.GitClient
 	ctx := context.Background()
 	cloneDir, err := gitClient.Clone(ctx, canonicalCloneURL, opts.GitArgs)

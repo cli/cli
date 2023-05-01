@@ -324,6 +324,12 @@ var configOptions = []ConfigOption{
 		Description:  "the web browser to use for opening URLs",
 		DefaultValue: "",
 	},
+	{
+		Key:           "clone_create_owner_dir",
+		Description:   "use OWNER/REPO pattern in local directories",
+		DefaultValue:  "no",
+		AllowedValues: []string{"no", "yes"},
+	},
 }
 
 func ConfigOptions() []ConfigOption {
