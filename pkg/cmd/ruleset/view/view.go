@@ -81,7 +81,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the ruleset in the browser")
-	cmd.Flags().StringVarP(&opts.Organization, "org", "o", "", "Organization name if the ID ")
+	cmd.Flags().StringVarP(&opts.Organization, "org", "o", "", "Organization name if the provided ID is an organization-level ruleset")
 
 	return cmd
 }
@@ -104,22 +104,6 @@ func viewRun(opts *ViewOptions) error {
 
 	hostname, _ := cfg.DefaultHost()
 
-	if opts.WebMode {
-		// TODO need to validate ruleset's existence before opening
-		var rulesetURL string
-		if opts.Organization != "" {
-			rulesetURL = fmt.Sprintf("%sorganizations/%s/settings/rules/%s", ghinstance.HostPrefix(hostname), opts.Organization, opts.ID)
-		} else {
-			rulesetURL = ghrepo.GenerateRepoURL(repoI, "settings/rules/%s", opts.ID)
-		}
-
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(rulesetURL))
-		}
-
-		return opts.Browser.Browse(rulesetURL)
-	}
-
 	var rs *shared.Ruleset
 	if opts.Organization != "" {
 		rs, err = viewOrgRuleset(httpClient, opts.Organization, opts.ID, hostname)
@@ -134,6 +118,25 @@ func viewRun(opts *ViewOptions) error {
 	cs := opts.IO.ColorScheme()
 	w := opts.IO.Out
 
+	if opts.WebMode {
+		if rs != nil {
+			var rulesetURL string
+			if opts.Organization != "" {
+				rulesetURL = fmt.Sprintf("%sorganizations/%s/settings/rules/%s", ghinstance.HostPrefix(hostname), opts.Organization, opts.ID)
+			} else {
+				rulesetURL = ghrepo.GenerateRepoURL(repoI, "settings/rules/%s", opts.ID)
+			}
+
+			if opts.IO.IsStdoutTTY() {
+				fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(rulesetURL))
+			}
+
+			return opts.Browser.Browse(rulesetURL)
+		} else {
+			fmt.Fprintf(w, "ruleset not found\n")
+		}
+	}
+
 	fmt.Fprintf(w, "\n%s\n", cs.Bold(rs.Name))
 	fmt.Fprintf(w, "ID: %d\n", rs.Id)
 
@@ -141,7 +144,7 @@ func viewRun(opts *ViewOptions) error {
 	case "disabled":
 		fmt.Fprintf(w, "%s\n", cs.Red("Disabled"))
 	case "evaluate":
-		fmt.Fprintf(w, "%s\n", cs.Yellow("Evaluate Mode (not being enforced)"))
+		fmt.Fprintf(w, "%s\n", cs.Yellow("Evaluate Mode (not enforced)"))
 	case "active":
 		fmt.Fprintf(w, "%s\n", cs.Green("Active"))
 	default:
@@ -165,7 +168,7 @@ func viewRun(opts *ViewOptions) error {
 
 		fmt.Fprintf(w, "Actor types allowed to bypass:\n")
 		for name, count := range types {
-			fmt.Fprintf(w, "- %s: %d actors\n", name, count)
+			fmt.Fprintf(w, "- %s: %d configured\n", name, count)
 		}
 	}
 
@@ -173,8 +176,8 @@ func viewRun(opts *ViewOptions) error {
 	if len(rs.Conditions) == 0 {
 		fmt.Fprintf(w, "No conditions configured\n")
 	} else {
-		// sort keys for consistent responses, mismatched types don't allow this to be broken
-		// into a separate function
+		// sort keys for consistent responses, can't make a separate function due to
+		// mismatched types
 		keys := make([]string, 0, len(rs.Conditions))
 		for key := range rs.Conditions {
 			keys = append(keys, key)

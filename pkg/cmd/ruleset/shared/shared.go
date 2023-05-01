@@ -21,6 +21,10 @@ type Ruleset struct {
 		// 	Protected bool
 		// } `json:"repository_name"`
 	}
+	Source struct {
+		RepoOwner string
+		OrgOwner  string
+	}
 	RulesGql struct {
 		TotalCount int
 	}

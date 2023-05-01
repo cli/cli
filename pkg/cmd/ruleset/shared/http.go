@@ -1,4 +1,4 @@
-package list
+package shared
 
 import (
 	"fmt"
@@ -6,14 +6,13 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 )
 
 type RulesetResponse struct {
 	Level struct {
 		Rulesets struct {
 			TotalCount int
-			Nodes      []shared.Ruleset
+			Nodes      []Ruleset
 			PageInfo   struct {
 				HasNextPage bool
 				EndCursor   string
@@ -24,21 +23,23 @@ type RulesetResponse struct {
 
 type RulesetList struct {
 	TotalCount int
-	Rulesets   []shared.Ruleset
+	Rulesets   []Ruleset
 }
 
-func listRepoRulesets(httpClient *http.Client, repo ghrepo.Interface, limit int) (*RulesetList, error) {
+func ListRepoRulesets(httpClient *http.Client, repo ghrepo.Interface, limit int, includeParents bool) (*RulesetList, error) {
 	variables := map[string]interface{}{
-		"owner": repo.RepoOwner(),
-		"repo":  repo.RepoName(),
+		"owner":          repo.RepoOwner(),
+		"repo":           repo.RepoName(),
+		"includeParents": includeParents,
 	}
 
 	return listRulesets(httpClient, rulesetsQuery(false), variables, limit, repo.RepoHost())
 }
 
-func listOrgRulesets(httpClient *http.Client, orgLogin string, limit int, host string) (*RulesetList, error) {
+func ListOrgRulesets(httpClient *http.Client, orgLogin string, limit int, host string, includeParents bool) (*RulesetList, error) {
 	variables := map[string]interface{}{
-		"login": orgLogin,
+		"login":          orgLogin,
+		"includeParents": includeParents,
 	}
 
 	return listRulesets(httpClient, rulesetsQuery(true), variables, limit, host)
@@ -48,7 +49,7 @@ func listRulesets(httpClient *http.Client, query string, variables map[string]in
 	pageLimit := min(limit, 100)
 
 	res := RulesetList{
-		Rulesets: []shared.Ruleset{},
+		Rulesets: []Ruleset{},
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
@@ -90,16 +91,20 @@ func rulesetsQuery(org bool) string {
 		level = "repository(owner: $owner, name: $repo)"
 	}
 
-	str := fmt.Sprintf("query RulesetList($limit: Int!, $endCursor: String, %s) { level: %s {", args, level)
+	str := fmt.Sprintf("query RulesetList($limit: Int!, $endCursor: String, $includeParents: Boolean, %s) { level: %s {", args, level)
 
 	return str + `
-		rulesets(first: $limit, after: $endCursor) {
+		rulesets(first: $limit, after: $endCursor, includeParents: $includeParents) {
 			totalCount
 			nodes {
 				id: databaseId
 				name
 				target
 				enforcement
+				source {
+					... on Repository { repoOwner: nameWithOwner }
+					... on Organization { orgOwner: login }
+				}
 				# conditions {
 				# 	refName {
 				# 		include

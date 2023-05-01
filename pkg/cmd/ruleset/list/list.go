@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -25,9 +26,10 @@ type ListOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
 
-	Limit        int
-	WebMode      bool
-	Organization string
+	Limit          int
+	IncludeParents bool
+	WebMode        bool
+	Organization   string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -62,8 +64,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of rulesets to list")
-	cmd.Flags().StringVarP(&opts.Organization, "org", "o", "", "List organization-wide rulesets")
-	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List rulesets in the web browser")
+	cmd.Flags().StringVarP(&opts.Organization, "org", "o", "", "List organization-wide rulesets for the provided organization")
+	cmd.Flags().BoolVarP(&opts.IncludeParents, "parents", "p", false, "Include rulesets configured at higher levels that also apply")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the list of rulesets in the web browser")
 
 	return cmd
 }
@@ -101,12 +104,12 @@ func listRun(opts *ListOptions) error {
 		return opts.Browser.Browse(rulesetURL)
 	}
 
-	var result *RulesetList
+	var result *shared.RulesetList
 
 	if opts.Organization != "" {
-		result, err = listOrgRulesets(httpClient, opts.Organization, opts.Limit, hostname)
+		result, err = shared.ListOrgRulesets(httpClient, opts.Organization, opts.Limit, hostname, opts.IncludeParents)
 	} else {
-		result, err = listRepoRulesets(httpClient, repoI, opts.Limit)
+		result, err = shared.ListRepoRulesets(httpClient, repoI, opts.Limit, opts.IncludeParents)
 	}
 
 	if err != nil {
@@ -121,7 +124,11 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if result.TotalCount == 0 {
-		msg := fmt.Sprintf("no rulesets found in %s", entityName)
+		parentsMsg := ""
+		if opts.IncludeParents {
+			parentsMsg = " or its parents"
+		}
+		msg := fmt.Sprintf("no rulesets found in %s%s", entityName, parentsMsg)
 		return cmdutil.NewNoResultsError(msg)
 	}
 
@@ -139,17 +146,25 @@ func listRun(opts *ListOptions) error {
 	}
 
 	tp := tableprinter.New(opts.IO)
-	tp.HeaderRow("ID", "NAME", "STATUS", "TARGET")
+	tp.HeaderRow("ID", "NAME", "SOURCE", "STATUS", "TARGET", "RULES")
 
 	for _, rs := range result.Rulesets {
 		tp.AddField(strconv.Itoa(rs.Id))
 		tp.AddField(rs.Name, tableprinter.WithColor(cs.Bold))
+		var ownerString string
+		if rs.Source.RepoOwner != "" {
+			ownerString = fmt.Sprintf("%s (repo)", rs.Source.RepoOwner)
+		} else if rs.Source.OrgOwner != "" {
+			ownerString = fmt.Sprintf("%s (org)", rs.Source.OrgOwner)
+		} else {
+			ownerString = "(unknown)"
+		}
+		tp.AddField(ownerString)
 		tp.AddField(strings.ToLower(rs.Enforcement))
 		tp.AddField(strings.ToLower(rs.Target))
+		tp.AddField(strconv.Itoa(rs.RulesGql.TotalCount))
 		tp.EndRow()
 	}
 
 	return tp.Render()
 }
-
-// func getRulesets()
