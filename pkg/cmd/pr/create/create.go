@@ -44,6 +44,7 @@ type CreateOptions struct {
 	RepoOverride    string
 
 	Autofill    bool
+	FillFirst   bool
 	WebMode     bool
 	RecoverFile string
 
@@ -160,8 +161,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return errors.New("`--template` is not supported when using `--body` or `--body-file`")
 			}
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.Autofill && (!opts.TitleProvided || !opts.BodyProvided) {
-				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill`) when not running interactively")
+			if !opts.IO.CanPrompt() && !opts.WebMode && !(opts.Autofill || opts.FillFirst) && (!opts.TitleProvided || !opts.BodyProvided) {
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `fill-first`) when not running interactively")
 			}
 
 			if runF != nil {
@@ -180,6 +181,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
+	fl.BoolVar(&opts.FillFirst, "fill-first", false, "Do not prompt for title/body and just use first commit info")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
 	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
@@ -188,6 +190,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
+
+	cmd.MarkFlagsMutuallyExclusive("fill", "fill-first")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -387,7 +391,7 @@ func createRun(opts *CreateOptions) (err error) {
 	return
 }
 
-func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) error {
+func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, opts *CreateOptions) error {
 	baseRef := ctx.BaseTrackingBranch
 	headRef := ctx.HeadBranch
 	gitClient := ctx.GitClient
@@ -397,7 +401,7 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) e
 		return err
 	}
 
-	if len(commits) == 1 {
+	if len(commits) == 1 || opts.FillFirst {
 		state.Title = commits[0].Title
 		body, err := gitClient.CommitBody(context.Background(), commits[0].Sha)
 		if err != nil {
@@ -480,8 +484,8 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 		Draft:      opts.IsDraft,
 	}
 
-	if opts.Autofill || !opts.TitleProvided || !opts.BodyProvided {
-		err := initDefaultTitleBody(ctx, state)
+	if opts.Autofill || opts.FillFirst || !opts.TitleProvided || !opts.BodyProvided {
+		err := initDefaultTitleBody(ctx, state, &opts)
 		if err != nil && opts.Autofill {
 			return nil, fmt.Errorf("could not compute title or body defaults: %w", err)
 		}

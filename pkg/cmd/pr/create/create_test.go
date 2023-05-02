@@ -168,6 +168,32 @@ func TestNewCmdCreate(t *testing.T) {
 			cli:      "-t mytitle --template bug_fix.md --body-file body_file.md",
 			wantsErr: true,
 		},
+		{
+			name:     "with fill-first option",
+			tty:      false,
+			cli:      "--fill-first",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "",
+				TitleProvided:       false,
+				Body:                "",
+				BodyProvided:        false,
+				Autofill:            false,
+				FillFirst:           true,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+			},
+		},
+		{
+			name:     "fill and fill-first is mutually exclusive",
+			tty:      false,
+			cli:      "--fill --fill-first",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -210,6 +236,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.Title, opts.Title)
 			assert.Equal(t, tt.wantsOpts.TitleProvided, opts.TitleProvided)
 			assert.Equal(t, tt.wantsOpts.Autofill, opts.Autofill)
+			assert.Equal(t, tt.wantsOpts.FillFirst, opts.FillFirst)
 			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
 			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
 			assert.Equal(t, tt.wantsOpts.IsDraft, opts.IsDraft)
