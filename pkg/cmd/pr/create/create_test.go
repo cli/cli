@@ -1008,12 +1008,11 @@ func Test_createRun(t *testing.T) {
 				cs.Register(
 					"git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature",
 					0,
-					`56b6f8bb7c9e3a30093cd17e48934ce354148e80,first commit of pr
-					343jdfe47c9e3a30093cd17e48934ce354148e80,second commit of pr
-					`,
+					"56b6f8bb7c9e3a30093cd17e48934ce354148e80,second commit of pr\n"+
+						"343jdfe47c9e3a30093cd17e48934ce354148e80,first commit of pr",
 				)
 				cs.Register(
-					"git -c log.ShowSignature=false show -s --pretty=format:%b 56b6f8bb7c9e3a30093cd17e48934ce354148e80",
+					"git -c log.ShowSignature=false show -s --pretty=format:%b 343jdfe47c9e3a30093cd17e48934ce354148e80",
 					0,
 					"first commit description",
 				)

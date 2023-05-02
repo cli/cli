@@ -405,8 +405,16 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, o
 	if err != nil {
 		return err
 	}
-
-	if len(commits) == 1 || opts.FillFirst {
+	if opts.FillFirst {
+		firstCommitIndex := len(commits) - 1
+		state.Title = commits[firstCommitIndex].Title
+		body, err := gitClient.CommitBody(context.Background(), commits[firstCommitIndex].Sha)
+		if err != nil {
+			return err
+		}
+		state.Body = body
+		fmt.Print(state.Title, state.Body)
+	} else if len(commits) == 1 {
 		state.Title = commits[0].Title
 		body, err := gitClient.CommitBody(context.Background(), commits[0].Sha)
 		if err != nil {
