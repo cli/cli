@@ -285,7 +285,7 @@ func createRun(opts *CreateOptions) (err error) {
 			ghrepo.FullName(ctx.BaseRepo))
 	}
 
-	if opts.Autofill || (opts.TitleProvided && opts.BodyProvided) {
+	if opts.Autofill || opts.FillFirst || (opts.TitleProvided && opts.BodyProvided) {
 		err = handlePush(*opts, *ctx)
 		if err != nil {
 			return
@@ -491,7 +491,7 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 
 	if opts.Autofill || opts.FillFirst || !opts.TitleProvided || !opts.BodyProvided {
 		err := initDefaultTitleBody(ctx, state, &opts)
-		if err != nil && opts.Autofill {
+		if err != nil && (opts.Autofill || opts.FillFirst) {
 			return nil, fmt.Errorf("could not compute title or body defaults: %w", err)
 		}
 	}
