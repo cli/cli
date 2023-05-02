@@ -12,7 +12,7 @@ type RulesetResponse struct {
 	Level struct {
 		Rulesets struct {
 			TotalCount int
-			Nodes      []Ruleset
+			Nodes      []RulesetGraphQL
 			PageInfo   struct {
 				HasNextPage bool
 				EndCursor   string
@@ -23,7 +23,7 @@ type RulesetResponse struct {
 
 type RulesetList struct {
 	TotalCount int
-	Rulesets   []Ruleset
+	Rulesets   []RulesetGraphQL
 }
 
 func ListRepoRulesets(httpClient *http.Client, repo ghrepo.Interface, limit int, includeParents bool) (*RulesetList, error) {
@@ -49,7 +49,7 @@ func listRulesets(httpClient *http.Client, query string, variables map[string]in
 	pageLimit := min(limit, 100)
 
 	res := RulesetList{
-		Rulesets: []Ruleset{},
+		Rulesets: []RulesetGraphQL{},
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
@@ -97,7 +97,7 @@ func rulesetsQuery(org bool) string {
 		rulesets(first: $limit, after: $endCursor, includeParents: $includeParents) {
 			totalCount
 			nodes {
-				id: databaseId
+				databaseId
 				name
 				target
 				enforcement
@@ -105,18 +105,7 @@ func rulesetsQuery(org bool) string {
 					... on Repository { repoOwner: nameWithOwner }
 					... on Organization { orgOwner: login }
 				}
-				# conditions {
-				# 	refName {
-				# 		include
-				# 		exclude
-				# 	}
-				# 	repositoryName {
-				# 		include
-				# 		exclude
-				# 		protected
-				# 	}
-				# }
-				rulesGql: rules {
+				rules {
 					totalCount
 				}
 			}

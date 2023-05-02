@@ -149,7 +149,7 @@ func listRun(opts *ListOptions) error {
 	tp.HeaderRow("ID", "NAME", "SOURCE", "STATUS", "TARGET", "RULES")
 
 	for _, rs := range result.Rulesets {
-		tp.AddField(strconv.Itoa(rs.Id))
+		tp.AddField(strconv.Itoa(rs.DatabaseId))
 		tp.AddField(rs.Name, tableprinter.WithColor(cs.Bold))
 		var ownerString string
 		if rs.Source.RepoOwner != "" {
@@ -162,7 +162,7 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(ownerString)
 		tp.AddField(strings.ToLower(rs.Enforcement))
 		tp.AddField(strings.ToLower(rs.Target))
-		tp.AddField(strconv.Itoa(rs.RulesGql.TotalCount))
+		tp.AddField(strconv.Itoa(rs.Rules.TotalCount))
 		tp.EndRow()
 	}
 

@@ -1,6 +1,20 @@
 package shared
 
-type Ruleset struct {
+type RulesetGraphQL struct {
+	DatabaseId  int
+	Name        string
+	Target      string
+	Enforcement string
+	Source      struct {
+		RepoOwner string
+		OrgOwner  string
+	}
+	Rules struct {
+		TotalCount int
+	}
+}
+
+type RulesetREST struct {
 	Id           int
 	Name         string
 	Target       string
@@ -10,23 +24,9 @@ type Ruleset struct {
 		ActorId   int    `json:"actor_id"`
 		ActorType string `json:"actor_type"`
 	} `json:"bypass_actors"`
-	Conditions map[string]map[string]interface {
-		// RefName struct {
-		// 	Include []string
-		// 	Exclude []string
-		// } `json:"ref_name"`
-		// RepositoryName struct {
-		// 	Include   []string
-		// 	Exclude   []string
-		// 	Protected bool
-		// } `json:"repository_name"`
-	}
-	Source struct {
-		RepoOwner string
-		OrgOwner  string
-	}
-	RulesGql struct {
-		TotalCount int
-	}
-	Rules []interface{}
+	Conditions map[string]map[string]interface{}
+	// TODO is this source field used?
+	SourceType string `json:"source_type"`
+	Source     string
+	Rules      []struct{}
 }

@@ -104,7 +104,7 @@ func viewRun(opts *ViewOptions) error {
 
 	hostname, _ := cfg.DefaultHost()
 
-	var rs *shared.Ruleset
+	var rs *shared.RulesetREST
 	if opts.Organization != "" {
 		rs, err = viewOrgRuleset(httpClient, opts.Organization, opts.ID, hostname)
 	} else {
