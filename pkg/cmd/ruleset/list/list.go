@@ -43,11 +43,32 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List rulesets for a repository or organization",
 		Long: heredoc.Doc(`
-			TODO
+			List GitHub rulesets for a repository or organization.
+
+			If no options are provided, the current repository's rulesets are listed. You can query a different
+			repository's rulesets by using the --repo flag. You can also use the --org flag to list rulesets
+			configured for the provided organization.
+
+			Use the --parents flag to include rulesets configured at higher levels that also apply to the current repository.
+			
+			Your access token must have the admin:org scope, which can be granted by running "gh auth refresh -s admin:org".
 		`),
-		Example: "TODO",
-		Args:    cobra.ExactArgs(0),
+		Example: heredoc.Doc(`
+			# List rulesets in the current repository
+			$ gh ruleset list
+
+			# List rulesets in a different repository, including those configured at higher levels
+			$ gh ruleset list --repo owner/repo --parents
+
+			# List rulesets in an organization
+			$ gh ruleset list --org org-name
+		`),
+		Args: cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && opts.Organization != "" {
+				return cmdutil.FlagErrorf("only one of --repo and --org may be specified")
+			}
+
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 

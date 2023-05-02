@@ -60,6 +60,10 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && opts.Organization != "" {
+				return cmdutil.FlagErrorf("only one of --repo and --org may be specified")
+			}
+
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
