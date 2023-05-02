@@ -995,6 +995,49 @@ func Test_createRun(t *testing.T) {
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
+		{
+			name: "fill-first flag provided",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = false
+				opts.FillFirst = true
+				opts.HeadBranch = "feature"
+				return func() {}
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(
+					"git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature",
+					0,
+					`56b6f8bb7c9e3a30093cd17e48934ce354148e80,first commit of pr
+					343jdfe47c9e3a30093cd17e48934ce354148e80,second commit of pr
+					`,
+				)
+				cs.Register(
+					"git -c log.ShowSignature=false show -s --pretty=format:%b 56b6f8bb7c9e3a30093cd17e48934ce354148e80",
+					0,
+					"first commit description",
+				)
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ 
+						"data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+							} } } 
+						}
+						`,
+						func(input map[string]interface{}) {
+							assert.Equal(t, "first commit of pr", input["title"], "pr title should be first commit message")
+							assert.Equal(t, "first commit description", input["body"], "pr body should be first commit description")
+						},
+					),
+				)
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
