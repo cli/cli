@@ -1,8 +1,10 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -58,6 +60,10 @@ func listRulesets(httpClient *http.Client, query string, variables map[string]in
 		var data RulesetResponse
 		err := client.GraphQL(host, query, variables, &data)
 		if err != nil {
+			if strings.Contains(err.Error(), "requires one of the following scopes: ['admin:org']") {
+				return nil, errors.New("the 'admin:org' scope is required to view organization rulesets, try running 'gh auth refresh -s admin:org'")
+			}
+
 			return nil, err
 		}
 
