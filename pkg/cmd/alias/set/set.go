@@ -7,9 +7,9 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,7 @@ type SetOptions struct {
 	Expansion string
 	IsShell   bool
 
-	validCommand func(string) bool
+	existingCommand func(string) bool
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -70,29 +70,12 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			opts.Name = args[0]
 			opts.Expansion = args[1]
 
-			opts.validCommand = func(args string) bool {
-				split, err := shlex.Split(args)
-				if err != nil {
-					return false
-				}
-
-				rootCmd := cmd.Root()
-				cmd, _, err := rootCmd.Traverse(split)
-				if err == nil && cmd != rootCmd {
-					return true
-				}
-
-				for _, ext := range f.ExtensionManager.List() {
-					if ext.Name() == split[0] {
-						return true
-					}
-				}
-				return false
-			}
+			opts.existingCommand = shared.ExistingCommandFunc(f, cmd)
 
 			if runF != nil {
 				return runF(opts)
 			}
+
 			return setRun(opts)
 		},
 	}
@@ -127,11 +110,11 @@ func setRun(opts *SetOptions) error {
 	}
 	isShell = strings.HasPrefix(expansion, "!")
 
-	if opts.validCommand(opts.Name) {
+	if opts.existingCommand(opts.Name) {
 		return fmt.Errorf("could not create alias: %q is already a gh command", opts.Name)
 	}
 
-	if !isShell && !opts.validCommand(expansion) {
+	if !isShell && !opts.existingCommand(expansion) {
 		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", expansion)
 	}
 
