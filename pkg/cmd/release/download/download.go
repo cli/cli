@@ -140,6 +140,9 @@ func downloadRun(opts *DownloadOptions) error {
 		return err
 	}
 
+	opts.IO.StartProgressIndicatorWithLabel("Downloading ")
+	defer opts.IO.StopProgressIndicator()
+
 	ctx := context.Background()
 
 	var release *shared.Release
@@ -193,9 +196,6 @@ func downloadRun(opts *DownloadOptions) error {
 		stdout:       opts.IO.Out,
 	}
 
-	opts.IO.StartProgressBarWithLabel("Downloading ", len(toDownload))
-	defer opts.IO.StopProgressBar()
-
 	return downloadAssets(&dest, httpClient, toDownload, opts.Concurrency, isArchive, opts.IO)
 }
 
@@ -223,8 +223,8 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 	for w := 1; w <= numWorkers; w++ {
 		go func() {
 			for a := range jobs {
+				io.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading %s", a.Name))
 				results <- downloadAsset(dest, httpClient, a.APIURL, a.Name, isArchive)
-				io.UpdateProgressBar(1)
 			}
 		}()
 	}
