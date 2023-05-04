@@ -137,20 +137,8 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	var entityName string
-	if opts.Organization != "" {
-		entityName = opts.Organization
-	} else {
-		entityName = ghrepo.FullName(repoI)
-	}
-
 	if result.TotalCount == 0 {
-		parentsMsg := ""
-		if opts.IncludeParents {
-			parentsMsg = " or its parents"
-		}
-		msg := fmt.Sprintf("no rulesets found in %s%s", entityName, parentsMsg)
-		return cmdutil.NewNoResultsError(msg)
+		return shared.NoRulesetsFoundError(opts.Organization, repoI, opts.IncludeParents)
 	}
 
 	opts.IO.DetectTerminalTheme()
@@ -163,7 +151,13 @@ func listRun(opts *ListOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "\nShowing %d of %d rulesets in %s\n\n", len(result.Rulesets), result.TotalCount, entityName)
+		parentsMsg := ""
+		if opts.IncludeParents {
+			parentsMsg = " and its parents"
+		}
+
+		inMsg := fmt.Sprintf("%s%s", shared.EntityName(opts.Organization, repoI), parentsMsg)
+		fmt.Fprintf(opts.IO.Out, "\nShowing %d of %d rulesets in %s\n\n", len(result.Rulesets), result.TotalCount, inMsg)
 	}
 
 	tp := tableprinter.New(opts.IO)
@@ -172,15 +166,7 @@ func listRun(opts *ListOptions) error {
 	for _, rs := range result.Rulesets {
 		tp.AddField(strconv.Itoa(rs.DatabaseId))
 		tp.AddField(rs.Name, tableprinter.WithColor(cs.Bold))
-		var ownerString string
-		if rs.Source.RepoOwner != "" {
-			ownerString = fmt.Sprintf("%s (repo)", rs.Source.RepoOwner)
-		} else if rs.Source.OrgOwner != "" {
-			ownerString = fmt.Sprintf("%s (org)", rs.Source.OrgOwner)
-		} else {
-			ownerString = "(unknown)"
-		}
-		tp.AddField(ownerString)
+		tp.AddField(shared.RulesetSource(rs))
 		tp.AddField(strings.ToLower(rs.Enforcement))
 		tp.AddField(strings.ToLower(rs.Target))
 		tp.AddField(strconv.Itoa(rs.Rules.TotalCount))

@@ -108,8 +108,9 @@ func rulesetsQuery(org bool) string {
 				target
 				enforcement
 				source {
-					... on Repository { repoOwner: nameWithOwner }
-					... on Organization { orgOwner: login }
+					__typename
+					... on Repository { owner: nameWithOwner }
+					... on Organization { owner: login }
 				}
 				rules {
 					totalCount

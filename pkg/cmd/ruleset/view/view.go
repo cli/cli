@@ -6,12 +6,14 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -25,10 +27,13 @@ type ViewOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
+	Prompter   prompter.Prompter
 
-	ID           string
-	WebMode      bool
-	Organization string
+	ID              string
+	WebMode         bool
+	IncludeParents  bool
+	InteractiveMode bool
+	Organization    string
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -37,6 +42,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
 		Config:     f.Config,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -49,6 +55,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			the ruleset to view.
 		`),
 		Example: heredoc.Doc(`
+			# Interactively choose a ruleset to view
+			$ gh ruleset view
+
 			# View a ruleset in the current repository
 			$ gh ruleset view 43
 
@@ -75,6 +84,10 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 					return cmdutil.FlagErrorf("invalid value for ruleset ID: %v is not an integer", args[0])
 				}
 				opts.ID = args[0]
+			} else if !opts.IO.CanPrompt() {
+				return cmdutil.FlagErrorf("a ruleset ID must be provided when not running interactively")
+			} else {
+				opts.InteractiveMode = true
 			}
 
 			if runF != nil {
@@ -86,6 +99,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the ruleset in the browser")
 	cmd.Flags().StringVarP(&opts.Organization, "org", "o", "", "Organization name if the provided ID is an organization-level ruleset")
+	cmd.Flags().BoolVarP(&opts.IncludeParents, "parents", "p", false, "When choosing interactively, include rulesets configured at higher levels that also apply")
 
 	return cmd
 }
@@ -107,6 +121,38 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	hostname, _ := cfg.DefaultHost()
+
+	if opts.InteractiveMode {
+		var rsList *shared.RulesetList
+		limit := 30
+		if opts.Organization != "" {
+			rsList, err = shared.ListOrgRulesets(httpClient, opts.Organization, limit, hostname, opts.IncludeParents)
+		} else {
+			rsList, err = shared.ListRepoRulesets(httpClient, repoI, limit, opts.IncludeParents)
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if rsList.TotalCount == 0 {
+			return shared.NoRulesetsFoundError(opts.Organization, repoI, opts.IncludeParents)
+		}
+
+		rs, err := selectRulesetID(rsList, opts.Prompter)
+		if err != nil {
+			return err
+		}
+
+		if rs != nil {
+			opts.ID = strconv.Itoa(rs.DatabaseId)
+
+			// can't get a ruleset lower in the chain than what was queried, so no need to handle repos here
+			if rs.Source.TypeName == "Organization" {
+				opts.Organization = rs.Source.Owner
+			}
+		}
+	}
 
 	var rs *shared.RulesetREST
 	if opts.Organization != "" {
@@ -231,4 +277,26 @@ func viewRun(opts *ViewOptions) error {
 	fmt.Fprintf(w, "%d configured\n", reflect.ValueOf(rs.Rules).Len())
 
 	return nil
+}
+
+func selectRulesetID(rsList *shared.RulesetList, p prompter.Prompter) (*shared.RulesetGraphQL, error) {
+	rulesets := make([]string, len(rsList.Rulesets))
+	for i, rs := range rsList.Rulesets {
+		s := fmt.Sprintf(
+			"%d: %s | %s | contains %s | configured in %s",
+			rs.DatabaseId,
+			rs.Name,
+			strings.ToLower(rs.Enforcement),
+			text.Pluralize(rs.Rules.TotalCount, "rule"),
+			shared.RulesetSource(rs),
+		)
+		rulesets[i] = s
+	}
+
+	r, err := p.Select("Which ruleset would you like to view?", rulesets[0], rulesets)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rsList.Rulesets[r], nil
 }
