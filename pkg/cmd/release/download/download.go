@@ -140,7 +140,7 @@ func downloadRun(opts *DownloadOptions) error {
 		return err
 	}
 
-	opts.IO.StartProgressIndicatorWithLabel("Downloading ")
+	opts.IO.StartProgressIndicatorWithLabel("Finding assets to download")
 	defer opts.IO.StopProgressIndicator()
 
 	ctx := context.Background()
