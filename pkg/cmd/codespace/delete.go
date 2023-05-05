@@ -200,7 +200,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 
 	if a.io.IsStdoutTTY() && deletedCodespaces > 0 {
 		successMsg := fmt.Sprintf("%d codespace(s) deleted successfully\n", deletedCodespaces)
-		fmt.Fprint(a.io.Out, successMsg)
+		fmt.Fprint(a.io.ErrOut, successMsg)
 	}
 
 	return err
