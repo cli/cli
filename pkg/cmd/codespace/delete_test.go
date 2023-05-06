@@ -42,7 +42,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc"},
-			wantStdout:  "1 codespace(s) deleted successfully\n",
+			wantStderr:  "1 codespace(s) deleted successfully\n",
 		},
 		{
 			name: "by repo",
@@ -70,7 +70,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"monalisa-spoonknife-123", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "2 codespace(s) deleted successfully\n",
+			wantStderr:  "2 codespace(s) deleted successfully\n",
 		},
 		{
 			name: "unused",
@@ -93,7 +93,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "2 codespace(s) deleted successfully\n",
+			wantStderr:  "2 codespace(s) deleted successfully\n",
 		},
 		{
 			name: "deletion failed",
@@ -150,7 +150,7 @@ func TestDelete(t *testing.T) {
 				"Codespace hubot-robawt-abc has unsaved changes. OK to delete?":        true,
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "2 codespace(s) deleted successfully\n",
+			wantStderr:  "2 codespace(s) deleted successfully\n",
 		},
 		{
 			name: "deletion for org codespace by admin succeeds",
@@ -175,7 +175,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"monalisa-spoonknife-123"},
-			wantStdout:  "1 codespace(s) deleted successfully\n",
+			wantStderr:  "1 codespace(s) deleted successfully\n",
 		},
 		{
 			name: "deletion for org codespace by admin fails for codespace not found",
@@ -217,7 +217,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"monalisa-spoonknife-123"},
-			wantStdout:  "1 codespace(s) deleted successfully\n",
+			wantStderr:  "1 codespace(s) deleted successfully\n",
 		},
 		{
 			name: "by repo owner",
@@ -255,6 +255,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"octocat-spoonknife-123", "octocat-spoonknife-c4f3"},
+			wantStderr:  "2 codespace(s) deleted successfully\n",
 			wantStdout:  "",
 		},
 	}
