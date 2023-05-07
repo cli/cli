@@ -225,7 +225,6 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 			for a := range jobs {
 				io.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading %s", a.Name))
 				results <- downloadAsset(dest, httpClient, a.APIURL, a.Name, isArchive)
-				io.StopProgressIndicator()
 			}
 		}()
 	}
@@ -241,6 +240,8 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 			downloadError = err
 		}
 	}
+
+	io.StopProgressIndicator()
 
 	return downloadError
 }
