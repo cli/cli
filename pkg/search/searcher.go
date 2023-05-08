@@ -173,7 +173,7 @@ func (s searcher) search(query Query, result interface{}) (*http.Response, error
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	if query.TextMatch {
+	if query.Kind == KindCode {
 		req.Header.Set("Accept", "application/vnd.github.text-match+json")
 	}
 

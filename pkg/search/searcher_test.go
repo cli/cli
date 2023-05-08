@@ -12,10 +12,9 @@ import (
 
 func TestSearcherCode(t *testing.T) {
 	query := Query{
-		Keywords:  []string{"keyword"},
-		Kind:      "code",
-		Limit:     30,
-		TextMatch: true,
+		Keywords: []string{"keyword"},
+		Kind:     "code",
+		Limit:    30,
 		Qualifiers: Qualifiers{
 			Language: "go",
 		},

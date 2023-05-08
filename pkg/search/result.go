@@ -15,6 +15,14 @@ var CodeFields = []string{
 	"url",
 }
 
+var TextMatchFields = []string{
+	"fragment",
+	"matches",
+	"url",
+	"type",
+	"property",
+}
+
 var CommitFields = []string{
 	"author",
 	"commit",
@@ -115,11 +123,11 @@ type Code struct {
 }
 
 type TextMatch struct {
-	Fragment   string  `json:"fragment"`
-	Matches    []Match `json:"matches"`
-	ObjectURL  string  `json:"object_url"`
-	ObjectType string  `json:"object_type"`
-	Property   string  `json:"property"`
+	Fragment string  `json:"fragment"`
+	Matches  []Match `json:"matches"`
+	URL      string  `json:"object_url"`
+	Type     string  `json:"object_type"`
+	Property string  `json:"property"`
 }
 
 type Match struct {
@@ -274,6 +282,25 @@ func (code Code) ExportData(fields []string) map[string]interface{} {
 		switch f {
 		case "repository":
 			data[f] = code.Repo.ExportData(RepositoryFields)
+		case "textMatches":
+			matches := make([]interface{}, 0, len(code.TextMatches))
+			for _, match := range code.TextMatches {
+				matches = append(matches, match.ExportData(TextMatchFields))
+			}
+			data[f] = matches
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+	return data
+}
+
+func (textMatch TextMatch) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(textMatch)
+	data := map[string]interface{}{}
+	for _, f := range fields {
+		switch f {
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()

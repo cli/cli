@@ -23,7 +23,6 @@ type Query struct {
 	Page       int
 	Qualifiers Qualifiers
 	Sort       string
-	TextMatch  bool
 }
 
 type Qualifiers struct {

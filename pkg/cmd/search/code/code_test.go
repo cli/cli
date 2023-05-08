@@ -32,10 +32,9 @@ func TestNewCmdCode(t *testing.T) {
 			input: "react lifecycle",
 			output: CodeOptions{
 				Query: search.Query{
-					Keywords:  []string{"react", "lifecycle"},
-					Kind:      "code",
-					Limit:     30,
-					TextMatch: true,
+					Keywords: []string{"react", "lifecycle"},
+					Kind:     "code",
+					Limit:    30,
 				},
 			},
 		},
@@ -44,10 +43,9 @@ func TestNewCmdCode(t *testing.T) {
 			input: "--web",
 			output: CodeOptions{
 				Query: search.Query{
-					Keywords:  []string{},
-					Kind:      "code",
-					Limit:     30,
-					TextMatch: true,
+					Keywords: []string{},
+					Kind:     "code",
+					Limit:    30,
 				},
 				WebMode: true,
 			},
@@ -57,10 +55,9 @@ func TestNewCmdCode(t *testing.T) {
 			input: "--limit 10",
 			output: CodeOptions{
 				Query: search.Query{
-					Keywords:  []string{},
-					Kind:      "code",
-					Limit:     10,
-					TextMatch: true,
+					Keywords: []string{},
+					Kind:     "code",
+					Limit:    10,
 				},
 			},
 		},
@@ -83,10 +80,9 @@ func TestNewCmdCode(t *testing.T) {
 			`,
 			output: CodeOptions{
 				Query: search.Query{
-					Keywords:  []string{},
-					Kind:      "code",
-					Limit:     30,
-					TextMatch: true,
+					Keywords: []string{},
+					Kind:     "code",
+					Limit:    30,
 					Qualifiers: search.Qualifiers{
 						Extension: "extension",
 						Filename:  "filename",
@@ -141,7 +137,6 @@ func TestCodeRun(t *testing.T) {
 			Language: "go",
 			Repo:     []string{"cli/cli"},
 		},
-		TextMatch: true,
 	}
 	tests := []struct {
 		errMsg     string

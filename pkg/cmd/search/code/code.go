@@ -29,7 +29,7 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 	opts := &CodeOptions{
 		Browser: f.Browser,
 		IO:      f.IOStreams,
-		Query:   search.Query{Kind: search.KindCode, TextMatch: true},
+		Query:   search.Query{Kind: search.KindCode},
 	}
 
 	cmd := &cobra.Command{
@@ -58,9 +58,6 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 
 			# search code matching "cli" in repositories owned by microsoft organization
 			$ gh search code cli --owner=microsoft
-
-			# search code matching "html" in repositories owned by octocat
-			$ gh search code html --owner=octocat
 
 			# search code matching "panic" in cli repository
 			$ gh search code panic --repo cli/cli
@@ -99,8 +96,8 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Extension, "extension", "", "Filter on file extension")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Filename, "filename", "", "Filter on filename")
 	cmdutil.StringSliceEnumFlag(cmd, &opts.Query.Qualifiers.In, "match", "", nil, []string{"file", "path"}, "Restrict search to file contents or file path")
-	cmd.Flags().StringVarP(&opts.Query.Qualifiers.Language, "language", "l", "", "Filter results by language")
-	cmd.Flags().StringSliceVar(&opts.Query.Qualifiers.Repo, "repo", nil, "Filter on repository")
+	cmd.Flags().StringVarP(&opts.Query.Qualifiers.Language, "language", "", "", "Filter results by language")
+	cmd.Flags().StringSliceVarP(&opts.Query.Qualifiers.Repo, "repo", "R", nil, "Filter on repository")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Size, "size", "", "Filter on size range, in kilobytes")
 	cmd.Flags().StringSliceVar(&opts.Query.Qualifiers.User, "owner", nil, "Filter on owner")
 
@@ -131,7 +128,7 @@ func codeRun(opts *CodeOptions) error {
 		fmt.Fprintf(io.ErrOut, "failed to start pager: %v\n", err)
 	}
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(io, results)
+		return opts.Exporter.Write(io, results.Items)
 	}
 
 	return displayResults(io, results, opts.Query.Limit)
@@ -141,33 +138,28 @@ func displayResults(io *iostreams.IOStreams, results search.CodeResult, limit in
 	cs := io.ColorScheme()
 	tp := tableprinter.New(io)
 	displayed := 0
+outer:
 	for _, code := range results.Items {
-		if displayed == limit {
-			break
-		}
 		if io.IsStdoutTTY() {
 			header := fmt.Sprintf("%s %s", cs.GreenBold(code.Repo.FullName), cs.GreenBold(code.Path))
 			tp.AddField(header)
 			tp.EndRow()
 		}
-		row := 0
-		for _, textMatch := range code.TextMatches {
-			out, shouldPrint := buildOutput(textMatch, cs)
-			for i, line := range strings.Split(out, "\n") {
-				if !shouldPrint[i] {
-					continue
-				}
-				if displayed == limit {
-					break
-				}
+		i := 1
+		for _, match := range code.TextMatches {
+			fragments := formatMatch(cs, match)
+			for _, fragment := range fragments {
 				if io.IsStdoutTTY() {
-					tp.AddField(fmt.Sprintf("%s: %s", cs.CyanBold(strconv.Itoa(row+1)), line))
+					tp.AddField(fmt.Sprintf("%s: %s", strconv.Itoa(i), fragment))
 				} else {
-					tp.AddField(fmt.Sprintf("%s %s: %s", code.Repo.FullName, code.Path, line))
+					tp.AddField(fmt.Sprintf("%s %s: %s", code.Repo.FullName, code.Path, fragment))
 				}
 				tp.EndRow()
-				row++
+				i++
 				displayed++
+				if displayed == limit {
+					break outer
+				}
 			}
 		}
 	}
@@ -178,27 +170,32 @@ func displayResults(io *iostreams.IOStreams, results search.CodeResult, limit in
 	return tp.Render()
 }
 
-func buildOutput(tm search.TextMatch, cs *iostreams.ColorScheme) (string, map[int]bool) {
-	shouldHighlight := getHighlightIndices(tm.Matches)
-	linesToPrint := make(map[int]bool)
-	line := 0
-	var out strings.Builder
+func formatMatch(cs *iostreams.ColorScheme, tm search.TextMatch) []string {
+	shouldHighlight := matchHighlightMask(tm.Fragment, tm.Matches)
+	var lines []string
+	var found bool
+	var b strings.Builder
 	for i, c := range tm.Fragment {
-		if shouldHighlight[i] {
-			out.WriteString(cs.CyanBold(string(c)))
-			linesToPrint[line] = true
-		} else {
-			out.WriteRune(c)
-		}
 		if c == '\n' {
-			line++
+			if found {
+				lines = append(lines, b.String())
+			}
+			found = false
+			b.Reset()
+			continue
+		}
+		if shouldHighlight[i] {
+			b.WriteString(cs.CyanBold(string(c)))
+			found = true
+		} else {
+			b.WriteRune(c)
 		}
 	}
-	return out.String(), linesToPrint
+	return lines
 }
 
-func getHighlightIndices(matches []search.Match) map[int]bool {
-	m := make(map[int]bool)
+func matchHighlightMask(fragment string, matches []search.Match) []bool {
+	m := make([]bool, len(fragment))
 	for _, match := range matches {
 		start := match.Indices[0]
 		stop := match.Indices[1]

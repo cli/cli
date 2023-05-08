@@ -39,10 +39,13 @@ func TestCodeExportData(t *testing.T) {
 								},
 							},
 						},
+						Property: "property",
+						Type:     "type",
+						URL:      "url",
 					},
 				},
 			},
-			output: `{"name":"name","path":"path","textMatches":[{"fragment":"fragment","matches":[{"indices":[0,1],"text":"fr"}],"object_url":"","object_type":"","property":""}]}`,
+			output: `{"name":"name","path":"path","textMatches":[{"fragment":"fragment","matches":[{"indices":[0,1],"text":"fr"}],"property":"property","type":"type","url":"url"}]}`,
 		},
 	}
 	for _, tt := range tests {
