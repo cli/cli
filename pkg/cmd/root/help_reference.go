@@ -19,7 +19,11 @@ func referenceHelpFn(io *iostreams.IOStreams) func(*cobra.Command, []string) {
 			wrapWidth = io.TerminalWidth()
 		}
 
-		md, err := markdown.Render(cmd.Long,
+		// Assumes that we want to produce reference text for the entire tree of commands,
+		// starting from the root.
+		referenceText := stringifyCmdReference(cmd.Root())
+
+		md, err := markdown.Render(referenceText,
 			markdown.WithTheme(io.TerminalTheme()),
 			markdown.WithWrap(wrapWidth))
 		if err != nil {
@@ -38,7 +42,7 @@ func referenceHelpFn(io *iostreams.IOStreams) func(*cobra.Command, []string) {
 	}
 }
 
-func referenceLong(cmd *cobra.Command) string {
+func stringifyCmdReference(cmd *cobra.Command) string {
 	buf := bytes.NewBufferString("# gh reference\n\n")
 	for _, c := range cmd.Commands() {
 		if c.Hidden {
