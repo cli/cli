@@ -39,6 +39,8 @@ type PullRequest struct {
 	ClosedAt            *time.Time
 	MergedAt            *time.Time
 
+	AutoMergeRequest *AutoMergeRequest
+
 	MergeCommit          *Commit
 	PotentialMergeCommit *Commit
 
@@ -134,6 +136,16 @@ type CheckContext struct {
 type PRRepository struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type AutoMergeRequest struct {
+	AuthorEmail    *string `json:"authorEmail"`
+	CommitBody     *string `json:"commitBody"`
+	CommitHeadline *string `json:"commitHeadline"`
+	// MERGE, REBASE, SQUASH
+	MergeMethod string    `json:"mergeMethod"`
+	EnabledAt   time.Time `json:"enabledAt"`
+	EnabledBy   Author    `json:"enabledBy"`
 }
 
 // Commit loads just the commit SHA and nothing else
