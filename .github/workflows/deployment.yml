@@ -161,15 +161,33 @@ jobs:
         id: setupmsbuild
         uses: microsoft/setup-msbuild@v1.3.1
       - name: Build MSI
-        id: buildmsi
         shell: bash
         env:
           MSBUILD_PATH: ${{ steps.setupmsbuild.outputs.msbuildPath }}
         run: |
-          ZIP_FILE="$(ls dist/gh_*_windows_amd64.zip | head -n1)"
-          MSI_VERSION="$(basename "$ZIP_FILE" | cut -d_ -f2 | cut -d- -f1)"
-          unzip -o "$ZIP_FILE"
-          "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$PWD" -p:OutputPath="$PWD\dist" -p:OutputName="$(basename "$ZIP_FILE" ".zip")" -p:ProductVersion="${MSI_VERSION#v}"
+          for ZIP_FILE in dist/gh_*_windows_*.zip; do
+            MSI_NAME="$(basename "$ZIP_FILE" ".zip")"
+            MSI_VERSION="$(cut -d_ -f2 <<<"$MSI_NAME" | cut -d- -f1)"
+            case "$MSI_NAME" in
+            *_386 )
+              source_dir="$PWD/dist/windows_windows_386"
+              platform="x86"
+              ;;
+            *_amd64 )
+              source_dir="$PWD/dist/windows_windows_amd64_v1"
+              platform="x64"
+              ;;
+            *_arm64 )
+              source_dir="$PWD/dist/windows_windows_arm64"
+              platform="arm64"
+              ;;
+            * )
+              printf "unsupported architecture: %s\n" "$MSI_NAME" >&2
+              exit 1
+              ;;
+            esac
+            echo "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$source_dir" -p:OutputPath="$PWD/dist" -p:OutputName="$MSI_NAME" -p:ProductVersion="${MSI_VERSION#v}" -p:Platform="$platform"
+          done
       - name: Sign MSI
         if: inputs.environment == 'production'
         shell: pwsh
