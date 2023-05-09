@@ -1,7 +1,7 @@
 name: Deployment
 
 concurrency: 
-  group: ${{ inputs.environment }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
 permissions:
@@ -321,7 +321,7 @@ jobs:
           fi
           action="echo"
           [ "$DO_PUBLISH" = "false" ] || action="command"
-          $action gh release create "${release_args[@]}" -- dist/gh_*
+          script/label-assets dist/gh_* | xargs $action gh release create "${release_args[@]}" -- 
       - name: Publish site
         env:
           DO_PUBLISH: ${{ inputs.environment == 'production' && !contains(inputs.tag_name, '-') }}
