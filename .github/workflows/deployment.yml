@@ -39,17 +39,15 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ inputs.go_version }}
-      - name: Configure GoReleaser
-        run: |
-          touch CHANGELOG.md
-          sed '/#build:windows/,/^$/d; /#build:macos/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
-      - name: Run GoReleaser
+      - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v4
         with:
           version: "~1.17.1"
-          args: release -f .goreleaser.generated.yml --skip-validate --skip-publish --release-notes=CHANGELOG.md
+          install-only: true
+      - name: Build release binaries
         env:
-          GORELEASER_CURRENT_TAG: ${{ inputs.tag_name }}
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: script/release --local "$TAG_NAME" --platform linux
       - name: Generate web manual pages
         run: |
           go run ./cmd/gen-docs --website --doc-path dist/manual
@@ -93,18 +91,16 @@ jobs:
           security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_APPLICATION_CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
           rm "$RUNNER_TEMP/cert.p12"
-      - name: Configure GoReleaser
-        run: |
-          touch CHANGELOG.md
-          sed '/#build:windows/,/^$/d; /#build:linux/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
-      - name: Run GoReleaser
+      - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v4
         with:
           version: "~1.17.1"
-          args: release -f .goreleaser.generated.yml --skip-validate --skip-publish --release-notes=CHANGELOG.md
+          install-only: true
+      - name: Build release binaries
         env:
-          GORELEASER_CURRENT_TAG: ${{ inputs.tag_name }}
+          TAG_NAME: ${{ inputs.tag_name }}
           APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
+        run: script/release --local "$TAG_NAME" --platform macos
       - name: Notarize macOS archives
         if: inputs.environment == 'production'
         env:
@@ -134,11 +130,6 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ inputs.go_version }}
-      - name: Configure GoReleaser
-        shell: bash
-        run: |
-          touch CHANGELOG.md
-          sed '/#build:macos/,/^$/d; /#build:linux/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
       - name: Obtain signing certificate
         id: obtain_cert
         if: inputs.environment == 'production'
@@ -148,15 +139,18 @@ jobs:
           printf "cert-file=%s\n" ".\\cert.pfx" >> $GITHUB_OUTPUT
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
-      - name: Run GoReleaser
+      - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v4
         with:
           version: "~1.17.1"
-          args: release -f .goreleaser.generated.yml --skip-validate --skip-publish --release-notes=CHANGELOG.md
+          install-only: true
+      - name: Build release binaries
+        shell: bash
         env:
-          GORELEASER_CURRENT_TAG: ${{ inputs.tag_name }}
+          TAG_NAME: ${{ inputs.tag_name }}
           CERT_FILE: ${{ steps.obtain_cert.outputs.cert-file }}
           CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: script/release --local "$TAG_NAME" --platform windows
       - name: Set up MSBuild
         id: setupmsbuild
         uses: microsoft/setup-msbuild@v1.3.1
