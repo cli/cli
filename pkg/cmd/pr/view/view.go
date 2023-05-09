@@ -77,7 +77,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 }
 
 var defaultFields = []string{
-	"url", "number", "title", "state", "body", "author",
+	"url", "number", "title", "state", "body", "author", "autoMergeRequest",
 	"isDraft", "maintainerCanModify", "mergeable", "additions", "deletions", "commitsCount",
 	"baseRefName", "headRefName", "headRepositoryOwner", "headRepository", "isCrossRepository",
 	"reviewRequests", "reviews", "assignees", "labels", "projectCards", "milestone",
@@ -157,6 +157,15 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintf(out, "url:\t%s\n", pr.URL)
 	fmt.Fprintf(out, "additions:\t%s\n", cs.Green(strconv.Itoa(pr.Additions)))
 	fmt.Fprintf(out, "deletions:\t%s\n", cs.Red(strconv.Itoa(pr.Deletions)))
+	var autoMerge string
+	if pr.AutoMergeRequest == nil {
+		autoMerge = "disabled"
+	} else {
+		autoMerge = fmt.Sprintf("enabled\t%s\t%s",
+			pr.AutoMergeRequest.EnabledBy.Login,
+			strings.ToLower(pr.AutoMergeRequest.MergeMethod))
+	}
+	fmt.Fprintf(out, "auto-merge:\t%s\n", autoMerge)
 
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, pr.Body)
@@ -221,6 +230,29 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	if pr.Milestone != nil {
 		fmt.Fprint(out, cs.Bold("Milestone: "))
 		fmt.Fprintln(out, pr.Milestone.Title)
+	}
+
+	// Auto-Merge status
+	autoMerge := pr.AutoMergeRequest
+	if autoMerge != nil {
+		var mergeMethod string
+		switch autoMerge.MergeMethod {
+		case "MERGE":
+			mergeMethod = "a merge commit"
+		case "REBASE":
+			mergeMethod = "rebase and merge"
+		case "SQUASH":
+			mergeMethod = "squash and merge"
+		default:
+			mergeMethod = fmt.Sprintf("an unknown merge method (%s)", autoMerge.MergeMethod)
+		}
+		fmt.Fprintf(out,
+			"%s %s by %s, using %s\n",
+			cs.Bold("Auto-merge:"),
+			cs.Green("enabled"),
+			autoMerge.EnabledBy.Login,
+			mergeMethod,
+		)
 	}
 
 	// Body
