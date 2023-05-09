@@ -128,11 +128,18 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 	return &response, nil
 }
 
+// RepositoryOwner represents owner of a repository
+type RepositoryOwner struct {
+	Type  string `json:"type"`
+	Login string `json:"login"`
+}
+
 // Repository represents a GitHub repository.
 type Repository struct {
-	ID            int    `json:"id"`
-	FullName      string `json:"full_name"`
-	DefaultBranch string `json:"default_branch"`
+	ID            int             `json:"id"`
+	FullName      string          `json:"full_name"`
+	DefaultBranch string          `json:"default_branch"`
+	Owner         RepositoryOwner `json:"owner"`
 }
 
 // GetRepository returns the repository associated with the given owner and name.
