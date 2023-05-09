@@ -68,7 +68,8 @@ while [ $# -gt 0 ]; do
 done
 
 announce() {
-  echo "$*" | sed "s:${TMPDIR%/}:\$TMPDIR:"
+  local tmpdir="${TMPDIR:-/tmp}"
+  echo "$*" | sed "s:${tmpdir%/}:\$TMPDIR:"
   "$@"
 }
 
