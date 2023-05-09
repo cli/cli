@@ -107,7 +107,7 @@ else
     announce git push
   fi
   trigger_deployment
-  if [ "$deploy_env" = "production "]; then
+  if [ "$deploy_env" = "production" ]; then
     echo
     echo "Go to Slack to manually approve this production deployment."
   fi
