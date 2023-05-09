@@ -140,7 +140,7 @@ func downloadRun(opts *DownloadOptions) error {
 		return err
 	}
 
-	opts.IO.StartProgressIndicator()
+	opts.IO.StartProgressIndicatorWithLabel("Finding assets to download")
 	defer opts.IO.StopProgressIndicator()
 
 	ctx := context.Background()
@@ -196,7 +196,7 @@ func downloadRun(opts *DownloadOptions) error {
 		stdout:       opts.IO.Out,
 	}
 
-	return downloadAssets(&dest, httpClient, toDownload, opts.Concurrency, isArchive)
+	return downloadAssets(&dest, httpClient, toDownload, opts.Concurrency, isArchive, opts.IO)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -208,7 +208,7 @@ func matchAny(patterns []string, name string) bool {
 	return false
 }
 
-func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload []shared.ReleaseAsset, numWorkers int, isArchive bool) error {
+func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload []shared.ReleaseAsset, numWorkers int, isArchive bool, io *iostreams.IOStreams) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -223,6 +223,7 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 	for w := 1; w <= numWorkers; w++ {
 		go func() {
 			for a := range jobs {
+				io.StartProgressIndicatorWithLabel(fmt.Sprintf("Downloading %s", a.Name))
 				results <- downloadAsset(dest, httpClient, a.APIURL, a.Name, isArchive)
 			}
 		}()
@@ -239,6 +240,8 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 			downloadError = err
 		}
 	}
+
+	io.StopProgressIndicator()
 
 	return downloadError
 }
