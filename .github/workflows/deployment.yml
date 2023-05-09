@@ -76,16 +76,12 @@ jobs:
         with:
           go-version: ${{ inputs.go_version }}
       - name: Configure macOS signing
+        if: inputs.environment == 'production'
         env:
           APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
           APPLE_APPLICATION_CERT: ${{ secrets.APPLE_APPLICATION_CERT }}
           APPLE_APPLICATION_CERT_PASSWORD: ${{ secrets.APPLE_APPLICATION_CERT_PASSWORD }}
         run: |
-          if [ -z "$APPLE_APPLICATION_CERT" ]; then
-            echo "warning: skipping code signing due to no Apple signing certificate found" >&2
-            exit 0
-          fi
-
           keychain="$RUNNER_TEMP/buildagent.keychain"
           keychain_password="password1"
 
@@ -110,6 +106,7 @@ jobs:
           GORELEASER_CURRENT_TAG: ${{ inputs.tag_name }}
           APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
       - name: Notarize macOS archives
+        if: inputs.environment == 'production'
         env:
           APPLE_ID: ${{ vars.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
@@ -144,6 +141,7 @@ jobs:
           sed '/#build:macos/,/^$/d; /#build:linux/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
       - name: Obtain signing certificate
         id: obtain_cert
+        if: inputs.environment == 'production'
         shell: bash
         run: |
           base64 -d <<<"$CERT_CONTENTS" > ./cert.pfx
@@ -172,7 +170,8 @@ jobs:
           MSI_VERSION="$(basename "$ZIP_FILE" | cut -d_ -f2 | cut -d- -f1)"
           unzip -o "$ZIP_FILE"
           "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$PWD" -p:OutputPath="$PWD\dist" -p:OutputName="$(basename "$ZIP_FILE" ".zip")" -p:ProductVersion="${MSI_VERSION#v}"
-      - name: Run GoReleaser
+      - name: Sign MSI
+        if: inputs.environment == 'production'
         shell: pwsh
         run: |
           Get-ChildItem -Path .\dist -Filter *.msi | ForEach-Object {
@@ -232,6 +231,7 @@ jobs:
       - name: Install packaging dependencies
         run: sudo apt-get install -y rpm reprepro
       - name: Set up GPG
+        if: inputs.environment == 'production'
         env:
           GPG_PUBKEY: ${{ secrets.GPG_PUBKEY }}
           GPG_KEY: ${{ secrets.GPG_KEY }}
@@ -244,17 +244,20 @@ jobs:
           gpg-connect-agent RELOADAGENT /bye
           /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP" <<<"$GPG_PASSPHRASE"
       - name: Sign RPMs
+        if: inputs.environment == 'production'
         run: |
           cp script/rpmmacros ~/.rpmmacros
           rpmsign --addsign dist/*.rpm
       - name: Run createrepo
+        env:
+          GPG_SIGN: ${{ inputs.environment == 'production' }}
         run: |
           mkdir -p site/packages/rpm
           cp dist/*.rpm site/packages/rpm/
           ./script/createrepo.sh
           cp -r dist/repodata site/packages/rpm/
           pushd site/packages/rpm
-          gpg --yes --detach-sign --armor repodata/repomd.xml
+          [ "$GPG_SIGN" = "false" ] || gpg --yes --detach-sign --armor repodata/repomd.xml
           popd
       - name: Run reprepro
         env:
@@ -274,6 +277,7 @@ jobs:
           cp -a upload/* site/packages/
       - name: Create the release
         env:
+          DO_PUBLISH: ${{ inputs.environment == 'production' }}
           TAG_NAME: ${{ inputs.tag_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -293,9 +297,12 @@ jobs:
           else
             release_args+=( --discussion-category "General" )
           fi
-          gh release create "${release_args[@]}" -- dist/gh_*
+          action="echo"
+          [ "$DO_PUBLISH" = "false" ] || action="command"
+          $action gh release create "${release_args[@]}" -- dist/gh_*
       - name: Publish site
         env:
+          DO_PUBLISH: ${{ inputs.environment == 'production' && !contains(inputs.tag_name, '-') }}
           TAG_NAME: ${{ inputs.tag_name }}
           GIT_COMMITTER_NAME: cli automation
           GIT_AUTHOR_NAME: cli automation
@@ -305,15 +312,15 @@ jobs:
         run: |
           git add packages
           git commit -m "Add rpm and deb packages for $TAG_NAME"
-          if [[ $TAG_NAME == *-* ]]; then
+          if [ "$DO_PUBLISH" = "true" ]; then
+            git push
+          else
             git log --oneline @{upstream}..
             git diff --name-status @{upstream}..
-          else
-            git push
           fi
       - name: Bump homebrew-core formula
         uses: mislav/bump-homebrew-formula-action@v2
-        if: ${{ !contains(inputs.tag_name, '-') }}
+        if: inputs.environment == 'production' && !contains(inputs.tag_name, '-')
         with:
           formula-name: gh
           tag-name: ${{ inputs.tag_name }}
