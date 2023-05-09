@@ -1,7 +1,7 @@
 name: Deployment
 
 concurrency: 
-  group: production
+  group: ${{ inputs.environment }}
   cancel-in-progress: true
 
 permissions:
@@ -178,8 +178,10 @@ jobs:
               platform="x64"
               ;;
             *_arm64 )
-              source_dir="$PWD/dist/windows_windows_arm64"
-              platform="arm64"
+              echo "skipping building MSI for arm64 because WiX 3.11 doesn't support it: https://github.com/wixtoolset/issues/issues/6141" >&2
+              continue
+              #source_dir="$PWD/dist/windows_windows_arm64"
+              #platform="arm64"
               ;;
             * )
               printf "unsupported architecture: %s\n" "$MSI_NAME" >&2
@@ -279,12 +281,14 @@ jobs:
           popd
       - name: Run reprepro
         env:
+          GPG_SIGN: ${{ inputs.environment == 'production' }}
           # We are no longer adding to the distribution list.
           # All apt distributions should use "stable" according to our install documentation.
           # In the future we will remove legacy distributions listed here.
           RELEASES: "cosmic eoan disco groovy focal stable oldstable testing sid unstable buster bullseye stretch jessie bionic trusty precise xenial hirsute impish kali-rolling"
         run: |
           mkdir -p upload
+          [ "$GPG_SIGN" = "true" ] || sed -i.bak '/^SignWith:/d' script/distributions
           for release in $RELEASES; do
             for file in dist/*.deb; do
               reprepro --confdir="+b/script" includedeb "$release" "$file"
