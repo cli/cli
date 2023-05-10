@@ -9,8 +9,8 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/briandowns/spinner"
 	"github.com/cli/go-gh/v2/pkg/api"
+	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 )
 
 type ClientOptions struct {
