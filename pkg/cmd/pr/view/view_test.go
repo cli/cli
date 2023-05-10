@@ -314,6 +314,25 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`\*\*blueberries taste good\*\*`,
 			},
 		},
+		"PR with auto-merge enabled": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithAutoMergeEnabled.json",
+			},
+			expectedOutputs: []string{
+				`title:\tBlueberries are from a fork\n`,
+				`state:\tOPEN\n`,
+				`author:\tnobody\n`,
+				`labels:\t\n`,
+				`assignees:\t\n`,
+				`projects:\t\n`,
+				`milestone:\t\n`,
+				`additions:\t100\n`,
+				`deletions:\t10\n`,
+				`auto-merge:\tenabled\thubot\tsquash\n`,
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -500,6 +519,20 @@ func TestPRView_Preview(t *testing.T) {
 				`Blueberries are from a fork #12`,
 				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10 • No checks`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
+		"PR with auto-merge enabled": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithAutoMergeEnabled.json",
+			},
+			expectedOutputs: []string{
+				`Blueberries are from a fork #12\n`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`Auto-merge:.*enabled.* by hubot, using squash and merge`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},

@@ -30,9 +30,5 @@
         <WixExtension Include="WixUIExtension"/>
         <WixExtension Include="WixUtilExtension"/>
     </ItemGroup>
-    <Target Name="SetStepOutput" AfterTargets="Build" Condition="'$(GITHUB_ACTIONS)' != ''">
-        <!-- Make sure the correct target path is always set as the step output -->
-        <Message Importance="high" Text="::set-output name=msi::$(TargetPath)"/>
-    </Target>
     <Import Project="$(WixTargetsPath)"/>
 </Project>

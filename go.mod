@@ -12,6 +12,7 @@ require (
 	github.com/cli/go-gh/v2 v2.0.0
 	github.com/cli/oauth v1.0.1
 	github.com/cli/safeexec v1.0.1
+	github.com/cli/shurcooL-graphql v0.0.3
 	github.com/cpuguy83/go-md2man/v2 v2.0.2
 	github.com/creack/pty v1.1.18
 	github.com/gabriel-vasile/mimetype v1.4.2
@@ -31,7 +32,6 @@ require (
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/rivo/tview v0.0.0-20221029100920-c4a7e501810d
 	github.com/shurcooL/githubv4 v0.0.0-20230424031643-6cea62ecd5a9
-	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
@@ -52,7 +52,6 @@ require (
 	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cli/browser v1.1.0 // indirect
-	github.com/cli/shurcooL-graphql v0.0.3 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
@@ -75,6 +74,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29 // indirect
 	github.com/stretchr/objx v0.4.0 // indirect
 	github.com/thlib/go-timezone-local v0.0.0-20210907160436-ef149e42d28e // indirect
 	github.com/yuin/goldmark v1.4.13 // indirect
