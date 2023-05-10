@@ -39,7 +39,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 	opts := deleteOpts{}
 	deleteCmd := &cobra.Command{
 		Short: "Delete a project",
-		Use:   "delete [number]",
+		Use:   "delete [<number>]",
 		Example: `
 # delete the current user's project 1
 gh project delete 1 --user "@me"

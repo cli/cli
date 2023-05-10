@@ -40,7 +40,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 	opts := closeOpts{}
 	closeCmd := &cobra.Command{
 		Short: "Close a project",
-		Use:   "close [number]",
+		Use:   "close [<number>]",
 		Example: `
 # close project 1 owned by user monalisa
 gh project close 1 --user monalisa

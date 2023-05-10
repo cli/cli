@@ -43,7 +43,7 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 	opts := copyOpts{}
 	copyCmd := &cobra.Command{
 		Short: "Copy a project",
-		Use:   "copy [number]",
+		Use:   "copy [<number>]",
 		Example: `
 # copy project 1 owned by user monalisa to org github with title "a new project"
 gh project copy 1 --source-user monalisa --title "a new project" --target-org github

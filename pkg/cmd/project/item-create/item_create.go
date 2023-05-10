@@ -41,7 +41,7 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 	opts := createItemOpts{}
 	createItemCmd := &cobra.Command{
 		Short: "Create a draft issue item in a project",
-		Use:   "item-create [number]",
+		Use:   "item-create [<number>]",
 		Example: `
 # create a draft issue in the current user's project 1 with title "new item" and body "new item body"
 gh project item-create 1 --user "@me" --title "new item" --body "new item body"

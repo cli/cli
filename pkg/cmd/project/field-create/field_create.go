@@ -42,7 +42,7 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 	opts := createFieldOpts{}
 	createFieldCmd := &cobra.Command{
 		Short: "Create a field in a project",
-		Use:   "field-create [number]",
+		Use:   "field-create [<number>]",
 		Example: `
 # create a field in the current user's project 1 with title "new item" and dataType "text"
 gh project field-create 1 --user "@me" --name "new field" --data-type "text"

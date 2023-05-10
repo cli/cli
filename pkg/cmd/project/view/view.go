@@ -35,7 +35,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(config viewConfig) error) *cobra.C
 	opts := viewOpts{}
 	viewCmd := &cobra.Command{
 		Short: "View a project",
-		Use:   "view [number]",
+		Use:   "view [<number>]",
 		Example: `
 # view the current user's project 1
 gh project view 1

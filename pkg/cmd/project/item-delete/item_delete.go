@@ -38,7 +38,7 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 	opts := deleteItemOpts{}
 	deleteItemCmd := &cobra.Command{
 		Short: "Delete an item from a project by ID",
-		Use:   "item-delete [number]",
+		Use:   "item-delete [<number>]",
 		Example: `
 # delete an item in the current user's project 1
 gh project item-delete 1 --user "@me" --id ID

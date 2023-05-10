@@ -46,7 +46,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	opts := listOpts{}
 	listCmd := &cobra.Command{
 		Short: "List the items in a project",
-		Use:   "item-list [number]",
+		Use:   "item-list [<number>]",
 		Example: `
 The default output is a column format with a subset of system defined fields.
 To list all of the fields, use the --format directive.

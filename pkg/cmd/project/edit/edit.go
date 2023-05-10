@@ -46,7 +46,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(config editConfig) error) *cobra.C
 	opts := editOpts{}
 	editCmd := &cobra.Command{
 		Short: "Edit a project",
-		Use:   "edit [number]",
+		Use:   "edit [<number>]",
 		Example: `
 # edit user monalisa's project 1 to have the new title "New title"
 gh project edit 1 --user monalisa --title "New title"

@@ -41,7 +41,7 @@ func NewCmdAddItem(f *cmdutil.Factory, runF func(config addItemConfig) error) *c
 	opts := addItemOpts{}
 	addItemCmd := &cobra.Command{
 		Short: "Add a pull request or an issue to a project",
-		Use:   "item-add [number]",
+		Use:   "item-add [<number>]",
 		Example: `
 # add an item to the current user's project 1
 gh project item-add 1 --user "@me" --url https://github.com/cli/go-gh/issues/1

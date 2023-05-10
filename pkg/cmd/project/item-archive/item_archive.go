@@ -47,7 +47,7 @@ func NewCmdArchiveItem(f *cmdutil.Factory, runF func(config archiveItemConfig) e
 	opts := archiveItemOpts{}
 	archiveItemCmd := &cobra.Command{
 		Short: "Archive an item in a project",
-		Use:   "item-archive [number]",
+		Use:   "item-archive [<number>]",
 		Example: `
 # archive an item in the current user's project 1
 gh project item-archive 1 --user "@me" --id ID
