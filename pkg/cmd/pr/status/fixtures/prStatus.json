@@ -15,7 +15,8 @@
               "headRepositoryOwner": {
                 "login": "OWNER"
               },
-              "isCrossRepository": false
+              "isCrossRepository": false,
+              "autoMergeRequest": null
             }
           }
         ]
@@ -31,7 +32,8 @@
             "state": "OPEN",
             "url": "https://github.com/cli/cli/pull/8",
             "headRefName": "strawberries",
-            "isDraft": false
+            "isDraft": false,
+            "autoMergeRequest": null
           }
         }
       ]
@@ -46,7 +48,17 @@
             "state": "OPEN",
             "url": "https://github.com/cli/cli/pull/9",
             "headRefName": "apples",
-            "isDraft": false
+            "isDraft": false,
+            "autoMergeRequest": {
+              "authorEmail": null,
+              "commitBody": null,
+              "commitHeadline": null,
+              "mergeMethod": "SQUASH",
+              "enabledAt": "2020-08-27T19:00:12Z",
+              "enabledBy": {
+                "login": "hubot"
+              }
+            }
           } }, {
           "node": {
             "number": 11,
@@ -54,7 +66,8 @@
             "state": "OPEN",
             "url": "https://github.com/cli/cli/pull/1",
             "headRefName": "figs",
-            "isDraft": true
+            "isDraft": true,
+            "autoMergeRequest": null
           }
         }
       ]
