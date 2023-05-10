@@ -204,7 +204,7 @@ func TestCodeRun(t *testing.T) {
 				},
 			},
 			tty:        true,
-			wantStdout: "\nShowing 2 of 2 results\n\ncli/cli context/context.go\n1: \trepoMap := map[string]bool{}\ncli/cli pkg/cmd/pr/pr.go\n1: \t\tAnnotations: map[string]string{\n",
+			wantStdout: "\nShowing 2 of 2 results\n\ncli/cli context/context.go\n\trepoMap := map[string]bool{}\n\ncli/cli pkg/cmd/pr/pr.go\n\tAnnotations: map[string]string{\n",
 		},
 		{
 			name: "displays results notty",
@@ -263,7 +263,7 @@ func TestCodeRun(t *testing.T) {
 				},
 			},
 			tty:        false,
-			wantStdout: "cli/cli context/context.go: \trepoMap := map[string]bool{}\ncli/cli pkg/cmd/pr/pr.go: \t\tAnnotations: map[string]string{\n",
+			wantStdout: "cli/cli:context/context.go: repoMap := map[string]bool{}\ncli/cli:pkg/cmd/pr/pr.go: Annotations: map[string]string{\n",
 		},
 		{
 			name: "displays no results",
