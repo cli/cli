@@ -2,12 +2,10 @@ package code
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/search/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -131,51 +129,50 @@ func codeRun(opts *CodeOptions) error {
 		return opts.Exporter.Write(io, results.Items)
 	}
 
-	return displayResults(io, results, opts.Query.Limit)
+	return displayResults(io, results)
 }
 
-func displayResults(io *iostreams.IOStreams, results search.CodeResult, limit int) error {
+func displayResults(io *iostreams.IOStreams, results search.CodeResult) error {
 	cs := io.ColorScheme()
-	tp := tableprinter.New(io)
-	displayed := 0
-outer:
-	for _, code := range results.Items {
-		if io.IsStdoutTTY() {
-			header := fmt.Sprintf("%s %s", cs.GreenBold(code.Repo.FullName), cs.GreenBold(code.Path))
-			tp.AddField(header)
-			tp.EndRow()
-		}
-		i := 1
-		for _, match := range code.TextMatches {
-			fragments := formatMatch(cs, match)
-			for _, fragment := range fragments {
-				if io.IsStdoutTTY() {
-					tp.AddField(fmt.Sprintf("%s: %s", strconv.Itoa(i), fragment))
-				} else {
-					tp.AddField(fmt.Sprintf("%s %s: %s", code.Repo.FullName, code.Path, fragment))
-				}
-				tp.EndRow()
-				i++
-				displayed++
-				if displayed == limit {
-					break outer
+	if io.IsStdoutTTY() {
+		fmt.Fprintf(io.Out, "\nShowing %d of %d results\n\n", len(results.Items), results.Total)
+		for _, code := range results.Items {
+			fmt.Fprintf(io.Out, "%s %s\n", cs.Blue(code.Repo.FullName), cs.GreenBold(code.Path))
+			for _, match := range code.TextMatches {
+				lines := formatMatch(match.Fragment, match.Matches, io.ColorEnabled())
+				for _, line := range lines {
+					fmt.Fprintf(io.Out, "\t%s\n", strings.TrimSpace(line))
 				}
 			}
 		}
+		return nil
 	}
-	if io.IsStdoutTTY() {
-		header := fmt.Sprintf("Showing %d of %d results\n\n", displayed, max(displayed, results.Total))
-		fmt.Fprintf(io.Out, "\n%s", header)
+	for _, code := range results.Items {
+		for _, match := range code.TextMatches {
+			lines := formatMatch(match.Fragment, match.Matches, io.ColorEnabled())
+			for _, line := range lines {
+				fmt.Fprintf(io.Out, "%s:%s: %s\n", cs.Blue(code.Repo.FullName), cs.GreenBold(code.Path), strings.TrimSpace(line))
+			}
+		}
 	}
-	return tp.Render()
+	return nil
 }
 
-func formatMatch(cs *iostreams.ColorScheme, tm search.TextMatch) []string {
-	shouldHighlight := matchHighlightMask(tm.Fragment, tm.Matches)
+func formatMatch(t string, matches []search.Match, colorize bool) []string {
+	startIndices := map[int]struct{}{}
+	endIndices := map[int]struct{}{}
+	for _, m := range matches {
+		if len(m.Indices) < 2 {
+			continue
+		}
+		startIndices[m.Indices[0]] = struct{}{}
+		endIndices[m.Indices[1]] = struct{}{}
+	}
+
 	var lines []string
-	var found bool
 	var b strings.Builder
-	for i, c := range tm.Fragment {
+	var found bool
+	for i, c := range t {
 		if c == '\n' {
 			if found {
 				lines = append(lines, b.String())
@@ -184,31 +181,20 @@ func formatMatch(cs *iostreams.ColorScheme, tm search.TextMatch) []string {
 			b.Reset()
 			continue
 		}
-		if shouldHighlight[i] {
-			b.WriteString(cs.CyanBold(string(c)))
+		if _, ok := startIndices[i]; ok {
+			if colorize {
+				b.WriteString("\x1b[30;43m") // black text on yellow background
+			}
 			found = true
-		} else {
-			b.WriteRune(c)
+		} else if _, ok := endIndices[i]; ok {
+			if colorize {
+				b.WriteString("\x1b[m") // color reset
+			}
 		}
+		b.WriteRune(c)
+	}
+	if found {
+		lines = append(lines, b.String())
 	}
 	return lines
-}
-
-func matchHighlightMask(fragment string, matches []search.Match) []bool {
-	m := make([]bool, len(fragment))
-	for _, match := range matches {
-		start := match.Indices[0]
-		stop := match.Indices[1]
-		for i := start; i < stop; i++ {
-			m[i] = true
-		}
-	}
-	return m
-}
-
-func max(a, b int) int {
-	if b < a {
-		return a
-	}
-	return b
 }
