@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const commandNameColumnWidth = 14
+
 func rootUsageFunc(w io.Writer, command *cobra.Command) error {
 	fmt.Fprintf(w, "Usage:  %s", command.UseLine())
 
@@ -101,8 +103,6 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 		return
 	}
 
-	namePadding := 12
-
 	type helpEntry struct {
 		Title string
 		Body  string
@@ -126,7 +126,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	for _, g := range GroupedCommands(command) {
 		var names []string
 		for _, c := range g.Commands {
-			names = append(names, rpad(c.Name()+":", namePadding)+c.Short)
+			names = append(names, rpad(c.Name()+":", commandNameColumnWidth)+c.Short)
 		}
 		helpEntries = append(helpEntries, helpEntry{
 			Title: strings.ToUpper(g.Title),
@@ -137,10 +137,10 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	if isRootCmd(command) {
 		var helpTopics []string
 		if c := findCommand(command, "actions"); c != nil {
-			helpTopics = append(helpTopics, rpad(c.Name()+":", namePadding)+c.Short)
+			helpTopics = append(helpTopics, rpad(c.Name()+":", commandNameColumnWidth)+c.Short)
 		}
 		for topic, params := range HelpTopics {
-			helpTopics = append(helpTopics, rpad(topic+":", namePadding)+params["short"])
+			helpTopics = append(helpTopics, rpad(topic+":", commandNameColumnWidth)+params["short"])
 		}
 		sort.Strings(helpTopics)
 		helpEntries = append(helpEntries, helpEntry{"HELP TOPICS", strings.Join(helpTopics, "\n")})
