@@ -136,7 +136,10 @@ func displayResults(io *iostreams.IOStreams, results search.CodeResult) error {
 	cs := io.ColorScheme()
 	if io.IsStdoutTTY() {
 		fmt.Fprintf(io.Out, "\nShowing %d of %d results\n\n", len(results.Items), results.Total)
-		for _, code := range results.Items {
+		for i, code := range results.Items {
+			if i > 0 {
+				fmt.Fprint(io.Out, "\n")
+			}
 			fmt.Fprintf(io.Out, "%s %s\n", cs.Blue(code.Repo.FullName), cs.GreenBold(code.Path))
 			for _, match := range code.TextMatches {
 				lines := formatMatch(match.Fragment, match.Matches, io.ColorEnabled())
