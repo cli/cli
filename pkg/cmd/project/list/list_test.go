@@ -356,7 +356,7 @@ func TestRunListEmpty(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	ios, _, stdout, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 	config := listConfig{
 		tp:     tableprinter.New(ios),
 		opts:   listOpts{},
@@ -364,11 +364,10 @@ func TestRunListEmpty(t *testing.T) {
 	}
 
 	err = runList(config)
-	assert.NoError(t, err)
-	assert.Equal(
+	assert.EqualError(
 		t,
-		"No projects found for me\n",
-		stdout.String())
+		err,
+		"No projects found for me")
 }
 
 func TestRunListWithClosed(t *testing.T) {

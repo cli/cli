@@ -143,9 +143,7 @@ func runList(config listConfig) error {
 
 func printResults(config listConfig, items []queries.ProjectItem, login string) error {
 	if len(items) == 0 {
-		config.tp.AddField(fmt.Sprintf("Project %d for login %s has no items", config.opts.number, login))
-		config.tp.EndRow()
-		return config.tp.Render()
+		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for login %s has no items", config.opts.number, login))
 	}
 
 	config.tp.AddField("Type")

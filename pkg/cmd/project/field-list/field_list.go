@@ -140,9 +140,7 @@ func runList(config listConfig) error {
 
 func printResults(config listConfig, fields []queries.ProjectField, login string) error {
 	if len(fields) == 0 {
-		config.tp.AddField(fmt.Sprintf("Project %d for login %s has no fields", config.opts.number, login))
-		config.tp.EndRow()
-		return config.tp.Render()
+		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for login %s has no fields", config.opts.number, login))
 	}
 
 	config.tp.AddField("Name")

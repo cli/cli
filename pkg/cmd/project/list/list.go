@@ -189,9 +189,7 @@ func filterProjects(nodes []queries.Project, config listConfig) []queries.Projec
 
 func printResults(config listConfig, projects []queries.Project, login string) error {
 	if len(projects) == 0 {
-		config.tp.AddField(fmt.Sprintf("No projects found for %s", login))
-		config.tp.EndRow()
-		return config.tp.Render()
+		return cmdutil.NewNoResultsError(fmt.Sprintf("No projects found for %s", login))
 	}
 
 	config.tp.AddField("Title")

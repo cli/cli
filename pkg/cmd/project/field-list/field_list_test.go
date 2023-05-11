@@ -138,9 +138,9 @@ func TestRunList_User(t *testing.T) {
 			"variables": map[string]interface{}{
 				"login":       "monalisa",
 				"number":      1,
-				"firstItems":  100,
+				"firstItems":  30,
 				"afterItems":  nil,
-				"firstFields": 100,
+				"firstFields": 30,
 				"afterFields": nil,
 			},
 		}).
@@ -224,9 +224,9 @@ func TestRunList_Org(t *testing.T) {
 			"variables": map[string]interface{}{
 				"login":       "github",
 				"number":      1,
-				"firstItems":  100,
+				"firstItems":  30,
 				"afterItems":  nil,
-				"firstFields": 100,
+				"firstFields": 30,
 				"afterFields": nil,
 			},
 		}).
@@ -307,9 +307,9 @@ func TestRunList_Me(t *testing.T) {
 			"query": "query ViewerProject.*",
 			"variables": map[string]interface{}{
 				"number":      1,
-				"firstItems":  100,
+				"firstItems":  30,
 				"afterItems":  nil,
-				"firstFields": 100,
+				"firstFields": 30,
 				"afterFields": nil,
 			},
 		}).
@@ -390,9 +390,9 @@ func TestRunList_Empty(t *testing.T) {
 			"query": "query ViewerProject.*",
 			"variables": map[string]interface{}{
 				"number":      1,
-				"firstItems":  100,
+				"firstItems":  30,
 				"afterItems":  nil,
-				"firstFields": 100,
+				"firstFields": 30,
 				"afterFields": nil,
 			},
 		}).
@@ -412,7 +412,7 @@ func TestRunList_Empty(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	ios, _, stdout, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
@@ -423,9 +423,8 @@ func TestRunList_Empty(t *testing.T) {
 	}
 
 	err = runList(config)
-	assert.NoError(t, err)
-	assert.Equal(
+	assert.EqualError(
 		t,
-		"Project 1 for login @me has no fields\n",
-		stdout.String())
+		err,
+		"Project 1 for login @me has no fields")
 }
