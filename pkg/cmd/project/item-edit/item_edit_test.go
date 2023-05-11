@@ -28,6 +28,12 @@ func TestNewCmdeditItem(t *testing.T) {
 			wantsErrMsg: "required flag(s) \"id\" not set",
 		},
 		{
+			name:        "invalid-flags",
+			cli:         "--id 123 --text t --date 2023-01-01",
+			wantsErr:    true,
+			wantsErrMsg: "only one of `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` may be used",
+		},
+		{
 			name: "item-id",
 			cli:  "--id 123",
 			wants: editItemOpts{

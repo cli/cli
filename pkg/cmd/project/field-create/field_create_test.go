@@ -31,7 +31,7 @@ func TestNewCmdCreateField(t *testing.T) {
 			name:        "user-and-org",
 			cli:         "--user monalisa --org github  --name n --data-type TEXT",
 			wantsErr:    true,
-			wantsErrMsg: "if any flags in the group [user org] are set none of the others can be; [org user] were all set",
+			wantsErrMsg: "only one of `--user` or `--org` may be used",
 		},
 		{
 			name:        "not-a-number",

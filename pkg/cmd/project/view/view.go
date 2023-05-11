@@ -50,6 +50,14 @@ gh project view 1 --org github --closed
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -86,9 +94,6 @@ gh project view 1 --org github --closed
 	viewCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
 	viewCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open project in the browser.")
 	viewCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
-
-	// owner can be a user or an org
-	viewCmd.MarkFlagsMutuallyExclusive("user", "org")
 
 	return viewCmd
 }

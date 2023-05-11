@@ -64,6 +64,14 @@ gh project item-list 1 --org github
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -95,8 +103,6 @@ gh project item-list 1 --org github
 	listCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
 	listCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
 	listCmd.Flags().StringVar(&opts.limit, "limit", "", "Maximum number of items. Defaults to 100. Set to 'all' to list all items.")
-	// owner can be a user or an org
-	listCmd.MarkFlagsMutuallyExclusive("user", "org")
 
 	return listCmd
 }

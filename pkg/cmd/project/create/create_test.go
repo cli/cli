@@ -25,7 +25,7 @@ func TestNewCmdCreate(t *testing.T) {
 			name:        "user-and-org",
 			cli:         "--title t --user monalisa --org github",
 			wantsErr:    true,
-			wantsErrMsg: "if any flags in the group [user org] are set none of the others can be; [org user] were all set",
+			wantsErrMsg: "only one of `--user` or `--org` may be used",
 		},
 		{
 			name: "title",

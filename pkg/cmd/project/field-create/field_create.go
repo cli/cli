@@ -60,6 +60,14 @@ gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -98,7 +106,6 @@ gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE
 	createFieldCmd.Flags().StringSliceVar(&opts.singleSelectOptions, "single-select-options", []string{}, "At least one option is required when data type is SINGLE_SELECT.")
 	createFieldCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
 
-	createFieldCmd.MarkFlagsMutuallyExclusive("user", "org")
 	_ = createFieldCmd.MarkFlagRequired("name")
 	_ = createFieldCmd.MarkFlagRequired("data-type")
 

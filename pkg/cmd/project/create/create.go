@@ -52,6 +52,14 @@ gh project create --user '@me' --title "a new project"
 # add --format=json to output in JSON format
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -78,7 +86,6 @@ gh project create --user '@me' --title "a new project"
 	createCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
 
 	_ = createCmd.MarkFlagRequired("title")
-	createCmd.MarkFlagsMutuallyExclusive("user", "org")
 
 	return createCmd
 }

@@ -28,6 +28,18 @@ func TestNewCmdCopy(t *testing.T) {
 			wantsErrMsg: "invalid number: x",
 		},
 		{
+			name:        "source-org-and-user",
+			cli:         "123 --title t --source-org github --source-user monalisa",
+			wantsErr:    true,
+			wantsErrMsg: "only one of `--source-user` or `--source-org` may be used",
+		},
+		{
+			name:        "target-org-and-user",
+			cli:         "123 --title t --target-org github --target-user monalisa",
+			wantsErr:    true,
+			wantsErrMsg: "only one of `--target-user` or `--target-org` may be used",
+		},
+		{
 			name: "title",
 			cli:  "--title t",
 			wants: copyOpts{

@@ -61,6 +61,14 @@ gh project edit 1 --org github --visibility PUBLIC
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -102,8 +110,6 @@ gh project edit 1 --org github --visibility PUBLIC
 	editCmd.Flags().StringVar(&opts.readme, "readme", "", "The edited readme of the project.")
 	editCmd.Flags().StringVarP(&opts.shortDescription, "description", "d", "", "The edited short description of the project.")
 	editCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
-
-	editCmd.MarkFlagsMutuallyExclusive("user", "org")
 
 	return editCmd
 }

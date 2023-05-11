@@ -53,6 +53,14 @@ gh project item-delete 1 --org github --id ID
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -85,7 +93,6 @@ gh project item-delete 1 --org github --id ID
 	deleteItemCmd.Flags().StringVar(&opts.itemID, "id", "", "Global ID of the item to delete from the project.")
 	deleteItemCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
 
-	deleteItemCmd.MarkFlagsMutuallyExclusive("user", "org")
 	_ = deleteItemCmd.MarkFlagRequired("id")
 
 	return deleteItemCmd

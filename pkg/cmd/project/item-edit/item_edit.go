@@ -82,6 +82,17 @@ gh project item-edit --id ITEM_ID --field-id FIELD_ID --project-id PROJECT_ID --
 gh project item-edit --id ITEM_ID --field-id FIELD_ID --project-id PROJECT_ID --iteration-id ITERATION_ID
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` may be used",
+				opts.text != "",
+				opts.number != 0,
+				opts.date != "",
+				opts.singleSelectOptionID != "",
+				opts.iterationID != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -116,7 +127,6 @@ gh project item-edit --id ITEM_ID --field-id FIELD_ID --project-id PROJECT_ID --
 	editItemCmd.Flags().StringVar(&opts.singleSelectOptionID, "single-select-option-id", "", "ID of the single select option value to set on the field.")
 	editItemCmd.Flags().StringVar(&opts.iterationID, "iteration-id", "", "ID of the iteration value to set on the field.")
 
-	editItemCmd.MarkFlagsMutuallyExclusive("text", "number", "date", "single-select-option-id", "iteration-id")
 	_ = editItemCmd.MarkFlagRequired("id")
 
 	return editItemCmd

@@ -55,6 +55,14 @@ gh project close 1 --org github --undo
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -86,7 +94,6 @@ gh project close 1 --org github --undo
 	closeCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
 	closeCmd.Flags().BoolVar(&opts.reopen, "undo", false, "Reopen a closed project.")
 	closeCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
-	closeCmd.MarkFlagsMutuallyExclusive("user", "org")
 
 	return closeCmd
 }

@@ -65,6 +65,14 @@ gh project item-archive 1 --user "@me" --id ID --undo
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -98,7 +106,6 @@ gh project item-archive 1 --user "@me" --id ID --undo
 	archiveItemCmd.Flags().BoolVar(&opts.undo, "undo", false, "Undo archive (unarchive) of an item.")
 	archiveItemCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
 
-	archiveItemCmd.MarkFlagsMutuallyExclusive("user", "org")
 	_ = archiveItemCmd.MarkFlagRequired("id")
 
 	return archiveItemCmd

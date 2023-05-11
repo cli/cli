@@ -54,6 +54,14 @@ gh project delete 1 --org github
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -84,8 +92,6 @@ gh project delete 1 --org github
 	deleteCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
 	deleteCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
 	deleteCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
-
-	deleteCmd.MarkFlagsMutuallyExclusive("user", "org")
 
 	return deleteCmd
 }

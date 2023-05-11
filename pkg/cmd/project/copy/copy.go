@@ -58,6 +58,22 @@ gh project copy 1 --source-org github --title "a new project" --target-user mona
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--source-user` or `--source-org` may be used",
+				opts.sourceUserOwner != "",
+				opts.sourceOrgOwner != "",
+			); err != nil {
+				return err
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--target-user` or `--target-org` may be used",
+				opts.targetUserOwner != "",
+				opts.targetOrgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -94,8 +110,6 @@ gh project copy 1 --source-org github --title "a new project" --target-user mona
 	copyCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
 
 	_ = copyCmd.MarkFlagRequired("title")
-	copyCmd.MarkFlagsMutuallyExclusive("source-user", "source-org")
-	copyCmd.MarkFlagsMutuallyExclusive("target-user", "target-org")
 
 	return copyCmd
 }

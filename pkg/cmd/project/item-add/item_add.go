@@ -56,6 +56,14 @@ gh project item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -86,7 +94,6 @@ gh project item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
 	addItemCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
 	addItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
 	addItemCmd.Flags().StringVar(&opts.itemURL, "url", "", "URL of the issue or pull request to add to the project. Note that the name of the owner is case sensitive, and will fail to find the item if it does not match. Must be of form https://github.com/OWNER/REPO/issues/NUMBER or https://github.com/OWNER/REPO/pull/NUMBER")
-	addItemCmd.MarkFlagsMutuallyExclusive("user", "org")
 	addItemCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
 
 	_ = addItemCmd.MarkFlagRequired("url")

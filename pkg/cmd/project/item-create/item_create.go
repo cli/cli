@@ -56,6 +56,14 @@ gh project item-create 1 --org github --title "new item" --body "new item body"
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := cmdutil.MutuallyExclusive(
+				"only one of `--user` or `--org` may be used",
+				opts.userOwner != "",
+				opts.orgOwner != "",
+			); err != nil {
+				return err
+			}
+
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -89,7 +97,6 @@ gh project item-create 1 --org github --title "new item" --body "new item body"
 	createItemCmd.Flags().StringVar(&opts.body, "body", "", "Body of the draft issue item.")
 	createItemCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
 
-	createItemCmd.MarkFlagsMutuallyExclusive("user", "org")
 	_ = createItemCmd.MarkFlagRequired("title")
 
 	return createItemCmd
