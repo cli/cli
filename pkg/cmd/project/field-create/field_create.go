@@ -100,7 +100,7 @@ gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE
 	createFieldCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
 	createFieldCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
 	createFieldCmd.Flags().StringVar(&opts.name, "name", "", "Name of the new field.")
-	createFieldCmd.Flags().StringVar(&opts.dataType, "data-type", "", "DataType of the new field. Must be one of TEXT, SINGLE_SELECT, DATE, NUMBER.")
+	cmdutil.StringEnumFlag(createFieldCmd, &opts.dataType, "data-type", "", "", []string{"TEXT", "SINGLE_SELECT", "DATE", "NUMBER"}, "DataType of the new field.")
 	createFieldCmd.Flags().StringSliceVar(&opts.singleSelectOptions, "single-select-options", []string{}, "At least one option is required when data type is SINGLE_SELECT.")
 	createFieldCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
 
