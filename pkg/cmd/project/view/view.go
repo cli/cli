@@ -5,11 +5,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/glamour"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +27,7 @@ type viewConfig struct {
 	tp        *tableprinter.TablePrinter
 	client    *api.GraphQLClient
 	opts      viewOpts
+	io        *iostreams.IOStreams
 	URLOpener func(string) error
 }
 
@@ -77,6 +79,7 @@ gh project view 1 --org github --closed
 				tp:        t,
 				client:    client,
 				opts:      opts,
+				io:        f.IOStreams,
 				URLOpener: URLOpener,
 			}
 
@@ -191,8 +194,10 @@ func printResults(config viewConfig, project *queries.Project) error {
 		sb.WriteString(fmt.Sprintf("%s (%s)\n\n", f.Name(), f.Type()))
 	}
 
-	// TODO: respect the glamour env var if set
-	out, err := glamour.Render(sb.String(), "dark")
+	out, err := markdown.Render(sb.String(),
+		markdown.WithTheme(config.io.TerminalTheme()),
+		markdown.WithWrap(config.io.TerminalWidth()))
+
 	if err != nil {
 		return err
 	}

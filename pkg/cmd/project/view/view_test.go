@@ -219,6 +219,7 @@ func TestRunView_User(t *testing.T) {
 			userOwner: "monalisa",
 			number:    1,
 		},
+		io:     ios,
 		client: client,
 	}
 
@@ -283,6 +284,7 @@ func TestRunView_Viewer(t *testing.T) {
 			userOwner: "@me",
 			number:    1,
 		},
+		io:     ios,
 		client: client,
 	}
 
@@ -349,6 +351,7 @@ func TestRunView_Org(t *testing.T) {
 			orgOwner: "github",
 			number:   1,
 		},
+		io:     ios,
 		client: client,
 	}
 
