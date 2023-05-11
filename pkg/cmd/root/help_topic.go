@@ -11,11 +11,10 @@ import (
 )
 
 type helpTopic struct {
-	name       string
-	short      string
-	long       string
-	example    string
-	helpFuncFn func(io *iostreams.IOStreams) func(*cobra.Command, []string)
+	name    string
+	short   string
+	long    string
+	example string
 }
 
 var HelpTopics = []helpTopic{
@@ -102,9 +101,8 @@ var HelpTopics = []helpTopic{
 		`),
 	},
 	{
-		name:       "reference",
-		short:      "A comprehensive reference of all gh commands",
-		helpFuncFn: referenceHelpFn,
+		name:  "reference",
+		short: "A comprehensive reference of all gh commands",
 	},
 	{
 		name:  "formatting",
@@ -293,17 +291,9 @@ func NewCmdHelpTopic(ios *iostreams.IOStreams, ht helpTopic) *cobra.Command {
 		return helpTopicUsageFunc(ios.ErrOut, c)
 	})
 
-	helpFunc := func() func(*cobra.Command, []string) {
-		if ht.helpFuncFn != nil {
-			return ht.helpFuncFn(ios)
-		}
-
-		return func(c *cobra.Command, _ []string) {
-			helpTopicHelpFunc(ios.Out, c)
-		}
-	}()
-
-	cmd.SetHelpFunc(helpFunc)
+	cmd.SetHelpFunc(func(c *cobra.Command, _ []string) {
+		helpTopicHelpFunc(ios.Out, c)
+	})
 
 	return cmd
 }
