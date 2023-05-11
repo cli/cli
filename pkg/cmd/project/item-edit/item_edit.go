@@ -134,7 +134,7 @@ func runEditItem(config editItemConfig) error {
 	// update draft issue
 	if config.opts.title != "" || config.opts.body != "" {
 		if !strings.HasPrefix(config.opts.itemID, "DI_") {
-			return errors.New("ID must be the ID of the draft issue content which is prefixed with `DI_`")
+			return cmdutil.FlagErrorf("ID must be the ID of the draft issue content which is prefixed with `DI_`")
 		}
 
 		if config.opts.format != "" && config.opts.format != "json" {
