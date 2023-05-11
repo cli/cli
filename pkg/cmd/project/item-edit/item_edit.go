@@ -1,7 +1,6 @@
 package itemedit
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -158,11 +157,11 @@ func runEditItem(config editItemConfig) error {
 	// update item values
 	if config.opts.text != "" || config.opts.number != 0 || config.opts.date != "" || config.opts.singleSelectOptionID != "" || config.opts.iterationID != "" {
 		if config.opts.fieldID == "" {
-			return errors.New("field-id must be provided")
+			return cmdutil.FlagErrorf("field-id must be provided")
 		}
 		if config.opts.projectID == "" {
 			// TODO: offer to fetch interactively
-			return errors.New("project-id must be provided")
+			return cmdutil.FlagErrorf("project-id must be provided")
 		}
 
 		var parsedDate time.Time
