@@ -13,7 +13,7 @@ import (
 )
 
 type listOpts struct {
-	limit     string
+	limit     int
 	userOwner string
 	orgOwner  string
 	number    int
@@ -24,20 +24,6 @@ type listConfig struct {
 	tp     *tableprinter.TablePrinter
 	client *api.GraphQLClient
 	opts   listOpts
-}
-
-func parseLimit(limit string) (int, error) {
-	if limit == "" {
-		return queries.LimitMax, nil
-	} else if limit == "all" {
-		return 0, nil
-	}
-
-	v, err := strconv.Atoi(limit)
-	if err != nil {
-		return 0, fmt.Errorf("invalid value '%s' for limit", limit)
-	}
-	return v, nil
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.Command {
@@ -100,7 +86,7 @@ gh project item-list 1 --org github
 	listCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
 	listCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
 	listCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
-	listCmd.Flags().StringVar(&opts.limit, "limit", "", "Maximum number of items. Defaults to 30. Set to 'all' to list all items.")
+	listCmd.Flags().IntVarP(&opts.limit, "limit", "l", 0, "Maximum number of items. Defaults to 30.")
 
 	return listCmd
 }
@@ -108,11 +94,6 @@ gh project item-list 1 --org github
 func runList(config listConfig) error {
 	if config.opts.format != "" && config.opts.format != "json" {
 		return fmt.Errorf("format must be 'json'")
-	}
-
-	limit, err := parseLimit(config.opts.limit)
-	if err != nil {
-		return err
 	}
 
 	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)
@@ -129,7 +110,7 @@ func runList(config listConfig) error {
 		config.opts.number = project.Number
 	}
 
-	project, err := queries.ProjectItems(config.client, owner, config.opts.number, limit)
+	project, err := queries.ProjectItems(config.client, owner, config.opts.number, config.opts.limit)
 	if err != nil {
 		return err
 	}

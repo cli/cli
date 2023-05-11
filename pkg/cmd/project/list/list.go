@@ -2,7 +2,6 @@ package list
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
@@ -13,7 +12,7 @@ import (
 )
 
 type listOpts struct {
-	limit     string
+	limit     int
 	web       bool
 	userOwner string
 	orgOwner  string
@@ -26,20 +25,6 @@ type listConfig struct {
 	client    *api.GraphQLClient
 	opts      listOpts
 	URLOpener func(string) error
-}
-
-func parseLimit(limit string) (int, error) {
-	if limit == "" {
-		return queries.LimitMax, nil
-	} else if limit == "all" {
-		return 0, nil
-	}
-
-	v, err := strconv.Atoi(limit)
-	if err != nil {
-		return 0, fmt.Errorf("invalid value '%s' for limit", limit)
-	}
-	return v, nil
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.Command {
@@ -97,7 +82,7 @@ gh project list --org github --closed
 	listCmd.Flags().BoolVarP(&opts.closed, "closed", "c", false, "Show closed projects.")
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser.")
 	listCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
-	listCmd.Flags().StringVar(&opts.limit, "limit", "", "Maximum number of projects. Defaults to 30. Set to 'all' to list all projects. Note that closed projects are filtered from the final results without the --closed flag.")
+	listCmd.Flags().IntVarP(&opts.limit, "limit", "l", 0, "Maximum number of projects. Defaults to 30.")
 
 	return listCmd
 }
@@ -119,11 +104,6 @@ func runList(config listConfig) error {
 		return fmt.Errorf("format must be 'json'")
 	}
 
-	limit, err := parseLimit(config.opts.limit)
-	if err != nil {
-		return err
-	}
-
 	var login string
 	var ownerType queries.OwnerType
 	if config.opts.userOwner != "" {
@@ -142,7 +122,7 @@ func runList(config listConfig) error {
 		ownerType = queries.ViewerOwner
 	}
 
-	projects, totalCount, err := queries.Projects(config.client, login, ownerType, limit, false)
+	projects, totalCount, err := queries.Projects(config.client, login, ownerType, config.opts.limit, false)
 	if err != nil {
 		return err
 	}

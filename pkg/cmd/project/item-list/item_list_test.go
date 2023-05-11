@@ -57,13 +57,6 @@ func TestNewCmdList(t *testing.T) {
 			},
 		},
 		{
-			name: "limit",
-			cli:  "--limit all",
-			wants: listOpts{
-				limit: "all",
-			},
-		},
-		{
 			name: "json",
 			cli:  "--format json",
 			wants: listOpts{
@@ -137,7 +130,7 @@ func TestRunList_User(t *testing.T) {
 		JSON(map[string]interface{}{
 			"query": "query UserProjectWithItems.*",
 			"variables": map[string]interface{}{
-				"firstItems":  queries.LimitMax,
+				"firstItems":  queries.LimitDefault,
 				"afterItems":  nil,
 				"firstFields": queries.LimitMax,
 				"afterFields": nil,
@@ -237,7 +230,7 @@ func TestRunList_Org(t *testing.T) {
 		JSON(map[string]interface{}{
 			"query": "query OrgProjectWithItems.*",
 			"variables": map[string]interface{}{
-				"firstItems":  queries.LimitMax,
+				"firstItems":  queries.LimitDefault,
 				"afterItems":  nil,
 				"firstFields": queries.LimitMax,
 				"afterFields": nil,
@@ -335,7 +328,7 @@ func TestRunList_Me(t *testing.T) {
 		JSON(map[string]interface{}{
 			"query": "query ViewerProjectWithItems.*",
 			"variables": map[string]interface{}{
-				"firstItems":  queries.LimitMax,
+				"firstItems":  queries.LimitDefault,
 				"afterItems":  nil,
 				"firstFields": queries.LimitMax,
 				"afterFields": nil,

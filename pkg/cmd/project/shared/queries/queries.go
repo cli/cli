@@ -29,7 +29,8 @@ func NewClient() (*api.GraphQLClient, error) {
 }
 
 const (
-	LimitMax = 30 // https://docs.github.com/en/graphql/overview/resource-limitations#node-limit
+	LimitDefault = 30
+	LimitMax     = 100 // https://docs.github.com/en/graphql/overview/resource-limitations#node-limit
 )
 
 // doQuery wraps calls to client.Query with a spinner
@@ -309,15 +310,19 @@ func (p ProjectItem) URL() string {
 }
 
 // ProjectItems returns the items of a project. If the OwnerType is VIEWER, no login is required.
+// If limit is 0, the default limit is used.
 func ProjectItems(client *api.GraphQLClient, o *Owner, number int, limit int) (*Project, error) {
 	project := &Project{}
-	hasLimit := limit != 0
-	// the api limits batches to 100. We want to use the maximum batch size unless the user
-	// requested a lower limit.
+	if limit == 0 {
+		limit = LimitDefault
+	}
+
+	// set first to the min of limit and LimitMax
 	first := LimitMax
-	if hasLimit && limit < first {
+	if limit < first {
 		first = limit
 	}
+
 	variables := map[string]interface{}{
 		"firstItems":  graphql.Int(first),
 		"afterItems":  (*githubv4.String)(nil),
@@ -483,13 +488,12 @@ type projectAttribute interface {
 func paginateAttributes[N projectAttribute](client *api.GraphQLClient, p pager[N], variables map[string]any, queryName string, firstKey string, afterKey string, limit int, nodes []N) ([]N, error) {
 	hasNextPage := p.HasNextPage()
 	cursor := p.EndCursor()
-	hasLimit := limit != 0
 	for {
-		if !hasNextPage || (hasLimit && len(nodes) >= limit) {
+		if !hasNextPage || len(nodes) >= limit {
 			return nodes, nil
 		}
 
-		if hasLimit && len(nodes)+LimitMax > limit {
+		if len(nodes)+LimitMax > limit {
 			first := limit - len(nodes)
 			variables[firstKey] = graphql.Int(first)
 		}
@@ -577,13 +581,16 @@ func (p ProjectField) Options() []SingleSelectFieldOptions {
 }
 
 // ProjectFields returns a project with fields. If the OwnerType is VIEWER, no login is required.
+// If limit is 0, the default limit is used.
 func ProjectFields(client *api.GraphQLClient, o *Owner, number int, limit int) (*Project, error) {
 	project := &Project{}
-	hasLimit := limit != 0
-	// the api limits batches to 100. We want to use the maximum batch size unless the user
-	// requested a lower limit.
+	if limit == 0 {
+		limit = LimitDefault
+	}
+
+	// set first to the min of limit and LimitMax
 	first := LimitMax
-	if hasLimit && limit < first {
+	if limit < first {
 		first = limit
 	}
 	variables := map[string]interface{}{
@@ -1066,17 +1073,20 @@ func NewProject(client *api.GraphQLClient, o *Owner, number int, fields bool) (*
 }
 
 // Projects returns all the projects for an Owner. If the OwnerType is VIEWER, no login is required.
+// If limit is 0, the default limit is used.
 func Projects(client *api.GraphQLClient, login string, t OwnerType, limit int, fields bool) ([]Project, int, error) {
 	projects := make([]Project, 0)
 	cursor := (*githubv4.String)(nil)
 	hasNextPage := false
-	hasLimit := limit != 0
 	totalCount := 0
 
-	// the api limits batches to 100. We want to use the maximum batch size unless the user
-	// requested a lower limit.
+	if limit == 0 {
+		limit = LimitDefault
+	}
+
+	// set first to the min of limit and LimitMax
 	first := LimitMax
-	if hasLimit && limit < first {
+	if limit < first {
 		first = limit
 	}
 
@@ -1130,12 +1140,12 @@ func Projects(client *api.GraphQLClient, login string, t OwnerType, limit int, f
 			totalCount = query.Owner.Projects.TotalCount
 		}
 
-		if !hasNextPage || (hasLimit && len(projects) >= limit) {
+		if !hasNextPage || len(projects) >= limit {
 			return projects, totalCount, nil
 		}
 
 		if len(projects)+LimitMax > limit {
-			first = limit - len(projects)
+			first := limit - len(projects)
 			variables["first"] = graphql.Int(first)
 		}
 		variables["after"] = cursor

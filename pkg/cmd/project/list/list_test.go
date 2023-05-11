@@ -57,13 +57,6 @@ func TestNewCmdlist(t *testing.T) {
 			},
 		},
 		{
-			name: "limit",
-			cli:  "--limit all",
-			wants: listOpts{
-				limit: "all",
-			},
-		},
-		{
 			name: "json",
 			cli:  "--format json",
 			wants: listOpts{

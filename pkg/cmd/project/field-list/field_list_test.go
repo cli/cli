@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -52,13 +53,6 @@ func TestNewCmdList(t *testing.T) {
 			cli:  "--org github",
 			wants: listOpts{
 				orgOwner: "github",
-			},
-		},
-		{
-			name: "limit",
-			cli:  "--limit all",
-			wants: listOpts{
-				limit: "all",
 			},
 		},
 		{
@@ -138,9 +132,9 @@ func TestRunList_User(t *testing.T) {
 			"variables": map[string]interface{}{
 				"login":       "monalisa",
 				"number":      1,
-				"firstItems":  30,
+				"firstItems":  queries.LimitMax,
 				"afterItems":  nil,
-				"firstFields": 30,
+				"firstFields": queries.LimitDefault,
 				"afterFields": nil,
 			},
 		}).
@@ -224,9 +218,9 @@ func TestRunList_Org(t *testing.T) {
 			"variables": map[string]interface{}{
 				"login":       "github",
 				"number":      1,
-				"firstItems":  30,
+				"firstItems":  queries.LimitMax,
 				"afterItems":  nil,
-				"firstFields": 30,
+				"firstFields": queries.LimitDefault,
 				"afterFields": nil,
 			},
 		}).
@@ -307,9 +301,9 @@ func TestRunList_Me(t *testing.T) {
 			"query": "query ViewerProject.*",
 			"variables": map[string]interface{}{
 				"number":      1,
-				"firstItems":  30,
+				"firstItems":  queries.LimitMax,
 				"afterItems":  nil,
-				"firstFields": 30,
+				"firstFields": queries.LimitDefault,
 				"afterFields": nil,
 			},
 		}).
@@ -390,9 +384,9 @@ func TestRunList_Empty(t *testing.T) {
 			"query": "query ViewerProject.*",
 			"variables": map[string]interface{}{
 				"number":      1,
-				"firstItems":  30,
+				"firstItems":  queries.LimitMax,
 				"afterItems":  nil,
-				"firstFields": 30,
+				"firstFields": queries.LimitDefault,
 				"afterFields": nil,
 			},
 		}).
