@@ -123,7 +123,7 @@ func TestProjectItems_NoLimit(t *testing.T) {
 		JSON(map[string]interface{}{
 			"query": "query UserProjectWithItems.*",
 			"variables": map[string]interface{}{
-				"firstItems":  LimitMax,
+				"firstItems":  LimitDefault,
 				"afterItems":  nil,
 				"firstFields": LimitMax,
 				"afterFields": nil,
@@ -287,7 +287,7 @@ func TestProjectFields_NoLimit(t *testing.T) {
 				"number":      1,
 				"firstItems":  LimitMax,
 				"afterItems":  nil,
-				"firstFields": LimitMax,
+				"firstFields": LimitDefault,
 				"afterFields": nil,
 			},
 		}).
