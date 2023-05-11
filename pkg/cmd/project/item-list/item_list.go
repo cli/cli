@@ -100,7 +100,7 @@ gh project item-list 1 --org github
 	listCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
 	listCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
 	listCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
-	listCmd.Flags().StringVar(&opts.limit, "limit", "", "Maximum number of items. Defaults to 100. Set to 'all' to list all items.")
+	listCmd.Flags().StringVar(&opts.limit, "limit", "", "Maximum number of items. Defaults to 30. Set to 'all' to list all items.")
 
 	return listCmd
 }

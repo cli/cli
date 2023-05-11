@@ -29,7 +29,7 @@ func NewClient() (*api.GraphQLClient, error) {
 }
 
 const (
-	LimitMax = 100 // https://docs.github.com/en/graphql/overview/resource-limitations#node-limit
+	LimitMax = 30 // https://docs.github.com/en/graphql/overview/resource-limitations#node-limit
 )
 
 // doQuery wraps calls to client.Query with a spinner

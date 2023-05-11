@@ -97,7 +97,7 @@ gh project list --org github --closed
 	listCmd.Flags().BoolVarP(&opts.closed, "closed", "c", false, "Show closed projects.")
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser.")
 	listCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
-	listCmd.Flags().StringVar(&opts.limit, "limit", "", "Maximum number of projects. Defaults to 100. Set to 'all' to list all projects. Note that closed projects are filtered from the final results without the --closed flag.")
+	listCmd.Flags().StringVar(&opts.limit, "limit", "", "Maximum number of projects. Defaults to 30. Set to 'all' to list all projects. Note that closed projects are filtered from the final results without the --closed flag.")
 
 	return listCmd
 }
