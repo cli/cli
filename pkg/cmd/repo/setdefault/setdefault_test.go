@@ -68,7 +68,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "run from non-git directory",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --git-dir`, 128, "")
+				cs.Register(`git rev-parse --git-dir`, 0, "")
 			},
 			input:   "",
 			wantErr: true,

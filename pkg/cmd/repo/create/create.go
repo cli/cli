@@ -449,15 +449,15 @@ func createFromLocal(opts *CreateOptions) error {
 		return err
 	}
 
-	isRepo, err := isLocalRepo(opts.GitClient)
-	if err != nil {
-		return err
-	}
+	isRepo, err := opts.GitClient.IsLocalGitRepo(context.Background())
 	if !isRepo {
 		if repoPath == "." {
 			return fmt.Errorf("current directory is not a git repository. Run `git init` to initialize it")
 		}
 		return fmt.Errorf("%s is not a git repository. Run `git -C \"%s\" init` to initialize it", absPath, repoPath)
+	}
+	if err != nil {
+		return err
 	}
 
 	committed, err := hasCommits(opts.GitClient)
@@ -630,24 +630,6 @@ func hasCommits(gitClient *git.Client) (bool, error) {
 		return false, err
 	}
 	return false, nil
-}
-
-// check if path is the top level directory of a git repo
-func isLocalRepo(gitClient *git.Client) (bool, error) {
-	projectDir, projectDirErr := gitClient.GitDir(context.Background())
-	if projectDirErr != nil {
-		var execError *exec.ExitError
-		if errors.As(projectDirErr, &execError) {
-			if exitCode := int(execError.ExitCode()); exitCode == 128 {
-				return false, nil
-			}
-			return false, projectDirErr
-		}
-	}
-	if projectDir != ".git" {
-		return false, nil
-	}
-	return true, nil
 }
 
 // clone the checkout branch to specified path

@@ -90,10 +90,12 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 				return cmdutil.FlagErrorf("repository required when not running interactively")
 			}
 
-			if isLocal, err := opts.GitClient.IsLocalGitRepo(cmd.Context()); err != nil {
-				return err
-			} else if !isLocal {
+			isLocal, err := opts.GitClient.IsLocalGitRepo(cmd.Context())
+			if !isLocal {
 				return errors.New("must be run from inside a git repository")
+			}
+			if err != nil {
+				return err
 			}
 
 			if runF != nil {

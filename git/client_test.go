@@ -784,7 +784,7 @@ func TestClientGitDir(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
-			dir, err := client.GitDir(context.Background())
+			dir, err := client.GitDir(context.Background(), false)
 			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
 			if tt.wantErrorMsg == "" {
 				assert.NoError(t, err)

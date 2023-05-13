@@ -74,6 +74,20 @@ func (c *Client) AuthenticatedCommand(ctx context.Context, args ...string) (*Com
 	return c.Command(ctx, args...)
 }
 
+// IgnoreLocaleCommand is a wrapper around Command to specify the POSIX locale before executing
+// a command.
+// We use the LANGUAGE env since it has priority over LANG and LC_ALL, to ensure that the message
+// is in english. See https://www.gnu.org/software/gettext/manual/html_node/The-LANGUAGE-variable.html
+// Also, using the special POSIX locale "C". See https://www.gnu.org/software/gettext/manual/html_node/Locale-Names.html
+func (c *Client) IgnoreLocaleCommand(ctx context.Context, args ...string) (*Command, error) {
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	cmd.Env = append(cmd.Env, "LANGUAGE=C")
+	return cmd, nil
+}
+
 func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	remoteArgs := []string{"remote", "-v"}
 	remoteCmd, err := c.Command(ctx, remoteArgs...)
@@ -350,7 +364,7 @@ func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch strin
 }
 
 func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
-	_, err := c.revParse(ctx, "--verify", "refs/heads/"+branch)
+	_, err := c.revParse(ctx, false, "--verify", "refs/heads/"+branch)
 	return err == nil
 }
 
@@ -372,15 +386,15 @@ func (c *Client) TrackingBranchNames(ctx context.Context, prefix string) []strin
 
 // ToplevelDir returns the top-level directory path of the current repository.
 func (c *Client) ToplevelDir(ctx context.Context) (string, error) {
-	out, err := c.revParse(ctx, "--show-toplevel")
+	out, err := c.revParse(ctx, false, "--show-toplevel")
 	if err != nil {
 		return "", err
 	}
 	return firstLine(out), nil
 }
 
-func (c *Client) GitDir(ctx context.Context) (string, error) {
-	out, err := c.revParse(ctx, "--git-dir")
+func (c *Client) GitDir(ctx context.Context, ignoreLocale bool) (string, error) {
+	out, err := c.revParse(ctx, ignoreLocale, "--git-dir")
 	if err != nil {
 		return "", err
 	}
@@ -389,7 +403,7 @@ func (c *Client) GitDir(ctx context.Context) (string, error) {
 
 // Show current directory relative to the top-level directory of repository.
 func (c *Client) PathFromRoot(ctx context.Context) string {
-	out, err := c.revParse(ctx, "--show-prefix")
+	out, err := c.revParse(ctx, false, "--show-prefix")
 	if err != nil {
 		return ""
 	}
@@ -399,9 +413,15 @@ func (c *Client) PathFromRoot(ctx context.Context) string {
 	return ""
 }
 
-func (c *Client) revParse(ctx context.Context, args ...string) ([]byte, error) {
+func (c *Client) revParse(ctx context.Context, ignoreLocale bool, args ...string) ([]byte, error) {
 	args = append([]string{"rev-parse"}, args...)
-	cmd, err := c.Command(ctx, args...)
+	var cmd *Command
+	var err error
+	if ignoreLocale {
+		cmd, err = c.IgnoreLocaleCommand(ctx, args...)
+	} else {
+		cmd, err = c.Command(ctx, args...)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -514,13 +534,19 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 }
 
 func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
-	_, err := c.GitDir(ctx)
+	projectDir, err := c.GitDir(ctx, true)
 	if err != nil {
-		var execError errWithExitCode
-		if errors.As(err, &execError) && execError.ExitCode() == 128 {
-			return false, nil
+		var gitErr *GitError
+		if ok := errors.As(err, &gitErr); ok && strings.Contains(err.Error(), ErrNotAGitRepository.Error()) {
+			gitErr.err = ErrNotAGitRepository
+			gitErr.Stderr = "not a git repository"
+			return false, gitErr
 		}
-		return false, err
+		_, err := c.GitDir(ctx, false)
+		return true, err // It's a git repository, but there is another error
+	}
+	if projectDir != ".git" {
+		return false, nil
 	}
 	return true, nil
 }
