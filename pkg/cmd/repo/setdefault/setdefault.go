@@ -119,10 +119,11 @@ func setDefaultRun(opts *SetDefaultOptions) error {
 	currentDefaultRepo, _ := remotes.ResolvedRemote()
 
 	if opts.ViewMode {
-		if currentDefaultRepo == nil {
-			return errors.New("no default repository has been set; use `gh repo set-default` to select one")
+		if currentDefaultRepo != nil {
+			fmt.Fprintln(opts.IO.Out, displayRemoteRepoName(currentDefaultRepo))
+		} else if opts.IO.IsStdoutTTY() {
+			fmt.Fprintln(opts.IO.Out, "no default repository has been set; use `gh repo set-default` to select one")
 		}
-		fmt.Fprintln(opts.IO.Out, displayRemoteRepoName(currentDefaultRepo))
 		return nil
 	}
 
