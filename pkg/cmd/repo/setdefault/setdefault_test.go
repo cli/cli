@@ -175,7 +175,7 @@ func TestDefaultRun(t *testing.T) {
 					Repo:   repo1,
 				},
 			},
-			wantStdout: "no default repository has been set; use `gh repo set-default` to select one",
+			wantStdout: "no default repository has been set; use `gh repo set-default` to select one\n",
 		},
 		{
 			name: "view mode no current default",
