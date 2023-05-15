@@ -86,7 +86,7 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 				}
 			}
 
-			if !opts.IO.CanPrompt() && opts.Repo == nil {
+			if !opts.ViewMode && !opts.IO.CanPrompt() && opts.Repo == nil {
 				return cmdutil.FlagErrorf("repository required when not running interactively")
 			}
 
@@ -119,10 +119,10 @@ func setDefaultRun(opts *SetDefaultOptions) error {
 	currentDefaultRepo, _ := remotes.ResolvedRemote()
 
 	if opts.ViewMode {
-		if currentDefaultRepo == nil {
-			fmt.Fprintln(opts.IO.Out, "no default repository has been set; use `gh repo set-default` to select one")
-		} else {
+		if currentDefaultRepo != nil {
 			fmt.Fprintln(opts.IO.Out, displayRemoteRepoName(currentDefaultRepo))
+		} else if opts.IO.IsStdoutTTY() {
+			fmt.Fprintln(opts.IO.Out, "no default repository has been set; use `gh repo set-default` to select one")
 		}
 		return nil
 	}
