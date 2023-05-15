@@ -652,3 +652,19 @@ var globReplacer = strings.NewReplacer(
 func escapeGlob(p string) string {
 	return globReplacer.Replace(p)
 }
+
+func (c *Client) SetRemoteBranches(ctx context.Context, remote string, refspec string, mods ...CommandModifier) error {
+	args := []string{"remote", "set-branches", remote, refspec}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	for _, mod := range mods {
+		mod(cmd)
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
+}
