@@ -148,6 +148,28 @@ func StatusCheckRollupGraphQL(after string) string {
 	if after != "" {
 		afterClause = ",after:" + after
 	}
+	// TODO checkRunCountsByState
+	if true {
+		return shortenQuery(`
+		statusCheckRollup: commits(last: 1) {
+			nodes {
+				commit {
+					statusCheckRollup {
+						contexts {
+							checkRunCountsByState {
+								state,
+								count
+							}
+							statusContextCountsByState {
+								state,
+								count
+							}
+						}
+					}
+				}
+			}
+		}`)
+	}
 	return fmt.Sprintf(shortenQuery(`
 	statusCheckRollup: commits(last: 1) {
 		nodes {

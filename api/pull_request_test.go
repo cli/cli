@@ -35,6 +35,7 @@ func TestPullRequest_ChecksStatus(t *testing.T) {
 	err := json.Unmarshal([]byte(payload), &pr)
 	assert.NoError(t, err)
 
+	// TODO: handle checkRunCountsByState
 	checks := pr.ChecksStatus()
 	assert.Equal(t, 8, checks.Total)
 	assert.Equal(t, 3, checks.Pending)

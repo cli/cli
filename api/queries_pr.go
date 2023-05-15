@@ -98,6 +98,15 @@ type CommitStatusCheckRollup struct {
 }
 
 type CheckContexts struct {
+	CheckRunCountsByState struct {
+		State string
+		Count int
+	}
+	CtatusContextCountsByState struct {
+		State string
+		Count int
+	}
+
 	Nodes    []CheckContext
 	PageInfo struct {
 		HasNextPage bool
@@ -262,6 +271,11 @@ type PullRequestChecksStatus struct {
 }
 
 func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
+	if pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.CheckRunCountsByState.State != "" {
+		// ALTERNATE IMPLEMENTATION
+		return summary
+	}
+
 	if len(pr.StatusCheckRollup.Nodes) == 0 {
 		return
 	}
