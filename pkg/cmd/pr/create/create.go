@@ -325,8 +325,6 @@ func createRun(opts *CreateOptions) (err error) {
 
 			if template != nil {
 				templateContent = string(template.Body())
-			} else {
-				templateContent = string(tpl.LegacyBody())
 			}
 		}
 
