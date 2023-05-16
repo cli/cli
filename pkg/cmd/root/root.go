@@ -128,18 +128,26 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
 
 	// Help topics
-	cmd.AddCommand(NewHelpTopic(f.IOStreams, "environment"))
-	cmd.AddCommand(NewHelpTopic(f.IOStreams, "formatting"))
-	cmd.AddCommand(NewHelpTopic(f.IOStreams, "mintty"))
-	cmd.AddCommand(NewHelpTopic(f.IOStreams, "exit-codes"))
-	referenceCmd := NewHelpTopic(f.IOStreams, "reference")
-	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
-	cmd.AddCommand(referenceCmd)
+	var referenceCmd *cobra.Command
+	for _, ht := range HelpTopics {
+		helpTopicCmd := NewCmdHelpTopic(f.IOStreams, ht)
+		cmd.AddCommand(helpTopicCmd)
+
+		// See bottom of the function for why we explicitly care about the reference cmd
+		if ht.name == "reference" {
+			referenceCmd = helpTopicCmd
+		}
+	}
 
 	cmdutil.DisableAuthCheck(cmd)
 
-	// this needs to appear last:
-	referenceCmd.Long = referenceLong(cmd)
+	// The reference command produces paged output that displays information on every other command.
+	// Therefore, we explicitly set the Long text and HelpFunc here after all other commands are registered.
+	// We experimented with producing the paged output dynamically when the HelpFunc is called but since
+	// doc generation makes use of the Long text, it is simpler to just be explicit here that this command
+	// is special.
+	referenceCmd.Long = stringifyReference(cmd)
+	referenceCmd.SetHelpFunc(longPager(f.IOStreams))
 	return cmd
 }
 

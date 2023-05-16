@@ -293,6 +293,7 @@ jobs:
           cp -a upload/* site/packages/
       - name: Create the release
         env:
+          # In non-production environments, the assets will not have been signed
           DO_PUBLISH: ${{ inputs.environment == 'production' }}
           TAG_NAME: ${{ inputs.tag_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -313,9 +314,9 @@ jobs:
           else
             release_args+=( --discussion-category "General" )
           fi
-          action="echo"
-          [ "$DO_PUBLISH" = "false" ] || action="command"
-          script/label-assets dist/gh_* | xargs $action gh release create "${release_args[@]}" -- 
+          guard="echo"
+          [ "$DO_PUBLISH" = "false" ] || guard=""
+          script/label-assets dist/gh_* | xargs $guard gh release create "${release_args[@]}" --
       - name: Publish site
         env:
           DO_PUBLISH: ${{ inputs.environment == 'production' && !contains(inputs.tag_name, '-') }}
