@@ -223,6 +223,7 @@ func RequiredStatusCheckRollupGraphQL(prID, after string) string {
 								targetUrl,
 								createdAt,
 								isRequired(pullRequestId: %[2]s)
+								description
 							},
 							...on CheckRun {
 								name,

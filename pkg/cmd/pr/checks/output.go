@@ -46,6 +46,7 @@ func addRow(tp utils.TablePrinter, io *iostreams.IOStreams, o check) {
 		tp.AddField(name, nil, nil)
 		tp.AddField(elapsed, nil, nil)
 		tp.AddField(o.Link, nil, nil)
+		tp.AddField(o.Description, nil, nil)
 	} else {
 		tp.AddField(o.Name, nil, nil)
 		tp.AddField(o.Bucket, nil, nil)
@@ -55,6 +56,7 @@ func addRow(tp utils.TablePrinter, io *iostreams.IOStreams, o check) {
 			tp.AddField(elapsed, nil, nil)
 		}
 		tp.AddField(o.Link, nil, nil)
+		tp.AddField(o.Description, nil, nil)
 	}
 
 	tp.EndRow()
