@@ -21,7 +21,8 @@ type ImportOptions struct {
 	Filename          string
 	OverwriteExisting bool
 
-	existingCommand func(string) bool
+	validAliasName      func(string) bool
+	validAliasExpansion func(string) bool
 }
 
 func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Command {
@@ -74,7 +75,8 @@ func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Co
 				opts.Filename = args[0]
 			}
 
-			opts.existingCommand = shared.ExistingCommandFunc(f, cmd)
+			opts.validAliasName = shared.ValidAliasNameFunc(cmd)
+			opts.validAliasExpansion = shared.ValidAliasExpansionFunc(cmd)
 
 			if runF != nil {
 				return runF(opts)
@@ -120,9 +122,9 @@ func importRun(opts *ImportOptions) error {
 	var msg strings.Builder
 
 	for _, alias := range getSortedKeys(aliasMap) {
-		if opts.existingCommand(alias) {
+		if !opts.validAliasName(alias) {
 			msg.WriteString(
-				fmt.Sprintf("%s Could not import alias %s: already a gh command\n",
+				fmt.Sprintf("%s Could not import alias %s: already a gh command, extension, or alias\n",
 					cs.FailureIcon(),
 					cs.Bold(alias),
 				),
@@ -133,9 +135,9 @@ func importRun(opts *ImportOptions) error {
 
 		expansion := aliasMap[alias]
 
-		if !(strings.HasPrefix(expansion, "!") || opts.existingCommand(expansion)) {
+		if !opts.validAliasExpansion(expansion) {
 			msg.WriteString(
-				fmt.Sprintf("%s Could not import alias %s: expansion does not correspond to a gh command\n",
+				fmt.Sprintf("%s Could not import alias %s: expansion does not correspond to a gh command, extension, or alias\n",
 					cs.FailureIcon(),
 					cs.Bold(alias),
 				),

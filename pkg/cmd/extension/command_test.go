@@ -226,9 +226,6 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "install an extension",
 			args: []string{"install", "owner/gh-some-ext"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func() []extensions.Extension {
-					return []extensions.Extension{}
-				}
 				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
 					return nil
 				}
@@ -236,8 +233,6 @@ func TestNewCmdExtension(t *testing.T) {
 					installCalls := em.InstallCalls()
 					assert.Equal(t, 1, len(installCalls))
 					assert.Equal(t, "gh-some-ext", installCalls[0].InterfaceMoqParam.RepoName())
-					listCalls := em.ListCalls()
-					assert.Equal(t, 1, len(listCalls))
 				}
 			},
 		},
