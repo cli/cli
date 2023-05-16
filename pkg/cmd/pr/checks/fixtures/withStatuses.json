@@ -28,7 +28,8 @@
                     {
                       "state": "FAILURE",
                       "name": "a status",
-                      "targetUrl": "sweet link"
+                      "targetUrl": "sweet link",
+                      "description": "status description"
                     }
                   ]
                 }

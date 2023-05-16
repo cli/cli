@@ -165,7 +165,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someFailing.json"),
 				)
 			},
-			wantOut: "Some checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
+			wantOut: "Some checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link  \n✓  cool tests  1m26s  sweet link  \n*  slow tests  1m26s  sweet link  \n",
 			wantErr: "SilentError",
 		},
 		{
@@ -177,7 +177,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/somePending.json"),
 				)
 			},
-			wantOut: "Some checks are still pending\n0 failing, 2 successful, 0 skipped, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
+			wantOut: "Some checks are still pending\n0 failing, 2 successful, 0 skipped, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link  \n✓  rad tests   1m26s  sweet link  \n*  slow tests  1m26s  sweet link  \n",
 			wantErr: "SilentError",
 		},
 		{
@@ -189,7 +189,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/allPassing.json"),
 				)
 			},
-			wantOut: "All checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
+			wantOut: "All checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link  \n✓  cool tests     1m26s  sweet link  \n✓  rad tests      1m26s  sweet link  \n",
 			wantErr: "",
 		},
 		{
@@ -202,7 +202,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/allPassing.json"),
 				)
 			},
-			wantOut: "\x1b[?1049hAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n\x1b[?1049lAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
+			wantOut: "\x1b[?1049hAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link  \n✓  cool tests     1m26s  sweet link  \n✓  rad tests      1m26s  sweet link  \n\x1b[?1049lAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link  \n✓  cool tests     1m26s  sweet link  \n✓  rad tests      1m26s  sweet link  \n",
 			wantErr: "",
 		},
 		{
@@ -216,7 +216,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someFailing.json"),
 				)
 			},
-			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing checks status every 0 seconds. Press Ctrl+C to quit.\n\nSome checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n*  slow tests  1m26s  sweet link\n\x1b[?1049lSome checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
+			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing checks status every 0 seconds. Press Ctrl+C to quit.\n\nSome checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link  \n✓  cool tests  1m26s  sweet link  \n*  slow tests  1m26s  sweet link  \n\x1b[?1049lSome checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link  \n✓  cool tests  1m26s  sweet link  \n*  slow tests  1m26s  sweet link  \n",
 			wantErr: "SilentError",
 		},
 		{
@@ -228,7 +228,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withStatuses.json"),
 				)
 			},
-			wantOut: "Some checks were not successful\n1 failing, 2 successful, 0 skipped, and 0 pending checks\n\nX  a status           sweet link\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n",
+			wantOut: "Some checks were not successful\n1 failing, 2 successful, 0 skipped, and 0 pending checks\n\nX  a status           sweet link  status description\n✓  cool tests  1m26s  sweet link  \n✓  rad tests   1m26s  sweet link  \n",
 			wantErr: "SilentError",
 		},
 		{
@@ -250,7 +250,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someFailing.json"),
 				)
 			},
-			wantOut: "sad tests\tfail\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
+			wantOut: "sad tests\tfail\t1m26s\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\n",
 			wantErr: "SilentError",
 		},
 		{
@@ -261,7 +261,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/somePending.json"),
 				)
 			},
-			wantOut: "cool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
+			wantOut: "cool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\n",
 			wantErr: "SilentError",
 		},
 		{
@@ -272,7 +272,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/allPassing.json"),
 				)
 			},
-			wantOut: "awesome tests\tpass\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
+			wantOut: "awesome tests\tpass\t1m26s\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\n",
 			wantErr: "",
 		},
 		{
@@ -283,7 +283,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withStatuses.json"),
 				)
 			},
-			wantOut: "a status\tfail\t0\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
+			wantOut: "a status\tfail\t0\tsweet link\tstatus description\ncool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\n",
 			wantErr: "SilentError",
 		},
 		{
@@ -295,7 +295,7 @@ func Test_checksRun(t *testing.T) {
 				)
 			},
 			tty:     true,
-			wantOut: "All checks were successful\n0 failing, 1 successful, 2 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n-  rad tests   1m26s  sweet link\n-  skip tests  1m26s  sweet link\n",
+			wantOut: "All checks were successful\n0 failing, 1 successful, 2 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link  \n-  rad tests   1m26s  sweet link  \n-  skip tests  1m26s  sweet link  \n",
 			wantErr: "",
 		},
 		{
@@ -307,7 +307,7 @@ func Test_checksRun(t *testing.T) {
 				)
 			},
 			tty:      true,
-			wantOut:  "All checks were successful\n0 failing, 1 successful, 0 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n",
+			wantOut:  "All checks were successful\n0 failing, 1 successful, 0 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link  \n",
 			wantErr:  "",
 			required: true,
 		},
