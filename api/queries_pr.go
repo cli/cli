@@ -261,9 +261,11 @@ type PullRequestChecksStatus struct {
 	Total   int
 }
 
-func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
+func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
+	var summary PullRequestChecksStatus
+
 	if len(pr.StatusCheckRollup.Nodes) == 0 {
-		return
+		return summary
 	}
 
 	commit := pr.StatusCheckRollup.Nodes[0].Commit
@@ -295,7 +297,7 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		summary.Total++
 	}
 
-	return
+	return summary
 }
 
 func (pr *PullRequest) DisplayableReviews() PullRequestReviews {
