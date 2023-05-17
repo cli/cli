@@ -83,7 +83,7 @@ func TestPullRequestFeatures(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name:     "github.com",
+			name:     "github.com with merge queue",
 			hostname: "github.com",
 			queryResponse: map[string]string{
 				`query PullRequest_fields\b`: heredoc.Doc(`
@@ -95,7 +95,8 @@ func TestPullRequestFeatures(t *testing.T) {
 				`query StatusCheckRollupContextConnection_fields\b`: emptyIntrospectionFor("StatusCheckRollupContextConnection"),
 			},
 			wantFeatures: PullRequestFeatures{
-				MergeQueue: true,
+				MergeQueue:                     true,
+				CheckRunAndStatusContextCounts: true,
 			},
 			wantErr: false,
 		},
@@ -110,7 +111,8 @@ func TestPullRequestFeatures(t *testing.T) {
 				`query StatusCheckRollupContextConnection_fields\b`: emptyIntrospectionFor("StatusCheckRollupContextConnection"),
 			},
 			wantFeatures: PullRequestFeatures{
-				MergeQueue: false,
+				MergeQueue:                     false,
+				CheckRunAndStatusContextCounts: true,
 			},
 			wantErr: false,
 		},
@@ -132,8 +134,20 @@ func TestPullRequestFeatures(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:     "Any GitHub host without check run and status context count support",
+			name:     "GitHub.com supports check and run status context counts regardless of GQL response",
 			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`:                        emptyIntrospectionFor("PullRequest"),
+				`query StatusCheckRollupContextConnection_fields\b`: emptyIntrospectionFor("StatusCheckRollupContextConnection"),
+			},
+			wantFeatures: PullRequestFeatures{
+				CheckRunAndStatusContextCounts: true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE without check run and status context count support",
+			hostname: "git.my.org",
 			queryResponse: map[string]string{
 				`query PullRequest_fields\b`: emptyIntrospectionFor("PullRequest"),
 				`query StatusCheckRollupContextConnection_fields\b`: heredoc.Doc(`
@@ -147,8 +161,8 @@ func TestPullRequestFeatures(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:     "Any GitHub host with check run and status context count support",
-			hostname: "github.com",
+			name:     "GHE host with check run and status context count support",
+			hostname: "git.my.org",
 			queryResponse: map[string]string{
 				`query PullRequest_fields\b`: emptyIntrospectionFor("PullRequest"),
 				`query StatusCheckRollupContextConnection_fields\b`: heredoc.Doc(`

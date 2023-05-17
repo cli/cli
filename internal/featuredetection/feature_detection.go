@@ -99,51 +99,63 @@ func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
 	// }
 
 	features := PullRequestFeatures{}
-
-	var pullRequestFeatureDetection struct {
-		PullRequest struct {
-			Fields []struct {
-				Name string
-			} `graphql:"fields(includeDeprecated: true)"`
-		} `graphql:"PullRequest: __type(name: \"PullRequest\")"`
-	}
-
-	var statusCheckRollupContextConnectionFeatureDetection struct {
-		StatusCheckRollupContextConnection struct {
-			Fields []struct {
-				Name string
-			} `graphql:"fields(includeDeprecated: true)"`
-		} `graphql:"StatusCheckRollupContextConnection: __type(name: \"StatusCheckRollupContextConnection\")"`
-	}
-
 	gql := api.NewClientFromHTTP(d.httpClient)
 
 	g := new(errgroup.Group)
 	g.Go(func() error {
-		return gql.Query(d.host, "PullRequest_fields", &pullRequestFeatureDetection, nil)
+		var pullRequestFeatureDetection struct {
+			PullRequest struct {
+				Fields []struct {
+					Name string
+				} `graphql:"fields(includeDeprecated: true)"`
+			} `graphql:"PullRequest: __type(name: \"PullRequest\")"`
+		}
+
+		if err := gql.Query(d.host, "PullRequest_fields", &pullRequestFeatureDetection, nil); err != nil {
+			return err
+		}
+
+		for _, field := range pullRequestFeatureDetection.PullRequest.Fields {
+			if field.Name == "isInMergeQueue" {
+				features.MergeQueue = true
+			}
+		}
+
+		return nil
 	})
 
 	g.Go(func() error {
-		return gql.Query(d.host, "StatusCheckRollupContextConnection_fields", &statusCheckRollupContextConnectionFeatureDetection, nil)
+		if !ghinstance.IsEnterprise(d.host) {
+			features.CheckRunAndStatusContextCounts = true
+			return nil
+		}
+
+		var statusCheckRollupContextConnectionFeatureDetection struct {
+			StatusCheckRollupContextConnection struct {
+				Fields []struct {
+					Name string
+				} `graphql:"fields(includeDeprecated: true)"`
+			} `graphql:"StatusCheckRollupContextConnection: __type(name: \"StatusCheckRollupContextConnection\")"`
+		}
+
+		if err := gql.Query(d.host, "StatusCheckRollupContextConnection_fields", &statusCheckRollupContextConnectionFeatureDetection, nil); err != nil {
+			return err
+		}
+
+		for _, field := range statusCheckRollupContextConnectionFeatureDetection.StatusCheckRollupContextConnection.Fields {
+			// We only check for checkRunCount here but it, checkRunCountsByState, statusContextCount and statusContextCountsByState
+			// were all introduced in the same version of the API.
+			if field.Name == "checkRunCount" {
+				features.CheckRunAndStatusContextCounts = true
+			}
+		}
+
+		return nil
 	})
 
 	err := g.Wait()
 	if err != nil {
 		return features, err
-	}
-
-	for _, field := range pullRequestFeatureDetection.PullRequest.Fields {
-		if field.Name == "isInMergeQueue" {
-			features.MergeQueue = true
-		}
-	}
-
-	for _, field := range statusCheckRollupContextConnectionFeatureDetection.StatusCheckRollupContextConnection.Fields {
-		// We only check for checkRunCount here but it, checkRunCountsByState, statusContextCount and statusContextCountsByState
-		// were all introduced in the same version of the API.
-		if field.Name == "checkRunCount" {
-			features.CheckRunAndStatusContextCounts = true
-		}
 	}
 
 	return features, nil
