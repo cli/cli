@@ -97,7 +97,26 @@ type CommitStatusCheckRollup struct {
 	Contexts CheckContexts
 }
 
+type CheckRunCountByState struct {
+	State string
+	Count int
+}
+
+type StatusContextCountByState struct {
+	State string
+	Count int
+}
+
 type CheckContexts struct {
+	// These fields are available on newer versions of the GraphQL API
+	// to support summary counts by state
+	CheckRunCount              int
+	CheckRunCountsByState      []CheckRunCountByState
+	StatusContextCount         int
+	StatusContextCountsByState []StatusContextCountByState
+
+	// These are available on older versions and provide more details
+	// required for checks
 	Nodes    []CheckContext
 	PageInfo struct {
 		HasNextPage bool
@@ -268,8 +287,38 @@ func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
 		return summary
 	}
 
-	commit := pr.StatusCheckRollup.Nodes[0].Commit
-	for _, c := range commit.StatusCheckRollup.Contexts.Nodes {
+	contexts := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts
+
+	// If this commit has counts by state then we can summarise check status from those
+	if len(contexts.CheckRunCountsByState) != 0 && len(contexts.StatusContextCountsByState) != 0 {
+		summary.Total = contexts.CheckRunCount + contexts.StatusContextCount
+		for _, countByState := range contexts.CheckRunCountsByState {
+			switch parseCheckStatus(countByState.State) {
+			case passing:
+				summary.Passing += countByState.Count
+			case failing:
+				summary.Failing += countByState.Count
+			default:
+				summary.Pending += countByState.Count
+			}
+		}
+
+		for _, countByState := range contexts.StatusContextCountsByState {
+			switch parseCheckStatus(countByState.State) {
+			case passing:
+				summary.Passing += countByState.Count
+			case failing:
+				summary.Failing += countByState.Count
+			default:
+				summary.Pending += countByState.Count
+			}
+		}
+
+		return summary
+	}
+
+	// If we don't have the counts by state, then we'll need to summarise by looking at the more detailed contexts
+	for _, c := range contexts.Nodes {
 		// Nodes are a discriminated union of CheckRun or StatusContext,
 		// but we can use the State field to disambiguate, rather than using the TypeName.
 		// First we try to get the State, as if we have a StatusContext
@@ -298,6 +347,27 @@ func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
 	}
 
 	return summary
+}
+
+type checkStatus int
+
+const (
+	passing checkStatus = iota
+	failing
+	pending
+)
+
+func parseCheckStatus(state string) checkStatus {
+	switch state {
+	case "SUCCESS", "NEUTRAL", "SKIPPED":
+		return passing
+	case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
+		return failing
+	// We treat anything that isn't Passing or Failing as Pending, which included any future unknown states
+	// we might get back from the API.
+	default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE", "STARTUP_FAILURE", "COMPLETED"
+		return pending
+	}
 }
 
 func (pr *PullRequest) DisplayableReviews() PullRequestReviews {
