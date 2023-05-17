@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/set"
@@ -47,17 +49,30 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		ReviewRequested edges
 	}
 
+	// SPIKE: Let's see if we can detect here and wire through
+	cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+	detector := fd.NewDetector(cachedClient, repo.RepoHost())
+	prFeatures, err := detector.PullRequestFeatures()
+	if err != nil {
+		return nil, err
+	}
+
+	var prGraphQLOpts []api.IssueGraphQLOptFn
+	if prFeatures.CheckRunAndStatusContextCounts {
+		prGraphQLOpts = append(prGraphQLOpts, api.WithUseCheckRunAndStatusContextCounts())
+	}
+
 	var fragments string
 	if len(options.Fields) > 0 {
 		fields := set.NewStringSet()
 		fields.AddValues(options.Fields)
 		// these are always necessary to find the PR for the current branch
 		fields.AddValues([]string{"isCrossRepository", "headRepositoryOwner", "headRefName"})
-		gr := api.PullRequestGraphQL(fields.ToSlice())
+		gr := api.PullRequestGraphQL(fields.ToSlice(), prGraphQLOpts...)
 		fragments = fmt.Sprintf("fragment pr on PullRequest{%s}fragment prWithReviews on PullRequest{...pr}", gr)
 	} else {
 		var err error
-		fragments, err = pullRequestFragment(repo.RepoHost(), options.ConflictStatus)
+		fragments, err = pullRequestFragment(repo.RepoHost(), options.ConflictStatus, prGraphQLOpts...)
 		if err != nil {
 			return nil, err
 		}
@@ -146,8 +161,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 	}
 
 	var resp response
-	err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
-	if err != nil {
+	if err = apiClient.GraphQL(repo.RepoHost(), query, variables, &resp); err != nil {
 		return nil, err
 	}
 
@@ -187,7 +201,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 	return &payload, nil
 }
 
-func pullRequestFragment(hostname string, conflictStatus bool) (string, error) {
+func pullRequestFragment(hostname string, conflictStatus bool, opts ...api.IssueGraphQLOptFn) (string, error) {
 	fields := []string{
 		"number", "title", "state", "url", "isDraft", "isCrossRepository",
 		"headRefName", "headRepositoryOwner", "mergeStateStatus",
@@ -201,6 +215,6 @@ func pullRequestFragment(hostname string, conflictStatus bool) (string, error) {
 	fragments := fmt.Sprintf(`
 	fragment pr on PullRequest {%s}
 	fragment prWithReviews on PullRequest {...pr,%s}
-	`, api.PullRequestGraphQL(fields), api.PullRequestGraphQL(reviewFields))
+	`, api.PullRequestGraphQL(fields, opts...), api.PullRequestGraphQL(reviewFields, opts...))
 	return fragments, nil
 }

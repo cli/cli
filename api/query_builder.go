@@ -143,7 +143,31 @@ var autoMergeRequest = shortenQuery(`
 	}
 `)
 
-func StatusCheckRollupGraphQL(after string) string {
+func StatusCheckRollupGraphQLWithCountByState() string {
+	return shortenQuery(`
+	statusCheckRollup: commits(last: 1) {
+		nodes {
+			commit {
+				statusCheckRollup {
+					contexts {
+						checkRunCount,
+						checkRunCountsByState {
+						  state,
+						  count
+						},
+						statusContextCount,
+						statusContextCountsByState {
+						  state,
+						  count
+						}
+					}
+				}
+			}
+		}
+	}`)
+}
+
+func StatusCheckRollupGraphQLWithoutCountByState(after string) string {
 	var afterClause string
 	if after != "" {
 		afterClause = ",after:" + after
@@ -268,8 +292,28 @@ var PullRequestFields = append(IssueFields,
 	"statusCheckRollup",
 )
 
+type issueGraphQLOpts struct {
+	useCheckRunAndStatusContextCounts bool
+}
+
+type IssueGraphQLOptFn func(*issueGraphQLOpts)
+
+func WithUseCheckRunAndStatusContextCounts() IssueGraphQLOptFn {
+	return func(opts *issueGraphQLOpts) {
+		opts.useCheckRunAndStatusContextCounts = true
+	}
+}
+
 // IssueGraphQL constructs a GraphQL query fragment for a set of issue fields.
-func IssueGraphQL(fields []string) string {
+func IssueGraphQL(fields []string, opts ...IssueGraphQLOptFn) string {
+	issueGraphQLOpts := issueGraphQLOpts{
+		useCheckRunAndStatusContextCounts: false,
+	}
+
+	for _, opt := range opts {
+		opt(&issueGraphQLOpts)
+	}
+
 	var q []string
 	for _, field := range fields {
 		switch field {
@@ -320,7 +364,11 @@ func IssueGraphQL(fields []string) string {
 		case "requiresStrictStatusChecks": // pseudo-field
 			q = append(q, `baseRef{branchProtectionRule{requiresStrictStatusChecks}}`)
 		case "statusCheckRollup":
-			q = append(q, StatusCheckRollupGraphQL(""))
+			if issueGraphQLOpts.useCheckRunAndStatusContextCounts {
+				q = append(q, StatusCheckRollupGraphQLWithCountByState())
+			} else {
+				q = append(q, StatusCheckRollupGraphQLWithoutCountByState(""))
+			}
 		default:
 			q = append(q, field)
 		}
@@ -330,12 +378,12 @@ func IssueGraphQL(fields []string) string {
 
 // PullRequestGraphQL constructs a GraphQL query fragment for a set of pull request fields.
 // It will try to sanitize the fields to just those available on pull request.
-func PullRequestGraphQL(fields []string) string {
+func PullRequestGraphQL(fields []string, opts ...IssueGraphQLOptFn) string {
 	invalidFields := []string{"isPinned", "stateReason"}
 	s := set.NewStringSet()
 	s.AddValues(fields)
 	s.RemoveValues(invalidFields)
-	return IssueGraphQL(s.ToSlice())
+	return IssueGraphQL(s.ToSlice(), opts...)
 }
 
 var RepositoryFields = []string{

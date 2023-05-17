@@ -76,7 +76,10 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 }
 
 func initFakeHTTP() *httpmock.Registry {
-	return &httpmock.Registry{}
+	registry := &httpmock.Registry{}
+	// SPIKE: perhaps we should inject a mock detector into the command instead?
+	registry.Register(httpmock.GraphQL(`query PullRequest_fields\b`), httpmock.FileResponse("./fixtures/prIntrospection.json"))
+	return registry
 }
 
 func TestPRStatus(t *testing.T) {
