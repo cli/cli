@@ -91,7 +91,7 @@ func TestPRStatus(t *testing.T) {
 
 	expectedPrs := []*regexp.Regexp{
 		regexp.MustCompile(`#8.*\[strawberries\]`),
-		regexp.MustCompile(`#9.*\[apples\]`),
+		regexp.MustCompile(`#9.*\[apples\].*✓ Auto-merge enabled`),
 		regexp.MustCompile(`#10.*\[blueberries\]`),
 		regexp.MustCompile(`#11.*\[figs\]`),
 	}
