@@ -1,6 +1,7 @@
 package featuredetection
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -91,6 +92,7 @@ func TestPullRequestFeatures(t *testing.T) {
 						{"name": "isMergeQueueEnabled"}
 					] } } }
 				`),
+				`query StatusCheckRollupContextConnection_fields\b`: emptyIntrospectionFor("StatusCheckRollupContextConnection"),
 			},
 			wantFeatures: PullRequestFeatures{
 				MergeQueue: true,
@@ -105,6 +107,7 @@ func TestPullRequestFeatures(t *testing.T) {
 					{ "data": { "PullRequest": { "fields": [
 					] } } }
 				`),
+				`query StatusCheckRollupContextConnection_fields\b`: emptyIntrospectionFor("StatusCheckRollupContextConnection"),
 			},
 			wantFeatures: PullRequestFeatures{
 				MergeQueue: false,
@@ -121,9 +124,44 @@ func TestPullRequestFeatures(t *testing.T) {
 						{"name": "isMergeQueueEnabled"}
 					] } } }
 				`),
+				`query StatusCheckRollupContextConnection_fields\b`: emptyIntrospectionFor("StatusCheckRollupContextConnection"),
 			},
 			wantFeatures: PullRequestFeatures{
 				MergeQueue: true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "Any GitHub host without check run and status context count support",
+			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: emptyIntrospectionFor("PullRequest"),
+				`query StatusCheckRollupContextConnection_fields\b`: heredoc.Doc(`
+					{ "data": { "StatusCheckRollupContextConnection": { "fields": [
+					] } } }
+				`),
+			},
+			wantFeatures: PullRequestFeatures{
+				CheckRunAndStatusContextCounts: false,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "Any GitHub host with check run and status context count support",
+			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: emptyIntrospectionFor("PullRequest"),
+				`query StatusCheckRollupContextConnection_fields\b`: heredoc.Doc(`
+					{ "data": { "StatusCheckRollupContextConnection": { "fields": [
+						{"name": "checkRunCount"},
+						{"name": "checkRunCountsByState"},
+						{"name": "statusContextCount"},
+						{"name": "statusContextCountsByState"}
+					] } } }
+				`),
+			},
+			wantFeatures: PullRequestFeatures{
+				CheckRunAndStatusContextCounts: true,
 			},
 			wantErr: false,
 		},
@@ -242,4 +280,11 @@ func TestRepositoryFeatures(t *testing.T) {
 			assert.Equal(t, tt.wantFeatures, gotFeatures)
 		})
 	}
+}
+
+func emptyIntrospectionFor(typ string) string {
+	return fmt.Sprintf(`
+		{ "data": { "%s": { "fields": [
+		] } } }
+	`, typ)
 }
