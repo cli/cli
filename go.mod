@@ -34,7 +34,7 @@ require (
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/zalando/go-keyring v0.2.3
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/sync v0.1.0
