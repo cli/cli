@@ -9,7 +9,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/briandowns/spinner"
 	"github.com/cli/go-gh/v2/pkg/api"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -324,22 +323,22 @@ func ProjectItems(client *api.GraphQLClient, o *Owner, number int, limit int) (*
 	}
 
 	variables := map[string]interface{}{
-		"firstItems":  graphql.Int(first),
+		"firstItems":  githubv4.Int(first),
 		"afterItems":  (*githubv4.String)(nil),
-		"firstFields": graphql.Int(LimitMax),
+		"firstFields": githubv4.Int(LimitMax),
 		"afterFields": (*githubv4.String)(nil),
-		"number":      graphql.Int(number),
+		"number":      githubv4.Int(number),
 	}
 
 	var query pager[ProjectItem]
 	var queryName string
 	switch o.Type {
 	case UserOwner:
-		variables["login"] = graphql.String(o.Login)
+		variables["login"] = githubv4.String(o.Login)
 		query = &userOwnerWithItems{} // must be a pointer to work with graphql queries
 		queryName = "UserProjectWithItems"
 	case OrgOwner:
-		variables["login"] = graphql.String(o.Login)
+		variables["login"] = githubv4.String(o.Login)
 		query = &orgOwnerWithItems{} // must be a pointer to work with graphql queries
 		queryName = "OrgProjectWithItems"
 	case ViewerOwner:
@@ -495,7 +494,7 @@ func paginateAttributes[N projectAttribute](client *api.GraphQLClient, p pager[N
 
 		if len(nodes)+LimitMax > limit {
 			first := limit - len(nodes)
-			variables[firstKey] = graphql.Int(first)
+			variables[firstKey] = githubv4.Int(first)
 		}
 
 		// set the cursor to the end of the last page
@@ -594,22 +593,22 @@ func ProjectFields(client *api.GraphQLClient, o *Owner, number int, limit int) (
 		first = limit
 	}
 	variables := map[string]interface{}{
-		"firstItems":  graphql.Int(LimitMax),
+		"firstItems":  githubv4.Int(LimitMax),
 		"afterItems":  (*githubv4.String)(nil),
-		"firstFields": graphql.Int(first),
+		"firstFields": githubv4.Int(first),
 		"afterFields": (*githubv4.String)(nil),
-		"number":      graphql.Int(number),
+		"number":      githubv4.Int(number),
 	}
 
 	var query pager[ProjectField]
 	var queryName string
 	switch o.Type {
 	case UserOwner:
-		variables["login"] = graphql.String(o.Login)
+		variables["login"] = githubv4.String(o.Login)
 		query = &userOwnerWithFields{} // must be a pointer to work with graphql queries
 		queryName = "UserProjectWithFields"
 	case OrgOwner:
-		variables["login"] = graphql.String(o.Login)
+		variables["login"] = githubv4.String(o.Login)
 		query = &orgOwnerWithFields{} // must be a pointer to work with graphql queries
 		queryName = "OrgProjectWithFields"
 	case ViewerOwner:
@@ -756,7 +755,7 @@ func ViewerLoginName(client *api.GraphQLClient) (string, error) {
 // OwnerID returns the ID of an OwnerType. If the OwnerType is VIEWER, no login is required.
 func OwnerID(client *api.GraphQLClient, login string, t OwnerType) (string, error) {
 	variables := map[string]interface{}{
-		"login": graphql.String(login),
+		"login": githubv4.String(login),
 	}
 	if t == UserOwner {
 		var query userLogin
@@ -894,7 +893,7 @@ func userOrgLogins(client *api.GraphQLClient) ([]loginTypes, error) {
 func paginateOrgLogins(client *api.GraphQLClient, l []loginTypes, cursor string) ([]loginTypes, error) {
 	var v viewerLoginOrgs
 	variables := map[string]interface{}{
-		"after": (graphql.String)(cursor),
+		"after": githubv4.String(cursor),
 	}
 
 	err := doQuery(client, "ViewerLoginAndOrgs", &v, variables)
@@ -1009,7 +1008,7 @@ func NewOwner(client *api.GraphQLClient, userLogin, orgLogin string) (*Owner, er
 func NewProject(client *api.GraphQLClient, o *Owner, number int, fields bool) (*Project, error) {
 	if number != 0 {
 		variables := map[string]interface{}{
-			"number":      graphql.Int(number),
+			"number":      githubv4.Int(number),
 			"firstItems":  githubv4.Int(0),
 			"afterItems":  (*githubv4.String)(nil),
 			"firstFields": githubv4.Int(0),
@@ -1091,7 +1090,7 @@ func Projects(client *api.GraphQLClient, login string, t OwnerType, limit int, f
 	}
 
 	variables := map[string]interface{}{
-		"first":       graphql.Int(first),
+		"first":       githubv4.Int(first),
 		"after":       cursor,
 		"firstItems":  githubv4.Int(0),
 		"afterItems":  (*githubv4.String)(nil),
@@ -1104,7 +1103,7 @@ func Projects(client *api.GraphQLClient, login string, t OwnerType, limit int, f
 	}
 
 	if t != ViewerOwner {
-		variables["login"] = graphql.String(login)
+		variables["login"] = githubv4.String(login)
 	}
 	// loop until we get all the projects
 	for {
@@ -1146,7 +1145,7 @@ func Projects(client *api.GraphQLClient, login string, t OwnerType, limit int, f
 
 		if len(projects)+LimitMax > limit {
 			first := limit - len(projects)
-			variables["first"] = graphql.Int(first)
+			variables["first"] = githubv4.Int(first)
 		}
 		variables["after"] = cursor
 	}
