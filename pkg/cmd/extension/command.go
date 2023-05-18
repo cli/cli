@@ -643,10 +643,8 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 	}
 
 	commandName := strings.TrimPrefix(extName, "gh-")
-	if c, _, err := rootCmd.Traverse([]string{commandName}); err != nil {
-		return nil, err
-	} else if c != rootCmd {
-		return nil, fmt.Errorf("%q matches the name of a built-in command", commandName)
+	if c, _, _ := rootCmd.Find([]string{commandName}); c != rootCmd && c.GroupID != "extension" {
+		return nil, fmt.Errorf("%q matches the name of a built-in command or alias", commandName)
 	}
 
 	for _, ext := range m.List() {

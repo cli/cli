@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -257,9 +256,9 @@ func TestImportRun(t *testing.T) {
 			wantStderr: strings.Join(
 				[]string{
 					importFileMsg,
-					"X Could not import alias api: already a gh command",
-					"X Could not import alias issue: already a gh command",
-					"X Could not import alias pr: already a gh command\n\n",
+					"X Could not import alias api: already a gh command, extension, or alias",
+					"X Could not import alias issue: already a gh command, extension, or alias",
+					"X Could not import alias pr: already a gh command, extension, or alias\n\n",
 				},
 				"\n",
 			),
@@ -277,8 +276,8 @@ func TestImportRun(t *testing.T) {
 			wantStderr: strings.Join(
 				[]string{
 					importFileMsg,
-					"X Could not import alias alias1: expansion does not correspond to a gh command",
-					"X Could not import alias alias2: expansion does not correspond to a gh command\n\n",
+					"X Could not import alias alias1: expansion does not correspond to a gh command, extension, or alias",
+					"X Could not import alias alias2: expansion does not correspond to a gh command, extension, or alias\n\n",
 				},
 				"\n",
 			),
@@ -304,16 +303,6 @@ func TestImportRun(t *testing.T) {
 				return cfg, nil
 			}
 
-			// Create fake command factory for testing.
-			f := &cmdutil.Factory{
-				IOStreams: ios,
-				ExtensionManager: &extensions.ExtensionManagerMock{
-					ListFunc: func() []extensions.Extension {
-						return []extensions.Extension{}
-					},
-				},
-			}
-
 			// Create fake command structure for testing.
 			rootCmd := &cobra.Command{}
 			prCmd := &cobra.Command{Use: "pr"}
@@ -327,7 +316,8 @@ func TestImportRun(t *testing.T) {
 			apiCmd.AddCommand(&cobra.Command{Use: "graphql"})
 			rootCmd.AddCommand(apiCmd)
 
-			tt.opts.existingCommand = shared.ExistingCommandFunc(f, rootCmd)
+			tt.opts.validAliasName = shared.ValidAliasNameFunc(rootCmd)
+			tt.opts.validAliasExpansion = shared.ValidAliasExpansionFunc(rootCmd)
 
 			if tt.stdin != "" {
 				stdin.WriteString(tt.stdin)

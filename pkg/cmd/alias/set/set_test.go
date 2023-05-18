@@ -73,7 +73,7 @@ func TestAliasSet_gh_command(t *testing.T) {
 	cfg := config.NewFromString(``)
 
 	_, err := runCommand(cfg, true, "pr 'pr status'", "")
-	assert.EqualError(t, err, `could not create alias: "pr" is already a gh command`)
+	assert.EqualError(t, err, `could not create alias: "pr" is already a gh command, extension, or alias`)
 }
 
 func TestAliasSet_empty_aliases(t *testing.T) {
@@ -231,7 +231,7 @@ func TestAliasSet_invalid_command(t *testing.T) {
 	cfg := config.NewFromString(``)
 
 	_, err := runCommand(cfg, true, "co 'pe checkout'", "")
-	assert.EqualError(t, err, "could not create alias: pe checkout does not correspond to a gh command")
+	assert.EqualError(t, err, "could not create alias: pe checkout does not correspond to a gh command, extension, or alias")
 }
 
 func TestShellAlias_flag(t *testing.T) {
