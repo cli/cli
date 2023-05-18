@@ -1,8 +1,10 @@
 package root
 
 import (
+	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/MakeNowJust/heredoc"
@@ -36,15 +38,29 @@ import (
 	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
 	workflowCmd "github.com/cli/cli/v2/pkg/cmd/workflow"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
+type AuthError struct {
+	err error
+}
+
+func (ae *AuthError) Error() string {
+	return ae.err.Error()
+}
+
+func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, error) {
+	io := f.IOStreams
+	cfg, err := f.Config()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read configuration: %s\n", err)
+	}
+
 	cmd := &cobra.Command{
 		Use:   "gh <command> <subcommand> [flags]",
 		Short: "GitHub CLI",
 		Long:  `Work seamlessly with GitHub from the command line.`,
-
 		Example: heredoc.Doc(`
 			$ gh issue create
 			$ gh repo clone cli/cli
@@ -52,6 +68,14 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		`),
 		Annotations: map[string]string{
 			"versionInfo": versionCmd.Format(version, buildDate),
+		},
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// require that the user is authenticated before running most commands
+			if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
+				fmt.Fprint(io.ErrOut, authHelp())
+				return &AuthError{}
+			}
+			return nil
 		},
 	}
 
@@ -84,6 +108,10 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddGroup(&cobra.Group{
 		ID:    "actions",
 		Title: "GitHub Actions commands",
+	})
+	cmd.AddGroup(&cobra.Group{
+		ID:    "extension",
+		Title: "Extension commands",
 	})
 
 	// Child commands
@@ -136,6 +164,51 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		}
 	}
 
+	// Aliases
+	aliases := cfg.Aliases()
+	for k, v := range aliases.All() {
+		aliasName := k
+		aliasValue := v
+		isShellAlias := strings.HasPrefix(aliasValue, "!")
+		split, _ := shlex.Split(aliasName)
+		parentCmd, parentArgs, _ := cmd.Find(split)
+		// If there are no parent args the user defined an alias that shadows an existing command.
+		if parentCmd != nil && len(parentArgs) == 1 {
+			if !parentCmd.ContainsGroup("alias") {
+				parentCmd.AddGroup(&cobra.Group{
+					ID:    "alias",
+					Title: "Alias commands",
+				})
+			}
+			if isShellAlias {
+				shellAliasCmd := NewCmdShellAlias(io, parentArgs[0], aliasValue)
+				parentCmd.AddCommand(shellAliasCmd)
+				parentCmd.ValidArgs = append(parentCmd.ValidArgs, fmt.Sprintf("%s\tShell alias", aliasName))
+			} else {
+				aliasCmd := NewCmdAlias(io, parentArgs[0], aliasValue)
+				split, _ := shlex.Split(aliasValue)
+				child, _, _ := cmd.Find(split)
+				aliasCmd.SetUsageFunc(func(_ *cobra.Command) error {
+					return rootUsageFunc(f.IOStreams.ErrOut, child)
+				})
+				aliasCmd.SetHelpFunc(func(_ *cobra.Command, args []string) {
+					rootHelpFunc(f, child, args)
+				})
+				parentCmd.AddCommand(aliasCmd)
+				parentCmd.ValidArgs = append(parentCmd.ValidArgs, fmt.Sprintf("%s\tAlias for %s", aliasName, aliasValue))
+			}
+		}
+	}
+
+	// Extensions
+	em := f.ExtensionManager
+	for _, e := range em.List() {
+		extension := e
+		extensionCmd := NewCmdExtension(io, em, e)
+		cmd.AddCommand(extensionCmd)
+		cmd.ValidArgs = append(cmd.ValidArgs, fmt.Sprintf("%s\t%s", extension.Name(), extensionCmd.Short))
+	}
+
 	cmdutil.DisableAuthCheck(cmd)
 
 	// The reference command produces paged output that displays information on every other command.
@@ -145,7 +218,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	// is special.
 	referenceCmd.Long = stringifyReference(cmd)
 	referenceCmd.SetHelpFunc(longPager(f.IOStreams))
-	return cmd
+	return cmd, nil
 }
 
 func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, error) {
