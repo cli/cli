@@ -1,12 +1,17 @@
 /bin
+/share/bash-completion/completions
+/share/fish/vendor_completions.d
 /share/man/man1
+/share/zsh/site-functions
 /gh-cli
 .envrc
 /dist
 /site
 .github/**/node_modules
 /CHANGELOG.md
+/.goreleaser.generated.yml
 /script/build
+/script/build.exe
 
 # VS Code
 .vscode

@@ -139,8 +139,8 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 		if c := findCommand(command, "actions"); c != nil {
 			helpTopics = append(helpTopics, rpad(c.Name()+":", namePadding)+c.Short)
 		}
-		for topic, params := range HelpTopics {
-			helpTopics = append(helpTopics, rpad(topic+":", namePadding)+params["short"])
+		for _, helpTopic := range HelpTopics {
+			helpTopics = append(helpTopics, rpad(helpTopic.name+":", namePadding)+helpTopic.short)
 		}
 		sort.Strings(helpTopics)
 		helpEntries = append(helpEntries, helpEntry{"HELP TOPICS", strings.Join(helpTopics, "\n")})

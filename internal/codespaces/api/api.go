@@ -122,17 +122,24 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 
 	var response User
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
 	return &response, nil
 }
 
+// RepositoryOwner represents owner of a repository
+type RepositoryOwner struct {
+	Type  string `json:"type"`
+	Login string `json:"login"`
+}
+
 // Repository represents a GitHub repository.
 type Repository struct {
-	ID            int    `json:"id"`
-	FullName      string `json:"full_name"`
-	DefaultBranch string `json:"default_branch"`
+	ID            int             `json:"id"`
+	FullName      string          `json:"full_name"`
+	DefaultBranch string          `json:"default_branch"`
+	Owner         RepositoryOwner `json:"owner"`
 }
 
 // GetRepository returns the repository associated with the given owner and name.
@@ -160,7 +167,7 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 
 	var response Repository
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
 	return &response, nil
@@ -336,7 +343,7 @@ func (a *API) ListCodespaces(ctx context.Context, opts ListCodespacesOptions) (c
 
 		dec := json.NewDecoder(resp.Body)
 		if err := dec.Decode(&response); err != nil {
-			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+			return nil, fmt.Errorf("error unmarshalling response: %w", err)
 		}
 
 		nextURL := findNextPage(resp.Header.Get("Link"))
@@ -398,7 +405,7 @@ func (a *API) GetOrgMemberCodespace(ctx context.Context, orgName string, userNam
 
 		dec := json.NewDecoder(resp.Body)
 		if err := dec.Decode(&response); err != nil {
-			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+			return nil, fmt.Errorf("error unmarshalling response: %w", err)
 		}
 
 		for _, cs := range response.Codespaces {
@@ -455,7 +462,7 @@ func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeCon
 
 	var response Codespace
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
 	return &response, nil
@@ -563,7 +570,7 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 		Machines []*Machine `json:"machines"`
 	}
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
 	return response.Machines, nil
@@ -636,7 +643,7 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 		Items []*Repository `json:"items"`
 	}
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
 	repoNames := make([]string, len(response.Items))
@@ -683,7 +690,7 @@ func (a *API) GetCodespaceBillableOwner(ctx context.Context, nwo string) (*User,
 		}
 	}
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
 	// While this response contains further helpful information ahead of codespace creation,
@@ -815,7 +822,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 
 		var response Codespace
 		if err := json.Unmarshal(b, &response); err != nil {
-			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+			return nil, fmt.Errorf("error unmarshalling response: %w", err)
 		}
 
 		return &response, errProvisioningInProgress // RPC finished before result of creation known
@@ -831,7 +838,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 			return nil, fmt.Errorf("error reading response body: %w", err)
 		}
 		if err := json.Unmarshal(b, &ue); err != nil {
-			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+			return nil, fmt.Errorf("error unmarshalling response: %w", err)
 		}
 
 		if ue.AllowPermissionsURL != "" {
@@ -853,7 +860,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 
 	var response Codespace
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
 	return &response, nil
@@ -934,7 +941,7 @@ func (a *API) ListDevContainers(ctx context.Context, repoID int, branch string, 
 
 		dec := json.NewDecoder(resp.Body)
 		if err := dec.Decode(&response); err != nil {
-			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+			return nil, fmt.Errorf("error unmarshalling response: %w", err)
 		}
 
 		nextURL := findNextPage(resp.Header.Get("Link"))
@@ -1007,7 +1014,7 @@ func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *E
 
 	var response Codespace
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
 	return &response, nil
@@ -1055,7 +1062,7 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 
 	var response getCodespaceRepositoryContentsResponse
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(response.Content)
