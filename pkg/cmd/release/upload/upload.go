@@ -130,7 +130,7 @@ func uploadRun(opts *UploadOptions) error {
 // one that only exists in the client
 func sanitizeFileName(name string) string {
 
-	value := regexp.MustCompile("[[:^ascii:]]").ReplaceAllLiteralString(name, "")
+	value := text.RemoveDiacritics(name)
 	// Stripped all non-ascii characters, provide default name.
 	if strings.HasPrefix(value, ".") {
 		value = "default" + value

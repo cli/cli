@@ -39,6 +39,10 @@ func Test_SanitizeFileName(t *testing.T) {
 			name:     "this@has@at@signs.jpg",
 			expected: "this@has@at@signs.jpg",
 		},
+		{
+			name:     "façade.exposé",
+			expected: "facade.expose",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
