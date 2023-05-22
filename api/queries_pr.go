@@ -261,15 +261,23 @@ type PullRequestChecksStatus struct {
 	Total   int
 }
 
-func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
+func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
+	var summary PullRequestChecksStatus
+
 	if len(pr.StatusCheckRollup.Nodes) == 0 {
-		return
+		return summary
 	}
+
 	commit := pr.StatusCheckRollup.Nodes[0].Commit
 	for _, c := range commit.StatusCheckRollup.Contexts.Nodes {
-		state := c.State // StatusContext
+		// Nodes are a discriminated union of CheckRun or StatusContext,
+		// but we can use the State field to disambiguate, rather than using the TypeName.
+		// First we try to get the State, as if we have a StatusContext
+		state := c.State
+		// But if the State is empty, then we assume we actually have a CheckRun
 		if state == "" {
-			// CheckRun
+			// If the Status of a CheckRun is COMPLETED, then we want to look more closely
+			// at the Conclusion, as that contains the relevant information.
 			if c.Status == "COMPLETED" {
 				state = c.Conclusion
 			} else {
@@ -281,13 +289,15 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 			summary.Passing++
 		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			summary.Failing++
-		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
+		// We treat anything that isn't Passing or Failing as Pending, which included any future unknown states
+		// we might get back from the API.
+		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE", "STARTUP_FAILURE"
 			summary.Pending++
 		}
 		summary.Total++
 	}
 
-	return
+	return summary
 }
 
 func (pr *PullRequest) DisplayableReviews() PullRequestReviews {
