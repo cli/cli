@@ -292,28 +292,8 @@ var PullRequestFields = append(IssueFields,
 	"statusCheckRollup",
 )
 
-type issueGraphQLOpts struct {
-	useCheckRunAndStatusContextCounts bool
-}
-
-type IssueGraphQLOptFn func(*issueGraphQLOpts)
-
-func WithUseCheckRunAndStatusContextCounts() IssueGraphQLOptFn {
-	return func(opts *issueGraphQLOpts) {
-		opts.useCheckRunAndStatusContextCounts = true
-	}
-}
-
 // IssueGraphQL constructs a GraphQL query fragment for a set of issue fields.
-func IssueGraphQL(fields []string, opts ...IssueGraphQLOptFn) string {
-	issueGraphQLOpts := issueGraphQLOpts{
-		useCheckRunAndStatusContextCounts: false,
-	}
-
-	for _, opt := range opts {
-		opt(&issueGraphQLOpts)
-	}
-
+func IssueGraphQL(fields []string) string {
 	var q []string
 	for _, field := range fields {
 		switch field {
@@ -364,11 +344,9 @@ func IssueGraphQL(fields []string, opts ...IssueGraphQLOptFn) string {
 		case "requiresStrictStatusChecks": // pseudo-field
 			q = append(q, `baseRef{branchProtectionRule{requiresStrictStatusChecks}}`)
 		case "statusCheckRollup":
-			if issueGraphQLOpts.useCheckRunAndStatusContextCounts {
-				q = append(q, StatusCheckRollupGraphQLWithCountByState())
-			} else {
-				q = append(q, StatusCheckRollupGraphQLWithoutCountByState(""))
-			}
+			q = append(q, StatusCheckRollupGraphQLWithoutCountByState(""))
+		case "statusCheckRollupWithCountByState": // pseudo-field
+			q = append(q, StatusCheckRollupGraphQLWithCountByState())
 		default:
 			q = append(q, field)
 		}
@@ -378,12 +356,12 @@ func IssueGraphQL(fields []string, opts ...IssueGraphQLOptFn) string {
 
 // PullRequestGraphQL constructs a GraphQL query fragment for a set of pull request fields.
 // It will try to sanitize the fields to just those available on pull request.
-func PullRequestGraphQL(fields []string, opts ...IssueGraphQLOptFn) string {
+func PullRequestGraphQL(fields []string) string {
 	invalidFields := []string{"isPinned", "stateReason"}
 	s := set.NewStringSet()
 	s.AddValues(fields)
 	s.RemoveValues(invalidFields)
-	return IssueGraphQL(s.ToSlice(), opts...)
+	return IssueGraphQL(s.ToSlice())
 }
 
 var RepositoryFields = []string{

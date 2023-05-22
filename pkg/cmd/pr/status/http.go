@@ -57,22 +57,24 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		return nil, err
 	}
 
-	var prGraphQLOpts []api.IssueGraphQLOptFn
-	if prFeatures.CheckRunAndStatusContextCounts {
-		prGraphQLOpts = append(prGraphQLOpts, api.WithUseCheckRunAndStatusContextCounts())
-	}
-
 	var fragments string
 	if len(options.Fields) > 0 {
 		fields := set.NewStringSet()
 		fields.AddValues(options.Fields)
 		// these are always necessary to find the PR for the current branch
 		fields.AddValues([]string{"isCrossRepository", "headRepositoryOwner", "headRefName"})
-		gr := api.PullRequestGraphQL(fields.ToSlice(), prGraphQLOpts...)
+
+		if prFeatures.CheckRunAndStatusContextCounts {
+			fields.Add("statusCheckRollupWithCountByState")
+		} else {
+			fields.Add("statusCheckRollup")
+		}
+
+		gr := api.PullRequestGraphQL(fields.ToSlice())
 		fragments = fmt.Sprintf("fragment pr on PullRequest{%s}fragment prWithReviews on PullRequest{...pr}", gr)
 	} else {
 		var err error
-		fragments, err = pullRequestFragment(repo.RepoHost(), options.ConflictStatus, prGraphQLOpts...)
+		fragments, err = pullRequestFragment(repo.RepoHost(), options.ConflictStatus, prFeatures.CheckRunAndStatusContextCounts)
 		if err != nil {
 			return nil, err
 		}
@@ -201,20 +203,27 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 	return &payload, nil
 }
 
-func pullRequestFragment(hostname string, conflictStatus bool, opts ...api.IssueGraphQLOptFn) (string, error) {
+func pullRequestFragment(hostname string, conflictStatus bool, statusCheckRollupWithCountByState bool) (string, error) {
 	fields := []string{
 		"number", "title", "state", "url", "isDraft", "isCrossRepository",
 		"headRefName", "headRepositoryOwner", "mergeStateStatus",
-		"statusCheckRollup", "requiresStrictStatusChecks", "autoMergeRequest",
+		"requiresStrictStatusChecks", "autoMergeRequest",
 	}
 
 	if conflictStatus {
 		fields = append(fields, "mergeable")
 	}
+
+	if statusCheckRollupWithCountByState {
+		fields = append(fields, "statusCheckRollupWithCountByState")
+	} else {
+		fields = append(fields, "statusCheckRollup")
+	}
+
 	reviewFields := []string{"reviewDecision", "latestReviews"}
 	fragments := fmt.Sprintf(`
 	fragment pr on PullRequest {%s}
 	fragment prWithReviews on PullRequest {...pr,%s}
-	`, api.PullRequestGraphQL(fields, opts...), api.PullRequestGraphQL(reviewFields, opts...))
+	`, api.PullRequestGraphQL(fields), api.PullRequestGraphQL(reviewFields))
 	return fragments, nil
 }
