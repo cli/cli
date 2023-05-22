@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/cli/cli/v2/api"
-	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/set"
@@ -19,6 +17,8 @@ type requestOptions struct {
 	Username       string
 	Fields         []string
 	ConflictStatus bool
+
+	CheckRunAndStatusContextCountsSupported bool
 }
 
 type pullRequestsPayload struct {
@@ -49,14 +49,6 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		ReviewRequested edges
 	}
 
-	// SPIKE: Let's see if we can detect here and wire through
-	cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-	detector := fd.NewDetector(cachedClient, repo.RepoHost())
-	prFeatures, err := detector.PullRequestFeatures()
-	if err != nil {
-		return nil, err
-	}
-
 	var fragments string
 	if len(options.Fields) > 0 {
 		fields := set.NewStringSet()
@@ -64,7 +56,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		// these are always necessary to find the PR for the current branch
 		fields.AddValues([]string{"isCrossRepository", "headRepositoryOwner", "headRefName"})
 
-		if prFeatures.CheckRunAndStatusContextCounts {
+		if options.CheckRunAndStatusContextCountsSupported {
 			fields.Add("statusCheckRollupWithCountByState")
 		} else {
 			fields.Add("statusCheckRollup")
@@ -74,7 +66,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		fragments = fmt.Sprintf("fragment pr on PullRequest{%s}fragment prWithReviews on PullRequest{...pr}", gr)
 	} else {
 		var err error
-		fragments, err = pullRequestFragment(repo.RepoHost(), options.ConflictStatus, prFeatures.CheckRunAndStatusContextCounts)
+		fragments, err = pullRequestFragment(repo.RepoHost(), options.ConflictStatus, options.CheckRunAndStatusContextCountsSupported)
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +155,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 	}
 
 	var resp response
-	if err = apiClient.GraphQL(repo.RepoHost(), query, variables, &resp); err != nil {
+	if err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp); err != nil {
 		return nil, err
 	}
 

@@ -8,11 +8,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -104,6 +106,15 @@ func statusRun(opts *StatusOptions) error {
 	if opts.Exporter != nil {
 		options.Fields = opts.Exporter.Fields()
 	}
+
+	// SPIKE: Let's see if we can detect here and wire through
+	cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+	detector := fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	prFeatures, err := detector.PullRequestFeatures()
+	if err != nil {
+		return err
+	}
+	options.CheckRunAndStatusContextCountsSupported = prFeatures.CheckRunAndStatusContextCounts
 
 	prPayload, err := pullRequestStatus(httpClient, baseRepo, options)
 	if err != nil {
