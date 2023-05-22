@@ -35,6 +35,8 @@ type StatusOptions struct {
 	HasRepoOverride bool
 	Exporter        cmdutil.Exporter
 	ConflictStatus  bool
+
+	Detector fd.Detector
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -107,10 +109,11 @@ func statusRun(opts *StatusOptions) error {
 		options.Fields = opts.Exporter.Fields()
 	}
 
-	// SPIKE: Let's see if we can detect here and wire through
-	cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-	detector := fd.NewDetector(cachedClient, baseRepo.RepoHost())
-	prFeatures, err := detector.PullRequestFeatures()
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+	prFeatures, err := opts.Detector.PullRequestFeatures()
 	if err != nil {
 		return err
 	}

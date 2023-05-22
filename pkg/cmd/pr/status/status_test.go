@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -55,7 +56,12 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 		GitClient: &git.Client{GitPath: "some/path/git"},
 	}
 
-	cmd := NewCmdStatus(factory, nil)
+	withAllFeaturesDisabled := func(opts *StatusOptions) error {
+		opts.Detector = &fd.DisabledDetectorMock{}
+		return statusRun(opts)
+	}
+
+	cmd := NewCmdStatus(factory, withAllFeaturesDisabled)
 	cmd.PersistentFlags().StringP("repo", "R", "", "")
 
 	argv, err := shlex.Split(cli)
@@ -76,10 +82,7 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 }
 
 func initFakeHTTP() *httpmock.Registry {
-	registry := &httpmock.Registry{}
-	// SPIKE: perhaps we should inject a mock detector into the command instead?
-	registry.Register(httpmock.GraphQL(`query PullRequest_fields\b`), httpmock.FileResponse("./fixtures/prIntrospection.json"))
-	return registry
+	return &httpmock.Registry{}
 }
 
 func TestPRStatus(t *testing.T) {

@@ -31,7 +31,8 @@ type PullRequestFeatures struct {
 }
 
 var allPullRequestFeatures = PullRequestFeatures{
-	MergeQueue: true,
+	MergeQueue:                     true,
+	CheckRunAndStatusContextCounts: true,
 }
 
 type RepositoryFeatures struct {
