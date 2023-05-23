@@ -83,16 +83,28 @@ func TestPullRequestFeatures(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name:     "github.com with merge queue",
+			name:     "github.com with merge queue and status check counts by state",
 			hostname: "github.com",
 			queryResponse: map[string]string{
 				`query PullRequest_fields\b`: heredoc.Doc(`
-					{ "data": { "PullRequest": { "fields": [
-						{"name": "isInMergeQueue"},
-						{"name": "isMergeQueueEnabled"}
-					] } } }
-				`),
-				`query StatusCheckRollupContextConnection_fields\b`: emptyIntrospectionFor("StatusCheckRollupContextConnection"),
+				{
+					"data": {
+						"PullRequest": {
+							"fields": [
+								{"name": "isInMergeQueue"},
+								{"name": "isMergeQueueEnabled"}
+							]
+						},
+						"StatusCheckRollupContextConnection": {
+							"fields": [
+								{"name": "checkRunCount"},
+								{"name": "checkRunCountsByState"},
+								{"name": "statusContextCount"},
+								{"name": "statusContextCountsByState"}
+							]
+						}
+					}
+				}`),
 			},
 			wantFeatures: PullRequestFeatures{
 				MergeQueue:                     true,
@@ -105,10 +117,21 @@ func TestPullRequestFeatures(t *testing.T) {
 			hostname: "github.com",
 			queryResponse: map[string]string{
 				`query PullRequest_fields\b`: heredoc.Doc(`
-					{ "data": { "PullRequest": { "fields": [
-					] } } }
-				`),
-				`query StatusCheckRollupContextConnection_fields\b`: emptyIntrospectionFor("StatusCheckRollupContextConnection"),
+				{
+					"data": {
+						"PullRequest": {
+							"fields": []
+						},
+						"StatusCheckRollupContextConnection": {
+							"fields": [
+								{"name": "checkRunCount"},
+								{"name": "checkRunCountsByState"},
+								{"name": "statusContextCount"},
+								{"name": "statusContextCountsByState"}
+							]
+						}
+					}
+				}`),
 			},
 			wantFeatures: PullRequestFeatures{
 				MergeQueue:                     false,
@@ -117,65 +140,54 @@ func TestPullRequestFeatures(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:     "GHE",
+			name:     "GHE with merge queue and status check counts by state",
 			hostname: "git.my.org",
 			queryResponse: map[string]string{
 				`query PullRequest_fields\b`: heredoc.Doc(`
-					{ "data": { "PullRequest": { "fields": [
-						{"name": "isInMergeQueue"},
-						{"name": "isMergeQueueEnabled"}
-					] } } }
-				`),
-				`query StatusCheckRollupContextConnection_fields\b`: emptyIntrospectionFor("StatusCheckRollupContextConnection"),
+				{
+					"data": {
+						"PullRequest": {
+							"fields": [
+								{"name": "isInMergeQueue"},
+								{"name": "isMergeQueueEnabled"}
+							]
+						},
+						"StatusCheckRollupContextConnection": {
+							"fields": [
+								{"name": "checkRunCount"},
+								{"name": "checkRunCountsByState"},
+								{"name": "statusContextCount"},
+								{"name": "statusContextCountsByState"}
+							]
+						}
+					}
+				}`),
 			},
 			wantFeatures: PullRequestFeatures{
-				MergeQueue: true,
-			},
-			wantErr: false,
-		},
-		{
-			name:     "GitHub.com supports check and run status context counts regardless of GQL response",
-			hostname: "github.com",
-			queryResponse: map[string]string{
-				`query PullRequest_fields\b`:                        emptyIntrospectionFor("PullRequest"),
-				`query StatusCheckRollupContextConnection_fields\b`: emptyIntrospectionFor("StatusCheckRollupContextConnection"),
-			},
-			wantFeatures: PullRequestFeatures{
+				MergeQueue:                     true,
 				CheckRunAndStatusContextCounts: true,
 			},
 			wantErr: false,
 		},
 		{
-			name:     "GHE without check run and status context count support",
+			name:     "GHE without merge queue and status check counts by state",
 			hostname: "git.my.org",
 			queryResponse: map[string]string{
-				`query PullRequest_fields\b`: emptyIntrospectionFor("PullRequest"),
-				`query StatusCheckRollupContextConnection_fields\b`: heredoc.Doc(`
-					{ "data": { "StatusCheckRollupContextConnection": { "fields": [
-					] } } }
-				`),
+				`query PullRequest_fields\b`: heredoc.Doc(`
+				{
+					"data": {
+						"PullRequest": {
+							"fields": []
+						},
+						"StatusCheckRollupContextConnection": {
+							"fields": []
+						}
+					}
+				}`),
 			},
 			wantFeatures: PullRequestFeatures{
+				MergeQueue:                     false,
 				CheckRunAndStatusContextCounts: false,
-			},
-			wantErr: false,
-		},
-		{
-			name:     "GHE host with check run and status context count support",
-			hostname: "git.my.org",
-			queryResponse: map[string]string{
-				`query PullRequest_fields\b`: emptyIntrospectionFor("PullRequest"),
-				`query StatusCheckRollupContextConnection_fields\b`: heredoc.Doc(`
-					{ "data": { "StatusCheckRollupContextConnection": { "fields": [
-						{"name": "checkRunCount"},
-						{"name": "checkRunCountsByState"},
-						{"name": "statusContextCount"},
-						{"name": "statusContextCountsByState"}
-					] } } }
-				`),
-			},
-			wantFeatures: PullRequestFeatures{
-				CheckRunAndStatusContextCounts: true,
 			},
 			wantErr: false,
 		},

@@ -5,7 +5,6 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
-	"golang.org/x/sync/errgroup"
 )
 
 type Detector interface {
@@ -99,64 +98,38 @@ func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
 	// 	return allPullRequestFeatures, nil
 	// }
 
-	features := PullRequestFeatures{}
+	var pullRequestFeatureDetection struct {
+		PullRequest struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"PullRequest: __type(name: \"PullRequest\")"`
+		StatusCheckRollupContextConnection struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"StatusCheckRollupContextConnection: __type(name: \"StatusCheckRollupContextConnection\")"`
+	}
+
 	gql := api.NewClientFromHTTP(d.httpClient)
+	if err := gql.Query(d.host, "PullRequest_fields", &pullRequestFeatureDetection, nil); err != nil {
+		return PullRequestFeatures{}, err
+	}
 
-	g := new(errgroup.Group)
-	g.Go(func() error {
-		var pullRequestFeatureDetection struct {
-			PullRequest struct {
-				Fields []struct {
-					Name string
-				} `graphql:"fields(includeDeprecated: true)"`
-			} `graphql:"PullRequest: __type(name: \"PullRequest\")"`
+	features := PullRequestFeatures{}
+
+	for _, field := range pullRequestFeatureDetection.PullRequest.Fields {
+		if field.Name == "isInMergeQueue" {
+			features.MergeQueue = true
 		}
+	}
 
-		if err := gql.Query(d.host, "PullRequest_fields", &pullRequestFeatureDetection, nil); err != nil {
-			return err
-		}
-
-		for _, field := range pullRequestFeatureDetection.PullRequest.Fields {
-			if field.Name == "isInMergeQueue" {
-				features.MergeQueue = true
-			}
-		}
-
-		return nil
-	})
-
-	g.Go(func() error {
-		if !ghinstance.IsEnterprise(d.host) {
+	for _, field := range pullRequestFeatureDetection.StatusCheckRollupContextConnection.Fields {
+		// We only check for checkRunCount here but it, checkRunCountsByState, statusContextCount and statusContextCountsByState
+		// were all introduced in the same version of the API.
+		if field.Name == "checkRunCount" {
 			features.CheckRunAndStatusContextCounts = true
-			return nil
 		}
-
-		var statusCheckRollupContextConnectionFeatureDetection struct {
-			StatusCheckRollupContextConnection struct {
-				Fields []struct {
-					Name string
-				} `graphql:"fields(includeDeprecated: true)"`
-			} `graphql:"StatusCheckRollupContextConnection: __type(name: \"StatusCheckRollupContextConnection\")"`
-		}
-
-		if err := gql.Query(d.host, "StatusCheckRollupContextConnection_fields", &statusCheckRollupContextConnectionFeatureDetection, nil); err != nil {
-			return err
-		}
-
-		for _, field := range statusCheckRollupContextConnectionFeatureDetection.StatusCheckRollupContextConnection.Fields {
-			// We only check for checkRunCount here but it, checkRunCountsByState, statusContextCount and statusContextCountsByState
-			// were all introduced in the same version of the API.
-			if field.Name == "checkRunCount" {
-				features.CheckRunAndStatusContextCounts = true
-			}
-		}
-
-		return nil
-	})
-
-	err := g.Wait()
-	if err != nil {
-		return features, err
 	}
 
 	return features, nil
