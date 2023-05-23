@@ -14,7 +14,7 @@ import (
 )
 
 type closeOpts struct {
-	number    int
+	number    int32
 	userOwner string
 	orgOwner  string
 	reopen    bool
@@ -68,10 +68,11 @@ gh project close 1 --org github --undo
 			}
 
 			if len(args) == 1 {
-				opts.number, err = strconv.Atoi(args[0])
+				num, err := strconv.ParseInt(args[0], 10, 32)
 				if err != nil {
-					return fmt.Errorf("invalid number: %v", args[0])
+					return cmdutil.FlagErrorf("invalid number: %v", args[0])
 				}
+				opts.number = int32(num)
 			}
 
 			t := tableprinter.New(f.IOStreams)

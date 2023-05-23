@@ -18,7 +18,7 @@ type createItemOpts struct {
 	body      string
 	userOwner string
 	orgOwner  string
-	number    int
+	number    int32
 	projectID string
 	format    string
 }
@@ -68,10 +68,11 @@ gh project item-create 1 --org github --title "new item" --body "new item body"
 			}
 
 			if len(args) == 1 {
-				opts.number, err = strconv.Atoi(args[0])
+				num, err := strconv.ParseInt(args[0], 10, 32)
 				if err != nil {
-					return fmt.Errorf("invalid number: %v", args[0])
+					return cmdutil.FlagErrorf("invalid number: %v", args[0])
 				}
+				opts.number = int32(num)
 			}
 
 			t := tableprinter.New(f.IOStreams)

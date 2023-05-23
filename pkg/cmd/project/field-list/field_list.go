@@ -16,7 +16,7 @@ type listOpts struct {
 	limit     int
 	userOwner string
 	orgOwner  string
-	number    int
+	number    int32
 	format    string
 }
 
@@ -59,10 +59,11 @@ gh project field-list 1 --org github --limit 30
 			}
 
 			if len(args) == 1 {
-				opts.number, err = strconv.Atoi(args[0])
+				num, err := strconv.ParseInt(args[0], 10, 32)
 				if err != nil {
-					return fmt.Errorf("invalid number: %v", args[0])
+					return cmdutil.FlagErrorf("invalid number: %v", args[0])
 				}
+				opts.number = int32(num)
 			}
 
 			t := tableprinter.New(f.IOStreams)

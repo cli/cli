@@ -16,7 +16,7 @@ import (
 type addItemOpts struct {
 	userOwner string
 	orgOwner  string
-	number    int
+	number    int32
 	itemURL   string
 	projectID string
 	itemID    string
@@ -68,10 +68,11 @@ gh project item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
 			}
 
 			if len(args) == 1 {
-				opts.number, err = strconv.Atoi(args[0])
+				num, err := strconv.ParseInt(args[0], 10, 32)
 				if err != nil {
-					return fmt.Errorf("invalid number: %v", args[0])
+					return cmdutil.FlagErrorf("invalid number: %v", args[0])
 				}
+				opts.number = int32(num)
 			}
 
 			t := tableprinter.New(f.IOStreams)

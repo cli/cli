@@ -82,7 +82,7 @@ func JSONProjects(projects []queries.Project, totalCount int) ([]byte, error) {
 }
 
 type projectJSON struct {
-	Number           int    `json:"number"`
+	Number           int32  `json:"number"`
 	URL              string `json:"url"`
 	ShortDescription string `json:"shortDescription"`
 	Public           bool   `json:"public"`

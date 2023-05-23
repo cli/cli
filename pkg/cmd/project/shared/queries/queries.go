@@ -51,7 +51,7 @@ type PageInfo struct {
 
 // Project is a ProjectV2 GraphQL object https://docs.github.com/en/graphql/reference/objects#projectv2.
 type Project struct {
-	Number           int
+	Number           int32
 	URL              string
 	ShortDescription string
 	Public           bool
@@ -310,7 +310,7 @@ func (p ProjectItem) URL() string {
 
 // ProjectItems returns the items of a project. If the OwnerType is VIEWER, no login is required.
 // If limit is 0, the default limit is used.
-func ProjectItems(client *api.GraphQLClient, o *Owner, number int, limit int) (*Project, error) {
+func ProjectItems(client *api.GraphQLClient, o *Owner, number int32, limit int) (*Project, error) {
 	project := &Project{}
 	if limit == 0 {
 		limit = LimitDefault
@@ -581,7 +581,7 @@ func (p ProjectField) Options() []SingleSelectFieldOptions {
 
 // ProjectFields returns a project with fields. If the OwnerType is VIEWER, no login is required.
 // If limit is 0, the default limit is used.
-func ProjectFields(client *api.GraphQLClient, o *Owner, number int, limit int) (*Project, error) {
+func ProjectFields(client *api.GraphQLClient, o *Owner, number int32, limit int) (*Project, error) {
 	project := &Project{}
 	if limit == 0 {
 		limit = LimitDefault
@@ -1005,7 +1005,7 @@ func NewOwner(client *api.GraphQLClient, userLogin, orgLogin string) (*Owner, er
 // if number is 0 it will prompt the user to select a project interactively
 // otherwise it will make a request to get the project by number
 // set `fields“ to true to get the project's field data
-func NewProject(client *api.GraphQLClient, o *Owner, number int, fields bool) (*Project, error) {
+func NewProject(client *api.GraphQLClient, o *Owner, number int32, fields bool) (*Project, error) {
 	if number != 0 {
 		variables := map[string]interface{}{
 			"number":      githubv4.Int(number),
