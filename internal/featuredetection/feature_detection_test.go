@@ -1,7 +1,6 @@
 package featuredetection
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -306,11 +305,4 @@ func TestRepositoryFeatures(t *testing.T) {
 			assert.Equal(t, tt.wantFeatures, gotFeatures)
 		})
 	}
-}
-
-func emptyIntrospectionFor(typ string) string {
-	return fmt.Sprintf(`
-		{ "data": { "%s": { "fields": [
-		] } } }
-	`, typ)
 }
