@@ -126,8 +126,8 @@ type CheckRunCountByState struct {
 type StatusState string
 
 const (
-	StatusStateExpected StatusState = "EXPECTED"
 	StatusStateError    StatusState = "ERROR"
+	StatusStateExpected StatusState = "EXPECTED"
 	StatusStateFailure  StatusState = "FAILURE"
 	StatusStatePending  StatusState = "PENDING"
 	StatusStateSuccess  StatusState = "SUCCESS"
@@ -142,12 +142,12 @@ type StatusContextCountByState struct {
 type CheckStatusState string
 
 const (
-	CheckStatusStateQueued     CheckStatusState = "QUEUED"
-	CheckStatusStateInProgress CheckStatusState = "IN_PROGRESS"
 	CheckStatusStateCompleted  CheckStatusState = "COMPLETED"
-	CheckStatusStateWaiting    CheckStatusState = "WAITING"
+	CheckStatusStateInProgress CheckStatusState = "IN_PROGRESS"
 	CheckStatusStatePending    CheckStatusState = "PENDING"
+	CheckStatusStateQueued     CheckStatusState = "QUEUED"
 	CheckStatusStateRequested  CheckStatusState = "REQUESTED"
+	CheckStatusStateWaiting    CheckStatusState = "WAITING"
 )
 
 // https://docs.github.com/en/graphql/reference/enums#checkconclusionstate
@@ -155,14 +155,14 @@ type CheckConclusionState string
 
 const (
 	CheckConclusionStateActionRequired CheckConclusionState = "ACTION_REQUIRED"
-	CheckConclusionStateTimedOut       CheckConclusionState = "TIMED_OUT"
 	CheckConclusionStateCancelled      CheckConclusionState = "CANCELLED"
 	CheckConclusionStateFailure        CheckConclusionState = "FAILURE"
-	CheckConclusionStateSuccess        CheckConclusionState = "SUCCESS"
 	CheckConclusionStateNeutral        CheckConclusionState = "NEUTRAL"
 	CheckConclusionStateSkipped        CheckConclusionState = "SKIPPED"
-	CheckConclusionStateStartupFailure CheckConclusionState = "STARTUP_FAILURE"
 	CheckConclusionStateStale          CheckConclusionState = "STALE"
+	CheckConclusionStateStartupFailure CheckConclusionState = "STARTUP_FAILURE"
+	CheckConclusionStateSuccess        CheckConclusionState = "SUCCESS"
+	CheckConclusionStateTimedOut       CheckConclusionState = "TIMED_OUT"
 )
 
 type CheckContexts struct {
