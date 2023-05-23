@@ -319,29 +319,35 @@ func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
 
 	// If we don't have the counts by state, then we'll need to summarise by looking at the more detailed contexts
 	for _, c := range contexts.Nodes {
-		// Nodes are a discriminated union of CheckRun or StatusContext,
-		// but we can use the State field to disambiguate, rather than using the TypeName.
-		// First we try to get the State, as if we have a StatusContext
-		state := c.State
-		// But if the State is empty, then we assume we actually have a CheckRun
-		if state == "" {
-			// If the Status of a CheckRun is COMPLETED, then we want to look more closely
-			// at the Conclusion, as that contains the relevant information.
+		// Nodes are a discriminated union of CheckRun or StatusContext and we can match on
+		// the TypeName to narrow the type.
+		if c.TypeName == "CheckRun" {
+			// https://docs.github.com/en/graphql/reference/enums#checkstatusstate
+			// If the status is completed then we can check the conclusion field
 			if c.Status == "COMPLETED" {
-				state = c.Conclusion
+				switch parseCheckStatusFromCheckConclusionState(c.Conclusion) {
+				case passing:
+					summary.Passing++
+				case failing:
+					summary.Failing++
+				default:
+					summary.Pending++
+				}
+				// otherwise we're in some form of pending state:
+				// "COMPLETED", "IN_PROGRESS", "PENDING", "QUEUED", "REQUESTED", "WAITING" or otherwise unknown
 			} else {
-				state = c.Status
+				summary.Pending++
 			}
-		}
-		switch state {
-		case "SUCCESS", "NEUTRAL", "SKIPPED":
-			summary.Passing++
-		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
-			summary.Failing++
-		// We treat anything that isn't Passing or Failing as Pending, which included any future unknown states
-		// we might get back from the API.
-		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE", "STARTUP_FAILURE"
-			summary.Pending++
+
+		} else { // c.TypeName == StatusContext
+			switch parseCheckStatusFromStatusState(c.State) {
+			case passing:
+				summary.Passing++
+			case failing:
+				summary.Failing++
+			default:
+				summary.Pending++
+			}
 		}
 		summary.Total++
 	}
@@ -382,6 +388,23 @@ func parseCheckStatusFromCheckRunState(state string) checkStatus {
 	case "ACTION_REQUIRED", "CANCELLED", "FAILURE", "TIMED_OUT":
 		return failing
 	case "COMPLETED", "IN_PROGRESS", "PENDING", "QUEUED", "STALE", "STARTUP_FAILURE", "WAITING":
+		return pending
+	// Currently, we treat anything unknown as pending, which includes any future unknown
+	// states we might get back from the API. It might be interesting to do some work to add an additional
+	// unknown state.
+	default:
+		return pending
+	}
+}
+
+// https://docs.github.com/en/graphql/reference/enums#checkconclusionstate
+func parseCheckStatusFromCheckConclusionState(state string) checkStatus {
+	switch state {
+	case "NEUTRAL", "SKIPPED", "SUCCESS":
+		return passing
+	case "ACTION_REQUIRED", "CANCELLED", "FAILURE", "TIMED_OUT":
+		return failing
+	case "STALE", "STARTUP_FAILURE":
 		return pending
 	// Currently, we treat anything unknown as pending, which includes any future unknown
 	// states we might get back from the API. It might be interesting to do some work to add an additional
