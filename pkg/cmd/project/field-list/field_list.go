@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -31,16 +32,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd := &cobra.Command{
 		Short: "List the fields in a project",
 		Use:   "field-list number",
-		Example: `
-# list the fields in the current user's project number 1
-gh project field-list 1 --user "@me"
-
-# list the fields in user monalisa's project number 1
-gh project field-list 1 --user monalisa
-
-# list the first 30 fields in org github's project number 1
-gh project field-list 1 --org github --limit 30
-`,
+		Example: heredoc.Doc(`
+			# list fields in the current user's project "1"
+			gh project field-list 1 --user "@me"
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(

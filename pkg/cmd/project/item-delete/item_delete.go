@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -38,16 +39,10 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 	deleteItemCmd := &cobra.Command{
 		Short: "Delete an item from a project by ID",
 		Use:   "item-delete [<number>]",
-		Example: `
-# delete an item in the current user's project 1
-gh project item-delete 1 --user "@me" --id ID
-
-# delete an item in the monalisa user project 1
-gh project item-delete 1 --user monalisa --id ID
-
-# delete an item in the github org project 1
-gh project item-delete 1 --org github --id ID
-`,
+		Example: heredoc.Doc(`
+			# delete an item in the current user's project "1"
+			gh project item-delete 1 --user "@me" --id <item-ID>
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -40,16 +41,13 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 	closeCmd := &cobra.Command{
 		Short: "Close a project",
 		Use:   "close [<number>]",
-		Example: `
-# close project 1 owned by user monalisa
-gh project close 1 --user monalisa
+		Example: heredoc.Doc(`
+			# close project "1" owned by user monalisa
+			gh project close 1 --user monalisa
 
-# close project 1 owned by org github
-gh project close 1 --org github
-
-# reopen closed project 1 owned by org github
-gh project close 1 --org github --undo
-`,
+			# reopen closed project "1" owned by org github
+			gh project close 1 --org github --undo
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(

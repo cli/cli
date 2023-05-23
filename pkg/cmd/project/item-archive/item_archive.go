@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -46,19 +47,10 @@ func NewCmdArchiveItem(f *cmdutil.Factory, runF func(config archiveItemConfig) e
 	archiveItemCmd := &cobra.Command{
 		Short: "Archive an item in a project",
 		Use:   "item-archive [<number>]",
-		Example: `
-# archive an item in the current user's project 1
-gh project item-archive 1 --user "@me" --id ID
-
-# archive an item in the monalisa user's project 1
-gh project item-archive 1 --user monalisa --id ID
-
-# archive an item in the org github's project 1
-gh project item-archive 1 --org github --id ID
-
-# unarchive an item
-gh project item-archive 1 --user "@me" --id ID --undo
-`,
+		Example: heredoc.Doc(`
+			# archive an item in the current user's project "1"
+			gh project item-archive 1 --user "@me" --id <item-ID>
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(

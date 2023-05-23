@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -53,29 +54,16 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	opts := editItemOpts{}
 	editItemCmd := &cobra.Command{
 		Use:   "item-edit",
-		Short: "Edit an item in a project by ID",
-		Long: `
-Edit one of a draft issue or a project item. Both require the ID of the item to edit. For non-draft issues, the ID of the project is also required, and only a single field value can be updated per invocation. See the flags for more details.`,
-		Example: `
-# edit a draft issue title and body
-gh project item-edit --id DRAFT_ISSUE_CONTENT_ID --title "a new title" --body "a new body"
-
-# edit an item's text field value
-gh project item-edit --id ITEM_ID --field-id FIELD_ID --project-id PROJECT_ID --text "new text"
-
-# edit an item's number field value
-gh project item-edit --id ITEM_ID --field-id FIELD_ID --project-id PROJECT_ID --number 1
-
-# edit an item' date field value
-gh project item-edit --id ITEM_ID --field-id FIELD_ID --project-id PROJECT_ID --date "2023-01-01"
-
-# edit an item's single-select field value
-# you can retrieve the option ID from the output of the 'field-list --format=json' command
-gh project item-edit --id ITEM_ID --field-id FIELD_ID --project-id PROJECT_ID --single-select-option-id OPTION_ID
-
-# edit an item's iteration field value
-gh project item-edit --id ITEM_ID --field-id FIELD_ID --project-id PROJECT_ID --iteration-id ITERATION_ID
-`,
+		Short: "Edit an item in a project",
+		Long: heredoc.Doc(`
+			Edit either a draft issue or a project item. Both usages require the ID of the item to edit.
+			
+			For non-draft issues, the ID of the project is also required, and only a single field value can be updated per invocation.
+		`),
+		Example: heredoc.Doc(`
+			# edit an item's text field value
+			gh project item-edit --id <item-ID> --field-id <field-ID> --project-id <project-ID> --text "new text"
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(
 				"only one of `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` may be used",

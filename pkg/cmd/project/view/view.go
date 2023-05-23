@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -36,16 +37,13 @@ func NewCmdView(f *cmdutil.Factory, runF func(config viewConfig) error) *cobra.C
 	viewCmd := &cobra.Command{
 		Short: "View a project",
 		Use:   "view [<number>]",
-		Example: `
-# view the current user's project 1
-gh project view 1
+		Example: heredoc.Doc(`
+			# view the current user's project "1"
+			gh project view 1
 
-# open user monalisa's project 1 in the browser
-gh project view 1 --user monalisa --web
-
-# view org github's project 1 including closed projects
-gh project view 1 --org github --closed
-`,
+			# open user monalisa's project "1" in the browser
+			gh project view 1 --user monalisa --web
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(

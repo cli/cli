@@ -3,6 +3,7 @@ package create
 import (
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -37,16 +38,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 	createCmd := &cobra.Command{
 		Short: "Create a project",
 		Use:   "create",
-		Example: `
-# create a new project owned by user monalisa with title "a new project"
-gh project create --user monalisa --title "a new project"
-
-# create a new project owned by org github with title "a new project"
-gh project create --org github --title "a new project"
-
-# create a new project owned by the current user with title "a new project"
-gh project create --user '@me' --title "a new project"
-`,
+		Example: heredoc.Doc(`
+			# create a new project owned by user monalisa
+			gh project create --user monalisa --title "a new project"
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(
 				"only one of `--user` or `--org` may be used",

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -31,19 +32,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd := &cobra.Command{
 		Short: "List the items in a project",
 		Use:   "item-list [<number>]",
-		Example: `
-The default output is a column format with a subset of system defined fields.
-To list all of the fields, use the --format directive.
-
-# list the items in the current users's project number 1
-gh project item-list 1 --user "@me"
-
-# list the items in user monalisa's project number 1
-gh project item-list 1 --user monalisa
-
-# list the items in org github's project number 1
-gh project item-list 1 --org github
-`,
+		Example: heredoc.Doc(`
+			# list the items in the current users's project "1"
+			gh project item-list 1 --user "@me"
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(

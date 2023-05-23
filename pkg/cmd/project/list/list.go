@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -32,16 +33,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd := &cobra.Command{
 		Short: "List the projects for an owner",
 		Use:   "list",
-		Example: `
-# list the current user's projects
-gh project list
+		Example: heredoc.Doc(`
+			# list the current user's projects
+			gh project list
 
-# open projects for user monalisa in the browser
-gh project list --user monalisa --web
-
-# list the projects for org github including closed projects
-gh project list --org github --closed
-`,
+			# list the projects for org github including closed projects
+			gh project list --org github --closed
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(
 				"only one of `--user` or `--org` may be used",

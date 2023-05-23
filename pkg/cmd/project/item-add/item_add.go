@@ -3,6 +3,7 @@ package itemadd
 import (
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -39,16 +40,10 @@ func NewCmdAddItem(f *cmdutil.Factory, runF func(config addItemConfig) error) *c
 	addItemCmd := &cobra.Command{
 		Short: "Add a pull request or an issue to a project",
 		Use:   "item-add [<number>]",
-		Example: `
-# add an item to the current user's project 1
-gh project item-add 1 --user "@me" --url https://github.com/cli/go-gh/issues/1
-
-# add an item to user monalisa's project 1
-gh project item-add 1 --user monalisa --url https://github.com/cli/go-gh/issues/1
-
-# add an item to the org github's project 1
-gh project item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
-`,
+		Example: heredoc.Doc(`
+			# add an item to monalisa's project "1"
+			gh project item-add 1 --user monalisa --url https://github.com/monalisa/myproject/issues/23
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(

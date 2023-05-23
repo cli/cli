@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -41,19 +42,13 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 	createFieldCmd := &cobra.Command{
 		Short: "Create a field in a project",
 		Use:   "field-create [<number>]",
-		Example: `
-# create a field in the current user's project 1 with title "new item" and dataType "text"
-gh project field-create 1 --user "@me" --name "new field" --data-type "text"
+		Example: heredoc.Doc(`
+			# create a field in the current user's project "1"
+			gh project field-create 1 --user "@me" --name "new field" --data-type "text"
 
-# create a field in user monalisa's project 1 with title "new item" and dataType "text"
-gh project field-create 1 --user monalisa --name "new field" --data-type "text"
-
-# create a field in org github's' project 1 with title "new item" and dataType "text"
-gh project field-create 1 --org github --name "new field" --data-type "text"
-
-# create a field with single select options
-gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
-`,
+			# create a field with three options to select from
+			gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(

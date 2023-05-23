@@ -3,6 +3,7 @@ package delete
 import (
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -37,16 +38,10 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 	deleteCmd := &cobra.Command{
 		Short: "Delete a project",
 		Use:   "delete [<number>]",
-		Example: `
-# delete the current user's project 1
-gh project delete 1 --user "@me"
-
-# delete user monalisa's project 1
-gh project delete 1 --user monalisa
-
-# delete org github's project 1
-gh project delete 1 --org github
-`,
+		Example: heredoc.Doc(`
+			# delete the current user's project "1"
+			gh project delete 1 --user "@me"
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(

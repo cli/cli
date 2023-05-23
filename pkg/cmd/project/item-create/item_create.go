@@ -3,6 +3,7 @@ package itemcreate
 import (
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -39,16 +40,10 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 	createItemCmd := &cobra.Command{
 		Short: "Create a draft issue item in a project",
 		Use:   "item-create [<number>]",
-		Example: `
-# create a draft issue in the current user's project 1 with title "new item" and body "new item body"
-gh project item-create 1 --user "@me" --title "new item" --body "new item body"
-
-# create a draft issue in user monalisa's project 1 with title "new item" and body "new item body"
-gh project item-create 1 --user monalisa --title "new item" --body "new item body"
-
-# create a draft issue in org github's project 1 with title "new item" and body "new item body"
-gh project item-create 1 --org github --title "new item" --body "new item body"
-`,
+		Example: heredoc.Doc(`
+			# create a draft issue in the current user's project "1"
+			gh project item-create 1 --user "@me" --title "new item" --body "new item body"
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(

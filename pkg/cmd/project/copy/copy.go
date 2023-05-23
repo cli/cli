@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -43,16 +44,10 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 	copyCmd := &cobra.Command{
 		Short: "Copy a project",
 		Use:   "copy [<number>]",
-		Example: `
-# copy project 1 owned by user monalisa to org github with title "a new project"
-gh project copy 1 --source-user monalisa --title "a new project" --target-org github
-
-# copy project 1 owned by the org github to current user with title "a new project"
-gh project copy 1 --source-org github --title "a new project" --target-me
-
-# copy project 1 owned by the org github to user monalisa with title "a new project" and include draft issues
-gh project copy 1 --source-org github --title "a new project" --target-user monalisa --drafts
-`,
+		Example: heredoc.Doc(`
+			# copy project "1" owned by user monalisa to the github org
+			gh project copy 1 --source-user monalisa --target-org github --title "a new project"
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(
@@ -104,7 +99,7 @@ gh project copy 1 --source-org github --title "a new project" --target-user mona
 	copyCmd.Flags().StringVar(&opts.targetUserOwner, "target-user", "", "Login of the target organization owner. Use \"@me\" for the current user.")
 	copyCmd.Flags().StringVar(&opts.targetOrgOwner, "target-org", "", "Login of the target organization owner")
 	copyCmd.Flags().StringVar(&opts.title, "title", "", "Title for the new project")
-	copyCmd.Flags().BoolVar(&opts.includeDraftIssues, "drafts", false, "Include draft issues")
+	copyCmd.Flags().BoolVar(&opts.includeDraftIssues, "drafts", false, "Include draft issues when copying")
 	cmdutil.StringEnumFlag(copyCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = copyCmd.MarkFlagRequired("title")

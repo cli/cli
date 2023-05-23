@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -45,16 +46,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(config editConfig) error) *cobra.C
 	editCmd := &cobra.Command{
 		Short: "Edit a project",
 		Use:   "edit [<number>]",
-		Example: `
-# edit user monalisa's project 1 to have the new title "New title"
-gh project edit 1 --user monalisa --title "New title"
-
-# edit org github's project 1 to have the new title "New title"
-gh project edit 1 --org github --title "New title"
-
-# edit org github's project 1 to have visibility public
-gh project edit 1 --org github --visibility PUBLIC
-`,
+		Example: heredoc.Doc(`
+			# edit the title of monalisa's project "1"
+			gh project edit 1 --user monalisa --title "New title"
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(
