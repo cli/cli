@@ -35,7 +35,7 @@ var _ Prompter = &PrompterMock{}
 //			MarkdownEditorFunc: func(s1 string, s2 string, b bool) (string, error) {
 //				panic("mock out the MarkdownEditor method")
 //			},
-//			MultiSelectFunc: func(s string, strings1 []string, strings2 []string) ([]string, error) {
+//			MultiSelectFunc: func(s string, strings1 []string, strings2 []string) ([]int, error) {
 //				panic("mock out the MultiSelect method")
 //			},
 //			PasswordFunc: func(s string) (string, error) {
@@ -70,7 +70,7 @@ type PrompterMock struct {
 	MarkdownEditorFunc func(s1 string, s2 string, b bool) (string, error)
 
 	// MultiSelectFunc mocks the MultiSelect method.
-	MultiSelectFunc func(s string, strings1 []string, strings2 []string) ([]string, error)
+	MultiSelectFunc func(s string, strings1 []string, strings2 []string) ([]int, error)
 
 	// PasswordFunc mocks the Password method.
 	PasswordFunc func(s string) (string, error)
@@ -348,7 +348,7 @@ func (mock *PrompterMock) MarkdownEditorCalls() []struct {
 }
 
 // MultiSelect calls MultiSelectFunc.
-func (mock *PrompterMock) MultiSelect(s string, strings1 []string, strings2 []string) ([]string, error) {
+func (mock *PrompterMock) MultiSelect(s string, strings1 []string, strings2 []string) ([]int, error) {
 	if mock.MultiSelectFunc == nil {
 		panic("PrompterMock.MultiSelectFunc: method is nil but Prompter.MultiSelect was just called")
 	}
