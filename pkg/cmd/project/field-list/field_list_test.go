@@ -8,7 +8,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
@@ -171,8 +170,7 @@ func TestRunList_User(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
@@ -184,7 +182,7 @@ func TestRunList_User(t *testing.T) {
 		client: client,
 	}
 
-	err = runList(config)
+	err := runList(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -257,8 +255,7 @@ func TestRunList_Org(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
@@ -270,7 +267,7 @@ func TestRunList_Org(t *testing.T) {
 		client: client,
 	}
 
-	err = runList(config)
+	err := runList(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -340,8 +337,7 @@ func TestRunList_Me(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
@@ -353,7 +349,7 @@ func TestRunList_Me(t *testing.T) {
 		client: client,
 	}
 
-	err = runList(config)
+	err := runList(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -407,8 +403,7 @@ func TestRunList_Empty(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, _, _ := iostreams.Test()
 	config := listConfig{
@@ -420,7 +415,7 @@ func TestRunList_Empty(t *testing.T) {
 		client: client,
 	}
 
-	err = runList(config)
+	err := runList(config)
 	assert.EqualError(
 		t,
 		err,

@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
@@ -215,8 +215,7 @@ func TestRunUpdate_User(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editConfig{
@@ -232,7 +231,7 @@ func TestRunUpdate_User(t *testing.T) {
 		client: client,
 	}
 
-	err = runEdit(config)
+	err := runEdit(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -307,8 +306,7 @@ func TestRunUpdate_Org(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editConfig{
@@ -324,7 +322,7 @@ func TestRunUpdate_Org(t *testing.T) {
 		client: client,
 	}
 
-	err = runEdit(config)
+	err := runEdit(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -395,8 +393,7 @@ func TestRunUpdate_Me(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editConfig{
@@ -412,7 +409,7 @@ func TestRunUpdate_Me(t *testing.T) {
 		client: client,
 	}
 
-	err = runEdit(config)
+	err := runEdit(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -487,8 +484,7 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editConfig{
@@ -501,7 +497,7 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 		client: client,
 	}
 
-	err = runEdit(config)
+	err := runEdit(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,

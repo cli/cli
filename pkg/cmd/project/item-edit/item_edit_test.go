@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
@@ -169,8 +169,7 @@ func TestRunItemEdit_Draft(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
@@ -183,7 +182,7 @@ func TestRunItemEdit_Draft(t *testing.T) {
 		client: client,
 	}
 
-	err = runEditItem(config)
+	err := runEditItem(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -219,8 +218,7 @@ func TestRunItemEdit_Text(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
@@ -234,7 +232,7 @@ func TestRunItemEdit_Text(t *testing.T) {
 		client: client,
 	}
 
-	err = runEditItem(config)
+	err := runEditItem(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -270,8 +268,7 @@ func TestRunItemEdit_Number(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
@@ -285,7 +282,7 @@ func TestRunItemEdit_Number(t *testing.T) {
 		client: client,
 	}
 
-	err = runEditItem(config)
+	err := runEditItem(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -321,8 +318,7 @@ func TestRunItemEdit_Date(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
@@ -336,7 +332,7 @@ func TestRunItemEdit_Date(t *testing.T) {
 		client: client,
 	}
 
-	err = runEditItem(config)
+	err := runEditItem(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -372,8 +368,7 @@ func TestRunItemEdit_SingleSelect(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
@@ -387,7 +382,7 @@ func TestRunItemEdit_SingleSelect(t *testing.T) {
 		client: client,
 	}
 
-	err = runEditItem(config)
+	err := runEditItem(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -423,8 +418,7 @@ func TestRunItemEdit_Iteration(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
@@ -438,7 +432,7 @@ func TestRunItemEdit_Iteration(t *testing.T) {
 		client: client,
 	}
 
-	err = runEditItem(config)
+	err := runEditItem(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -450,8 +444,7 @@ func TestRunItemEdit_NoChanges(t *testing.T) {
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
@@ -460,7 +453,7 @@ func TestRunItemEdit_NoChanges(t *testing.T) {
 		client: client,
 	}
 
-	err = runEditItem(config)
+	err := runEditItem(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -472,9 +465,7 @@ func TestRunItemEdit_InvalidID(t *testing.T) {
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
-
+	client := queries.NewTestClient()
 	ios, _, _, _ := iostreams.Test()
 	config := editItemConfig{
 		tp: tableprinter.New(ios),
@@ -486,6 +477,6 @@ func TestRunItemEdit_InvalidID(t *testing.T) {
 		client: client,
 	}
 
-	err = runEditItem(config)
+	err := runEditItem(config)
 	assert.Error(t, err, "ID must be the ID of the draft issue content which is prefixed with `DI_`")
 }

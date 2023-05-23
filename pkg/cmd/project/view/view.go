@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +25,7 @@ type viewOpts struct {
 
 type viewConfig struct {
 	tp        *tableprinter.TablePrinter
-	client    *api.GraphQLClient
+	client    *queries.Client
 	opts      viewOpts
 	io        *iostreams.IOStreams
 	URLOpener func(string) error
@@ -109,12 +108,12 @@ func runView(config viewConfig) error {
 		return nil
 	}
 
-	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err
 	}
 
-	project, err := queries.NewProject(config.client, owner, config.opts.number, true)
+	project, err := config.client.NewProject(owner, config.opts.number, true)
 	if err != nil {
 		return err
 	}
@@ -129,7 +128,7 @@ func runView(config viewConfig) error {
 func buildURL(config viewConfig) (string, error) {
 	var url string
 	if config.opts.userOwner == "@me" {
-		login, err := queries.ViewerLoginName(config.client)
+		login, err := config.client.ViewerLoginName()
 		if err != nil {
 			return "", err
 		}

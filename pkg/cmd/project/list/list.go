@@ -8,7 +8,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +22,7 @@ type listOpts struct {
 
 type listConfig struct {
 	tp        *tableprinter.TablePrinter
-	client    *api.GraphQLClient
+	client    *queries.Client
 	opts      listOpts
 	URLOpener func(string) error
 }
@@ -78,7 +77,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd.Flags().BoolVarP(&opts.closed, "closed", "", false, "Include closed projects")
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser")
 	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
-	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", 30, "Maximum number of projects to fetch")
+	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of projects to fetch")
 
 	return listCmd
 }
@@ -114,7 +113,7 @@ func runList(config listConfig) error {
 		ownerType = queries.ViewerOwner
 	}
 
-	projects, totalCount, err := queries.Projects(config.client, login, ownerType, config.opts.limit, false)
+	projects, totalCount, err := config.client.Projects(login, ownerType, config.opts.limit, false)
 	if err != nil {
 		return err
 	}
@@ -134,7 +133,7 @@ func buildURL(config listConfig) (string, error) {
 	} else if config.opts.orgOwner != "" {
 		url = fmt.Sprintf("https://github.com/orgs/%s/projects", config.opts.orgOwner)
 	} else {
-		login, err := queries.ViewerLoginName(config.client)
+		login, err := config.client.ViewerLoginName()
 		if err != nil {
 			return "", err
 		}

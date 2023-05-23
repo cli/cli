@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -34,7 +33,7 @@ type editItemOpts struct {
 
 type editItemConfig struct {
 	tp     *tableprinter.TablePrinter
-	client *api.GraphQLClient
+	client *queries.Client
 	opts   editItemOpts
 }
 

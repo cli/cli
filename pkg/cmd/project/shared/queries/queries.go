@@ -4,27 +4,57 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"regexp"
+	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/briandowns/spinner"
+	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/pkg/set"
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/shurcooL/githubv4"
 )
 
-type ClientOptions struct {
-	Timeout time.Duration
+func NewClient() (*Client, error) {
+	apiClient, err := api.NewGraphQLClient(api.ClientOptions{
+		Timeout: 15 * time.Second,
+		Headers: map[string]string{},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &Client{
+		apiClient: apiClient,
+		// TODO: inform by iostreams
+		spinner:  true,
+		prompter: prompter.New("", os.Stdin, os.Stdout, os.Stderr),
+	}, nil
 }
 
-func NewClient() (*api.GraphQLClient, error) {
-	timeout := 15 * time.Second
-
-	apiOpts := api.ClientOptions{
-		Timeout: timeout,
-		Headers: map[string]string{},
+func NewTestClient() *Client {
+	apiClient, err := api.NewGraphQLClient(api.ClientOptions{
+		AuthToken: "TEST-TOKEN",
+		Headers:   map[string]string{},
+	})
+	if err != nil {
+		panic(err)
 	}
+	return &Client{
+		apiClient: apiClient,
+		spinner:   false,
+		prompter:  nil,
+	}
+}
 
-	return api.NewGraphQLClient(apiOpts)
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
+
+type Client struct {
+	apiClient *api.GraphQLClient
+	spinner   bool
+	prompter  iprompter
 }
 
 const (
@@ -32,15 +62,26 @@ const (
 	LimitMax     = 100 // https://docs.github.com/en/graphql/overview/resource-limitations#node-limit
 )
 
-// doQuery wraps calls to client.Query with a spinner
-func doQuery(client *api.GraphQLClient, name string, query interface{}, variables map[string]interface{}) error {
-	// https://github.com/briandowns/spinner#available-character-sets
-	dotStyle := spinner.CharSets[11]
-	sp := spinner.New(dotStyle, 120*time.Millisecond, spinner.WithColor("fgCyan"))
-	sp.Start()
-	err := client.Query(name, query, variables)
-	sp.Stop()
-	return err
+// doQuery wraps API calls with a visual spinner
+func (c *Client) doQuery(name string, query interface{}, variables map[string]interface{}) error {
+	var sp *spinner.Spinner
+	if c.spinner {
+		// https://github.com/briandowns/spinner#available-character-sets
+		dotStyle := spinner.CharSets[11]
+		sp = spinner.New(dotStyle, 120*time.Millisecond, spinner.WithColor("fgCyan"))
+		sp.Start()
+	}
+	err := c.apiClient.Query(name, query, variables)
+	if sp != nil {
+		sp.Stop()
+	}
+	return handleError(err)
+}
+
+// TODO: un-export this since it couples the caller heavily to api.GraphQLClient
+func (c *Client) Mutate(operationName string, query interface{}, variables map[string]interface{}) error {
+	err := c.apiClient.Mutate(operationName, query, variables)
+	return handleError(err)
 }
 
 // PageInfo is a PageInfo GraphQL object https://docs.github.com/en/graphql/reference/objects#pageinfo.
@@ -310,7 +351,7 @@ func (p ProjectItem) URL() string {
 
 // ProjectItems returns the items of a project. If the OwnerType is VIEWER, no login is required.
 // If limit is 0, the default limit is used.
-func ProjectItems(client *api.GraphQLClient, o *Owner, number int32, limit int) (*Project, error) {
+func (c *Client) ProjectItems(o *Owner, number int32, limit int) (*Project, error) {
 	project := &Project{}
 	if limit == 0 {
 		limit = LimitDefault
@@ -345,13 +386,13 @@ func ProjectItems(client *api.GraphQLClient, o *Owner, number int32, limit int) 
 		query = &viewerOwnerWithItems{} // must be a pointer to work with graphql queries
 		queryName = "ViewerProjectWithItems"
 	}
-	err := doQuery(client, queryName, query, variables)
+	err := c.doQuery(queryName, query, variables)
 	if err != nil {
 		return project, err
 	}
 	project = query.Project()
 
-	items, err := paginateAttributes(client, query, variables, queryName, "firstItems", "afterItems", limit, query.Nodes())
+	items, err := paginateAttributes(c, query, variables, queryName, "firstItems", "afterItems", limit, query.Nodes())
 	if err != nil {
 		return project, err
 	}
@@ -484,7 +525,7 @@ type projectAttribute interface {
 // nodes is the list of attributes that have already been fetched.
 //
 // the return value is a slice of the newly fetched attributes appended to nodes.
-func paginateAttributes[N projectAttribute](client *api.GraphQLClient, p pager[N], variables map[string]any, queryName string, firstKey string, afterKey string, limit int, nodes []N) ([]N, error) {
+func paginateAttributes[N projectAttribute](c *Client, p pager[N], variables map[string]any, queryName string, firstKey string, afterKey string, limit int, nodes []N) ([]N, error) {
 	hasNextPage := p.HasNextPage()
 	cursor := p.EndCursor()
 	for {
@@ -499,7 +540,7 @@ func paginateAttributes[N projectAttribute](client *api.GraphQLClient, p pager[N
 
 		// set the cursor to the end of the last page
 		variables[afterKey] = (*githubv4.String)(&cursor)
-		err := doQuery(client, queryName, p, variables)
+		err := c.doQuery(queryName, p, variables)
 		if err != nil {
 			return nodes, err
 		}
@@ -581,7 +622,7 @@ func (p ProjectField) Options() []SingleSelectFieldOptions {
 
 // ProjectFields returns a project with fields. If the OwnerType is VIEWER, no login is required.
 // If limit is 0, the default limit is used.
-func ProjectFields(client *api.GraphQLClient, o *Owner, number int32, limit int) (*Project, error) {
+func (c *Client) ProjectFields(o *Owner, number int32, limit int) (*Project, error) {
 	project := &Project{}
 	if limit == 0 {
 		limit = LimitDefault
@@ -615,13 +656,13 @@ func ProjectFields(client *api.GraphQLClient, o *Owner, number int32, limit int)
 		query = &viewerOwnerWithFields{} // must be a pointer to work with graphql queries
 		queryName = "ViewerProjectWithFields"
 	}
-	err := doQuery(client, queryName, query, variables)
+	err := c.doQuery(queryName, query, variables)
 	if err != nil {
 		return project, err
 	}
 	project = query.Project()
 
-	fields, err := paginateAttributes(client, query, variables, queryName, "firstFields", "afterFields", limit, query.Nodes())
+	fields, err := paginateAttributes(c, query, variables, queryName, "firstFields", "afterFields", limit, query.Nodes())
 	if err != nil {
 		return project, err
 	}
@@ -743,9 +784,9 @@ const OrgOwner OwnerType = "ORGANIZATION"
 const ViewerOwner OwnerType = "VIEWER"
 
 // ViewerLoginName returns the login name of the viewer.
-func ViewerLoginName(client *api.GraphQLClient) (string, error) {
+func (c *Client) ViewerLoginName() (string, error) {
 	var query viewerLogin
-	err := doQuery(client, "Viewer", &query, map[string]interface{}{})
+	err := c.doQuery("Viewer", &query, map[string]interface{}{})
 	if err != nil {
 		return "", err
 	}
@@ -753,21 +794,21 @@ func ViewerLoginName(client *api.GraphQLClient) (string, error) {
 }
 
 // OwnerID returns the ID of an OwnerType. If the OwnerType is VIEWER, no login is required.
-func OwnerID(client *api.GraphQLClient, login string, t OwnerType) (string, error) {
+func (c *Client) OwnerID(login string, t OwnerType) (string, error) {
 	variables := map[string]interface{}{
 		"login": githubv4.String(login),
 	}
 	if t == UserOwner {
 		var query userLogin
-		err := doQuery(client, "UserLogin", &query, variables)
+		err := c.doQuery("UserLogin", &query, variables)
 		return query.User.Id, err
 	} else if t == OrgOwner {
 		var query orgLogin
-		err := doQuery(client, "OrgLogin", &query, variables)
+		err := c.doQuery("OrgLogin", &query, variables)
 		return query.Organization.Id, err
 	} else if t == ViewerOwner {
 		var query viewerLogin
-		err := doQuery(client, "ViewerLogin", &query, nil)
+		err := c.doQuery("ViewerLogin", &query, nil)
 		return query.Viewer.Id, err
 	}
 	return "", errors.New("unknown owner type")
@@ -787,7 +828,7 @@ type issueOrPullRequest struct {
 }
 
 // IssueOrPullRequestID returns the ID of the issue or pull request from a URL.
-func IssueOrPullRequestID(client *api.GraphQLClient, rawURL string) (string, error) {
+func (c *Client) IssueOrPullRequestID(rawURL string) (string, error) {
 	uri, err := url.Parse(rawURL)
 	if err != nil {
 		return "", err
@@ -796,7 +837,7 @@ func IssueOrPullRequestID(client *api.GraphQLClient, rawURL string) (string, err
 		"url": githubv4.URI{URL: uri},
 	}
 	var query issueOrPullRequest
-	err = doQuery(client, "GetIssueOrPullRequest", &query, variables)
+	err = c.doQuery("GetIssueOrPullRequest", &query, variables)
 	if err != nil {
 		return "", err
 	}
@@ -851,14 +892,14 @@ type loginTypes struct {
 }
 
 // userOrgLogins gets all the logins of the viewer and the organizations the viewer is a member of.
-func userOrgLogins(client *api.GraphQLClient) ([]loginTypes, error) {
+func (c *Client) userOrgLogins() ([]loginTypes, error) {
 	l := make([]loginTypes, 0)
 	var v viewerLoginOrgs
 	variables := map[string]interface{}{
 		"after": (*githubv4.String)(nil),
 	}
 
-	err := doQuery(client, "ViewerLoginAndOrgs", &v, variables)
+	err := c.doQuery("ViewerLoginAndOrgs", &v, variables)
 	if err != nil {
 		return l, err
 	}
@@ -883,20 +924,20 @@ func userOrgLogins(client *api.GraphQLClient) ([]loginTypes, error) {
 
 	// this seem unlikely, but if there are more org logins, paginate the rest
 	if v.Viewer.Organizations.PageInfo.HasNextPage {
-		return paginateOrgLogins(client, l, string(v.Viewer.Organizations.PageInfo.EndCursor))
+		return c.paginateOrgLogins(l, string(v.Viewer.Organizations.PageInfo.EndCursor))
 	}
 
 	return l, nil
 }
 
 // paginateOrgLogins after cursor and append them to the list of logins.
-func paginateOrgLogins(client *api.GraphQLClient, l []loginTypes, cursor string) ([]loginTypes, error) {
+func (c *Client) paginateOrgLogins(l []loginTypes, cursor string) ([]loginTypes, error) {
 	var v viewerLoginOrgs
 	variables := map[string]interface{}{
 		"after": githubv4.String(cursor),
 	}
 
-	err := doQuery(client, "ViewerLoginAndOrgs", &v, variables)
+	err := c.doQuery("ViewerLoginAndOrgs", &v, variables)
 	if err != nil {
 		return l, err
 	}
@@ -912,7 +953,7 @@ func paginateOrgLogins(client *api.GraphQLClient, l []loginTypes, cursor string)
 	}
 
 	if v.Viewer.Organizations.PageInfo.HasNextPage {
-		return paginateOrgLogins(client, l, string(v.Viewer.Organizations.PageInfo.EndCursor))
+		return c.paginateOrgLogins(l, string(v.Viewer.Organizations.PageInfo.EndCursor))
 	}
 
 	return l, nil
@@ -930,9 +971,9 @@ type Owner struct {
 // If orgLogin is not empty, it is used to lookup the org owner
 // If both userLogin and orgLogin are empty, interative mode is used to select an owner
 // from the current viewer and their organizations
-func NewOwner(client *api.GraphQLClient, userLogin, orgLogin string) (*Owner, error) {
+func (c *Client) NewOwner(userLogin, orgLogin string) (*Owner, error) {
 	if userLogin == "@me" {
-		id, err := OwnerID(client, userLogin, ViewerOwner)
+		id, err := c.OwnerID(userLogin, ViewerOwner)
 		if err != nil {
 			return nil, err
 		}
@@ -943,7 +984,7 @@ func NewOwner(client *api.GraphQLClient, userLogin, orgLogin string) (*Owner, er
 			ID:    id,
 		}, nil
 	} else if userLogin != "" {
-		id, err := OwnerID(client, userLogin, UserOwner)
+		id, err := c.OwnerID(userLogin, UserOwner)
 		if err != nil {
 			return nil, err
 		}
@@ -954,7 +995,7 @@ func NewOwner(client *api.GraphQLClient, userLogin, orgLogin string) (*Owner, er
 			ID:    id,
 		}, nil
 	} else if orgLogin != "" {
-		id, err := OwnerID(client, orgLogin, OrgOwner)
+		id, err := c.OwnerID(orgLogin, OrgOwner)
 		if err != nil {
 			return nil, err
 		}
@@ -966,7 +1007,7 @@ func NewOwner(client *api.GraphQLClient, userLogin, orgLogin string) (*Owner, er
 		}, nil
 	}
 
-	logins, err := userOrgLogins(client)
+	logins, err := c.userOrgLogins()
 	if err != nil {
 		return nil, err
 	}
@@ -976,19 +1017,7 @@ func NewOwner(client *api.GraphQLClient, userLogin, orgLogin string) (*Owner, er
 		options = append(options, l.Login)
 	}
 
-	var q = []*survey.Question{
-		{
-			Name: "owner",
-			Prompt: &survey.Select{
-				Message: "Which owner would you like to use?",
-				Options: options,
-			},
-			Validate: survey.Required,
-		},
-	}
-
-	answerIndex := 0
-	err = survey.Ask(q, &answerIndex)
+	answerIndex, err := c.prompter.Select("Which owner would you like to use?", "", options)
 	if err != nil {
 		return nil, err
 	}
@@ -1005,7 +1034,7 @@ func NewOwner(client *api.GraphQLClient, userLogin, orgLogin string) (*Owner, er
 // if number is 0 it will prompt the user to select a project interactively
 // otherwise it will make a request to get the project by number
 // set `fields“ to true to get the project's field data
-func NewProject(client *api.GraphQLClient, o *Owner, number int32, fields bool) (*Project, error) {
+func (c *Client) NewProject(o *Owner, number int32, fields bool) (*Project, error) {
 	if number != 0 {
 		variables := map[string]interface{}{
 			"number":      githubv4.Int(number),
@@ -1021,22 +1050,22 @@ func NewProject(client *api.GraphQLClient, o *Owner, number int32, fields bool) 
 		if o.Type == UserOwner {
 			var query userOwner
 			variables["login"] = githubv4.String(o.Login)
-			err := doQuery(client, "UserProject", &query, variables)
+			err := c.doQuery("UserProject", &query, variables)
 			return &query.Owner.Project, err
 		} else if o.Type == OrgOwner {
 			variables["login"] = githubv4.String(o.Login)
 			var query orgOwner
-			err := doQuery(client, "OrgProject", &query, variables)
+			err := c.doQuery("OrgProject", &query, variables)
 			return &query.Owner.Project, err
 		} else if o.Type == ViewerOwner {
 			var query viewerOwner
-			err := doQuery(client, "ViewerProject", &query, variables)
+			err := c.doQuery("ViewerProject", &query, variables)
 			return &query.Owner.Project, err
 		}
 		return nil, errors.New("unknown owner type")
 	}
 
-	projects, _, err := Projects(client, o.Login, o.Type, 0, fields)
+	projects, _, err := c.Projects(o.Login, o.Type, 0, fields)
 	if err != nil {
 		return nil, err
 	}
@@ -1051,19 +1080,7 @@ func NewProject(client *api.GraphQLClient, o *Owner, number int32, fields bool) 
 		options = append(options, title)
 	}
 
-	var q = []*survey.Question{
-		{
-			Name: "project",
-			Prompt: &survey.Select{
-				Message: "Which project would you like to use?",
-				Options: options,
-			},
-			Validate: survey.Required,
-		},
-	}
-
-	answerIndex := 0
-	err = survey.Ask(q, &answerIndex)
+	answerIndex, err := c.prompter.Select("Which project would you like to use?", "", options)
 	if err != nil {
 		return nil, err
 	}
@@ -1073,7 +1090,7 @@ func NewProject(client *api.GraphQLClient, o *Owner, number int32, fields bool) 
 
 // Projects returns all the projects for an Owner. If the OwnerType is VIEWER, no login is required.
 // If limit is 0, the default limit is used.
-func Projects(client *api.GraphQLClient, login string, t OwnerType, limit int, fields bool) ([]Project, int, error) {
+func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) ([]Project, int, error) {
 	projects := make([]Project, 0)
 	cursor := (*githubv4.String)(nil)
 	hasNextPage := false
@@ -1112,7 +1129,7 @@ func Projects(client *api.GraphQLClient, login string, t OwnerType, limit int, f
 		// the cost.
 		if t == UserOwner {
 			var query userProjects
-			if err := doQuery(client, "UserProjects", &query, variables); err != nil {
+			if err := c.doQuery("UserProjects", &query, variables); err != nil {
 				return projects, 0, err
 			}
 			projects = append(projects, query.Owner.Projects.Nodes...)
@@ -1121,7 +1138,7 @@ func Projects(client *api.GraphQLClient, login string, t OwnerType, limit int, f
 			totalCount = query.Owner.Projects.TotalCount
 		} else if t == OrgOwner {
 			var query orgProjects
-			if err := doQuery(client, "OrgProjects", &query, variables); err != nil {
+			if err := c.doQuery("OrgProjects", &query, variables); err != nil {
 				return projects, 0, err
 			}
 			projects = append(projects, query.Owner.Projects.Nodes...)
@@ -1130,7 +1147,7 @@ func Projects(client *api.GraphQLClient, login string, t OwnerType, limit int, f
 			totalCount = query.Owner.Projects.TotalCount
 		} else if t == ViewerOwner {
 			var query viewerProjects
-			if err := doQuery(client, "ViewerProjects", &query, variables); err != nil {
+			if err := c.doQuery("ViewerProjects", &query, variables); err != nil {
 				return projects, 0, err
 			}
 			projects = append(projects, query.Owner.Projects.Nodes...)
@@ -1149,4 +1166,41 @@ func Projects(client *api.GraphQLClient, login string, t OwnerType, limit int, f
 		}
 		variables["after"] = cursor
 	}
+}
+
+func handleError(err error) error {
+	var gerr *api.GraphQLError
+	if errors.As(err, &gerr) {
+		missing := set.NewStringSet()
+		for _, e := range gerr.Errors {
+			if e.Type != "INSUFFICIENT_SCOPES" {
+				continue
+			}
+			missing.AddValues(requiredScopesFromServerMessage(e.Message))
+		}
+		if missing.Len() > 0 {
+			s := missing.ToSlice()
+			// TODO: this duplicates parts of generateScopesSuggestion
+			return fmt.Errorf(
+				"error: your authentication token is missing required scopes %v\n"+
+					"To request it, run:  gh auth refresh -s %s",
+				s,
+				strings.Join(s, ","))
+		}
+	}
+	return err
+}
+
+var scopesRE = regexp.MustCompile(`one of the following scopes: \[(.+?)]`)
+
+func requiredScopesFromServerMessage(msg string) []string {
+	m := scopesRE.FindStringSubmatch(msg)
+	if m == nil {
+		return nil
+	}
+	var scopes []string
+	for _, mm := range strings.Split(m[1], ",") {
+		scopes = append(scopes, strings.Trim(mm, "' "))
+	}
+	return scopes
 }

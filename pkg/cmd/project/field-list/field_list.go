@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +22,7 @@ type listOpts struct {
 
 type listConfig struct {
 	tp     *tableprinter.TablePrinter
-	client *api.GraphQLClient
+	client *queries.Client
 	opts   listOpts
 }
 
@@ -77,27 +76,27 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
 	listCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
 	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
-	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", 30, "Maximum number of fields to fetch")
+	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of fields to fetch")
 
 	return listCmd
 }
 
 func runList(config listConfig) error {
-	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err
 	}
 
 	// no need to fetch the project if we already have the number
 	if config.opts.number == 0 {
-		project, err := queries.NewProject(config.client, owner, config.opts.number, false)
+		project, err := config.client.NewProject(owner, config.opts.number, false)
 		if err != nil {
 			return err
 		}
 		config.opts.number = project.Number
 	}
 
-	project, err := queries.ProjectFields(config.client, owner, config.opts.number, config.opts.limit)
+	project, err := config.client.ProjectFields(owner, config.opts.number, config.opts.limit)
 	if err != nil {
 		return err
 	}

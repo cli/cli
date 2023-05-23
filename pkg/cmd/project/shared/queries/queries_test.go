@@ -1,9 +1,9 @@
 package queries
 
 import (
+	"reflect"
 	"testing"
 
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -49,15 +49,14 @@ func TestProjectItems_DefaultLimit(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := NewTestClient()
 
 	owner := &Owner{
 		Type:  "USER",
 		Login: "monalisa",
 		ID:    "user ID",
 	}
-	project, err := ProjectItems(client, owner, 1, LimitMax)
+	project, err := client.ProjectItems(owner, 1, LimitMax)
 	assert.NoError(t, err)
 	assert.Len(t, project.Items.Nodes, 3)
 }
@@ -100,15 +99,14 @@ func TestProjectItems_LowerLimit(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := NewTestClient()
 
 	owner := &Owner{
 		Type:  "USER",
 		Login: "monalisa",
 		ID:    "user ID",
 	}
-	project, err := ProjectItems(client, owner, 1, 2)
+	project, err := client.ProjectItems(owner, 1, 2)
 	assert.NoError(t, err)
 	assert.Len(t, project.Items.Nodes, 2)
 }
@@ -154,15 +152,14 @@ func TestProjectItems_NoLimit(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := NewTestClient()
 
 	owner := &Owner{
 		Type:  "USER",
 		Login: "monalisa",
 		ID:    "user ID",
 	}
-	project, err := ProjectItems(client, owner, 1, 0)
+	project, err := client.ProjectItems(owner, 1, 0)
 	assert.NoError(t, err)
 	assert.Len(t, project.Items.Nodes, 3)
 }
@@ -205,15 +202,13 @@ func TestProjectFields_LowerLimit(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
-
+	client := NewTestClient()
 	owner := &Owner{
 		Type:  "USER",
 		Login: "monalisa",
 		ID:    "user ID",
 	}
-	project, err := ProjectFields(client, owner, 1, 2)
+	project, err := client.ProjectFields(owner, 1, 2)
 	assert.NoError(t, err)
 	assert.Len(t, project.Fields.Nodes, 2)
 }
@@ -260,15 +255,14 @@ func TestProjectFields_DefaultLimit(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := NewTestClient()
 
 	owner := &Owner{
 		Type:  "USER",
 		Login: "monalisa",
 		ID:    "user ID",
 	}
-	project, err := ProjectFields(client, owner, 1, LimitMax)
+	project, err := client.ProjectFields(owner, 1, LimitMax)
 	assert.NoError(t, err)
 	assert.Len(t, project.Fields.Nodes, 3)
 }
@@ -314,15 +308,45 @@ func TestProjectFields_NoLimit(t *testing.T) {
 			},
 		})
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := NewTestClient()
 
 	owner := &Owner{
 		Type:  "USER",
 		Login: "monalisa",
 		ID:    "user ID",
 	}
-	project, err := ProjectFields(client, owner, 1, 0)
+	project, err := client.ProjectFields(owner, 1, 0)
 	assert.NoError(t, err)
 	assert.Len(t, project.Fields.Nodes, 3)
+}
+
+func Test_requiredScopesFromServerMessage(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want []string
+	}{
+		{
+			name: "no scopes",
+			msg:  "SERVER OOPSIE",
+			want: []string(nil),
+		},
+		{
+			name: "one scope",
+			msg:  "Your token has not been granted the required scopes to execute this query. The 'dataType' field requires one of the following scopes: ['read:project'], but your token has only been granted the: ['codespace', repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens.",
+			want: []string{"read:project"},
+		},
+		{
+			name: "multiple scopes",
+			msg:  "Your token has not been granted the required scopes to execute this query. The 'dataType' field requires one of the following scopes: ['read:project', 'read:discussion', 'codespace'], but your token has only been granted the: [repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens.",
+			want: []string{"read:project", "read:discussion", "codespace"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := requiredScopesFromServerMessage(tt.msg); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("requiredScopesFromServerMessage() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

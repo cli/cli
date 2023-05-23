@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -29,7 +28,7 @@ type copyOpts struct {
 
 type copyConfig struct {
 	tp     *tableprinter.TablePrinter
-	client *api.GraphQLClient
+	client *queries.Client
 	opts   copyOpts
 }
 
@@ -108,17 +107,17 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 }
 
 func runCopy(config copyConfig) error {
-	sourceOwner, err := queries.NewOwner(config.client, config.opts.sourceUserOwner, config.opts.sourceOrgOwner)
+	sourceOwner, err := config.client.NewOwner(config.opts.sourceUserOwner, config.opts.sourceOrgOwner)
 	if err != nil {
 		return err
 	}
 
-	targetOwner, err := queries.NewOwner(config.client, config.opts.targetUserOwner, config.opts.targetOrgOwner)
+	targetOwner, err := config.client.NewOwner(config.opts.targetUserOwner, config.opts.targetOrgOwner)
 	if err != nil {
 		return err
 	}
 
-	project, err := queries.NewProject(config.client, sourceOwner, config.opts.number, false)
+	project, err := config.client.NewProject(sourceOwner, config.opts.number, false)
 	if err != nil {
 		return err
 	}

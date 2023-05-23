@@ -8,7 +8,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +22,7 @@ type deleteOpts struct {
 
 type deleteConfig struct {
 	tp     *tableprinter.TablePrinter
-	client *api.GraphQLClient
+	client *queries.Client
 	opts   deleteOpts
 }
 
@@ -88,12 +87,12 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 }
 
 func runDelete(config deleteConfig) error {
-	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err
 	}
 
-	project, err := queries.NewProject(config.client, owner, config.opts.number, false)
+	project, err := config.client.NewProject(owner, config.opts.number, false)
 	if err != nil {
 		return err
 	}

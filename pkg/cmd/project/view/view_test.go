@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
@@ -124,8 +124,7 @@ func TestBuildURLViewer(t *testing.T) {
 			}
 		`)
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	url, err := buildURL(viewConfig{
 		opts: viewOpts{
@@ -209,8 +208,7 @@ func TestRunView_User(t *testing.T) {
 			}
 		`)
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
@@ -223,7 +221,7 @@ func TestRunView_User(t *testing.T) {
 		client: client,
 	}
 
-	err = runView(config)
+	err := runView(config)
 	assert.NoError(t, err)
 
 }
@@ -274,8 +272,7 @@ func TestRunView_Viewer(t *testing.T) {
 			}
 		`)
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
@@ -288,7 +285,7 @@ func TestRunView_Viewer(t *testing.T) {
 		client: client,
 	}
 
-	err = runView(config)
+	err := runView(config)
 	assert.NoError(t, err)
 }
 
@@ -341,8 +338,7 @@ func TestRunView_Org(t *testing.T) {
 			}
 		`)
 
-	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
-	assert.NoError(t, err)
+	client := queries.NewTestClient()
 
 	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
@@ -355,7 +351,7 @@ func TestRunView_Org(t *testing.T) {
 		client: client,
 	}
 
-	err = runView(config)
+	err := runView(config)
 	assert.NoError(t, err)
 }
 
