@@ -55,13 +55,6 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		fields.AddValues(options.Fields)
 		// these are always necessary to find the PR for the current branch
 		fields.AddValues([]string{"isCrossRepository", "headRepositoryOwner", "headRefName"})
-
-		if options.CheckRunAndStatusContextCountsSupported {
-			fields.Add("statusCheckRollupWithCountByState")
-		} else {
-			fields.Add("statusCheckRollup")
-		}
-
 		gr := api.PullRequestGraphQL(fields.ToSlice())
 		fragments = fmt.Sprintf("fragment pr on PullRequest{%s}fragment prWithReviews on PullRequest{...pr}", gr)
 	} else {
