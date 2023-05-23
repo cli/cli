@@ -48,7 +48,8 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show status of relevant pull requests",
-		Args:  cmdutil.NoArgsQuoteReminder,
+		// TODO this seems pointless; we take no args and have no non-bool argument; why not cobra.NoArgs
+		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
