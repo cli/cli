@@ -14,7 +14,7 @@ import (
 //go:generate moq -rm -out prompter_mock.go . Prompter
 type Prompter interface {
 	Select(string, string, []string) (int, error)
-	MultiSelect(string, []string, []string) ([]string, error)
+	MultiSelect(string, []string, []string) ([]int, error)
 	Input(string, string) (string, error)
 	InputHostname() (string, error)
 	Password(string) (string, error)
@@ -86,15 +86,13 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 	return
 }
 
-func (p *surveyPrompter) MultiSelect(message string, defaultValue, options []string) (result []string, err error) {
+func (p *surveyPrompter) MultiSelect(message string, defaultValue, options []string) (result []int, err error) {
 	q := &survey.MultiSelect{
 		Message:  message,
 		Options:  options,
 		PageSize: 20,
 		Filter:   LatinMatchingFilter,
 	}
-
-	// TODO will I regret this returning []string and not []int?
 
 	if len(defaultValue) > 0 {
 		// TODO I don't actually know that this is needed, just being extra cautious

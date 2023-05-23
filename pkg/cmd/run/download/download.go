@@ -30,7 +30,7 @@ type platform interface {
 	Download(url string, dir string) error
 }
 type iprompter interface {
-	MultiSelect(string, []string, []string) ([]string, error)
+	MultiSelect(string, []string, []string) ([]int, error)
 }
 
 func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobra.Command {
@@ -131,8 +131,13 @@ func runDownload(opts *DownloadOptions) error {
 		if len(options) > 10 {
 			options = options[:10]
 		}
-		if wantNames, err = opts.Prompter.MultiSelect("Select artifacts to download:", nil, options); err != nil {
+		var selected []int
+		if selected, err = opts.Prompter.MultiSelect("Select artifacts to download:", nil, options); err != nil {
 			return err
+		}
+		wantNames = []string{}
+		for _, x := range selected {
+			wantNames = append(wantNames, options[x])
 		}
 		if len(wantNames) == 0 {
 			return errors.New("no artifacts selected")

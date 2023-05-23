@@ -284,8 +284,8 @@ func Test_runDownload(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterMultiSelect("Select artifacts to download:", nil, []string{"artifact-1", "artifact-2"},
-					func(_ string, _, opts []string) ([]string, error) {
-						return []string{"artifact-2"}, nil
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{1}, nil
 					})
 			},
 		},
