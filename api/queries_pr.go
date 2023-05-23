@@ -293,7 +293,7 @@ func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
 	if len(contexts.CheckRunCountsByState) != 0 && len(contexts.StatusContextCountsByState) != 0 {
 		summary.Total = contexts.CheckRunCount + contexts.StatusContextCount
 		for _, countByState := range contexts.CheckRunCountsByState {
-			switch parseCheckStatus(countByState.State) {
+			switch parseCheckStatusFromCheckRunState(countByState.State) {
 			case passing:
 				summary.Passing += countByState.Count
 			case failing:
@@ -304,7 +304,7 @@ func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
 		}
 
 		for _, countByState := range contexts.StatusContextCountsByState {
-			switch parseCheckStatus(countByState.State) {
+			switch parseCheckStatusFromStatusState(countByState.State) {
 			case passing:
 				summary.Passing += countByState.Count
 			case failing:
@@ -357,15 +357,36 @@ const (
 	pending
 )
 
-func parseCheckStatus(state string) checkStatus {
+// https://docs.github.com/en/graphql/reference/enums#statusstate
+func parseCheckStatusFromStatusState(state string) checkStatus {
 	switch state {
-	case "SUCCESS", "NEUTRAL", "SKIPPED":
+	case "SUCCESS":
 		return passing
-	case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
+	case "FAILURE", "ERROR":
 		return failing
-	// We treat anything that isn't Passing or Failing as Pending, which included any future unknown states
-	// we might get back from the API.
-	default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE", "STARTUP_FAILURE", "COMPLETED"
+	case "EXPECTED", "PENDING":
+		return pending
+	// Currently, we treat anything unknown as pending, which includes any future unknown
+	// states we might get back from the API. It might be interesting to do some work to add an additional
+	// unknown state.
+	default:
+		return pending
+	}
+}
+
+// https://docs.github.com/en/graphql/reference/enums#checkrunstate
+func parseCheckStatusFromCheckRunState(state string) checkStatus {
+	switch state {
+	case "NEUTRAL", "SKIPPED", "SUCCESS":
+		return passing
+	case "ACTION_REQUIRED", "CANCELLED", "FAILURE", "TIMED_OUT":
+		return failing
+	case "COMPLETED", "IN_PROGRESS", "PENDING", "QUEUED", "STALE", "STARTUP_FAILURE", "WAITING":
+		return pending
+	// Currently, we treat anything unknown as pending, which includes any future unknown
+	// states we might get back from the API. It might be interesting to do some work to add an additional
+	// unknown state.
+	default:
 		return pending
 	}
 }
