@@ -49,8 +49,6 @@ gh project close 1 --org github
 
 # reopen closed project 1 owned by org github
 gh project close 1 --org github --undo
-
-# add --format=json to output in JSON format
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -91,9 +89,9 @@ gh project close 1 --org github --undo
 	}
 
 	closeCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	closeCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	closeCmd.Flags().BoolVar(&opts.reopen, "undo", false, "Reopen a closed project.")
-	closeCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	closeCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	closeCmd.Flags().BoolVar(&opts.reopen, "undo", false, "Reopen a closed project")
+	closeCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'")
 
 	return closeCmd
 }

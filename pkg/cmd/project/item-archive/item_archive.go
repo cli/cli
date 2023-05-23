@@ -58,8 +58,6 @@ gh project item-archive 1 --org github --id ID
 
 # unarchive an item
 gh project item-archive 1 --user "@me" --id ID --undo
-
-# add --format=json to output in JSON format
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -100,10 +98,10 @@ gh project item-archive 1 --user "@me" --id ID --undo
 	}
 
 	archiveItemCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	archiveItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	archiveItemCmd.Flags().StringVar(&opts.itemID, "id", "", "Global ID of the item to archive from the project.")
-	archiveItemCmd.Flags().BoolVar(&opts.undo, "undo", false, "Undo archive (unarchive) of an item.")
-	archiveItemCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	archiveItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	archiveItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to archive")
+	archiveItemCmd.Flags().BoolVar(&opts.undo, "undo", false, "Unarchive an item")
+	cmdutil.StringEnumFlag(archiveItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = archiveItemCmd.MarkFlagRequired("id")
 

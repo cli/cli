@@ -47,8 +47,6 @@ gh project item-delete 1 --user monalisa --id ID
 
 # delete an item in the github org project 1
 gh project item-delete 1 --org github --id ID
-
-# add --format=json to output in JSON format
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -89,9 +87,9 @@ gh project item-delete 1 --org github --id ID
 	}
 
 	deleteItemCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	deleteItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	deleteItemCmd.Flags().StringVar(&opts.itemID, "id", "", "Global ID of the item to delete from the project.")
-	deleteItemCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	deleteItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	deleteItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to delete")
+	cmdutil.StringEnumFlag(deleteItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = deleteItemCmd.MarkFlagRequired("id")
 
@@ -99,10 +97,6 @@ gh project item-delete 1 --org github --id ID
 }
 
 func runDeleteItem(config deleteItemConfig) error {
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
-	}
-
 	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err

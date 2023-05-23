@@ -46,8 +46,6 @@ gh project create --org github --title "a new project"
 
 # create a new project owned by the current user with title "a new project"
 gh project create --user '@me' --title "a new project"
-
-# add --format=json to output in JSON format
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(
@@ -78,10 +76,10 @@ gh project create --user '@me' --title "a new project"
 		},
 	}
 
-	createCmd.Flags().StringVar(&opts.title, "title", "", "Title of the project. Titles do not need to be unique.")
+	createCmd.Flags().StringVar(&opts.title, "title", "", "Title for the project")
 	createCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	createCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	createCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	createCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	cmdutil.StringEnumFlag(createCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = createCmd.MarkFlagRequired("title")
 
@@ -89,10 +87,6 @@ gh project create --user '@me' --title "a new project"
 }
 
 func runCreate(config createConfig) error {
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
-	}
-
 	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err

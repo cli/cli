@@ -43,8 +43,6 @@ gh project item-list 1 --user monalisa
 
 # list the items in org github's project number 1
 gh project item-list 1 --org github
-
-# add --format=json to output in JSON format
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -85,9 +83,9 @@ gh project item-list 1 --org github
 	}
 
 	listCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	listCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	listCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
-	listCmd.Flags().IntVarP(&opts.limit, "limit", "l", 0, "Maximum number of items. Defaults to 30.")
+	listCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", 30, "Maximum number of items to fetch")
 
 	return listCmd
 }

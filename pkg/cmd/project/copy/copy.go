@@ -52,8 +52,6 @@ gh project copy 1 --source-org github --title "a new project" --target-me
 
 # copy project 1 owned by the org github to user monalisa with title "a new project" and include draft issues
 gh project copy 1 --source-org github --title "a new project" --target-user monalisa --drafts
-
-# add --format=json to output in JSON format
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -102,12 +100,12 @@ gh project copy 1 --source-org github --title "a new project" --target-user mona
 	}
 
 	copyCmd.Flags().StringVar(&opts.sourceUserOwner, "source-user", "", "Login of the source user owner. Use \"@me\" for the current user.")
-	copyCmd.Flags().StringVar(&opts.sourceOrgOwner, "source-org", "", "Login of the source organization owner.")
+	copyCmd.Flags().StringVar(&opts.sourceOrgOwner, "source-org", "", "Login of the source organization owner")
 	copyCmd.Flags().StringVar(&opts.targetUserOwner, "target-user", "", "Login of the target organization owner. Use \"@me\" for the current user.")
-	copyCmd.Flags().StringVar(&opts.targetOrgOwner, "target-org", "", "Login of the target organization owner.")
-	copyCmd.Flags().StringVar(&opts.title, "title", "", "Title of the new project copy. Titles do not need to be unique.")
-	copyCmd.Flags().BoolVar(&opts.includeDraftIssues, "drafts", false, "Include draft issues in new copy.")
-	copyCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	copyCmd.Flags().StringVar(&opts.targetOrgOwner, "target-org", "", "Login of the target organization owner")
+	copyCmd.Flags().StringVar(&opts.title, "title", "", "Title for the new project")
+	copyCmd.Flags().BoolVar(&opts.includeDraftIssues, "drafts", false, "Include draft issues")
+	cmdutil.StringEnumFlag(copyCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = copyCmd.MarkFlagRequired("title")
 
@@ -115,10 +113,6 @@ gh project copy 1 --source-org github --title "a new project" --target-user mona
 }
 
 func runCopy(config copyConfig) error {
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
-	}
-
 	sourceOwner, err := queries.NewOwner(config.client, config.opts.sourceUserOwner, config.opts.sourceOrgOwner)
 	if err != nil {
 		return err

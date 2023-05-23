@@ -1,7 +1,6 @@
 package itemadd
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
@@ -49,8 +48,6 @@ gh project item-add 1 --user monalisa --url https://github.com/cli/go-gh/issues/
 
 # add an item to the org github's project 1
 gh project item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
-
-# add --format=json to output in JSON format
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -91,9 +88,9 @@ gh project item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
 	}
 
 	addItemCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	addItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	addItemCmd.Flags().StringVar(&opts.itemURL, "url", "", "URL of the issue or pull request to add to the project. Note that the name of the owner is case sensitive, and will fail to find the item if it does not match. Must be of form https://github.com/OWNER/REPO/issues/NUMBER or https://github.com/OWNER/REPO/pull/NUMBER")
-	addItemCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	addItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	addItemCmd.Flags().StringVar(&opts.itemURL, "url", "", "URL of the issue or pull request to add to the project")
+	cmdutil.StringEnumFlag(addItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = addItemCmd.MarkFlagRequired("url")
 
@@ -101,10 +98,6 @@ gh project item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
 }
 
 func runAddItem(config addItemConfig) error {
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
-	}
-
 	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err

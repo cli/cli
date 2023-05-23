@@ -1,8 +1,6 @@
 package fielddelete
 
 import (
-	"fmt"
-
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -37,8 +35,6 @@ func NewCmdDeleteField(f *cmdutil.Factory, runF func(config deleteFieldConfig) e
 		Example: `
 # delete a field by ID
 gh project field-delete --id ID
-
-# add --format=json to output in JSON format
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := queries.NewClient()
@@ -61,8 +57,8 @@ gh project field-delete --id ID
 		},
 	}
 
-	deleteFieldCmd.Flags().StringVar(&opts.fieldID, "id", "", "ID of the field to delete.")
-	deleteFieldCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	deleteFieldCmd.Flags().StringVar(&opts.fieldID, "id", "", "ID of the field to delete")
+	cmdutil.StringEnumFlag(deleteFieldCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = deleteFieldCmd.MarkFlagRequired("id")
 
@@ -70,10 +66,6 @@ gh project field-delete --id ID
 }
 
 func runDeleteField(config deleteFieldConfig) error {
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
-	}
-
 	query, variables := deleteFieldArgs(config)
 
 	err := config.client.Mutate("DeleteField", query, variables)

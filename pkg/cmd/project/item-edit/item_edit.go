@@ -57,8 +57,6 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 		Long: `
 Edit one of a draft issue or a project item. Both require the ID of the item to edit. For non-draft issues, the ID of the project is also required, and only a single field value can be updated per invocation. See the flags for more details.`,
 		Example: `
-# add --format=json to output in JSON format
-
 # edit a draft issue title and body
 gh project item-edit --id DRAFT_ISSUE_CONTENT_ID --title "a new title" --body "a new body"
 
@@ -110,19 +108,19 @@ gh project item-edit --id ITEM_ID --field-id FIELD_ID --project-id PROJECT_ID --
 		},
 	}
 
-	editItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to edit (required). For draft issues, the ID is for the draft issue content which is prefixed with `DI_`. For other issues, it is the ID of the project item.")
-	editItemCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	editItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to edit")
+	cmdutil.StringEnumFlag(editItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
-	editItemCmd.Flags().StringVar(&opts.title, "title", "", "DRAFT ISSUE - Title of the draft issue item to edit.")
-	editItemCmd.Flags().StringVar(&opts.body, "body", "", "DRAFT ISSUE - Body of the draft issue item to edit.")
+	editItemCmd.Flags().StringVar(&opts.title, "title", "", "Title of the draft issue item")
+	editItemCmd.Flags().StringVar(&opts.body, "body", "", "Body of the draft issue item")
 
-	editItemCmd.Flags().StringVar(&opts.fieldID, "field-id", "", "ID of the field to update.")
-	editItemCmd.Flags().StringVar(&opts.projectID, "project-id", "", "ID of the project to which the field belongs to.")
-	editItemCmd.Flags().StringVar(&opts.text, "text", "", "Text value to set on the field.")
-	editItemCmd.Flags().Float32Var(&opts.number, "number", 0, "Number value to set on the field.")
-	editItemCmd.Flags().StringVar(&opts.date, "date", "", "The ISO 8601 (YYYY-MM-DD) date value to set on the field.")
-	editItemCmd.Flags().StringVar(&opts.singleSelectOptionID, "single-select-option-id", "", "ID of the single select option value to set on the field.")
-	editItemCmd.Flags().StringVar(&opts.iterationID, "iteration-id", "", "ID of the iteration value to set on the field.")
+	editItemCmd.Flags().StringVar(&opts.fieldID, "field-id", "", "ID of the field to update")
+	editItemCmd.Flags().StringVar(&opts.projectID, "project-id", "", "ID of the project to which the field belongs to")
+	editItemCmd.Flags().StringVar(&opts.text, "text", "", "Text value for the field")
+	editItemCmd.Flags().Float32Var(&opts.number, "number", 0, "Number value for the field")
+	editItemCmd.Flags().StringVar(&opts.date, "date", "", "Date value for the field (YYYY-MM-DD)")
+	editItemCmd.Flags().StringVar(&opts.singleSelectOptionID, "single-select-option-id", "", "ID of the single select option value to set on the field")
+	editItemCmd.Flags().StringVar(&opts.iterationID, "iteration-id", "", "ID of the iteration value to set on the field")
 
 	_ = editItemCmd.MarkFlagRequired("id")
 
@@ -166,9 +164,9 @@ func runEditItem(config editItemConfig) error {
 
 		var parsedDate time.Time
 		if config.opts.date != "" {
-			date, error := time.Parse("2006-01-02", config.opts.date)
-			if error != nil {
-				return error
+			date, err := time.Parse("2006-01-02", config.opts.date)
+			if err != nil {
+				return err
 			}
 			parsedDate = date
 		}

@@ -45,8 +45,6 @@ gh project view 1 --user monalisa --web
 
 # view org github's project 1 including closed projects
 gh project view 1 --org github --closed
-
-# add --format=json to output in JSON format
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -93,9 +91,9 @@ gh project view 1 --org github --closed
 	}
 
 	viewCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	viewCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	viewCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open project in the browser.")
-	viewCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	viewCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	viewCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open a project in the browser")
+	cmdutil.StringEnumFlag(viewCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	return viewCmd
 }
@@ -111,10 +109,6 @@ func runView(config viewConfig) error {
 			return err
 		}
 		return nil
-	}
-
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
 	}
 
 	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)

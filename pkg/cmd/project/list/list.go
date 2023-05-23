@@ -41,8 +41,6 @@ gh project list --user monalisa --web
 
 # list the projects for org github including closed projects
 gh project list --org github --closed
-
-# add --format=json to output in JSON format
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(
@@ -78,11 +76,11 @@ gh project list --org github --closed
 	}
 
 	listCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner")
-	listCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	listCmd.Flags().BoolVarP(&opts.closed, "closed", "c", false, "Show closed projects.")
-	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser.")
-	listCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
-	listCmd.Flags().IntVarP(&opts.limit, "limit", "l", 0, "Maximum number of projects. Defaults to 30.")
+	listCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	listCmd.Flags().BoolVarP(&opts.closed, "closed", "", false, "Include closed projects")
+	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser")
+	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", 30, "Maximum number of projects to fetch")
 
 	return listCmd
 }
@@ -98,10 +96,6 @@ func runList(config listConfig) error {
 			return err
 		}
 		return nil
-	}
-
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
 	}
 
 	var login string

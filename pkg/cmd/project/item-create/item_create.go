@@ -1,7 +1,6 @@
 package itemcreate
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
@@ -49,8 +48,6 @@ gh project item-create 1 --user monalisa --title "new item" --body "new item bod
 
 # create a draft issue in org github's project 1 with title "new item" and body "new item body"
 gh project item-create 1 --org github --title "new item" --body "new item body"
-
-# add --format=json to output in JSON format
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -91,10 +88,10 @@ gh project item-create 1 --org github --title "new item" --body "new item body"
 	}
 
 	createItemCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	createItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	createItemCmd.Flags().StringVar(&opts.title, "title", "", "Title of the draft issue item.")
-	createItemCmd.Flags().StringVar(&opts.body, "body", "", "Body of the draft issue item.")
-	createItemCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	createItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	createItemCmd.Flags().StringVar(&opts.title, "title", "", "Title for the draft issue")
+	createItemCmd.Flags().StringVar(&opts.body, "body", "", "Body for the draft issue")
+	cmdutil.StringEnumFlag(createItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = createItemCmd.MarkFlagRequired("title")
 
@@ -102,10 +99,6 @@ gh project item-create 1 --org github --title "new item" --body "new item body"
 }
 
 func runCreateItem(config createItemConfig) error {
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
-	}
-
 	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err

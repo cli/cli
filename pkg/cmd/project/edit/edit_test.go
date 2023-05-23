@@ -37,7 +37,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:        "visibility-error",
 			cli:         "--visibility v",
 			wantsErr:    true,
-			wantsErrMsg: "visibility must match either PUBLIC or PRIVATE",
+			wantsErrMsg: "invalid argument \"v\" for \"--visibility\" flag: valid values are {PUBLIC|PRIVATE}",
 		},
 		{
 			name:        "no-args",

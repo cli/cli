@@ -54,8 +54,6 @@ gh project edit 1 --org github --title "New title"
 
 # edit org github's project 1 to have visibility public
 gh project edit 1 --org github --visibility PUBLIC
-
-# add --format=json to output in JSON format
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -87,10 +85,6 @@ gh project edit 1 --org github --visibility PUBLIC
 				opts:   opts,
 			}
 
-			if config.opts.visibility != "" && config.opts.visibility != projectVisibilityPublic && config.opts.visibility != projectVisibilityPrivate {
-				return fmt.Errorf("visibility must match either PUBLIC or PRIVATE")
-			}
-
 			if config.opts.title == "" && config.opts.shortDescription == "" && config.opts.readme == "" && config.opts.visibility == "" {
 				return fmt.Errorf("no fields to edit")
 			}
@@ -103,21 +97,17 @@ gh project edit 1 --org github --visibility PUBLIC
 	}
 
 	editCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	editCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	editCmd.Flags().StringVar(&opts.visibility, "visibility", "", "Update the visibility of the project public. Must be one of PUBLIC or PRIVATE.")
-	editCmd.Flags().StringVar(&opts.title, "title", "", "The edited title of the project.")
-	editCmd.Flags().StringVar(&opts.readme, "readme", "", "The edited readme of the project.")
-	editCmd.Flags().StringVarP(&opts.shortDescription, "description", "d", "", "The edited short description of the project.")
-	editCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	editCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	cmdutil.StringEnumFlag(editCmd, &opts.visibility, "visibility", "", "", []string{projectVisibilityPublic, projectVisibilityPrivate}, "Change project visibility")
+	editCmd.Flags().StringVar(&opts.title, "title", "", "New title for the project")
+	editCmd.Flags().StringVar(&opts.readme, "readme", "", "New readme for the project")
+	editCmd.Flags().StringVarP(&opts.shortDescription, "description", "d", "", "New description of the project")
+	cmdutil.StringEnumFlag(editCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	return editCmd
 }
 
 func runEdit(config editConfig) error {
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
-	}
-
 	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err

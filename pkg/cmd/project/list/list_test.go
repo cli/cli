@@ -33,6 +33,7 @@ func TestNewCmdlist(t *testing.T) {
 			cli:  "--user monalisa",
 			wants: listOpts{
 				userOwner: "monalisa",
+				limit:     30,
 			},
 		},
 		{
@@ -40,6 +41,7 @@ func TestNewCmdlist(t *testing.T) {
 			cli:  "--org github",
 			wants: listOpts{
 				orgOwner: "github",
+				limit:    30,
 			},
 		},
 		{
@@ -47,13 +49,15 @@ func TestNewCmdlist(t *testing.T) {
 			cli:  "--closed",
 			wants: listOpts{
 				closed: true,
+				limit:  30,
 			},
 		},
 		{
 			name: "web",
 			cli:  "--web",
 			wants: listOpts{
-				web: true,
+				web:   true,
+				limit: 30,
 			},
 		},
 		{
@@ -61,6 +65,7 @@ func TestNewCmdlist(t *testing.T) {
 			cli:  "--format json",
 			wants: listOpts{
 				format: "json",
+				limit:  30,
 			},
 		},
 	}

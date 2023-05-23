@@ -53,8 +53,6 @@ gh project field-create 1 --org github --name "new field" --data-type "text"
 
 # create a field with single select options
 gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
-
-# add --format=json to output in JSON format
 `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -87,7 +85,7 @@ gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE
 			}
 
 			if config.opts.dataType == "SINGLE_SELECT" && len(config.opts.singleSelectOptions) == 0 {
-				return fmt.Errorf("at least one single select options is required with data type is SINGLE_SELECT")
+				return fmt.Errorf("passing `--single-select-options` is required for SINGLE_SELECT data type")
 			}
 
 			// allow testing of the command without actually running it
@@ -99,11 +97,11 @@ gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE
 	}
 
 	createFieldCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	createFieldCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner.")
-	createFieldCmd.Flags().StringVar(&opts.name, "name", "", "Name of the new field.")
+	createFieldCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	createFieldCmd.Flags().StringVar(&opts.name, "name", "", "Name of the new field")
 	cmdutil.StringEnumFlag(createFieldCmd, &opts.dataType, "data-type", "", "", []string{"TEXT", "SINGLE_SELECT", "DATE", "NUMBER"}, "DataType of the new field.")
-	createFieldCmd.Flags().StringSliceVar(&opts.singleSelectOptions, "single-select-options", []string{}, "At least one option is required when data type is SINGLE_SELECT.")
-	createFieldCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'.")
+	createFieldCmd.Flags().StringSliceVar(&opts.singleSelectOptions, "single-select-options", []string{}, "Options for SINGLE_SELECT data type")
+	cmdutil.StringEnumFlag(createFieldCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = createFieldCmd.MarkFlagRequired("name")
 	_ = createFieldCmd.MarkFlagRequired("data-type")
@@ -112,10 +110,6 @@ gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE
 }
 
 func runCreateField(config createFieldConfig) error {
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
-	}
-
 	owner, err := queries.NewOwner(config.client, config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err

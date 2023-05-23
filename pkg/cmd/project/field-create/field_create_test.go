@@ -43,7 +43,7 @@ func TestNewCmdCreateField(t *testing.T) {
 			name:        "single-select-no-options",
 			cli:         "123 --name n --data-type SINGLE_SELECT",
 			wantsErr:    true,
-			wantsErrMsg: "at least one single select options is required with data type is SINGLE_SELECT",
+			wantsErrMsg: "passing `--single-select-options` is required for SINGLE_SELECT data type",
 		},
 		{
 			name: "number",
