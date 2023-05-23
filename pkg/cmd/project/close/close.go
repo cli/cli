@@ -94,10 +94,6 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 }
 
 func runClose(config closeConfig) error {
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
-	}
-
 	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err

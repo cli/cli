@@ -125,6 +125,7 @@ func runView(config viewConfig) error {
 	return printResults(config, project)
 }
 
+// TODO: support non-github.com hostnames
 func buildURL(config viewConfig) (string, error) {
 	var url string
 	if config.opts.userOwner == "@me" {

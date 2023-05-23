@@ -126,6 +126,7 @@ func runList(config listConfig) error {
 	return printResults(config, projects, login)
 }
 
+// TODO: support non-github.com hostnames
 func buildURL(config listConfig) (string, error) {
 	var url string
 	if config.opts.userOwner != "" {
@@ -141,9 +142,8 @@ func buildURL(config listConfig) (string, error) {
 	}
 
 	if config.opts.closed {
-		url = fmt.Sprintf("%s?query=is%%3Aclosed", url)
+		return url + "?query=is%3Aclosed", nil
 	}
-
 	return url, nil
 }
 

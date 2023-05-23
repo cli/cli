@@ -1,7 +1,6 @@
 package itemarchive
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
@@ -100,10 +99,6 @@ func NewCmdArchiveItem(f *cmdutil.Factory, runF func(config archiveItemConfig) e
 }
 
 func runArchiveItem(config archiveItemConfig) error {
-	if config.opts.format != "" && config.opts.format != "json" {
-		return fmt.Errorf("format must be 'json'")
-	}
-
 	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
 	if err != nil {
 		return err

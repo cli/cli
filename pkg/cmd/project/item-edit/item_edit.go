@@ -121,10 +121,6 @@ func runEditItem(config editItemConfig) error {
 			return cmdutil.FlagErrorf("ID must be the ID of the draft issue content which is prefixed with `DI_`")
 		}
 
-		if config.opts.format != "" && config.opts.format != "json" {
-			return fmt.Errorf("format must be 'json'")
-		}
-
 		query, variables := buildEditDraftIssue(config)
 
 		err := config.client.Mutate("EditDraftIssueItem", query, variables)
