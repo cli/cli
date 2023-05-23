@@ -97,15 +97,73 @@ type CommitStatusCheckRollup struct {
 	Contexts CheckContexts
 }
 
+// https://docs.github.com/en/graphql/reference/enums#checkrunstate
+type CheckRunState string
+
+const (
+	CheckRunStateActionRequired CheckRunState = "ACTION_REQUIRED"
+	CheckRunStateCancelled      CheckRunState = "CANCELLED"
+	CheckRunStateCompleted      CheckRunState = "COMPLETED"
+	CheckRunStateFailure        CheckRunState = "FAILURE"
+	CheckRunStateInProgress     CheckRunState = "IN_PROGRESS"
+	CheckRunStateNeutral        CheckRunState = "NEUTRAL"
+	CheckRunStatePending        CheckRunState = "PENDING"
+	CheckRunStateQueued         CheckRunState = "QUEUED"
+	CheckRunStateSkipped        CheckRunState = "SKIPPED"
+	CheckRunStateStale          CheckRunState = "STALE"
+	CheckRunStateStartupFailure CheckRunState = "STARTUP_FAILURE"
+	CheckRunStateSuccess        CheckRunState = "SUCCESS"
+	CheckRunStateTimedOut       CheckRunState = "TIMED_OUT"
+	CheckRunStateWaiting        CheckRunState = "WAITING"
+)
+
 type CheckRunCountByState struct {
-	State string
+	State CheckRunState
 	Count int
 }
 
+// https://docs.github.com/en/graphql/reference/enums#statusstate
+type StatusState string
+
+const (
+	StatusStateExpected StatusState = "EXPECTED"
+	StatusStateError    StatusState = "ERROR"
+	StatusStateFailure  StatusState = "FAILURE"
+	StatusStatePending  StatusState = "PENDING"
+	StatusStateSuccess  StatusState = "SUCCESS"
+)
+
 type StatusContextCountByState struct {
-	State string
+	State StatusState
 	Count int
 }
+
+// https://docs.github.com/en/graphql/reference/enums#checkstatusstate
+type CheckStatusState string
+
+const (
+	CheckStatusStateQueued     CheckStatusState = "QUEUED"
+	CheckStatusStateInProgress CheckStatusState = "IN_PROGRESS"
+	CheckStatusStateCompleted  CheckStatusState = "COMPLETED"
+	CheckStatusStateWaiting    CheckStatusState = "WAITING"
+	CheckStatusStatePending    CheckStatusState = "PENDING"
+	CheckStatusStateRequested  CheckStatusState = "REQUESTED"
+)
+
+// https://docs.github.com/en/graphql/reference/enums#checkconclusionstate
+type CheckConclusionState string
+
+const (
+	CheckConclusionStateActionRequired CheckConclusionState = "ACTION_REQUIRED"
+	CheckConclusionStateTimedOut       CheckConclusionState = "TIMED_OUT"
+	CheckConclusionStateCancelled      CheckConclusionState = "CANCELLED"
+	CheckConclusionStateFailure        CheckConclusionState = "FAILURE"
+	CheckConclusionStateSuccess        CheckConclusionState = "SUCCESS"
+	CheckConclusionStateNeutral        CheckConclusionState = "NEUTRAL"
+	CheckConclusionStateSkipped        CheckConclusionState = "SKIPPED"
+	CheckConclusionStateStartupFailure CheckConclusionState = "STARTUP_FAILURE"
+	CheckConclusionStateStale          CheckConclusionState = "STALE"
+)
 
 type CheckContexts struct {
 	// These fields are available on newer versions of the GraphQL API
@@ -138,18 +196,18 @@ type CheckContext struct {
 	// QUEUED IN_PROGRESS COMPLETED WAITING PENDING REQUESTED
 	Status string `json:"status"`
 	// ACTION_REQUIRED TIMED_OUT CANCELLED FAILURE SUCCESS NEUTRAL SKIPPED STARTUP_FAILURE STALE
-	Conclusion  string    `json:"conclusion"`
-	StartedAt   time.Time `json:"startedAt"`
-	CompletedAt time.Time `json:"completedAt"`
-	DetailsURL  string    `json:"detailsUrl"`
+	Conclusion  CheckConclusionState `json:"conclusion"`
+	StartedAt   time.Time            `json:"startedAt"`
+	CompletedAt time.Time            `json:"completedAt"`
+	DetailsURL  string               `json:"detailsUrl"`
 
 	/* StatusContext fields */
 
 	Context string `json:"context"`
 	// EXPECTED ERROR FAILURE PENDING SUCCESS
-	State     string    `json:"state"`
-	TargetURL string    `json:"targetUrl"`
-	CreatedAt time.Time `json:"createdAt"`
+	State     StatusState `json:"state"`
+	TargetURL string      `json:"targetUrl"`
+	CreatedAt time.Time   `json:"createdAt"`
 }
 
 type PRRepository struct {
@@ -363,14 +421,13 @@ const (
 	pending
 )
 
-// https://docs.github.com/en/graphql/reference/enums#statusstate
-func parseCheckStatusFromStatusState(state string) checkStatus {
+func parseCheckStatusFromStatusState(state StatusState) checkStatus {
 	switch state {
-	case "SUCCESS":
+	case StatusStateSuccess:
 		return passing
-	case "FAILURE", "ERROR":
+	case StatusStateFailure, StatusStateError:
 		return failing
-	case "EXPECTED", "PENDING":
+	case StatusStateExpected, StatusStatePending:
 		return pending
 	// Currently, we treat anything unknown as pending, which includes any future unknown
 	// states we might get back from the API. It might be interesting to do some work to add an additional
@@ -380,14 +437,14 @@ func parseCheckStatusFromStatusState(state string) checkStatus {
 	}
 }
 
-// https://docs.github.com/en/graphql/reference/enums#checkrunstate
-func parseCheckStatusFromCheckRunState(state string) checkStatus {
+func parseCheckStatusFromCheckRunState(state CheckRunState) checkStatus {
 	switch state {
-	case "NEUTRAL", "SKIPPED", "SUCCESS":
+	case CheckRunStateNeutral, CheckRunStateSkipped, CheckRunStateSuccess:
 		return passing
-	case "ACTION_REQUIRED", "CANCELLED", "FAILURE", "TIMED_OUT":
+	case CheckRunStateActionRequired, CheckRunStateCancelled, CheckRunStateFailure, CheckRunStateTimedOut:
 		return failing
-	case "COMPLETED", "IN_PROGRESS", "PENDING", "QUEUED", "STALE", "STARTUP_FAILURE", "WAITING":
+	case CheckRunStateCompleted, CheckRunStateInProgress, CheckRunStatePending, CheckRunStateQueued,
+		CheckRunStateStale, CheckRunStateStartupFailure, CheckRunStateWaiting:
 		return pending
 	// Currently, we treat anything unknown as pending, which includes any future unknown
 	// states we might get back from the API. It might be interesting to do some work to add an additional
@@ -397,14 +454,13 @@ func parseCheckStatusFromCheckRunState(state string) checkStatus {
 	}
 }
 
-// https://docs.github.com/en/graphql/reference/enums#checkconclusionstate
-func parseCheckStatusFromCheckConclusionState(state string) checkStatus {
+func parseCheckStatusFromCheckConclusionState(state CheckConclusionState) checkStatus {
 	switch state {
-	case "NEUTRAL", "SKIPPED", "SUCCESS":
+	case CheckConclusionStateNeutral, CheckConclusionStateSkipped, CheckConclusionStateSuccess:
 		return passing
-	case "ACTION_REQUIRED", "CANCELLED", "FAILURE", "TIMED_OUT":
+	case CheckConclusionStateActionRequired, CheckConclusionStateCancelled, CheckConclusionStateFailure, CheckConclusionStateTimedOut:
 		return failing
-	case "STALE", "STARTUP_FAILURE":
+	case CheckConclusionStateStale, CheckConclusionStateStartupFailure:
 		return pending
 	// Currently, we treat anything unknown as pending, which includes any future unknown
 	// states we might get back from the API. It might be interesting to do some work to add an additional
