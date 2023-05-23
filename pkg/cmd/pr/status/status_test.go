@@ -19,7 +19,54 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/require"
 )
+
+func TestNewCmdStatus(t *testing.T) {
+	// TODO
+	tests := []struct {
+		name  string
+		cli   string
+		wants StatusOptions
+	}{
+		{
+			name:  "blank",
+			wants: StatusOptions{},
+		},
+		{
+			name: "sets conflict",
+			cli:  "--conflict-status",
+			wants: StatusOptions{
+				ConflictStatus: true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &cmdutil.Factory{}
+
+			argv, err := shlex.Split(tt.cli)
+			require.NoError(t, err)
+
+			var gotOpts *StatusOptions
+			cmd := NewCmdStatus(f, func(opts *StatusOptions) error {
+				gotOpts = opts
+				return nil
+			})
+
+			cmd.SetArgs(argv)
+			_, err = cmd.ExecuteC()
+			require.NoError(t, err)
+
+			require.Equal(t, tt.wants.ConflictStatus, gotOpts.ConflictStatus)
+		})
+	}
+}
+
+func TestStatusRun(t *testing.T) {
+	// TODO
+}
 
 func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
