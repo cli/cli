@@ -23,12 +23,13 @@ import (
 
 type StatusOptions struct {
 	HttpClient func() (*http.Client, error)
-	GitClient  *git.Client
-	Config     func() (config.Config, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (ghContext.Remotes, error)
-	Branch     func() (string, error)
+	// TODO switch to local interface
+	GitClient *git.Client
+	Config    func() (config.Config, error)
+	IO        *iostreams.IOStreams
+	BaseRepo  func() (ghrepo.Interface, error)
+	Remotes   func() (ghContext.Remotes, error)
+	Branch    func() (string, error)
 
 	HasRepoOverride bool
 	Exporter        cmdutil.Exporter

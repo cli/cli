@@ -19,11 +19,11 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdStatus(t *testing.T) {
-	// TODO
 	tests := []struct {
 		name  string
 		cli   string
@@ -64,8 +64,51 @@ func TestNewCmdStatus(t *testing.T) {
 	}
 }
 
+type mockGitClient struct {
+	mock.Mock
+}
+
+// TODO fill in client methods
+
 func TestStatusRun(t *testing.T) {
-	// TODO
+	tests := []struct {
+		name      string
+		httpStubs func(*httpmock.Registry)
+		gitStubs  func(*mockGitClient)
+		opts      *StatusOptions
+		wantOut   string
+	}{
+		{
+			name: "blank",
+			httpStubs: func(reg *httpmock.Registry) {
+				// TODO
+			},
+			opts:    &StatusOptions{},
+			wantOut: "TODO",
+		},
+	}
+
+	for _, tt := range tests {
+		reg := &httpmock.Registry{}
+		tt.httpStubs(reg)
+		tt.opts.HttpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(true)
+		tt.opts.IO = ios
+		// TODO Branch and such
+		// TODO git client
+		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName("OWNER/REPO")
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			err := statusRun(tt.opts)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantOut, stdout.String())
+			reg.Verify(t)
+		})
+	}
 }
 
 func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
