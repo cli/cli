@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -161,15 +161,15 @@ func TestNewCmdRerun(t *testing.T) {
 
 func TestRerun(t *testing.T) {
 	tests := []struct {
-		name      string
-		httpStubs func(*httpmock.Registry)
-		askStubs  func(*prompt.AskStubber)
-		opts      *RerunOptions
-		tty       bool
-		wantErr   bool
-		errOut    string
-		wantOut   string
-		wantDebug bool
+		name        string
+		httpStubs   func(*httpmock.Registry)
+		promptStubs func(*prompter.MockPrompter)
+		opts        *RerunOptions
+		tty         bool
+		wantErr     bool
+		errOut      string
+		wantOut     string
+		wantDebug   bool
 	}{
 		{
 			name: "arg",
@@ -336,9 +336,12 @@ func TestRerun(t *testing.T) {
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/rerun"),
 					httpmock.StringResponse("{}"))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(2)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return 2, nil
+					})
 			},
 			wantOut: "✓ Requested rerun of run 1234\n",
 		},
@@ -408,11 +411,10 @@ func TestRerun(t *testing.T) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
+		pm := prompter.NewMockPrompter(t)
+		tt.opts.Prompter = pm
+		if tt.promptStubs != nil {
+			tt.promptStubs(pm)
 		}
 
 		t.Run(tt.name, func(t *testing.T) {

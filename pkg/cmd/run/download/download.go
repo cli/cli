@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +16,7 @@ import (
 type DownloadOptions struct {
 	IO       *iostreams.IOStreams
 	Platform platform
-	Prompter prompter
+	Prompter iprompter
 
 	DoPrompt       bool
 	RunID          string
@@ -31,13 +29,14 @@ type platform interface {
 	List(runID string) ([]shared.Artifact, error)
 	Download(url string, dir string) error
 }
-type prompter interface {
-	Prompt(message string, options []string, result interface{}) error
+type iprompter interface {
+	MultiSelect(string, []string, []string) ([]int, error)
 }
 
 func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobra.Command {
 	opts := &DownloadOptions{
-		IO: f.IOStreams,
+		IO:       f.IOStreams,
+		Prompter: f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -85,7 +84,6 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				client: httpClient,
 				repo:   baseRepo,
 			}
-			opts.Prompter = &surveyPrompter{}
 
 			if runF != nil {
 				return runF(opts)
@@ -133,9 +131,13 @@ func runDownload(opts *DownloadOptions) error {
 		if len(options) > 10 {
 			options = options[:10]
 		}
-		err := opts.Prompter.Prompt("Select artifacts to download:", options, &wantNames)
-		if err != nil {
+		var selected []int
+		if selected, err = opts.Prompter.MultiSelect("Select artifacts to download:", nil, options); err != nil {
 			return err
+		}
+		wantNames = []string{}
+		for _, x := range selected {
+			wantNames = append(wantNames, options[x])
 		}
 		if len(wantNames) == 0 {
 			return errors.New("no artifacts selected")
@@ -193,14 +195,4 @@ func matchAnyPattern(patterns []string, name string) bool {
 		}
 	}
 	return false
-}
-
-type surveyPrompter struct{}
-
-func (sp *surveyPrompter) Prompt(message string, options []string, result interface{}) error {
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	return prompt.SurveyAskOne(&survey.MultiSelect{
-		Message: message,
-		Options: options,
-	}, result)
 }

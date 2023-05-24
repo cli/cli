@@ -14,7 +14,7 @@ import (
 //go:generate moq -rm -out prompter_mock.go . Prompter
 type Prompter interface {
 	Select(string, string, []string) (int, error)
-	MultiSelect(string, string, []string) ([]string, error)
+	MultiSelect(string, []string, []string) ([]int, error)
 	Input(string, string) (string, error)
 	InputHostname() (string, error)
 	Password(string) (string, error)
@@ -86,7 +86,7 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 	return
 }
 
-func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []string) (result []string, err error) {
+func (p *surveyPrompter) MultiSelect(message string, defaultValues, options []string) (result []int, err error) {
 	q := &survey.MultiSelect{
 		Message:  message,
 		Options:  options,
@@ -94,8 +94,17 @@ func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []str
 		Filter:   LatinMatchingFilter,
 	}
 
-	if defaultValue != "" {
-		q.Default = defaultValue
+	if len(defaultValues) > 0 {
+		// TODO I don't actually know that this is needed, just being extra cautious
+		validatedDefault := []string{}
+		for _, x := range defaultValues {
+			for _, y := range options {
+				if x == y {
+					validatedDefault = append(validatedDefault, x)
+				}
+			}
+		}
+		q.Default = validatedDefault
 	}
 
 	err = p.ask(q, &result)

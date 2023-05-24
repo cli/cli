@@ -20,6 +20,7 @@ type RerunOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   shared.Prompter
 
 	RunID      string
 	OnlyFailed bool
@@ -32,6 +33,7 @@ type RerunOptions struct {
 func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Command {
 	opts := &RerunOptions{
 		IO:         f.IOStreams,
+		Prompter:   f.Prompter,
 		HttpClient: f.HttpClient,
 	}
 
@@ -114,8 +116,7 @@ func runRerun(opts *RerunOptions) error {
 		if len(runs) == 0 {
 			return errors.New("no recent runs have failed; please specify a specific `<run-id>`")
 		}
-		runID, err = shared.PromptForRun(cs, runs)
-		if err != nil {
+		if runID, err = shared.SelectRun(opts.Prompter, cs, runs); err != nil {
 			return err
 		}
 	}
