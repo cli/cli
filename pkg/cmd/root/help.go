@@ -88,8 +88,10 @@ func isRootCmd(command *cobra.Command) bool {
 }
 
 func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
+	flags := command.Flags()
+
 	if isRootCmd(command) {
-		if versionVal, err := command.Flags().GetBool("version"); err == nil && versionVal {
+		if versionVal, err := flags.GetBool("version"); err == nil && versionVal {
 			fmt.Fprint(f.IOStreams.Out, command.Annotations["versionInfo"])
 			return
 		} else if err != nil {
@@ -101,8 +103,8 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 
 	cs := f.IOStreams.ColorScheme()
 
-	if help, _ := command.Flags().GetBool("help"); !help && !command.Runnable() && !isRootCmd(command) {
-		nestedSuggestFunc(f.IOStreams.ErrOut, command, strings.Join(command.Flags().Args(), " "))
+	if help, _ := flags.GetBool("help"); !help && !command.Runnable() && len(flags.Args()) > 0 {
+		nestedSuggestFunc(f.IOStreams.ErrOut, command, strings.Join(flags.Args(), " "))
 		hasFailed = true
 		return
 	}
