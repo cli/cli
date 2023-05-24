@@ -26,6 +26,7 @@
                       "contexts": {
                         "nodes": [
                           {
+                            "__typeName": "StatusContext",
                             "state": "SUCCESS"
                           }
                         ]
@@ -80,6 +81,7 @@
                       "contexts": {
                         "nodes": [
                           {
+                            "__typeName": "CheckRun",
                             "status": "IN_PROGRESS",
                             "conclusion": ""
                           }
@@ -109,13 +111,16 @@
                       "contexts": {
                         "nodes": [
                           {
+                            "__typeName": "CheckRun",
                             "status": "IN_PROGRESS",
                             "conclusion": ""
                           },
                           {
+                            "__typeName": "StatusContext",
                             "state": "FAILURE"
                           },
                           {
+                            "__typeName": "CheckRun",
                             "status": "COMPLETED",
                             "conclusion": "NEUTRAL"
                           }
@@ -144,6 +149,7 @@
                       "contexts": {
                         "nodes": [
                           {
+                            "__typeName": "StatusContext",
                             "state": "SUCCESS"
                           }
                         ]
