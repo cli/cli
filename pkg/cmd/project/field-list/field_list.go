@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +22,7 @@ type listOpts struct {
 }
 
 type listConfig struct {
+	io     *iostreams.IOStreams
 	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   listOpts
@@ -60,6 +62,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 
 			t := tableprinter.New(f.IOStreams)
 			config := listConfig{
+				io:     f.IOStreams,
 				tp:     t,
 				client: client,
 				opts:   opts,
@@ -113,10 +116,7 @@ func printResults(config listConfig, fields []queries.ProjectField, login string
 		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for login %s has no fields", config.opts.number, login))
 	}
 
-	config.tp.AddField("Name")
-	config.tp.AddField("DataType")
-	config.tp.AddField("ID")
-	config.tp.EndRow()
+	config.tp.HeaderRow("Name", "Data type", "ID")
 
 	for _, f := range fields {
 		config.tp.AddField(f.Name())
@@ -133,7 +133,6 @@ func printJSON(config listConfig, project *queries.Project) error {
 	if err != nil {
 		return err
 	}
-	config.tp.AddField(string(b))
-
-	return config.tp.Render()
+	_, err = config.io.Out.Write(b)
+	return err
 }

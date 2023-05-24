@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -32,6 +33,7 @@ type editItemOpts struct {
 }
 
 type editItemConfig struct {
+	io     *iostreams.IOStreams
 	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   editItemOpts
@@ -82,6 +84,7 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 
 			t := tableprinter.New(f.IOStreams)
 			config := editItemConfig{
+				io:     f.IOStreams,
 				tp:     t,
 				client: client,
 				opts:   opts,
@@ -167,9 +170,10 @@ func runEditItem(config editItemConfig) error {
 		return printItemResults(config, &query.Update.Item)
 	}
 
-	config.tp.AddField("No changes to make")
-	return config.tp.Render()
-
+	if _, err := fmt.Fprintln(config.io.ErrOut, "error: no changes to make"); err != nil {
+		return err
+	}
+	return cmdutil.SilentError
 }
 
 func buildEditDraftIssue(config editItemConfig) (*EditProjectDraftIssue, map[string]interface{}) {
@@ -217,14 +221,11 @@ func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2Fie
 }
 
 func printDraftIssueResults(config editItemConfig, item queries.DraftIssue) error {
-	// using table printer here for consistency in case it ends up being needed in the future
-	config.tp.AddField("Title")
-	config.tp.AddField("Body")
-	config.tp.EndRow()
-	config.tp.AddField(item.Title)
-	config.tp.AddField(item.Body)
-	config.tp.EndRow()
-	return config.tp.Render()
+	if !config.io.IsStdoutTTY() {
+		return nil
+	}
+	_, err := fmt.Fprintf(config.io.Out, "Edited draft issue %q\n", item.Title)
+	return err
 }
 
 func printDraftIssueJSON(config editItemConfig, item queries.DraftIssue) error {
@@ -232,34 +233,16 @@ func printDraftIssueJSON(config editItemConfig, item queries.DraftIssue) error {
 	if err != nil {
 		return err
 	}
-	config.tp.AddField(string(b))
-	return config.tp.Render()
+	_, err = config.io.Out.Write(b)
+	return err
 }
 
 func printItemResults(config editItemConfig, item *queries.ProjectItem) error {
-	config.tp.AddField("Type")
-	config.tp.AddField("Title")
-	config.tp.AddField("Number")
-	config.tp.AddField("Repository")
-	config.tp.AddField("ID")
-	config.tp.EndRow()
-
-	config.tp.AddField(item.Type())
-	config.tp.AddField(item.Title())
-	if item.Number() == 0 {
-		config.tp.AddField(" - ")
-	} else {
-		config.tp.AddField(fmt.Sprintf("%d", item.Number()))
+	if !config.io.IsStdoutTTY() {
+		return nil
 	}
-	if item.Repo() == "" {
-		config.tp.AddField(" - ")
-	} else {
-		config.tp.AddField(item.Repo())
-	}
-	config.tp.AddField(item.ID())
-	config.tp.EndRow()
-
-	return config.tp.Render()
+	_, err := fmt.Fprintf(config.io.Out, "Edited item %q\n", item.Title())
+	return err
 }
 
 func printItemJSON(config editItemConfig, item *queries.ProjectItem) error {
@@ -267,8 +250,7 @@ func printItemJSON(config editItemConfig, item *queries.ProjectItem) error {
 	if err != nil {
 		return err
 	}
-	config.tp.AddField(string(b))
-	config.tp.EndRow()
-	return config.tp.Render()
+	_, err = config.io.Out.Write(b)
+	return err
 
 }

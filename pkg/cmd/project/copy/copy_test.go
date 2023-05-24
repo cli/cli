@@ -1,10 +1,8 @@
 package copy
 
 import (
-	"os"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -104,9 +102,6 @@ func TestNewCmdCopy(t *testing.T) {
 		},
 	}
 
-	os.Setenv("GH_TOKEN", "auth-token")
-	defer os.Unsetenv("GH_TOKEN")
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
@@ -146,7 +141,7 @@ func TestNewCmdCopy(t *testing.T) {
 
 func TestRunCopy_User(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// get user project ID
 	gock.New("https://api.github.com").
@@ -236,8 +231,10 @@ func TestRunCopy_User(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(false)
+
 	config := copyConfig{
-		tp: tableprinter.New(ios),
+		io: ios,
 		opts: copyOpts{
 			title:           "a title",
 			sourceUserOwner: "monalisa",
@@ -249,15 +246,12 @@ func TestRunCopy_User(t *testing.T) {
 
 	err := runCopy(config)
 	assert.NoError(t, err)
-	assert.Equal(
-		t,
-		"Created project copy 'a title'\nhttp://a-url.com\n",
-		stdout.String())
+	assert.Equal(t, "", stdout.String())
 }
 
 func TestRunCopy_Org(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// get org project ID
 	gock.New("https://api.github.com").
@@ -346,8 +340,10 @@ func TestRunCopy_Org(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(false)
+
 	config := copyConfig{
-		tp: tableprinter.New(ios),
+		io: ios,
 		opts: copyOpts{
 			title:          "a title",
 			sourceOrgOwner: "github",
@@ -359,15 +355,13 @@ func TestRunCopy_Org(t *testing.T) {
 
 	err := runCopy(config)
 	assert.NoError(t, err)
-	assert.Equal(
-		t,
-		"Created project copy 'a title'\nhttp://a-url.com\n",
-		stdout.String())
+	assert.Equal(t, "", stdout.String())
 }
 
 func TestRunCopy_Me(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
+
 	// get viewer project ID
 	gock.New("https://api.github.com").
 		Post("/graphql").
@@ -448,8 +442,10 @@ func TestRunCopy_Me(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
 	config := copyConfig{
-		tp: tableprinter.New(ios),
+		io: ios,
 		opts: copyOpts{
 			title:           "a title",
 			sourceUserOwner: "@me",
@@ -463,6 +459,6 @@ func TestRunCopy_Me(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Created project copy 'a title'\nhttp://a-url.com\n",
+		"Copied project to http://a-url.com\n",
 		stdout.String())
 }

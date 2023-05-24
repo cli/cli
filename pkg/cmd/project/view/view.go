@@ -144,7 +144,6 @@ func buildURL(config viewConfig) (string, error) {
 }
 
 func printResults(config viewConfig, project *queries.Project) error {
-
 	var sb strings.Builder
 	sb.WriteString("# Title\n")
 	sb.WriteString(project.Title)
@@ -194,9 +193,8 @@ func printResults(config viewConfig, project *queries.Project) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(out)
-	config.tp.AddField(out)
-	return config.tp.Render()
+	_, err = fmt.Fprint(config.io.Out, out)
+	return err
 }
 
 func printJSON(config viewConfig, project queries.Project) error {
@@ -204,6 +202,6 @@ func printJSON(config viewConfig, project queries.Project) error {
 	if err != nil {
 		return err
 	}
-	config.tp.AddField(string(b))
-	return config.tp.Render()
+	_, err = config.io.Out.Write(b)
+	return err
 }

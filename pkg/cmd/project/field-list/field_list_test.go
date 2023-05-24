@@ -106,7 +106,7 @@ func TestNewCmdList(t *testing.T) {
 
 func TestRunList_User(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// get user ID
 	gock.New("https://api.github.com").
@@ -186,13 +186,14 @@ func TestRunList_User(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Name\tDataType\tID\nFieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
+		"FieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
 		stdout.String())
 }
 
 func TestRunList_Org(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
+
 	// get org ID
 	gock.New("https://api.github.com").
 		Post("/graphql").
@@ -271,13 +272,13 @@ func TestRunList_Org(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Name\tDataType\tID\nFieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
+		"FieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
 		stdout.String())
 }
 
 func TestRunList_Me(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// get viewer ID
 	gock.New("https://api.github.com").
@@ -353,13 +354,13 @@ func TestRunList_Me(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Name\tDataType\tID\nFieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
+		"FieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
 		stdout.String())
 }
 
 func TestRunList_Empty(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// get viewer ID
 	gock.New("https://api.github.com").

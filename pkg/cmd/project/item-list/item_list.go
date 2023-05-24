@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +22,7 @@ type listOpts struct {
 }
 
 type listConfig struct {
+	io     *iostreams.IOStreams
 	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   listOpts
@@ -60,6 +62,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 
 			t := tableprinter.New(f.IOStreams)
 			config := listConfig{
+				io:     f.IOStreams,
 				tp:     t,
 				client: client,
 				opts:   opts,
@@ -113,26 +116,17 @@ func printResults(config listConfig, items []queries.ProjectItem, login string) 
 		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for login %s has no items", config.opts.number, login))
 	}
 
-	config.tp.AddField("Type")
-	config.tp.AddField("Title")
-	config.tp.AddField("Number")
-	config.tp.AddField("Repository")
-	config.tp.AddField("ID")
-	config.tp.EndRow()
+	config.tp.HeaderRow("Type", "Title", "Number", "Repository", "ID")
 
 	for _, i := range items {
 		config.tp.AddField(i.Type())
 		config.tp.AddField(i.Title())
 		if i.Number() == 0 {
-			config.tp.AddField(" - ")
+			config.tp.AddField("")
 		} else {
-			config.tp.AddField(fmt.Sprintf("%d", i.Number()))
+			config.tp.AddField(strconv.Itoa(i.Number()))
 		}
-		if i.Repo() == "" {
-			config.tp.AddField(" - ")
-		} else {
-			config.tp.AddField(i.Repo())
-		}
+		config.tp.AddField(i.Repo())
 		config.tp.AddField(i.ID())
 		config.tp.EndRow()
 	}
@@ -145,8 +139,6 @@ func printJSON(config listConfig, project *queries.Project) error {
 	if err != nil {
 		return err
 	}
-	config.tp.AddField(string(b))
-	config.tp.EndRow()
-	return config.tp.Render()
-
+	_, err = config.io.Out.Write(b)
+	return err
 }

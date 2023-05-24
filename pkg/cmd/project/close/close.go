@@ -5,10 +5,10 @@ import (
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +23,7 @@ type closeOpts struct {
 }
 
 type closeConfig struct {
-	tp     *tableprinter.TablePrinter
+	io     *iostreams.IOStreams
 	client *queries.Client
 	opts   closeOpts
 }
@@ -70,9 +70,8 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 				opts.number = int32(num)
 			}
 
-			t := tableprinter.New(f.IOStreams)
 			config := closeConfig{
-				tp:     t,
+				io:     f.IOStreams,
 				client: client,
 				opts:   opts,
 			}
@@ -134,16 +133,17 @@ func closeArgs(config closeConfig) (*updateProjectMutation, map[string]interface
 }
 
 func printResults(config closeConfig, project queries.Project) error {
-	// using table printer here for consistency in case it ends up being needed in the future
+	if !config.io.IsStdoutTTY() {
+		return nil
+	}
 	var action string
 	if config.opts.reopen {
 		action = "Reopened"
 	} else {
 		action = "Closed"
 	}
-	config.tp.AddField(fmt.Sprintf("%s project %s", action, project.URL))
-	config.tp.EndRow()
-	return config.tp.Render()
+	_, err := fmt.Fprintf(config.io.Out, "%s project %s\n", action, project.URL)
+	return err
 }
 
 func printJSON(config closeConfig, project queries.Project) error {
@@ -151,6 +151,6 @@ func printJSON(config closeConfig, project queries.Project) error {
 	if err != nil {
 		return err
 	}
-	config.tp.AddField(string(b))
-	return config.tp.Render()
+	_, err = config.io.Out.Write(b)
+	return err
 }

@@ -5,10 +5,10 @@ import (
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +27,7 @@ type copyOpts struct {
 }
 
 type copyConfig struct {
-	tp     *tableprinter.TablePrinter
+	io     *iostreams.IOStreams
 	client *queries.Client
 	opts   copyOpts
 }
@@ -78,9 +78,8 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 				opts.number = int32(num)
 			}
 
-			t := tableprinter.New(f.IOStreams)
 			config := copyConfig{
-				tp:     t,
+				io:     f.IOStreams,
 				client: client,
 				opts:   opts,
 			}
@@ -155,12 +154,11 @@ func copyArgs(config copyConfig) (*copyProjectMutation, map[string]interface{}) 
 }
 
 func printResults(config copyConfig, project queries.Project) error {
-	// using table printer here for consistency in case it ends up being needed in the future
-	config.tp.AddField(fmt.Sprintf("Created project copy '%s'", project.Title))
-	config.tp.EndRow()
-	config.tp.AddField(project.URL)
-	config.tp.EndRow()
-	return config.tp.Render()
+	if !config.io.IsStdoutTTY() {
+		return nil
+	}
+	_, err := fmt.Fprintf(config.io.Out, "Copied project to %s\n", project.URL)
+	return err
 }
 
 func printJSON(config copyConfig, project queries.Project) error {
@@ -168,6 +166,6 @@ func printJSON(config copyConfig, project queries.Project) error {
 	if err != nil {
 		return err
 	}
-	config.tp.AddField(string(b))
-	return config.tp.Render()
+	_, err = config.io.Out.Write(b)
+	return err
 }

@@ -151,7 +151,7 @@ func TestNewCmdeditItem(t *testing.T) {
 
 func TestRunItemEdit_Draft(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// edit item
 	gock.New("https://api.github.com").
@@ -172,7 +172,10 @@ func TestRunItemEdit_Draft(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
 	config := editItemConfig{
+		io: ios,
 		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			title:  "a title",
@@ -186,13 +189,13 @@ func TestRunItemEdit_Draft(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Title\tBody\na title\ta new body\n",
+		"Edited draft issue \"a title\"\n",
 		stdout.String())
 }
 
 func TestRunItemEdit_Text(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// edit item
 	gock.New("https://api.github.com").
@@ -222,6 +225,7 @@ func TestRunItemEdit_Text(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
+		io: ios,
 		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			text:      "item text",
@@ -234,15 +238,12 @@ func TestRunItemEdit_Text(t *testing.T) {
 
 	err := runEditItem(config)
 	assert.NoError(t, err)
-	assert.Equal(
-		t,
-		"Type\tTitle\tNumber\tRepository\tID\nIssue\ttitle\t1\tmy-repo\titem_id\n",
-		stdout.String())
+	assert.Equal(t, "", stdout.String())
 }
 
 func TestRunItemEdit_Number(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// edit item
 	gock.New("https://api.github.com").
@@ -271,7 +272,10 @@ func TestRunItemEdit_Number(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
 	config := editItemConfig{
+		io: ios,
 		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			number:    2,
@@ -286,13 +290,13 @@ func TestRunItemEdit_Number(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Type\tTitle\tNumber\tRepository\tID\nIssue\ttitle\t1\tmy-repo\titem_id\n",
+		"Edited item \"title\"\n",
 		stdout.String())
 }
 
 func TestRunItemEdit_Date(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// edit item
 	gock.New("https://api.github.com").
@@ -322,6 +326,7 @@ func TestRunItemEdit_Date(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
+		io: ios,
 		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			date:      "2023-01-01",
@@ -334,15 +339,12 @@ func TestRunItemEdit_Date(t *testing.T) {
 
 	err := runEditItem(config)
 	assert.NoError(t, err)
-	assert.Equal(
-		t,
-		"Type\tTitle\tNumber\tRepository\tID\nIssue\ttitle\t1\tmy-repo\titem_id\n",
-		stdout.String())
+	assert.Equal(t, "", stdout.String())
 }
 
 func TestRunItemEdit_SingleSelect(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// edit item
 	gock.New("https://api.github.com").
@@ -372,6 +374,7 @@ func TestRunItemEdit_SingleSelect(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
+		io: ios,
 		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			singleSelectOptionID: "option_id",
@@ -384,15 +387,12 @@ func TestRunItemEdit_SingleSelect(t *testing.T) {
 
 	err := runEditItem(config)
 	assert.NoError(t, err)
-	assert.Equal(
-		t,
-		"Type\tTitle\tNumber\tRepository\tID\nIssue\ttitle\t1\tmy-repo\titem_id\n",
-		stdout.String())
+	assert.Equal(t, "", stdout.String())
 }
 
 func TestRunItemEdit_Iteration(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// edit item
 	gock.New("https://api.github.com").
@@ -421,7 +421,10 @@ func TestRunItemEdit_Iteration(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
 	config := editItemConfig{
+		io: ios,
 		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			iterationID: "option_id",
@@ -436,34 +439,35 @@ func TestRunItemEdit_Iteration(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Type\tTitle\tNumber\tRepository\tID\nIssue\ttitle\t1\tmy-repo\titem_id\n",
+		"Edited item \"title\"\n",
 		stdout.String())
 }
 
 func TestRunItemEdit_NoChanges(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	client := queries.NewTestClient()
 
-	ios, _, stdout, _ := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
 	config := editItemConfig{
+		io:     ios,
 		tp:     tableprinter.New(ios),
 		opts:   editItemOpts{},
 		client: client,
 	}
 
 	err := runEditItem(config)
-	assert.NoError(t, err)
-	assert.Equal(
-		t,
-		"No changes to make",
-		stdout.String())
+	assert.Error(t, err, "SilentError")
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "error: no changes to make\n", stderr.String())
 }
 
 func TestRunItemEdit_InvalidID(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	client := queries.NewTestClient()
 	ios, _, _, _ := iostreams.Test()

@@ -163,32 +163,19 @@ func printResults(config listConfig, projects []queries.Project, login string) e
 		return cmdutil.NewNoResultsError(fmt.Sprintf("No projects found for %s", login))
 	}
 
-	config.tp.AddField("Title")
-	config.tp.AddField("Description")
-	config.tp.AddField("URL")
-	if config.opts.closed {
-		config.tp.AddField("State")
-	}
-	config.tp.AddField("ID")
-	config.tp.EndRow()
+	config.tp.HeaderRow("Title", "Description", "URL", "State", "ID")
 
 	for _, p := range projects {
 		config.tp.AddField(p.Title)
-		if p.ShortDescription == "" {
-			config.tp.AddField(" - ")
-		} else {
-			config.tp.AddField(p.ShortDescription)
-		}
+		config.tp.AddField(p.ShortDescription)
 		config.tp.AddField(p.URL)
-		if config.opts.closed {
-			var state string
-			if p.Closed {
-				state = "closed"
-			} else {
-				state = "open"
-			}
-			config.tp.AddField(state)
+		var state string
+		if p.Closed {
+			state = "closed"
+		} else {
+			state = "open"
 		}
+		config.tp.AddField(state)
 		config.tp.AddField(p.ID)
 		config.tp.EndRow()
 	}

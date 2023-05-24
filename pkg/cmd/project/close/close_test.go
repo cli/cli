@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -108,7 +107,7 @@ func TestNewCmdClose(t *testing.T) {
 
 func TestRunClose_User(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// get user ID
 	gock.New("https://api.github.com").
@@ -177,8 +176,10 @@ func TestRunClose_User(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
 	config := closeConfig{
-		tp: tableprinter.New(ios),
+		io: ios,
 		opts: closeOpts{
 			number:    1,
 			userOwner: "monalisa",
@@ -196,7 +197,7 @@ func TestRunClose_User(t *testing.T) {
 
 func TestRunClose_Org(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// get org ID
 	gock.New("https://api.github.com").
@@ -266,7 +267,7 @@ func TestRunClose_Org(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := closeConfig{
-		tp: tableprinter.New(ios),
+		io: ios,
 		opts: closeOpts{
 			number:   1,
 			orgOwner: "github",
@@ -276,15 +277,12 @@ func TestRunClose_Org(t *testing.T) {
 
 	err := runClose(config)
 	assert.NoError(t, err)
-	assert.Equal(
-		t,
-		"Closed project http://a-url.com\n",
-		stdout.String())
+	assert.Equal(t, "", stdout.String())
 }
 
 func TestRunClose_Me(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// get viewer ID
 	gock.New("https://api.github.com").
@@ -350,7 +348,7 @@ func TestRunClose_Me(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := closeConfig{
-		tp: tableprinter.New(ios),
+		io: ios,
 		opts: closeOpts{
 			number:    1,
 			userOwner: "@me",
@@ -360,15 +358,12 @@ func TestRunClose_Me(t *testing.T) {
 
 	err := runClose(config)
 	assert.NoError(t, err)
-	assert.Equal(
-		t,
-		"Closed project http://a-url.com\n",
-		stdout.String())
+	assert.Equal(t, "", stdout.String())
 }
 
 func TestRunClose_Reopen(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// get user ID
 	gock.New("https://api.github.com").
@@ -437,8 +432,10 @@ func TestRunClose_Reopen(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
 	config := closeConfig{
-		tp: tableprinter.New(ios),
+		io: ios,
 		opts: closeOpts{
 			number:    1,
 			userOwner: "monalisa",

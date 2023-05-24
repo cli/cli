@@ -107,7 +107,8 @@ func TestNewCmdList(t *testing.T) {
 
 func TestRunList_User(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
+
 	// get user ID
 	gock.New("https://api.github.com").
 		Post("/graphql").
@@ -200,13 +201,14 @@ func TestRunList_User(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Type\tTitle\tNumber\tRepository\tID\nIssue\tan issue\t1\tcli/go-gh\tissue ID\nPullRequest\ta pull request\t2\tcli/go-gh\tpull request ID\nDraftIssue\tdraft issue\t - \t - \tdraft issue ID\n",
+		"Issue\tan issue\t1\tcli/go-gh\tissue ID\nPullRequest\ta pull request\t2\tcli/go-gh\tpull request ID\nDraftIssue\tdraft issue\t\t\tdraft issue ID\n",
 		stdout.String())
 }
 
 func TestRunList_Org(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
+
 	// get org ID
 	gock.New("https://api.github.com").
 		Post("/graphql").
@@ -299,13 +301,13 @@ func TestRunList_Org(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Type\tTitle\tNumber\tRepository\tID\nIssue\tan issue\t1\tcli/go-gh\tissue ID\nPullRequest\ta pull request\t2\tcli/go-gh\tpull request ID\nDraftIssue\tdraft issue\t - \t - \tdraft issue ID\n",
+		"Issue\tan issue\t1\tcli/go-gh\tissue ID\nPullRequest\ta pull request\t2\tcli/go-gh\tpull request ID\nDraftIssue\tdraft issue\t\t\tdraft issue ID\n",
 		stdout.String())
 }
 
 func TestRunList_Me(t *testing.T) {
 	defer gock.Off()
-	gock.Observe(gock.DumpRequest)
+	// gock.Observe(gock.DumpRequest)
 
 	// get viewer ID
 	gock.New("https://api.github.com").
@@ -395,6 +397,6 @@ func TestRunList_Me(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Type\tTitle\tNumber\tRepository\tID\nIssue\tan issue\t1\tcli/go-gh\tissue ID\nPullRequest\ta pull request\t2\tcli/go-gh\tpull request ID\nDraftIssue\tdraft issue\t - \t - \tdraft issue ID\n",
+		"Issue\tan issue\t1\tcli/go-gh\tissue ID\nPullRequest\ta pull request\t2\tcli/go-gh\tpull request ID\nDraftIssue\tdraft issue\t\t\tdraft issue ID\n",
 		stdout.String())
 }
