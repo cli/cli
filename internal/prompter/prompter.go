@@ -86,7 +86,7 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 	return
 }
 
-func (p *surveyPrompter) MultiSelect(message string, defaultValue, options []string) (result []int, err error) {
+func (p *surveyPrompter) MultiSelect(message string, defaultValues, options []string) (result []int, err error) {
 	q := &survey.MultiSelect{
 		Message:  message,
 		Options:  options,
@@ -94,10 +94,10 @@ func (p *surveyPrompter) MultiSelect(message string, defaultValue, options []str
 		Filter:   LatinMatchingFilter,
 	}
 
-	if len(defaultValue) > 0 {
+	if len(defaultValues) > 0 {
 		// TODO I don't actually know that this is needed, just being extra cautious
 		validatedDefault := []string{}
-		for _, x := range defaultValue {
+		for _, x := range defaultValues {
 			for _, y := range options {
 				if x == y {
 					validatedDefault = append(validatedDefault, x)
