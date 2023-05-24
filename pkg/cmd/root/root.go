@@ -12,6 +12,7 @@ import (
 	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
+	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
@@ -166,21 +167,21 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 
 	// Aliases
 	aliases := cfg.Aliases()
+	validAliasName := shared.ValidAliasNameFunc(cmd)
+	validAliasExpansion := shared.ValidAliasExpansionFunc(cmd)
 	for k, v := range aliases.All() {
 		aliasName := k
 		aliasValue := v
-		isShellAlias := strings.HasPrefix(aliasValue, "!")
-		split, _ := shlex.Split(aliasName)
-		parentCmd, parentArgs, _ := cmd.Find(split)
-		// If there are no parent args the user defined an alias that shadows an existing command.
-		if parentCmd != nil && len(parentArgs) == 1 {
+		if validAliasName(aliasName) && validAliasExpansion(aliasValue) {
+			split, _ := shlex.Split(aliasName)
+			parentCmd, parentArgs, _ := cmd.Find(split)
 			if !parentCmd.ContainsGroup("alias") {
 				parentCmd.AddGroup(&cobra.Group{
 					ID:    "alias",
 					Title: "Alias commands",
 				})
 			}
-			if isShellAlias {
+			if strings.HasPrefix(aliasValue, "!") {
 				shellAliasCmd := NewCmdShellAlias(io, parentArgs[0], aliasValue)
 				parentCmd.AddCommand(shellAliasCmd)
 				parentCmd.ValidArgs = append(parentCmd.ValidArgs, fmt.Sprintf("%s\tShell alias", aliasName))

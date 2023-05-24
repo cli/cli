@@ -29,9 +29,6 @@ func rootUsageFunc(w io.Writer, command *cobra.Command) error {
 	if len(subcommands) > 0 {
 		fmt.Fprint(w, "\n\nAvailable commands:\n")
 		for _, c := range subcommands {
-			if c.Hidden {
-				continue
-			}
 			fmt.Fprintf(w, "  %s\n", c.Name())
 		}
 		return nil
@@ -104,8 +101,8 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 
 	cs := f.IOStreams.ColorScheme()
 
-	if isRootCmd(command.Parent()) && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
-		nestedSuggestFunc(f.IOStreams.ErrOut, command, args[1])
+	if help, _ := command.Flags().GetBool("help"); !help && !command.Runnable() && !isRootCmd(command) {
+		nestedSuggestFunc(f.IOStreams.ErrOut, command, strings.Join(command.Flags().Args(), " "))
 		hasFailed = true
 		return
 	}

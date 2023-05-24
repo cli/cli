@@ -8,8 +8,10 @@ import (
 )
 
 // ValidAliasNameFunc returns a function that will check if the given string
-// is a valid alias name. A name can be invalid if it shadows an existing
-// command or it is nested under a command that does not exist.
+// is a valid alias name. A name is valid if:
+//   - it does not shadow an existing command,
+//   - it is not nested under a command that is runnable,
+//   - it is not nested under a command that does not exist.
 func ValidAliasNameFunc(cmd *cobra.Command) func(string) bool {
 	return func(args string) bool {
 		split, err := shlex.Split(args)
@@ -19,9 +21,7 @@ func ValidAliasNameFunc(cmd *cobra.Command) func(string) bool {
 
 		rootCmd := cmd.Root()
 		foundCmd, foundArgs, _ := rootCmd.Find(split)
-		// If there are no found args the user is trying to define an alias
-		// that shadows an existing command.
-		if foundCmd != nil && len(foundArgs) == 1 {
+		if foundCmd != nil && !foundCmd.Runnable() && len(foundArgs) == 1 {
 			return true
 		}
 
@@ -30,8 +30,9 @@ func ValidAliasNameFunc(cmd *cobra.Command) func(string) bool {
 }
 
 // ValidAliasExpansionFunc returns a function that will check if the given string
-// is a valid alias expansion. All shell expansions are valid. Non-shell expansions
-// are valid if they correspond to an existing command, extension, or alias.
+// is a valid alias expansion. An expansion is valid if:
+//   - it is a shell expansion,
+//   - it is a non-shell expansion that corresponds to an existing command, extension, or alias.
 func ValidAliasExpansionFunc(cmd *cobra.Command) func(string) bool {
 	return func(expansion string) bool {
 		if strings.HasPrefix(expansion, "!") {

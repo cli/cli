@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/findsh"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
@@ -18,7 +19,7 @@ import (
 func NewCmdShellAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *cobra.Command {
 	return &cobra.Command{
 		Use:   aliasName,
-		Short: "Shell alias",
+		Short: fmt.Sprintf("Shell alias for %q", text.Truncate(80, aliasValue)),
 		RunE: func(c *cobra.Command, args []string) error {
 			expandedArgs, err := expandShellAlias(aliasValue, args, nil)
 			if err != nil {
@@ -38,7 +39,6 @@ func NewCmdShellAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *co
 		Annotations: map[string]string{
 			"skipAuthCheck": "true",
 		},
-		Hidden:             true,
 		DisableFlagParsing: true,
 	}
 }
@@ -46,7 +46,7 @@ func NewCmdShellAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *co
 func NewCmdAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *cobra.Command {
 	return &cobra.Command{
 		Use:   aliasName,
-		Short: fmt.Sprintf("Alias for %q", aliasValue),
+		Short: fmt.Sprintf("Alias for %q", text.Truncate(80, aliasValue)),
 		RunE: func(c *cobra.Command, args []string) error {
 			expandedArgs, err := expandAlias(aliasValue, args)
 			if err != nil {
@@ -60,7 +60,6 @@ func NewCmdAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *cobra.C
 		Annotations: map[string]string{
 			"skipAuthCheck": "true",
 		},
-		Hidden:             true,
 		DisableFlagParsing: true,
 	}
 }
