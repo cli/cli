@@ -22,12 +22,6 @@ func TestNewCmdDelete(t *testing.T) {
 		wantsErrMsg string
 	}{
 		{
-			name:        "user-and-org",
-			cli:         "--user monalisa --org github",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
-		{
 			name:        "not-a-number",
 			cli:         "x",
 			wantsErr:    true,
@@ -42,16 +36,9 @@ func TestNewCmdDelete(t *testing.T) {
 		},
 		{
 			name: "user",
-			cli:  "--user monalisa",
+			cli:  "--login monalisa",
 			wants: deleteOpts{
-				userOwner: "monalisa",
-			},
-		},
-		{
-			name: "org",
-			cli:  "--org github",
-			wants: deleteOpts{
-				orgOwner: "github",
+				login: "monalisa",
 			},
 		},
 		{
@@ -92,8 +79,7 @@ func TestNewCmdDelete(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
 	}
@@ -108,7 +94,7 @@ func TestRunDelete_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -118,6 +104,12 @@ func TestRunDelete_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -169,8 +161,8 @@ func TestRunDelete_User(t *testing.T) {
 	config := deleteConfig{
 		tp: tableprinter.New(ios),
 		opts: deleteOpts{
-			userOwner: "monalisa",
-			number:    1,
+			login:  "monalisa",
+			number: 1,
 		},
 		client: client,
 	}
@@ -192,7 +184,7 @@ func TestRunDelete_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -202,6 +194,12 @@ func TestRunDelete_Org(t *testing.T) {
 			"data": map[string]interface{}{
 				"organization": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -253,8 +251,8 @@ func TestRunDelete_Org(t *testing.T) {
 	config := deleteConfig{
 		tp: tableprinter.New(ios),
 		opts: deleteOpts{
-			orgOwner: "github",
-			number:   1,
+			login:  "github",
+			number: 1,
 		},
 		client: client,
 	}
@@ -333,8 +331,8 @@ func TestRunDelete_Me(t *testing.T) {
 	config := deleteConfig{
 		tp: tableprinter.New(ios),
 		opts: deleteOpts{
-			userOwner: "@me",
-			number:    1,
+			login:  "@me",
+			number: 1,
 		},
 		client: client,
 	}

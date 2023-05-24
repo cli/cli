@@ -13,11 +13,10 @@ import (
 )
 
 type createOpts struct {
-	title     string
-	userOwner string
-	orgOwner  string
-	ownerID   string
-	format    string
+	title   string
+	login   string
+	ownerID string
+	format  string
 }
 
 type createConfig struct {
@@ -38,18 +37,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 		Short: "Create a project",
 		Use:   "create",
 		Example: heredoc.Doc(`
-			# create a new project owned by user monalisa
-			gh project create --user monalisa --title "a new project"
+			# create a new project owned by login monalisa
+			gh project create --login monalisa --title "a new project"
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--user` or `--org` may be used",
-				opts.userOwner != "",
-				opts.orgOwner != "",
-			); err != nil {
-				return err
-			}
-
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -71,8 +62,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 	}
 
 	createCmd.Flags().StringVar(&opts.title, "title", "", "Title for the project")
-	createCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	createCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	createCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
 	cmdutil.StringEnumFlag(createCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = createCmd.MarkFlagRequired("title")
@@ -81,7 +71,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 }
 
 func runCreate(config createConfig) error {
-	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.login)
 	if err != nil {
 		return err
 	}

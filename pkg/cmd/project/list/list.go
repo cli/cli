@@ -12,12 +12,11 @@ import (
 )
 
 type listOpts struct {
-	limit     int
-	web       bool
-	userOwner string
-	orgOwner  string
-	closed    bool
-	format    string
+	limit  int
+	web    bool
+	login  string
+	closed bool
+	format string
 }
 
 type listConfig struct {
@@ -37,17 +36,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 			gh project list
 
 			# list the projects for org github including closed projects
-			gh project list --org github --closed
+			gh project list --login github --closed
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--user` or `--org` may be used",
-				opts.userOwner != "",
-				opts.orgOwner != "",
-			); err != nil {
-				return err
-			}
-
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -72,8 +63,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 		},
 	}
 
-	listCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner")
-	listCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	listCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner")
 	listCmd.Flags().BoolVarP(&opts.closed, "closed", "", false, "Include closed projects")
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser")
 	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
@@ -95,25 +85,15 @@ func runList(config listConfig) error {
 		return nil
 	}
 
-	var login string
-	var ownerType queries.OwnerType
-	if config.opts.userOwner != "" {
-		if config.opts.userOwner == "@me" {
-			login = "me"
-			ownerType = queries.ViewerOwner
-		} else {
-			login = config.opts.userOwner
-			ownerType = queries.UserOwner
-		}
-	} else if config.opts.orgOwner != "" {
-		login = config.opts.orgOwner
-		ownerType = queries.OrgOwner
-	} else {
-		login = "me"
-		ownerType = queries.ViewerOwner
+	if config.opts.login == "" {
+		config.opts.login = "@me"
+	}
+	owner, err := config.client.NewOwner(config.opts.login)
+	if err != nil {
+		return err
 	}
 
-	projects, totalCount, err := config.client.Projects(login, ownerType, config.opts.limit, false)
+	projects, totalCount, err := config.client.Projects(config.opts.login, owner.Type, config.opts.limit, false)
 	if err != nil {
 		return err
 	}
@@ -123,22 +103,29 @@ func runList(config listConfig) error {
 		return printJSON(config, projects, totalCount)
 	}
 
-	return printResults(config, projects, login)
+	return printResults(config, projects, owner.Login)
 }
 
 // TODO: support non-github.com hostnames
 func buildURL(config listConfig) (string, error) {
 	var url string
-	if config.opts.userOwner != "" {
-		url = fmt.Sprintf("https://github.com/users/%s/projects", config.opts.userOwner)
-	} else if config.opts.orgOwner != "" {
-		url = fmt.Sprintf("https://github.com/orgs/%s/projects", config.opts.orgOwner)
-	} else {
+	if config.opts.login == "@me" || config.opts.login == "" {
 		login, err := config.client.ViewerLoginName()
 		if err != nil {
 			return "", err
 		}
 		url = fmt.Sprintf("https://github.com/users/%s/projects", login)
+	} else {
+		_, ownerType, err := config.client.OwnerIDAndType(config.opts.login)
+		if err != nil {
+			return "", err
+		}
+
+		if ownerType == queries.UserOwner {
+			url = fmt.Sprintf("https://github.com/users/%s/projects", config.opts.login)
+		} else {
+			url = fmt.Sprintf("https://github.com/orgs/%s/projects", config.opts.login)
+		}
 	}
 
 	if config.opts.closed {

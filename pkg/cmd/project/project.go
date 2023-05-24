@@ -28,10 +28,10 @@ func NewCmdProject(f *cmdutil.Factory) *cobra.Command {
 		Short: "Work with GitHub Projects.",
 		Long:  "Work with GitHub Projects. Note that the token you are using must have 'project' scope, which is not set by default. You can verify your token scope by running 'gh auth status' and add the project scope by running 'gh auth refresh -s project'.",
 		Example: heredoc.Doc(`
-			$ gh project create --user monalisa --title "Roadmap"
-			$ gh project view 1 --org cli --web
-			$ gh project field-list 1 --org cli
-			$ gh project item-list 1 --org cli
+			$ gh project create --login monalisa --title "Roadmap"
+			$ gh project view 1 --login cli --web
+			$ gh project field-list 1 --login cli
+			$ gh project item-list 1 --login cli
 		`),
 		GroupID: "core",
 	}

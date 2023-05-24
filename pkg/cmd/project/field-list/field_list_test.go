@@ -22,12 +22,6 @@ func TestNewCmdList(t *testing.T) {
 		wantsErrMsg string
 	}{
 		{
-			name:        "user-and-org",
-			cli:         "--user monalisa --org github",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
-		{
 			name:        "not-a-number",
 			cli:         "x",
 			wantsErr:    true,
@@ -43,18 +37,10 @@ func TestNewCmdList(t *testing.T) {
 		},
 		{
 			name: "user",
-			cli:  "--user monalisa",
+			cli:  "--login monalisa",
 			wants: listOpts{
-				userOwner: "monalisa",
-				limit:     30,
-			},
-		},
-		{
-			name: "org",
-			cli:  "--org github",
-			wants: listOpts{
-				orgOwner: "github",
-				limit:    30,
+				login: "monalisa",
+				limit: 30,
 			},
 		},
 		{
@@ -96,8 +82,7 @@ func TestNewCmdList(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.limit, gotOpts.limit)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
@@ -113,7 +98,7 @@ func TestRunList_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -123,6 +108,12 @@ func TestRunList_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -176,8 +167,8 @@ func TestRunList_User(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			number:    1,
-			userOwner: "monalisa",
+			number: 1,
+			login:  "monalisa",
 		},
 		client: client,
 	}
@@ -199,7 +190,7 @@ func TestRunList_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -209,6 +200,12 @@ func TestRunList_Org(t *testing.T) {
 			"data": map[string]interface{}{
 				"organization": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -262,8 +259,8 @@ func TestRunList_Org(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			number:   1,
-			orgOwner: "github",
+			number: 1,
+			login:  "github",
 		},
 		client: client,
 	}
@@ -344,8 +341,8 @@ func TestRunList_Me(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			number:    1,
-			userOwner: "@me",
+			number: 1,
+			login:  "@me",
 		},
 		client: client,
 	}
@@ -410,8 +407,8 @@ func TestRunList_Empty(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			number:    1,
-			userOwner: "@me",
+			number: 1,
+			login:  "@me",
 		},
 		client: client,
 	}

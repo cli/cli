@@ -679,22 +679,6 @@ type viewerLogin struct {
 	}
 }
 
-// userLogin is used to query the Login of a user.
-type userLogin struct {
-	User struct {
-		Login string
-		Id    string
-	} `graphql:"user(login: $login)"`
-}
-
-// orgLogin is used to query the Login of an organization.
-type orgLogin struct {
-	Organization struct {
-		Login string
-		Id    string
-	} `graphql:"organization(login: $login)"`
-}
-
 type viewerLoginOrgs struct {
 	Viewer struct {
 		Login         string
@@ -793,25 +777,49 @@ func (c *Client) ViewerLoginName() (string, error) {
 	return query.Viewer.Login, nil
 }
 
-// OwnerID returns the ID of an OwnerType. If the OwnerType is VIEWER, no login is required.
-func (c *Client) OwnerID(login string, t OwnerType) (string, error) {
+// OwnerIDAndType returns the ID and OwnerType. The special login "@me" or an empty string queries the current user.
+func (c *Client) OwnerIDAndType(login string) (string, OwnerType, error) {
+	if login == "@me" || login == "" {
+		var query viewerLogin
+		err := c.doQuery("ViewerLogin", &query, nil)
+		if err != nil {
+			return "", "", err
+		}
+		return query.Viewer.Id, ViewerOwner, nil
+	}
+
 	variables := map[string]interface{}{
 		"login": githubv4.String(login),
 	}
-	if t == UserOwner {
-		var query userLogin
-		err := c.doQuery("UserLogin", &query, variables)
-		return query.User.Id, err
-	} else if t == OrgOwner {
-		var query orgLogin
-		err := c.doQuery("OrgLogin", &query, variables)
-		return query.Organization.Id, err
-	} else if t == ViewerOwner {
-		var query viewerLogin
-		err := c.doQuery("ViewerLogin", &query, nil)
-		return query.Viewer.Id, err
+	var query struct {
+		User struct {
+			Login string
+			Id    string
+		} `graphql:"user(login: $login)"`
+		Organization struct {
+			Login string
+			Id    string
+		} `graphql:"organization(login: $login)"`
 	}
-	return "", errors.New("unknown owner type")
+
+	err := c.doQuery("UserOrgLogin", &query, variables)
+	if err != nil {
+		// Due to the way the queries are structured, we don't know if a login belongs to a user
+		// or to an org, even though they are unique. To deal with this, we try both - if neither
+		// is found, we return the error.
+		var graphErr *api.GraphQLError
+		if errors.As(err, &graphErr) {
+			if graphErr.Match("NOT_FOUND", "user") && graphErr.Match("NOT_FOUND", "organization") {
+				return "", "", err
+			} else if graphErr.Match("NOT_FOUND", "organization") { // org isn't found must be a user
+				return query.User.Id, UserOwner, nil
+			} else if graphErr.Match("NOT_FOUND", "user") { // user isn't found must be an org
+				return query.Organization.Id, OrgOwner, nil
+			}
+		}
+	}
+
+	return "", "", errors.New("unknown owner type")
 }
 
 // issueOrPullRequest is used to query the global id of an issue or pull request by its URL.
@@ -966,43 +974,19 @@ type Owner struct {
 }
 
 // NewOwner creates a project Owner
-// When userLogin == "@me", userLogin becomes the current viewer
-// If userLogin is not empty, it is used to lookup the user owner
-// If orgLogin is not empty, it is used to lookup the org owner
-// If both userLogin and orgLogin are empty, interative mode is used to select an owner
+// If login is not empty, it is used to lookup the project owner.
+// If login is empty empty, interative mode is used to select an owner.
 // from the current viewer and their organizations
-func (c *Client) NewOwner(userLogin, orgLogin string) (*Owner, error) {
-	if userLogin == "@me" {
-		id, err := c.OwnerID(userLogin, ViewerOwner)
+func (c *Client) NewOwner(login string) (*Owner, error) {
+	if login != "" {
+		id, ownerType, err := c.OwnerIDAndType(login)
 		if err != nil {
 			return nil, err
 		}
 
 		return &Owner{
-			Login: userLogin,
-			Type:  ViewerOwner,
-			ID:    id,
-		}, nil
-	} else if userLogin != "" {
-		id, err := c.OwnerID(userLogin, UserOwner)
-		if err != nil {
-			return nil, err
-		}
-
-		return &Owner{
-			Login: userLogin,
-			Type:  UserOwner,
-			ID:    id,
-		}, nil
-	} else if orgLogin != "" {
-		id, err := c.OwnerID(orgLogin, OrgOwner)
-		if err != nil {
-			return nil, err
-		}
-
-		return &Owner{
-			Login: orgLogin,
-			Type:  OrgOwner,
+			Login: login,
+			Type:  ownerType,
 			ID:    id,
 		}, nil
 	}

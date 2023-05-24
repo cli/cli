@@ -27,13 +27,6 @@ func TestNewCmdCreateItem(t *testing.T) {
 			wantsErr:    true,
 			wantsErrMsg: "required flag(s) \"title\" not set",
 		},
-
-		{
-			name:        "user-and-org",
-			cli:         "--user monalisa --org github --title t",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
 		{
 			name:        "not-a-number",
 			cli:         "x --title t",
@@ -57,18 +50,10 @@ func TestNewCmdCreateItem(t *testing.T) {
 		},
 		{
 			name: "user",
-			cli:  "--user monalisa --title t",
+			cli:  "--login monalisa --title t",
 			wants: createItemOpts{
-				userOwner: "monalisa",
-				title:     "t",
-			},
-		},
-		{
-			name: "org",
-			cli:  "--org github --title t",
-			wants: createItemOpts{
-				orgOwner: "github",
-				title:    "t",
+				login: "monalisa",
+				title: "t",
 			},
 		},
 		{
@@ -118,8 +103,7 @@ func TestNewCmdCreateItem(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.title, gotOpts.title)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
@@ -134,7 +118,7 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -144,6 +128,12 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -195,9 +185,9 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 	config := createItemConfig{
 		tp: tableprinter.New(ios),
 		opts: createItemOpts{
-			title:     "a title",
-			userOwner: "monalisa",
-			number:    1,
+			title:  "a title",
+			login:  "monalisa",
+			number: 1,
 		},
 		client: client,
 	}
@@ -218,7 +208,7 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -228,6 +218,12 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 			"data": map[string]interface{}{
 				"organization": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -279,9 +275,9 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 	config := createItemConfig{
 		tp: tableprinter.New(ios),
 		opts: createItemOpts{
-			title:    "a title",
-			orgOwner: "github",
-			number:   1,
+			title:  "a title",
+			login:  "github",
+			number: 1,
 		},
 		client: client,
 	}
@@ -359,10 +355,10 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 	config := createItemConfig{
 		tp: tableprinter.New(ios),
 		opts: createItemOpts{
-			title:     "a title",
-			userOwner: "@me",
-			number:    1,
-			body:      "a body",
+			title:  "a title",
+			login:  "@me",
+			number: 1,
+			body:   "a body",
 		},
 		client: client,
 	}

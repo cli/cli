@@ -22,12 +22,6 @@ func TestNewCmdEdit(t *testing.T) {
 		wantsErrMsg string
 	}{
 		{
-			name:        "user-and-org",
-			cli:         "--user monalisa --org github",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
-		{
 			name:        "not-a-number",
 			cli:         "x",
 			wantsErr:    true,
@@ -61,19 +55,11 @@ func TestNewCmdEdit(t *testing.T) {
 			},
 		},
 		{
-			name: "user",
-			cli:  "--user monalisa --title t",
+			name: "login",
+			cli:  "--login monalisa --title t",
 			wants: editOpts{
-				userOwner: "monalisa",
-				title:     "t",
-			},
-		},
-		{
-			name: "org",
-			cli:  "--org github --title t",
-			wants: editOpts{
-				orgOwner: "github",
-				title:    "t",
+				login: "monalisa",
+				title: "t",
 			},
 		},
 		{
@@ -136,8 +122,7 @@ func TestNewCmdEdit(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.visibility, gotOpts.visibility)
 			assert.Equal(t, tt.wants.title, gotOpts.title)
 			assert.Equal(t, tt.wants.readme, gotOpts.readme)
@@ -156,7 +141,7 @@ func TestRunUpdate_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -166,6 +151,12 @@ func TestRunUpdate_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -222,7 +213,7 @@ func TestRunUpdate_User(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:           1,
-			userOwner:        "monalisa",
+			login:            "monalisa",
 			title:            "a new title",
 			shortDescription: "a new description",
 			visibility:       "PUBLIC",
@@ -247,7 +238,7 @@ func TestRunUpdate_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -257,6 +248,12 @@ func TestRunUpdate_Org(t *testing.T) {
 			"data": map[string]interface{}{
 				"organization": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -313,7 +310,7 @@ func TestRunUpdate_Org(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:           1,
-			orgOwner:         "github",
+			login:            "github",
 			title:            "a new title",
 			shortDescription: "a new description",
 			visibility:       "PUBLIC",
@@ -400,7 +397,7 @@ func TestRunUpdate_Me(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:           1,
-			userOwner:        "@me",
+			login:            "@me",
 			title:            "a new title",
 			shortDescription: "a new description",
 			visibility:       "PRIVATE",
@@ -425,7 +422,7 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -435,6 +432,12 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -490,9 +493,9 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 	config := editConfig{
 		tp: tableprinter.New(ios),
 		opts: editOpts{
-			number:    1,
-			userOwner: "monalisa",
-			title:     "another title",
+			number: 1,
+			login:  "monalisa",
+			title:  "another title",
 		},
 		client: client,
 	}

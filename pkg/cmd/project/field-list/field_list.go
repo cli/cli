@@ -14,11 +14,10 @@ import (
 )
 
 type listOpts struct {
-	limit     int
-	userOwner string
-	orgOwner  string
-	number    int32
-	format    string
+	limit  int
+	login  string
+	number int32
+	format string
 }
 
 type listConfig struct {
@@ -35,18 +34,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 		Use:   "field-list number",
 		Example: heredoc.Doc(`
 			# list fields in the current user's project "1"
-			gh project field-list 1 --user "@me"
+			gh project field-list 1 --login "@me"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--user` or `--org` may be used",
-				opts.userOwner != "",
-				opts.orgOwner != "",
-			); err != nil {
-				return err
-			}
-
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -76,8 +67,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 		},
 	}
 
-	listCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	listCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	listCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
 	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of fields to fetch")
 
@@ -85,7 +75,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 }
 
 func runList(config listConfig) error {
-	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.login)
 	if err != nil {
 		return err
 	}

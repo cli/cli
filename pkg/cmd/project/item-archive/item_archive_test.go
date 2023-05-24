@@ -28,12 +28,6 @@ func TestNewCmdarchiveItem(t *testing.T) {
 			wantsErrMsg: "required flag(s) \"id\" not set",
 		},
 		{
-			name:        "user-and-org",
-			cli:         "--user monalisa --org github --id 123",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
-		{
 			name:        "not-a-number",
 			cli:         "x --id 123",
 			wantsErr:    true,
@@ -56,18 +50,10 @@ func TestNewCmdarchiveItem(t *testing.T) {
 		},
 		{
 			name: "user",
-			cli:  "--user monalisa --id 123",
+			cli:  "--login monalisa --id 123",
 			wants: archiveItemOpts{
-				userOwner: "monalisa",
-				itemID:    "123",
-			},
-		},
-		{
-			name: "org",
-			cli:  "--org github  --id 123",
-			wants: archiveItemOpts{
-				orgOwner: "github",
-				itemID:   "123",
+				login:  "monalisa",
+				itemID: "123",
 			},
 		},
 		{
@@ -117,8 +103,7 @@ func TestNewCmdarchiveItem(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.itemID, gotOpts.itemID)
 			assert.Equal(t, tt.wants.undo, gotOpts.undo)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
@@ -135,7 +120,7 @@ func TestRunArchive_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -145,6 +130,12 @@ func TestRunArchive_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -196,9 +187,9 @@ func TestRunArchive_User(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			userOwner: "monalisa",
-			number:    1,
-			itemID:    "item ID",
+			login:  "monalisa",
+			number: 1,
+			itemID: "item ID",
 		},
 		client: client,
 	}
@@ -219,7 +210,7 @@ func TestRunArchive_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -229,6 +220,12 @@ func TestRunArchive_Org(t *testing.T) {
 			"data": map[string]interface{}{
 				"organization": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -280,9 +277,9 @@ func TestRunArchive_Org(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			orgOwner: "github",
-			number:   1,
-			itemID:   "item ID",
+			login:  "github",
+			number: 1,
+			itemID: "item ID",
 		},
 		client: client,
 	}
@@ -360,9 +357,9 @@ func TestRunArchive_Me(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			userOwner: "@me",
-			number:    1,
-			itemID:    "item ID",
+			login:  "@me",
+			number: 1,
+			itemID: "item ID",
 		},
 		client: client,
 	}
@@ -383,7 +380,7 @@ func TestRunArchive_User_Undo(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -393,6 +390,12 @@ func TestRunArchive_User_Undo(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -443,10 +446,10 @@ func TestRunArchive_User_Undo(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			userOwner: "monalisa",
-			number:    1,
-			itemID:    "item ID",
-			undo:      true,
+			login:  "monalisa",
+			number: 1,
+			itemID: "item ID",
+			undo:   true,
 		},
 		client: client,
 	}
@@ -467,7 +470,7 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -477,6 +480,12 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 			"data": map[string]interface{}{
 				"organization": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -528,10 +537,10 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			orgOwner: "github",
-			number:   1,
-			itemID:   "item ID",
-			undo:     true,
+			login:  "github",
+			number: 1,
+			itemID: "item ID",
+			undo:   true,
 		},
 		client: client,
 	}
@@ -608,10 +617,10 @@ func TestRunArchive_Me_Undo(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			userOwner: "@me",
-			number:    1,
-			itemID:    "item ID",
-			undo:      true,
+			login:  "@me",
+			number: 1,
+			itemID: "item ID",
+			undo:   true,
 		},
 		client: client,
 	}

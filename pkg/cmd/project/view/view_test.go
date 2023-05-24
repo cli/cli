@@ -23,12 +23,6 @@ func TestNewCmdview(t *testing.T) {
 		wantsErrMsg string
 	}{
 		{
-			name:        "user-and-org",
-			cli:         "--user monalisa --org github",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
-		{
 			name:        "not-a-number",
 			cli:         "x",
 			wantsErr:    true,
@@ -43,16 +37,9 @@ func TestNewCmdview(t *testing.T) {
 		},
 		{
 			name: "user",
-			cli:  "--user monalisa",
+			cli:  "--login monalisa",
 			wants: viewOpts{
-				userOwner: "monalisa",
-			},
-		},
-		{
-			name: "org",
-			cli:  "--org github",
-			wants: viewOpts{
-				orgOwner: "github",
+				login: "monalisa",
 			},
 		},
 		{
@@ -100,8 +87,7 @@ func TestNewCmdview(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 			assert.Equal(t, tt.wants.web, gotOpts.web)
 		})
@@ -128,35 +114,13 @@ func TestBuildURLViewer(t *testing.T) {
 
 	url, err := buildURL(viewConfig{
 		opts: viewOpts{
-			number:    1,
-			userOwner: "@me",
+			number: 1,
+			login:  "@me",
 		},
 		client: client,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "https://github.com/users/theviewer/projects/1", url)
-}
-
-func TestBuildURLUser(t *testing.T) {
-	url, err := buildURL(viewConfig{
-		opts: viewOpts{
-			userOwner: "monalisa",
-			number:    1,
-		},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "https://github.com/users/monalisa/projects/1", url)
-}
-
-func TestBuildURLOrg(t *testing.T) {
-	url, err := buildURL(viewConfig{
-		opts: viewOpts{
-			orgOwner: "github",
-			number:   1,
-		},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "https://github.com/orgs/github/projects/1", url)
 }
 
 func TestRunView_User(t *testing.T) {
@@ -167,7 +131,7 @@ func TestRunView_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -177,6 +141,12 @@ func TestRunView_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -214,8 +184,8 @@ func TestRunView_User(t *testing.T) {
 	config := viewConfig{
 		tp: tableprinter.New(ios),
 		opts: viewOpts{
-			userOwner: "monalisa",
-			number:    1,
+			login:  "monalisa",
+			number: 1,
 		},
 		io:     ios,
 		client: client,
@@ -278,8 +248,8 @@ func TestRunView_Viewer(t *testing.T) {
 	config := viewConfig{
 		tp: tableprinter.New(ios),
 		opts: viewOpts{
-			userOwner: "@me",
-			number:    1,
+			login:  "@me",
+			number: 1,
 		},
 		io:     ios,
 		client: client,
@@ -297,7 +267,7 @@ func TestRunView_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -307,6 +277,12 @@ func TestRunView_Org(t *testing.T) {
 			"data": map[string]interface{}{
 				"organization": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -344,8 +320,8 @@ func TestRunView_Org(t *testing.T) {
 	config := viewConfig{
 		tp: tableprinter.New(ios),
 		opts: viewOpts{
-			orgOwner: "github",
-			number:   1,
+			login:  "github",
+			number: 1,
 		},
 		io:     ios,
 		client: client,
@@ -355,21 +331,219 @@ func TestRunView_Org(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestRunViewWeb(t *testing.T) {
+func TestRunViewWeb_User(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgLogin.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(`
+		{"data":
+			{"user":
+				{
+					"login":"monalisa",
+					"projectV2": {
+						"number": 1,
+						"items": {
+							"totalCount": 10
+						},
+						"readme": null,
+						"fields": {
+							"nodes": [
+								{
+									"name": "Title"
+								}
+							]
+						}
+					}
+				}
+			}
+		}
+	`)
+
+	client := queries.NewTestClient()
 	buf := bytes.Buffer{}
 	config := viewConfig{
 		opts: viewOpts{
-			userOwner: "monalisa",
-			web:       true,
-			number:    8,
+			login:  "monalisa",
+			web:    true,
+			number: 8,
 		},
 		URLOpener: func(url string) error {
 			buf.WriteString(url)
 			return nil
 		},
+		client: client,
 	}
 
 	err := runView(config)
 	assert.NoError(t, err)
 	assert.Equal(t, "https://github.com/users/monalisa/projects/8", buf.String())
+}
+
+func TestRunViewWeb_Org(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get org ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgLogin.*",
+			"variables": map[string]interface{}{
+				"login": "github",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"organization": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(`
+		{"data":
+			{"organization":
+				{
+					"login":"github",
+					"projectV2": {
+						"number": 1,
+						"items": {
+							"totalCount": 10
+						},
+						"readme": null,
+						"fields": {
+							"nodes": [
+								{
+									"name": "Title"
+								}
+							]
+						}
+					}
+				}
+			}
+		}
+	`)
+
+	client := queries.NewTestClient()
+	buf := bytes.Buffer{}
+	config := viewConfig{
+		opts: viewOpts{
+			login:  "github",
+			web:    true,
+			number: 8,
+		},
+		URLOpener: func(url string) error {
+			buf.WriteString(url)
+			return nil
+		},
+		client: client,
+	}
+
+	err := runView(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://github.com/orgs/github/projects/8", buf.String())
+}
+
+func TestRunViewWeb_Me(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get viewer ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query Viewer.*",
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"id":    "an ID",
+					"login": "theviewer",
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(`
+		{"data":
+			{"user":
+				{
+					"login":"github",
+					"projectV2": {
+						"number": 1,
+						"items": {
+							"totalCount": 10
+						},
+						"readme": null,
+						"fields": {
+							"nodes": [
+								{
+									"name": "Title"
+								}
+							]
+						}
+					}
+				}
+			}
+		}
+	`)
+
+	client := queries.NewTestClient()
+	buf := bytes.Buffer{}
+	config := viewConfig{
+		opts: viewOpts{
+			login:  "@me",
+			web:    true,
+			number: 8,
+		},
+		URLOpener: func(url string) error {
+			buf.WriteString(url)
+			return nil
+		},
+		client: client,
+	}
+
+	err := runView(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://github.com/users/theviewer/projects/8", buf.String())
 }

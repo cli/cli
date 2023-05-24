@@ -28,12 +28,6 @@ func TestNewCmdCreateField(t *testing.T) {
 			wantsErrMsg: "required flag(s) \"data-type\", \"name\" not set",
 		},
 		{
-			name:        "user-and-org",
-			cli:         "--user monalisa --org github  --name n --data-type TEXT",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
-		{
 			name:        "not-a-number",
 			cli:         "x  --name n --data-type TEXT",
 			wantsErr:    true,
@@ -57,19 +51,9 @@ func TestNewCmdCreateField(t *testing.T) {
 		},
 		{
 			name: "user",
-			cli:  "--user monalisa --name n --data-type TEXT",
+			cli:  "--login monalisa --name n --data-type TEXT",
 			wants: createFieldOpts{
-				userOwner:           "monalisa",
-				name:                "n",
-				dataType:            "TEXT",
-				singleSelectOptions: []string{},
-			},
-		},
-		{
-			name: "org",
-			cli:  "--org github --name n --data-type TEXT",
-			wants: createFieldOpts{
-				orgOwner:            "github",
+				login:               "monalisa",
 				name:                "n",
 				dataType:            "TEXT",
 				singleSelectOptions: []string{},
@@ -125,8 +109,7 @@ func TestNewCmdCreateField(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.name, gotOpts.name)
 			assert.Equal(t, tt.wants.dataType, gotOpts.dataType)
 			assert.Equal(t, tt.wants.singleSelectOptions, gotOpts.singleSelectOptions)
@@ -144,7 +127,7 @@ func TestRunCreateField_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -154,6 +137,12 @@ func TestRunCreateField_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -205,10 +194,10 @@ func TestRunCreateField_User(t *testing.T) {
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
-			name:      "a name",
-			userOwner: "monalisa",
-			number:    1,
-			dataType:  "TEXT",
+			name:     "a name",
+			login:    "monalisa",
+			number:   1,
+			dataType: "TEXT",
 		},
 		client: client,
 	}
@@ -230,7 +219,7 @@ func TestRunCreateField_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -240,6 +229,12 @@ func TestRunCreateField_Org(t *testing.T) {
 			"data": map[string]interface{}{
 				"organization": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -292,7 +287,7 @@ func TestRunCreateField_Org(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			name:     "a name",
-			orgOwner: "github",
+			login:    "github",
 			number:   1,
 			dataType: "TEXT",
 		},
@@ -372,10 +367,10 @@ func TestRunCreateField_Me(t *testing.T) {
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
-			userOwner: "@me",
-			number:    1,
-			name:      "a name",
-			dataType:  "TEXT",
+			login:    "@me",
+			number:   1,
+			name:     "a name",
+			dataType: "TEXT",
 		},
 		client: client,
 	}
@@ -453,10 +448,10 @@ func TestRunCreateField_TEXT(t *testing.T) {
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
-			userOwner: "@me",
-			number:    1,
-			name:      "a name",
-			dataType:  "TEXT",
+			login:    "@me",
+			number:   1,
+			name:     "a name",
+			dataType: "TEXT",
 		},
 		client: client,
 	}
@@ -534,10 +529,10 @@ func TestRunCreateField_DATE(t *testing.T) {
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
-			userOwner: "@me",
-			number:    1,
-			name:      "a name",
-			dataType:  "DATE",
+			login:    "@me",
+			number:   1,
+			name:     "a name",
+			dataType: "DATE",
 		},
 		client: client,
 	}
@@ -615,10 +610,10 @@ func TestRunCreateField_NUMBER(t *testing.T) {
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
-			userOwner: "@me",
-			number:    1,
-			name:      "a name",
-			dataType:  "NUMBER",
+			login:    "@me",
+			number:   1,
+			name:     "a name",
+			dataType: "NUMBER",
 		},
 		client: client,
 	}

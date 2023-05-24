@@ -23,25 +23,11 @@ func TestNewCmdlist(t *testing.T) {
 		wantsErrMsg string
 	}{
 		{
-			name:        "user-and-org",
-			cli:         "--user monalisa --org github",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
-		{
-			name: "user",
-			cli:  "--user monalisa",
+			name: "login",
+			cli:  "--login monalisa",
 			wants: listOpts{
-				userOwner: "monalisa",
-				limit:     30,
-			},
-		},
-		{
-			name: "org",
-			cli:  "--org github",
-			wants: listOpts{
-				orgOwner: "github",
-				limit:    30,
+				login: "monalisa",
+				limit: 30,
 			},
 		},
 		{
@@ -98,8 +84,7 @@ func TestNewCmdlist(t *testing.T) {
 			}
 			assert.NoError(t, err)
 
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.closed, gotOpts.closed)
 			assert.Equal(t, tt.wants.web, gotOpts.web)
 			assert.Equal(t, tt.wants.limit, gotOpts.limit)
@@ -108,84 +93,62 @@ func TestNewCmdlist(t *testing.T) {
 	}
 }
 
-func TestBuildURLViewer(t *testing.T) {
-	defer gock.Off()
-
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		Reply(200).
-		JSON(`
-			{"data":
-				{"viewer":
-					{
-						"login":"theviewer"
-					}
-				}
-			}
-		`)
-
-	client := queries.NewTestClient()
-
-	url, err := buildURL(listConfig{
-		opts:   listOpts{},
-		client: client,
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "https://github.com/users/theviewer/projects", url)
-}
-
-func TestBuildURLUser(t *testing.T) {
-	url, err := buildURL(listConfig{
-		opts: listOpts{
-			userOwner: "monalisa",
-		},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "https://github.com/users/monalisa/projects", url)
-}
-
-func TestBuildURLOrg(t *testing.T) {
-	url, err := buildURL(listConfig{
-		opts: listOpts{
-			orgOwner: "github",
-		},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "https://github.com/orgs/github/projects", url)
-}
-
-func TestBuildURLWithClosed(t *testing.T) {
-	url, err := buildURL(listConfig{
-		opts: listOpts{
-			orgOwner: "github",
-			closed:   true,
-		},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "https://github.com/orgs/github/projects?query=is%3Aclosed", url)
-}
-
 func TestRunList(t *testing.T) {
 	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgLogin.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		Reply(200).
-		JSON(`
-			{"data":
-				{"user":
-					{
-						"login":"monalisa",
-						"projectsV2": {
-							"nodes": [
-								{"title": "Project 1", "shortDescription": "Short description 1", "url": "url1", "closed": false, "ID": "1"},
-								{"title": "Project 2", "shortDescription": "", "url": "url2", "closed": true, "ID": "2"}
-							]
-						}
-					}
-				}
-			}
-		`)
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"nodes": []interface{}{
+							map[string]interface{}{
+								"title":            "Project 1",
+								"shortDescription": "Short description 1",
+								"url":              "url1",
+								"closed":           false,
+								"ID":               "1",
+							},
+							map[string]interface{}{
+								"title":            "Project 2",
+								"shortDescription": "",
+								"url":              "url2",
+								"closed":           true,
+								"ID":               "2",
+							},
+						},
+					},
+				},
+			},
+		})
 
 	client := queries.NewTestClient()
 
@@ -193,7 +156,7 @@ func TestRunList(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			userOwner: "monalisa",
+			login: "monalisa",
 		},
 		client: client,
 	}
@@ -208,25 +171,52 @@ func TestRunList(t *testing.T) {
 
 func TestRunList_Me(t *testing.T) {
 	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get viewer ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query ViewerLogin.*",
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+		})
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		Reply(200).
-		JSON(`
-			{"data":
-				{"viewer":
-					{
-						"login":"monalisa",
-						"projectsV2": {
-							"nodes": [
-								{"title": "Project 1", "shortDescription": "Short description 1", "url": "url1", "closed": false, "ID": "1"},
-								{"title": "Project 2", "shortDescription": "", "url": "url2", "closed": true, "ID": "2"}
-							]
-						}
-					}
-				}
-			}
-		`)
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"nodes": []interface{}{
+							map[string]interface{}{
+								"title":            "Project 1",
+								"shortDescription": "Short description 1",
+								"url":              "url1",
+								"closed":           false,
+								"ID":               "1",
+							},
+							map[string]interface{}{
+								"title":            "Project 2",
+								"shortDescription": "",
+								"url":              "url2",
+								"closed":           true,
+								"ID":               "2",
+							},
+						},
+					},
+				},
+			},
+		})
 
 	client := queries.NewTestClient()
 
@@ -234,7 +224,7 @@ func TestRunList_Me(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			userOwner: "@me",
+			login: "@me",
 		},
 		client: client,
 	}
@@ -249,25 +239,52 @@ func TestRunList_Me(t *testing.T) {
 
 func TestRunListViewer(t *testing.T) {
 	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get viewer ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query ViewerLogin.*",
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+		})
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		Reply(200).
-		JSON(`
-			{"data":
-				{"viewer":
-					{
-						"login":"monalisa",
-						"projectsV2": {
-							"nodes": [
-								{"title": "Project 1", "shortDescription": "Short description 1", "url": "url1", "closed": false, "ID": "1"},
-								{"title": "Project 2", "shortDescription": "", "url": "url2", "closed": true, "ID": "2"}
-							]
-						}
-					}
-				}
-			}
-		`)
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"nodes": []interface{}{
+							map[string]interface{}{
+								"title":            "Project 1",
+								"shortDescription": "Short description 1",
+								"url":              "url1",
+								"closed":           false,
+								"ID":               "1",
+							},
+							map[string]interface{}{
+								"title":            "Project 2",
+								"shortDescription": "",
+								"url":              "url2",
+								"closed":           true,
+								"ID":               "2",
+							},
+						},
+					},
+				},
+			},
+		})
 
 	client := queries.NewTestClient()
 
@@ -288,25 +305,61 @@ func TestRunListViewer(t *testing.T) {
 
 func TestRunListOrg(t *testing.T) {
 	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get org ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgLogin.*",
+			"variables": map[string]interface{}{
+				"login": "github",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"organization": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
+				},
+			},
+		})
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		Reply(200).
-		JSON(`
-			{"data":
-				{"organization":
-					{
-						"login":"monalisa",
-						"projectsV2": {
-							"nodes": [
-								{"title": "Project 1", "shortDescription": "Short description 1", "url": "url1", "closed": false, "ID": "1"},
-								{"title": "Project 2", "shortDescription": "", "url": "url2", "closed": true, "ID": "2"}
-							]
-						}
-					}
-				}
-			}
-		`)
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"organization": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"nodes": []interface{}{
+							map[string]interface{}{
+								"title":            "Project 1",
+								"shortDescription": "Short description 1",
+								"url":              "url1",
+								"closed":           false,
+								"ID":               "1",
+							},
+							map[string]interface{}{
+								"title":            "Project 2",
+								"shortDescription": "",
+								"url":              "url2",
+								"closed":           true,
+								"ID":               "2",
+							},
+						},
+					},
+				},
+			},
+		})
 
 	client := queries.NewTestClient()
 
@@ -314,7 +367,7 @@ func TestRunListOrg(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			orgOwner: "github",
+			login: "github",
 		},
 		client: client,
 	}
@@ -329,23 +382,38 @@ func TestRunListOrg(t *testing.T) {
 
 func TestRunListEmpty(t *testing.T) {
 	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get viewer ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query Viewer.*",
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"id":    "an ID",
+					"login": "theviewer",
+				},
+			},
+		})
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		Reply(200).
-		JSON(`
-			{"data":
-				{"viewer":
-					{
-						"login":"monalisa",
-						"projectsV2": {
-							"nodes": []
-						}
-					}
-				}
-			}
-		`)
-
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"nodes": []interface{}{},
+					},
+				},
+			},
+		})
 	client := queries.NewTestClient()
 
 	ios, _, _, _ := iostreams.Test()
@@ -359,30 +427,65 @@ func TestRunListEmpty(t *testing.T) {
 	assert.EqualError(
 		t,
 		err,
-		"No projects found for me")
+		"No projects found for @me")
 }
 
 func TestRunListWithClosed(t *testing.T) {
 	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgLogin.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		Reply(200).
-		JSON(`
-			{"data":
-				{"user":
-					{
-						"login":"monalisa",
-						"projectsV2": {
-							"nodes": [
-								{"title": "Project 1", "shortDescription": "Short description 1", "url": "url1", "closed": false, "ID": "1"},
-								{"title": "Project 2", "shortDescription": "", "url": "url2", "closed": true, "ID": "2"}
-							]
-						}
-					}
-				}
-			}
-		`)
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"nodes": []interface{}{
+							map[string]interface{}{
+								"title":            "Project 1",
+								"shortDescription": "Short description 1",
+								"url":              "url1",
+								"closed":           false,
+								"ID":               "1",
+							},
+							map[string]interface{}{
+								"title":            "Project 2",
+								"shortDescription": "",
+								"url":              "url2",
+								"closed":           true,
+								"ID":               "2",
+							},
+						},
+					},
+				},
+			},
+		})
 
 	client := queries.NewTestClient()
 
@@ -390,8 +493,8 @@ func TestRunListWithClosed(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			userOwner: "monalisa",
-			closed:    true,
+			login:  "monalisa",
+			closed: true,
 		},
 		client: client,
 	}
@@ -404,20 +507,215 @@ func TestRunListWithClosed(t *testing.T) {
 		stdout.String())
 }
 
-func TestRunListWeb(t *testing.T) {
+func TestRunListWeb_User(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgLogin.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
 	buf := bytes.Buffer{}
 	config := listConfig{
 		opts: listOpts{
-			userOwner: "monalisa",
-			web:       true,
+			login: "monalisa",
+			web:   true,
 		},
 		URLOpener: func(url string) error {
 			buf.WriteString(url)
 			return nil
 		},
+		client: client,
 	}
 
 	err := runList(config)
 	assert.NoError(t, err)
 	assert.Equal(t, "https://github.com/users/monalisa/projects", buf.String())
+}
+
+func TestRunListWeb_Org(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get org ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgLogin.*",
+			"variables": map[string]interface{}{
+				"login": "github",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"organization": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+	buf := bytes.Buffer{}
+	config := listConfig{
+		opts: listOpts{
+			login: "github",
+			web:   true,
+		},
+		URLOpener: func(url string) error {
+			buf.WriteString(url)
+			return nil
+		},
+		client: client,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://github.com/orgs/github/projects", buf.String())
+}
+
+func TestRunListWeb_Me(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get viewer ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query Viewer.*",
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"id":    "an ID",
+					"login": "theviewer",
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+	buf := bytes.Buffer{}
+	config := listConfig{
+		opts: listOpts{
+			login: "@me",
+			web:   true,
+		},
+		URLOpener: func(url string) error {
+			buf.WriteString(url)
+			return nil
+		},
+		client: client,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://github.com/users/theviewer/projects", buf.String())
+}
+
+func TestRunListWeb_Empty(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get viewer ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query Viewer.*",
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"id":    "an ID",
+					"login": "theviewer",
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+	buf := bytes.Buffer{}
+	config := listConfig{
+		opts: listOpts{
+			web: true,
+		},
+		URLOpener: func(url string) error {
+			buf.WriteString(url)
+			return nil
+		},
+		client: client,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://github.com/users/theviewer/projects", buf.String())
+}
+
+func TestRunListWeb_Closed(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get viewer ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query Viewer.*",
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"id":    "an ID",
+					"login": "theviewer",
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+	buf := bytes.Buffer{}
+	config := listConfig{
+		opts: listOpts{
+			web:    true,
+			closed: true,
+		},
+		URLOpener: func(url string) error {
+			buf.WriteString(url)
+			return nil
+		},
+		client: client,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://github.com/users/theviewer/projects?query=is%3Aclosed", buf.String())
 }

@@ -26,18 +26,6 @@ func TestNewCmdCopy(t *testing.T) {
 			wantsErrMsg: "invalid number: x",
 		},
 		{
-			name:        "source-org-and-user",
-			cli:         "123 --title t --source-org github --source-user monalisa",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--source-user` or `--source-org` may be used",
-		},
-		{
-			name:        "target-org-and-user",
-			cli:         "123 --title t --target-org github --target-user monalisa",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--target-user` or `--target-org` may be used",
-		},
-		{
 			name: "title",
 			cli:  "--title t",
 			wants: copyOpts{
@@ -53,35 +41,19 @@ func TestNewCmdCopy(t *testing.T) {
 			},
 		},
 		{
-			name: "source-user",
-			cli:  "--source-user monalisa --title t",
+			name: "source-login",
+			cli:  "--source-login monalisa --title t",
 			wants: copyOpts{
-				sourceUserOwner: "monalisa",
-				title:           "t",
+				sourceLogin: "monalisa",
+				title:       "t",
 			},
 		},
 		{
-			name: "source-org",
-			cli:  "--source-org github --title t",
+			name: "target-login",
+			cli:  "--target-login monalisa --title t",
 			wants: copyOpts{
-				sourceOrgOwner: "github",
-				title:          "t",
-			},
-		},
-		{
-			name: "target-user",
-			cli:  "--target-user monalisa --title t",
-			wants: copyOpts{
-				targetUserOwner: "monalisa",
-				title:           "t",
-			},
-		},
-		{
-			name: "target-org",
-			cli:  "--target-org github --title t",
-			wants: copyOpts{
-				targetOrgOwner: "github",
-				title:          "t",
+				targetLogin: "monalisa",
+				title:       "t",
 			},
 		},
 		{
@@ -128,10 +100,8 @@ func TestNewCmdCopy(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.sourceUserOwner, gotOpts.sourceUserOwner)
-			assert.Equal(t, tt.wants.sourceOrgOwner, gotOpts.sourceOrgOwner)
-			assert.Equal(t, tt.wants.targetUserOwner, gotOpts.targetUserOwner)
-			assert.Equal(t, tt.wants.targetOrgOwner, gotOpts.targetOrgOwner)
+			assert.Equal(t, tt.wants.sourceLogin, gotOpts.sourceLogin)
+			assert.Equal(t, tt.wants.targetLogin, gotOpts.targetLogin)
 			assert.Equal(t, tt.wants.title, gotOpts.title)
 			assert.Equal(t, tt.wants.includeDraftIssues, gotOpts.includeDraftIssues)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
@@ -174,7 +144,7 @@ func TestRunCopy_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]string{
 				"login": "monalisa",
 			},
@@ -187,6 +157,12 @@ func TestRunCopy_User(t *testing.T) {
 					"login": "monalisa",
 				},
 			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
 		})
 
 	// get target user ID
@@ -194,7 +170,7 @@ func TestRunCopy_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]string{
 				"login": "monalisa",
 			},
@@ -205,6 +181,12 @@ func TestRunCopy_User(t *testing.T) {
 				"user": map[string]interface{}{
 					"id":    "an ID",
 					"login": "monalisa",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -236,10 +218,10 @@ func TestRunCopy_User(t *testing.T) {
 	config := copyConfig{
 		io: ios,
 		opts: copyOpts{
-			title:           "a title",
-			sourceUserOwner: "monalisa",
-			targetUserOwner: "monalisa",
-			number:          1,
+			title:       "a title",
+			sourceLogin: "monalisa",
+			targetLogin: "monalisa",
+			number:      1,
 		},
 		client: client,
 	}
@@ -283,7 +265,7 @@ func TestRunCopy_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]string{
 				"login": "github",
 			},
@@ -296,6 +278,12 @@ func TestRunCopy_Org(t *testing.T) {
 					"login": "github",
 				},
 			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
+				},
+			},
 		})
 
 	// get target source org ID
@@ -303,7 +291,7 @@ func TestRunCopy_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]string{
 				"login": "github",
 			},
@@ -314,6 +302,12 @@ func TestRunCopy_Org(t *testing.T) {
 				"organization": map[string]interface{}{
 					"id":    "an ID",
 					"login": "github",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -345,10 +339,10 @@ func TestRunCopy_Org(t *testing.T) {
 	config := copyConfig{
 		io: ios,
 		opts: copyOpts{
-			title:          "a title",
-			sourceOrgOwner: "github",
-			targetOrgOwner: "github",
-			number:         1,
+			title:       "a title",
+			sourceLogin: "github",
+			targetLogin: "github",
+			number:      1,
 		},
 		client: client,
 	}
@@ -447,10 +441,10 @@ func TestRunCopy_Me(t *testing.T) {
 	config := copyConfig{
 		io: ios,
 		opts: copyOpts{
-			title:           "a title",
-			sourceUserOwner: "@me",
-			targetUserOwner: "@me",
-			number:          1,
+			title:       "a title",
+			sourceLogin: "@me",
+			targetLogin: "@me",
+			number:      1,
 		},
 		client: client,
 	}

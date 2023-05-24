@@ -28,12 +28,6 @@ func TestNewCmdaddItem(t *testing.T) {
 			wantsErrMsg: "required flag(s) \"url\" not set",
 		},
 		{
-			name:        "user-and-org",
-			cli:         "--user monalisa --org github --url github.com/cli/cli",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
-		{
 			name:        "not-a-number",
 			cli:         "x --url github.com/cli/cli",
 			wantsErr:    true,
@@ -56,18 +50,10 @@ func TestNewCmdaddItem(t *testing.T) {
 		},
 		{
 			name: "user",
-			cli:  "--user monalisa --url github.com/cli/cli",
+			cli:  "--login monalisa --url github.com/cli/cli",
 			wants: addItemOpts{
-				userOwner: "monalisa",
-				itemURL:   "github.com/cli/cli",
-			},
-		},
-		{
-			name: "org",
-			cli:  "--org github --url github.com/cli/cli",
-			wants: addItemOpts{
-				orgOwner: "github",
-				itemURL:  "github.com/cli/cli",
+				login:   "monalisa",
+				itemURL: "github.com/cli/cli",
 			},
 		},
 		{
@@ -109,8 +95,7 @@ func TestNewCmdaddItem(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.itemURL, gotOpts.itemURL)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
@@ -126,7 +111,7 @@ func TestRunAddItem_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -136,6 +121,12 @@ func TestRunAddItem_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -207,9 +198,9 @@ func TestRunAddItem_User(t *testing.T) {
 	config := addItemConfig{
 		tp: tableprinter.New(ios),
 		opts: addItemOpts{
-			userOwner: "monalisa",
-			number:    1,
-			itemURL:   "https://github.com/cli/go-gh/issues/1",
+			login:   "monalisa",
+			number:  1,
+			itemURL: "https://github.com/cli/go-gh/issues/1",
 		},
 		client: client,
 	}
@@ -230,7 +221,7 @@ func TestRunAddItem_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -240,6 +231,12 @@ func TestRunAddItem_Org(t *testing.T) {
 			"data": map[string]interface{}{
 				"organization": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -311,9 +308,9 @@ func TestRunAddItem_Org(t *testing.T) {
 	config := addItemConfig{
 		tp: tableprinter.New(ios),
 		opts: addItemOpts{
-			orgOwner: "github",
-			number:   1,
-			itemURL:  "https://github.com/cli/go-gh/issues/1",
+			login:   "github",
+			number:  1,
+			itemURL: "https://github.com/cli/go-gh/issues/1",
 		},
 		client: client,
 	}
@@ -411,9 +408,9 @@ func TestRunAddItem_Me(t *testing.T) {
 	config := addItemConfig{
 		tp: tableprinter.New(ios),
 		opts: addItemOpts{
-			userOwner: "@me",
-			number:    1,
-			itemURL:   "https://github.com/cli/go-gh/pull/1",
+			login:   "@me",
+			number:  1,
+			itemURL: "https://github.com/cli/go-gh/pull/1",
 		},
 		client: client,
 	}

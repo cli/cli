@@ -18,10 +18,8 @@ type copyOpts struct {
 	number             int32
 	ownerID            string
 	projectID          string
-	sourceOrgOwner     string
-	sourceUserOwner    string
-	targetOrgOwner     string
-	targetUserOwner    string
+	sourceLogin        string
+	targetLogin        string
 	title              string
 	format             string
 }
@@ -44,27 +42,11 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 		Short: "Copy a project",
 		Use:   "copy [<number>]",
 		Example: heredoc.Doc(`
-			# copy project "1" owned by user monalisa to the github org
-			gh project copy 1 --source-user monalisa --target-org github --title "a new project"
+			# copy project "1" owned by source-login monalisa to target-login github
+			gh project copy 1 --source-login monalisa --target-login github --title "a new project"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--source-user` or `--source-org` may be used",
-				opts.sourceUserOwner != "",
-				opts.sourceOrgOwner != "",
-			); err != nil {
-				return err
-			}
-
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--target-user` or `--target-org` may be used",
-				opts.targetUserOwner != "",
-				opts.targetOrgOwner != "",
-			); err != nil {
-				return err
-			}
-
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -92,10 +74,8 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 		},
 	}
 
-	copyCmd.Flags().StringVar(&opts.sourceUserOwner, "source-user", "", "Login of the source user owner. Use \"@me\" for the current user.")
-	copyCmd.Flags().StringVar(&opts.sourceOrgOwner, "source-org", "", "Login of the source organization owner")
-	copyCmd.Flags().StringVar(&opts.targetUserOwner, "target-user", "", "Login of the target organization owner. Use \"@me\" for the current user.")
-	copyCmd.Flags().StringVar(&opts.targetOrgOwner, "target-org", "", "Login of the target organization owner")
+	copyCmd.Flags().StringVar(&opts.sourceLogin, "source-login", "", "Login of the source owner. Use \"@me\" for the current user.")
+	copyCmd.Flags().StringVar(&opts.targetLogin, "target-login", "", "Login of the target owner. Use \"@me\" for the current user.")
 	copyCmd.Flags().StringVar(&opts.title, "title", "", "Title for the new project")
 	copyCmd.Flags().BoolVar(&opts.includeDraftIssues, "drafts", false, "Include draft issues when copying")
 	cmdutil.StringEnumFlag(copyCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
@@ -106,23 +86,23 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 }
 
 func runCopy(config copyConfig) error {
-	sourceOwner, err := config.client.NewOwner(config.opts.sourceUserOwner, config.opts.sourceOrgOwner)
+	sourceLogin, err := config.client.NewOwner(config.opts.sourceLogin)
 	if err != nil {
 		return err
 	}
 
-	targetOwner, err := config.client.NewOwner(config.opts.targetUserOwner, config.opts.targetOrgOwner)
+	targetLogin, err := config.client.NewOwner(config.opts.targetLogin)
 	if err != nil {
 		return err
 	}
 
-	project, err := config.client.NewProject(sourceOwner, config.opts.number, false)
+	project, err := config.client.NewProject(sourceLogin, config.opts.number, false)
 	if err != nil {
 		return err
 	}
 
 	config.opts.projectID = project.ID
-	config.opts.ownerID = targetOwner.ID
+	config.opts.ownerID = targetLogin.ID
 
 	query, variables := copyArgs(config)
 

@@ -15,8 +15,7 @@ import (
 
 type closeOpts struct {
 	number    int32
-	userOwner string
-	orgOwner  string
+	login     string
 	reopen    bool
 	projectID string
 	format    string
@@ -41,22 +40,14 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 		Short: "Close a project",
 		Use:   "close [<number>]",
 		Example: heredoc.Doc(`
-			# close project "1" owned by user monalisa
-			gh project close 1 --user monalisa
+			# close project "1" owned by login monalisa
+			gh project close 1 --login monalisa
 
-			# reopen closed project "1" owned by org github
-			gh project close 1 --org github --undo
+			# reopen closed project "1" owned by login github
+			gh project close 1 --login github --undo
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--user` or `--org` may be used",
-				opts.userOwner != "",
-				opts.orgOwner != "",
-			); err != nil {
-				return err
-			}
-
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -84,8 +75,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 		},
 	}
 
-	closeCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	closeCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	closeCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
 	closeCmd.Flags().BoolVar(&opts.reopen, "undo", false, "Reopen a closed project")
 	closeCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'")
 
@@ -93,7 +83,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 }
 
 func runClose(config closeConfig) error {
-	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.login)
 	if err != nil {
 		return err
 	}

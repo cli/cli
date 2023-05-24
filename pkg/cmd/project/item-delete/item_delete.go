@@ -13,8 +13,7 @@ import (
 )
 
 type deleteItemOpts struct {
-	userOwner string
-	orgOwner  string
+	login     string
 	number    int32
 	itemID    string
 	projectID string
@@ -40,18 +39,10 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 		Use:   "item-delete [<number>]",
 		Example: heredoc.Doc(`
 			# delete an item in the current user's project "1"
-			gh project item-delete 1 --user "@me" --id <item-ID>
+			gh project item-delete 1 --login "@me" --id <item-ID>
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--user` or `--org` may be used",
-				opts.userOwner != "",
-				opts.orgOwner != "",
-			); err != nil {
-				return err
-			}
-
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -80,8 +71,7 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 		},
 	}
 
-	deleteItemCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	deleteItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	deleteItemCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
 	deleteItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to delete")
 	cmdutil.StringEnumFlag(deleteItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
@@ -91,7 +81,7 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 }
 
 func runDeleteItem(config deleteItemConfig) error {
-	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.login)
 	if err != nil {
 		return err
 	}

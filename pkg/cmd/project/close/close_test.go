@@ -21,12 +21,6 @@ func TestNewCmdClose(t *testing.T) {
 		wantsErrMsg string
 	}{
 		{
-			name:        "user-and-org",
-			cli:         "--user monalisa --org github",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
-		{
 			name:        "not-a-number",
 			cli:         "x",
 			wantsErr:    true,
@@ -40,17 +34,10 @@ func TestNewCmdClose(t *testing.T) {
 			},
 		},
 		{
-			name: "user",
-			cli:  "--user monalisa",
+			name: "login",
+			cli:  "--login monalisa",
 			wants: closeOpts{
-				userOwner: "monalisa",
-			},
-		},
-		{
-			name: "org",
-			cli:  "--org github",
-			wants: closeOpts{
-				orgOwner: "github",
+				login: "monalisa",
 			},
 		},
 		{
@@ -98,8 +85,7 @@ func TestNewCmdClose(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
 	}
@@ -114,7 +100,7 @@ func TestRunClose_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -124,6 +110,12 @@ func TestRunClose_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -181,8 +173,8 @@ func TestRunClose_User(t *testing.T) {
 	config := closeConfig{
 		io: ios,
 		opts: closeOpts{
-			number:    1,
-			userOwner: "monalisa",
+			number: 1,
+			login:  "monalisa",
 		},
 		client: client,
 	}
@@ -204,7 +196,7 @@ func TestRunClose_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -214,6 +206,12 @@ func TestRunClose_Org(t *testing.T) {
 			"data": map[string]interface{}{
 				"organization": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -269,8 +267,8 @@ func TestRunClose_Org(t *testing.T) {
 	config := closeConfig{
 		io: ios,
 		opts: closeOpts{
-			number:   1,
-			orgOwner: "github",
+			number: 1,
+			login:  "github",
 		},
 		client: client,
 	}
@@ -350,8 +348,8 @@ func TestRunClose_Me(t *testing.T) {
 	config := closeConfig{
 		io: ios,
 		opts: closeOpts{
-			number:    1,
-			userOwner: "@me",
+			number: 1,
+			login:  "@me",
 		},
 		client: client,
 	}
@@ -370,7 +368,7 @@ func TestRunClose_Reopen(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -380,6 +378,12 @@ func TestRunClose_Reopen(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -437,9 +441,9 @@ func TestRunClose_Reopen(t *testing.T) {
 	config := closeConfig{
 		io: ios,
 		opts: closeOpts{
-			number:    1,
-			userOwner: "monalisa",
-			reopen:    true,
+			number: 1,
+			login:  "monalisa",
+			reopen: true,
 		},
 		client: client,
 	}

@@ -16,9 +16,8 @@ import (
 type createFieldOpts struct {
 	name                string
 	dataType            string
-	userOwner           string
+	login               string
 	singleSelectOptions []string
-	orgOwner            string
 	number              int32
 	projectID           string
 	format              string
@@ -43,21 +42,13 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 		Use:   "field-create [<number>]",
 		Example: heredoc.Doc(`
 			# create a field in the current user's project "1"
-			gh project field-create 1 --user "@me" --name "new field" --data-type "text"
+			gh project field-create 1 --login "@me" --name "new field" --data-type "text"
 
-			# create a field with three options to select from
-			gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
+			# create a field with three options to select from for owner monalisa
+			gh project field-create 1 --login monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--user` or `--org` may be used",
-				opts.userOwner != "",
-				opts.orgOwner != "",
-			); err != nil {
-				return err
-			}
-
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -90,8 +81,7 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 		},
 	}
 
-	createFieldCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	createFieldCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	createFieldCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
 	createFieldCmd.Flags().StringVar(&opts.name, "name", "", "Name of the new field")
 	cmdutil.StringEnumFlag(createFieldCmd, &opts.dataType, "data-type", "", "", []string{"TEXT", "SINGLE_SELECT", "DATE", "NUMBER"}, "DataType of the new field.")
 	createFieldCmd.Flags().StringSliceVar(&opts.singleSelectOptions, "single-select-options", []string{}, "Options for SINGLE_SELECT data type")
@@ -104,7 +94,7 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 }
 
 func runCreateField(config createFieldConfig) error {
-	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.login)
 	if err != nil {
 		return err
 	}

@@ -15,8 +15,7 @@ import (
 type createItemOpts struct {
 	title     string
 	body      string
-	userOwner string
-	orgOwner  string
+	login     string
 	number    int32
 	projectID string
 	format    string
@@ -41,18 +40,10 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 		Use:   "item-create [<number>]",
 		Example: heredoc.Doc(`
 			# create a draft issue in the current user's project "1"
-			gh project item-create 1 --user "@me" --title "new item" --body "new item body"
+			gh project item-create 1 --login "@me" --title "new item" --body "new item body"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--user` or `--org` may be used",
-				opts.userOwner != "",
-				opts.orgOwner != "",
-			); err != nil {
-				return err
-			}
-
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -81,8 +72,7 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 		},
 	}
 
-	createItemCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	createItemCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	createItemCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
 	createItemCmd.Flags().StringVar(&opts.title, "title", "", "Title for the draft issue")
 	createItemCmd.Flags().StringVar(&opts.body, "body", "", "Body for the draft issue")
 	cmdutil.StringEnumFlag(createItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
@@ -93,7 +83,7 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 }
 
 func runCreateItem(config createItemConfig) error {
-	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.login)
 	if err != nil {
 		return err
 	}

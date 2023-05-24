@@ -13,8 +13,7 @@ import (
 )
 
 type deleteOpts struct {
-	userOwner string
-	orgOwner  string
+	login     string
 	number    int32
 	projectID string
 	format    string
@@ -39,18 +38,10 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 		Use:   "delete [<number>]",
 		Example: heredoc.Doc(`
 			# delete the current user's project "1"
-			gh project delete 1 --user "@me"
+			gh project delete 1 --login "@me"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--user` or `--org` may be used",
-				opts.userOwner != "",
-				opts.orgOwner != "",
-			); err != nil {
-				return err
-			}
-
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -79,15 +70,14 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 		},
 	}
 
-	deleteCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	deleteCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	deleteCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
 	cmdutil.StringEnumFlag(deleteCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	return deleteCmd
 }
 
 func runDelete(config deleteConfig) error {
-	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.login)
 	if err != nil {
 		return err
 	}

@@ -22,12 +22,6 @@ func TestNewCmdCreate(t *testing.T) {
 		wantsErrMsg string
 	}{
 		{
-			name:        "user-and-org",
-			cli:         "--title t --user monalisa --org github",
-			wantsErr:    true,
-			wantsErrMsg: "only one of `--user` or `--org` may be used",
-		},
-		{
 			name: "title",
 			cli:  "--title t",
 			wants: createOpts{
@@ -35,19 +29,11 @@ func TestNewCmdCreate(t *testing.T) {
 			},
 		},
 		{
-			name: "user",
-			cli:  "--title t --user monalisa",
+			name: "login",
+			cli:  "--title t --login monalisa",
 			wants: createOpts{
-				userOwner: "monalisa",
-				title:     "t",
-			},
-		},
-		{
-			name: "org",
-			cli:  "--title t --org github",
-			wants: createOpts{
-				orgOwner: "github",
-				title:    "t",
+				login: "monalisa",
+				title: "t",
 			},
 		},
 		{
@@ -89,8 +75,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.title, gotOpts.title)
-			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
-			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.login, gotOpts.login)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
 	}
@@ -105,7 +90,7 @@ func TestRunCreate_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]string{
 				"login": "monalisa",
 			},
@@ -116,6 +101,12 @@ func TestRunCreate_User(t *testing.T) {
 				"user": map[string]interface{}{
 					"id":    "an ID",
 					"login": "monalisa",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
 				},
 			},
 		})
@@ -145,8 +136,8 @@ func TestRunCreate_User(t *testing.T) {
 	config := createConfig{
 		tp: tableprinter.New(ios),
 		opts: createOpts{
-			title:     "a title",
-			userOwner: "monalisa",
+			title: "a title",
+			login: "monalisa",
 		},
 		client: client,
 	}
@@ -167,7 +158,7 @@ func TestRunCreate_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query OrgLogin.*",
+			"query": "query UserOrgLogin.*",
 			"variables": map[string]string{
 				"login": "github",
 			},
@@ -178,6 +169,12 @@ func TestRunCreate_Org(t *testing.T) {
 				"organization": map[string]interface{}{
 					"id":    "an ID",
 					"login": "github",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
 				},
 			},
 		})
@@ -206,8 +203,8 @@ func TestRunCreate_Org(t *testing.T) {
 	config := createConfig{
 		tp: tableprinter.New(ios),
 		opts: createOpts{
-			title:    "a title",
-			orgOwner: "github",
+			title: "a title",
+			login: "github",
 		},
 		client: client,
 	}
@@ -264,8 +261,8 @@ func TestRunCreate_Me(t *testing.T) {
 	config := createConfig{
 		tp: tableprinter.New(ios),
 		opts: createOpts{
-			title:     "a title",
-			userOwner: "@me",
+			title: "a title",
+			login: "@me",
 		},
 		client: client,
 	}

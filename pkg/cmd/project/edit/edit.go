@@ -15,8 +15,7 @@ import (
 
 type editOpts struct {
 	number           int32
-	userOwner        string
-	orgOwner         string
+	login            string
 	title            string
 	readme           string
 	visibility       string
@@ -47,18 +46,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(config editConfig) error) *cobra.C
 		Use:   "edit [<number>]",
 		Example: heredoc.Doc(`
 			# edit the title of monalisa's project "1"
-			gh project edit 1 --user monalisa --title "New title"
+			gh project edit 1 --login monalisa --title "New title"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--user` or `--org` may be used",
-				opts.userOwner != "",
-				opts.orgOwner != "",
-			); err != nil {
-				return err
-			}
-
 			client, err := queries.NewClient()
 			if err != nil {
 				return err
@@ -90,8 +81,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(config editConfig) error) *cobra.C
 		},
 	}
 
-	editCmd.Flags().StringVar(&opts.userOwner, "user", "", "Login of the user owner. Use \"@me\" for the current user.")
-	editCmd.Flags().StringVar(&opts.orgOwner, "org", "", "Login of the organization owner")
+	editCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
 	cmdutil.StringEnumFlag(editCmd, &opts.visibility, "visibility", "", "", []string{projectVisibilityPublic, projectVisibilityPrivate}, "Change project visibility")
 	editCmd.Flags().StringVar(&opts.title, "title", "", "New title for the project")
 	editCmd.Flags().StringVar(&opts.readme, "readme", "", "New readme for the project")
@@ -102,7 +92,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(config editConfig) error) *cobra.C
 }
 
 func runEdit(config editConfig) error {
-	owner, err := config.client.NewOwner(config.opts.userOwner, config.opts.orgOwner)
+	owner, err := config.client.NewOwner(config.opts.login)
 	if err != nil {
 		return err
 	}
