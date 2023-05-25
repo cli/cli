@@ -974,7 +974,7 @@ func Test_checkValidExtension(t *testing.T) {
 				manager: m,
 				extName: "gh-auth",
 			},
-			wantError: "\"auth\" matches the name of a built-in command",
+			wantError: "\"auth\" matches the name of a built-in command or alias",
 		},
 		{
 			name: "clashes with an installed extension",

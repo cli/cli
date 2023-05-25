@@ -21,7 +21,8 @@ type SetOptions struct {
 	Expansion string
 	IsShell   bool
 
-	existingCommand func(string) bool
+	validAliasName      func(string) bool
+	validAliasExpansion func(string) bool
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -59,6 +60,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			$ gh alias set homework 'issue list --assignee @me'
 			$ gh homework
 
+			$ gh alias set 'issue mine' 'issue list --mention @me'
+			$ gh issue mine
+
 			$ gh alias set epicsBy 'issue list --author="$1" --label="epic"'
 			$ gh epicsBy vilmibm  #=> gh issue list --author="vilmibm" --label="epic"
 
@@ -70,7 +74,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			opts.Name = args[0]
 			opts.Expansion = args[1]
 
-			opts.existingCommand = shared.ExistingCommandFunc(f, cmd)
+			opts.validAliasName = shared.ValidAliasNameFunc(cmd)
+			opts.validAliasExpansion = shared.ValidAliasExpansionFunc(cmd)
 
 			if runF != nil {
 				return runF(opts)
@@ -104,18 +109,16 @@ func setRun(opts *SetOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "- Adding alias for %s: %s\n", cs.Bold(opts.Name), cs.Bold(expansion))
 	}
 
-	isShell := opts.IsShell
-	if isShell && !strings.HasPrefix(expansion, "!") {
+	if opts.IsShell && !strings.HasPrefix(expansion, "!") {
 		expansion = "!" + expansion
 	}
-	isShell = strings.HasPrefix(expansion, "!")
 
-	if opts.existingCommand(opts.Name) {
-		return fmt.Errorf("could not create alias: %q is already a gh command", opts.Name)
+	if !opts.validAliasName(opts.Name) {
+		return fmt.Errorf("could not create alias: %q is already a gh command, extension, or alias", opts.Name)
 	}
 
-	if !isShell && !opts.existingCommand(expansion) {
-		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", expansion)
+	if !opts.validAliasExpansion(expansion) {
+		return fmt.Errorf("could not create alias: %s does not correspond to a gh command, extension, or alias", expansion)
 	}
 
 	successMsg := fmt.Sprintf("%s Added alias.", cs.SuccessIcon())
