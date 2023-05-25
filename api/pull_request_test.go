@@ -60,6 +60,11 @@ func TestChecksStatus_SummarisingCheckRuns(t *testing.T) {
 			expectedChecksStatus: PullRequestChecksStatus{Pending: 1, Total: 1},
 		},
 		{
+			name:                 "COMPLETED with no conclusion is treated as Pending",
+			payload:              singleCheckRunWithStatus("COMPLETED"),
+			expectedChecksStatus: PullRequestChecksStatus{Pending: 1, Total: 1},
+		},
+		{
 			name:                 "COMPLETED / STARTUP_FAILURE is treated as Pending",
 			payload:              singleCompletedCheckRunWithConclusion("STARTUP_FAILURE"),
 			expectedChecksStatus: PullRequestChecksStatus{Pending: 1, Total: 1},
@@ -218,6 +223,120 @@ func TestChecksStatus_SummarisingCheckRunsAndStatusContexts(t *testing.T) {
 		Failing: 1,
 		Passing: 1,
 		Total:   3,
+	}
+	require.Equal(t, expectedChecksStatus, pr.ChecksStatus())
+}
+
+func TestChecksStatus_SummarisingCheckRunAndStatusContextCountsByState(t *testing.T) {
+	t.Parallel()
+
+	payload := `
+	{ "statusCheckRollup": { "nodes": [{ "commit": {
+		"statusCheckRollup": {
+			"contexts": {
+				"checkRunCount": 14,
+				"checkRunCountsByState": [
+					{
+						"state": "ACTION_REQUIRED",
+						"count": 1
+					},
+					{
+						"state": "CANCELLED",
+						"count": 1
+					},
+					{
+						"state": "COMPLETED",
+						"count": 1
+					},
+					{
+						"state": "FAILURE",
+						"count": 1
+					},
+					{
+						"state": "IN_PROGRESS",
+						"count": 1
+					},
+					{
+						"state": "NEUTRAL",
+						"count": 1
+					},
+					{
+						"state": "PENDING",
+						"count": 1
+					},
+					{
+						"state": "QUEUED",
+						"count": 1
+					},
+					{
+						"state": "SKIPPED",
+						"count": 1
+					},
+					{
+						"state": "STALE",
+						"count": 1
+					},
+					{
+						"state": "STARTUP_FAILURE",
+						"count": 1
+					},
+					{
+						"state": "SUCCESS",
+						"count": 1
+					},
+					{
+						"state": "TIMED_OUT",
+						"count": 1
+					},
+					{
+						"state": "WAITING",
+						"count": 1
+					},
+					{
+						"state": "AnUnrecognizedStateJustForThisTest",
+						"count": 1
+					}
+				],
+				"statusContextCount": 6,
+				"statusContextCountsByState": [
+					{
+						"state": "EXPECTED",
+						"count": 1
+					},
+					{
+						"state": "ERROR",
+						"count": 1
+					},
+					{
+						"state": "FAILURE",
+						"count": 1
+					},
+					{
+						"state": "PENDING",
+						"count": 1
+					},
+					{
+						"state": "SUCCESS",
+						"count": 1
+					},
+					{
+						"state": "AnUnrecognizedStateJustForThisTest",
+						"count": 1
+					}
+				]
+			}
+		}
+	} }] } }
+	`
+
+	var pr PullRequest
+	require.NoError(t, json.Unmarshal([]byte(payload), &pr))
+
+	expectedChecksStatus := PullRequestChecksStatus{
+		Pending: 11,
+		Failing: 6,
+		Passing: 4,
+		Total:   20,
 	}
 	require.Equal(t, expectedChecksStatus, pr.ChecksStatus())
 }
