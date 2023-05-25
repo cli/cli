@@ -1,6 +1,6 @@
-GitHub takes the security of our software products and services seriously, including the open source code repositories managed through our GitHub organizations, such as [cli](https://github.com/cli).
-
-If you believe you have found a security vulnerability in GitHub CLI, you can report it to us in one of two ways:
+GitHub ให้ความสำคัญกับความ ปลอดภัยของผลิตภัณฑ์ซอฟต์แวร์และบริการของเราอย่างจริงจัง รวมถึงที่เก็บรหัสโอเพ่นซอร์สที่จัดการผ่านองค์กร GitHub ของเรา เช่น[cli] (https://github.com/cli)
+...
+หากคุณเชื่อว่าคุณพบช่องโหว่ด้านความปลอดภัยใน GitHub CLI คุณสามารถรายงานให้เราทราบได้สองวิธี:
 
 * Report it to this repository directly using [private vulnerability reporting][]. Such reports are not eligible for a bounty reward.
 
