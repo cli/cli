@@ -1,6 +1,7 @@
 package build
 
 import (
+	"os"
 	"runtime/debug"
 )
 
@@ -16,4 +17,7 @@ func init() {
 			Version = info.Main.Version
 		}
 	}
+
+	// https://github.com/gdamore/tcell/commit/2f889d79bd61b1fd2f43372529975a65b792a7ae
+	_ = os.Setenv("TCELL_MINIMIZE", "1")
 }
