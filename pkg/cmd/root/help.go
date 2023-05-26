@@ -104,7 +104,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	cs := f.IOStreams.ColorScheme()
 
 	if help, _ := flags.GetBool("help"); !help && !command.Runnable() && len(flags.Args()) > 0 {
-		nestedSuggestFunc(f.IOStreams.ErrOut, command, strings.Join(flags.Args(), " "))
+		nestedSuggestFunc(f.IOStreams.ErrOut, command, flags.Args()[0])
 		hasFailed = true
 		return
 	}
