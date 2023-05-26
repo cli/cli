@@ -732,7 +732,8 @@ func TestManager_UpgradeExtension_GitExtension_Pinned(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
 	ext := exts[0]
-	ext.isPinned = true
+	pinnedTrue := true
+	ext.isPinned = &pinnedTrue
 	ext.latestVersion = "new version"
 
 	err = m.upgradeExtension(ext, false)
