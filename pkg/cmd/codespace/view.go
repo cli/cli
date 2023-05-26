@@ -2,8 +2,9 @@ package codespace
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strconv"
-	"strings"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -34,6 +35,10 @@ func newViewCmd(app *App) *cobra.Command {
 }
 
 func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions, exporter cmdutil.Exporter) error {
+	if codespaceName := os.Getenv("CODESPACES_NAME"); os.Getenv("CODESPACES") == "true" && codespaceName != "" {
+		opts.selector.codespaceName = codespaceName
+	}
+
 	selectedCodespace, err := opts.selector.Select(ctx)
 	if err != nil {
 		return err
@@ -70,15 +75,12 @@ func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions, exporter cmd
 		{"Repository", c.Repository.FullName},
 		{"Branch", c.GitStatus.Ref},
 		{"Devcontainer Path", c.DevContainerPath},
-		{"Commits Ahead", strconv.Itoa(c.GitStatus.Ahead)},
-		{"Commits Behind", strconv.Itoa(c.GitStatus.Behind)},
-		{"Has Uncommitted Changes", strconv.FormatBool(c.GitStatus.HasUncommittedChanges)},
-		{"Has Unpushed Changes", strconv.FormatBool(c.GitStatus.HasUnpushedChanges)},
+		{"Git Status", formatGitStatus(c)},
 		{"Created At", c.CreatedAt},
 		{"Last Used At", c.LastUsedAt},
 		{"Idle Timeout Minutes", strconv.Itoa(c.IdleTimeoutMinutes)},
+		{"Retention Period Days", strconv.Itoa(c.RetentionPeriodMinutes / 1440)},
 		{"Retention Expires At", c.RetentionExpiresAt},
-		{"Recent Folders", strings.Join(c.RecentFolders, ", ")},
 	}
 
 	for _, field := range fields {
@@ -96,4 +98,9 @@ func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions, exporter cmd
 	}
 
 	return nil
+}
+
+func formatGitStatus(codespace codespace) string {
+	branchWithGitStatus := codespace.branchWithGitStatus()
+	return fmt.Sprintf("%s \u25cf %d\u2193 %d\u2191", branchWithGitStatus, codespace.GitStatus.Behind, codespace.GitStatus.Ahead)
 }

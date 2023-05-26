@@ -196,6 +196,7 @@ type Codespace struct {
 	Prebuild                       bool                `json:"prebuild"`
 	Location                       string              `json:"location"`
 	IdleTimeoutMinutes             int                 `json:"idle_timeout_minutes"`
+	RetentionPeriodMinutes         int                 `json:"retention_period_minutes"`
 	RetentionExpiresAt             string              `json:"retention_expires_at"`
 	RecentFolders                  []string            `json:"recent_folders"`
 	BillableOwner                  User                `json:"billable_owner"`
