@@ -35,7 +35,8 @@ func newViewCmd(app *App) *cobra.Command {
 }
 
 func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions, exporter cmdutil.Exporter) error {
-	if codespaceName := os.Getenv("CODESPACES_NAME"); os.Getenv("CODESPACES") == "true" && codespaceName != "" {
+	// If we are in a codespace, show the details for it
+	if codespaceName := os.Getenv("CODESPACE_NAME"); os.Getenv("CODESPACES") == "true" && codespaceName != "" {
 		opts.selector.codespaceName = codespaceName
 	}
 
@@ -66,21 +67,12 @@ func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions, exporter cmd
 		{"Name", formattedName},
 		{"Display Name", c.DisplayName},
 		{"State", c.State},
-		{"Machine Name", c.Machine.Name},
-		{"Machine Display Name", c.Machine.DisplayName},
-		{"Prebuild", strconv.FormatBool(c.Prebuild)},
-		{"Owner", c.Owner.Login},
-		{"BillableOwner", c.BillableOwner.Login},
-		{"Location", c.Location},
-		{"Repository", c.Repository.FullName},
-		{"Branch", c.GitStatus.Ref},
-		{"Devcontainer Path", c.DevContainerPath},
 		{"Git Status", formatGitStatus(c)},
+		{"Devcontainer Path", c.DevContainerPath},
+		{"Machine Display Name", c.Machine.DisplayName},
 		{"Created At", c.CreatedAt},
-		{"Last Used At", c.LastUsedAt},
-		{"Idle Timeout Minutes", strconv.Itoa(c.IdleTimeoutMinutes)},
-		{"Retention Period Days", strconv.Itoa(c.RetentionPeriodMinutes / 1440)},
-		{"Retention Expires At", c.RetentionExpiresAt},
+		{"Idle Timeout", strconv.Itoa(c.IdleTimeoutMinutes) + " minutes"},
+		{"Retention Period", strconv.Itoa(c.RetentionPeriodMinutes/1440) + " days"},
 	}
 
 	for _, field := range fields {

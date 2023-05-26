@@ -269,6 +269,7 @@ var ViewCodespaceFields = []string{
 	"createdAt",
 	"lastUsedAt",
 	"idleTimeoutMinutes",
+	"retentionPeriodDays",
 	"retentionExpiresAt",
 	"recentFolders",
 }
@@ -287,6 +288,8 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 			data[f] = c.Machine.Name
 		case "machineDisplayName":
 			data[f] = c.Machine.DisplayName
+		case "retentionPeriodDays":
+			data[f] = c.RetentionPeriodMinutes / 1440
 		case "gitStatus":
 			data[f] = map[string]interface{}{
 				"ref":                   c.GitStatus.Ref,
