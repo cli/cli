@@ -192,6 +192,13 @@ type Codespace struct {
 	PendingOperationDisabledReason string              `json:"pending_operation_disabled_reason"`
 	IdleTimeoutNotice              string              `json:"idle_timeout_notice"`
 	WebURL                         string              `json:"web_url"`
+	DevContainerPath               string              `json:"devcontainer_path"`
+	Prebuild                       bool                `json:"prebuild"`
+	Location                       string              `json:"location"`
+	IdleTimeoutMinutes             int                 `json:"idle_timeout_minutes"`
+	RetentionExpiresAt             string              `json:"retention_expires_at"`
+	RecentFolders                  []string            `json:"recent_folders"`
+	BillableOwner                  User                `json:"billable_owner"`
 }
 
 type CodespaceGitStatus struct {
@@ -230,8 +237,8 @@ type CodespaceConnection struct {
 	HostPublicKeys []string `json:"hostPublicKeys"`
 }
 
-// CodespaceFields is the list of exportable fields for a codespace.
-var CodespaceFields = []string{
+// ListCodespaceFields is the list of exportable fields for a codespace when using the `gh cs list` command.
+var ListCodespaceFields = []string{
 	"displayName",
 	"name",
 	"owner",
@@ -242,6 +249,27 @@ var CodespaceFields = []string{
 	"lastUsedAt",
 	"machineName",
 	"vscsTarget",
+}
+
+// ViewCodespaceFields is the list of exportable fields for a codespace when using the `gh cs view` command.
+var ViewCodespaceFields = []string{
+	"name",
+	"displayName",
+	"state",
+	"owner",
+	"billableOwner",
+	"location",
+	"repository",
+	"gitStatus",
+	"devcontainerPath",
+	"machineName",
+	"machineDisplayName",
+	"prebuild",
+	"createdAt",
+	"lastUsedAt",
+	"idleTimeoutMinutes",
+	"retentionExpiresAt",
+	"recentFolders",
 }
 
 func (c *Codespace) ExportData(fields []string) map[string]interface{} {
@@ -256,11 +284,15 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 			data[f] = c.Repository.FullName
 		case "machineName":
 			data[f] = c.Machine.Name
+		case "machineDisplayName":
+			data[f] = c.Machine.DisplayName
 		case "gitStatus":
 			data[f] = map[string]interface{}{
 				"ref":                   c.GitStatus.Ref,
 				"hasUnpushedChanges":    c.GitStatus.HasUnpushedChanges,
 				"hasUncommittedChanges": c.GitStatus.HasUncommittedChanges,
+				"ahead":                 c.GitStatus.Ahead,
+				"behind":                c.GitStatus.Behind,
 			}
 		case "vscsTarget":
 			if c.VSCSTarget != "" && c.VSCSTarget != VSCSTargetProduction {
