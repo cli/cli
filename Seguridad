@@ -1,0 +1,80 @@
+Documentación de GitHub
+Seguridad de código/Análisis de secretos/Acerca del examen de secretos
+Acerca del examen de secretos
+En este artículo
+Acerca de secret scanning
+Acerca de alertas de examen de secretos para asociados
+Acerca de alertas de examen de secretos para usuarios
+Información adicional
+GitHub Enterprise Cloud escanea repositorios para encontrar tipos conocidos de secretos para prevenir el uso fraudulento de aquellos que se confirmaron por accidente.
+
+Alertas de examen de secretos para asociados se ejecuta de forma automática en repositorios públicos para notificar a los proveedores de servicio sobre secretos filtrados en GitHub.com.
+
+Alertas de examen de secretos para usuarios están disponibles de forma gratuita en todos los repositorios públicos. Las organizaciones que usan GitHub Enterprise Cloud con una licencia de GitHub Advanced Security también pueden habilitar alertas de examen de secretos para usuarios en sus repositorios privados e internos. Para más información, consulta "Acerca del examen de secretos" y "Acerca de GitHub Advanced Security".
+
+Acerca de secret scanning
+Si tu proyecto se comunica con un servicio externo, puedes utilizar un token o llave privada para autenticación. Los tokens y llaves privadas son ejemplos de secretos que puede emitir un proveedor de servicios. Si registras un secreto en un repositorio, cualquiera que tenga acceso de lectura al mismo puede utilizarlo para acceder al servicio externo con tus privilegios. Te recomendamos que almacenes los secretos en una ubicación dedicada y segura fuera del repositorio de tu proyecto.
+
+Secret scanning examinará todo el historial de Git en todas las ramas presentes en el repositorio de GitHub para buscar secretos, incluso si el repositorio está archivado. Secret scanning también analiza las descripciones de problemas y los comentarios de los secretos.
+
+Secret scanning también examina los títulos, las descripciones y los comentarios, en incidencias históricas abiertas y cerradas, e informa de secretos filtrados como alertas en GitHub. Se envía una notificación al asociado correspondiente cuando se detecta un patrón de asociado histórico.
+
+Nota: Para los repositorios que pertenecen a organizaciones, Secret scanning se encuentra actualmente en versión beta y está sujeto a cambios.
+
+Secret scanning está disponible en GitHub.com de dos formas:
+
+Alertas de examen de secretos para asociados. Se ejecuta automáticamente en todos los repositorios públicos y los paquetes npm públicos. Cualquier secuencia que coincida con los patrones que hayan proporcionado los socios del escaneo de secretos se reportarán directamente al socio relevante. Para más información, consulta la sección "Acerca de alertas de examen de secretos para asociados" a continuación.
+
+Alertas de examen de secretos para usuarios. Puedes habilitar y configurar exámenes adicionales en repositorios que pertenezcan a organizaciones que usan GitHub Enterprise Cloud para cualquier repositorio público (gratuito) y para repositorios privados e internos cuando tienes una licencia de GitHub Advanced Security.
+
+Las cadenas que coinciden con los patrones proporcionados por los asociados de exámenes de secretos, por otros proveedores de servicios o definidos por usted o su organización, se notifican como alertas en la pestaña Seguridad de los repositorios. Si una cadena en un repositorio público coincide con un patrón de asociado, también se notificará a dicho asociado. Para más información, consulta la sección "Acerca de alertas de examen de secretos para usuarios" a continuación.
+
+Puedes auditar las acciones realizadas en respuesta a las alertas de secret scanning mediante las herramientas de GitHub. Para obtener más información, vea «Auditoría de alertas de seguridad».
+
+Los proveedores de servicio pueden asociarse con GitHub para proporcionar sus formatos de secreto para el escaneo de los mismos. Para información sobre nuestro programa de asociados, consulta "Programa asociado del escaneo de secretos".
+
+También puede habilitar secret scanning como protección de inserción para un repositorio o una organización. Al habilitar esta característica, secret scanning impide que los colaboradores inserten código con un secreto detectado. Para continuar, los colaboradores deben quitar los secretos de la inserción o, si es necesario, omitir la protección. Los administradores también pueden especificar un vínculo personalizado que se muestra al colaborador cuando se bloquea una inserción; el vínculo puede incluir recursos específicos de la organización para ayudar a los colaboradores. Para obtener más información, consulta "Protección de inserciones con análisis de secretos".
+
+Acerca de alertas de examen de secretos para asociados
+Cuando haces público a un repositorio o cuando subes cambios a un repositorio público, GitHub Enterprise Cloud siempre escanea el código en busca de los secretos que coinciden con los patrones socios. También se examinan los paquetes públicos del registro npm. Secret scanning también analiza las descripciones de problemas y los comentarios de los secretos. Si secret scanning detecta un posible secreto, lo notificamos al proveedor del servicio que emitió el secreto. El proveedor de servicios valida la secuencia y luego decide si debería revocar el secreto, emitir uno nuevo o contactarte directamente. Su acción dependerá de los riesgos asociados contigo o con ellos. Para obtener más información, vea «Patrones de análisis de secretos».
+
+No puedes cambiar la configuración de secret scanning de los patrones de asociados en los repositorios públicos.
+
+Acerca de alertas de examen de secretos para usuarios
+Alertas de examen de secretos para usuarios está disponible de forma gratuita en todos los repositorios públicos, y para repositorios privados e internos que pertenecen a organizaciones que usan GitHub Enterprise Cloud con una licencia para GitHub Advanced Security. Al habilitar secret scanning para un repositorio, GitHub examina el código de los patrones que coinciden con los secretos usados por muchos proveedores de servicios. Cuando se completa el examen, GitHub envía una alerta por correo electrónico a los propietarios de la empresa y de la organización, incluso si no se encontraron secretos.
+
+Secret scanning también analiza las descripciones de problemas y los comentarios de los secretos. Cuando se filtra un secreto admitido, GitHub Enterprise Cloud genera una alerta de secret scanning. GitHub también ejecutará periódicamente un examen completo de historial de Git del contenido existente en los reposicións GitHub Advanced Security donde secret scanning está habilitado, y enviará notificaciones de alerta conforme a lo establecido en la configuración de notificación de alertas de secret scanning Para más información, consulta los patrones de "Secretos admitidos para alertas de usuario".
+
+Nota: Secret scanning para las descripciones del problema y los comentarios se encuentra en versión beta pública y está sujeto a cambios.
+
+Si es administrador del repositorio, puede habilitar alertas de examen de secretos para usuarios para cualquier repositorio , incluidos los repositorios archivados. Los propietarios de la organización también pueden habilitar alertas de examen de secretos para usuarios para todos los repositorios o para todos los repositorios dentro de una organización. Para obtener más información, vea «Administración de la configuración de seguridad y análisis para el repositorio» y «Administrar la configuración de seguridad y análisis de su organización».
+
+También se puede definir patrones personalizados de secret scanning para un repositorio, una organización o una empresa. Para obtener más información, vea «Definición de patrones personalizados para el examen de secretos».
+
+GitHub almacena los secretos detectados mediante cifrado simétrico, tanto en tránsito como en reposo.
+
+Acceso a alertas de examen de secretos
+Cuando el secret scanning se habilita en un repositorio o se insertan confirmaciones en un repositorio con secret scanning habilitado, GitHub examina el contenido de esas confirmaciones en busca de secretos que coincidan con los patrones definidos por proveedores de servicios y con cualquier patrón personalizado en la empresa, organización o repositorio. Secret scanning también analiza las descripciones de problemas y los comentarios de los secretos. GitHub también ejecuta un examen de todo el contenido histórico de losrepositorios que tengan habilitado secret scanning cuando se agrega o actualiza un nuevo patrón de asociado o patrón personalizado.
+
+Si el secret scanning detecta un secreto, GitHub generará una alerta.
+
+GitHub envía una alerta por correo electrónico a los administradores del repositorio y a los propietarios de la organización. Recibirás una alerta si estás viendo el repositorio , si has habilitado notificaciones para las alertas de seguridad o para toda la actividad en el repositorio , y si, en la configuración de notificación, has seleccionado recibir notificaciones por correo electrónico para los repositorios que estás viendo.
+Si el colaborador que ha confirmado el secreto no ignora el repositorio, GitHub también enviará una alerta por correo electrónico al colaborador. Los correos electrónicos contienen un vínculo a la alerta de secret scanning relacionada. El autor de la confirmación puede entonces ver la alerta en el repositorio y resolverla.
+GitHub muestra una alerta en la pestaña Seguridad del repositorio.
+Para obtener más información sobre el visionado y la resolución de alertas de examen de secretos, consulta "Administración de alertas del examen de secretos".
+
+Para obtener más información sobre cómo configurar notificaciones para alertas de examen de secretos, consulta "Configuración de notificaciones para alertas de análisis de secretos".
+
+Los administradores de repositorio y propietarios de las organizaciones pueden otorgar a los usuarios y equipos acceso a alertas de examen de secretos. Para obtener más información, vea «Administración de la configuración de seguridad y análisis para el repositorio».
+
+Puede usar la información general sobre seguridad para obtener una vista de nivel de la organización de los repositorios en los que secret scanning se ha habilitado y las alertas detectadas. Para obtener más información, vea «Información general sobre seguridad».
+
+También puedes usar la API REST para supervisar los resultados de secret scanning de todos los repositorios. Para obtener más información sobre los puntos de conexión de API, consulta "Análisis de secretos".
+
+Información adicional
+"Asegurar tu repositorio"
+"Mantener tu cuenta y tus datos seguros"
+"Administrar secretos cifrados para tus codespaces"
+"Configuración del acceso a registros privados para Dependabot"
+"Secretos cifrados"
+Ayuda y soporte técnico
