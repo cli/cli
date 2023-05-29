@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
@@ -63,6 +64,7 @@ type CreateOptions struct {
 	Interactive        bool
 	IncludeAllBranches bool
 	AddReadme          bool
+	CopyUrl            bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -196,6 +198,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.DisableWiki, "disable-wiki", false, "Disable wiki in the new repository")
 	cmd.Flags().BoolVar(&opts.IncludeAllBranches, "include-all-branches", false, "Include all branches from template repository")
 	cmd.Flags().BoolVar(&opts.AddReadme, "add-readme", false, "Add a README file to the new repository")
+	cmd.Flags().BoolVar(&opts.CopyUrl, "copy-url", false, "Copy the repository url to your clipboard")
 
 	// deprecated flags
 	cmd.Flags().BoolP("confirm", "y", false, "Skip the confirmation prompt")
@@ -406,6 +409,12 @@ func createFromScratch(opts *CreateOptions) error {
 		}
 	}
 
+	if opts.CopyUrl {
+		err := clipboard.WriteAll(repo.URL)
+		if err != nil {
+			fmt.Println("Cannot copy URL to clipboard.\n", err)
+		}
+	}
 	return nil
 }
 
