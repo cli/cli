@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -23,6 +24,7 @@ type createConfig struct {
 	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   createOpts
+	io     *iostreams.IOStreams
 }
 
 type createProjectMutation struct {
@@ -51,6 +53,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 				tp:     t,
 				client: client,
 				opts:   opts,
+				io:     f.IOStreams,
 			}
 
 			// allow testing of the command without actually running it
@@ -105,12 +108,8 @@ func createArgs(config createConfig) (*createProjectMutation, map[string]interfa
 }
 
 func printResults(config createConfig, project queries.Project) error {
-	// using table printer here for consistency in case it ends up being needed in the future
-	config.tp.AddField(fmt.Sprintf("Created project '%s'", project.Title))
-	config.tp.EndRow()
-	config.tp.AddField(project.URL)
-	config.tp.EndRow()
-	return config.tp.Render()
+	_, err := fmt.Fprintf(config.io.Out, "Created project '%s'\n%s\n", project.Title, project.URL)
+	return err
 }
 
 func printJSON(config createConfig, project queries.Project) error {

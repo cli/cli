@@ -190,6 +190,7 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 			number: 1,
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreateItem(config)
@@ -280,6 +281,7 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 			number: 1,
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreateItem(config)
@@ -361,6 +363,7 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 			body:   "a body",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreateItem(config)

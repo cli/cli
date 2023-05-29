@@ -203,6 +203,7 @@ func TestRunAddItem_User(t *testing.T) {
 			itemURL: "https://github.com/cli/go-gh/issues/1",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runAddItem(config)
@@ -313,6 +314,7 @@ func TestRunAddItem_Org(t *testing.T) {
 			itemURL: "https://github.com/cli/go-gh/issues/1",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runAddItem(config)
@@ -413,6 +415,7 @@ func TestRunAddItem_Me(t *testing.T) {
 			itemURL: "https://github.com/cli/go-gh/pull/1",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runAddItem(config)

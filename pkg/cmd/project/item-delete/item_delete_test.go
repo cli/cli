@@ -180,6 +180,7 @@ func TestRunDelete_User(t *testing.T) {
 			itemID: "item ID",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runDeleteItem(config)
@@ -268,6 +269,7 @@ func TestRunDelete_Org(t *testing.T) {
 			itemID: "item ID",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runDeleteItem(config)
@@ -346,6 +348,7 @@ func TestRunDelete_Me(t *testing.T) {
 			itemID: "item ID",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runDeleteItem(config)

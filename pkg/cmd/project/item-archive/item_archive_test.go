@@ -192,6 +192,7 @@ func TestRunArchive_User(t *testing.T) {
 			itemID: "item ID",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runArchiveItem(config)
@@ -282,6 +283,7 @@ func TestRunArchive_Org(t *testing.T) {
 			itemID: "item ID",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runArchiveItem(config)
@@ -362,6 +364,7 @@ func TestRunArchive_Me(t *testing.T) {
 			itemID: "item ID",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runArchiveItem(config)
@@ -452,6 +455,7 @@ func TestRunArchive_User_Undo(t *testing.T) {
 			undo:   true,
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runArchiveItem(config)
@@ -543,6 +547,7 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 			undo:   true,
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runArchiveItem(config)
@@ -623,6 +628,7 @@ func TestRunArchive_Me_Undo(t *testing.T) {
 			undo:   true,
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runArchiveItem(config)

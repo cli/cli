@@ -220,6 +220,7 @@ func TestRunUpdate_User(t *testing.T) {
 			readme:           "a new readme",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runEdit(config)
@@ -317,6 +318,7 @@ func TestRunUpdate_Org(t *testing.T) {
 			readme:           "a new readme",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runEdit(config)
@@ -404,6 +406,7 @@ func TestRunUpdate_Me(t *testing.T) {
 			readme:           "a new readme",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runEdit(config)
@@ -498,6 +501,7 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 			title:  "another title",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runEdit(config)

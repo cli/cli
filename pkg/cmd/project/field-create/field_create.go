@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -27,6 +28,7 @@ type createFieldConfig struct {
 	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   createFieldOpts
+	io     *iostreams.IOStreams
 }
 
 type createProjectV2FieldMutation struct {
@@ -67,6 +69,7 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 				tp:     t,
 				client: client,
 				opts:   opts,
+				io:     f.IOStreams,
 			}
 
 			if config.opts.dataType == "SINGLE_SELECT" && len(config.opts.singleSelectOptions) == 0 {
@@ -143,10 +146,8 @@ func createFieldArgs(config createFieldConfig) (*createProjectV2FieldMutation, m
 }
 
 func printResults(config createFieldConfig, field queries.ProjectField) error {
-	// using table printer here for consistency in case it ends up being needed in the future
-	config.tp.AddField("Created field")
-	config.tp.EndRow()
-	return config.tp.Render()
+	_, err := fmt.Fprintf(config.io.Out, "Created field\n")
+	return err
 }
 
 func printJSON(config createFieldConfig, field queries.ProjectField) error {

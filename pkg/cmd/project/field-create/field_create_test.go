@@ -200,6 +200,7 @@ func TestRunCreateField_User(t *testing.T) {
 			dataType: "TEXT",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreateField(config)
@@ -292,6 +293,7 @@ func TestRunCreateField_Org(t *testing.T) {
 			dataType: "TEXT",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreateField(config)
@@ -373,6 +375,7 @@ func TestRunCreateField_Me(t *testing.T) {
 			dataType: "TEXT",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreateField(config)
@@ -454,6 +457,7 @@ func TestRunCreateField_TEXT(t *testing.T) {
 			dataType: "TEXT",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreateField(config)
@@ -535,6 +539,7 @@ func TestRunCreateField_DATE(t *testing.T) {
 			dataType: "DATE",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreateField(config)
@@ -616,6 +621,7 @@ func TestRunCreateField_NUMBER(t *testing.T) {
 			dataType: "NUMBER",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreateField(config)

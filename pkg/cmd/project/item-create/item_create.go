@@ -1,6 +1,7 @@
 package itemcreate
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
@@ -8,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +27,7 @@ type createItemConfig struct {
 	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   createItemOpts
+	io     *iostreams.IOStreams
 }
 
 type createProjectDraftItemMutation struct {
@@ -62,6 +65,7 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 				tp:     t,
 				client: client,
 				opts:   opts,
+				io:     f.IOStreams,
 			}
 
 			// allow testing of the command without actually running it
@@ -119,10 +123,8 @@ func createDraftIssueArgs(config createItemConfig) (*createProjectDraftItemMutat
 }
 
 func printResults(config createItemConfig, item queries.ProjectItem) error {
-	// using table printer here for consistency in case it ends up being needed in the future
-	config.tp.AddField("Created item")
-	config.tp.EndRow()
-	return config.tp.Render()
+	_, err := fmt.Fprintf(config.io.Out, "Created item\n")
+	return err
 }
 
 func printJSON(config createItemConfig, item queries.ProjectItem) error {

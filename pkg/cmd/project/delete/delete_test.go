@@ -165,6 +165,7 @@ func TestRunDelete_User(t *testing.T) {
 			number: 1,
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runDelete(config)
@@ -255,6 +256,7 @@ func TestRunDelete_Org(t *testing.T) {
 			number: 1,
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runDelete(config)
@@ -335,6 +337,7 @@ func TestRunDelete_Me(t *testing.T) {
 			number: 1,
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runDelete(config)

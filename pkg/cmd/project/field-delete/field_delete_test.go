@@ -106,6 +106,7 @@ func TestRunDeleteField(t *testing.T) {
 			fieldID: "an ID",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runDeleteField(config)

@@ -140,6 +140,7 @@ func TestRunCreate_User(t *testing.T) {
 			login: "monalisa",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreate(config)
@@ -207,6 +208,7 @@ func TestRunCreate_Org(t *testing.T) {
 			login: "github",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreate(config)
@@ -265,6 +267,7 @@ func TestRunCreate_Me(t *testing.T) {
 			login: "@me",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runCreate(config)

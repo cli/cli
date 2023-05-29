@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -24,6 +25,7 @@ type deleteItemConfig struct {
 	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   deleteItemOpts
+	io     *iostreams.IOStreams
 }
 
 type deleteProjectItemMutation struct {
@@ -61,6 +63,7 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 				tp:     t,
 				client: client,
 				opts:   opts,
+				io:     f.IOStreams,
 			}
 
 			// allow testing of the command without actually running it
@@ -116,10 +119,8 @@ func deleteItemArgs(config deleteItemConfig) (*deleteProjectItemMutation, map[st
 }
 
 func printResults(config deleteItemConfig) error {
-	// using table printer here for consistency in case it ends up being needed in the future
-	config.tp.AddField("Deleted item")
-	config.tp.EndRow()
-	return config.tp.Render()
+	_, err := fmt.Fprintf(config.io.Out, "Deleted item\n")
+	return err
 }
 
 func printJSON(config deleteItemConfig, ID githubv4.ID) error {

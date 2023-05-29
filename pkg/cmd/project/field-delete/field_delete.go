@@ -1,10 +1,13 @@
 package fielddelete
 
 import (
+	"fmt"
+
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -18,6 +21,7 @@ type deleteFieldConfig struct {
 	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   deleteFieldOpts
+	io     *iostreams.IOStreams
 }
 
 type deleteProjectV2FieldMutation struct {
@@ -42,6 +46,7 @@ func NewCmdDeleteField(f *cmdutil.Factory, runF func(config deleteFieldConfig) e
 				tp:     t,
 				client: client,
 				opts:   opts,
+				io:     f.IOStreams,
 			}
 
 			// allow testing of the command without actually running it
@@ -84,10 +89,8 @@ func deleteFieldArgs(config deleteFieldConfig) (*deleteProjectV2FieldMutation, m
 }
 
 func printResults(config deleteFieldConfig, field queries.ProjectField) error {
-	// using table printer here for consistency in case it ends up being needed in the future
-	config.tp.AddField("Deleted field")
-	config.tp.EndRow()
-	return config.tp.Render()
+	_, err := fmt.Fprintf(config.io.Out, "Deleted field\n")
+	return err
 }
 
 func printJSON(config deleteFieldConfig, field queries.ProjectField) error {

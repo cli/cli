@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -28,6 +29,7 @@ type editConfig struct {
 	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   editOpts
+	io     *iostreams.IOStreams
 }
 
 type updateProjectMutation struct {
@@ -68,6 +70,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(config editConfig) error) *cobra.C
 				tp:     t,
 				client: client,
 				opts:   opts,
+				io:     f.IOStreams,
 			}
 
 			if config.opts.title == "" && config.opts.shortDescription == "" && config.opts.readme == "" && config.opts.visibility == "" {
@@ -145,10 +148,8 @@ func editArgs(config editConfig) (*updateProjectMutation, map[string]interface{}
 }
 
 func printResults(config editConfig, project queries.Project) error {
-	// using table printer here for consistency in case it ends up being needed in the future
-	config.tp.AddField(fmt.Sprintf("Updated project %s", project.URL))
-	config.tp.EndRow()
-	return config.tp.Render()
+	_, err := fmt.Fprintf(config.io.Out, "Updated project %s\n", project.URL)
+	return err
 }
 
 func printJSON(config editConfig, project queries.Project) error {
