@@ -974,10 +974,11 @@ type Owner struct {
 }
 
 // NewOwner creates a project Owner
+// If canPrompt is false, login is required as we cannot prompt for it.
 // If login is not empty, it is used to lookup the project owner.
 // If login is empty empty, interative mode is used to select an owner.
 // from the current viewer and their organizations
-func (c *Client) NewOwner(login string) (*Owner, error) {
+func (c *Client) NewOwner(canPrompt bool, login string) (*Owner, error) {
 	if login != "" {
 		id, ownerType, err := c.OwnerIDAndType(login)
 		if err != nil {
@@ -989,6 +990,10 @@ func (c *Client) NewOwner(login string) (*Owner, error) {
 			Type:  ownerType,
 			ID:    id,
 		}, nil
+	}
+
+	if !canPrompt {
+		return nil, fmt.Errorf("login is required when not running interactively")
 	}
 
 	logins, err := c.userOrgLogins()
@@ -1015,10 +1020,11 @@ func (c *Client) NewOwner(login string) (*Owner, error) {
 }
 
 // NewProject creates a project based on the owner and project number
+// if canPrompt is false, number is required as we cannot prompt for it
 // if number is 0 it will prompt the user to select a project interactively
 // otherwise it will make a request to get the project by number
 // set `fields“ to true to get the project's field data
-func (c *Client) NewProject(o *Owner, number int32, fields bool) (*Project, error) {
+func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool) (*Project, error) {
 	if number != 0 {
 		variables := map[string]interface{}{
 			"number":      githubv4.Int(number),
@@ -1047,6 +1053,10 @@ func (c *Client) NewProject(o *Owner, number int32, fields bool) (*Project, erro
 			return &query.Owner.Project, err
 		}
 		return nil, errors.New("unknown owner type")
+	}
+
+	if !canPrompt {
+		return nil, fmt.Errorf("project number is required when not running interactively")
 	}
 
 	projects, _, err := c.Projects(o.Login, o.Type, 0, fields)

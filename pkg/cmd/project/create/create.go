@@ -74,7 +74,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 }
 
 func runCreate(config createConfig) error {
-	owner, err := config.client.NewOwner(config.opts.login)
+	canPrompt := config.io.CanPrompt()
+	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
 	if err != nil {
 		return err
 	}

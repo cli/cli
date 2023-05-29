@@ -98,12 +98,13 @@ func runView(config viewConfig) error {
 		return nil
 	}
 
-	owner, err := config.client.NewOwner(config.opts.login)
+	canPrompt := config.io.CanPrompt()
+	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
 	if err != nil {
 		return err
 	}
 
-	project, err := config.client.NewProject(owner, config.opts.number, true)
+	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, true)
 	if err != nil {
 		return err
 	}

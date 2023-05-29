@@ -159,6 +159,7 @@ func TestRunList(t *testing.T) {
 			login: "monalisa",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runList(config)
@@ -227,6 +228,7 @@ func TestRunList_Me(t *testing.T) {
 			login: "@me",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runList(config)
@@ -293,6 +295,7 @@ func TestRunListViewer(t *testing.T) {
 		tp:     tableprinter.New(ios),
 		opts:   listOpts{},
 		client: client,
+		io:     ios,
 	}
 
 	err := runList(config)
@@ -370,6 +373,7 @@ func TestRunListOrg(t *testing.T) {
 			login: "github",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runList(config)
@@ -421,6 +425,7 @@ func TestRunListEmpty(t *testing.T) {
 		tp:     tableprinter.New(ios),
 		opts:   listOpts{},
 		client: client,
+		io:     ios,
 	}
 
 	err := runList(config)
@@ -497,6 +502,7 @@ func TestRunListWithClosed(t *testing.T) {
 			closed: true,
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runList(config)

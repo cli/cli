@@ -86,17 +86,18 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 }
 
 func runCopy(config copyConfig) error {
-	sourceLogin, err := config.client.NewOwner(config.opts.sourceLogin)
+	canPrompt := config.io.CanPrompt()
+	sourceLogin, err := config.client.NewOwner(canPrompt, config.opts.sourceLogin)
 	if err != nil {
 		return err
 	}
 
-	targetLogin, err := config.client.NewOwner(config.opts.targetLogin)
+	targetLogin, err := config.client.NewOwner(canPrompt, config.opts.targetLogin)
 	if err != nil {
 		return err
 	}
 
-	project, err := config.client.NewProject(sourceLogin, config.opts.number, false)
+	project, err := config.client.NewProject(canPrompt, sourceLogin, config.opts.number, false)
 	if err != nil {
 		return err
 	}

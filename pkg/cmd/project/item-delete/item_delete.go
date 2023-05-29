@@ -84,12 +84,13 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 }
 
 func runDeleteItem(config deleteItemConfig) error {
-	owner, err := config.client.NewOwner(config.opts.login)
+	canPrompt := config.io.CanPrompt()
+	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
 	if err != nil {
 		return err
 	}
 
-	project, err := config.client.NewProject(owner, config.opts.number, false)
+	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, false)
 	if err != nil {
 		return err
 	}

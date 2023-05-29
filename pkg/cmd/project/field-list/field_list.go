@@ -75,14 +75,16 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 }
 
 func runList(config listConfig) error {
-	owner, err := config.client.NewOwner(config.opts.login)
+	canPrompt := config.io.CanPrompt()
+	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
 	if err != nil {
 		return err
 	}
 
 	// no need to fetch the project if we already have the number
 	if config.opts.number == 0 {
-		project, err := config.client.NewProject(owner, config.opts.number, false)
+		canPrompt := config.io.CanPrompt()
+		project, err := config.client.NewProject(canPrompt, owner, config.opts.number, false)
 		if err != nil {
 			return err
 		}

@@ -171,6 +171,7 @@ func TestRunList_User(t *testing.T) {
 			login:  "monalisa",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runList(config)
@@ -263,6 +264,7 @@ func TestRunList_Org(t *testing.T) {
 			login:  "github",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runList(config)
@@ -345,6 +347,7 @@ func TestRunList_Me(t *testing.T) {
 			login:  "@me",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runList(config)
@@ -411,6 +414,7 @@ func TestRunList_Empty(t *testing.T) {
 			login:  "@me",
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runList(config)

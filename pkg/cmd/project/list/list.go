@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +25,7 @@ type listConfig struct {
 	client    *queries.Client
 	opts      listOpts
 	URLOpener func(string) error
+	io        *iostreams.IOStreams
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.Command {
@@ -53,6 +55,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 				client:    client,
 				opts:      opts,
 				URLOpener: URLOpener,
+				io:        f.IOStreams,
 			}
 
 			// allow testing of the command without actually running it
@@ -88,7 +91,8 @@ func runList(config listConfig) error {
 	if config.opts.login == "" {
 		config.opts.login = "@me"
 	}
-	owner, err := config.client.NewOwner(config.opts.login)
+	canPrompt := config.io.CanPrompt()
+	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
 	if err != nil {
 		return err
 	}
