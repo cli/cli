@@ -147,6 +147,10 @@ func createFieldArgs(config createFieldConfig) (*createProjectV2FieldMutation, m
 }
 
 func printResults(config createFieldConfig, field queries.ProjectField) error {
+	if !config.io.IsStdoutTTY() {
+		return nil
+	}
+
 	_, err := fmt.Fprintf(config.io.Out, "Created field\n")
 	return err
 }

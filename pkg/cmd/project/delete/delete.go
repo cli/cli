@@ -120,6 +120,10 @@ func deleteItemArgs(config deleteConfig) (*deleteProjectMutation, map[string]int
 }
 
 func printResults(config deleteConfig) error {
+	if !config.io.IsStdoutTTY() {
+		return nil
+	}
+
 	_, err := fmt.Fprintf(config.io.Out, "Deleted project\n")
 	return err
 }

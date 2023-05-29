@@ -195,6 +195,7 @@ func TestRunAddItem_User(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := addItemConfig{
 		tp: tableprinter.New(ios),
 		opts: addItemOpts{
@@ -306,6 +307,7 @@ func TestRunAddItem_Org(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := addItemConfig{
 		tp: tableprinter.New(ios),
 		opts: addItemOpts{
@@ -407,6 +409,7 @@ func TestRunAddItem_Me(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := addItemConfig{
 		tp: tableprinter.New(ios),
 		opts: addItemOpts{

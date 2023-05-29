@@ -109,6 +109,10 @@ func createArgs(config createConfig) (*createProjectMutation, map[string]interfa
 }
 
 func printResults(config createConfig, project queries.Project) error {
+	if !config.io.IsStdoutTTY() {
+		return nil
+	}
+
 	_, err := fmt.Fprintf(config.io.Out, "Created project '%s'\n%s\n", project.Title, project.URL)
 	return err
 }

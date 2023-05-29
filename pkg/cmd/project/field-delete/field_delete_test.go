@@ -100,6 +100,7 @@ func TestRunDeleteField(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := deleteFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: deleteFieldOpts{

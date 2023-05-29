@@ -149,6 +149,10 @@ func editArgs(config editConfig) (*updateProjectMutation, map[string]interface{}
 }
 
 func printResults(config editConfig, project queries.Project) error {
+	if !config.io.IsStdoutTTY() {
+		return nil
+	}
+
 	_, err := fmt.Fprintf(config.io.Out, "Updated project %s\n", project.URL)
 	return err
 }

@@ -172,6 +172,7 @@ func TestRunDelete_User(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := deleteItemConfig{
 		tp: tableprinter.New(ios),
 		opts: deleteItemOpts{
@@ -261,6 +262,7 @@ func TestRunDelete_Org(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := deleteItemConfig{
 		tp: tableprinter.New(ios),
 		opts: deleteItemOpts{
@@ -340,6 +342,7 @@ func TestRunDelete_Me(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := deleteItemConfig{
 		tp: tableprinter.New(ios),
 		opts: deleteItemOpts{

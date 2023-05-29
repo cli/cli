@@ -184,6 +184,7 @@ func TestRunArchive_User(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
@@ -275,6 +276,7 @@ func TestRunArchive_Org(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
@@ -356,6 +358,7 @@ func TestRunArchive_Me(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
@@ -446,6 +449,7 @@ func TestRunArchive_User_Undo(t *testing.T) {
 
 	client := queries.NewTestClient()
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
@@ -538,6 +542,7 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
@@ -619,6 +624,7 @@ func TestRunArchive_Me_Undo(t *testing.T) {
 
 	client := queries.NewTestClient()
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{

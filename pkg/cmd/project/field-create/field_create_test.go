@@ -191,6 +191,7 @@ func TestRunCreateField_User(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
@@ -284,6 +285,7 @@ func TestRunCreateField_Org(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
@@ -366,6 +368,7 @@ func TestRunCreateField_Me(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
@@ -448,6 +451,7 @@ func TestRunCreateField_TEXT(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
@@ -530,6 +534,7 @@ func TestRunCreateField_DATE(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
@@ -612,6 +617,7 @@ func TestRunCreateField_NUMBER(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{

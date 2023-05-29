@@ -133,6 +133,7 @@ func TestRunCreate_User(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := createConfig{
 		tp: tableprinter.New(ios),
 		opts: createOpts{
@@ -201,6 +202,7 @@ func TestRunCreate_Org(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := createConfig{
 		tp: tableprinter.New(ios),
 		opts: createOpts{
@@ -260,6 +262,7 @@ func TestRunCreate_Me(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := createConfig{
 		tp: tableprinter.New(ios),
 		opts: createOpts{

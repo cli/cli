@@ -209,6 +209,7 @@ func TestRunUpdate_User(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := editConfig{
 		tp: tableprinter.New(ios),
 		opts: editOpts{
@@ -307,6 +308,7 @@ func TestRunUpdate_Org(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := editConfig{
 		tp: tableprinter.New(ios),
 		opts: editOpts{
@@ -395,6 +397,7 @@ func TestRunUpdate_Me(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := editConfig{
 		tp: tableprinter.New(ios),
 		opts: editOpts{
@@ -493,6 +496,7 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 	client := queries.NewTestClient()
 
 	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
 	config := editConfig{
 		tp: tableprinter.New(ios),
 		opts: editOpts{

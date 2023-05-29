@@ -124,6 +124,10 @@ func createDraftIssueArgs(config createItemConfig) (*createProjectDraftItemMutat
 }
 
 func printResults(config createItemConfig, item queries.ProjectItem) error {
+	if !config.io.IsStdoutTTY() {
+		return nil
+	}
+
 	_, err := fmt.Fprintf(config.io.Out, "Created item\n")
 	return err
 }

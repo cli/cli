@@ -89,6 +89,10 @@ func deleteFieldArgs(config deleteFieldConfig) (*deleteProjectV2FieldMutation, m
 }
 
 func printResults(config deleteFieldConfig, field queries.ProjectField) error {
+	if !config.io.IsStdoutTTY() {
+		return nil
+	}
+
 	_, err := fmt.Fprintf(config.io.Out, "Deleted field\n")
 	return err
 }

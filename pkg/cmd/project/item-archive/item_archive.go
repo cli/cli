@@ -150,7 +150,10 @@ func unarchiveItemArgs(config archiveItemConfig, itemID string) (*unarchiveProje
 }
 
 func printResults(config archiveItemConfig, item queries.ProjectItem) error {
-	// using table printer here for consistency in case it ends up being needed in the future
+	if !config.io.IsStdoutTTY() {
+		return nil
+	}
+
 	if config.opts.undo {
 		_, err := fmt.Fprintf(config.io.Out, "Unarchived item\n")
 		return err
