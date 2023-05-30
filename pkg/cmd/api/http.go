@@ -103,21 +103,8 @@ func addQuery(path string, params map[string]interface{}) string {
 	}
 
 	query := url.Values{}
-	for key, value := range params {
-		switch v := value.(type) {
-		case string:
-			query.Add(key, v)
-		case []byte:
-			query.Add(key, string(v))
-		case nil:
-			query.Add(key, "")
-		case int:
-			query.Add(key, fmt.Sprintf("%d", v))
-		case bool:
-			query.Add(key, fmt.Sprintf("%v", v))
-		default:
-			panic(fmt.Sprintf("unknown type %v", v))
-		}
+	if err := addQueryParam(query, "", params); err != nil {
+		panic(err)
 	}
 
 	sep := "?"
@@ -125,4 +112,31 @@ func addQuery(path string, params map[string]interface{}) string {
 		sep = "&"
 	}
 	return path + sep + query.Encode()
+}
+
+func addQueryParam(query url.Values, key string, value interface{}) error {
+	switch v := value.(type) {
+	case string:
+		query.Add(key, v)
+	case []byte:
+		query.Add(key, string(v))
+	case nil:
+		query.Add(key, "")
+	case int:
+		query.Add(key, fmt.Sprintf("%d", v))
+	case bool:
+		query.Add(key, fmt.Sprintf("%v", v))
+	case map[string]interface{}:
+		for subkey, value := range v {
+			// support for nested subkeys can be added here if that is ever necessary
+			addQueryParam(query, subkey, value)
+		}
+	case []interface{}:
+		for _, entry := range v {
+			addQueryParam(query, key+"[]", entry)
+		}
+	default:
+		return fmt.Errorf("unknown type %v", v)
+	}
+	return nil
 }

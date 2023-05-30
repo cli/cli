@@ -323,6 +323,14 @@ func Test_addQuery(t *testing.T) {
 			want: "?a=hello",
 		},
 		{
+			name: "array",
+			args: args{
+				path:   "",
+				params: map[string]interface{}{"a": []interface{}{"hello", "world"}},
+			},
+			want: "?a%5B%5D=hello&a%5B%5D=world",
+		},
+		{
 			name: "append",
 			args: args{
 				path:   "path",
