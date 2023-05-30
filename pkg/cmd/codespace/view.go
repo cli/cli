@@ -19,8 +19,6 @@ const (
 type viewOptions struct {
 	selector *CodespaceSelector
 	exporter cmdutil.Exporter
-	orgName  string
-	userName string
 }
 
 func newViewCmd(app *App) *cobra.Command {
