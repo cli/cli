@@ -200,6 +200,7 @@ type Codespace struct {
 	RetentionExpiresAt             string              `json:"retention_expires_at"`
 	RecentFolders                  []string            `json:"recent_folders"`
 	BillableOwner                  User                `json:"billable_owner"`
+	EnvironmentId                  string              `json:"environment_id"`
 }
 
 type CodespaceGitStatus struct {
@@ -272,6 +273,8 @@ var ViewCodespaceFields = []string{
 	"retentionPeriodDays",
 	"retentionExpiresAt",
 	"recentFolders",
+	"vscsTarget",
+	"environmentId",
 }
 
 func (c *Codespace) ExportData(fields []string) map[string]interface{} {
