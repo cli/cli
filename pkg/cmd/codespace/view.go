@@ -134,7 +134,10 @@ func formatGitStatus(codespace codespace) string {
 
 func formatRetentionPeriodDays(codespace codespace) string {
 	days := codespace.RetentionPeriodMinutes / minutesInDay
-	if days == 1 {
+	// Don't display the retention period if it is 0 days
+	if days == 0 {
+		return ""
+	} else if days == 1 {
 		return "1 day"
 	}
 
