@@ -10,9 +10,6 @@ import (
 )
 
 func Test_NewCmdView(t *testing.T) {
-	type fields struct {
-		apiClient apiClient
-	}
 	tests := []struct {
 		tName         string
 		codespaceName string
