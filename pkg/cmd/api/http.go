@@ -129,11 +129,15 @@ func addQueryParam(query url.Values, key string, value interface{}) error {
 	case map[string]interface{}:
 		for subkey, value := range v {
 			// support for nested subkeys can be added here if that is ever necessary
-			addQueryParam(query, subkey, value)
+			if err := addQueryParam(query, subkey, value); err != nil {
+				return err
+			}
 		}
 	case []interface{}:
 		for _, entry := range v {
-			addQueryParam(query, key+"[]", entry)
+			if err := addQueryParam(query, key+"[]", entry); err != nil {
+				return err
+			}
 		}
 	default:
 		return fmt.Errorf("unknown type %v", v)
