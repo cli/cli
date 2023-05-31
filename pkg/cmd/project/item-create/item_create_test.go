@@ -49,10 +49,10 @@ func TestNewCmdCreateItem(t *testing.T) {
 			},
 		},
 		{
-			name: "user",
-			cli:  "--login monalisa --title t",
+			name: "owner",
+			cli:  "--owner monalisa --title t",
 			wants: createItemOpts{
-				login: "monalisa",
+				owner: "monalisa",
 				title: "t",
 			},
 		},
@@ -103,7 +103,7 @@ func TestNewCmdCreateItem(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.title, gotOpts.title)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
@@ -118,7 +118,7 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -187,7 +187,7 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: createItemOpts{
 			title:  "a title",
-			login:  "monalisa",
+			owner:  "monalisa",
 			number: 1,
 		},
 		client: client,
@@ -210,7 +210,7 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -279,7 +279,7 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: createItemOpts{
 			title:  "a title",
-			login:  "github",
+			owner:  "github",
 			number: 1,
 		},
 		client: client,
@@ -302,7 +302,7 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -361,7 +361,7 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: createItemOpts{
 			title:  "a title",
-			login:  "@me",
+			owner:  "@me",
 			number: 1,
 			body:   "a body",
 		},

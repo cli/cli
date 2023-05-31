@@ -18,7 +18,7 @@ import (
 type createFieldOpts struct {
 	name                string
 	dataType            string
-	login               string
+	owner               string
 	singleSelectOptions []string
 	number              int32
 	projectID           string
@@ -45,10 +45,10 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 		Use:   "field-create [<number>]",
 		Example: heredoc.Doc(`
 			# create a field in the current user's project "1"
-			gh project field-create 1 --login "@me" --name "new field" --data-type "text"
+			gh project field-create 1 --owner "@me" --name "new field" --data-type "text"
 
 			# create a field with three options to select from for owner monalisa
-			gh project field-create 1 --login monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
+			gh project field-create 1 --owner monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -85,7 +85,7 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 		},
 	}
 
-	createFieldCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
+	createFieldCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	createFieldCmd.Flags().StringVar(&opts.name, "name", "", "Name of the new field")
 	cmdutil.StringEnumFlag(createFieldCmd, &opts.dataType, "data-type", "", "", []string{"TEXT", "SINGLE_SELECT", "DATE", "NUMBER"}, "DataType of the new field.")
 	createFieldCmd.Flags().StringSliceVar(&opts.singleSelectOptions, "single-select-options", []string{}, "Options for SINGLE_SELECT data type")
@@ -99,7 +99,7 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 
 func runCreateField(config createFieldConfig) error {
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}

@@ -49,10 +49,10 @@ func TestNewCmdDeleteItem(t *testing.T) {
 			},
 		},
 		{
-			name: "user",
-			cli:  "--login monalisa --id 123",
+			name: "owner",
+			cli:  "--owner monalisa --id 123",
 			wants: deleteItemOpts{
-				login:  "monalisa",
+				owner:  "monalisa",
 				itemID: "123",
 			},
 		},
@@ -95,7 +95,7 @@ func TestNewCmdDeleteItem(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.itemID, gotOpts.itemID)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
@@ -110,7 +110,7 @@ func TestRunDelete_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -176,7 +176,7 @@ func TestRunDelete_User(t *testing.T) {
 	config := deleteItemConfig{
 		tp: tableprinter.New(ios),
 		opts: deleteItemOpts{
-			login:  "monalisa",
+			owner:  "monalisa",
 			number: 1,
 			itemID: "item ID",
 		},
@@ -200,7 +200,7 @@ func TestRunDelete_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -266,7 +266,7 @@ func TestRunDelete_Org(t *testing.T) {
 	config := deleteItemConfig{
 		tp: tableprinter.New(ios),
 		opts: deleteItemOpts{
-			login:  "github",
+			owner:  "github",
 			number: 1,
 			itemID: "item ID",
 		},
@@ -290,7 +290,7 @@ func TestRunDelete_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -346,7 +346,7 @@ func TestRunDelete_Me(t *testing.T) {
 	config := deleteItemConfig{
 		tp: tableprinter.New(ios),
 		opts: deleteItemOpts{
-			login:  "@me",
+			owner:  "@me",
 			number: 1,
 			itemID: "item ID",
 		},

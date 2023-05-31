@@ -18,7 +18,7 @@ import (
 type createItemOpts struct {
 	title     string
 	body      string
-	login     string
+	owner     string
 	number    int32
 	projectID string
 	format    string
@@ -44,7 +44,7 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 		Use:   "item-create [<number>]",
 		Example: heredoc.Doc(`
 			# create a draft issue in the current user's project "1"
-			gh project item-create 1 --login "@me" --title "new item" --body "new item body"
+			gh project item-create 1 --owner "@me" --title "new item" --body "new item body"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -77,7 +77,7 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 		},
 	}
 
-	createItemCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
+	createItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	createItemCmd.Flags().StringVar(&opts.title, "title", "", "Title for the draft issue")
 	createItemCmd.Flags().StringVar(&opts.body, "body", "", "Body for the draft issue")
 	cmdutil.StringEnumFlag(createItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
@@ -89,7 +89,7 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 
 func runCreateItem(config createItemConfig) error {
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}

@@ -19,8 +19,8 @@ type copyOpts struct {
 	number             int32
 	ownerID            string
 	projectID          string
-	sourceLogin        string
-	targetLogin        string
+	sourceOwner        string
+	targetOwner        string
 	title              string
 	format             string
 }
@@ -43,8 +43,8 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 		Short: "Copy a project",
 		Use:   "copy [<number>]",
 		Example: heredoc.Doc(`
-			# copy project "1" owned by source-login monalisa to target-login github
-			gh project copy 1 --source-login monalisa --target-login github --title "a new project"
+			# copy project "1" owned by monalisa to github
+			gh project copy 1 --source-owner monalisa --target-owner github --title "a new project"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,8 +75,8 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 		},
 	}
 
-	copyCmd.Flags().StringVar(&opts.sourceLogin, "source-login", "", "Login of the source owner. Use \"@me\" for the current user.")
-	copyCmd.Flags().StringVar(&opts.targetLogin, "target-login", "", "Login of the target owner. Use \"@me\" for the current user.")
+	copyCmd.Flags().StringVar(&opts.sourceOwner, "source-owner", "", "Login of the source owner. Use \"@me\" for the current user.")
+	copyCmd.Flags().StringVar(&opts.targetOwner, "target-owner", "", "Login of the target owner. Use \"@me\" for the current user.")
 	copyCmd.Flags().StringVar(&opts.title, "title", "", "Title for the new project")
 	copyCmd.Flags().BoolVar(&opts.includeDraftIssues, "drafts", false, "Include draft issues when copying")
 	cmdutil.StringEnumFlag(copyCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
@@ -88,23 +88,23 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 
 func runCopy(config copyConfig) error {
 	canPrompt := config.io.CanPrompt()
-	sourceLogin, err := config.client.NewOwner(canPrompt, config.opts.sourceLogin)
+	sourceOwner, err := config.client.NewOwner(canPrompt, config.opts.sourceOwner)
 	if err != nil {
 		return err
 	}
 
-	targetLogin, err := config.client.NewOwner(canPrompt, config.opts.targetLogin)
+	targetOwner, err := config.client.NewOwner(canPrompt, config.opts.targetOwner)
 	if err != nil {
 		return err
 	}
 
-	project, err := config.client.NewProject(canPrompt, sourceLogin, config.opts.number, false)
+	project, err := config.client.NewProject(canPrompt, sourceOwner, config.opts.number, false)
 	if err != nil {
 		return err
 	}
 
 	config.opts.projectID = project.ID
-	config.opts.ownerID = targetLogin.ID
+	config.opts.ownerID = targetOwner.ID
 
 	query, variables := copyArgs(config)
 

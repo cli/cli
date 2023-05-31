@@ -16,7 +16,7 @@ import (
 
 type createOpts struct {
 	title   string
-	login   string
+	owner   string
 	ownerID string
 	format  string
 }
@@ -41,7 +41,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 		Use:   "create",
 		Example: heredoc.Doc(`
 			# create a new project owned by login monalisa
-			gh project create --login monalisa --title "a new project"
+			gh project create --owner monalisa --title "a new project"
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := client.New(f)
@@ -66,7 +66,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 	}
 
 	createCmd.Flags().StringVar(&opts.title, "title", "", "Title for the project")
-	createCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
+	createCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	cmdutil.StringEnumFlag(createCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	_ = createCmd.MarkFlagRequired("title")
@@ -76,7 +76,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 
 func runCreate(config createConfig) error {
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}

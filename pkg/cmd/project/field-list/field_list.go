@@ -16,7 +16,7 @@ import (
 
 type listOpts struct {
 	limit  int
-	login  string
+	owner  string
 	number int32
 	format string
 }
@@ -35,7 +35,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 		Use:   "field-list number",
 		Example: heredoc.Doc(`
 			# list fields in the current user's project "1"
-			gh project field-list 1 --login "@me"
+			gh project field-list 1 --owner "@me"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -68,7 +68,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 		},
 	}
 
-	listCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
+	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of fields to fetch")
 
@@ -77,7 +77,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 
 func runList(config listConfig) error {
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func runList(config listConfig) error {
 
 func printResults(config listConfig, fields []queries.ProjectField, login string) error {
 	if len(fields) == 0 {
-		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for login %s has no fields", config.opts.number, login))
+		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for owner %s has no fields", config.opts.number, login))
 	}
 
 	config.tp.HeaderRow("Name", "Data type", "ID")

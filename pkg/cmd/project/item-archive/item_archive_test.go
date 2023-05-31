@@ -49,10 +49,10 @@ func TestNewCmdarchiveItem(t *testing.T) {
 			},
 		},
 		{
-			name: "user",
-			cli:  "--login monalisa --id 123",
+			name: "owner",
+			cli:  "--owner monalisa --id 123",
 			wants: archiveItemOpts{
-				login:  "monalisa",
+				owner:  "monalisa",
 				itemID: "123",
 			},
 		},
@@ -103,7 +103,7 @@ func TestNewCmdarchiveItem(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.itemID, gotOpts.itemID)
 			assert.Equal(t, tt.wants.undo, gotOpts.undo)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
@@ -120,7 +120,7 @@ func TestRunArchive_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -188,7 +188,7 @@ func TestRunArchive_User(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			login:  "monalisa",
+			owner:  "monalisa",
 			number: 1,
 			itemID: "item ID",
 		},
@@ -212,7 +212,7 @@ func TestRunArchive_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -280,7 +280,7 @@ func TestRunArchive_Org(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			login:  "github",
+			owner:  "github",
 			number: 1,
 			itemID: "item ID",
 		},
@@ -304,7 +304,7 @@ func TestRunArchive_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -362,7 +362,7 @@ func TestRunArchive_Me(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			login:  "@me",
+			owner:  "@me",
 			number: 1,
 			itemID: "item ID",
 		},
@@ -386,7 +386,7 @@ func TestRunArchive_User_Undo(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -453,7 +453,7 @@ func TestRunArchive_User_Undo(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			login:  "monalisa",
+			owner:  "monalisa",
 			number: 1,
 			itemID: "item ID",
 			undo:   true,
@@ -478,7 +478,7 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -546,7 +546,7 @@ func TestRunArchive_Org_Undo(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			login:  "github",
+			owner:  "github",
 			number: 1,
 			itemID: "item ID",
 			undo:   true,
@@ -571,7 +571,7 @@ func TestRunArchive_Me_Undo(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -628,7 +628,7 @@ func TestRunArchive_Me_Undo(t *testing.T) {
 	config := archiveItemConfig{
 		tp: tableprinter.New(ios),
 		opts: archiveItemOpts{
-			login:  "@me",
+			owner:  "@me",
 			number: 1,
 			itemID: "item ID",
 			undo:   true,

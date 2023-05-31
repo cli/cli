@@ -16,7 +16,7 @@ import (
 
 type closeOpts struct {
 	number    int32
-	login     string
+	owner     string
 	reopen    bool
 	projectID string
 	format    string
@@ -41,11 +41,11 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 		Short: "Close a project",
 		Use:   "close [<number>]",
 		Example: heredoc.Doc(`
-			# close project "1" owned by login monalisa
-			gh project close 1 --login monalisa
+			# close project "1" owned by monalisa
+			gh project close 1 --owner monalisa
 
-			# reopen closed project "1" owned by login github
-			gh project close 1 --login github --undo
+			# reopen closed project "1" owned by github
+			gh project close 1 --owner github --undo
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -76,7 +76,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 		},
 	}
 
-	closeCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
+	closeCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	closeCmd.Flags().BoolVar(&opts.reopen, "undo", false, "Reopen a closed project")
 	closeCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'")
 
@@ -85,7 +85,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 
 func runClose(config closeConfig) error {
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}

@@ -29,10 +29,10 @@ func TestNewCmdCreate(t *testing.T) {
 			},
 		},
 		{
-			name: "login",
-			cli:  "--title t --login monalisa",
+			name: "owner",
+			cli:  "--title t --owner monalisa",
 			wants: createOpts{
-				login: "monalisa",
+				owner: "monalisa",
 				title: "t",
 			},
 		},
@@ -75,7 +75,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.title, gotOpts.title)
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
 	}
@@ -90,7 +90,7 @@ func TestRunCreate_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]string{
 				"login": "monalisa",
 			},
@@ -138,7 +138,7 @@ func TestRunCreate_User(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: createOpts{
 			title: "a title",
-			login: "monalisa",
+			owner: "monalisa",
 		},
 		client: client,
 		io:     ios,
@@ -160,7 +160,7 @@ func TestRunCreate_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]string{
 				"login": "github",
 			},
@@ -207,7 +207,7 @@ func TestRunCreate_Org(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: createOpts{
 			title: "a title",
-			login: "github",
+			owner: "github",
 		},
 		client: client,
 		io:     ios,
@@ -229,7 +229,7 @@ func TestRunCreate_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -267,7 +267,7 @@ func TestRunCreate_Me(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: createOpts{
 			title: "a title",
-			login: "@me",
+			owner: "@me",
 		},
 		client: client,
 		io:     ios,

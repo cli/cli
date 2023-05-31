@@ -34,10 +34,10 @@ func TestNewCmdClose(t *testing.T) {
 			},
 		},
 		{
-			name: "login",
-			cli:  "--login monalisa",
+			name: "owner",
+			cli:  "--owner monalisa",
 			wants: closeOpts{
-				login: "monalisa",
+				owner: "monalisa",
 			},
 		},
 		{
@@ -85,7 +85,7 @@ func TestNewCmdClose(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
 	}
@@ -100,7 +100,7 @@ func TestRunClose_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -174,7 +174,7 @@ func TestRunClose_User(t *testing.T) {
 		io: ios,
 		opts: closeOpts{
 			number: 1,
-			login:  "monalisa",
+			owner:  "monalisa",
 		},
 		client: client,
 	}
@@ -196,7 +196,7 @@ func TestRunClose_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -268,7 +268,7 @@ func TestRunClose_Org(t *testing.T) {
 		io: ios,
 		opts: closeOpts{
 			number: 1,
-			login:  "github",
+			owner:  "github",
 		},
 		client: client,
 	}
@@ -287,7 +287,7 @@ func TestRunClose_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -349,7 +349,7 @@ func TestRunClose_Me(t *testing.T) {
 		io: ios,
 		opts: closeOpts{
 			number: 1,
-			login:  "@me",
+			owner:  "@me",
 		},
 		client: client,
 	}
@@ -368,7 +368,7 @@ func TestRunClose_Reopen(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -442,7 +442,7 @@ func TestRunClose_Reopen(t *testing.T) {
 		io: ios,
 		opts: closeOpts{
 			number: 1,
-			login:  "monalisa",
+			owner:  "monalisa",
 			reopen: true,
 		},
 		client: client,

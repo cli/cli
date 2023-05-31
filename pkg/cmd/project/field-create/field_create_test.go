@@ -50,10 +50,10 @@ func TestNewCmdCreateField(t *testing.T) {
 			},
 		},
 		{
-			name: "user",
-			cli:  "--login monalisa --name n --data-type TEXT",
+			name: "owner",
+			cli:  "--owner monalisa --name n --data-type TEXT",
 			wants: createFieldOpts{
-				login:               "monalisa",
+				owner:               "monalisa",
 				name:                "n",
 				dataType:            "TEXT",
 				singleSelectOptions: []string{},
@@ -109,7 +109,7 @@ func TestNewCmdCreateField(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.name, gotOpts.name)
 			assert.Equal(t, tt.wants.dataType, gotOpts.dataType)
 			assert.Equal(t, tt.wants.singleSelectOptions, gotOpts.singleSelectOptions)
@@ -127,7 +127,7 @@ func TestRunCreateField_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -196,7 +196,7 @@ func TestRunCreateField_User(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			name:     "a name",
-			login:    "monalisa",
+			owner:    "monalisa",
 			number:   1,
 			dataType: "TEXT",
 		},
@@ -221,7 +221,7 @@ func TestRunCreateField_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -290,7 +290,7 @@ func TestRunCreateField_Org(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			name:     "a name",
-			login:    "github",
+			owner:    "github",
 			number:   1,
 			dataType: "TEXT",
 		},
@@ -314,7 +314,7 @@ func TestRunCreateField_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -372,7 +372,7 @@ func TestRunCreateField_Me(t *testing.T) {
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
-			login:    "@me",
+			owner:    "@me",
 			number:   1,
 			name:     "a name",
 			dataType: "TEXT",
@@ -397,7 +397,7 @@ func TestRunCreateField_TEXT(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -455,7 +455,7 @@ func TestRunCreateField_TEXT(t *testing.T) {
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
-			login:    "@me",
+			owner:    "@me",
 			number:   1,
 			name:     "a name",
 			dataType: "TEXT",
@@ -480,7 +480,7 @@ func TestRunCreateField_DATE(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -538,7 +538,7 @@ func TestRunCreateField_DATE(t *testing.T) {
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
-			login:    "@me",
+			owner:    "@me",
 			number:   1,
 			name:     "a name",
 			dataType: "DATE",
@@ -563,7 +563,7 @@ func TestRunCreateField_NUMBER(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -621,7 +621,7 @@ func TestRunCreateField_NUMBER(t *testing.T) {
 	config := createFieldConfig{
 		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
-			login:    "@me",
+			owner:    "@me",
 			number:   1,
 			name:     "a name",
 			dataType: "NUMBER",

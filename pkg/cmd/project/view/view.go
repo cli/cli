@@ -18,7 +18,7 @@ import (
 
 type viewOpts struct {
 	web    bool
-	login  string
+	owner  string
 	number int32
 	format string
 }
@@ -41,7 +41,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(config viewConfig) error) *cobra.C
 			gh project view 1
 
 			# open user monalisa's project "1" in the browser
-			gh project view 1 --login monalisa --web
+			gh project view 1 --owner monalisa --web
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -79,7 +79,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(config viewConfig) error) *cobra.C
 		},
 	}
 
-	viewCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
+	viewCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	viewCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open a project in the browser")
 	cmdutil.StringEnumFlag(viewCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
@@ -100,7 +100,7 @@ func runView(config viewConfig) error {
 	}
 
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}
@@ -120,22 +120,22 @@ func runView(config viewConfig) error {
 // TODO: support non-github.com hostnames
 func buildURL(config viewConfig) (string, error) {
 	var url string
-	if config.opts.login == "@me" {
-		login, err := config.client.ViewerLoginName()
+	if config.opts.owner == "@me" {
+		owner, err := config.client.ViewerLoginName()
 		if err != nil {
 			return "", err
 		}
-		url = fmt.Sprintf("https://github.com/users/%s/projects/%d", login, config.opts.number)
+		url = fmt.Sprintf("https://github.com/users/%s/projects/%d", owner, config.opts.number)
 	} else {
-		_, ownerType, err := config.client.OwnerIDAndType(config.opts.login)
+		_, ownerType, err := config.client.OwnerIDAndType(config.opts.owner)
 		if err != nil {
 			return "", err
 		}
 
 		if ownerType == queries.UserOwner {
-			url = fmt.Sprintf("https://github.com/users/%s/projects/%d", config.opts.login, config.opts.number)
+			url = fmt.Sprintf("https://github.com/users/%s/projects/%d", config.opts.owner, config.opts.number)
 		} else {
-			url = fmt.Sprintf("https://github.com/orgs/%s/projects/%d", config.opts.login, config.opts.number)
+			url = fmt.Sprintf("https://github.com/orgs/%s/projects/%d", config.opts.owner, config.opts.number)
 		}
 	}
 

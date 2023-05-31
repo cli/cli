@@ -23,10 +23,10 @@ func TestNewCmdlist(t *testing.T) {
 		wantsErrMsg string
 	}{
 		{
-			name: "login",
-			cli:  "--login monalisa",
+			name: "owner",
+			cli:  "--owner monalisa",
 			wants: listOpts{
-				login: "monalisa",
+				owner: "monalisa",
 				limit: 30,
 			},
 		},
@@ -84,7 +84,7 @@ func TestNewCmdlist(t *testing.T) {
 			}
 			assert.NoError(t, err)
 
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.closed, gotOpts.closed)
 			assert.Equal(t, tt.wants.web, gotOpts.web)
 			assert.Equal(t, tt.wants.limit, gotOpts.limit)
@@ -101,7 +101,7 @@ func TestRunList(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -156,7 +156,7 @@ func TestRunList(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			login: "monalisa",
+			owner: "monalisa",
 		},
 		client: client,
 		io:     ios,
@@ -179,7 +179,7 @@ func TestRunList_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -225,7 +225,7 @@ func TestRunList_Me(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			login: "@me",
+			owner: "@me",
 		},
 		client: client,
 		io:     ios,
@@ -248,7 +248,7 @@ func TestRunListViewer(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -315,7 +315,7 @@ func TestRunListOrg(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -370,7 +370,7 @@ func TestRunListOrg(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			login: "github",
+			owner: "github",
 		},
 		client: client,
 		io:     ios,
@@ -443,7 +443,7 @@ func TestRunListWithClosed(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -498,7 +498,7 @@ func TestRunListWithClosed(t *testing.T) {
 	config := listConfig{
 		tp: tableprinter.New(ios),
 		opts: listOpts{
-			login:  "monalisa",
+			owner:  "monalisa",
 			closed: true,
 		},
 		client: client,
@@ -521,7 +521,7 @@ func TestRunListWeb_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -545,7 +545,7 @@ func TestRunListWeb_User(t *testing.T) {
 	buf := bytes.Buffer{}
 	config := listConfig{
 		opts: listOpts{
-			login: "monalisa",
+			owner: "monalisa",
 			web:   true,
 		},
 		URLOpener: func(url string) error {
@@ -568,7 +568,7 @@ func TestRunListWeb_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -592,7 +592,7 @@ func TestRunListWeb_Org(t *testing.T) {
 	buf := bytes.Buffer{}
 	config := listConfig{
 		opts: listOpts{
-			login: "github",
+			owner: "github",
 			web:   true,
 		},
 		URLOpener: func(url string) error {
@@ -632,7 +632,7 @@ func TestRunListWeb_Me(t *testing.T) {
 	buf := bytes.Buffer{}
 	config := listConfig{
 		opts: listOpts{
-			login: "@me",
+			owner: "@me",
 			web:   true,
 		},
 		URLOpener: func(url string) error {

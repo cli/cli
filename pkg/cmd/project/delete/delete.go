@@ -16,7 +16,7 @@ import (
 )
 
 type deleteOpts struct {
-	login     string
+	owner     string
 	number    int32
 	projectID string
 	format    string
@@ -42,7 +42,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 		Use:   "delete [<number>]",
 		Example: heredoc.Doc(`
 			# delete the current user's project "1"
-			gh project delete 1 --login "@me"
+			gh project delete 1 --owner "@me"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,7 +75,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 		},
 	}
 
-	deleteCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
+	deleteCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	cmdutil.StringEnumFlag(deleteCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
 	return deleteCmd
@@ -83,7 +83,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 
 func runDelete(config deleteConfig) error {
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}

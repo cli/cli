@@ -36,10 +36,10 @@ func TestNewCmdview(t *testing.T) {
 			},
 		},
 		{
-			name: "user",
-			cli:  "--login monalisa",
+			name: "owner",
+			cli:  "--owner monalisa",
 			wants: viewOpts{
-				login: "monalisa",
+				owner: "monalisa",
 			},
 		},
 		{
@@ -87,7 +87,7 @@ func TestNewCmdview(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 			assert.Equal(t, tt.wants.web, gotOpts.web)
 		})
@@ -115,7 +115,7 @@ func TestBuildURLViewer(t *testing.T) {
 	url, err := buildURL(viewConfig{
 		opts: viewOpts{
 			number: 1,
-			login:  "@me",
+			owner:  "@me",
 		},
 		client: client,
 	})
@@ -131,7 +131,7 @@ func TestRunView_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -184,7 +184,7 @@ func TestRunView_User(t *testing.T) {
 	config := viewConfig{
 		tp: tableprinter.New(ios),
 		opts: viewOpts{
-			login:  "monalisa",
+			owner:  "monalisa",
 			number: 1,
 		},
 		io:     ios,
@@ -204,7 +204,7 @@ func TestRunView_Viewer(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -248,7 +248,7 @@ func TestRunView_Viewer(t *testing.T) {
 	config := viewConfig{
 		tp: tableprinter.New(ios),
 		opts: viewOpts{
-			login:  "@me",
+			owner:  "@me",
 			number: 1,
 		},
 		io:     ios,
@@ -267,7 +267,7 @@ func TestRunView_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -320,7 +320,7 @@ func TestRunView_Org(t *testing.T) {
 	config := viewConfig{
 		tp: tableprinter.New(ios),
 		opts: viewOpts{
-			login:  "github",
+			owner:  "github",
 			number: 1,
 		},
 		io:     ios,
@@ -339,7 +339,7 @@ func TestRunViewWeb_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -390,7 +390,7 @@ func TestRunViewWeb_User(t *testing.T) {
 	buf := bytes.Buffer{}
 	config := viewConfig{
 		opts: viewOpts{
-			login:  "monalisa",
+			owner:  "monalisa",
 			web:    true,
 			number: 8,
 		},
@@ -414,7 +414,7 @@ func TestRunViewWeb_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -465,7 +465,7 @@ func TestRunViewWeb_Org(t *testing.T) {
 	buf := bytes.Buffer{}
 	config := viewConfig{
 		opts: viewOpts{
-			login:  "github",
+			owner:  "github",
 			web:    true,
 			number: 8,
 		},
@@ -532,7 +532,7 @@ func TestRunViewWeb_Me(t *testing.T) {
 	buf := bytes.Buffer{}
 	config := viewConfig{
 		opts: viewOpts{
-			login:  "@me",
+			owner:  "@me",
 			web:    true,
 			number: 8,
 		},

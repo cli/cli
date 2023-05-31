@@ -42,18 +42,18 @@ func TestNewCmdCopy(t *testing.T) {
 			},
 		},
 		{
-			name: "source-login",
-			cli:  "--source-login monalisa --title t",
+			name: "source-owner",
+			cli:  "--source-owner monalisa --title t",
 			wants: copyOpts{
-				sourceLogin: "monalisa",
+				sourceOwner: "monalisa",
 				title:       "t",
 			},
 		},
 		{
-			name: "target-login",
-			cli:  "--target-login monalisa --title t",
+			name: "target-owner",
+			cli:  "--target-owner monalisa --title t",
 			wants: copyOpts{
-				targetLogin: "monalisa",
+				targetOwner: "monalisa",
 				title:       "t",
 			},
 		},
@@ -104,8 +104,8 @@ func TestNewCmdCopy(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.sourceLogin, gotOpts.sourceLogin)
-			assert.Equal(t, tt.wants.targetLogin, gotOpts.targetLogin)
+			assert.Equal(t, tt.wants.sourceOwner, gotOpts.sourceOwner)
+			assert.Equal(t, tt.wants.targetOwner, gotOpts.targetOwner)
 			assert.Equal(t, tt.wants.title, gotOpts.title)
 			assert.Equal(t, tt.wants.includeDraftIssues, gotOpts.includeDraftIssues)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
@@ -148,7 +148,7 @@ func TestRunCopy_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]string{
 				"login": "monalisa",
 			},
@@ -174,7 +174,7 @@ func TestRunCopy_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]string{
 				"login": "monalisa",
 			},
@@ -223,8 +223,8 @@ func TestRunCopy_User(t *testing.T) {
 		io: ios,
 		opts: copyOpts{
 			title:       "a title",
-			sourceLogin: "monalisa",
-			targetLogin: "monalisa",
+			sourceOwner: "monalisa",
+			targetOwner: "monalisa",
 			number:      1,
 		},
 		client: client,
@@ -269,7 +269,7 @@ func TestRunCopy_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]string{
 				"login": "github",
 			},
@@ -295,7 +295,7 @@ func TestRunCopy_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]string{
 				"login": "github",
 			},
@@ -344,8 +344,8 @@ func TestRunCopy_Org(t *testing.T) {
 		io: ios,
 		opts: copyOpts{
 			title:       "a title",
-			sourceLogin: "github",
-			targetLogin: "github",
+			sourceOwner: "github",
+			targetOwner: "github",
 			number:      1,
 		},
 		client: client,
@@ -390,7 +390,7 @@ func TestRunCopy_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -407,7 +407,7 @@ func TestRunCopy_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -446,8 +446,8 @@ func TestRunCopy_Me(t *testing.T) {
 		io: ios,
 		opts: copyOpts{
 			title:       "a title",
-			sourceLogin: "@me",
-			targetLogin: "@me",
+			sourceOwner: "@me",
+			targetOwner: "@me",
 			number:      1,
 		},
 		client: client,

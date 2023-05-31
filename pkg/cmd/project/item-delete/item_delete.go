@@ -15,7 +15,7 @@ import (
 )
 
 type deleteItemOpts struct {
-	login     string
+	owner     string
 	number    int32
 	itemID    string
 	projectID string
@@ -42,7 +42,7 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 		Use:   "item-delete [<number>]",
 		Example: heredoc.Doc(`
 			# delete an item in the current user's project "1"
-			gh project item-delete 1 --login "@me" --id <item-ID>
+			gh project item-delete 1 --owner "@me" --id <item-ID>
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,7 +75,7 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 		},
 	}
 
-	deleteItemCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
+	deleteItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	deleteItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to delete")
 	cmdutil.StringEnumFlag(deleteItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
@@ -86,7 +86,7 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 
 func runDeleteItem(config deleteItemConfig) error {
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}

@@ -36,10 +36,10 @@ func TestNewCmdList(t *testing.T) {
 			},
 		},
 		{
-			name: "user",
-			cli:  "--login monalisa",
+			name: "owner",
+			cli:  "--owner monalisa",
 			wants: listOpts{
-				login: "monalisa",
+				owner: "monalisa",
 				limit: 30,
 			},
 		},
@@ -82,7 +82,7 @@ func TestNewCmdList(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.limit, gotOpts.limit)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
@@ -98,7 +98,7 @@ func TestRunList_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -168,7 +168,7 @@ func TestRunList_User(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
-			login:  "monalisa",
+			owner:  "monalisa",
 		},
 		client: client,
 		io:     ios,
@@ -191,7 +191,7 @@ func TestRunList_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -261,7 +261,7 @@ func TestRunList_Org(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
-			login:  "github",
+			owner:  "github",
 		},
 		client: client,
 		io:     ios,
@@ -284,7 +284,7 @@ func TestRunList_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -344,7 +344,7 @@ func TestRunList_Me(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
-			login:  "@me",
+			owner:  "@me",
 		},
 		client: client,
 		io:     ios,
@@ -367,7 +367,7 @@ func TestRunList_Empty(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -411,7 +411,7 @@ func TestRunList_Empty(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
-			login:  "@me",
+			owner:  "@me",
 		},
 		client: client,
 		io:     ios,
@@ -421,5 +421,5 @@ func TestRunList_Empty(t *testing.T) {
 	assert.EqualError(
 		t,
 		err,
-		"Project 1 for login @me has no fields")
+		"Project 1 for owner @me has no fields")
 }

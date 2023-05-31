@@ -55,10 +55,10 @@ func TestNewCmdEdit(t *testing.T) {
 			},
 		},
 		{
-			name: "login",
-			cli:  "--login monalisa --title t",
+			name: "owner",
+			cli:  "--owner monalisa --title t",
 			wants: editOpts{
-				login: "monalisa",
+				owner: "monalisa",
 				title: "t",
 			},
 		},
@@ -122,7 +122,7 @@ func TestNewCmdEdit(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.visibility, gotOpts.visibility)
 			assert.Equal(t, tt.wants.title, gotOpts.title)
 			assert.Equal(t, tt.wants.readme, gotOpts.readme)
@@ -141,7 +141,7 @@ func TestRunUpdate_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -214,7 +214,7 @@ func TestRunUpdate_User(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:           1,
-			login:            "monalisa",
+			owner:            "monalisa",
 			title:            "a new title",
 			shortDescription: "a new description",
 			visibility:       "PUBLIC",
@@ -240,7 +240,7 @@ func TestRunUpdate_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -313,7 +313,7 @@ func TestRunUpdate_Org(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:           1,
-			login:            "github",
+			owner:            "github",
 			title:            "a new title",
 			shortDescription: "a new description",
 			visibility:       "PUBLIC",
@@ -338,7 +338,7 @@ func TestRunUpdate_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -402,7 +402,7 @@ func TestRunUpdate_Me(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:           1,
-			login:            "@me",
+			owner:            "@me",
 			title:            "a new title",
 			shortDescription: "a new description",
 			visibility:       "PRIVATE",
@@ -428,7 +428,7 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -501,7 +501,7 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number: 1,
-			login:  "monalisa",
+			owner:  "monalisa",
 			title:  "another title",
 		},
 		client: client,

@@ -16,7 +16,7 @@ import (
 type listOpts struct {
 	limit  int
 	web    bool
-	login  string
+	owner  string
 	closed bool
 	format string
 }
@@ -39,7 +39,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 			gh project list
 
 			# list the projects for org github including closed projects
-			gh project list --login github --closed
+			gh project list --owner github --closed
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := client.New(f)
@@ -67,7 +67,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 		},
 	}
 
-	listCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner")
+	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner")
 	listCmd.Flags().BoolVarP(&opts.closed, "closed", "", false, "Include closed projects")
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser")
 	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
@@ -89,16 +89,16 @@ func runList(config listConfig) error {
 		return nil
 	}
 
-	if config.opts.login == "" {
-		config.opts.login = "@me"
+	if config.opts.owner == "" {
+		config.opts.owner = "@me"
 	}
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}
 
-	projects, totalCount, err := config.client.Projects(config.opts.login, owner.Type, config.opts.limit, false)
+	projects, totalCount, err := config.client.Projects(config.opts.owner, owner.Type, config.opts.limit, false)
 	if err != nil {
 		return err
 	}
@@ -114,22 +114,22 @@ func runList(config listConfig) error {
 // TODO: support non-github.com hostnames
 func buildURL(config listConfig) (string, error) {
 	var url string
-	if config.opts.login == "@me" || config.opts.login == "" {
-		login, err := config.client.ViewerLoginName()
+	if config.opts.owner == "@me" || config.opts.owner == "" {
+		owner, err := config.client.ViewerLoginName()
 		if err != nil {
 			return "", err
 		}
-		url = fmt.Sprintf("https://github.com/users/%s/projects", login)
+		url = fmt.Sprintf("https://github.com/users/%s/projects", owner)
 	} else {
-		_, ownerType, err := config.client.OwnerIDAndType(config.opts.login)
+		_, ownerType, err := config.client.OwnerIDAndType(config.opts.owner)
 		if err != nil {
 			return "", err
 		}
 
 		if ownerType == queries.UserOwner {
-			url = fmt.Sprintf("https://github.com/users/%s/projects", config.opts.login)
+			url = fmt.Sprintf("https://github.com/users/%s/projects", config.opts.owner)
 		} else {
-			url = fmt.Sprintf("https://github.com/orgs/%s/projects", config.opts.login)
+			url = fmt.Sprintf("https://github.com/orgs/%s/projects", config.opts.owner)
 		}
 	}
 
@@ -150,9 +150,9 @@ func filterProjects(nodes []queries.Project, config listConfig) []queries.Projec
 	return projects
 }
 
-func printResults(config listConfig, projects []queries.Project, login string) error {
+func printResults(config listConfig, projects []queries.Project, owner string) error {
 	if len(projects) == 0 {
-		return cmdutil.NewNoResultsError(fmt.Sprintf("No projects found for %s", login))
+		return cmdutil.NewNoResultsError(fmt.Sprintf("No projects found for %s", owner))
 	}
 
 	config.tp.HeaderRow("Title", "Description", "URL", "State", "ID")

@@ -16,7 +16,7 @@ import (
 )
 
 type archiveItemOpts struct {
-	login     string
+	owner     string
 	number    int32
 	undo      bool
 	itemID    string
@@ -50,7 +50,7 @@ func NewCmdArchiveItem(f *cmdutil.Factory, runF func(config archiveItemConfig) e
 		Use:   "item-archive [<number>]",
 		Example: heredoc.Doc(`
 			# archive an item in the current user's project "1"
-			gh project item-archive 1 --login "@me" --id <item-ID>
+			gh project item-archive 1 --owner "@me" --id <item-ID>
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -83,7 +83,7 @@ func NewCmdArchiveItem(f *cmdutil.Factory, runF func(config archiveItemConfig) e
 		},
 	}
 
-	archiveItemCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
+	archiveItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	archiveItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to archive")
 	archiveItemCmd.Flags().BoolVar(&opts.undo, "undo", false, "Unarchive an item")
 	cmdutil.StringEnumFlag(archiveItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
@@ -95,7 +95,7 @@ func NewCmdArchiveItem(f *cmdutil.Factory, runF func(config archiveItemConfig) e
 
 func runArchiveItem(config archiveItemConfig) error {
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}

@@ -16,7 +16,7 @@ import (
 )
 
 type addItemOpts struct {
-	login     string
+	owner     string
 	number    int32
 	itemURL   string
 	projectID string
@@ -44,7 +44,7 @@ func NewCmdAddItem(f *cmdutil.Factory, runF func(config addItemConfig) error) *c
 		Use:   "item-add [<number>]",
 		Example: heredoc.Doc(`
 			# add an item to monalisa's project "1"
-			gh project item-add 1 --login monalisa --url https://github.com/monalisa/myproject/issues/23
+			gh project item-add 1 --owner monalisa --url https://github.com/monalisa/myproject/issues/23
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -77,7 +77,7 @@ func NewCmdAddItem(f *cmdutil.Factory, runF func(config addItemConfig) error) *c
 		},
 	}
 
-	addItemCmd.Flags().StringVar(&opts.login, "login", "", "Login of the owner. Use \"@me\" for the current user.")
+	addItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	addItemCmd.Flags().StringVar(&opts.itemURL, "url", "", "URL of the issue or pull request to add to the project")
 	cmdutil.StringEnumFlag(addItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
@@ -88,7 +88,7 @@ func NewCmdAddItem(f *cmdutil.Factory, runF func(config addItemConfig) error) *c
 
 func runAddItem(config addItemConfig) error {
 	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.login)
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
 		return err
 	}

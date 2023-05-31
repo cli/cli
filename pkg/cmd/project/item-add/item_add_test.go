@@ -49,10 +49,10 @@ func TestNewCmdaddItem(t *testing.T) {
 			},
 		},
 		{
-			name: "user",
-			cli:  "--login monalisa --url github.com/cli/cli",
+			name: "owner",
+			cli:  "--owner monalisa --url github.com/cli/cli",
 			wants: addItemOpts{
-				login:   "monalisa",
+				owner:   "monalisa",
 				itemURL: "github.com/cli/cli",
 			},
 		},
@@ -95,7 +95,7 @@ func TestNewCmdaddItem(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.login, gotOpts.login)
+			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.itemURL, gotOpts.itemURL)
 			assert.Equal(t, tt.wants.format, gotOpts.format)
 		})
@@ -111,7 +111,7 @@ func TestRunAddItem_User(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "monalisa",
 			},
@@ -199,7 +199,7 @@ func TestRunAddItem_User(t *testing.T) {
 	config := addItemConfig{
 		tp: tableprinter.New(ios),
 		opts: addItemOpts{
-			login:   "monalisa",
+			owner:   "monalisa",
 			number:  1,
 			itemURL: "https://github.com/cli/go-gh/issues/1",
 		},
@@ -223,7 +223,7 @@ func TestRunAddItem_Org(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserOrgLogin.*",
+			"query": "query UserOrgOwner.*",
 			"variables": map[string]interface{}{
 				"login": "github",
 			},
@@ -311,7 +311,7 @@ func TestRunAddItem_Org(t *testing.T) {
 	config := addItemConfig{
 		tp: tableprinter.New(ios),
 		opts: addItemOpts{
-			login:   "github",
+			owner:   "github",
 			number:  1,
 			itemURL: "https://github.com/cli/go-gh/issues/1",
 		},
@@ -335,7 +335,7 @@ func TestRunAddItem_Me(t *testing.T) {
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query ViewerLogin.*",
+			"query": "query ViewerOwner.*",
 		}).
 		Reply(200).
 		JSON(map[string]interface{}{
@@ -413,7 +413,7 @@ func TestRunAddItem_Me(t *testing.T) {
 	config := addItemConfig{
 		tp: tableprinter.New(ios),
 		opts: addItemOpts{
-			login:   "@me",
+			owner:   "@me",
 			number:  1,
 			itemURL: "https://github.com/cli/go-gh/pull/1",
 		},

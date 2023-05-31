@@ -793,7 +793,7 @@ func (c *Client) ViewerLoginName() (string, error) {
 func (c *Client) OwnerIDAndType(login string) (string, OwnerType, error) {
 	if login == "@me" || login == "" {
 		var query viewerLogin
-		err := c.doQuery("ViewerLogin", &query, nil)
+		err := c.doQuery("ViewerOwner", &query, nil)
 		if err != nil {
 			return "", "", err
 		}
@@ -814,7 +814,7 @@ func (c *Client) OwnerIDAndType(login string) (string, OwnerType, error) {
 		} `graphql:"organization(login: $login)"`
 	}
 
-	err := c.doQuery("UserOrgLogin", &query, variables)
+	err := c.doQuery("UserOrgOwner", &query, variables)
 	if err != nil {
 		// Due to the way the queries are structured, we don't know if a login belongs to a user
 		// or to an org, even though they are unique. To deal with this, we try both - if neither
