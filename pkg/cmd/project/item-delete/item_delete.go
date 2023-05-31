@@ -130,6 +130,6 @@ func printResults(config deleteItemConfig) error {
 }
 
 func printJSON(config deleteItemConfig, ID githubv4.ID) error {
-	config.tp.AddField(fmt.Sprintf(`{"id": "%s"}`, ID))
-	return config.tp.Render()
+	_, err := config.io.Out.Write([]byte(fmt.Sprintf(`{"id": "%s"}`, ID)))
+	return err
 }

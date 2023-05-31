@@ -123,6 +123,7 @@ func printJSON(config createConfig, project queries.Project) error {
 	if err != nil {
 		return err
 	}
-	config.tp.AddField(string(b))
-	return config.tp.Render()
+
+	_, err = config.io.Out.Write(b)
+	return err
 }

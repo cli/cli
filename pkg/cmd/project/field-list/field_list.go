@@ -126,6 +126,7 @@ func printJSON(config listConfig, project *queries.Project) error {
 	if err != nil {
 		return err
 	}
+
 	_, err = config.io.Out.Write(b)
 	return err
 }
