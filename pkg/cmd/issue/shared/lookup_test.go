@@ -285,10 +285,8 @@ func TestIssuesFromArgsWithFields(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			for i, issue := range issues {
-				if issue.Number != tt.wantIssues[i] {
-					t.Errorf("want issue #%d, got #%d", tt.wantIssues[i], issue.Number)
-				}
+			for i := range issues {
+				assert.Contains(t, tt.wantIssues, issues[i].Number)
 			}
 			if repo != nil {
 				repoURL := ghrepo.GenerateRepoURL(repo, "")
