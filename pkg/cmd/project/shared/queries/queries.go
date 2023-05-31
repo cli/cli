@@ -3,42 +3,36 @@ package queries
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/set"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/shurcooL/githubv4"
 )
 
-func NewClient() (*Client, error) {
-	apiClient, err := api.NewGraphQLClient(api.ClientOptions{
-		Timeout: 15 * time.Second,
-		Headers: map[string]string{},
-	})
-	if err != nil {
-		return nil, err
+func NewClient(httpClient *http.Client, hostname string, ios *iostreams.IOStreams) *Client {
+	apiClient := &hostScopedClient{
+		hostname: hostname,
+		Client:   api.NewClientFromHTTP(httpClient),
 	}
 	return &Client{
 		apiClient: apiClient,
-		// TODO: inform by iostreams
-		spinner:  true,
-		prompter: prompter.New("", os.Stdin, os.Stdout, os.Stderr),
-	}, nil
+		spinner:   ios.IsStdoutTTY() && ios.IsStderrTTY(),
+		prompter:  prompter.New("", ios.In, ios.Out, ios.ErrOut),
+	}
 }
 
 func NewTestClient() *Client {
-	apiClient, err := api.NewGraphQLClient(api.ClientOptions{
-		AuthToken: "TEST-TOKEN",
-		Headers:   map[string]string{},
-	})
-	if err != nil {
-		panic(err)
+	apiClient := &hostScopedClient{
+		hostname: "github.com",
+		Client:   api.NewClientFromHTTP(http.DefaultClient),
 	}
 	return &Client{
 		apiClient: apiClient,
@@ -51,8 +45,26 @@ type iprompter interface {
 	Select(string, string, []string) (int, error)
 }
 
+type hostScopedClient struct {
+	*api.Client
+	hostname string
+}
+
+func (c *hostScopedClient) Query(queryName string, query interface{}, variables map[string]interface{}) error {
+	return c.Client.Query(c.hostname, queryName, query, variables)
+}
+
+func (c *hostScopedClient) Mutate(queryName string, query interface{}, variables map[string]interface{}) error {
+	return c.Client.Mutate(c.hostname, queryName, query, variables)
+}
+
+type graphqlClient interface {
+	Query(queryName string, query interface{}, variables map[string]interface{}) error
+	Mutate(queryName string, query interface{}, variables map[string]interface{}) error
+}
+
 type Client struct {
-	apiClient *api.GraphQLClient
+	apiClient graphqlClient
 	spinner   bool
 	prompter  iprompter
 }
@@ -807,7 +819,7 @@ func (c *Client) OwnerIDAndType(login string) (string, OwnerType, error) {
 		// Due to the way the queries are structured, we don't know if a login belongs to a user
 		// or to an org, even though they are unique. To deal with this, we try both - if neither
 		// is found, we return the error.
-		var graphErr *api.GraphQLError
+		var graphErr api.GraphQLError
 		if errors.As(err, &graphErr) {
 			if graphErr.Match("NOT_FOUND", "user") && graphErr.Match("NOT_FOUND", "organization") {
 				return "", "", err
@@ -1163,7 +1175,7 @@ func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) ([]
 }
 
 func handleError(err error) error {
-	var gerr *api.GraphQLError
+	var gerr api.GraphQLError
 	if errors.As(err, &gerr) {
 		missing := set.NewStringSet()
 		for _, e := range gerr.Errors {

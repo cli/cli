@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -36,7 +37,7 @@ func NewCmdDeleteField(f *cmdutil.Factory, runF func(config deleteFieldConfig) e
 		Short: "Delete a field in a project",
 		Use:   "field-delete",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client, err := queries.NewClient()
+			client, err := client.New(f)
 			if err != nil {
 				return err
 			}
