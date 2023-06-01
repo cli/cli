@@ -165,6 +165,15 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 		}
 	}
 
+	// Extensions
+	em := f.ExtensionManager
+	for _, e := range em.List() {
+		extension := e
+		extensionCmd := NewCmdExtension(io, em, e)
+		cmd.AddCommand(extensionCmd)
+		cmd.ValidArgs = append(cmd.ValidArgs, fmt.Sprintf("%s\t%s", extension.Name(), extensionCmd.Short))
+	}
+
 	// Aliases
 	aliases := cfg.Aliases()
 	validAliasName := shared.ValidAliasNameFunc(cmd)
@@ -199,15 +208,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 				parentCmd.ValidArgs = append(parentCmd.ValidArgs, fmt.Sprintf("%s\tAlias for %s", aliasName, aliasValue))
 			}
 		}
-	}
-
-	// Extensions
-	em := f.ExtensionManager
-	for _, e := range em.List() {
-		extension := e
-		extensionCmd := NewCmdExtension(io, em, e)
-		cmd.AddCommand(extensionCmd)
-		cmd.ValidArgs = append(cmd.ValidArgs, fmt.Sprintf("%s\t%s", extension.Name(), extensionCmd.Short))
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
