@@ -184,7 +184,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
-			opts.RequestMethod = strings.ToUpper(opts.RequestMethod)
 
 			if runtime.GOOS == "windows" && filepath.IsAbs(opts.RequestPath) {
 				return fmt.Errorf(`invalid API endpoint: "%s". Your shell might be rewriting URL paths as filesystem paths. To avoid this, omit the leading slash from the endpoint argument`, opts.RequestPath)

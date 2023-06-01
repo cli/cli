@@ -50,7 +50,7 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 		return nil, fmt.Errorf("unrecognized parameters type: %v", params)
 	}
 
-	req, err := http.NewRequest(method, requestURL, body)
+	req, err := http.NewRequest(strings.ToUpper(method), requestURL, body)
 	if err != nil {
 		return nil, err
 	}
