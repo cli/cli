@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -284,7 +285,7 @@ func runView(opts *ViewOptions) error {
 		}
 		defer runLogZip.Close()
 
-		attachRunLog(runLogZip, jobs)
+		attachRunLog(&runLogZip.Reader, jobs)
 
 		return displayRunLog(opts.IO.Out, jobs, opts.LogFailed)
 	}
@@ -480,7 +481,19 @@ func promptForJob(prompter shared.Prompter, cs *iostreams.ColorScheme, jobs []sh
 }
 
 func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
-	re := fmt.Sprintf(`%s\/%d_.*\.txt`, regexp.QuoteMeta(job.Name), step.Number)
+	// As described in https://github.com/cli/cli/issues/5011#issuecomment-1570713070, there are a number of steps
+	// the server can take when producing the downloaded zip file that can result in a mismatch between the job name
+	// and the filename in the zip including:
+	//  * Removing characters in the job name that aren't allowed in file paths
+	//  * Truncating names that are too long for zip files
+	//  * Adding collision deduplicating numbers for jobs with the same name
+	//
+	// We are hesitant to duplicate all the server logic due to the fragility but while we explore our options, it
+	// is sensible to fix the issue that is unavoidable for users, that when a job uses a composite action, the server
+	// constructs a job name by constructing a job name of `<JOB_NAME`> / <ACTION_NAME>`. This means that logs will
+	// never be found for jobs that use composite actions.
+	sanitizedJobName := strings.ReplaceAll(job.Name, "/", "")
+	re := fmt.Sprintf(`%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
 }
 
@@ -500,7 +513,7 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 // It iterates through the list of jobs and tries to find the matching
 // log in the zip file. If the matching log is found it is attached
 // to the job.
-func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
+func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 	for i, job := range jobs {
 		for j, step := range job.Steps {
 			re := logFilenameRegexp(job, step)
