@@ -135,14 +135,16 @@ func TestRunList(t *testing.T) {
 								"shortDescription": "Short description 1",
 								"url":              "url1",
 								"closed":           false,
-								"ID":               "1",
+								"ID":               "id-1",
+								"number":           1,
 							},
 							map[string]interface{}{
 								"title":            "Project 2",
 								"shortDescription": "",
 								"url":              "url2",
 								"closed":           true,
-								"ID":               "2",
+								"ID":               "id-2",
+								"number":           2,
 							},
 						},
 					},
@@ -166,7 +168,7 @@ func TestRunList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Project 1\tShort description 1\turl1\topen\t1\n",
+		"Project 1\t1\topen\tid-1\n",
 		stdout.String())
 }
 
@@ -204,14 +206,16 @@ func TestRunList_Me(t *testing.T) {
 								"shortDescription": "Short description 1",
 								"url":              "url1",
 								"closed":           false,
-								"ID":               "1",
+								"ID":               "id-1",
+								"number":           1,
 							},
 							map[string]interface{}{
 								"title":            "Project 2",
 								"shortDescription": "",
 								"url":              "url2",
 								"closed":           true,
-								"ID":               "2",
+								"ID":               "id-2",
+								"number":           2,
 							},
 						},
 					},
@@ -235,7 +239,7 @@ func TestRunList_Me(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Project 1\tShort description 1\turl1\topen\t1\n",
+		"Project 1\t1\topen\tid-1\n",
 		stdout.String())
 }
 
@@ -273,14 +277,16 @@ func TestRunListViewer(t *testing.T) {
 								"shortDescription": "Short description 1",
 								"url":              "url1",
 								"closed":           false,
-								"ID":               "1",
+								"ID":               "id-1",
+								"number":           1,
 							},
 							map[string]interface{}{
 								"title":            "Project 2",
 								"shortDescription": "",
 								"url":              "url2",
 								"closed":           true,
-								"ID":               "2",
+								"ID":               "id-2",
+								"number":           2,
 							},
 						},
 					},
@@ -302,7 +308,7 @@ func TestRunListViewer(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Project 1\tShort description 1\turl1\topen\t1\n",
+		"Project 1\t1\topen\tid-1\n",
 		stdout.String())
 }
 
@@ -349,14 +355,16 @@ func TestRunListOrg(t *testing.T) {
 								"shortDescription": "Short description 1",
 								"url":              "url1",
 								"closed":           false,
-								"ID":               "1",
+								"ID":               "id-1",
+								"number":           1,
 							},
 							map[string]interface{}{
 								"title":            "Project 2",
 								"shortDescription": "",
 								"url":              "url2",
 								"closed":           true,
-								"ID":               "2",
+								"ID":               "id-2",
+								"number":           2,
 							},
 						},
 					},
@@ -380,7 +388,7 @@ func TestRunListOrg(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Project 1\tShort description 1\turl1\topen\t1\n",
+		"Project 1\t1\topen\tid-1\n",
 		stdout.String())
 }
 
@@ -477,14 +485,16 @@ func TestRunListWithClosed(t *testing.T) {
 								"shortDescription": "Short description 1",
 								"url":              "url1",
 								"closed":           false,
-								"ID":               "1",
+								"ID":               "id-1",
+								"number":           1,
 							},
 							map[string]interface{}{
 								"title":            "Project 2",
 								"shortDescription": "",
 								"url":              "url2",
 								"closed":           true,
-								"ID":               "2",
+								"ID":               "id-2",
+								"number":           2,
 							},
 						},
 					},
@@ -509,7 +519,7 @@ func TestRunListWithClosed(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Project 1\tShort description 1\turl1\topen\t1\nProject 2\t\turl2\tclosed\t2\n",
+		"Project 1\t1\topen\tid-1\nProject 2\t2\tclosed\tid-2\n",
 		stdout.String())
 }
 

@@ -2,6 +2,7 @@ package list
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
@@ -155,12 +156,11 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 		return cmdutil.NewNoResultsError(fmt.Sprintf("No projects found for %s", owner))
 	}
 
-	config.tp.HeaderRow("Title", "Description", "URL", "State", "ID")
+	config.tp.HeaderRow("Title", "Number", "State", "ID")
 
 	for _, p := range projects {
 		config.tp.AddField(p.Title)
-		config.tp.AddField(p.ShortDescription)
-		config.tp.AddField(p.URL)
+		config.tp.AddField(strconv.Itoa(int(p.Number)))
 		var state string
 		if p.Closed {
 			state = "closed"
