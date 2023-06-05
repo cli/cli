@@ -89,7 +89,7 @@ func viewRun(opts *ViewOptions) error {
 
 	cs := opts.IO.ColorScheme()
 	if gistID == "" {
-		gistID, err = shared.PromptGists(client, hostname, cs)
+		gistID, err = shared.PromptGists(opts.Prompter, client, hostname, cs)
 		if err != nil {
 			return err
 		}

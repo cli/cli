@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -94,17 +94,21 @@ func TestIsBinaryContents(t *testing.T) {
 
 func TestPromptGists(t *testing.T) {
 	tests := []struct {
-		name     string
-		askStubs func(as *prompt.AskStubber)
-		response string
-		wantOut  string
-		gist     *Gist
-		wantErr  bool
+		name          string
+		prompterStubs func(pm *prompter.MockPrompter)
+		response      string
+		wantOut       string
+		gist          *Gist
+		wantErr       bool
 	}{
 		{
 			name: "multiple files, select first gist",
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Select a gist").AnswerWith("cool.txt  about 6 hours ago")
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a gist",
+					[]string{"cool.txt  about 6 hours ago", "gistfile0.txt  about 6 hours ago"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "cool.txt  about 6 hours ago")
+					})
 			},
 			response: `{ "data": { "viewer": { "gists": { "nodes": [
 							{
@@ -126,8 +130,12 @@ func TestPromptGists(t *testing.T) {
 		},
 		{
 			name: "multiple files, select second gist",
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Select a gist").AnswerWith("gistfile0.txt  about 6 hours ago")
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a gist",
+					[]string{"cool.txt  about 6 hours ago", "gistfile0.txt  about 6 hours ago"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "gistfile0.txt  about 6 hours ago")
+					})
 			},
 			response: `{ "data": { "viewer": { "gists": { "nodes": [
 							{
@@ -173,12 +181,13 @@ func TestPromptGists(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+
+			mockPrompter := prompter.NewMockPrompter(t)
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(mockPrompter)
 			}
 
-			gistID, err := PromptGists(client, "github.com", ios.ColorScheme())
+			gistID, err := PromptGists(mockPrompter, client, "github.com", ios.ColorScheme())
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, gistID)
 			reg.Verify(t)

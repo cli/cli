@@ -12,21 +12,23 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/surveyext"
 	"github.com/spf13/cobra"
 )
+
+var editNextOptions = []string{"Edit another file", "Submit", "Cancel"}
 
 type EditOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
+	Prompter   prompter.Prompter
 
 	Edit func(string, string, string, *iostreams.IOStreams) (string, error)
 
@@ -42,6 +44,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		Prompter:   f.Prompter,
 		Edit: func(editorCmd, filename, defaultContent string, io *iostreams.IOStreams) (string, error) {
 			return surveyext.Edit(
 				editorCmd,
@@ -100,7 +103,7 @@ func editRun(opts *EditOptions) error {
 	if gistID == "" {
 		cs := opts.IO.ColorScheme()
 		if gistID == "" {
-			gistID, err = shared.PromptGists(client, host, cs)
+			gistID, err = shared.PromptGists(opts.Prompter, client, host, cs)
 			if err != nil {
 				return err
 			}
@@ -202,15 +205,11 @@ func editRun(opts *EditOptions) error {
 				if !opts.IO.CanPrompt() {
 					return errors.New("unsure what file to edit; either specify --filename or run interactively")
 				}
-				//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-				err = prompt.SurveyAskOne(&survey.Select{
-					Message: "Edit which file?",
-					Options: candidates,
-				}, &filename)
-
+				result, err := opts.Prompter.Select("Edit which file?", "", candidates)
 				if err != nil {
 					return fmt.Errorf("could not prompt: %w", err)
 				}
+				filename = candidates[result]
 			}
 		}
 
@@ -262,20 +261,11 @@ func editRun(opts *EditOptions) error {
 		}
 
 		choice := ""
-
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(&survey.Select{
-			Message: "What next?",
-			Options: []string{
-				"Edit another file",
-				"Submit",
-				"Cancel",
-			},
-		}, &choice)
-
+		result, err := opts.Prompter.Select("What next?", "", editNextOptions)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
+		choice = editNextOptions[result]
 
 		stop := false
 

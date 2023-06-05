@@ -9,11 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/shurcooL/githubv4"
 )
@@ -177,7 +176,7 @@ func IsBinaryContents(contents []byte) bool {
 	return isBinary
 }
 
-func PromptGists(client *http.Client, host string, cs *iostreams.ColorScheme) (gistID string, err error) {
+func PromptGists(prompter prompter.Prompter, client *http.Client, host string, cs *iostreams.ColorScheme) (gistID string, err error) {
 	gists, err := ListGists(client, host, 10, "all")
 	if err != nil {
 		return "", err
@@ -188,7 +187,6 @@ func PromptGists(client *http.Client, host string, cs *iostreams.ColorScheme) (g
 	}
 
 	var opts []string
-	var result int
 	var gistIDs = make([]string, len(gists))
 
 	for i, gist := range gists {
@@ -214,13 +212,7 @@ func PromptGists(client *http.Client, host string, cs *iostreams.ColorScheme) (g
 		opts = append(opts, opt)
 	}
 
-	questions := &survey.Select{
-		Message: "Select a gist",
-		Options: opts,
-	}
-
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err = prompt.SurveyAskOne(questions, &result)
+	result, err := prompter.Select("Select a gist", "", opts)
 
 	if err != nil {
 		return "", err

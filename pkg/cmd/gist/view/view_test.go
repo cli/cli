@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -336,6 +336,10 @@ func Test_viewRun(t *testing.T) {
 				httpmock.JSONResponse(tt.gist))
 		}
 
+		if tt.opts == nil {
+			tt.opts = &ViewOptions{}
+		}
+
 		if tt.mockGistList {
 			sixHours, _ := time.ParseDuration("6h")
 			sixHoursAgo := time.Now().Add(-sixHours)
@@ -355,13 +359,11 @@ func Test_viewRun(t *testing.T) {
 				)),
 			)
 
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			as.StubPrompt("Select a gist").AnswerDefault()
-		}
-
-		if tt.opts == nil {
-			tt.opts = &ViewOptions{}
+			pm := prompter.NewMockPrompter(t)
+			pm.RegisterSelect("Select a gist", []string{"cool.txt  about 6 hours ago"}, func(_, _ string, opts []string) (int, error) {
+				return 0, nil
+			})
+			tt.opts.Prompter = pm
 		}
 
 		tt.opts.HttpClient = func() (*http.Client, error) {
