@@ -159,7 +159,7 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 	config.tp.HeaderRow("Number", "Title", "State", "ID")
 
 	for _, p := range projects {
-		config.tp.AddField(strconv.Itoa(int(p.Number)))
+		config.tp.AddField(strconv.Itoa(int(p.Number)), tableprinter.WithTruncate(nil))
 		config.tp.AddField(p.Title)
 		var state string
 		if p.Closed {
@@ -168,7 +168,7 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 			state = "open"
 		}
 		config.tp.AddField(state)
-		config.tp.AddField(p.ID)
+		config.tp.AddField(p.ID, tableprinter.WithTruncate(nil))
 		config.tp.EndRow()
 	}
 

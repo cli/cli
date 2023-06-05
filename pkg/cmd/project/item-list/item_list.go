@@ -119,7 +119,7 @@ func printResults(config listConfig, items []queries.ProjectItem, login string) 
 			config.tp.AddField(strconv.Itoa(i.Number()))
 		}
 		config.tp.AddField(i.Repo())
-		config.tp.AddField(i.ID())
+		config.tp.AddField(i.ID(), tableprinter.WithTruncate(nil))
 		config.tp.EndRow()
 	}
 
