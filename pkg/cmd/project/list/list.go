@@ -156,11 +156,11 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 		return cmdutil.NewNoResultsError(fmt.Sprintf("No projects found for %s", owner))
 	}
 
-	config.tp.HeaderRow("Title", "Number", "State", "ID")
+	config.tp.HeaderRow("Number", "Title", "State", "ID")
 
 	for _, p := range projects {
-		config.tp.AddField(p.Title)
 		config.tp.AddField(strconv.Itoa(int(p.Number)))
+		config.tp.AddField(p.Title)
 		var state string
 		if p.Closed {
 			state = "closed"

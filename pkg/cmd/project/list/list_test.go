@@ -168,7 +168,7 @@ func TestRunList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Project 1\t1\topen\tid-1\n",
+		"1\tProject 1\topen\tid-1\n",
 		stdout.String())
 }
 
@@ -239,7 +239,7 @@ func TestRunList_Me(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Project 1\t1\topen\tid-1\n",
+		"1\tProject 1\topen\tid-1\n",
 		stdout.String())
 }
 
@@ -308,7 +308,7 @@ func TestRunListViewer(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Project 1\t1\topen\tid-1\n",
+		"1\tProject 1\topen\tid-1\n",
 		stdout.String())
 }
 
@@ -388,7 +388,7 @@ func TestRunListOrg(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Project 1\t1\topen\tid-1\n",
+		"1\tProject 1\topen\tid-1\n",
 		stdout.String())
 }
 
@@ -519,7 +519,7 @@ func TestRunListWithClosed(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Project 1\t1\topen\tid-1\nProject 2\t2\tclosed\tid-2\n",
+		"1\tProject 1\topen\tid-1\n2\tProject 2\tclosed\tid-2\n",
 		stdout.String())
 }
 
