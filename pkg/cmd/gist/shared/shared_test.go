@@ -1,8 +1,14 @@
 package shared
 
 import (
+	"fmt"
+	"net/http"
 	"testing"
+	"time"
 
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -83,5 +89,99 @@ func TestIsBinaryContents(t *testing.T) {
 
 	for _, tt := range tests {
 		assert.Equal(t, tt.want, IsBinaryContents(tt.fileContent))
+	}
+}
+
+func TestPromptGists(t *testing.T) {
+	tests := []struct {
+		name     string
+		askStubs func(as *prompt.AskStubber)
+		response string
+		wantOut  string
+		gist     *Gist
+		wantErr  bool
+	}{
+		{
+			name: "multiple files, select first gist",
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Select a gist").AnswerWith("cool.txt  about 6 hours ago")
+			},
+			response: `{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "gistid1",
+								"files": [{ "name": "cool.txt" }],
+								"description": "",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							},
+							{
+								"name": "gistid2",
+								"files": [{ "name": "gistfile0.txt" }],
+								"description": "",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							}
+						] } } } }`,
+			wantOut: "gistid1",
+		},
+		{
+			name: "multiple files, select second gist",
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Select a gist").AnswerWith("gistfile0.txt  about 6 hours ago")
+			},
+			response: `{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "gistid1",
+								"files": [{ "name": "cool.txt" }],
+								"description": "",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							},
+							{
+								"name": "gistid2",
+								"files": [{ "name": "gistfile0.txt" }],
+								"description": "",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							}
+						] } } } }`,
+			wantOut: "gistid2",
+		},
+		{
+			name:     "no files",
+			response: `{ "data": { "viewer": { "gists": { "nodes": [] } } } }`,
+			wantOut:  "",
+		},
+	}
+
+	ios, _, _, _ := iostreams.Test()
+
+	for _, tt := range tests {
+		reg := &httpmock.Registry{}
+
+		const query = `query GistList\b`
+		sixHours, _ := time.ParseDuration("6h")
+		sixHoursAgo := time.Now().Add(-sixHours)
+		reg.Register(
+			httpmock.GraphQL(query),
+			httpmock.StringResponse(fmt.Sprintf(
+				tt.response,
+				sixHoursAgo.Format(time.RFC3339),
+			)),
+		)
+		client := &http.Client{Transport: reg}
+
+		t.Run(tt.name, func(t *testing.T) {
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
+			gistID, err := PromptGists(client, "github.com", ios.ColorScheme())
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantOut, gistID)
+			reg.Verify(t)
+		})
 	}
 }

@@ -55,16 +55,15 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		Use:   "edit {<id> | <url>} [<filename>]",
 		Short: "Edit one of your gists",
 		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 1 {
-				return cmdutil.FlagErrorf("cannot edit: gist argument required")
-			}
 			if len(args) > 2 {
 				return cmdutil.FlagErrorf("too many arguments")
 			}
 			return nil
 		},
 		RunE: func(c *cobra.Command, args []string) error {
-			opts.Selector = args[0]
+			if len(args) > 0 {
+				opts.Selector = args[0]
+			}
 			if len(args) > 1 {
 				opts.SourceFile = args[1]
 			}
@@ -85,7 +84,33 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 }
 
 func editRun(opts *EditOptions) error {
+	client, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, _ := cfg.Authentication().DefaultHost()
+
 	gistID := opts.Selector
+	if gistID == "" {
+		cs := opts.IO.ColorScheme()
+		if gistID == "" {
+			gistID, err = shared.PromptGists(client, host, cs)
+			if err != nil {
+				return err
+			}
+
+			if gistID == "" {
+				fmt.Fprintln(opts.IO.Out, "No gists found.")
+				return nil
+			}
+		}
+	}
 
 	if strings.Contains(gistID, "/") {
 		id, err := shared.GistIDFromURL(gistID)
@@ -95,19 +120,7 @@ func editRun(opts *EditOptions) error {
 		gistID = id
 	}
 
-	client, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
 	apiClient := api.NewClientFromHTTP(client)
-
-	cfg, err := opts.Config()
-	if err != nil {
-		return err
-	}
-
-	host, _ := cfg.Authentication().DefaultHost()
 
 	gist, err := shared.GetGist(client, host, gistID)
 	if err != nil {
