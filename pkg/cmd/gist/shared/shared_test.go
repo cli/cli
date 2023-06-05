@@ -180,8 +180,6 @@ func TestPromptGists(t *testing.T) {
 		client := &http.Client{Transport: reg}
 
 		t.Run(tt.name, func(t *testing.T) {
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-
 			mockPrompter := prompter.NewMockPrompter(t)
 			if tt.prompterStubs != nil {
 				tt.prompterStubs(mockPrompter)
