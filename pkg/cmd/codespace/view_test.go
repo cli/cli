@@ -37,14 +37,14 @@ func Test_NewCmdView(t *testing.T) {
 			codespaceName: "monalisa-cli-cli-abcdef",
 			opts:          &viewOptions{},
 			wantErr:       false,
-			wantStdout:    "Name\tmonalisa-cli-cli-abcdef\nGit Status\t - 0↓ 0↑\nIdle Timeout\t0 minutes\n",
+			wantStdout:    "Name\tmonalisa-cli-cli-abcdef\nState\t\nRepository\t\nGit Status\t - 0 commits ahead, 0 commits behind\nDevcontainer Path\t\nMachine Display Name\t\nIdle Timeout\t0 minutes\nCreated At\t\nRetention Period\t\n",
 		},
 		{
 			tName:         "command succeeds because codespace exists (with details)",
 			codespaceName: "monalisa-cli-cli-hijklm",
 			opts:          &viewOptions{},
 			wantErr:       false,
-			wantStdout:    "Name\tmonalisa-cli-cli-hijklm\nGit Status\tmain* - 2↓ 1↑\nIdle Timeout\t30 minutes\nRetention Period\t1 day\n",
+			wantStdout:    "Name\tmonalisa-cli-cli-hijklm\nState\tAvailable\nRepository\tcli/cli\nGit Status\tmain* - 1 commit ahead, 2 commits behind\nDevcontainer Path\t.devcontainer/devcontainer.json\nMachine Display Name\tTest Display Name\nIdle Timeout\t30 minutes\nCreated At\t\nRetention Period\t1 day\n",
 		},
 	}
 
@@ -107,6 +107,12 @@ func testViewApiMock() *apiClientMock {
 		},
 		IdleTimeoutMinutes:     30,
 		RetentionPeriodMinutes: 1440,
+		State:                  "Available",
+		Repository:             api.Repository{FullName: "cli/cli"},
+		DevContainerPath:       ".devcontainer/devcontainer.json",
+		Machine: api.CodespaceMachine{
+			DisplayName: "Test Display Name",
+		},
 	}
 	return &apiClientMock{
 		GetCodespaceFunc: func(_ context.Context, name string, _ bool) (*api.Codespace, error) {

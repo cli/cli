@@ -7,8 +7,9 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -27,26 +28,12 @@ func newViewCmd(app *App) *cobra.Command {
 	viewCmd := &cobra.Command{
 		Use:   "view",
 		Short: "View details about a codespace",
-		Long: heredoc.Doc(`
-			View details about a codespace.
-
-			For more fine-grained details, you can add the "--json" flag to view the full list of fields available.
-
-			If this command doesn't provide enough information, you can use the "gh api" command to view the full JSON response:
-			$ gh api /user/codespaces/<codespace-name>
-		`),
 		Example: heredoc.Doc(`
 			# select a codespace from a list of all codespaces you own
 			$ gh cs view	
 
 			# view the details of a specific codespace
-			$ gh cs view -c <codespace-name>
-			
-			# select a codespace from a list of codespaces in a repository
-			$ gh cs view --repo <owner>/<repo>
-
-			# select a codespace from a list of codespaces with a specific repository owner
-			$ gh cs view --repo-owner <org/username>
+			$ gh cs view -c codespace-name-12345
 
 			# view the list of all available fields for a codespace
 			$ gh cs view --json
@@ -86,8 +73,7 @@ func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions) error {
 		return opts.exporter.Write(a.io, selectedCodespace)
 	}
 
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(a.io)
+	tp := tableprinter.New(a.io)
 	c := codespace{selectedCodespace}
 	formattedName := formatNameForVSCSTarget(c.Name, c.VSCSTarget)
 
@@ -108,10 +94,10 @@ func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions) error {
 	}
 
 	for _, field := range fields {
-		// Only display the field if it has a value.
-		if field.value != "" {
-			tp.AddField(field.name, nil, nil)
-			tp.AddField(field.value, nil, nil)
+		// Don't display the field if it is empty and we are printing to a TTY
+		if !a.io.IsStdoutTTY() || field.value != "" {
+			tp.AddField(field.name)
+			tp.AddField(field.value)
 			tp.EndRow()
 		}
 	}
@@ -126,8 +112,12 @@ func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions) error {
 
 func formatGitStatus(codespace codespace) string {
 	branchWithGitStatus := codespace.branchWithGitStatus()
-	// u2193 and u2191 are the unicode arrows for down and up
-	return fmt.Sprintf("%s - %d\u2193 %d\u2191", branchWithGitStatus, codespace.GitStatus.Behind, codespace.GitStatus.Ahead)
+
+	// Format the commits ahead/behind with proper pluralization
+	commitsAhead := text.Pluralize(codespace.GitStatus.Ahead, "commit")
+	commitsBehind := text.Pluralize(codespace.GitStatus.Behind, "commit")
+
+	return fmt.Sprintf("%s - %s ahead, %s behind", branchWithGitStatus, commitsAhead, commitsBehind)
 }
 
 func formatRetentionPeriodDays(codespace codespace) string {
