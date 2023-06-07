@@ -49,7 +49,7 @@ func run(args []string) error {
 		IOStreams: ios,
 		Browser:   &browser{},
 		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+			return config.NewFromString(""), nil
 		},
 		ExtensionManager: &em{},
 	}, "", "")

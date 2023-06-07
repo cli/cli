@@ -5,17 +5,15 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +26,7 @@ type ViewOptions struct {
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 	Browser    browser
+	Prompter   prompter.Prompter
 
 	Selector  string
 	Filename  string
@@ -42,6 +41,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -89,7 +89,7 @@ func viewRun(opts *ViewOptions) error {
 
 	cs := opts.IO.ColorScheme()
 	if gistID == "" {
-		gistID, err = promptGists(client, hostname, cs)
+		gistID, err = shared.PromptGists(opts.Prompter, client, hostname, cs)
 		if err != nil {
 			return err
 		}
@@ -203,56 +203,4 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	return nil
-}
-
-func promptGists(client *http.Client, host string, cs *iostreams.ColorScheme) (gistID string, err error) {
-	gists, err := shared.ListGists(client, host, 10, "all")
-	if err != nil {
-		return "", err
-	}
-
-	if len(gists) == 0 {
-		return "", nil
-	}
-
-	var opts []string
-	var result int
-	var gistIDs = make([]string, len(gists))
-
-	for i, gist := range gists {
-		gistIDs[i] = gist.ID
-		description := ""
-		gistName := ""
-
-		if gist.Description != "" {
-			description = gist.Description
-		}
-
-		filenames := make([]string, 0, len(gist.Files))
-		for fn := range gist.Files {
-			filenames = append(filenames, fn)
-		}
-		sort.Strings(filenames)
-		gistName = filenames[0]
-
-		gistTime := text.FuzzyAgo(time.Now(), gist.UpdatedAt)
-		// TODO: support dynamic maxWidth
-		description = text.Truncate(100, text.RemoveExcessiveWhitespace(description))
-		opt := fmt.Sprintf("%s %s %s", cs.Bold(gistName), description, cs.Gray(gistTime))
-		opts = append(opts, opt)
-	}
-
-	questions := &survey.Select{
-		Message: "Select a gist",
-		Options: opts,
-	}
-
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err = prompt.SurveyAskOne(questions, &result)
-
-	if err != nil {
-		return "", err
-	}
-
-	return gistIDs[result], nil
 }

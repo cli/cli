@@ -130,6 +130,24 @@ func Test_httpRequest(t *testing.T) {
 			},
 		},
 		{
+			name: "lowercase HTTP method",
+			args: args{
+				client:  &httpClient,
+				host:    "github.com",
+				method:  "get",
+				p:       "repos/octocat/spoon-knife",
+				params:  nil,
+				headers: []string{},
+			},
+			wantErr: false,
+			want: expects{
+				method:  "GET",
+				u:       "https://api.github.com/repos/octocat/spoon-knife",
+				body:    "",
+				headers: "",
+			},
+		},
+		{
 			name: "GET with leading slash",
 			args: args{
 				client:  &httpClient,
@@ -321,6 +339,14 @@ func Test_addQuery(t *testing.T) {
 				params: map[string]interface{}{"a": "hello"},
 			},
 			want: "?a=hello",
+		},
+		{
+			name: "array",
+			args: args{
+				path:   "",
+				params: map[string]interface{}{"a": []interface{}{"hello", "world"}},
+			},
+			want: "?a%5B%5D=hello&a%5B%5D=world",
 		},
 		{
 			name: "append",

@@ -70,7 +70,7 @@ func newListCmd(app *App) *cobra.Command {
 
 	listCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization to list codespaces for (admin-only)")
 	listCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to list codespaces for (used with --org)")
-	cmdutil.AddJSONFlags(listCmd, &exporter, api.CodespaceFields)
+	cmdutil.AddJSONFlags(listCmd, &exporter, api.ListCodespaceFields)
 
 	listCmd.Flags().BoolVarP(&opts.useWeb, "web", "w", false, "List codespaces in the web browser, cannot be used with --user or --org")
 
