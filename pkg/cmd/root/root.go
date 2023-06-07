@@ -168,10 +168,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	// Extensions
 	em := f.ExtensionManager
 	for _, e := range em.List() {
-		extension := e
 		extensionCmd := NewCmdExtension(io, em, e)
 		cmd.AddCommand(extensionCmd)
-		cmd.ValidArgs = append(cmd.ValidArgs, fmt.Sprintf("%s\t%s", extension.Name(), extensionCmd.Short))
 	}
 
 	// Aliases
@@ -193,7 +191,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 			if strings.HasPrefix(aliasValue, "!") {
 				shellAliasCmd := NewCmdShellAlias(io, parentArgs[0], aliasValue)
 				parentCmd.AddCommand(shellAliasCmd)
-				parentCmd.ValidArgs = append(parentCmd.ValidArgs, fmt.Sprintf("%s\tShell alias", aliasName))
 			} else {
 				aliasCmd := NewCmdAlias(io, parentArgs[0], aliasValue)
 				split, _ := shlex.Split(aliasValue)
@@ -205,7 +202,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 					rootHelpFunc(f, child, args)
 				})
 				parentCmd.AddCommand(aliasCmd)
-				parentCmd.ValidArgs = append(parentCmd.ValidArgs, fmt.Sprintf("%s\tAlias for %s", aliasName, aliasValue))
 			}
 		}
 	}
