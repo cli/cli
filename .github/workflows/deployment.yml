@@ -341,5 +341,6 @@ jobs:
         with:
           formula-name: gh
           tag-name: ${{ inputs.tag_name }}
+          push-to: cli/homebrew-core
         env:
-          COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_PR_PAT }}
