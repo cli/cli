@@ -168,7 +168,7 @@ func statusRun(opts *StatusOptions) error {
 		}
 		if prevEntry && failed {
 			fmt.Fprint(stderr, "\n")
-		} else if prevEntry && failed == false {
+		} else if prevEntry && !failed {
 			fmt.Fprint(stdout, "\n")
 		}
 		prevEntry = true

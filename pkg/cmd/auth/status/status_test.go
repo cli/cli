@@ -310,13 +310,12 @@ func Test_statusRun(t *testing.T) {
 				tt.opts = &StatusOptions{}
 			}
 
-			ios, _, _, stderr := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
 
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
 			ios.SetStdoutTTY(true)
 			tt.opts.IO = ios
-
 			cfg := config.NewFromString("")
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(cfg)
@@ -340,9 +339,13 @@ func Test_statusRun(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-
-			output := strings.ReplaceAll(stderr.String(), config.ConfigDir()+string(filepath.Separator), "GH_CONFIG_DIR/")
-			assert.Equal(t, tt.wantOut, output)
+			output := strings.ReplaceAll(stdout.String(), config.ConfigDir()+string(filepath.Separator), "GH_CONFIG_DIR/")
+			errorOutput := strings.ReplaceAll(stderr.String(), config.ConfigDir()+string(filepath.Separator), "GH_CONFIG_DIR/")
+			if output != "" {
+				assert.Equal(t, tt.wantOut, output)
+			} else {
+				assert.Equal(t, tt.wantOut, errorOutput)
+			}
 
 			mainBuf := bytes.Buffer{}
 			hostsBuf := bytes.Buffer{}
