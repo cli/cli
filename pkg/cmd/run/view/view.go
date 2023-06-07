@@ -12,9 +12,9 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
@@ -24,7 +24,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -65,6 +64,7 @@ type ViewOptions struct {
 	IO          *iostreams.IOStreams
 	BaseRepo    func() (ghrepo.Interface, error)
 	Browser     browser.Browser
+	Prompter    shared.Prompter
 	RunLogCache runLogCache
 
 	RunID      string
@@ -86,6 +86,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := &ViewOptions{
 		IO:          f.IOStreams,
 		HttpClient:  f.HttpClient,
+		Prompter:    f.Prompter,
 		Now:         time.Now,
 		Browser:     f.Browser,
 		RunLogCache: rlc{},
@@ -205,7 +206,7 @@ func runView(opts *ViewOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to get runs: %w", err)
 		}
-		runID, err = shared.PromptForRun(cs, runs.WorkflowRuns)
+		runID, err = shared.SelectRun(opts.Prompter, cs, runs.WorkflowRuns)
 		if err != nil {
 			return err
 		}
@@ -228,7 +229,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if opts.Prompt && len(jobs) > 1 {
-		selectedJob, err = promptForJob(cs, jobs)
+		selectedJob, err = promptForJob(opts.Prompter, cs, jobs)
 		if err != nil {
 			return err
 		}
@@ -284,7 +285,7 @@ func runView(opts *ViewOptions) error {
 		}
 		defer runLogZip.Close()
 
-		attachRunLog(runLogZip, jobs)
+		attachRunLog(&runLogZip.Reader, jobs)
 
 		return displayRunLog(opts.IO.Out, jobs, opts.LogFailed)
 	}
@@ -459,20 +460,14 @@ func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface
 	return cache.Open(filepath)
 }
 
-func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, error) {
+func promptForJob(prompter shared.Prompter, cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, error) {
 	candidates := []string{"View all jobs in this run"}
 	for _, job := range jobs {
 		symbol, _ := shared.Symbol(cs, job.Status, job.Conclusion)
 		candidates = append(candidates, fmt.Sprintf("%s %s", symbol, job.Name))
 	}
 
-	var selected int
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message:  "View a specific job in this run?",
-		Options:  candidates,
-		PageSize: 12,
-	}, &selected)
+	selected, err := prompter.Select("View a specific job in this run?", "", candidates)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +481,19 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 }
 
 func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
-	re := fmt.Sprintf(`%s\/%d_.*\.txt`, regexp.QuoteMeta(job.Name), step.Number)
+	// As described in https://github.com/cli/cli/issues/5011#issuecomment-1570713070, there are a number of steps
+	// the server can take when producing the downloaded zip file that can result in a mismatch between the job name
+	// and the filename in the zip including:
+	//  * Removing characters in the job name that aren't allowed in file paths
+	//  * Truncating names that are too long for zip files
+	//  * Adding collision deduplicating numbers for jobs with the same name
+	//
+	// We are hesitant to duplicate all the server logic due to the fragility but while we explore our options, it
+	// is sensible to fix the issue that is unavoidable for users, that when a job uses a composite action, the server
+	// constructs a job name by constructing a job name of `<JOB_NAME`> / <ACTION_NAME>`. This means that logs will
+	// never be found for jobs that use composite actions.
+	sanitizedJobName := strings.ReplaceAll(job.Name, "/", "")
+	re := fmt.Sprintf(`%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
 }
 
@@ -506,7 +513,7 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 // It iterates through the list of jobs and tries to find the matching
 // log in the zip file. If the matching log is found it is attached
 // to the job.
-func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
+func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 	for i, job := range jobs {
 		for j, step := range job.Steps {
 			re := logFilenameRegexp(job, step)

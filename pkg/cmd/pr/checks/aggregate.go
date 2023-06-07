@@ -30,10 +30,10 @@ func aggregateChecks(checkContexts []api.CheckContext, requiredChecks bool) (che
 			continue
 		}
 
-		state := c.State
+		state := string(c.State)
 		if state == "" {
 			if c.Status == "COMPLETED" {
-				state = c.Conclusion
+				state = string(c.Conclusion)
 			} else {
 				state = c.Status
 			}

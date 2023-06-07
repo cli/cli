@@ -50,7 +50,7 @@ type ConfirmStub struct {
 type MultiSelectStub struct {
 	Prompt       string
 	ExpectedOpts []string
-	Fn           func(string, string, []string) ([]string, error)
+	Fn           func(string, []string, []string) ([]int, error)
 }
 
 type InputHostnameStub struct {
@@ -83,8 +83,6 @@ type MockPrompter struct {
 	AuthTokenStubs       []AuthTokenStub
 	ConfirmDeletionStubs []ConfirmDeletionStub
 }
-
-// TODO thread safety
 
 func NewMockPrompter(t *testing.T) *MockPrompter {
 	m := &MockPrompter{
@@ -120,17 +118,17 @@ func NewMockPrompter(t *testing.T) *MockPrompter {
 		return s.Fn(p, d, opts)
 	}
 
-	m.MultiSelectFunc = func(p, d string, opts []string) ([]string, error) {
+	m.MultiSelectFunc = func(p string, d, opts []string) ([]int, error) {
 		var s MultiSelectStub
-		if len(m.SelectStubs) > 0 {
+		if len(m.MultiSelectStubs) > 0 {
 			s = m.MultiSelectStubs[0]
-			m.SelectStubs = m.SelectStubs[1:len(m.SelectStubs)]
+			m.MultiSelectStubs = m.MultiSelectStubs[1:len(m.MultiSelectStubs)]
 		} else {
-			return []string{}, NoSuchPromptErr(p)
+			return []int{}, NoSuchPromptErr(p)
 		}
 
 		if s.Prompt != p {
-			return []string{}, NoSuchPromptErr(p)
+			return []int{}, NoSuchPromptErr(p)
 		}
 
 		AssertOptions(m.t, s.ExpectedOpts, opts)
@@ -240,7 +238,7 @@ func (m *MockPrompter) RegisterSelect(prompt string, opts []string, stub func(_,
 		Fn:           stub})
 }
 
-func (m *MockPrompter) RegisterMultiSelect(prompt string, opts []string, stub func(_, _ string, _ []string) ([]string, error)) {
+func (m *MockPrompter) RegisterMultiSelect(prompt string, d, opts []string, stub func(_ string, _, _ []string) ([]int, error)) {
 	m.MultiSelectStubs = append(m.MultiSelectStubs, MultiSelectStub{
 		Prompt:       prompt,
 		ExpectedOpts: opts,

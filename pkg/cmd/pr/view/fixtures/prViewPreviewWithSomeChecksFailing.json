@@ -46,6 +46,7 @@
                   "contexts": {
                     "nodes": [
                       {
+                        "__typename": "CheckRun",
                         "conclusion": "SUCCESS",
                         "status": "COMPLETED",
                         "name": "cool tests",
@@ -54,6 +55,7 @@
                         "detailsUrl": "sweet link"
                       },
                       {
+                        "__typename": "CheckRun",
                         "conclusion": "FAILURE",
                         "status": "COMPLETED",
                         "name": "sad tests",

@@ -35,7 +35,7 @@ var _ Prompter = &PrompterMock{}
 //			MarkdownEditorFunc: func(s1 string, s2 string, b bool) (string, error) {
 //				panic("mock out the MarkdownEditor method")
 //			},
-//			MultiSelectFunc: func(s1 string, s2 string, strings []string) ([]string, error) {
+//			MultiSelectFunc: func(s string, strings1 []string, strings2 []string) ([]int, error) {
 //				panic("mock out the MultiSelect method")
 //			},
 //			PasswordFunc: func(s string) (string, error) {
@@ -70,7 +70,7 @@ type PrompterMock struct {
 	MarkdownEditorFunc func(s1 string, s2 string, b bool) (string, error)
 
 	// MultiSelectFunc mocks the MultiSelect method.
-	MultiSelectFunc func(s1 string, s2 string, strings []string) ([]string, error)
+	MultiSelectFunc func(s string, strings1 []string, strings2 []string) ([]int, error)
 
 	// PasswordFunc mocks the Password method.
 	PasswordFunc func(s string) (string, error)
@@ -116,12 +116,12 @@ type PrompterMock struct {
 		}
 		// MultiSelect holds details about calls to the MultiSelect method.
 		MultiSelect []struct {
-			// S1 is the s1 argument value.
-			S1 string
-			// S2 is the s2 argument value.
-			S2 string
-			// Strings is the strings argument value.
-			Strings []string
+			// S is the s argument value.
+			S string
+			// Strings1 is the strings1 argument value.
+			Strings1 []string
+			// Strings2 is the strings2 argument value.
+			Strings2 []string
 		}
 		// Password holds details about calls to the Password method.
 		Password []struct {
@@ -348,23 +348,23 @@ func (mock *PrompterMock) MarkdownEditorCalls() []struct {
 }
 
 // MultiSelect calls MultiSelectFunc.
-func (mock *PrompterMock) MultiSelect(s1 string, s2 string, strings []string) ([]string, error) {
+func (mock *PrompterMock) MultiSelect(s string, strings1 []string, strings2 []string) ([]int, error) {
 	if mock.MultiSelectFunc == nil {
 		panic("PrompterMock.MultiSelectFunc: method is nil but Prompter.MultiSelect was just called")
 	}
 	callInfo := struct {
-		S1      string
-		S2      string
-		Strings []string
+		S        string
+		Strings1 []string
+		Strings2 []string
 	}{
-		S1:      s1,
-		S2:      s2,
-		Strings: strings,
+		S:        s,
+		Strings1: strings1,
+		Strings2: strings2,
 	}
 	mock.lockMultiSelect.Lock()
 	mock.calls.MultiSelect = append(mock.calls.MultiSelect, callInfo)
 	mock.lockMultiSelect.Unlock()
-	return mock.MultiSelectFunc(s1, s2, strings)
+	return mock.MultiSelectFunc(s, strings1, strings2)
 }
 
 // MultiSelectCalls gets all the calls that were made to MultiSelect.
@@ -372,14 +372,14 @@ func (mock *PrompterMock) MultiSelect(s1 string, s2 string, strings []string) ([
 //
 //	len(mockedPrompter.MultiSelectCalls())
 func (mock *PrompterMock) MultiSelectCalls() []struct {
-	S1      string
-	S2      string
-	Strings []string
+	S        string
+	Strings1 []string
+	Strings2 []string
 } {
 	var calls []struct {
-		S1      string
-		S2      string
-		Strings []string
+		S        string
+		Strings1 []string
+		Strings2 []string
 	}
 	mock.lockMultiSelect.RLock()
 	calls = mock.calls.MultiSelect

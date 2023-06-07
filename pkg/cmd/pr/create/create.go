@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -129,6 +130,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
+			// Workaround: Due to the way this command is implemented, we need to manually check GH_REPO.
+			// Commands should use the standard BaseRepoOverride functionality to handle this behavior instead.
+			if opts.RepoOverride == "" {
+				opts.RepoOverride = os.Getenv("GH_REPO")
+			}
+
 			noMaintainerEdit, _ := cmd.Flags().GetBool("no-maintainer-edit")
 			opts.MaintainerCanModify = !noMaintainerEdit
 
@@ -318,8 +325,6 @@ func createRun(opts *CreateOptions) (err error) {
 
 			if template != nil {
 				templateContent = string(template.Body())
-			} else {
-				templateContent = string(tpl.LegacyBody())
 			}
 		}
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -144,11 +145,11 @@ func Test_NewCmdDownload(t *testing.T) {
 
 func Test_runDownload(t *testing.T) {
 	tests := []struct {
-		name       string
-		opts       DownloadOptions
-		mockAPI    func(*mockPlatform)
-		mockPrompt func(*mockPrompter)
-		wantErr    string
+		name        string
+		opts        DownloadOptions
+		mockAPI     func(*mockPlatform)
+		promptStubs func(*prompter.MockPrompter)
+		wantErr     string
 	}{
 		{
 			name: "download non-expired",
@@ -281,13 +282,11 @@ func Test_runDownload(t *testing.T) {
 				}, nil)
 				p.On("Download", "http://download.com/artifact2.zip", ".").Return(nil)
 			},
-			mockPrompt: func(p *mockPrompter) {
-				p.On("Prompt", "Select artifacts to download:", []string{"artifact-1", "artifact-2"}, mock.AnythingOfType("*[]string")).
-					Run(func(args mock.Arguments) {
-						result := args.Get(2).(*[]string)
-						*result = []string{"artifact-2"}
-					}).
-					Return(nil)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("Select artifacts to download:", nil, []string{"artifact-1", "artifact-2"},
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{1}, nil
+					})
 			},
 		},
 	}
@@ -297,7 +296,12 @@ func Test_runDownload(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
 			opts.IO = ios
 			opts.Platform = newMockPlatform(t, tt.mockAPI)
-			opts.Prompter = newMockPrompter(t, tt.mockPrompt)
+
+			pm := prompter.NewMockPrompter(t)
+			opts.Prompter = pm
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
+			}
 
 			err := runDownload(opts)
 			if tt.wantErr != "" {
@@ -335,26 +339,5 @@ func (p *mockPlatform) List(runID string) ([]shared.Artifact, error) {
 
 func (p *mockPlatform) Download(url string, dir string) error {
 	args := p.Called(url, dir)
-	return args.Error(0)
-}
-
-type mockPrompter struct {
-	mock.Mock
-}
-
-func newMockPrompter(t *testing.T, config func(*mockPrompter)) *mockPrompter {
-	m := &mockPrompter{}
-	m.Test(t)
-	t.Cleanup(func() {
-		m.AssertExpectations(t)
-	})
-	if config != nil {
-		config(m)
-	}
-	return m
-}
-
-func (p *mockPrompter) Prompt(msg string, opts []string, res interface{}) error {
-	args := p.Called(msg, opts, res)
 	return args.Error(0)
 }

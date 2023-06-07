@@ -17,6 +17,7 @@ type CancelOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   shared.Prompter
 
 	Prompt bool
 
@@ -27,6 +28,7 @@ func NewCmdCancel(f *cmdutil.Factory, runF func(*CancelOptions) error) *cobra.Co
 	opts := &CancelOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -83,11 +85,10 @@ func runCancel(opts *CancelOptions) error {
 		if len(runs) == 0 {
 			return fmt.Errorf("found no in progress runs to cancel")
 		}
-		runID, err = shared.PromptForRun(cs, runs)
-		if err != nil {
+		if runID, err = shared.SelectRun(opts.Prompter, cs, runs); err != nil {
 			return err
 		}
-		// TODO silly stopgap until dust settles and PromptForRun can just return a run
+		// TODO silly stopgap until dust settles and SelectRun can just return a run
 		for _, r := range runs {
 			if fmt.Sprintf("%d", r.ID) == runID {
 				run = &r

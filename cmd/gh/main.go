@@ -14,16 +14,10 @@ import (
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/run"
-	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/internal/update"
-	"github.com/cli/cli/v2/pkg/cmd/alias/expand"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -80,9 +74,6 @@ func mainRun() exitCode {
 		surveyCore.TemplateFuncsWithColor["color"] = func(style string) string {
 			switch style {
 			case "white":
-				if cmdFactory.IOStreams.ColorSupport256() {
-					return fmt.Sprintf("\x1b[%d;5;%dm", 38, 242)
-				}
 				return ansi.ColorCode("default")
 			default:
 				return ansi.ColorCode(style)
@@ -96,11 +87,9 @@ func mainRun() exitCode {
 		cobra.MousetrapHelpText = ""
 	}
 
-	rootCmd := root.NewCmdRoot(cmdFactory, buildVersion, buildDate)
-
-	cfg, err := cmdFactory.Config()
+	rootCmd, err := root.NewCmdRoot(cmdFactory, buildVersion, buildDate)
 	if err != nil {
-		fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
+		fmt.Fprintf(stderr, "failed to create root command: %s\n", err)
 		return exitError
 	}
 
@@ -109,110 +98,10 @@ func mainRun() exitCode {
 		expandedArgs = os.Args[1:]
 	}
 
-	// translate `gh help <command>` to `gh <command> --help` for extensions
-	if len(expandedArgs) == 2 && expandedArgs[0] == "help" && !hasCommand(rootCmd, expandedArgs[1:]) {
-		expandedArgs = []string{expandedArgs[1], "--help"}
-	}
-
-	if !hasCommand(rootCmd, expandedArgs) {
-		originalArgs := expandedArgs
-		isShell := false
-
-		argsForExpansion := append([]string{"gh"}, expandedArgs...)
-		expandedArgs, isShell, err = expand.ExpandAlias(cfg, argsForExpansion, nil)
-		if err != nil {
-			fmt.Fprintf(stderr, "failed to process aliases:  %s\n", err)
-			return exitError
-		}
-
-		if hasDebug {
-			fmt.Fprintf(stderr, "%v -> %v\n", originalArgs, expandedArgs)
-		}
-
-		if isShell {
-			exe, err := safeexec.LookPath(expandedArgs[0])
-			if err != nil {
-				fmt.Fprintf(stderr, "failed to run external command: %s", err)
-				return exitError
-			}
-
-			externalCmd := exec.Command(exe, expandedArgs[1:]...)
-			externalCmd.Stderr = os.Stderr
-			externalCmd.Stdout = os.Stdout
-			externalCmd.Stdin = os.Stdin
-			preparedCmd := run.PrepareCmd(externalCmd)
-
-			err = preparedCmd.Run()
-			if err != nil {
-				var execError *exec.ExitError
-				if errors.As(err, &execError) {
-					return exitCode(execError.ExitCode())
-				}
-				fmt.Fprintf(stderr, "failed to run external command: %s\n", err)
-				return exitError
-			}
-
-			return exitOK
-		} else if len(expandedArgs) > 0 && !hasCommand(rootCmd, expandedArgs) {
-			extensionManager := cmdFactory.ExtensionManager
-			if found, err := extensionManager.Dispatch(expandedArgs, os.Stdin, os.Stdout, os.Stderr); err != nil {
-				var execError *exec.ExitError
-				if errors.As(err, &execError) {
-					return exitCode(execError.ExitCode())
-				}
-				fmt.Fprintf(stderr, "failed to run extension: %s\n", err)
-				return exitError
-			} else if found {
-				return exitOK
-			}
-		}
-	}
-
-	// provide completions for aliases and extensions
-	rootCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		var results []string
-		aliases := cfg.Aliases()
-		for aliasName, aliasValue := range aliases.All() {
-			if strings.HasPrefix(aliasName, toComplete) {
-				var s string
-				if strings.HasPrefix(aliasValue, "!") {
-					s = fmt.Sprintf("%s\tShell alias", aliasName)
-				} else {
-					aliasValue = text.Truncate(80, aliasValue)
-					s = fmt.Sprintf("%s\tAlias for %s", aliasName, aliasValue)
-				}
-				results = append(results, s)
-			}
-		}
-		for _, ext := range cmdFactory.ExtensionManager.List() {
-			if strings.HasPrefix(ext.Name(), toComplete) {
-				var s string
-				if ext.IsLocal() {
-					s = fmt.Sprintf("%s\tLocal extension gh-%s", ext.Name(), ext.Name())
-				} else {
-					path := ext.URL()
-					if u, err := git.ParseURL(ext.URL()); err == nil {
-						if r, err := ghrepo.FromURL(u); err == nil {
-							path = ghrepo.FullName(r)
-						}
-					}
-					s = fmt.Sprintf("%s\tExtension %s", ext.Name(), path)
-				}
-				results = append(results, s)
-			}
-		}
-		return results, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	authError := errors.New("authError")
-	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		// require that the user is authenticated before running most commands
-		if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
-			fmt.Fprint(stderr, authHelp())
-			return authError
-		}
-
-		return nil
+	// translate `gh help <command>` to `gh <command> --help` for extensions.
+	if len(expandedArgs) >= 2 && expandedArgs[0] == "help" && isExtensionCommand(rootCmd, expandedArgs[1:]) {
+		expandedArgs = expandedArgs[1:]
+		expandedArgs = append(expandedArgs, "--help")
 	}
 
 	rootCmd.SetArgs(expandedArgs)
@@ -220,6 +109,8 @@ func mainRun() exitCode {
 	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
 		var pagerPipeError *iostreams.ErrClosedPagerPipe
 		var noResultsError cmdutil.NoResultsError
+		var execError *exec.ExitError
+		var authError *root.AuthError
 		if err == cmdutil.SilentError {
 			return exitError
 		} else if cmdutil.IsUserCancellation(err) {
@@ -228,7 +119,7 @@ func mainRun() exitCode {
 				fmt.Fprint(stderr, "\n")
 			}
 			return exitCancel
-		} else if errors.Is(err, authError) {
+		} else if errors.As(err, &authError) {
 			return exitAuth
 		} else if errors.As(err, &pagerPipeError) {
 			// ignore the error raised when piping to a closed pager
@@ -239,6 +130,8 @@ func mainRun() exitCode {
 			}
 			// no results is not a command failure
 			return exitOK
+		} else if errors.As(err, &execError) {
+			return exitCode(execError.ExitCode())
 		}
 
 		printError(stderr, err, cmd, hasDebug)
@@ -287,10 +180,10 @@ func mainRun() exitCode {
 	return exitOK
 }
 
-// hasCommand returns true if args resolve to a built-in command
-func hasCommand(rootCmd *cobra.Command, args []string) bool {
-	c, _, err := rootCmd.Traverse(args)
-	return err == nil && c != rootCmd
+// isExtensionCommand returns true if args resolve to an extension command.
+func isExtensionCommand(rootCmd *cobra.Command, args []string) bool {
+	c, _, err := rootCmd.Find(args)
+	return err == nil && c != nil && c.GroupID == "extension"
 }
 
 func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
@@ -313,27 +206,6 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 		}
 		fmt.Fprintln(out, cmd.UsageString())
 	}
-}
-
-func authHelp() string {
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		return heredoc.Doc(`
-			gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable. Example:
-			  env:
-			    GH_TOKEN: ${{ github.token }}
-		`)
-	}
-
-	if os.Getenv("CI") != "" {
-		return heredoc.Doc(`
-			gh: To use GitHub CLI in automation, set the GH_TOKEN environment variable.
-		`)
-	}
-
-	return heredoc.Doc(`
-		To get started with GitHub CLI, please run:  gh auth login
-		Alternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.
-	`)
 }
 
 func shouldCheckForUpdate() bool {
