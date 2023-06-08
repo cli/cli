@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -115,15 +115,15 @@ func Test_editRun(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name       string
-		opts       *EditOptions
-		gist       *shared.Gist
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		nontty     bool
-		stdin      string
-		wantErr    string
-		wantParams map[string]interface{}
+		name          string
+		opts          *EditOptions
+		gist          *shared.Gist
+		httpStubs     func(*httpmock.Registry)
+		prompterStubs func(*prompter.MockPrompter)
+		nontty        bool
+		stdin         string
+		wantErr       string
+		wantParams    map[string]interface{}
 	}{
 		{
 			name:    "no such gist",
@@ -161,9 +161,17 @@ func Test_editRun(t *testing.T) {
 		},
 		{
 			name: "multiple files, submit",
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
-				as.StubPrompt("What next?").AnswerWith("Submit")
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Edit which file?",
+					[]string{"cicada.txt", "unix.md"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "unix.md")
+					})
+				pm.RegisterSelect("What next?",
+					editNextOptions,
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "Submit")
+					})
 			},
 			gist: &shared.Gist{
 				ID:          "1234",
@@ -206,9 +214,17 @@ func Test_editRun(t *testing.T) {
 		},
 		{
 			name: "multiple files, cancel",
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
-				as.StubPrompt("What next?").AnswerWith("Cancel")
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Edit which file?",
+					[]string{"cicada.txt", "unix.md"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "unix.md")
+					})
+				pm.RegisterSelect("What next?",
+					editNextOptions,
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "Cancel")
+					})
 			},
 			wantErr: "CancelError",
 			gist: &shared.Gist{
@@ -486,11 +502,11 @@ func Test_editRun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := prompter.NewMockPrompter(t)
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
 			}
+			tt.opts.Prompter = pm
 
 			err := editRun(tt.opts)
 			reg.Verify(t)

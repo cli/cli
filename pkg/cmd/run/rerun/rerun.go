@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -39,8 +40,19 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 
 	cmd := &cobra.Command{
 		Use:   "rerun [<run-id>]",
-		Short: "Rerun a failed run",
-		Args:  cobra.MaximumNArgs(1),
+		Short: "Rerun a run",
+		Long: heredoc.Docf(`
+			Rerun an entire run, only failed jobs, or a specific job from a run.
+
+			Note that due for historical reasons, the %[1]s--job%[1]s flag may not take what you expect.
+			Specifically, when navigating to a job in the browser, the URL looks like this:
+			%[1]shttps://github.com/<org>/<repo>/actions/runs/<run-id>/jobs/<number>%[1]s.
+
+			However, this %[1]snumber%[1]s should not be used with the %[1]s--job%[1]s flag and will result in the
+			API returning %[1]s404 NOT FOUND%[1]s. Instead, you can get the correct job IDs using the following command:
+			%[1]sgh run view <run-id> --json jobs --jq '.jobs[] | {name, databaseId}'%[1]s.
+		`, "`"),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
