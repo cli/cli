@@ -31,18 +31,17 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "code [<query>]",
-		Short: "Search for code",
+		Use:   "code <query>",
+		Short: "Search within code",
 		Long: heredoc.Doc(`
-			Search for code on GitHub.
+			Search within code in GitHub repositories.
 
-			The command supports constructing queries using the GitHub search syntax,
-			using the parameter and qualifier flags, or a combination of the two.
-
-			At least one search term is required when searching code.
-
-			GitHub search syntax is documented at:
+			The search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-code>
+
+			Note that these search results are powered by what is now a legacy GitHub code search engine.
+			The results might not match what is seen on GitHub.com, and new features like regex search
+			are not yet available via the GitHub API.
 		`),
 		Example: heredoc.Doc(`
 			# search code matching "react" and "lifecycle"
@@ -57,7 +56,7 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 			# search code matching "cli" in repositories owned by microsoft organization
 			$ gh search code cli --owner=microsoft
 
-			# search code matching "panic" in cli repository
+			# search code matching "panic" in the GitHub CLI repository
 			$ gh search code panic --repo cli/cli
 
 			# search code matching keyword "lint" in package.json files
@@ -105,6 +104,8 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 func codeRun(opts *CodeOptions) error {
 	io := opts.IO
 	if opts.WebMode {
+		// FIXME: convert legacy `filename` and `extension` ES qualifiers to Blackbird's `path` qualifier
+		// when opening web search, otherwise the Blackbird search UI will complain.
 		url := opts.Searcher.URL(opts.Query)
 		if io.IsStdoutTTY() {
 			fmt.Fprintf(io.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(url))
@@ -140,7 +141,7 @@ func displayResults(io *iostreams.IOStreams, results search.CodeResult) error {
 			if i > 0 {
 				fmt.Fprint(io.Out, "\n")
 			}
-			fmt.Fprintf(io.Out, "%s %s\n", cs.Blue(code.Repo.FullName), cs.GreenBold(code.Path))
+			fmt.Fprintf(io.Out, "%s %s\n", cs.Blue(code.Repository.FullName), cs.GreenBold(code.Path))
 			for _, match := range code.TextMatches {
 				lines := formatMatch(match.Fragment, match.Matches, io.ColorEnabled())
 				for _, line := range lines {
@@ -154,7 +155,7 @@ func displayResults(io *iostreams.IOStreams, results search.CodeResult) error {
 		for _, match := range code.TextMatches {
 			lines := formatMatch(match.Fragment, match.Matches, io.ColorEnabled())
 			for _, line := range lines {
-				fmt.Fprintf(io.Out, "%s:%s: %s\n", cs.Blue(code.Repo.FullName), cs.GreenBold(code.Path), strings.TrimSpace(line))
+				fmt.Fprintf(io.Out, "%s:%s: %s\n", cs.Blue(code.Repository.FullName), cs.GreenBold(code.Path), strings.TrimSpace(line))
 			}
 		}
 	}

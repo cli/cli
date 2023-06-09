@@ -20,9 +20,9 @@ func TestCodeExportData(t *testing.T) {
 	}{
 		{
 			name:   "exports requested fields",
-			fields: []string{"name", "path", "textMatches"},
+			fields: []string{"path", "textMatches"},
 			code: Code{
-				Repo: Repository{
+				Repository: Repository{
 					Name: "repo",
 				},
 				Path: "path",
@@ -41,11 +41,10 @@ func TestCodeExportData(t *testing.T) {
 						},
 						Property: "property",
 						Type:     "type",
-						URL:      "url",
 					},
 				},
 			},
-			output: `{"name":"name","path":"path","textMatches":[{"fragment":"fragment","matches":[{"indices":[0,1],"text":"fr"}],"property":"property","type":"type","url":"url"}]}`,
+			output: `{"path":"path","textMatches":[{"fragment":"fragment","matches":[{"indices":[0,1],"text":"fr"}],"property":"property","type":"type"}]}`,
 		},
 	}
 	for _, tt := range tests {

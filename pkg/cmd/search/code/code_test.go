@@ -159,7 +159,7 @@ func TestCodeRun(t *testing.T) {
 								{
 									Name: "context.go",
 									Path: "context/context.go",
-									Repo: search.Repository{
+									Repository: search.Repository{
 										FullName: "cli/cli",
 									},
 									TextMatches: []search.TextMatch{
@@ -181,7 +181,7 @@ func TestCodeRun(t *testing.T) {
 								{
 									Name: "pr.go",
 									Path: "pkg/cmd/pr/pr.go",
-									Repo: search.Repository{
+									Repository: search.Repository{
 										FullName: "cli/cli",
 									},
 									TextMatches: []search.TextMatch{
@@ -218,7 +218,7 @@ func TestCodeRun(t *testing.T) {
 								{
 									Name: "context.go",
 									Path: "context/context.go",
-									Repo: search.Repository{
+									Repository: search.Repository{
 										FullName: "cli/cli",
 									},
 									TextMatches: []search.TextMatch{
@@ -240,7 +240,7 @@ func TestCodeRun(t *testing.T) {
 								{
 									Name: "pr.go",
 									Path: "pkg/cmd/pr/pr.go",
-									Repo: search.Repository{
+									Repository: search.Repository{
 										FullName: "cli/cli",
 									},
 									TextMatches: []search.TextMatch{

@@ -1,13 +1,13 @@
 package search
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"time"
 )
 
 var CodeFields = []string{
-	"name",
 	"path",
 	"repository",
 	"sha",
@@ -15,10 +15,9 @@ var CodeFields = []string{
 	"url",
 }
 
-var TextMatchFields = []string{
+var textMatchFields = []string{
 	"fragment",
 	"matches",
-	"url",
 	"type",
 	"property",
 }
@@ -116,7 +115,7 @@ type IssuesResult struct {
 type Code struct {
 	Name        string      `json:"name"`
 	Path        string      `json:"path"`
-	Repo        Repository  `json:"repository"`
+	Repository  Repository  `json:"repository"`
 	Sha         string      `json:"sha"`
 	TextMatches []TextMatch `json:"text_matches"`
 	URL         string      `json:"html_url"`
@@ -125,7 +124,6 @@ type Code struct {
 type TextMatch struct {
 	Fragment string  `json:"fragment"`
 	Matches  []Match `json:"matches"`
-	URL      string  `json:"object_url"`
 	Type     string  `json:"object_type"`
 	Property string  `json:"property"`
 }
@@ -280,12 +278,10 @@ func (code Code) ExportData(fields []string) map[string]interface{} {
 	data := map[string]interface{}{}
 	for _, f := range fields {
 		switch f {
-		case "repository":
-			data[f] = code.Repo.ExportData(RepositoryFields)
 		case "textMatches":
 			matches := make([]interface{}, 0, len(code.TextMatches))
 			for _, match := range code.TextMatches {
-				matches = append(matches, match.ExportData(TextMatchFields))
+				matches = append(matches, match.ExportData(textMatchFields))
 			}
 			data[f] = matches
 		default:
@@ -383,6 +379,16 @@ func (repo Repository) ExportData(fields []string) map[string]interface{} {
 		}
 	}
 	return data
+}
+
+func (repo Repository) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"id":            repo.ID,
+		"nameWithOwner": repo.FullName,
+		"url":           repo.URL,
+		"isPrivate":     repo.IsPrivate,
+		"isFork":        repo.IsFork,
+	})
 }
 
 // The state of an issue or a pull request, may be either open or closed.
