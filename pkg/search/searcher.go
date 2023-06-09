@@ -25,6 +25,7 @@ var jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 
 //go:generate moq -rm -out searcher_mock.go . Searcher
 type Searcher interface {
+	Code(Query) (CodeResult, error)
 	Commits(Query) (CommitsResult, error)
 	Repositories(Query) (RepositoriesResult, error)
 	Issues(Query) (IssuesResult, error)
@@ -55,6 +56,30 @@ func NewSearcher(client *http.Client, host string) Searcher {
 		client: client,
 		host:   host,
 	}
+}
+
+func (s searcher) Code(query Query) (CodeResult, error) {
+	result := CodeResult{}
+	toRetrieve := query.Limit
+	var resp *http.Response
+	var err error
+	for toRetrieve > 0 {
+		query.Limit = min(toRetrieve, maxPerPage)
+		query.Page = nextPage(resp)
+		if query.Page == 0 {
+			break
+		}
+		page := CodeResult{}
+		resp, err = s.search(query, &page)
+		if err != nil {
+			return result, err
+		}
+		result.IncompleteResults = page.IncompleteResults
+		result.Total = page.Total
+		result.Items = append(result.Items, page.Items...)
+		toRetrieve = toRetrieve - len(page.Items)
+	}
+	return result, nil
 }
 
 func (s searcher) Commits(query Query) (CommitsResult, error) {
@@ -148,6 +173,10 @@ func (s searcher) search(query Query, result interface{}) (*http.Response, error
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if query.Kind == KindCode {
+		req.Header.Set("Accept", "application/vnd.github.text-match+json")
+	}
+
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err

@@ -10,6 +10,7 @@ import (
 
 const (
 	KindRepositories = "repositories"
+	KindCode         = "code"
 	KindIssues       = "issues"
 	KindCommits      = "commits"
 )
@@ -41,6 +42,8 @@ type Qualifiers struct {
 	CommitterName       string
 	Created             string
 	Draft               *bool
+	Extension           string
+	Filename            string
 	Followers           string
 	Fork                string
 	Forks               string
