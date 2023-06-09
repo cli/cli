@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -174,7 +173,6 @@ func TestRunDelete_User(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := deleteItemConfig{
-		tp: tableprinter.New(ios),
 		opts: deleteItemOpts{
 			owner:  "monalisa",
 			number: 1,
@@ -264,7 +262,6 @@ func TestRunDelete_Org(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := deleteItemConfig{
-		tp: tableprinter.New(ios),
 		opts: deleteItemOpts{
 			owner:  "github",
 			number: 1,
@@ -344,7 +341,6 @@ func TestRunDelete_Me(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := deleteItemConfig{
-		tp: tableprinter.New(ios),
 		opts: deleteItemOpts{
 			owner:  "@me",
 			number: 1,

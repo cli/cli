@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -135,7 +134,6 @@ func TestRunCreate_User(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := createConfig{
-		tp: tableprinter.New(ios),
 		opts: createOpts{
 			title: "a title",
 			owner: "monalisa",
@@ -204,7 +202,6 @@ func TestRunCreate_Org(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := createConfig{
-		tp: tableprinter.New(ios),
 		opts: createOpts{
 			title: "a title",
 			owner: "github",
@@ -264,7 +261,6 @@ func TestRunCreate_Me(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := createConfig{
-		tp: tableprinter.New(ios),
 		opts: createOpts{
 			title: "a title",
 			owner: "@me",

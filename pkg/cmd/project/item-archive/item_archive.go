@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -25,7 +24,6 @@ type archiveItemOpts struct {
 }
 
 type archiveItemConfig struct {
-	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   archiveItemOpts
 	io     *iostreams.IOStreams
@@ -67,9 +65,7 @@ func NewCmdArchiveItem(f *cmdutil.Factory, runF func(config archiveItemConfig) e
 				opts.number = int32(num)
 			}
 
-			t := tableprinter.New(f.IOStreams)
 			config := archiveItemConfig{
-				tp:     t,
 				client: client,
 				opts:   opts,
 				io:     f.IOStreams,

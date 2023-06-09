@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -22,7 +21,6 @@ type createOpts struct {
 }
 
 type createConfig struct {
-	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   createOpts
 	io     *iostreams.IOStreams
@@ -49,9 +47,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 				return err
 			}
 
-			t := tableprinter.New(f.IOStreams)
 			config := createConfig{
-				tp:     t,
 				client: client,
 				opts:   opts,
 				io:     f.IOStreams,

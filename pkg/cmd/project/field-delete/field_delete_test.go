@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -102,7 +101,6 @@ func TestRunDeleteField(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := deleteFieldConfig{
-		tp: tableprinter.New(ios),
 		opts: deleteFieldOpts{
 			fieldID: "an ID",
 		},

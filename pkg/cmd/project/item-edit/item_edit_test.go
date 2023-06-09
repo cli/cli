@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -176,7 +175,6 @@ func TestRunItemEdit_Draft(t *testing.T) {
 
 	config := editItemConfig{
 		io: ios,
-		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			title:  "a title",
 			body:   "a new body",
@@ -226,7 +224,6 @@ func TestRunItemEdit_Text(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
 		io: ios,
-		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			text:      "item text",
 			itemID:    "item_id",
@@ -276,7 +273,6 @@ func TestRunItemEdit_Number(t *testing.T) {
 
 	config := editItemConfig{
 		io: ios,
-		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			number:    2,
 			itemID:    "item_id",
@@ -327,7 +323,6 @@ func TestRunItemEdit_Date(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
 		io: ios,
-		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			date:      "2023-01-01",
 			itemID:    "item_id",
@@ -375,7 +370,6 @@ func TestRunItemEdit_SingleSelect(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
 		io: ios,
-		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			singleSelectOptionID: "option_id",
 			itemID:               "item_id",
@@ -425,7 +419,6 @@ func TestRunItemEdit_Iteration(t *testing.T) {
 
 	config := editItemConfig{
 		io: ios,
-		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			iterationID: "option_id",
 			itemID:      "item_id",
@@ -454,7 +447,6 @@ func TestRunItemEdit_NoChanges(t *testing.T) {
 
 	config := editItemConfig{
 		io:     ios,
-		tp:     tableprinter.New(ios),
 		opts:   editItemOpts{},
 		client: client,
 	}
@@ -470,9 +462,7 @@ func TestRunItemEdit_InvalidID(t *testing.T) {
 	// gock.Observe(gock.DumpRequest)
 
 	client := queries.NewTestClient()
-	ios, _, _, _ := iostreams.Test()
 	config := editItemConfig{
-		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			title:  "a title",
 			body:   "a new body",

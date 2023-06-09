@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -35,7 +34,6 @@ type editItemOpts struct {
 
 type editItemConfig struct {
 	io     *iostreams.IOStreams
-	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   editItemOpts
 }
@@ -83,10 +81,8 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 				return err
 			}
 
-			t := tableprinter.New(f.IOStreams)
 			config := editItemConfig{
 				io:     f.IOStreams,
-				tp:     t,
 				client: client,
 				opts:   opts,
 			}

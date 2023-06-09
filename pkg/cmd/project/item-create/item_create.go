@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -25,7 +24,6 @@ type createItemOpts struct {
 }
 
 type createItemConfig struct {
-	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   createItemOpts
 	io     *iostreams.IOStreams
@@ -61,9 +59,7 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 				opts.number = int32(num)
 			}
 
-			t := tableprinter.New(f.IOStreams)
 			config := createItemConfig{
-				tp:     t,
 				client: client,
 				opts:   opts,
 				io:     f.IOStreams,

@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -193,7 +192,6 @@ func TestRunCreateField_User(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
-		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			name:     "a name",
 			owner:    "monalisa",
@@ -287,7 +285,6 @@ func TestRunCreateField_Org(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
-		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			name:     "a name",
 			owner:    "github",
@@ -370,7 +367,6 @@ func TestRunCreateField_Me(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
-		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			owner:    "@me",
 			number:   1,
@@ -453,7 +449,6 @@ func TestRunCreateField_TEXT(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
-		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			owner:    "@me",
 			number:   1,
@@ -536,7 +531,6 @@ func TestRunCreateField_DATE(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
-		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			owner:    "@me",
 			number:   1,
@@ -619,7 +613,6 @@ func TestRunCreateField_NUMBER(t *testing.T) {
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	config := createFieldConfig{
-		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			owner:    "@me",
 			number:   1,

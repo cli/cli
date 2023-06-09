@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -182,7 +181,6 @@ func TestRunView_User(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
-		tp: tableprinter.New(ios),
 		opts: viewOpts{
 			owner:  "monalisa",
 			number: 1,
@@ -246,7 +244,6 @@ func TestRunView_Viewer(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
-		tp: tableprinter.New(ios),
 		opts: viewOpts{
 			owner:  "@me",
 			number: 1,
@@ -318,7 +315,6 @@ func TestRunView_Org(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
-		tp: tableprinter.New(ios),
 		opts: viewOpts{
 			owner:  "github",
 			number: 1,

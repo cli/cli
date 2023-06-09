@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -23,7 +22,6 @@ type deleteItemOpts struct {
 }
 
 type deleteItemConfig struct {
-	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   deleteItemOpts
 	io     *iostreams.IOStreams
@@ -59,9 +57,7 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 				opts.number = int32(num)
 			}
 
-			t := tableprinter.New(f.IOStreams)
 			config := deleteItemConfig{
-				tp:     t,
 				client: client,
 				opts:   opts,
 				io:     f.IOStreams,
