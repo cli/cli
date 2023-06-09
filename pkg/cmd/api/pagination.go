@@ -130,8 +130,13 @@ func (r *paginatedArrayReader) Read(p []byte) (int, error) {
 		n, err = r.Reader.Read(p)
 	}
 	if !r.isSubsequentRead && !r.isFirstPage && n > 0 && p[0] == '[' {
-		// avoid starting a new array and continue with a comma instead
-		p[0] = ','
+		if n > 1 && p[1] == ']' {
+			// empty array case
+			p[0] = ' '
+		} else {
+			// avoid starting a new array and continue with a comma instead
+			p[0] = ','
+		}
 	}
 	if !r.isLastPage && n > 0 && p[n-1] == ']' {
 		// avoid closing off an array in case we determine we are at EOF

@@ -679,7 +679,7 @@ func Test_apiRun_arrayPaginationREST(t *testing.T) {
 			Body:       io.NopCloser(bytes.NewBufferString(`[{"item":1},{"item":2}]`)),
 			Header: http.Header{
 				"Content-Type": []string{"application/json"},
-				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=4>; rel="last"`},
 			},
 		},
 		{
@@ -687,12 +687,20 @@ func Test_apiRun_arrayPaginationREST(t *testing.T) {
 			Body:       io.NopCloser(bytes.NewBufferString(`[{"item":3},{"item":4}]`)),
 			Header: http.Header{
 				"Content-Type": []string{"application/json"},
-				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=4>; rel="last"`},
 			},
 		},
 		{
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewBufferString(`[{"item":5}]`)),
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=4>; rel="next", <https://api.github.com/repositories/1227/issues?page=4>; rel="last"`},
+			},
+		},
+		{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[]`)),
 			Header: http.Header{
 				"Content-Type": []string{"application/json"},
 			},
@@ -724,7 +732,7 @@ func Test_apiRun_arrayPaginationREST(t *testing.T) {
 	err := apiRun(&options)
 	assert.NoError(t, err)
 
-	assert.Equal(t, `[{"item":1},{"item":2},{"item":3},{"item":4},{"item":5}]`, stdout.String(), "stdout")
+	assert.Equal(t, `[{"item":1},{"item":2},{"item":3},{"item":4},{"item":5} ]`, stdout.String(), "stdout")
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	assert.Equal(t, "https://api.github.com/issues?page=1&per_page=50", responses[0].Request.URL.String())
