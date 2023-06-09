@@ -10,6 +10,7 @@ import (
 
 const (
 	KindRepositories = "repositories"
+	KindCode         = "code"
 	KindIssues       = "issues"
 	KindCommits      = "commits"
 )
@@ -41,6 +42,8 @@ type Qualifiers struct {
 	CommitterName       string
 	Created             string
 	Draft               *bool
+	Extension           string
+	Filename            string
 	Followers           string
 	Fork                string
 	Forks               string
@@ -79,7 +82,7 @@ type Qualifiers struct {
 	Tree                string
 	Type                string
 	Updated             string
-	User                string
+	User                []string
 }
 
 func (q Query) String() string {
@@ -147,7 +150,12 @@ func formatQualifiers(qs Qualifiers) []string {
 
 func formatKeywords(ks []string) []string {
 	for i, k := range ks {
-		ks[i] = quote(k)
+		before, after, found := strings.Cut(k, ":")
+		if !found {
+			ks[i] = quote(k)
+		} else {
+			ks[i] = fmt.Sprintf("%s:%s", before, quote(after))
+		}
 	}
 	return ks
 }

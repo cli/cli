@@ -19,7 +19,6 @@ import (
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/search"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -74,7 +73,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 				reg.Register(
 					httpmock.QueryMatcher("GET", "search/repositories", values),
-					httpmock.JSONResponse(searchResults()),
+					httpmock.JSONResponse(searchResults(4)),
 				)
 			},
 			isTTY:      true,
@@ -111,7 +110,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 				reg.Register(
 					httpmock.QueryMatcher("GET", "search/repositories", values),
-					httpmock.JSONResponse(searchResults()),
+					httpmock.JSONResponse(searchResults(4)),
 				)
 			},
 			wantStdout: "installed\tvilmibm/gh-screensaver\tterminal animations\n\tcli/gh-cool\tit's just cool ok\n\tsamcoe/gh-triage\thelps with triage\ninstalled\tgithub/gh-gei\tsomething something enterprise\n",
@@ -145,9 +144,7 @@ func TestNewCmdExtension(t *testing.T) {
 					"per_page": []string{"30"},
 					"q":        []string{"screen topic:gh-extension"},
 				}
-				results := searchResults()
-				results.Total = 1
-				results.Items = []search.Repository{results.Items[0]}
+				results := searchResults(1)
 				reg.Register(
 					httpmock.QueryMatcher("GET", "search/repositories", values),
 					httpmock.JSONResponse(results),
@@ -175,9 +172,7 @@ func TestNewCmdExtension(t *testing.T) {
 					"per_page": []string{"1"},
 					"q":        []string{"topic:gh-extension"},
 				}
-				results := searchResults()
-				results.Total = 1
-				results.Items = []search.Repository{results.Items[0]}
+				results := searchResults(1)
 				reg.Register(
 					httpmock.QueryMatcher("GET", "search/repositories", values),
 					httpmock.JSONResponse(results),
@@ -203,9 +198,7 @@ func TestNewCmdExtension(t *testing.T) {
 					"per_page": []string{"30"},
 					"q":        []string{"license:GPLv3 topic:gh-extension user:jillvalentine"},
 				}
-				results := searchResults()
-				results.Total = 1
-				results.Items = []search.Repository{results.Items[0]}
+				results := searchResults(1)
 				reg.Register(
 					httpmock.QueryMatcher("GET", "search/repositories", values),
 					httpmock.JSONResponse(results),
@@ -797,6 +790,55 @@ func TestNewCmdExtension(t *testing.T) {
 			wantErr: true,
 			errMsg:  "this command runs an interactive UI and needs to be run in a terminal",
 		},
+		{
+			name: "force install when absent",
+			args: []string{"install", "owner/gh-hello", "--force"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{}
+				}
+				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					listCalls := em.ListCalls()
+					assert.Equal(t, 1, len(listCalls))
+					installCalls := em.InstallCalls()
+					assert.Equal(t, 1, len(installCalls))
+					assert.Equal(t, "gh-hello", installCalls[0].InterfaceMoqParam.RepoName())
+				}
+			},
+			isTTY:      true,
+			wantStdout: "✓ Installed extension owner/gh-hello\n",
+		},
+		{
+			name: "force install when present",
+			args: []string{"install", "owner/gh-hello", "--force"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{
+						&Extension{path: "owner/gh-hello"},
+					}
+				}
+				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
+					return nil
+				}
+				em.UpgradeFunc = func(name string, force bool) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					listCalls := em.ListCalls()
+					assert.Equal(t, 1, len(listCalls))
+					installCalls := em.InstallCalls()
+					assert.Equal(t, 0, len(installCalls))
+					upgradeCalls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(upgradeCalls))
+					assert.Equal(t, "hello", upgradeCalls[0].Name)
+				}
+			},
+			isTTY:      true,
+			wantStdout: "✓ Successfully upgraded extension\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -925,7 +967,7 @@ func Test_checkValidExtension(t *testing.T) {
 				manager: m,
 				extName: "gh-auth",
 			},
-			wantError: "\"auth\" matches the name of a built-in command",
+			wantError: "\"auth\" matches the name of a built-in command or alias",
 		},
 		{
 			name: "clashes with an installed extension",
@@ -939,7 +981,7 @@ func Test_checkValidExtension(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := checkValidExtension(tt.args.rootCmd, tt.args.manager, tt.args.extName)
+			_, err := checkValidExtension(tt.args.rootCmd, tt.args.manager, tt.args.extName)
 			if tt.wantError == "" {
 				assert.NoError(t, err)
 			} else {
@@ -949,43 +991,48 @@ func Test_checkValidExtension(t *testing.T) {
 	}
 }
 
-func searchResults() search.RepositoriesResult {
-	return search.RepositoriesResult{
-		IncompleteResults: false,
-		Items: []search.Repository{
-			{
-				FullName:    "vilmibm/gh-screensaver",
-				Name:        "gh-screensaver",
-				Description: "terminal animations",
-				Owner: search.User{
-					Login: "vilmibm",
+func searchResults(numResults int) interface{} {
+	result := map[string]interface{}{
+		"incomplete_results": false,
+		"total_count":        4,
+		"items": []interface{}{
+			map[string]interface{}{
+				"name":        "gh-screensaver",
+				"full_name":   "vilmibm/gh-screensaver",
+				"description": "terminal animations",
+				"owner": map[string]interface{}{
+					"login": "vilmibm",
 				},
 			},
-			{
-				FullName:    "cli/gh-cool",
-				Name:        "gh-cool",
-				Description: "it's just cool ok",
-				Owner: search.User{
-					Login: "cli",
+			map[string]interface{}{
+				"name":        "gh-cool",
+				"full_name":   "cli/gh-cool",
+				"description": "it's just cool ok",
+				"owner": map[string]interface{}{
+					"login": "cli",
 				},
 			},
-			{
-				FullName:    "samcoe/gh-triage",
-				Name:        "gh-triage",
-				Description: "helps with triage",
-				Owner: search.User{
-					Login: "samcoe",
+			map[string]interface{}{
+				"name":        "gh-triage",
+				"full_name":   "samcoe/gh-triage",
+				"description": "helps with triage",
+				"owner": map[string]interface{}{
+					"login": "samcoe",
 				},
 			},
-			{
-				FullName:    "github/gh-gei",
-				Name:        "gh-gei",
-				Description: "something something enterprise",
-				Owner: search.User{
-					Login: "github",
+			map[string]interface{}{
+				"name":        "gh-gei",
+				"full_name":   "github/gh-gei",
+				"description": "something something enterprise",
+				"owner": map[string]interface{}{
+					"login": "github",
 				},
 			},
 		},
-		Total: 4,
 	}
+	if len(result["items"].([]interface{})) > numResults {
+		fewerItems := result["items"].([]interface{})[0:numResults]
+		result["items"] = fewerItems
+	}
+	return result
 }

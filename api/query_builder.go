@@ -132,7 +132,42 @@ var prCommits = shortenQuery(`
 	}
 `)
 
-func StatusCheckRollupGraphQL(after string) string {
+var autoMergeRequest = shortenQuery(`
+	autoMergeRequest {
+		authorEmail,
+		commitBody,
+		commitHeadline,
+		mergeMethod,
+		enabledAt,
+		enabledBy{login,...on User{id,name}}
+	}
+`)
+
+func StatusCheckRollupGraphQLWithCountByState() string {
+	return shortenQuery(`
+	statusCheckRollup: commits(last: 1) {
+		nodes {
+			commit {
+				statusCheckRollup {
+					contexts {
+						checkRunCount,
+						checkRunCountsByState {
+						  state,
+						  count
+						},
+						statusContextCount,
+						statusContextCountsByState {
+						  state,
+						  count
+						}
+					}
+				}
+			}
+		}
+	}`)
+}
+
+func StatusCheckRollupGraphQLWithoutCountByState(after string) string {
 	var afterClause string
 	if after != "" {
 		afterClause = ",after:" + after
@@ -231,6 +266,7 @@ var IssueFields = []string{
 
 var PullRequestFields = append(IssueFields,
 	"additions",
+	"autoMergeRequest",
 	"baseRefName",
 	"changedFiles",
 	"commits",
@@ -285,6 +321,8 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `mergeCommit{oid}`)
 		case "potentialMergeCommit":
 			q = append(q, `potentialMergeCommit{oid}`)
+		case "autoMergeRequest":
+			q = append(q, autoMergeRequest)
 		case "comments":
 			q = append(q, issueComments)
 		case "lastComment": // pseudo-field
@@ -306,7 +344,9 @@ func IssueGraphQL(fields []string) string {
 		case "requiresStrictStatusChecks": // pseudo-field
 			q = append(q, `baseRef{branchProtectionRule{requiresStrictStatusChecks}}`)
 		case "statusCheckRollup":
-			q = append(q, StatusCheckRollupGraphQL(""))
+			q = append(q, StatusCheckRollupGraphQLWithoutCountByState(""))
+		case "statusCheckRollupWithCountByState": // pseudo-field
+			q = append(q, StatusCheckRollupGraphQLWithCountByState())
 		default:
 			q = append(q, field)
 		}
@@ -372,6 +412,7 @@ var RepositoryFields = []string{
 	"isInOrganization",
 	"isMirror",
 	"isPrivate",
+	"visibility",
 	"isTemplate",
 	"isUserConfigurationRepository",
 	"licenseInfo",

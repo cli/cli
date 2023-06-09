@@ -84,120 +84,62 @@ func TestNewCmdDelete(t *testing.T) {
 	}
 }
 
-func Test_removeRun_repo(t *testing.T) {
+func TestRemoveRun(t *testing.T) {
 	tests := []struct {
 		name     string
 		opts     *DeleteOptions
 		wantPath string
 	}{
 		{
-			name: "Actions",
+			name: "repo",
 			opts: &DeleteOptions{
-				Application:  "actions",
 				VariableName: "cool_variable",
 			},
 			wantPath: "repos/owner/repo/actions/variables/cool_variable",
 		},
-	}
-
-	for _, tt := range tests {
-		reg := &httpmock.Registry{}
-
-		reg.Register(
-			httpmock.REST("DELETE", tt.wantPath),
-			httpmock.StatusStringResponse(204, "No Content"))
-
-		ios, _, _, _ := iostreams.Test()
-
-		tt.opts.IO = ios
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-		tt.opts.Config = func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		}
-		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("owner/repo")
-		}
-
-		err := removeRun(tt.opts)
-		assert.NoError(t, err)
-
-		reg.Verify(t)
-	}
-}
-
-func Test_removeRun_env(t *testing.T) {
-	reg := &httpmock.Registry{}
-
-	reg.Register(
-		httpmock.REST("DELETE", "repositories/owner/repo/environments/development/variables/cool_variable"),
-		httpmock.StatusStringResponse(204, "No Content"))
-
-	ios, _, _, _ := iostreams.Test()
-
-	opts := &DeleteOptions{
-		IO: ios,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
+		{
+			name: "env",
+			opts: &DeleteOptions{
+				VariableName: "cool_variable",
+				EnvName:      "development",
+			},
+			wantPath: "repos/owner/repo/environments/development/variables/cool_variable",
 		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("owner/repo")
-		},
-		VariableName: "cool_variable",
-		EnvName:      "development",
-	}
-
-	err := removeRun(opts)
-	assert.NoError(t, err)
-
-	reg.Verify(t)
-}
-
-func Test_removeRun_org(t *testing.T) {
-	tests := []struct {
-		name     string
-		opts     *DeleteOptions
-		wantPath string
-	}{
 		{
 			name: "org",
 			opts: &DeleteOptions{
-				OrgName: "UmbrellaCorporation",
+				VariableName: "cool_variable",
+				OrgName:      "UmbrellaCorporation",
 			},
-			wantPath: "orgs/UmbrellaCorporation/actions/variables/tVirus",
+			wantPath: "orgs/UmbrellaCorporation/actions/variables/cool_variable",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 
-			reg.Register(
-				httpmock.REST("DELETE", tt.wantPath),
+			reg.Register(httpmock.REST("DELETE", tt.wantPath),
 				httpmock.StatusStringResponse(204, "No Content"))
 
 			ios, _, _, _ := iostreams.Test()
+			tt.opts.IO = ios
+
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
 
 			tt.opts.Config = func() (config.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
+
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
 			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
-			tt.opts.IO = ios
-			tt.opts.VariableName = "tVirus"
 
 			err := removeRun(tt.opts)
 			assert.NoError(t, err)
-
-			reg.Verify(t)
 		})
 	}
 }

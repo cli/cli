@@ -17,6 +17,8 @@ type requestOptions struct {
 	Username       string
 	Fields         []string
 	ConflictStatus bool
+
+	CheckRunAndStatusContextCountsSupported bool
 }
 
 type pullRequestsPayload struct {
@@ -57,7 +59,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		fragments = fmt.Sprintf("fragment pr on PullRequest{%s}fragment prWithReviews on PullRequest{...pr}", gr)
 	} else {
 		var err error
-		fragments, err = pullRequestFragment(repo.RepoHost(), options.ConflictStatus)
+		fragments, err = pullRequestFragment(repo.RepoHost(), options.ConflictStatus, options.CheckRunAndStatusContextCountsSupported)
 		if err != nil {
 			return nil, err
 		}
@@ -146,8 +148,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 	}
 
 	var resp response
-	err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
-	if err != nil {
+	if err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp); err != nil {
 		return nil, err
 	}
 
@@ -187,16 +188,23 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 	return &payload, nil
 }
 
-func pullRequestFragment(hostname string, conflictStatus bool) (string, error) {
+func pullRequestFragment(hostname string, conflictStatus bool, statusCheckRollupWithCountByState bool) (string, error) {
 	fields := []string{
 		"number", "title", "state", "url", "isDraft", "isCrossRepository",
 		"headRefName", "headRepositoryOwner", "mergeStateStatus",
-		"statusCheckRollup", "requiresStrictStatusChecks",
+		"requiresStrictStatusChecks", "autoMergeRequest",
 	}
 
 	if conflictStatus {
 		fields = append(fields, "mergeable")
 	}
+
+	if statusCheckRollupWithCountByState {
+		fields = append(fields, "statusCheckRollupWithCountByState")
+	} else {
+		fields = append(fields, "statusCheckRollup")
+	}
+
 	reviewFields := []string{"reviewDecision", "latestReviews"}
 	fragments := fmt.Sprintf(`
 	fragment pr on PullRequest {%s}

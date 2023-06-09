@@ -85,6 +85,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVarP(&opts.YAML, "yaml", "y", false, "View the workflow yaml file")
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "The branch or tag name which contains the version of the workflow file you'd like to view")
 
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "ref")
+
 	return cmd
 }
 

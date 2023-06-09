@@ -39,6 +39,8 @@ type PullRequest struct {
 	ClosedAt            *time.Time
 	MergedAt            *time.Time
 
+	AutoMergeRequest *AutoMergeRequest
+
 	MergeCommit          *Commit
 	PotentialMergeCommit *Commit
 
@@ -95,7 +97,84 @@ type CommitStatusCheckRollup struct {
 	Contexts CheckContexts
 }
 
+// https://docs.github.com/en/graphql/reference/enums#checkrunstate
+type CheckRunState string
+
+const (
+	CheckRunStateActionRequired CheckRunState = "ACTION_REQUIRED"
+	CheckRunStateCancelled      CheckRunState = "CANCELLED"
+	CheckRunStateCompleted      CheckRunState = "COMPLETED"
+	CheckRunStateFailure        CheckRunState = "FAILURE"
+	CheckRunStateInProgress     CheckRunState = "IN_PROGRESS"
+	CheckRunStateNeutral        CheckRunState = "NEUTRAL"
+	CheckRunStatePending        CheckRunState = "PENDING"
+	CheckRunStateQueued         CheckRunState = "QUEUED"
+	CheckRunStateSkipped        CheckRunState = "SKIPPED"
+	CheckRunStateStale          CheckRunState = "STALE"
+	CheckRunStateStartupFailure CheckRunState = "STARTUP_FAILURE"
+	CheckRunStateSuccess        CheckRunState = "SUCCESS"
+	CheckRunStateTimedOut       CheckRunState = "TIMED_OUT"
+	CheckRunStateWaiting        CheckRunState = "WAITING"
+)
+
+type CheckRunCountByState struct {
+	State CheckRunState
+	Count int
+}
+
+// https://docs.github.com/en/graphql/reference/enums#statusstate
+type StatusState string
+
+const (
+	StatusStateError    StatusState = "ERROR"
+	StatusStateExpected StatusState = "EXPECTED"
+	StatusStateFailure  StatusState = "FAILURE"
+	StatusStatePending  StatusState = "PENDING"
+	StatusStateSuccess  StatusState = "SUCCESS"
+)
+
+type StatusContextCountByState struct {
+	State StatusState
+	Count int
+}
+
+// https://docs.github.com/en/graphql/reference/enums#checkstatusstate
+type CheckStatusState string
+
+const (
+	CheckStatusStateCompleted  CheckStatusState = "COMPLETED"
+	CheckStatusStateInProgress CheckStatusState = "IN_PROGRESS"
+	CheckStatusStatePending    CheckStatusState = "PENDING"
+	CheckStatusStateQueued     CheckStatusState = "QUEUED"
+	CheckStatusStateRequested  CheckStatusState = "REQUESTED"
+	CheckStatusStateWaiting    CheckStatusState = "WAITING"
+)
+
+// https://docs.github.com/en/graphql/reference/enums#checkconclusionstate
+type CheckConclusionState string
+
+const (
+	CheckConclusionStateActionRequired CheckConclusionState = "ACTION_REQUIRED"
+	CheckConclusionStateCancelled      CheckConclusionState = "CANCELLED"
+	CheckConclusionStateFailure        CheckConclusionState = "FAILURE"
+	CheckConclusionStateNeutral        CheckConclusionState = "NEUTRAL"
+	CheckConclusionStateSkipped        CheckConclusionState = "SKIPPED"
+	CheckConclusionStateStale          CheckConclusionState = "STALE"
+	CheckConclusionStateStartupFailure CheckConclusionState = "STARTUP_FAILURE"
+	CheckConclusionStateSuccess        CheckConclusionState = "SUCCESS"
+	CheckConclusionStateTimedOut       CheckConclusionState = "TIMED_OUT"
+)
+
 type CheckContexts struct {
+	// These fields are available on newer versions of the GraphQL API
+	// to support summary counts by state
+	CheckRunCount              int
+	CheckRunCountsByState      []CheckRunCountByState
+	StatusContextCount         int
+	StatusContextCountsByState []StatusContextCountByState
+
+	// These are available on older versions and provide more details
+	// required for checks
 	Nodes    []CheckContext
 	PageInfo struct {
 		HasNextPage bool
@@ -117,23 +196,33 @@ type CheckContext struct {
 	// QUEUED IN_PROGRESS COMPLETED WAITING PENDING REQUESTED
 	Status string `json:"status"`
 	// ACTION_REQUIRED TIMED_OUT CANCELLED FAILURE SUCCESS NEUTRAL SKIPPED STARTUP_FAILURE STALE
-	Conclusion  string    `json:"conclusion"`
-	StartedAt   time.Time `json:"startedAt"`
-	CompletedAt time.Time `json:"completedAt"`
-	DetailsURL  string    `json:"detailsUrl"`
+	Conclusion  CheckConclusionState `json:"conclusion"`
+	StartedAt   time.Time            `json:"startedAt"`
+	CompletedAt time.Time            `json:"completedAt"`
+	DetailsURL  string               `json:"detailsUrl"`
 
 	/* StatusContext fields */
 
 	Context string `json:"context"`
 	// EXPECTED ERROR FAILURE PENDING SUCCESS
-	State     string    `json:"state"`
-	TargetURL string    `json:"targetUrl"`
-	CreatedAt time.Time `json:"createdAt"`
+	State     StatusState `json:"state"`
+	TargetURL string      `json:"targetUrl"`
+	CreatedAt time.Time   `json:"createdAt"`
 }
 
 type PRRepository struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type AutoMergeRequest struct {
+	AuthorEmail    *string `json:"authorEmail"`
+	CommitBody     *string `json:"commitBody"`
+	CommitHeadline *string `json:"commitHeadline"`
+	// MERGE, REBASE, SQUASH
+	MergeMethod string    `json:"mergeMethod"`
+	EnabledAt   time.Time `json:"enabledAt"`
+	EnabledBy   Author    `json:"enabledBy"`
 }
 
 // Commit loads just the commit SHA and nothing else
@@ -249,33 +338,136 @@ type PullRequestChecksStatus struct {
 	Total   int
 }
 
-func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
+func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
+	var summary PullRequestChecksStatus
+
 	if len(pr.StatusCheckRollup.Nodes) == 0 {
-		return
+		return summary
 	}
-	commit := pr.StatusCheckRollup.Nodes[0].Commit
-	for _, c := range commit.StatusCheckRollup.Contexts.Nodes {
-		state := c.State // StatusContext
-		if state == "" {
-			// CheckRun
-			if c.Status == "COMPLETED" {
-				state = c.Conclusion
-			} else {
-				state = c.Status
+
+	contexts := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts
+
+	// If this commit has counts by state then we can summarise check status from those
+	if len(contexts.CheckRunCountsByState) != 0 && len(contexts.StatusContextCountsByState) != 0 {
+		summary.Total = contexts.CheckRunCount + contexts.StatusContextCount
+		for _, countByState := range contexts.CheckRunCountsByState {
+			switch parseCheckStatusFromCheckRunState(countByState.State) {
+			case passing:
+				summary.Passing += countByState.Count
+			case failing:
+				summary.Failing += countByState.Count
+			default:
+				summary.Pending += countByState.Count
 			}
 		}
-		switch state {
-		case "SUCCESS", "NEUTRAL", "SKIPPED":
-			summary.Passing++
-		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
-			summary.Failing++
-		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
-			summary.Pending++
+
+		for _, countByState := range contexts.StatusContextCountsByState {
+			switch parseCheckStatusFromStatusState(countByState.State) {
+			case passing:
+				summary.Passing += countByState.Count
+			case failing:
+				summary.Failing += countByState.Count
+			default:
+				summary.Pending += countByState.Count
+			}
+		}
+
+		return summary
+	}
+
+	// If we don't have the counts by state, then we'll need to summarise by looking at the more detailed contexts
+	for _, c := range contexts.Nodes {
+		// Nodes are a discriminated union of CheckRun or StatusContext and we can match on
+		// the TypeName to narrow the type.
+		if c.TypeName == "CheckRun" {
+			// https://docs.github.com/en/graphql/reference/enums#checkstatusstate
+			// If the status is completed then we can check the conclusion field
+			if c.Status == "COMPLETED" {
+				switch parseCheckStatusFromCheckConclusionState(c.Conclusion) {
+				case passing:
+					summary.Passing++
+				case failing:
+					summary.Failing++
+				default:
+					summary.Pending++
+				}
+				// otherwise we're in some form of pending state:
+				// "COMPLETED", "IN_PROGRESS", "PENDING", "QUEUED", "REQUESTED", "WAITING" or otherwise unknown
+			} else {
+				summary.Pending++
+			}
+
+		} else { // c.TypeName == StatusContext
+			switch parseCheckStatusFromStatusState(c.State) {
+			case passing:
+				summary.Passing++
+			case failing:
+				summary.Failing++
+			default:
+				summary.Pending++
+			}
 		}
 		summary.Total++
 	}
 
-	return
+	return summary
+}
+
+type checkStatus int
+
+const (
+	passing checkStatus = iota
+	failing
+	pending
+)
+
+func parseCheckStatusFromStatusState(state StatusState) checkStatus {
+	switch state {
+	case StatusStateSuccess:
+		return passing
+	case StatusStateFailure, StatusStateError:
+		return failing
+	case StatusStateExpected, StatusStatePending:
+		return pending
+	// Currently, we treat anything unknown as pending, which includes any future unknown
+	// states we might get back from the API. It might be interesting to do some work to add an additional
+	// unknown state.
+	default:
+		return pending
+	}
+}
+
+func parseCheckStatusFromCheckRunState(state CheckRunState) checkStatus {
+	switch state {
+	case CheckRunStateNeutral, CheckRunStateSkipped, CheckRunStateSuccess:
+		return passing
+	case CheckRunStateActionRequired, CheckRunStateCancelled, CheckRunStateFailure, CheckRunStateTimedOut:
+		return failing
+	case CheckRunStateCompleted, CheckRunStateInProgress, CheckRunStatePending, CheckRunStateQueued,
+		CheckRunStateStale, CheckRunStateStartupFailure, CheckRunStateWaiting:
+		return pending
+	// Currently, we treat anything unknown as pending, which includes any future unknown
+	// states we might get back from the API. It might be interesting to do some work to add an additional
+	// unknown state.
+	default:
+		return pending
+	}
+}
+
+func parseCheckStatusFromCheckConclusionState(state CheckConclusionState) checkStatus {
+	switch state {
+	case CheckConclusionStateNeutral, CheckConclusionStateSkipped, CheckConclusionStateSuccess:
+		return passing
+	case CheckConclusionStateActionRequired, CheckConclusionStateCancelled, CheckConclusionStateFailure, CheckConclusionStateTimedOut:
+		return failing
+	case CheckConclusionStateStale, CheckConclusionStateStartupFailure:
+		return pending
+	// Currently, we treat anything unknown as pending, which includes any future unknown
+	// states we might get back from the API. It might be interesting to do some work to add an additional
+	// unknown state.
+	default:
+		return pending
+	}
 }
 
 func (pr *PullRequest) DisplayableReviews() PullRequestReviews {

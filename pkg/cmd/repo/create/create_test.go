@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -118,6 +119,18 @@ func TestNewCmdCreate(t *testing.T) {
 				Template:           "https://github.com/OWNER/REPO",
 				IncludeAllBranches: true,
 			},
+		},
+		{
+			name:     "template with .gitignore",
+			cli:      "template-repo --template mytemplate --gitignore ../.gitignore --public",
+			wantsErr: true,
+			errMsg:   ".gitignore and license templates are not added when template is provided",
+		},
+		{
+			name:     "template with license",
+			cli:      "template-repo --template mytemplate --license ../.license --public",
+			wantsErr: true,
+			errMsg:   ".gitignore and license templates are not added when template is provided",
 		},
 	}
 
@@ -554,6 +567,98 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
 				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
 				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
+			},
+			wantStdout: "https://github.com/OWNER/REPO\n",
+		},
+		{
+			name: "noninteractive clone from scratch",
+			opts: &CreateOptions{
+				Interactive: false,
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+				Clone:       true,
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git init REPO`, 0, "")
+				cs.Register(`git -C REPO remote add origin https://github.com/OWNER/REPO`, 0, "")
+			},
+			wantStdout: "https://github.com/OWNER/REPO\n",
+		},
+		{
+			name: "noninteractive create from template with retry",
+			opts: &CreateOptions{
+				Interactive: false,
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+				Clone:       true,
+				Template:    "mytemplate",
+				BackOff:     &backoff.ZeroBackOff{},
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				// Test resolving repo owner from repo name only.
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER"}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"id": "REPOID",
+								"defaultBranchRef": {
+									"name": "main"
+								}
+							}
+						}
+					}`, func(s string, m map[string]interface{}) {
+						assert.Equal(t, "OWNER", m["owner"])
+						assert.Equal(t, "mytemplate", m["name"])
+					}),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"id":"OWNERID"}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation CloneTemplateRepository\b`),
+					httpmock.GraphQLMutation(`
+					{
+						"data": {
+							"cloneTemplateRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`, func(m map[string]interface{}) {
+						assert.Equal(t, "REPOID", m["repositoryId"])
+					}))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				// fatal: Remote branch main not found in upstream origin
+				cs.Register(`git clone --branch main https://github.com/OWNER/REPO`, 128, "")
+				cs.Register(`git clone --branch main https://github.com/OWNER/REPO`, 0, "")
 			},
 			wantStdout: "https://github.com/OWNER/REPO\n",
 		},

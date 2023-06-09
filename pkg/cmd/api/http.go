@@ -50,7 +50,7 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 		return nil, fmt.Errorf("unrecognized parameters type: %v", params)
 	}
 
-	req, err := http.NewRequest(method, requestURL, body)
+	req, err := http.NewRequest(strings.ToUpper(method), requestURL, body)
 	if err != nil {
 		return nil, err
 	}
@@ -103,21 +103,8 @@ func addQuery(path string, params map[string]interface{}) string {
 	}
 
 	query := url.Values{}
-	for key, value := range params {
-		switch v := value.(type) {
-		case string:
-			query.Add(key, v)
-		case []byte:
-			query.Add(key, string(v))
-		case nil:
-			query.Add(key, "")
-		case int:
-			query.Add(key, fmt.Sprintf("%d", v))
-		case bool:
-			query.Add(key, fmt.Sprintf("%v", v))
-		default:
-			panic(fmt.Sprintf("unknown type %v", v))
-		}
+	if err := addQueryParam(query, "", params); err != nil {
+		panic(err)
 	}
 
 	sep := "?"
@@ -125,4 +112,35 @@ func addQuery(path string, params map[string]interface{}) string {
 		sep = "&"
 	}
 	return path + sep + query.Encode()
+}
+
+func addQueryParam(query url.Values, key string, value interface{}) error {
+	switch v := value.(type) {
+	case string:
+		query.Add(key, v)
+	case []byte:
+		query.Add(key, string(v))
+	case nil:
+		query.Add(key, "")
+	case int:
+		query.Add(key, fmt.Sprintf("%d", v))
+	case bool:
+		query.Add(key, fmt.Sprintf("%v", v))
+	case map[string]interface{}:
+		for subkey, value := range v {
+			// support for nested subkeys can be added here if that is ever necessary
+			if err := addQueryParam(query, subkey, value); err != nil {
+				return err
+			}
+		}
+	case []interface{}:
+		for _, entry := range v {
+			if err := addQueryParam(query, key+"[]", entry); err != nil {
+				return err
+			}
+		}
+	default:
+		return fmt.Errorf("unknown type %v", v)
+	}
+	return nil
 }

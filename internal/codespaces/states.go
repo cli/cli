@@ -52,7 +52,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	}()
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
-	listen, localPort, err := ListenTCP(0)
+	listen, localPort, err := ListenTCP(0, false)
 	if err != nil {
 		return err
 	}

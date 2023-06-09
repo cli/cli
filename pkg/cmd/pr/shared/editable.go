@@ -7,6 +7,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/cli/cli/v2/pkg/surveyext"
 )
@@ -199,6 +200,59 @@ func (e Editable) MilestoneId() (*string, error) {
 	}
 	m, err := e.Metadata.MilestoneToID(e.Milestone.Value)
 	return &m, err
+}
+
+// Clone creates a mostly-shallow copy of Editable suitable for use in parallel
+// go routines. Fields that would be mutated will be copied.
+func (e *Editable) Clone() Editable {
+	return Editable{
+		Title:     e.Title.clone(),
+		Body:      e.Body.clone(),
+		Base:      e.Base.clone(),
+		Reviewers: e.Reviewers.clone(),
+		Assignees: e.Assignees.clone(),
+		Labels:    e.Labels.clone(),
+		Projects:  e.Projects.clone(),
+		Milestone: e.Milestone.clone(),
+		// Shallow copy since no mutation.
+		Metadata: e.Metadata,
+	}
+}
+
+func (es *EditableString) clone() EditableString {
+	return EditableString{
+		Value:   es.Value,
+		Default: es.Default,
+		Edited:  es.Edited,
+		// Shallow copies since no mutation.
+		Options: es.Options,
+	}
+}
+
+func (es *EditableSlice) clone() EditableSlice {
+	cpy := EditableSlice{
+		Edited:  es.Edited,
+		Allowed: es.Allowed,
+		// Shallow copies since no mutation.
+		Options: es.Options,
+		// Copy mutable string slices.
+		Add:     make([]string, len(es.Add)),
+		Remove:  make([]string, len(es.Remove)),
+		Value:   make([]string, len(es.Value)),
+		Default: make([]string, len(es.Default)),
+	}
+	copy(cpy.Add, es.Add)
+	copy(cpy.Remove, es.Remove)
+	copy(cpy.Value, es.Value)
+	copy(cpy.Default, es.Default)
+	return cpy
+}
+
+func (ep *EditableProjects) clone() EditableProjects {
+	return EditableProjects{
+		EditableSlice: ep.EditableSlice.clone(),
+		ProjectItems:  ep.ProjectItems,
+	}
 }
 
 func EditFieldsSurvey(editable *Editable, editorCommand string) error {
@@ -395,6 +449,7 @@ func multiSelectSurvey(message string, defaults, options []string) ([]string, er
 		Message: message,
 		Options: options,
 		Default: defaults,
+		Filter:  prompter.LatinMatchingFilter,
 	}
 	err := survey.AskOne(q, &results)
 	return results, err

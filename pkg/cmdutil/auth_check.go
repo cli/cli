@@ -14,12 +14,7 @@ func DisableAuthCheck(cmd *cobra.Command) {
 }
 
 func CheckAuth(cfg config.Config) bool {
-	// This will check if there are any environment variable
-	// authentication tokens set for enterprise hosts.
-	// Any non-github.com hostname is fine here
-	dummyHostname := "example.com"
-	token, _ := cfg.Authentication().Token(dummyHostname)
-	if token != "" {
+	if cfg.Authentication().HasEnvToken() {
 		return true
 	}
 

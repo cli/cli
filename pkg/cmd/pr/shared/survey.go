@@ -7,6 +7,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 )
@@ -223,6 +224,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 					Message: "Reviewers",
 					Options: reviewers,
 					Default: state.Reviewers,
+					Filter:  prompter.LatinMatchingFilter,
 				},
 			})
 		} else {
@@ -237,6 +239,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 					Message: "Assignees",
 					Options: assignees,
 					Default: state.Assignees,
+					Filter:  prompter.LatinMatchingFilter,
 				},
 			})
 		} else {
@@ -251,6 +254,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 					Message: "Labels",
 					Options: labels,
 					Default: state.Labels,
+					Filter:  prompter.LatinMatchingFilter,
 				},
 			})
 		} else {
@@ -265,6 +269,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 					Message: "Projects",
 					Options: projects,
 					Default: state.Projects,
+					Filter:  prompter.LatinMatchingFilter,
 				},
 			})
 		} else {

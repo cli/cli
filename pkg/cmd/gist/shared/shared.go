@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/shurcooL/githubv4"
 )
@@ -170,4 +174,49 @@ func IsBinaryContents(contents []byte) bool {
 		}
 	}
 	return isBinary
+}
+
+func PromptGists(prompter prompter.Prompter, client *http.Client, host string, cs *iostreams.ColorScheme) (gistID string, err error) {
+	gists, err := ListGists(client, host, 10, "all")
+	if err != nil {
+		return "", err
+	}
+
+	if len(gists) == 0 {
+		return "", nil
+	}
+
+	var opts []string
+	var gistIDs = make([]string, len(gists))
+
+	for i, gist := range gists {
+		gistIDs[i] = gist.ID
+		description := ""
+		gistName := ""
+
+		if gist.Description != "" {
+			description = gist.Description
+		}
+
+		filenames := make([]string, 0, len(gist.Files))
+		for fn := range gist.Files {
+			filenames = append(filenames, fn)
+		}
+		sort.Strings(filenames)
+		gistName = filenames[0]
+
+		gistTime := text.FuzzyAgo(time.Now(), gist.UpdatedAt)
+		// TODO: support dynamic maxWidth
+		description = text.Truncate(100, text.RemoveExcessiveWhitespace(description))
+		opt := fmt.Sprintf("%s %s %s", cs.Bold(gistName), description, cs.Gray(gistTime))
+		opts = append(opts, opt)
+	}
+
+	result, err := prompter.Select("Select a gist", "", opts)
+
+	if err != nil {
+		return "", err
+	}
+
+	return gistIDs[result], nil
 }

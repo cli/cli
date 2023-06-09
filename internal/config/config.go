@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	ghAuth "github.com/cli/go-gh/pkg/auth"
-	ghConfig "github.com/cli/go-gh/pkg/config"
+	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 	"github.com/zalando/go-keyring"
 )
 
@@ -124,7 +124,7 @@ type AuthConfig struct {
 
 // Token will retrieve the auth token for the given hostname,
 // searching environment variables, plain text config, and
-// lastly encypted storage.
+// lastly encrypted storage.
 func (c *AuthConfig) Token(hostname string) (string, string) {
 	if c.tokenOverride != nil {
 		return c.tokenOverride(hostname)
@@ -138,6 +138,23 @@ func (c *AuthConfig) Token(hostname string) (string, string) {
 		}
 	}
 	return token, source
+}
+
+// HasEnvToken returns true when a token has been specified in an
+// environment variable, else returns false.
+func (c *AuthConfig) HasEnvToken() bool {
+	// This will check if there are any environment variable
+	// authentication tokens set for enterprise hosts.
+	// Any non-github.com hostname is fine here
+	hostname := "example.com"
+	if c.tokenOverride != nil {
+		token, _ := c.tokenOverride(hostname)
+		if token != "" {
+			return true
+		}
+	}
+	token, _ := ghAuth.TokenFromEnvOrConfig(hostname)
+	return token != ""
 }
 
 // SetToken will override any token resolution and return the given
