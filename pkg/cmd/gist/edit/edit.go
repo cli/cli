@@ -32,11 +32,12 @@ type EditOptions struct {
 
 	Edit func(string, string, string, *iostreams.IOStreams) (string, error)
 
-	Selector     string
-	EditFilename string
-	AddFilename  string
-	SourceFile   string
-	Description  string
+	Selector       string
+	EditFilename   string
+	AddFilename    string
+	RemoveFilename string
+	SourceFile     string
+	Description    string
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -82,6 +83,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.AddFilename, "add", "a", "", "Add a new file to the gist")
 	cmd.Flags().StringVarP(&opts.Description, "desc", "d", "", "New description for the gist")
 	cmd.Flags().StringVarP(&opts.EditFilename, "filename", "f", "", "Select a file to edit")
+	cmd.Flags().StringVarP(&opts.RemoveFilename, "remove-file", "r", "", "Remove a file from the gist")
 
 	return cmd
 }
@@ -179,6 +181,17 @@ func editRun(opts *EditOptions) error {
 		}
 
 		files, err := getFilesToAdd(opts.AddFilename, content)
+		if err != nil {
+			return err
+		}
+
+		gist.Files = files
+		return updateGist(apiClient, host, gist)
+	}
+
+	// Remove a file from the gist
+	if opts.RemoveFilename != "" {
+		files, err := removeFile(gist.Files, opts.RemoveFilename)
 		if err != nil {
 			return err
 		}
@@ -336,4 +349,17 @@ func getFilesToAdd(file string, content []byte) (map[string]*shared.GistFile, er
 			Content:  string(content),
 		},
 	}, nil
+}
+
+func removeFile(files map[string]*shared.GistFile, filename string) (map[string]*shared.GistFile, error) {
+	if _, found := files[filename]; !found {
+		return nil, fmt.Errorf("gist has no file %q", filename)
+	}
+
+	for name := range files {
+		if strings.Compare(name, filename) == 0 {
+			files[name] = nil
+		}
+	}
+	return files, nil
 }

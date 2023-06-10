@@ -80,6 +80,14 @@ func TestNewCmdEdit(t *testing.T) {
 				Description: "my new description",
 			},
 		},
+		{
+			name: "remove",
+			cli:  "123 --remove-file cool.md",
+			wants: EditOptions{
+				Selector:       "123",
+				RemoveFilename: "cool.md",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -391,6 +399,63 @@ func Test_editRun(t *testing.T) {
 						"content":  "data from stdin",
 						"filename": "from_source.txt",
 					},
+				},
+			},
+		},
+		{
+			name: "remove file, file does not exist",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			opts: &EditOptions{
+				RemoveFilename: "sample2.txt",
+			},
+			wantErr: "gist has no file \"sample2.txt\"",
+		},
+		{
+			name: "remove file from existing gist",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+					"sample2.txt": {
+						Filename: "sample2.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			opts: &EditOptions{
+				RemoveFilename: "sample2.txt",
+			},
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"sample.txt": map[string]interface{}{
+						"filename": "sample.txt",
+						"content":  "bwhiizzzbwhuiiizzzz",
+						"type":     "text/plain",
+					},
+					"sample2.txt": nil,
 				},
 			},
 		},
