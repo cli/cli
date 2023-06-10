@@ -83,10 +83,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.AddFilename, "add", "a", "", "Add a new file to the gist")
 	cmd.Flags().StringVarP(&opts.Description, "desc", "d", "", "New description for the gist")
 	cmd.Flags().StringVarP(&opts.EditFilename, "filename", "f", "", "Select a file to edit")
-	cmd.Flags().StringVarP(&opts.RemoveFilename, "remove-file", "r", "", "Remove a file from the gist")
+	cmd.Flags().StringVarP(&opts.RemoveFilename, "remove", "r", "", "Remove a file from the gist")
 
-	cmd.MarkFlagsMutuallyExclusive("add", "remove-file")
-	cmd.MarkFlagsMutuallyExclusive("remove-file", "filename")
+	cmd.MarkFlagsMutuallyExclusive("add", "remove")
+	cmd.MarkFlagsMutuallyExclusive("remove", "filename")
 
 	return cmd
 }

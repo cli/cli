@@ -82,7 +82,7 @@ func TestNewCmdEdit(t *testing.T) {
 		},
 		{
 			name: "remove",
-			cli:  "123 --remove-file cool.md",
+			cli:  "123 --remove cool.md",
 			wants: EditOptions{
 				Selector:       "123",
 				RemoveFilename: "cool.md",
