@@ -1,7 +1,6 @@
 package extension
 
 import (
-	"bytes"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -139,14 +138,19 @@ func (m *Manager) list(includeMetadata bool) ([]*Extension, error) {
 			continue
 		}
 		if f.IsDir() {
-			kind := GitKind
 			if _, err := os.Stat(filepath.Join(dir, f.Name(), manifestName)); err == nil {
-				kind = BinaryKind
+				results = append(results, &Extension{
+					path:       filepath.Join(dir, f.Name(), f.Name()),
+					kind:       BinaryKind,
+					httpClient: m.client,
+				})
+			} else {
+				results = append(results, &Extension{
+					path:      filepath.Join(dir, f.Name(), f.Name()),
+					kind:      GitKind,
+					gitClient: m.gitClient.ForRepo(filepath.Join(dir, f.Name())),
+				})
 			}
-			results = append(results, &Extension{
-				path: filepath.Join(dir, f.Name(), f.Name()),
-				kind: kind,
-			})
 		} else if isSymlink(f.Type()) {
 			results = append(results, &Extension{
 				path: filepath.Join(dir, f.Name(), f.Name()),
@@ -172,101 +176,16 @@ func (m *Manager) list(includeMetadata bool) ([]*Extension, error) {
 	return results, nil
 }
 
-// manifestPath := filepath.Join(id, fi.Name(), manifestName)
-// manifest, err := os.ReadFile(manifestPath)
-// if err != nil {
-// 	return ext, fmt.Errorf("could not open %s for reading: %w", manifestPath, err)
-// }
-// var bm binManifest
-// err = yaml.Unmarshal(manifest, &bm)
-// if err != nil {
-// 	return ext, fmt.Errorf("could not parse %s: %w", manifestPath, err)
-// }
-// repo := ghrepo.NewWithHost(bm.Owner, bm.Name, bm.Host)
-// remoteURL := ghrepo.GenerateRepoURL(repo, "")
-// ext.url = remoteURL
-// ext.currentVersion = bm.Tag
-// ext.isPinned = bm.IsPinned
-// return ext, nil
-
-// remoteUrl := m.getRemoteUrl(fi.Name())
-// currentVersion := m.getCurrentVersion(fi.Name())
-
-// var isPinned bool
-// pinPath := filepath.Join(id, fi.Name(), fmt.Sprintf(".pin-%s", currentVersion))
-// if _, err := os.Stat(pinPath); err == nil {
-// 	isPinned = true
-// }
-
-// getCurrentVersion determines the current version for non-local git extensions.
-func (m *Manager) getCurrentVersion(extension string) string {
-	dir := filepath.Join(m.installDir(), extension)
-	scopedClient := m.gitClient.ForRepo(dir)
-	localSha, err := scopedClient.CommandOutput([]string{"rev-parse", "HEAD"})
-	if err != nil {
-		return ""
-	}
-	return string(bytes.TrimSpace(localSha))
-}
-
-// getRemoteUrl determines the remote URL for non-local git extensions.
-func (m *Manager) getRemoteUrl(extension string) string {
-	dir := filepath.Join(m.installDir(), extension)
-	scopedClient := m.gitClient.ForRepo(dir)
-	url, err := scopedClient.Config("remote.origin.url")
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(url))
-}
-
 func (m *Manager) populateLatestVersions(exts []*Extension) {
-	size := len(exts)
-	type result struct {
-		index   int
-		version string
-	}
-	ch := make(chan result, size)
 	var wg sync.WaitGroup
-	wg.Add(size)
-	for idx, ext := range exts {
-		go func(i int, e *Extension) {
+	for _, ext := range exts {
+		wg.Add(1)
+		go func(e *Extension) {
 			defer wg.Done()
-			version, _ := m.getLatestVersion(e)
-			ch <- result{index: i, version: version}
-		}(idx, ext)
+			e.LatestVersion()
+		}(ext)
 	}
 	wg.Wait()
-	close(ch)
-	for r := range ch {
-		exts[r.index].latestVersion = r.version
-	}
-}
-
-func (m *Manager) getLatestVersion(ext *Extension) (string, error) {
-	if ext.IsLocal() {
-		return "", localExtensionUpgradeError
-	}
-	if ext.IsBinary() {
-		repo, err := ghrepo.FromFullName(ext.URL())
-		if err != nil {
-			return "", err
-		}
-		r, err := fetchLatestRelease(m.client, repo)
-		if err != nil {
-			return "", err
-		}
-		return r.Tag, nil
-	} else {
-		extDir := filepath.Dir(ext.path)
-		scopedClient := m.gitClient.ForRepo(extDir)
-		lsRemote, err := scopedClient.CommandOutput([]string{"ls-remote", "origin", "HEAD"})
-		if err != nil {
-			return "", err
-		}
-		remoteSha := bytes.SplitN(lsRemote, []byte("\t"), 2)[0]
-		return string(remoteSha), nil
-	}
 }
 
 func (m *Manager) InstallLocal(dir string) error {
@@ -485,12 +404,12 @@ func (m *Manager) Upgrade(name string, force bool) error {
 		if f.Name() != name {
 			continue
 		}
-		var err error
-		// For single extensions manually retrieve latest version since we forgo
-		// doing it during list.
-		f.latestVersion, err = m.getLatestVersion(f)
-		if err != nil {
-			return err
+		if f.IsLocal() {
+			return localExtensionUpgradeError
+		}
+		// For single extensions manually retrieve latest version since we forgo doing it during list.
+		if latestVersion := f.LatestVersion(); latestVersion == "" {
+			return fmt.Errorf("unable to retrieve latest version for extension %q", name)
 		}
 		return m.upgradeExtensions([]*Extension{f}, force)
 	}
@@ -512,7 +431,7 @@ func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
 			fmt.Fprintf(m.io.Out, "%s\n", err)
 			continue
 		}
-		latestVersion := displayExtensionVersion(f, f.latestVersion)
+		latestVersion := displayExtensionVersion(f, f.LatestVersion())
 		if m.dryRunMode {
 			fmt.Fprintf(m.io.Out, "would have upgraded from %s to %s\n", currentVersion, latestVersion)
 		} else {
