@@ -148,8 +148,8 @@ func TestRunDelete_User(t *testing.T) {
 			"data": map[string]interface{}{
 				"deleteProjectV2": map[string]interface{}{
 					"projectV2": map[string]interface{}{
-						"id":  "project ID",
-						"url": "http://a-url.com",
+						"id":     "project ID",
+						"number": 1,
 					},
 				},
 			},
@@ -172,7 +172,7 @@ func TestRunDelete_User(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"http://a-url.com\n",
+		"Deleted project 1\n",
 		stdout.String())
 }
 
@@ -240,8 +240,8 @@ func TestRunDelete_Org(t *testing.T) {
 			"data": map[string]interface{}{
 				"deleteProjectV2": map[string]interface{}{
 					"projectV2": map[string]interface{}{
-						"id":  "project ID",
-						"url": "http://a-url.com",
+						"id":     "project ID",
+						"number": 1,
 					},
 				},
 			},
@@ -264,7 +264,7 @@ func TestRunDelete_Org(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"http://a-url.com\n",
+		"Deleted project 1\n",
 		stdout.String())
 }
 
@@ -322,8 +322,8 @@ func TestRunDelete_Me(t *testing.T) {
 			"data": map[string]interface{}{
 				"deleteProjectV2": map[string]interface{}{
 					"projectV2": map[string]interface{}{
-						"id":  "project ID",
-						"url": "http://a-url.com",
+						"id":     "project ID",
+						"number": 1,
 					},
 				},
 			},
@@ -346,6 +346,6 @@ func TestRunDelete_Me(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"http://a-url.com\n",
+		"Deleted project 1\n",
 		stdout.String())
 }

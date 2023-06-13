@@ -121,7 +121,7 @@ func printResults(config deleteConfig, project queries.Project) error {
 		return nil
 	}
 
-	_, err := fmt.Fprintf(config.io.Out, "%s\n", project.URL)
+	_, err := fmt.Fprintf(config.io.Out, "Deleted project %d\n", project.Number)
 	return err
 }
 
