@@ -100,7 +100,7 @@ func runDelete(config deleteConfig) error {
 		return printJSON(config, *project)
 	}
 
-	return printResults(config)
+	return printResults(config, query.DeleteProject.Project)
 
 }
 
@@ -116,12 +116,12 @@ func deleteItemArgs(config deleteConfig) (*deleteProjectMutation, map[string]int
 	}
 }
 
-func printResults(config deleteConfig) error {
+func printResults(config deleteConfig, project queries.Project) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
 
-	_, err := fmt.Fprintf(config.io.Out, "Deleted project\n")
+	_, err := fmt.Fprintf(config.io.Out, "%s\n", project.URL)
 	return err
 }
 

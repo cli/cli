@@ -183,7 +183,7 @@ func TestRunClose_User(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Closed project http://a-url.com\n",
+		"http://a-url.com\n",
 		stdout.String())
 }
 
@@ -452,6 +452,6 @@ func TestRunClose_Reopen(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Reopened project http://a-url.com\n",
+		"http://a-url.com\n",
 		stdout.String())
 }
