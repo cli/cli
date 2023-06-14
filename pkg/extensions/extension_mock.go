@@ -29,6 +29,9 @@ var _ Extension = &ExtensionMock{}
 //			IsPinnedFunc: func() bool {
 //				panic("mock out the IsPinned method")
 //			},
+//			LatestVersionFunc: func() string {
+//				panic("mock out the LatestVersion method")
+//			},
 //			NameFunc: func() string {
 //				panic("mock out the Name method")
 //			},
@@ -60,6 +63,9 @@ type ExtensionMock struct {
 	// IsPinnedFunc mocks the IsPinned method.
 	IsPinnedFunc func() bool
 
+	// LatestVersionFunc mocks the LatestVersion method.
+	LatestVersionFunc func() string
+
 	// NameFunc mocks the Name method.
 	NameFunc func() string
 
@@ -86,6 +92,9 @@ type ExtensionMock struct {
 		// IsPinned holds details about calls to the IsPinned method.
 		IsPinned []struct {
 		}
+		// LatestVersion holds details about calls to the LatestVersion method.
+		LatestVersion []struct {
+		}
 		// Name holds details about calls to the Name method.
 		Name []struct {
 		}
@@ -103,6 +112,7 @@ type ExtensionMock struct {
 	lockIsBinary        sync.RWMutex
 	lockIsLocal         sync.RWMutex
 	lockIsPinned        sync.RWMutex
+	lockLatestVersion   sync.RWMutex
 	lockName            sync.RWMutex
 	lockPath            sync.RWMutex
 	lockURL             sync.RWMutex
@@ -214,6 +224,33 @@ func (mock *ExtensionMock) IsPinnedCalls() []struct {
 	mock.lockIsPinned.RLock()
 	calls = mock.calls.IsPinned
 	mock.lockIsPinned.RUnlock()
+	return calls
+}
+
+// LatestVersion calls LatestVersionFunc.
+func (mock *ExtensionMock) LatestVersion() string {
+	if mock.LatestVersionFunc == nil {
+		panic("ExtensionMock.LatestVersionFunc: method is nil but Extension.LatestVersion was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockLatestVersion.Lock()
+	mock.calls.LatestVersion = append(mock.calls.LatestVersion, callInfo)
+	mock.lockLatestVersion.Unlock()
+	return mock.LatestVersionFunc()
+}
+
+// LatestVersionCalls gets all the calls that were made to LatestVersion.
+// Check the length with:
+//
+//	len(mockedExtension.LatestVersionCalls())
+func (mock *ExtensionMock) LatestVersionCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockLatestVersion.RLock()
+	calls = mock.calls.LatestVersion
+	mock.lockLatestVersion.RUnlock()
 	return calls
 }
 

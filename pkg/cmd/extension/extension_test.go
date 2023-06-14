@@ -8,7 +8,7 @@ import (
 
 func TestUpdateAvailable_IsLocal(t *testing.T) {
 	e := &Extension{
-		isLocal: true,
+		kind: LocalKind,
 	}
 
 	assert.False(t, e.UpdateAvailable())
@@ -16,7 +16,7 @@ func TestUpdateAvailable_IsLocal(t *testing.T) {
 
 func TestUpdateAvailable_NoCurrentVersion(t *testing.T) {
 	e := &Extension{
-		isLocal: false,
+		kind: LocalKind,
 	}
 
 	assert.False(t, e.UpdateAvailable())
@@ -24,7 +24,7 @@ func TestUpdateAvailable_NoCurrentVersion(t *testing.T) {
 
 func TestUpdateAvailable_NoLatestVersion(t *testing.T) {
 	e := &Extension{
-		isLocal:        false,
+		kind:           BinaryKind,
 		currentVersion: "1.0.0",
 	}
 
@@ -33,7 +33,7 @@ func TestUpdateAvailable_NoLatestVersion(t *testing.T) {
 
 func TestUpdateAvailable_CurrentVersionIsLatestVersion(t *testing.T) {
 	e := &Extension{
-		isLocal:        false,
+		kind:           BinaryKind,
 		currentVersion: "1.0.0",
 		latestVersion:  "1.0.0",
 	}
@@ -43,7 +43,7 @@ func TestUpdateAvailable_CurrentVersionIsLatestVersion(t *testing.T) {
 
 func TestUpdateAvailable(t *testing.T) {
 	e := &Extension{
-		isLocal:        false,
+		kind:           BinaryKind,
 		currentVersion: "1.0.0",
 		latestVersion:  "1.1.0",
 	}
