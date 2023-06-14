@@ -107,10 +107,38 @@ func TestNewCmdCreate(t *testing.T) {
 			},
 		},
 		{
+			name:     "template from name tty and submit",
+			tty:      true,
+			cli:      `-t mytitle --template "bug report" --submit`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				Template:    "bug report",
+				Interactive: false,
+			},
+		},
+		{
 			name:     "template from name non-tty",
 			tty:      false,
 			cli:      `-t mytitle --template "bug report"`,
 			wantsErr: true,
+		},
+		{
+			name:     "template from name non-tty and submit",
+			tty:      false,
+			cli:      `-t mytitle --template "bug report" --submit`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				Template:    "bug report",
+				Interactive: false,
+			},
 		},
 		{
 			name:     "template and body",

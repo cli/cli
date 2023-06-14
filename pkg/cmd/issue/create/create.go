@@ -35,6 +35,7 @@ type CreateOptions struct {
 	Title       string
 	Body        string
 	Interactive bool
+	Submit      bool
 
 	Assignees []string
 	Labels    []string
@@ -93,11 +94,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--recover` only supported when running interactively")
 			}
 
-			if opts.Template != "" && bodyProvided {
+			templateProvided := opts.Template != ""
+			if templateProvided && bodyProvided {
 				return errors.New("`--template` is not supported when using `--body` or `--body-file`")
 			}
 
-			opts.Interactive = !(titleProvided && bodyProvided)
+			opts.Interactive = !(titleProvided && bodyProvided) && !(titleProvided && templateProvided && opts.Submit)
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
@@ -114,6 +116,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to create an issue")
+	cmd.Flags().BoolVarP(&opts.Submit, "submit", "s", false, "Create an issue with a template without body modifications")
 	cmd.Flags().StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	cmd.Flags().StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the issue to projects by `name`")
