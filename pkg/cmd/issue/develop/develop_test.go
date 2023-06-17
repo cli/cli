@@ -322,12 +322,15 @@ func Test_developRun(t *testing.T) {
 			},
 			wantErr: "the `gh issue develop` command is not currently available",
 		},
-		{name: "develop new branch with a name provided",
+		{name: "develop new branch with name specified",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.Name = "my-branch"
 				opts.BaseBranch = "main"
 				opts.IssueSelector = "123"
 				return func() {}
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
@@ -358,7 +361,9 @@ func Test_developRun(t *testing.T) {
 							assert.Equal(t, "yar", inputs["issueId"])
 						}),
 				)
-
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
@@ -368,6 +373,9 @@ func Test_developRun(t *testing.T) {
 				opts.BaseBranch = "main"
 				opts.IssueSelector = "123"
 				return func() {}
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
@@ -399,6 +407,9 @@ func Test_developRun(t *testing.T) {
 						}),
 				)
 
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-issue-1:refs/remotes/origin/my-issue-1`, 0, "")
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-issue-1\n",
 		},

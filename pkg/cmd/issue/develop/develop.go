@@ -134,6 +134,11 @@ func developRunCreate(opts *DevelopOptions) (err error) {
 
 		if opts.Checkout {
 			return checkoutBranch(opts, baseRepo, ref.BranchName)
+		} else {
+			err := fetchBranch(opts, ref.BranchName)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if err != nil {
@@ -260,7 +265,7 @@ func checkoutBranch(opts *DevelopOptions, baseRepo ghrepo.Interface, checkoutBra
 			return err
 		}
 	} else {
-		err := opts.GitClient.Fetch(ctx.Background(), "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
+		err := fetchBranch(opts, checkoutBranch)
 		if err != nil {
 			return err
 		}
@@ -275,4 +280,8 @@ func checkoutBranch(opts *DevelopOptions, baseRepo ghrepo.Interface, checkoutBra
 	}
 
 	return nil
+}
+
+func fetchBranch(opts *DevelopOptions, targetBranch string) (err error) {
+	return opts.GitClient.Fetch(ctx.Background(), "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/%[1]s/%[1]s", targetBranch))
 }
