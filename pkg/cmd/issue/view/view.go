@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -314,6 +315,11 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme) string {
 			labelNames[i] = cs.HexToRGB(label.Color, label.Name)
 		}
 	}
+
+	// ignore case sort
+	sort.Slice(labelNames, func(i, j int) bool {
+		return strings.ToLower(labelNames[i]) < strings.ToLower(labelNames[j])
+	})
 
 	return strings.Join(labelNames, ", ")
 }
