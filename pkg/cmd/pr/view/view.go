@@ -421,7 +421,7 @@ func prLabelList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 	}
 
 	// ignore case sort
-	sort.Slice(labelNames, func(i, j int) bool {
+	sort.SliceStable(labelNames, func(i, j int) bool {
 		return strings.ToLower(labelNames[i]) < strings.ToLower(labelNames[j])
 	})
 
