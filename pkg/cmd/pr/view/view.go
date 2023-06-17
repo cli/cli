@@ -420,6 +420,11 @@ func prLabelList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 		labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
 	}
 
+	// ignore case sort
+	sort.Slice(labelNames, func(i, j int) bool {
+		return strings.ToLower(labelNames[i]) < strings.ToLower(labelNames[j])
+	})
+
 	list := strings.Join(labelNames, ", ")
 	if pr.Labels.TotalCount > len(pr.Labels.Nodes) {
 		list += ", …"
