@@ -31,6 +31,10 @@ func NewCmdShellAlias(io *iostreams.IOStreams, aliasName, aliasValue string) *co
 			externalCmd.Stdin = io.In
 			preparedCmd := run.PrepareCmd(externalCmd)
 			if err = preparedCmd.Run(); err != nil {
+				var execError *exec.ExitError
+				if errors.As(err, &execError) {
+					return &ExternalCommandExitError{execError}
+				}
 				return fmt.Errorf("failed to run external command: %w\n", err)
 			}
 			return nil
