@@ -99,6 +99,22 @@ func Test_NewCmdRefresh(t *testing.T) {
 				InsecureStorage: true,
 			},
 		},
+		{
+			name: "reset scopes",
+			tty:  true,
+			cli:  "--reset-scopes",
+			wants: RefreshOptions{
+				ResetScopes: true,
+			},
+		},
+		{
+			name: "remove scope",
+			tty:  true,
+			cli:  "--remove-scope read:public_key",
+			wants: RefreshOptions{
+				RemoveScopes: []string{"read:public_key"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -278,6 +294,53 @@ func Test_refreshRun(t *testing.T) {
 			wantAuthArgs: authArgs{
 				hostname: "obed.morton",
 				scopes:   nil,
+			},
+		},
+		{
+			name: "reset scopes",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "delete_repo, codespace",
+			opts: &RefreshOptions{
+				Hostname:    "github.com",
+				ResetScopes: true,
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        nil,
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove scopes",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "delete_repo, codespace, repo:invite, public_key:read",
+			opts: &RefreshOptions{
+				Hostname:     "github.com",
+				RemoveScopes: []string{"delete_repo", "repo:invite"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"codespace", "public_key:read"},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove scope but no old scope",
+			cfgHosts: []string{
+				"github.com",
+			},
+			opts: &RefreshOptions{
+				Hostname:     "github.com",
+				RemoveScopes: []string{"delete_repo"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        nil,
+				secureStorage: true,
 			},
 		},
 	}

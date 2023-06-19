@@ -24,9 +24,11 @@ type RefreshOptions struct {
 
 	MainExecutable string
 
-	Hostname string
-	Scopes   []string
-	AuthFlow func(*config.AuthConfig, *iostreams.IOStreams, string, []string, bool, bool) error
+	Hostname     string
+	Scopes       []string
+	RemoveScopes []string
+	ResetScopes  bool
+	AuthFlow     func(*config.AuthConfig, *iostreams.IOStreams, string, []string, bool, bool) error
 
 	Interactive     bool
 	InsecureStorage bool
@@ -90,6 +92,8 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The GitHub host to use for authentication")
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
+	cmd.Flags().StringSliceVarP(&opts.RemoveScopes, "remove-scope", "r", nil, "The authentication scopes to remove from gh")
+	cmd.Flags().BoolVarP(&opts.ResetScopes, "reset-scopes", "R", false, "Reset all authentication scopes for gh")
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
 	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store")
@@ -144,12 +148,14 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 
 	var additionalScopes []string
-	if oldToken, _ := authCfg.Token(hostname); oldToken != "" {
-		if oldScopes, err := shared.GetScopes(opts.HttpClient, hostname, oldToken); err == nil {
-			for _, s := range strings.Split(oldScopes, ",") {
-				s = strings.TrimSpace(s)
-				if s != "" {
-					additionalScopes = append(additionalScopes, s)
+	if !opts.ResetScopes {
+		if oldToken, _ := authCfg.Token(hostname); oldToken != "" {
+			if oldScopes, err := shared.GetScopes(opts.HttpClient, hostname, oldToken); err == nil {
+				for _, s := range strings.Split(oldScopes, ",") {
+					s = strings.TrimSpace(s)
+					if s != "" {
+						additionalScopes = append(additionalScopes, s)
+					}
 				}
 			}
 		}
@@ -161,13 +167,29 @@ func refreshRun(opts *RefreshOptions) error {
 		GitClient:  opts.GitClient,
 	}
 	gitProtocol, _ := authCfg.GitProtocol(hostname)
-	if opts.Interactive && gitProtocol == "https" {
+	if !opts.ResetScopes && opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
 		}
 		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
 	}
 
+	if len(opts.RemoveScopes) > 0 {
+		var scopes []string
+		for _, scope := range additionalScopes {
+			var match bool
+			for _, rmScope := range opts.RemoveScopes {
+				if rmScope == scope {
+					match = true
+					break
+				}
+			}
+			if !match {
+				scopes = append(scopes, scope)
+			}
+		}
+		additionalScopes = scopes
+	}
 	if err := opts.AuthFlow(authCfg, opts.IO, hostname, append(opts.Scopes, additionalScopes...), opts.Interactive, !opts.InsecureStorage); err != nil {
 		return err
 	}
