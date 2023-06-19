@@ -185,7 +185,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "obed.morton",
-				scopes:        nil,
+				scopes:        []string{},
 				secureStorage: true,
 			},
 		},
@@ -199,7 +199,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
-				scopes:        nil,
+				scopes:        []string{},
 				secureStorage: true,
 			},
 		},
@@ -219,7 +219,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
-				scopes:        nil,
+				scopes:        []string{},
 				secureStorage: true,
 			},
 		},
@@ -248,7 +248,68 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
-				scopes:        []string{"repo:invite", "public_key:read", "delete_repo", "codespace"},
+				scopes:        []string{"delete_repo", "codespace", "repo:invite", "public_key:read"},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove scopes",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "delete_repo, codespace",
+			opts: &RefreshOptions{
+				RemoveScopes: []string{"codespace", "delete_repo", "repo:invite"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove all scopes",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "repo:invite, delete_repo, codespace",
+			opts: &RefreshOptions{
+				RemoveScopes: []string{"codespace", "repo:invite", "delete_repo"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove scopes that don't exist",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "repo:invite, delete_repo, codespace",
+			opts: &RefreshOptions{
+				RemoveScopes: []string{"codespace", "repo:invite", "public_key:read"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"delete_repo"},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "add and remove scopes",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "repo:invite, delete_repo, codespace",
+			opts: &RefreshOptions{
+				Scopes:       []string{"repo:invite", "public_key:read", "workflow"},
+				RemoveScopes: []string{"codespace", "repo:invite", "workflow"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"delete_repo", "public_key:read"},
 				secureStorage: true,
 			},
 		},
@@ -262,7 +323,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "obed.morton",
-				scopes:        nil,
+				scopes:        []string{},
 				secureStorage: true,
 			},
 		},
@@ -277,7 +338,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname: "obed.morton",
-				scopes:   nil,
+				scopes:   []string{},
 			},
 		},
 	}
