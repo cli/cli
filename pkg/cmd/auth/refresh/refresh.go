@@ -30,6 +30,9 @@ type RefreshOptions struct {
 
 	Interactive     bool
 	InsecureStorage bool
+
+	RemoveScopes []string
+	ResetScopes  bool
 }
 
 func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.Command {
@@ -89,7 +92,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The GitHub host to use for authentication")
-	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
+	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Specify additional authentication scopes for gh to have (use comma to specify multiple scopes)")
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
 	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store")
@@ -97,6 +100,8 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 
 	cmd.Flags().BoolVarP(&opts.InsecureStorage, "insecure-storage", "", false, "Save authentication credentials in plain text instead of credential store")
 
+	cmd.Flags().StringSliceVarP(&opts.RemoveScopes, "remove-scopes", "r", nil, "Remove authentication scopes from gh (use comma to specify multiple scopes)")
+	cmd.Flags().BoolVarP(&opts.ResetScopes, "reset-scopes", "R", false, "Reset authentication scopes to the default minimum set of scopes")
 	return cmd
 }
 
@@ -143,32 +148,63 @@ func refreshRun(opts *RefreshOptions) error {
 		return cmdutil.SilentError
 	}
 
-	var additionalScopes []string
-	if oldToken, _ := authCfg.Token(hostname); oldToken != "" {
-		if oldScopes, err := shared.GetScopes(opts.HttpClient, hostname, oldToken); err == nil {
-			for _, s := range strings.Split(oldScopes, ",") {
-				s = strings.TrimSpace(s)
-				if s != "" {
-					additionalScopes = append(additionalScopes, s)
-				}
-			}
-		}
-	}
-
 	credentialFlow := &shared.GitCredentialFlow{
 		Executable: opts.MainExecutable,
 		Prompter:   opts.Prompter,
 		GitClient:  opts.GitClient,
 	}
+
+	tmpScopes := credentialFlow.Scopes()
+	if !opts.ResetScopes {
+		if oldToken, _ := authCfg.Token(hostname); oldToken != "" {
+			if oldScopes, err := shared.GetScopes(opts.HttpClient, hostname, oldToken); err == nil {
+				for _, s := range strings.Split(oldScopes, ",") {
+					s = strings.TrimSpace(s)
+					if s != "" {
+						tmpScopes = append(tmpScopes, s)
+					}
+				}
+			}
+		}
+	} else {
+		tmpScopes = []string{"repo", "read:org", "admin:org"}
+	}
+
+	for _, s := range opts.Scopes {
+		has := false
+		for _, ts := range tmpScopes {
+			if s == ts {
+				has = true
+				break
+			}
+		}
+		if !has {
+			tmpScopes = append(tmpScopes, s)
+		}
+	}
+
+	authScopes := make([]string, 0, len(tmpScopes))
+	for _, target := range tmpScopes {
+		remove := false
+		for _, scope := range opts.RemoveScopes {
+			if target == scope {
+				remove = true
+				break
+			}
+		}
+		if !remove {
+			authScopes = append(authScopes, target)
+		}
+	}
+
 	gitProtocol, _ := authCfg.GitProtocol(hostname)
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
 		}
-		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
 	}
 
-	if err := opts.AuthFlow(authCfg, opts.IO, hostname, append(opts.Scopes, additionalScopes...), opts.Interactive, !opts.InsecureStorage); err != nil {
+	if err := opts.AuthFlow(authCfg, opts.IO, hostname, authScopes, opts.Interactive, !opts.InsecureStorage); err != nil {
 		return err
 	}
 
