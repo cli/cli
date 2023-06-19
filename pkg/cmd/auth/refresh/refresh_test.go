@@ -99,6 +99,38 @@ func Test_NewCmdRefresh(t *testing.T) {
 				InsecureStorage: true,
 			},
 		},
+		{
+			name: "remove scopes",
+			tty:  true,
+			cli:  "--remove-scopes repo:invite,delete_repo",
+			wants: RefreshOptions{
+				RemoveScopes: []string{"repo:invite", "delete_repo"},
+			},
+		},
+		{
+			name: "remove scopes shorthand",
+			tty:  true,
+			cli:  "-r repo:invite,delete_repo",
+			wants: RefreshOptions{
+				RemoveScopes: []string{"repo:invite", "delete_repo"},
+			},
+		},
+		{
+			name: "reset scopes",
+			tty:  true,
+			cli:  "--reset-scopes",
+			wants: RefreshOptions{
+				ResetScopes: true,
+			},
+		},
+		{
+			name: "reset scopes shorthand",
+			tty:  true,
+			cli:  "-R",
+			wants: RefreshOptions{
+				ResetScopes: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
