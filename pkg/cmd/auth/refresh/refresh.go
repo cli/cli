@@ -175,7 +175,7 @@ func refreshRun(opts *RefreshOptions) error {
 			}
 		}
 	} else {
-		tmpScopes = []string{"repo", "read:org", "admin:org"}
+		tmpScopes = []string{"repo", "read:org"}
 	}
 
 	for _, s := range opts.Scopes {
