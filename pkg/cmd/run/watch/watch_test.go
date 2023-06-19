@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -193,14 +193,14 @@ func TestWatchRun(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		httpStubs func(*httpmock.Registry)
-		askStubs  func(*prompt.AskStubber)
-		opts      *WatchOptions
-		tty       bool
-		wantErr   bool
-		errMsg    string
-		wantOut   string
+		name        string
+		httpStubs   func(*httpmock.Registry)
+		promptStubs func(*prompter.MockPrompter)
+		opts        *WatchOptions
+		tty         bool
+		wantErr     bool
+		errMsg      string
+		wantOut     string
 	}{
 		{
 			name: "run ID provided run already completed",
@@ -269,10 +269,12 @@ func TestWatchRun(t *testing.T) {
 				Prompt:   true,
 			},
 			httpStubs: successfulRunStubs,
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Select a workflow run").
-					AssertOptions([]string{"* commit1, CI (trunk) Feb 23, 2021", "* commit2, CI (trunk) Feb 23, 2021"}).
-					AnswerWith("* commit2, CI (trunk) Feb 23, 2021")
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"* commit1, CI (trunk) Feb 23, 2021", "* commit2, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "* commit2, CI (trunk) Feb 23, 2021")
+					})
 			},
 			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[?1049l✓ trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run CI (2) completed with 'success'\n",
 		},
@@ -285,10 +287,12 @@ func TestWatchRun(t *testing.T) {
 				ExitStatus: true,
 			},
 			httpStubs: failedRunStubs,
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Select a workflow run").
-					AssertOptions([]string{"* commit1, CI (trunk) Feb 23, 2021", "* commit2, CI (trunk) Feb 23, 2021"}).
-					AnswerWith("* commit2, CI (trunk) Feb 23, 2021")
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"* commit1, CI (trunk) Feb 23, 2021", "* commit2, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "* commit2, CI (trunk) Feb 23, 2021")
+					})
 			},
 			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk CI · 2\nTriggered via push about 59 minutes ago\n\n\x1b[?1049lX trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run CI (2) completed with 'failure'\n",
 			wantErr: true,
@@ -317,10 +321,10 @@ func TestWatchRun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := prompter.NewMockPrompter(t)
+			tt.opts.Prompter = pm
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
 			}
 
 			err := watchRun(tt.opts)

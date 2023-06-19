@@ -465,7 +465,7 @@ func preloadPrChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullReq
 				%s
 			}
 		}
-	}`, api.StatusCheckRollupGraphQL("$endCursor"))
+	}`, api.StatusCheckRollupGraphQLWithoutCountByState("$endCursor"))
 
 	variables := map[string]interface{}{
 		"id": pr.ID,

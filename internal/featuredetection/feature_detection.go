@@ -22,30 +22,25 @@ var allIssueFeatures = IssueFeatures{
 }
 
 type PullRequestFeatures struct {
-	ReviewDecision       bool
-	StatusCheckRollup    bool
-	BranchProtectionRule bool
-	MergeQueue           bool
+	MergeQueue bool
+	// CheckRunAndStatusContextCounts indicates whether the API supports
+	// the checkRunCount, checkRunCountsByState, statusContextCount and stausContextCountsByState
+	// fields on the StatusCheckRollupContextConnection
+	CheckRunAndStatusContextCounts bool
 }
 
 var allPullRequestFeatures = PullRequestFeatures{
-	ReviewDecision:       true,
-	StatusCheckRollup:    true,
-	BranchProtectionRule: true,
-	MergeQueue:           true,
+	MergeQueue:                     true,
+	CheckRunAndStatusContextCounts: true,
 }
 
 type RepositoryFeatures struct {
-	IssueTemplateMutation    bool
-	IssueTemplateQuery       bool
 	PullRequestTemplateQuery bool
 	VisibilityField          bool
 	AutoMerge                bool
 }
 
 var allRepositoryFeatures = RepositoryFeatures{
-	IssueTemplateMutation:    true,
-	IssueTemplateQuery:       true,
 	PullRequestTemplateQuery: true,
 	VisibilityField:          true,
 	AutoMerge:                true,
@@ -103,29 +98,37 @@ func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
 	// 	return allPullRequestFeatures, nil
 	// }
 
-	features := PullRequestFeatures{
-		ReviewDecision:       true,
-		StatusCheckRollup:    true,
-		BranchProtectionRule: true,
-	}
-
-	var featureDetection struct {
+	var pullRequestFeatureDetection struct {
 		PullRequest struct {
 			Fields []struct {
 				Name string
 			} `graphql:"fields(includeDeprecated: true)"`
 		} `graphql:"PullRequest: __type(name: \"PullRequest\")"`
+		StatusCheckRollupContextConnection struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"StatusCheckRollupContextConnection: __type(name: \"StatusCheckRollupContextConnection\")"`
 	}
 
 	gql := api.NewClientFromHTTP(d.httpClient)
-	err := gql.Query(d.host, "PullRequest_fields", &featureDetection, nil)
-	if err != nil {
-		return features, err
+	if err := gql.Query(d.host, "PullRequest_fields", &pullRequestFeatureDetection, nil); err != nil {
+		return PullRequestFeatures{}, err
 	}
 
-	for _, field := range featureDetection.PullRequest.Fields {
+	features := PullRequestFeatures{}
+
+	for _, field := range pullRequestFeatureDetection.PullRequest.Fields {
 		if field.Name == "isInMergeQueue" {
 			features.MergeQueue = true
+		}
+	}
+
+	for _, field := range pullRequestFeatureDetection.StatusCheckRollupContextConnection.Fields {
+		// We only check for checkRunCount here but it, checkRunCountsByState, statusContextCount and statusContextCountsByState
+		// were all introduced in the same version of the API.
+		if field.Name == "checkRunCount" {
+			features.CheckRunAndStatusContextCounts = true
 		}
 	}
 
@@ -137,10 +140,7 @@ func (d *detector) RepositoryFeatures() (RepositoryFeatures, error) {
 		return allRepositoryFeatures, nil
 	}
 
-	features := RepositoryFeatures{
-		IssueTemplateQuery:    true,
-		IssueTemplateMutation: true,
-	}
+	features := RepositoryFeatures{}
 
 	var featureDetection struct {
 		Repository struct {

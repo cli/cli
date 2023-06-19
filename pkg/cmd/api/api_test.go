@@ -668,6 +668,78 @@ func Test_apiRun_paginationREST(t *testing.T) {
 	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=3", responses[2].Request.URL.String())
 }
 
+func Test_apiRun_arrayPaginationREST(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(false)
+
+	requestCount := 0
+	responses := []*http.Response{
+		{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"item":1},{"item":2}]`)),
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=4>; rel="last"`},
+			},
+		},
+		{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"item":3},{"item":4}]`)),
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=4>; rel="last"`},
+			},
+		},
+		{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"item":5}]`)),
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=4>; rel="next", <https://api.github.com/repositories/1227/issues?page=4>; rel="last"`},
+			},
+		},
+		{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[]`)),
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+		},
+	}
+
+	options := ApiOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				resp := responses[requestCount]
+				resp.Request = req
+				requestCount++
+				return resp, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+
+		RequestMethod:       "GET",
+		RequestMethodPassed: true,
+		RequestPath:         "issues",
+		Paginate:            true,
+		RawFields:           []string{"per_page=50", "page=1"},
+	}
+
+	err := apiRun(&options)
+	assert.NoError(t, err)
+
+	assert.Equal(t, `[{"item":1},{"item":2},{"item":3},{"item":4},{"item":5} ]`, stdout.String(), "stdout")
+	assert.Equal(t, "", stderr.String(), "stderr")
+
+	assert.Equal(t, "https://api.github.com/issues?page=1&per_page=50", responses[0].Request.URL.String())
+	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=2", responses[1].Request.URL.String())
+	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=3", responses[2].Request.URL.String())
+}
+
 func Test_apiRun_paginationGraphQL(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 
@@ -1236,7 +1308,7 @@ func Test_processResponse_template(t *testing.T) {
 	tmpl := template.New(ios.Out, ios.TerminalWidth(), ios.ColorEnabled())
 	err := tmpl.Parse(opts.Template)
 	require.NoError(t, err)
-	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, tmpl)
+	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, tmpl, true, true)
 	require.NoError(t, err)
 	err = tmpl.Flush()
 	require.NoError(t, err)

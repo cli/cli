@@ -36,6 +36,19 @@ type Client struct {
 	mu             sync.Mutex
 }
 
+func (c *Client) Copy() *Client {
+	return &Client{
+		GhPath:  c.GhPath,
+		RepoDir: c.RepoDir,
+		GitPath: c.GitPath,
+		Stderr:  c.Stderr,
+		Stdin:   c.Stdin,
+		Stdout:  c.Stdout,
+
+		commandContext: c.commandContext,
+	}
+}
+
 func (c *Client) Command(ctx context.Context, args ...string) (*Command, error) {
 	if c.RepoDir != "" {
 		args = append([]string{"-C", c.RepoDir}, args...)
@@ -408,6 +421,44 @@ func (c *Client) revParse(ctx context.Context, args ...string) ([]byte, error) {
 	return cmd.Output()
 }
 
+func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
+	_, err := c.GitDir(ctx)
+	if err != nil {
+		var execError errWithExitCode
+		if errors.As(err, &execError) && execError.ExitCode() == 128 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
+	args := []string{"config", "--unset", fmt.Sprintf("remote.%s.gh-resolved", name)}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) SetRemoteBranches(ctx context.Context, remote string, refspec string) error {
+	args := []string{"remote", "set-branches", remote, refspec}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Below are commands that make network calls and need authentication credentials supplied from gh.
 
 func (c *Client) Fetch(ctx context.Context, remote string, refspec string, mods ...CommandModifier) error {
@@ -511,31 +562,6 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 		PushURL:  urlParsed,
 	}
 	return remote, nil
-}
-
-func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
-	_, err := c.GitDir(ctx)
-	if err != nil {
-		var execError errWithExitCode
-		if errors.As(err, &execError) && execError.ExitCode() == 128 {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
-
-func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
-	args := []string{"config", "--unset", fmt.Sprintf("remote.%s.gh-resolved", name)}
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return err
-	}
-	_, err = cmd.Output()
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func resolveGitPath() (string, error) {

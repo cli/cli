@@ -143,7 +143,31 @@ var autoMergeRequest = shortenQuery(`
 	}
 `)
 
-func StatusCheckRollupGraphQL(after string) string {
+func StatusCheckRollupGraphQLWithCountByState() string {
+	return shortenQuery(`
+	statusCheckRollup: commits(last: 1) {
+		nodes {
+			commit {
+				statusCheckRollup {
+					contexts {
+						checkRunCount,
+						checkRunCountsByState {
+						  state,
+						  count
+						},
+						statusContextCount,
+						statusContextCountsByState {
+						  state,
+						  count
+						}
+					}
+				}
+			}
+		}
+	}`)
+}
+
+func StatusCheckRollupGraphQLWithoutCountByState(after string) string {
 	var afterClause string
 	if after != "" {
 		afterClause = ",after:" + after
@@ -320,7 +344,9 @@ func IssueGraphQL(fields []string) string {
 		case "requiresStrictStatusChecks": // pseudo-field
 			q = append(q, `baseRef{branchProtectionRule{requiresStrictStatusChecks}}`)
 		case "statusCheckRollup":
-			q = append(q, StatusCheckRollupGraphQL(""))
+			q = append(q, StatusCheckRollupGraphQLWithoutCountByState(""))
+		case "statusCheckRollupWithCountByState": // pseudo-field
+			q = append(q, StatusCheckRollupGraphQLWithCountByState())
 		default:
 			q = append(q, field)
 		}
