@@ -133,13 +133,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
 	cmd.AddCommand(newCodespaceCmd(f))
-
-	// the `api` command should not inherit any extra HTTP headers
-	bareHTTPCmdFactory := *f
-	bareHTTPCmdFactory.HttpClient = bareHTTPClient(f, version)
-
-	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, nil))
-
 	cmd.AddCommand(projectCmd.NewCmdProject(f))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
@@ -155,6 +148,13 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
 	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
 	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
+
+	// the `api` command should not inherit any extra HTTP headers
+	bareHTTPCmdFactory := *f
+	bareHTTPCmdFactory.HttpClient = bareHTTPClient(f, version)
+	bareHTTPCmdFactory.BaseRepo = factory.SmartBaseRepoFunc(&bareHTTPCmdFactory)
+
+	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, nil))
 
 	// Help topics
 	var referenceCmd *cobra.Command
