@@ -292,7 +292,7 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 				reg.Register(
 					httpmock.REST("POST", "repos/FORKOWNER/REPO-FORK/merge-upstream"),
-					httpmock.StatusStringResponse(404, `{}`))
+					httpmock.StatusStringResponse(422, `{}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
