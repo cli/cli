@@ -39,23 +39,21 @@ func Get(service, user string) (string, error) {
 	duration := time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
-	resCh := make(chan string, 1)
-	errCh := make(chan error, 1)
+	ch := make(chan struct {
+		val string
+		err error
+	}, 1)
 	go func() {
-		defer close(resCh)
-		defer close(errCh)
+		defer close(ch)
 		val, err := keyring.Get(service, user)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		resCh <- val
+		ch <- struct {
+			val string
+			err error
+		}{val, err}
 	}()
 	select {
-	case val := <-resCh:
-		return val, nil
-	case err := <-errCh:
-		return "", err
+	case res := <-ch:
+		return res.val, res.err
 	case <-ctx.Done():
 		return "", &TimeoutError{"timeout while trying to get secret from keyring"}
 	}
