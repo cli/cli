@@ -757,15 +757,20 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			return err
 		}
 
-		if _, err := remotes.FindByName(remoteName); err == nil {
-			renameTarget := "upstream"
-			renameCmd, err := gitClient.Command(context.Background(), "remote", "rename", remoteName, renameTarget)
-			if err != nil {
-				return err
-			}
-			_, err = renameCmd.Output()
-			if err != nil {
-				return err
+		if origin, _ := remotes.FindByName(remoteName); origin != nil {
+			if ghrepo.IsSame(origin, ctx.BaseRepo) {
+				renameTarget := "upstream"
+				renameCmd, err := gitClient.Command(context.Background(), "remote", "rename", remoteName, renameTarget)
+				if err != nil {
+					return fmt.Errorf("failed to rename origin remote: %w", err)
+				}
+				_, err = renameCmd.Output()
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(opts.IO.ErrOut, "renamed '%s' remote to '%s' and add 'origin' remote for forked repo\n", remoteName, renameTarget)
+			} else {
+				remoteName = "fork"
 			}
 		}
 
@@ -773,6 +778,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		if err != nil {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
+		fmt.Fprintf(opts.IO.ErrOut, "added remote %s\n", gitRemote.Name)
 		headRemote = &ghContext.Remote{
 			Remote: gitRemote,
 			Repo:   headRepo,
