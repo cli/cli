@@ -307,6 +307,11 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme) string {
 		return ""
 	}
 
+	// ignore case sort
+	sort.SliceStable(issue.Labels.Nodes, func(i, j int) bool {
+		return strings.ToLower(issue.Labels.Nodes[i].Name) < strings.ToLower(issue.Labels.Nodes[j].Name)
+	})
+
 	labelNames := make([]string, len(issue.Labels.Nodes))
 	for i, label := range issue.Labels.Nodes {
 		if cs == nil {
@@ -315,11 +320,6 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme) string {
 			labelNames[i] = cs.HexToRGB(label.Color, label.Name)
 		}
 	}
-
-	// ignore case sort
-	sort.SliceStable(labelNames, func(i, j int) bool {
-		return strings.ToLower(labelNames[i]) < strings.ToLower(labelNames[j])
-	})
 
 	return strings.Join(labelNames, ", ")
 }
