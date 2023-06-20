@@ -109,7 +109,7 @@ func mainRun() exitCode {
 	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
 		var pagerPipeError *iostreams.ErrClosedPagerPipe
 		var noResultsError cmdutil.NoResultsError
-		var execError *exec.ExitError
+		var extError *root.ExternalCommandExitError
 		var authError *root.AuthError
 		if err == cmdutil.SilentError {
 			return exitError
@@ -130,8 +130,9 @@ func mainRun() exitCode {
 			}
 			// no results is not a command failure
 			return exitOK
-		} else if errors.As(err, &execError) {
-			return exitCode(execError.ExitCode())
+		} else if errors.As(err, &extError) {
+			// pass on exit codes from extensions and shell aliases
+			return exitCode(extError.ExitCode())
 		}
 
 		printError(stderr, err, cmd, hasDebug)

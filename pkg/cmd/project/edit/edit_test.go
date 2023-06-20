@@ -226,7 +226,7 @@ func TestRunUpdate_User(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Updated project http://a-url.com\n",
+		"http://a-url.com\n",
 		stdout.String())
 }
 
@@ -324,7 +324,7 @@ func TestRunUpdate_Org(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Updated project http://a-url.com\n",
+		"http://a-url.com\n",
 		stdout.String())
 }
 
@@ -412,7 +412,7 @@ func TestRunUpdate_Me(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Updated project http://a-url.com\n",
+		"http://a-url.com\n",
 		stdout.String())
 }
 
@@ -507,6 +507,6 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Updated project http://a-url.com\n",
+		"http://a-url.com\n",
 		stdout.String())
 }

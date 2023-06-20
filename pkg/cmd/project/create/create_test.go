@@ -146,7 +146,7 @@ func TestRunCreate_User(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Created project 'a title'\nhttp://a-url.com\n",
+		"http://a-url.com\n",
 		stdout.String())
 }
 
@@ -214,7 +214,7 @@ func TestRunCreate_Org(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Created project 'a title'\nhttp://a-url.com\n",
+		"http://a-url.com\n",
 		stdout.String())
 }
 
@@ -273,6 +273,6 @@ func TestRunCreate_Me(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Created project 'a title'\nhttp://a-url.com\n",
+		"http://a-url.com\n",
 		stdout.String())
 }

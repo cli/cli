@@ -128,13 +128,8 @@ func printResults(config closeConfig, project queries.Project) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
-	var action string
-	if config.opts.reopen {
-		action = "Reopened"
-	} else {
-		action = "Closed"
-	}
-	_, err := fmt.Fprintf(config.io.Out, "%s project %s\n", action, project.URL)
+
+	_, err := fmt.Fprintf(config.io.Out, "%s\n", project.URL)
 	return err
 }
 
