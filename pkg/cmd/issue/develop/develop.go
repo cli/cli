@@ -283,5 +283,5 @@ func checkoutBranch(opts *DevelopOptions, baseRepo ghrepo.Interface, checkoutBra
 }
 
 func fetchBranch(opts *DevelopOptions, targetBranch string) (err error) {
-	return opts.GitClient.Fetch(ctx.Background(), "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/%[1]s/%[1]s", targetBranch))
+	return opts.GitClient.Fetch(ctx.Background(), "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", targetBranch))
 }
