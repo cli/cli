@@ -150,7 +150,7 @@ func printResults(config editConfig, project queries.Project) error {
 		return nil
 	}
 
-	_, err := fmt.Fprintf(config.io.Out, "Updated project %s\n", project.URL)
+	_, err := fmt.Fprintf(config.io.Out, "%s\n", project.URL)
 	return err
 }
 
