@@ -125,10 +125,10 @@ func Test_listRun(t *testing.T) {
 
 				Showing 3 of 3 rulesets in OWNER/REPO
 
-				ID  NAME    STATUS    TARGET
-				4   test    evaluate  branch
-				42  asdf    active    branch
-				77  foobar  disabled  branch
+				ID  NAME    SOURCE             STATUS    RULES
+				4   test    OWNER/REPO (repo)  evaluate  1
+				42  asdf    OWNER/REPO (repo)  active    2
+				77  foobar  Org-Name (org)     disabled  4
 			`),
 			wantStderr: "",
 		},
@@ -142,10 +142,10 @@ func Test_listRun(t *testing.T) {
 
 				Showing 3 of 3 rulesets in my-org
 
-				ID  NAME    STATUS    TARGET
-				4   test    evaluate  branch
-				42  asdf    active    branch
-				77  foobar  disabled  branch
+				ID  NAME    SOURCE             STATUS    RULES
+				4   test    OWNER/REPO (repo)  evaluate  1
+				42  asdf    OWNER/REPO (repo)  active    2
+				77  foobar  Org-Name (org)     disabled  4
 			`),
 			wantStderr: "",
 		},
@@ -153,9 +153,9 @@ func Test_listRun(t *testing.T) {
 			name:  "machine-readable",
 			isTTY: false,
 			wantStdout: heredoc.Doc(`
-				4	test	evaluate	branch
-				42	asdf	active	branch
-				77	foobar	disabled	branch
+				4	test	OWNER/REPO (repo)	evaluate	1
+				42	asdf	OWNER/REPO (repo)	active	2
+				77	foobar	Org-Name (org)	disabled	4
 			`),
 			wantStderr: "",
 		},

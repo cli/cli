@@ -35,7 +35,10 @@ type RulesetREST struct {
 	// TODO is this source field used?
 	SourceType string `json:"source_type"`
 	Source     string
-	Rules      []struct{}
+	Rules      []struct {
+		Type       string
+		Parameters map[string]interface{}
+	}
 }
 
 // Returns the source of the ruleset in the format "owner/name (repo)" or "owner (org)"

@@ -9,6 +9,10 @@
             "name": "test",
             "target": "BRANCH",
             "enforcement": "EVALUATE",
+            "source": {
+              "__typename": "Repository",
+              "owner": "OWNER/REPO"
+            },
             "conditions": {
               "refName": {
                 "include": [
@@ -27,6 +31,10 @@
             "name": "asdf",
             "target": "BRANCH",
             "enforcement": "ACTIVE",
+            "source": {
+              "__typename": "Repository",
+              "owner": "OWNER/REPO"
+            },
             "conditions": {
               "refName": {
                 "include": [
@@ -45,6 +53,10 @@
             "name": "foobar",
             "target": "BRANCH",
             "enforcement": "DISABLED",
+            "source": {
+              "__typename": "Organization",
+              "owner": "Org-Name"
+            },
             "conditions": {
               "refName": {
                 "include": [

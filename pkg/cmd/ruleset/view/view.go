@@ -3,7 +3,6 @@ package view
 import (
 	"fmt"
 	"net/http"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -189,7 +188,9 @@ func viewRun(opts *ViewOptions) error {
 
 	fmt.Fprintf(w, "\n%s\n", cs.Bold(rs.Name))
 	fmt.Fprintf(w, "ID: %d\n", rs.Id)
+	fmt.Fprintf(w, "Source: %s (%s)\n", rs.Source, rs.SourceType)
 
+	fmt.Fprint(w, "Enforceument: ")
 	switch rs.Enforcement {
 	case "disabled":
 		fmt.Fprintf(w, "%s\n", cs.Red("Disabled"))
@@ -198,7 +199,7 @@ func viewRun(opts *ViewOptions) error {
 	case "active":
 		fmt.Fprintf(w, "%s\n", cs.Green("Active"))
 	default:
-		fmt.Fprintf(w, "Enforcement: %s\n", rs.Enforcement)
+		fmt.Fprintf(w, "%s\n", rs.Enforcement)
 	}
 
 	fmt.Fprintf(w, "\n%s\n", cs.Bold("Bypassing"))
@@ -246,27 +247,7 @@ func viewRun(opts *ViewOptions) error {
 			sort.Strings(subkeys)
 
 			for _, n := range subkeys {
-				rawVal := condition[n]
-
-				k := reflect.TypeOf(rawVal).Kind()
-				if rawVal == nil ||
-					((k == reflect.Slice || k == reflect.Map) && len(rawVal.([]interface{})) == 0) {
-					continue
-				}
-
-				printVal := fmt.Sprint(rawVal)
-
-				// fmt.Fprintf(w, "n: %s, type: %s\n", n, reflect.TypeOf(rawVal).String())
-
-				// switch val := rawVal.(type) {
-				// case []interface{}:
-				// 	// currently only string arrays are returned by the API at this level
-				// 	printVal = fmt.Sprint(val)
-				// default:
-				// 	printVal = fmt.Sprint(val)
-				// }
-
-				fmt.Fprintf(w, "[%s: %s] ", n, printVal)
+				fmt.Fprintf(w, "[%s: %v] ", n, condition[n])
 			}
 
 			fmt.Fprint(w, "\n")
@@ -274,7 +255,35 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	fmt.Fprintf(w, "\n%s\n", cs.Bold("Rules"))
-	fmt.Fprintf(w, "%d configured\n", reflect.ValueOf(rs.Rules).Len())
+	if len(rs.Rules) == 0 {
+		fmt.Fprintf(w, "No rules configured\n")
+	} else {
+		// sort keys for consistent responses
+		sort.SliceStable(rs.Rules, func(i, j int) bool {
+			return rs.Rules[i].Type < rs.Rules[j].Type
+		})
+
+		for _, rule := range rs.Rules {
+			fmt.Fprintf(w, "- %s", rule.Type)
+
+			if rule.Parameters != nil && len(rule.Parameters) > 0 {
+				fmt.Fprintf(w, ": ")
+
+				// sort these keys too for consistency
+				params := make([]string, 0, len(rule.Parameters))
+				for p := range rule.Parameters {
+					params = append(params, p)
+				}
+				sort.Strings(params)
+
+				for _, n := range params {
+					fmt.Fprintf(w, "[%s: %v] ", n, rule.Parameters[n])
+				}
+			}
+
+			fmt.Fprint(w, "\n")
+		}
+	}
 
 	return nil
 }
