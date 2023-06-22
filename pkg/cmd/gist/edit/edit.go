@@ -194,12 +194,11 @@ func editRun(opts *EditOptions) error {
 
 	// Remove a file from the gist
 	if opts.RemoveFilename != "" {
-		files, err := removeFile(gist.Files, opts.RemoveFilename)
+		err := removeFile(gist, opts.RemoveFilename)
 		if err != nil {
 			return err
 		}
 
-		gist.Files = files
 		return updateGist(apiClient, host, gist)
 	}
 
@@ -354,15 +353,12 @@ func getFilesToAdd(file string, content []byte) (map[string]*shared.GistFile, er
 	}, nil
 }
 
-func removeFile(files map[string]*shared.GistFile, filename string) (map[string]*shared.GistFile, error) {
-	if _, found := files[filename]; !found {
-		return nil, fmt.Errorf("gist has no file %q", filename)
+func removeFile(gist *shared.Gist, filename string) error {
+	if _, found := gist.Files[filename]; !found {
+		return fmt.Errorf("gist has no file %q", filename)
 	}
 
-	for name := range files {
-		if strings.Compare(name, filename) == 0 {
-			files[name] = nil
-		}
-	}
-	return files, nil
+	gist.Files[filename] = nil
+
+	return nil
 }
