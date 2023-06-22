@@ -36,9 +36,10 @@ func Test_getFilesToAdd(t *testing.T) {
 
 func TestNewCmdEdit(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants EditOptions
+		name     string
+		cli      string
+		wants    EditOptions
+		wantsErr bool
 	}{
 		{
 			name: "no flags",
@@ -88,6 +89,16 @@ func TestNewCmdEdit(t *testing.T) {
 				RemoveFilename: "cool.md",
 			},
 		},
+		{
+			name:     "add and remove are mutually exclusive",
+			cli:      "123 --add cool.md --remove great.md",
+			wantsErr: true,
+		},
+		{
+			name:     "filename and remove are mutually exclusive",
+			cli:      "123 --filename cool.md --remove great.md",
+			wantsErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -108,11 +119,17 @@ func TestNewCmdEdit(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
-			assert.NoError(t, err)
+			if tt.wantsErr {
+				require.Error(t, err)
+				return
+			}
 
-			assert.Equal(t, tt.wants.EditFilename, gotOpts.EditFilename)
-			assert.Equal(t, tt.wants.AddFilename, gotOpts.AddFilename)
-			assert.Equal(t, tt.wants.Selector, gotOpts.Selector)
+			require.NoError(t, err)
+
+			require.Equal(t, tt.wants.EditFilename, gotOpts.EditFilename)
+			require.Equal(t, tt.wants.AddFilename, gotOpts.AddFilename)
+			require.Equal(t, tt.wants.Selector, gotOpts.Selector)
+			require.Equal(t, tt.wants.RemoveFilename, gotOpts.RemoveFilename)
 		})
 	}
 }
