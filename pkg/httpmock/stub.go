@@ -143,7 +143,20 @@ func StatusStringResponse(status int, body string) Responder {
 func JSONResponse(body interface{}) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		b, _ := json.Marshal(body)
-		return httpResponse(200, req, bytes.NewBuffer(b)), nil
+		header := http.Header{
+			"Content-Type": []string{"application/json"},
+		}
+		return httpResponseWithHeader(200, req, bytes.NewBuffer(b), header), nil
+	}
+}
+
+func StatusJSONResponse(status int, body interface{}) Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		b, _ := json.Marshal(body)
+		header := http.Header{
+			"Content-Type": []string{"application/json"},
+		}
+		return httpResponseWithHeader(status, req, bytes.NewBuffer(b), header), nil
 	}
 }
 
@@ -215,10 +228,14 @@ func ScopesResponder(scopes string) func(*http.Request) (*http.Response, error) 
 }
 
 func httpResponse(status int, req *http.Request, body io.Reader) *http.Response {
+	return httpResponseWithHeader(status, req, body, http.Header{})
+}
+
+func httpResponseWithHeader(status int, req *http.Request, body io.Reader, header http.Header) *http.Response {
 	return &http.Response{
 		StatusCode: status,
 		Request:    req,
 		Body:       io.NopCloser(body),
-		Header:     http.Header{},
+		Header:     header,
 	}
 }
