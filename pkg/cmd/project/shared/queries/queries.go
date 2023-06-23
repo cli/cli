@@ -167,6 +167,7 @@ type FieldValueNodes struct {
 		Field ProjectField
 	} `graphql:"... on ProjectV2ItemFieldDateValue"`
 	ProjectV2ItemFieldIterationValue struct {
+		Title     string
 		StartDate string
 		Duration  int
 		Field     ProjectField
@@ -193,6 +194,7 @@ type FieldValueNodes struct {
 	} `graphql:"... on ProjectV2ItemFieldTextValue"`
 	ProjectV2ItemFieldMilestoneValue struct {
 		Milestone struct {
+			Title       string
 			Description string
 			DueOn       string
 		}
