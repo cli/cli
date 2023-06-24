@@ -122,15 +122,31 @@ func importRun(opts *ImportOptions) error {
 	var msg strings.Builder
 
 	for _, alias := range getSortedKeys(aliasMap) {
-		if !opts.validAliasName(alias) {
-			msg.WriteString(
-				fmt.Sprintf("%s Could not import alias %s: already a gh command, extension, or alias\n",
-					cs.FailureIcon(),
-					cs.Bold(alias),
-				),
-			)
+		var existingAlias bool
+		if _, err := aliasCfg.Get(alias); err == nil {
+			existingAlias = true
+		}
 
-			continue
+		if !opts.validAliasName(alias) {
+			if !existingAlias {
+				msg.WriteString(
+					fmt.Sprintf("%s Could not import alias %s: already a gh command or extension\n",
+						cs.FailureIcon(),
+						cs.Bold(alias),
+					),
+				)
+				continue
+			}
+
+			if existingAlias && !opts.OverwriteExisting {
+				msg.WriteString(
+					fmt.Sprintf("%s Could not import alias %s: name already taken\n",
+						cs.FailureIcon(),
+						cs.Bold(alias),
+					),
+				)
+				continue
+			}
 		}
 
 		expansion := aliasMap[alias]
@@ -142,31 +158,19 @@ func importRun(opts *ImportOptions) error {
 					cs.Bold(alias),
 				),
 			)
-
 			continue
 		}
 
-		if _, err := aliasCfg.Get(alias); err == nil {
-			if opts.OverwriteExisting {
-				aliasCfg.Add(alias, expansion)
+		aliasCfg.Add(alias, expansion)
 
-				msg.WriteString(
-					fmt.Sprintf("%s Changed alias %s\n",
-						cs.WarningIcon(),
-						cs.Bold(alias),
-					),
-				)
-			} else {
-				msg.WriteString(
-					fmt.Sprintf("%s Could not import alias %s: name already taken\n",
-						cs.FailureIcon(),
-						cs.Bold(alias),
-					),
-				)
-			}
+		if existingAlias && opts.OverwriteExisting {
+			msg.WriteString(
+				fmt.Sprintf("%s Changed alias %s\n",
+					cs.WarningIcon(),
+					cs.Bold(alias),
+				),
+			)
 		} else {
-			aliasCfg.Add(alias, expansion)
-
 			msg.WriteString(
 				fmt.Sprintf("%s Added alias %s\n",
 					cs.SuccessIcon(),

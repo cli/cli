@@ -457,6 +457,6 @@ func TestRunCopy_Me(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Copied project to http://a-url.com\n",
+		"http://a-url.com\n",
 		stdout.String())
 }

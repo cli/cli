@@ -76,12 +76,13 @@ func Test_statusRun(t *testing.T) {
 	readConfigs := config.StubWriteConfig(t)
 
 	tests := []struct {
-		name      string
-		opts      *StatusOptions
-		httpStubs func(*httpmock.Registry)
-		cfgStubs  func(*config.ConfigMock)
-		wantErr   string
-		wantOut   string
+		name       string
+		opts       *StatusOptions
+		httpStubs  func(*httpmock.Registry)
+		cfgStubs   func(*config.ConfigMock)
+		wantErr    string
+		wantOut    string
+		wantErrOut string
 	}{
 		{
 			name: "hostname set",
@@ -126,7 +127,7 @@ func Test_statusRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
 			wantErr: "SilentError",
-			wantOut: heredoc.Doc(`
+			wantErrOut: heredoc.Doc(`
 				joel.miller
 				  X joel.miller: the token in GH_CONFIG_DIR/hosts.yml is missing required scope 'read:org'
 				  - To request missing scopes, run: gh auth refresh -h joel.miller
@@ -156,7 +157,7 @@ func Test_statusRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
 			wantErr: "SilentError",
-			wantOut: heredoc.Doc(`
+			wantErrOut: heredoc.Doc(`
 				joel.miller
 				  X joel.miller: authentication failed
 				  - The joel.miller token in GH_CONFIG_DIR/hosts.yml is no longer valid.
@@ -298,9 +299,9 @@ func Test_statusRun(t *testing.T) {
 			cfgStubs: func(c *config.ConfigMock) {
 				c.Set("github.com", "oauth_token", "abc123")
 			},
-			httpStubs: func(reg *httpmock.Registry) {},
-			wantErr:   "SilentError",
-			wantOut:   "Hostname \"github.example.com\" not found among authenticated GitHub hosts\n",
+			httpStubs:  func(reg *httpmock.Registry) {},
+			wantErr:    "SilentError",
+			wantErrOut: "Hostname \"github.example.com\" not found among authenticated GitHub hosts\n",
 		},
 	}
 
@@ -310,13 +311,12 @@ func Test_statusRun(t *testing.T) {
 				tt.opts = &StatusOptions{}
 			}
 
-			ios, _, _, stderr := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
 
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
 			ios.SetStdoutTTY(true)
 			tt.opts.IO = ios
-
 			cfg := config.NewFromString("")
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(cfg)
@@ -340,8 +340,10 @@ func Test_statusRun(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+			output := strings.ReplaceAll(stdout.String(), config.ConfigDir()+string(filepath.Separator), "GH_CONFIG_DIR/")
+			errorOutput := strings.ReplaceAll(stderr.String(), config.ConfigDir()+string(filepath.Separator), "GH_CONFIG_DIR/")
 
-			output := strings.ReplaceAll(stderr.String(), config.ConfigDir()+string(filepath.Separator), "GH_CONFIG_DIR/")
+			assert.Equal(t, tt.wantErrOut, errorOutput)
 			assert.Equal(t, tt.wantOut, output)
 
 			mainBuf := bytes.Buffer{}

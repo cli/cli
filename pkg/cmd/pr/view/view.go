@@ -415,6 +415,11 @@ func prLabelList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 		return ""
 	}
 
+	// ignore case sort
+	sort.SliceStable(pr.Labels.Nodes, func(i, j int) bool {
+		return strings.ToLower(pr.Labels.Nodes[i].Name) < strings.ToLower(pr.Labels.Nodes[j].Name)
+	})
+
 	labelNames := make([]string, 0, len(pr.Labels.Nodes))
 	for _, label := range pr.Labels.Nodes {
 		labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))

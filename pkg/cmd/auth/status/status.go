@@ -66,7 +66,7 @@ func statusRun(opts *StatusOptions) error {
 	// TODO check tty
 
 	stderr := opts.IO.ErrOut
-
+	stdout := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
 	statusInfo := map[string][]string{}
@@ -166,13 +166,22 @@ func statusRun(opts *StatusOptions) error {
 		if !ok {
 			continue
 		}
-		if prevEntry {
+		if prevEntry && failed {
 			fmt.Fprint(stderr, "\n")
+		} else if prevEntry && !failed {
+			fmt.Fprint(stdout, "\n")
 		}
 		prevEntry = true
-		fmt.Fprintf(stderr, "%s\n", cs.Bold(hostname))
-		for _, line := range lines {
-			fmt.Fprintf(stderr, "  %s\n", line)
+		if failed {
+			fmt.Fprintf(stderr, "%s\n", cs.Bold(hostname))
+			for _, line := range lines {
+				fmt.Fprintf(stderr, "  %s\n", line)
+			}
+		} else {
+			fmt.Fprintf(stdout, "%s\n", cs.Bold(hostname))
+			for _, line := range lines {
+				fmt.Fprintf(stdout, "  %s\n", line)
+			}
 		}
 	}
 

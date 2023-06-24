@@ -36,9 +36,10 @@ func Test_getFilesToAdd(t *testing.T) {
 
 func TestNewCmdEdit(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants EditOptions
+		name     string
+		cli      string
+		wants    EditOptions
+		wantsErr bool
 	}{
 		{
 			name: "no flags",
@@ -80,6 +81,24 @@ func TestNewCmdEdit(t *testing.T) {
 				Description: "my new description",
 			},
 		},
+		{
+			name: "remove",
+			cli:  "123 --remove cool.md",
+			wants: EditOptions{
+				Selector:       "123",
+				RemoveFilename: "cool.md",
+			},
+		},
+		{
+			name:     "add and remove are mutually exclusive",
+			cli:      "123 --add cool.md --remove great.md",
+			wantsErr: true,
+		},
+		{
+			name:     "filename and remove are mutually exclusive",
+			cli:      "123 --filename cool.md --remove great.md",
+			wantsErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -100,11 +119,17 @@ func TestNewCmdEdit(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
-			assert.NoError(t, err)
+			if tt.wantsErr {
+				require.Error(t, err)
+				return
+			}
 
-			assert.Equal(t, tt.wants.EditFilename, gotOpts.EditFilename)
-			assert.Equal(t, tt.wants.AddFilename, gotOpts.AddFilename)
-			assert.Equal(t, tt.wants.Selector, gotOpts.Selector)
+			require.NoError(t, err)
+
+			require.Equal(t, tt.wants.EditFilename, gotOpts.EditFilename)
+			require.Equal(t, tt.wants.AddFilename, gotOpts.AddFilename)
+			require.Equal(t, tt.wants.Selector, gotOpts.Selector)
+			require.Equal(t, tt.wants.RemoveFilename, gotOpts.RemoveFilename)
 		})
 	}
 }
@@ -391,6 +416,63 @@ func Test_editRun(t *testing.T) {
 						"content":  "data from stdin",
 						"filename": "from_source.txt",
 					},
+				},
+			},
+		},
+		{
+			name: "remove file, file does not exist",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			opts: &EditOptions{
+				RemoveFilename: "sample2.txt",
+			},
+			wantErr: "gist has no file \"sample2.txt\"",
+		},
+		{
+			name: "remove file from existing gist",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+					"sample2.txt": {
+						Filename: "sample2.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			opts: &EditOptions{
+				RemoveFilename: "sample2.txt",
+			},
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"sample.txt": map[string]interface{}{
+						"filename": "sample.txt",
+						"content":  "bwhiizzzbwhuiiizzzz",
+						"type":     "text/plain",
+					},
+					"sample2.txt": nil,
 				},
 			},
 		},
