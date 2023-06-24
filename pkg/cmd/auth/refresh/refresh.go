@@ -64,9 +64,12 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			your gh credentials to have. If no scopes are provided, the command
 			maintains previously added scopes.
 
-			The command can only add additional scopes, but not remove previously
-			added ones. To reset scopes to the default minimum set of scopes, you
-			will need to create new credentials using the auth login command.
+			The --remove-scope flag accepts a comma separated list of scopes you
+			want to remove from your gh credentials. Scope removal is idempotent.
+			The minimum set of scopes ("repo", "read:org" and "gist") cannot be removed.
+
+			The --reset-scopes flag resets the scopes for your gh credentials to
+			the default set of scopes for your auth flow.
 		`),
 		Example: heredoc.Doc(`
 			$ gh auth refresh --scopes write:org,read:public_key
@@ -74,6 +77,12 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 
 			$ gh auth refresh
 			# => open a browser to ensure your authentication credentials have the correct minimum scopes
+
+			$ gh auth refresh --remove-scope delete_repo
+			# => open a browser to idempotently remove the delete_repo scope
+
+			$ gh auth refresh --reset-scopes
+			# => open a browser to re-authenticate with the default minimum scopes
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Interactive = opts.IO.CanPrompt()
@@ -92,8 +101,8 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The GitHub host to use for authentication")
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
-	cmd.Flags().StringSliceVarP(&opts.RemoveScopes, "remove-scope", "r", nil, "The authentication scopes to remove from gh")
-	cmd.Flags().BoolVarP(&opts.ResetScopes, "reset-scopes", "R", false, "Reset all authentication scopes for gh")
+	cmd.Flags().StringSliceVarP(&opts.RemoveScopes, "remove-scope", "r", nil, "The authentication scope to remove from gh")
+	cmd.Flags().BoolVarP(&opts.ResetScopes, "reset-scopes", "R", false, "Reset authentication scopes to the default minimum set of scopes")
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
 	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store")
@@ -167,13 +176,14 @@ func refreshRun(opts *RefreshOptions) error {
 		GitClient:  opts.GitClient,
 	}
 	gitProtocol, _ := authCfg.GitProtocol(hostname)
-	if !opts.ResetScopes && opts.Interactive && gitProtocol == "https" {
+	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
 		}
 		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
 	}
 
+	additionalScopes = append(opts.Scopes, additionalScopes...)
 	if len(opts.RemoveScopes) > 0 {
 		var scopes []string
 		for _, scope := range additionalScopes {
@@ -190,7 +200,7 @@ func refreshRun(opts *RefreshOptions) error {
 		}
 		additionalScopes = scopes
 	}
-	if err := opts.AuthFlow(authCfg, opts.IO, hostname, append(opts.Scopes, additionalScopes...), opts.Interactive, !opts.InsecureStorage); err != nil {
+	if err := opts.AuthFlow(authCfg, opts.IO, hostname, additionalScopes, opts.Interactive, !opts.InsecureStorage); err != nil {
 		return err
 	}
 

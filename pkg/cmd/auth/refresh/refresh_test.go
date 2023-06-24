@@ -108,9 +108,25 @@ func Test_NewCmdRefresh(t *testing.T) {
 			},
 		},
 		{
+			name: "reset scopes shorthand",
+			tty:  true,
+			cli:  "-R",
+			wants: RefreshOptions{
+				ResetScopes: true,
+			},
+		},
+		{
 			name: "remove scope",
 			tty:  true,
 			cli:  "--remove-scope read:public_key",
+			wants: RefreshOptions{
+				RemoveScopes: []string{"read:public_key"},
+			},
+		},
+		{
+			name: "remove scope shorthand",
+			tty:  true,
+			cli:  "-r read:public_key",
 			wants: RefreshOptions{
 				RemoveScopes: []string{"read:public_key"},
 			},
@@ -313,6 +329,22 @@ func Test_refreshRun(t *testing.T) {
 			},
 		},
 		{
+			name: "reset scopes and add some scopes",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "repo:invite, delete_repo, codespace",
+			opts: &RefreshOptions{
+				Scopes:      []string{"public_key:read", "workflow"},
+				ResetScopes: true,
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"public_key:read", "workflow"},
+				secureStorage: true,
+			},
+		},
+		{
 			name: "remove scopes",
 			cfgHosts: []string{
 				"github.com",
@@ -340,6 +372,37 @@ func Test_refreshRun(t *testing.T) {
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
 				scopes:        nil,
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove and add scopes at the same time",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "repo:invite, delete_repo, codespace",
+			opts: &RefreshOptions{
+				Scopes:       []string{"repo:invite", "public_key:read", "workflow"},
+				RemoveScopes: []string{"codespace", "repo:invite", "workflow"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"public_key:read", "delete_repo"},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove scopes that don't exist",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "repo:invite, delete_repo, codespace",
+			opts: &RefreshOptions{
+				RemoveScopes: []string{"codespace", "repo:invite", "public_key:read"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"delete_repo"},
 				secureStorage: true,
 			},
 		},
