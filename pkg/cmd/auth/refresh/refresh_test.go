@@ -124,6 +124,14 @@ func Test_NewCmdRefresh(t *testing.T) {
 			},
 		},
 		{
+			name: "remove multiple scopes",
+			tty:  true,
+			cli:  "--remove-scope workflow,read:public_key",
+			wants: RefreshOptions{
+				RemoveScopes: []string{"workflow", "read:public_key"},
+			},
+		},
+		{
 			name: "remove scope shorthand",
 			tty:  true,
 			cli:  "-r read:public_key",
