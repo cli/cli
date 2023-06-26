@@ -49,6 +49,84 @@ func TestIsEnterprise(t *testing.T) {
 	}
 }
 
+func TestIsTenancy(t *testing.T) {
+	tests := []struct {
+		host string
+		want bool
+	}{
+		{
+			host: "github.com",
+			want: false,
+		},
+		{
+			host: "github.localhost",
+			want: false,
+		},
+		{
+			host: "garage.github.com",
+			want: false,
+		},
+		{
+			host: "ghe.com",
+			want: false,
+		},
+		{
+			host: "tenant.ghe.com",
+			want: true,
+		},
+		{
+			host: "api.tenant.ghe.com",
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			if got := IsTenancy(tt.host); got != tt.want {
+				t.Errorf("IsTenancy() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTenantName(t *testing.T) {
+	tests := []struct {
+		host string
+		want string
+	}{
+		{
+			host: "github.com",
+			want: "",
+		},
+		{
+			host: "github.localhost",
+			want: "",
+		},
+		{
+			host: "garage.github.com",
+			want: "",
+		},
+		{
+			host: "ghe.com",
+			want: "",
+		},
+		{
+			host: "tenant.ghe.com",
+			want: "tenant",
+		},
+		{
+			host: "api.tenant.ghe.com",
+			want: "tenant",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			if got := TenantName(tt.host); got != tt.want {
+				t.Errorf("TenantName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNormalizeHostname(t *testing.T) {
 	tests := []struct {
 		host string
@@ -89,6 +167,18 @@ func TestNormalizeHostname(t *testing.T) {
 		{
 			host: "git.my.org",
 			want: "git.my.org",
+		},
+		{
+			host: "ghe.com",
+			want: "ghe.com",
+		},
+		{
+			host: "tenant.ghe.com",
+			want: "tenant.ghe.com",
+		},
+		{
+			host: "api.tenant.ghe.com",
+			want: "tenant.ghe.com",
 		},
 	}
 	for _, tt := range tests {
@@ -139,6 +229,7 @@ func TestHostnameValidator(t *testing.T) {
 		})
 	}
 }
+
 func TestGraphQLEndpoint(t *testing.T) {
 	tests := []struct {
 		host string

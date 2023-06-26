@@ -92,9 +92,11 @@ func GenerateRepoURL(repo Interface, p string, args ...interface{}) string {
 	return baseURL
 }
 
-// TODO there is a parallel implementation for non-isolated commands
 func FormatRemoteURL(repo Interface, protocol string) string {
 	if protocol == "ssh" {
+		if ghinstance.IsTenancy(repo.RepoHost()) {
+			return fmt.Sprintf("%s@%s:%s/%s.git", ghinstance.TenantName(repo.RepoHost()), repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+		}
 		return fmt.Sprintf("git@%s:%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
 	}
 
