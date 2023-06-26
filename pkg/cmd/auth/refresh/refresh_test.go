@@ -16,8 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO prompt cfg test
-
 func Test_NewCmdRefresh(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -108,17 +106,9 @@ func Test_NewCmdRefresh(t *testing.T) {
 			},
 		},
 		{
-			name: "reset scopes shorthand",
-			tty:  true,
-			cli:  "-R",
-			wants: RefreshOptions{
-				ResetScopes: true,
-			},
-		},
-		{
 			name: "remove scope",
 			tty:  true,
-			cli:  "--remove-scope read:public_key",
+			cli:  "--remove-scopes read:public_key",
 			wants: RefreshOptions{
 				RemoveScopes: []string{"read:public_key"},
 			},
@@ -126,7 +116,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 		{
 			name: "remove multiple scopes",
 			tty:  true,
-			cli:  "--remove-scope workflow,read:public_key",
+			cli:  "--remove-scopes workflow,read:public_key",
 			wants: RefreshOptions{
 				RemoveScopes: []string{"workflow", "read:public_key"},
 			},
@@ -225,7 +215,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "obed.morton",
-				scopes:        nil,
+				scopes:        []string{},
 				secureStorage: true,
 			},
 		},
@@ -239,7 +229,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
-				scopes:        nil,
+				scopes:        []string{},
 				secureStorage: true,
 			},
 		},
@@ -259,7 +249,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
-				scopes:        nil,
+				scopes:        []string{},
 				secureStorage: true,
 			},
 		},
@@ -288,7 +278,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
-				scopes:        []string{"repo:invite", "public_key:read", "delete_repo", "codespace"},
+				scopes:        []string{"delete_repo", "codespace", "repo:invite", "public_key:read"},
 				secureStorage: true,
 			},
 		},
@@ -302,7 +292,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "obed.morton",
-				scopes:        nil,
+				scopes:        []string{},
 				secureStorage: true,
 			},
 		},
@@ -317,7 +307,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname: "obed.morton",
-				scopes:   nil,
+				scopes:   []string{},
 			},
 		},
 		{
@@ -332,7 +322,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
-				scopes:        nil,
+				scopes:        []string{},
 				secureStorage: true,
 			},
 		},
@@ -379,7 +369,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
-				scopes:        nil,
+				scopes:        []string{},
 				secureStorage: true,
 			},
 		},
@@ -395,7 +385,7 @@ func Test_refreshRun(t *testing.T) {
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "github.com",
-				scopes:        []string{"public_key:read", "delete_repo"},
+				scopes:        []string{"delete_repo", "public_key:read"},
 				secureStorage: true,
 			},
 		},
