@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 )
 
@@ -64,7 +65,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			your gh credentials to have. If no scopes are provided, the command
 			maintains previously added scopes.
 
-			The --remove-scope flag accepts a comma separated list of scopes you
+			The --remove-scopes flag accepts a comma separated list of scopes you
 			want to remove from your gh credentials. Scope removal is idempotent.
 			The minimum set of scopes ("repo", "read:org" and "gist") cannot be removed.
 
@@ -73,12 +74,12 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 		`),
 		Example: heredoc.Doc(`
 			$ gh auth refresh --scopes write:org,read:public_key
-			# => open a browser to add write:org and read:public_key scopes for use with gh api
+			# => open a browser to add write:org and read:public_key scopes
 
 			$ gh auth refresh
 			# => open a browser to ensure your authentication credentials have the correct minimum scopes
 
-			$ gh auth refresh --remove-scope delete_repo
+			$ gh auth refresh --remove-scopes delete_repo
 			# => open a browser to idempotently remove the delete_repo scope
 
 			$ gh auth refresh --reset-scopes
@@ -101,8 +102,8 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The GitHub host to use for authentication")
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
-	cmd.Flags().StringSliceVarP(&opts.RemoveScopes, "remove-scope", "r", nil, "The authentication scope to remove from gh")
-	cmd.Flags().BoolVarP(&opts.ResetScopes, "reset-scopes", "R", false, "Reset authentication scopes to the default minimum set of scopes")
+	cmd.Flags().StringSliceVarP(&opts.RemoveScopes, "remove-scopes", "r", nil, "Authentication scopes to remove from gh")
+	cmd.Flags().BoolVar(&opts.ResetScopes, "reset-scopes", false, "Reset authentication scopes to the default minimum set of scopes")
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
 	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store")
@@ -156,14 +157,15 @@ func refreshRun(opts *RefreshOptions) error {
 		return cmdutil.SilentError
 	}
 
-	var additionalScopes []string
+	additionalScopes := set.NewStringSet()
+
 	if !opts.ResetScopes {
 		if oldToken, _ := authCfg.Token(hostname); oldToken != "" {
 			if oldScopes, err := shared.GetScopes(opts.HttpClient, hostname, oldToken); err == nil {
 				for _, s := range strings.Split(oldScopes, ",") {
 					s = strings.TrimSpace(s)
 					if s != "" {
-						additionalScopes = append(additionalScopes, s)
+						additionalScopes.Add(s)
 					}
 				}
 			}
@@ -180,27 +182,14 @@ func refreshRun(opts *RefreshOptions) error {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
 		}
-		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
+		additionalScopes.AddValues(credentialFlow.Scopes())
 	}
 
-	additionalScopes = append(opts.Scopes, additionalScopes...)
-	if len(opts.RemoveScopes) > 0 {
-		var scopes []string
-		for _, scope := range additionalScopes {
-			var match bool
-			for _, rmScope := range opts.RemoveScopes {
-				if rmScope == scope {
-					match = true
-					break
-				}
-			}
-			if !match {
-				scopes = append(scopes, scope)
-			}
-		}
-		additionalScopes = scopes
-	}
-	if err := opts.AuthFlow(authCfg, opts.IO, hostname, additionalScopes, opts.Interactive, !opts.InsecureStorage); err != nil {
+	additionalScopes.AddValues(opts.Scopes)
+
+	additionalScopes.RemoveValues(opts.RemoveScopes)
+
+	if err := opts.AuthFlow(authCfg, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, !opts.InsecureStorage); err != nil {
 		return err
 	}
 
