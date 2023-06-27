@@ -26,7 +26,7 @@ func Test_getFilesToAdd(t *testing.T) {
 	gf, err := getFilesToAdd(filename, []byte("hello"))
 	require.NoError(t, err)
 
-	assert.Equal(t, map[string]*shared.GistFile{
+	assert.Equal(t, map[string]*gistFileToUpdate{
 		filename: {
 			Filename: filename,
 			Content:  "hello",
