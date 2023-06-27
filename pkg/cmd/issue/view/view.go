@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -305,6 +306,11 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme) string {
 	if len(issue.Labels.Nodes) == 0 {
 		return ""
 	}
+
+	// ignore case sort
+	sort.SliceStable(issue.Labels.Nodes, func(i, j int) bool {
+		return strings.ToLower(issue.Labels.Nodes[i].Name) < strings.ToLower(issue.Labels.Nodes[j].Name)
+	})
 
 	labelNames := make([]string, len(issue.Labels.Nodes))
 	for i, label := range issue.Labels.Nodes {

@@ -34,8 +34,16 @@ func addRow(tp utils.TablePrinter, io *iostreams.IOStreams, o check) {
 	}
 
 	if io.IsStdoutTTY() {
+		var name string
+		if o.Workflow != "" {
+			name += fmt.Sprintf("%s/", o.Workflow)
+		}
+		name += o.Name
+		if o.Event != "" {
+			name += fmt.Sprintf(" (%s)", o.Event)
+		}
 		tp.AddField(mark, nil, markColor)
-		tp.AddField(o.Name, nil, nil)
+		tp.AddField(name, nil, nil)
 		tp.AddField(elapsed, nil, nil)
 		tp.AddField(o.Link, nil, nil)
 	} else {

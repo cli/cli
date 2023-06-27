@@ -139,7 +139,7 @@ func printResults(config copyConfig, project queries.Project) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
-	_, err := fmt.Fprintf(config.io.Out, "Copied project to %s\n", project.URL)
+	_, err := fmt.Fprintf(config.io.Out, "%s\n", project.URL)
 	return err
 }
 

@@ -112,13 +112,14 @@ func TestImportRun(t *testing.T) {
 	importStdinMsg := "- Importing aliases from standard input"
 
 	tests := []struct {
-		name         string
-		opts         *ImportOptions
-		stdin        string
-		fileContents string
-		initConfig   string
-		wantConfig   string
-		wantStderr   string
+		name          string
+		opts          *ImportOptions
+		stdin         string
+		fileContents  string
+		initConfig    string
+		aliasCommands []*cobra.Command
+		wantConfig    string
+		wantStderr    string
 	}{
 		{
 			name: "with no existing aliases",
@@ -158,6 +159,9 @@ func TestImportRun(t *testing.T) {
                     igrep: '!gh issue list --label="$1" | grep "$2"'
                 editor: vim
             `),
+			aliasCommands: []*cobra.Command{
+				{Use: "igrep"},
+			},
 			wantConfig: heredoc.Doc(`
                 aliases:
                     igrep: '!gh issue list --label="$1" | grep "$2"'
@@ -211,6 +215,9 @@ func TestImportRun(t *testing.T) {
                     co: pr checkout
                 editor: vim
             `),
+			aliasCommands: []*cobra.Command{
+				{Use: "co"},
+			},
 			wantConfig: heredoc.Doc(`
                 aliases:
                     co: pr checkout
@@ -234,6 +241,9 @@ func TestImportRun(t *testing.T) {
                     co: pr checkout
                 editor: vim
             `),
+			aliasCommands: []*cobra.Command{
+				{Use: "co"},
+			},
 			wantConfig: heredoc.Doc(`
                 aliases:
                     co: pr checkout -R cool/repo
@@ -256,9 +266,9 @@ func TestImportRun(t *testing.T) {
 			wantStderr: strings.Join(
 				[]string{
 					importFileMsg,
-					"X Could not import alias api: already a gh command, extension, or alias",
-					"X Could not import alias issue: already a gh command, extension, or alias",
-					"X Could not import alias pr: already a gh command, extension, or alias\n\n",
+					"X Could not import alias api: already a gh command or extension",
+					"X Could not import alias issue: already a gh command or extension",
+					"X Could not import alias pr: already a gh command or extension\n\n",
 				},
 				"\n",
 			),
@@ -315,6 +325,9 @@ func TestImportRun(t *testing.T) {
 			apiCmd := &cobra.Command{Use: "api"}
 			apiCmd.AddCommand(&cobra.Command{Use: "graphql"})
 			rootCmd.AddCommand(apiCmd)
+			for _, cmd := range tt.aliasCommands {
+				rootCmd.AddCommand(cmd)
+			}
 
 			tt.opts.validAliasName = shared.ValidAliasNameFunc(rootCmd)
 			tt.opts.validAliasExpansion = shared.ValidAliasExpansionFunc(rootCmd)

@@ -110,7 +110,7 @@ func printResults(config createConfig, project queries.Project) error {
 		return nil
 	}
 
-	_, err := fmt.Fprintf(config.io.Out, "Created project '%s'\n%s\n", project.Title, project.URL)
+	_, err := fmt.Fprintf(config.io.Out, "%s\n", project.URL)
 	return err
 }
 
