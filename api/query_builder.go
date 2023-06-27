@@ -226,7 +226,7 @@ func RequiredStatusCheckRollupGraphQL(prID, after string) string {
 							},
 							...on CheckRun {
 								name,
-								checkSuite{workflowRun{workflow{name}}},
+								checkSuite{workflowRun{event,workflow{name}}},
 								status,
 								conclusion,
 								startedAt,
