@@ -14,6 +14,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/maps"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -309,10 +310,32 @@ func editRun(opts *EditOptions) error {
 	return updateGist(apiClient, host, gist)
 }
 
+// https://docs.github.com/en/rest/gists/gists?apiVersion=2022-11-28#update-a-gist
+type gistToUpdate struct {
+	// The description of the gist
+	Description string `json:"description"`
+	// The gist files to be updated, renamed or deleted. The key must match the current
+	// filename of the file to change. To delete a file, set the value to nil
+	Files map[string]*gistFileToUpdate `json:"files"`
+}
+
+type gistFileToUpdate struct {
+	// The new content of the file
+	Content string `json:"content"`
+	// The new name for the file
+	Filename string `json:"filename,omitempty"`
+}
+
 func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error {
-	body := shared.Gist{
+	body := gistToUpdate{
 		Description: gist.Description,
-		Files:       gist.Files,
+		Files: maps.Map(gist.Files, func(f *shared.GistFile) *gistFileToUpdate {
+			if f == nil {
+				return nil
+			}
+
+			return &gistFileToUpdate{Content: f.Content, Filename: f.Filename}
+		}),
 	}
 
 	path := "gists/" + gist.ID
@@ -327,7 +350,6 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 	result := shared.Gist{}
 
 	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
-
 	if err != nil {
 		return err
 	}
