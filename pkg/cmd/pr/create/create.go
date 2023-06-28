@@ -736,49 +736,51 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// missing:
 	// 1. the head repo was just created by auto-forking;
 	// 2. an existing fork was discovered by querying the API.
-	//
 	// In either case, we want to add the head repo as a new git remote so we
-	// can push to it.
+	// can push to it. We will try to add the head repo as the "origin" remote
+	// and fallback to the "fork" remote if it is unavailable. Also, if the
+	// base repo is the "origin" remote we will rename it "upstream".
 	if headRemote == nil && ctx.IsPushEnabled {
 		cfg, err := opts.Config()
 		if err != nil {
 			return err
 		}
-		cloneProtocol, _ := cfg.GetOrDefault(headRepo.RepoHost(), "git_protocol")
 
-		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
-
-		// TODO: prevent clashes with another remote of a same name
-		gitClient := ctx.GitClient
-
-		remoteName := "origin"
 		remotes, err := opts.Remotes()
 		if err != nil {
 			return err
 		}
 
-		if origin, _ := remotes.FindByName(remoteName); origin != nil {
-			if ghrepo.IsSame(origin, ctx.BaseRepo) {
-				renameTarget := "upstream"
-				renameCmd, err := gitClient.Command(context.Background(), "remote", "rename", remoteName, renameTarget)
-				if err != nil {
-					return fmt.Errorf("failed to rename origin remote: %w", err)
-				}
-				_, err = renameCmd.Output()
-				if err != nil {
-					return err
-				}
-				fmt.Fprintf(opts.IO.ErrOut, "renamed '%s' remote to '%s' and add 'origin' remote for forked repo\n", remoteName, renameTarget)
-			} else {
-				remoteName = "fork"
+		cloneProtocol, _ := cfg.GetOrDefault(headRepo.RepoHost(), "git_protocol")
+		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
+		gitClient := ctx.GitClient
+		origin, _ := remotes.FindByName("origin")
+		upstream, _ := remotes.FindByName("upstream")
+		remoteName := "origin"
+
+		if origin != nil {
+			remoteName = "fork"
+		}
+
+		if origin != nil && upstream == nil && ghrepo.IsSame(origin, ctx.BaseRepo) {
+			renameCmd, err := gitClient.Command(context.Background(), "remote", "rename", "origin", "upstream")
+			if err != nil {
+				return err
 			}
+			if _, err = renameCmd.Output(); err != nil {
+				return fmt.Errorf("error renaming origin remote: %w", err)
+			}
+			remoteName = "origin"
+			fmt.Fprintf(opts.IO.ErrOut, "Renamed 'origin' remote to 'upstream'\n")
 		}
 
 		gitRemote, err := gitClient.AddRemote(context.Background(), remoteName, headRepoURL, []string{})
 		if err != nil {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
-		fmt.Fprintf(opts.IO.ErrOut, "added remote %s\n", gitRemote.Name)
+
+		fmt.Fprintf(opts.IO.ErrOut, "Added forked repository as remote %s\n", gitRemote.Name)
+
 		headRemote = &ghContext.Remote{
 			Remote: gitRemote,
 			Repo:   headRepo,
