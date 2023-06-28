@@ -279,6 +279,82 @@ func TestJSONProjectDraftIssue(t *testing.T) {
 	assert.Equal(t, `{"id":"123","title":"title","body":"a body","type":"DraftIssue"}`, string(b))
 }
 
+func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldIterationValue(t *testing.T) {
+	iterationField := queries.ProjectField{TypeName: "ProjectV2IterationField"}
+	iterationField.IterationField.ID = "sprint"
+	iterationField.IterationField.Name = "Sprint"
+
+	iterationFieldValue := queries.FieldValueNodes{Type: "ProjectV2ItemFieldIterationValue"}
+	iterationFieldValue.ProjectV2ItemFieldIterationValue.Title = "Iteration Title"
+	iterationFieldValue.ProjectV2ItemFieldIterationValue.Field = iterationField
+
+	draftIssue := queries.ProjectItem{
+		Id: "draftIssueId",
+		Content: queries.ProjectItemContent{
+			TypeName: "DraftIssue",
+			DraftIssue: queries.DraftIssue{
+				Title: "Pull Request title",
+				Body:  "a body",
+			},
+		},
+	}
+	draftIssue.FieldValues.Nodes = []queries.FieldValueNodes{
+		iterationFieldValue,
+	}
+	p := &queries.Project{}
+	p.Fields.Nodes = []queries.ProjectField{iterationField}
+	p.Items.TotalCount = 5
+	p.Items.Nodes = []queries.ProjectItem{
+		draftIssue,
+	}
+
+	out, err := JSONProjectDetailedItems(p)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"items":[{"sprint":{"title":"Iteration Title","startDate":"","duration":0},"content":{"type":"DraftIssue","body":"a body","title":"Pull Request title"},"id":"draftIssueId"}],"totalCount":5}`,
+		string(out))
+
+}
+
+func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldMilestoneValue(t *testing.T) {
+	milestoneField := queries.ProjectField{TypeName: "ProjectV2IterationField"}
+	milestoneField.IterationField.ID = "milestone"
+	milestoneField.IterationField.Name = "Milestone"
+
+	milestoneFieldValue := queries.FieldValueNodes{Type: "ProjectV2ItemFieldMilestoneValue"}
+	milestoneFieldValue.ProjectV2ItemFieldMilestoneValue.Milestone.Title = "Milestone Title"
+	milestoneFieldValue.ProjectV2ItemFieldMilestoneValue.Field = milestoneField
+
+	draftIssue := queries.ProjectItem{
+		Id: "draftIssueId",
+		Content: queries.ProjectItemContent{
+			TypeName: "DraftIssue",
+			DraftIssue: queries.DraftIssue{
+				Title: "Pull Request title",
+				Body:  "a body",
+			},
+		},
+	}
+	draftIssue.FieldValues.Nodes = []queries.FieldValueNodes{
+		milestoneFieldValue,
+	}
+	p := &queries.Project{}
+	p.Fields.Nodes = []queries.ProjectField{milestoneField}
+	p.Items.TotalCount = 5
+	p.Items.Nodes = []queries.ProjectItem{
+		draftIssue,
+	}
+
+	out, err := JSONProjectDetailedItems(p)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"items":[{"milestone":{"title":"Milestone Title","dueOn":"","description":""},"content":{"type":"DraftIssue","body":"a body","title":"Pull Request title"},"id":"draftIssueId"}],"totalCount":5}`,
+		string(out))
+
+}
+
 func TestCamelCase(t *testing.T) {
 	assert.Equal(t, "camelCase", CamelCase("camelCase"))
 	assert.Equal(t, "camelCase", CamelCase("CamelCase"))
