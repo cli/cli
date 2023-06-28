@@ -480,7 +480,7 @@ func Test_createRun(t *testing.T) {
 				}
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
-			expectedErrOut: "\nCreating pull request for monalisa:feature into master in OWNER/REPO\n\nRenamed 'origin' remote to 'upstream'\nAdded forked repository as remote origin\n",
+			expectedErrOut: "\nCreating pull request for monalisa:feature into master in OWNER/REPO\n\nChanged OWNER/REPO remote to \"upstream\"\nAdded monalisa/REPO as remote \"origin\"\n",
 		},
 		{
 			name: "pushed to non base repo",

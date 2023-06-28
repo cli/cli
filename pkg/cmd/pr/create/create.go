@@ -771,7 +771,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 				return fmt.Errorf("error renaming origin remote: %w", err)
 			}
 			remoteName = "origin"
-			fmt.Fprintf(opts.IO.ErrOut, "Renamed 'origin' remote to 'upstream'\n")
+			fmt.Fprintf(opts.IO.ErrOut, "Changed %s remote to %q\n", ghrepo.FullName(ctx.BaseRepo), "upstream")
 		}
 
 		gitRemote, err := gitClient.AddRemote(context.Background(), remoteName, headRepoURL, []string{})
@@ -779,7 +779,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
 
-		fmt.Fprintf(opts.IO.ErrOut, "Added forked repository as remote %s\n", gitRemote.Name)
+		fmt.Fprintf(opts.IO.ErrOut, "Added %s as remote %q\n", ghrepo.FullName(headRepo), remoteName)
 
 		headRemote = &ghContext.Remote{
 			Remote: gitRemote,
