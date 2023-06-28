@@ -28,8 +28,8 @@ func Test_getFilesToAdd(t *testing.T) {
 
 	assert.Equal(t, map[string]*gistFileToUpdate{
 		filename: {
-			Filename: filename,
-			Content:  "hello",
+			NewFilename: filename,
+			Content:     "hello",
 		},
 	}, gf)
 }

@@ -14,7 +14,6 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/maps"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -149,12 +148,18 @@ func editRun(opts *EditOptions) error {
 	}
 
 	// Transform our gist into the schema that the update endpoint expects
+	filesToupdate := make(map[string]*gistFileToUpdate, len(gist.Files))
+	for filename, file := range gist.Files {
+		filesToupdate[filename] = &gistFileToUpdate{
+			Content:     file.Content,
+			NewFilename: file.Filename,
+		}
+	}
+
 	gistToUpdate := gistToUpdate{
 		id:          gist.ID,
 		Description: gist.Description,
-		Files: maps.Map(gist.Files, func(f *shared.GistFile) *gistFileToUpdate {
-			return &gistFileToUpdate{Content: f.Content, Filename: f.Filename}
-		}),
+		Files:       filesToupdate,
 	}
 
 	shouldUpdate := false
@@ -334,7 +339,7 @@ type gistFileToUpdate struct {
 	// The new content of the file
 	Content string `json:"content"`
 	// The new name for the file
-	Filename string `json:"filename,omitempty"`
+	NewFilename string `json:"filename,omitempty"`
 }
 
 func updateGist(apiClient *api.Client, hostname string, gist gistToUpdate) error {
@@ -367,8 +372,8 @@ func getFilesToAdd(file string, content []byte) (map[string]*gistFileToUpdate, e
 	filename := filepath.Base(file)
 	return map[string]*gistFileToUpdate{
 		filename: {
-			Filename: filename,
-			Content:  string(content),
+			NewFilename: filename,
+			Content:     string(content),
 		},
 	}, nil
 }
