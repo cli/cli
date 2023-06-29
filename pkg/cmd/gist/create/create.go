@@ -116,18 +116,22 @@ func createRun(opts *CreateOptions) error {
 	gistName := guessGistName(files)
 
 	processMessage := "Creating gist..."
-	completionMessage := "Created gist"
+
+	var completionMessage string
+	if opts.Public {
+		completionMessage = fmt.Sprintf("Created %s gist", cs.Red("public"))
+	} else {
+		completionMessage = fmt.Sprintf("Created %s gist", cs.Green("secret"))
+	}
+
 	if gistName != "" {
 		if len(files) > 1 {
 			processMessage = "Creating gist with multiple files"
 		} else {
 			processMessage = fmt.Sprintf("Creating gist %s", gistName)
 		}
-		if opts.Public {
-			completionMessage = fmt.Sprintf("Created %s gist %s", cs.Red("public"), gistName)
-		} else {
-			completionMessage = fmt.Sprintf("Created %s gist %s", cs.Green("secret"), gistName)
-		}
+
+		completionMessage += " " + gistName
 	}
 
 	errOut := opts.IO.ErrOut
