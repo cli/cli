@@ -49,7 +49,8 @@ func Test_developRun(t *testing.T) {
 		wantErr        string
 		tty            bool
 	}{
-		{name: "list branches for an issue",
+		{
+			name: "list branches for an issue",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.IssueSelector = "42"
 				opts.List = true
@@ -96,7 +97,8 @@ func Test_developRun(t *testing.T) {
 			},
 			expectedOut: "foo\nbar\n",
 		},
-		{name: "list branches for an issue in tty",
+		{
+			name: "list branches for an issue in tty",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.IssueSelector = "42"
 				opts.List = true
@@ -150,7 +152,8 @@ func Test_developRun(t *testing.T) {
 			},
 			expectedOut: "\nShowing linked branches for OWNER/REPO#42\n\nfoo  http://github.localhost/OWNER/REPO/tree/foo\nbar  http://github.localhost/OWNER/OTHER-REPO/tree/bar\n",
 		},
-		{name: "list branches for an issue providing an issue url",
+		{
+			name: "list branches for an issue providing an issue url",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
 				opts.List = true
@@ -197,7 +200,8 @@ func Test_developRun(t *testing.T) {
 			},
 			expectedOut: "foo\nbar\n",
 		},
-		{name: "list branches for an issue providing an issue repo",
+		{
+			name: "list branches for an issue providing an issue repo",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.IssueSelector = "42"
 				opts.IssueRepoSelector = "cli/test-repo"
@@ -245,7 +249,8 @@ func Test_developRun(t *testing.T) {
 			},
 			expectedOut: "foo\nbar\n",
 		},
-		{name: "list branches for an issue providing an issue url and specifying the same repo works",
+		{
+			name: "list branches for an issue providing an issue url and specifying the same repo works",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
 				opts.IssueRepoSelector = "cli/test-repo"
@@ -293,7 +298,8 @@ func Test_developRun(t *testing.T) {
 			},
 			expectedOut: "foo\nbar\n",
 		},
-		{name: "list branches for an issue providing an issue url and specifying a different repo returns an error",
+		{
+			name: "list branches for an issue providing an issue url and specifying a different repo returns an error",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
 				opts.IssueRepoSelector = "cli/other"
@@ -308,7 +314,8 @@ func Test_developRun(t *testing.T) {
 			},
 			wantErr: "issue repo in url cli/test-repo does not match the repo from --issue-repo cli/other",
 		},
-		{name: "returns an error when the feature isn't enabled in the GraphQL API",
+		{
+			name: "returns an error when the feature isn't enabled in the GraphQL API",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
 				opts.List = true
@@ -322,7 +329,8 @@ func Test_developRun(t *testing.T) {
 			},
 			wantErr: "the `gh issue develop` command is not currently available",
 		},
-		{name: "develop new branch with name specified",
+		{
+			name: "develop new branch with name specified",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.Name = "my-branch"
 				opts.BaseBranch = "main"
@@ -367,7 +375,8 @@ func Test_developRun(t *testing.T) {
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
-		{name: "develop new branch without a name provided omits the param from the mutation",
+		{
+			name: "develop new branch without a name provided omits the param from the mutation",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.Name = ""
 				opts.BaseBranch = "main"
@@ -406,14 +415,14 @@ func Test_developRun(t *testing.T) {
 							assert.Equal(t, "yar", inputs["issueId"])
 						}),
 				)
-
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git fetch origin \+refs/heads/my-issue-1:refs/remotes/origin/my-issue-1`, 0, "")
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-issue-1\n",
 		},
-		{name: "develop providing an issue url and specifying a different repo returns an error",
+		{
+			name: "develop providing an issue url and specifying a different repo returns an error",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
 				opts.IssueRepoSelector = "cli/other"
@@ -435,7 +444,8 @@ func Test_developRun(t *testing.T) {
 			},
 			wantErr: "issue repo in url cli/test-repo does not match the repo from --issue-repo cli/other",
 		},
-		{name: "develop new branch with checkout when the branch exists locally",
+		{
+			name: "develop new branch with checkout when the branch exists locally",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.Name = "my-branch"
 				opts.BaseBranch = "main"
@@ -475,16 +485,17 @@ func Test_developRun(t *testing.T) {
 							assert.Equal(t, "yar", inputs["issueId"])
 						}),
 				)
-
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
 				cs.Register(`git checkout my-branch`, 0, "")
 				cs.Register(`git pull --ff-only origin my-branch`, 0, "")
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
-		{name: "develop new branch with checkout when the branch does not exist locally",
+		{
+			name: "develop new branch with checkout when the branch does not exist locally",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.Name = "my-branch"
 				opts.BaseBranch = "main"
@@ -524,13 +535,11 @@ func Test_developRun(t *testing.T) {
 							assert.Equal(t, "yar", inputs["issueId"])
 						}),
 				)
-
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
 				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
 				cs.Register(`git checkout -b my-branch --track origin/my-branch`, 0, "")
-				cs.Register(`git pull --ff-only origin my-branch`, 0, "")
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
