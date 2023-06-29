@@ -256,9 +256,11 @@ func projectFieldValueData(v queries.FieldValueNodes) any {
 		return v.ProjectV2ItemFieldDateValue.Date
 	case "ProjectV2ItemFieldIterationValue":
 		return struct {
+			Title     string `json:"title"`
 			StartDate string `json:"startDate"`
 			Duration  int    `json:"duration"`
 		}{
+			Title:     v.ProjectV2ItemFieldIterationValue.Title,
 			StartDate: v.ProjectV2ItemFieldIterationValue.StartDate,
 			Duration:  v.ProjectV2ItemFieldIterationValue.Duration,
 		}
@@ -270,9 +272,11 @@ func projectFieldValueData(v queries.FieldValueNodes) any {
 		return v.ProjectV2ItemFieldTextValue.Text
 	case "ProjectV2ItemFieldMilestoneValue":
 		return struct {
+			Title       string `json:"title"`
 			Description string `json:"description"`
 			DueOn       string `json:"dueOn"`
 		}{
+			Title:       v.ProjectV2ItemFieldMilestoneValue.Milestone.Title,
 			Description: v.ProjectV2ItemFieldMilestoneValue.Milestone.Description,
 			DueOn:       v.ProjectV2ItemFieldMilestoneValue.Milestone.DueOn,
 		}

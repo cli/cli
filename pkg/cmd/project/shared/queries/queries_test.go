@@ -165,6 +165,7 @@ func TestProjectItems_NoLimit(t *testing.T) {
 }
 
 func TestProjectFields_LowerLimit(t *testing.T) {
+
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
 
@@ -362,4 +363,68 @@ func TestNewOwner_nonTTY(t *testing.T) {
 	_, err := client.NewOwner(false, "")
 	assert.EqualError(t, err, "login is required when not running interactively")
 
+}
+
+func TestProjectItems_FieldTitle(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// list project items
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserProjectWithItems.*",
+			"variables": map[string]interface{}{
+				"firstItems":  LimitMax,
+				"afterItems":  nil,
+				"firstFields": LimitMax,
+				"afterFields": nil,
+				"login":       "monalisa",
+				"number":      1,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"items": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"id": "draft issue ID",
+									"fieldValues": map[string]interface{}{
+										"nodes": []map[string]interface{}{
+											{
+												"__typename": "ProjectV2ItemFieldIterationValue",
+												"title":      "Iteration Title 1",
+											},
+											{
+												"__typename": "ProjectV2ItemFieldMilestoneValue",
+												"milestone": map[string]interface{}{
+													"title": "Milestone Title 1",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := NewTestClient()
+
+	owner := &Owner{
+		Type:  "USER",
+		Login: "monalisa",
+		ID:    "user ID",
+	}
+	project, err := client.ProjectItems(owner, 1, LimitMax)
+	assert.NoError(t, err)
+	assert.Len(t, project.Items.Nodes, 1)
+	assert.Len(t, project.Items.Nodes[0].FieldValues.Nodes, 2)
+	assert.Equal(t, project.Items.Nodes[0].FieldValues.Nodes[0].ProjectV2ItemFieldIterationValue.Title, "Iteration Title 1")
+	assert.Equal(t, project.Items.Nodes[0].FieldValues.Nodes[1].ProjectV2ItemFieldMilestoneValue.Milestone.Title, "Milestone Title 1")
 }
