@@ -26,6 +26,7 @@ type EditOptions struct {
 	Draft              *bool
 	Prerelease         *bool
 	IsLatest           *bool
+	VerifyTag          *bool
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -75,6 +76,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "", "Save the release as a draft instead of publishing it")
 	cmdutil.NilBoolFlag(cmd, &opts.Prerelease, "prerelease", "", "Mark the release as a prerelease")
 	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Explicitly mark the release as \"Latest\"")
+	cmdutil.NilBoolFlag(cmd, &opts.VerifyTag, "verify-tag", "", "Abort in case the git tag doesn't already exist in the remote repository")
 	cmdutil.NilStringFlag(cmd, &opts.Body, "notes", "n", "Release notes")
 	cmdutil.NilStringFlag(cmd, &opts.Name, "title", "t", "Release title")
 	cmdutil.NilStringFlag(cmd, &opts.DiscussionCategory, "discussion-category", "", "Start a discussion in the specified category when publishing a draft")
@@ -110,6 +112,19 @@ func editRun(tag string, opts *EditOptions) error {
 		params["tag_name"] = release.TagName
 	}
 
+	if opts.VerifyTag != nil {
+		if opts.TagName == "" {
+			return fmt.Errorf("No tag provided")
+		}
+		remoteTagPresent, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
+		if err != nil {
+			return err
+		}
+		if !remoteTagPresent {
+			return fmt.Errorf("Tag %s doesn't exist in the repo %s, aborting due to --verify-tag flag",
+				opts.TagName, ghrepo.FullName(baseRepo))
+		}
+	}
 	editedRelease, err := editRelease(httpClient, baseRepo, release.DatabaseID, params)
 	if err != nil {
 		return err

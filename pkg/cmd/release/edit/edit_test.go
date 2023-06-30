@@ -140,6 +140,15 @@ func Test_NewCmdEdit(t *testing.T) {
 				Body:    stringPtr("MY NOTES"),
 			},
 		},
+		{
+			name:  "with verify-tag",
+			args:  "v1.2.0 --tag=v1.1.0 --verify-tag=true",
+			isTTY: false,
+			want: EditOptions{
+				TagName:   "v1.1.0",
+				VerifyTag: boolPtr(true),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -189,6 +198,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			assert.Equal(t, tt.want.Draft, opts.Draft)
 			assert.Equal(t, tt.want.Prerelease, opts.Prerelease)
 			assert.Equal(t, tt.want.IsLatest, opts.IsLatest)
+			assert.Equal(t, tt.want.VerifyTag, opts.VerifyTag)
 		})
 	}
 }
@@ -404,6 +414,35 @@ func Test_editRun(t *testing.T) {
 				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: "",
+		},
+		{
+			name:  "error when remote tag does not exist and verify-tag flag is set",
+			isTTY: true,
+			opts: EditOptions{
+				TagName:   "v1.2.4",
+				VerifyTag: boolPtr(true),
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": ""}}}}`))
+			},
+			wantErr:    "Tag v1.2.4 doesn't exist in the repo OWNER/REPO, aborting due to --verify-tag flag",
+			wantStdout: "",
+			wantStderr: "",
+		},
+		{
+			name:  "error when tag name is not provided and verify-tag flag is set",
+			isTTY: true,
+			opts: EditOptions{
+				VerifyTag: boolPtr(true),
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": ""}}}}`))
+			},
+			wantErr:    "No tag provided",
+			wantStdout: "",
 			wantStderr: "",
 		},
 	}
