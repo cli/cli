@@ -204,14 +204,14 @@ func TestRunCancel(t *testing.T) {
 			wantOut: "✓ Request to cancel workflow 1234 submitted.\n",
 		},
 		{
-			name: "invalid run_id",
+			name: "invalid run-id",
 			opts: &CancelOptions{
 				RunID: "12\n34",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 			},
 			wantErr: true,
-			errMsg:  "invalid run_id \"12\\n34\"",
+			errMsg:  "invalid run-id \"12\\n34\"",
 		},
 	}
 

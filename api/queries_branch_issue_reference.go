@@ -4,63 +4,16 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/shurcooL/githubv4"
 )
 
 type LinkedBranch struct {
-	ID         string
 	BranchName string
-	RepoUrl    string
+	URL        string
 }
 
-// method to return url of linked branch, adds the branch name to the end of the repo url
-func (b *LinkedBranch) Url() string {
-	return fmt.Sprintf("%s/tree/%s", b.RepoUrl, b.BranchName)
-}
-
-func nameParam(params map[string]interface{}) string {
-	if params["name"] != "" {
-		return "name: $name,"
-	}
-	return ""
-}
-
-func nameArg(params map[string]interface{}) string {
-	if params["name"] != "" {
-		return "$name: String, "
-	}
-	return ""
-}
-
-func CreateBranchIssueReference(client *Client, repo *Repository, params map[string]interface{}) (*LinkedBranch, error) {
-	query := fmt.Sprintf(`
-		mutation CreateLinkedBranch($issueId: ID!, $oid: GitObjectID!, %[1]s$repositoryId: ID) {
-			createLinkedBranch(input: {
-			  issueId: $issueId,
-			  %[2]s
-			  oid: $oid,
-			  repositoryId: $repositoryId
-			}) {
-				linkedBranch {
-					id
-					ref {
-						name
-					}
-				}
-			}
-		}`, nameArg(params), nameParam(params))
-
-	inputParams := map[string]interface{}{
-		"repositoryId": repo.ID,
-	}
-
-	for key, val := range params {
-		switch key {
-		case "issueId", "name", "oid":
-			inputParams[key] = val
-		}
-	}
-
-	result := struct {
+func CreateLinkedBranch(client *Client, host string, issueID, branchName, oid string) (string, error) {
+	var mutation struct {
 		CreateLinkedBranch struct {
 			LinkedBranch struct {
 				ID  string
@@ -68,90 +21,72 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 					Name string
 				}
 			}
-		}
-	}{}
-
-	if err := client.GraphQL(repo.RepoHost(), query, inputParams, &result); err != nil {
-		return nil, err
+		} `graphql:"createLinkedBranch(input: $input)"`
 	}
 
-	ref := LinkedBranch{
-		ID:         result.CreateLinkedBranch.LinkedBranch.ID,
-		BranchName: result.CreateLinkedBranch.LinkedBranch.Ref.Name,
+	input := githubv4.CreateLinkedBranchInput{
+		IssueID: githubv4.ID(issueID),
+		Oid:     githubv4.GitObjectID(oid),
+	}
+	if branchName != "" {
+		name := githubv4.String(branchName)
+		input.Name = &name
+	}
+	variables := map[string]interface{}{
+		"input": input,
 	}
 
-	return &ref, nil
+	err := client.Mutate(host, "CreateLinkedBranch", &mutation, variables)
+	if err != nil {
+		return "", err
+	}
+
+	return mutation.CreateLinkedBranch.LinkedBranch.Ref.Name, nil
 }
 
 func ListLinkedBranches(client *Client, repo ghrepo.Interface, issueNumber int) ([]LinkedBranch, error) {
-	query := `
-	query BranchIssueReferenceListLinkedBranches($repositoryName: String!, $repositoryOwner: String!, $issueNumber: Int!) {
-		repository(name: $repositoryName, owner: $repositoryOwner) {
-			issue(number: $issueNumber) {
-				linkedBranches(first: 30) {
-					edges {
-						node {
-							ref {
-								name
-								repository {
-									url
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	`
-
-	variables := map[string]interface{}{
-		"repositoryName":  repo.RepoName(),
-		"repositoryOwner": repo.RepoOwner(),
-		"issueNumber":     issueNumber,
-	}
-
-	result := struct {
+	var query struct {
 		Repository struct {
 			Issue struct {
 				LinkedBranches struct {
-					Edges []struct {
-						Node struct {
-							Ref struct {
-								Name       string
-								Repository struct {
-									NameWithOwner string
-									Url           string
-								}
+					Nodes []struct {
+						Ref struct {
+							Name       string
+							Repository struct {
+								Url string
 							}
 						}
 					}
-				}
-			}
-		}
-	}{}
+				} `graphql:"linkedBranches(first: 30)"`
+			} `graphql:"issue(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
 
-	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
+	variables := map[string]interface{}{
+		"number": githubv4.Int(issueNumber),
+		"owner":  githubv4.String(repo.RepoOwner()),
+		"name":   githubv4.String(repo.RepoName()),
+	}
+
+	if err := client.Query(repo.RepoHost(), "ListLinkedBranches", &query, variables); err != nil {
 		return []LinkedBranch{}, err
 	}
 
 	var branchNames []LinkedBranch
 
-	for _, edge := range result.Repository.Issue.LinkedBranches.Edges {
+	for _, node := range query.Repository.Issue.LinkedBranches.Nodes {
 		branch := LinkedBranch{
-			BranchName: edge.Node.Ref.Name,
-			RepoUrl:    edge.Node.Ref.Repository.Url,
+			BranchName: node.Ref.Name,
+			URL:        fmt.Sprintf("%s/tree/%s", node.Ref.Repository.Url, node.Ref.Name),
 		}
-
 		branchNames = append(branchNames, branch)
 	}
 
 	return branchNames, nil
 }
 
-// introspects the schema to see if we expose the LinkedBranch type
-func CheckLinkedBranchFeature(client *Client, host string) (err error) {
-	var featureDetection struct {
+func CheckLinkedBranchFeature(client *Client, host string) error {
+	var query struct {
 		Name struct {
 			Fields []struct {
 				Name string
@@ -159,42 +94,19 @@ func CheckLinkedBranchFeature(client *Client, host string) (err error) {
 		} `graphql:"LinkedBranch: __type(name: \"LinkedBranch\")"`
 	}
 
-	if err := client.Query(host, "LinkedBranch_fields", &featureDetection, nil); err != nil {
+	if err := client.Query(host, "LinkedBranchFeature", &query, nil); err != nil {
 		return err
 	}
 
-	if len(featureDetection.Name.Fields) == 0 {
+	if len(query.Name.Fields) == 0 {
 		return fmt.Errorf("the `gh issue develop` command is not currently available")
 	}
 
 	return nil
 }
 
-// This fetches the oids for the repo's default branch (`main`, etc) and the name the user might have provided in one shot.
-func FindBaseOid(client *Client, repo *Repository, ref string) (string, string, error) {
-	query := `
-	query BranchIssueReferenceFindBaseOid($repositoryName: String!, $repositoryOwner: String!, $ref: String!) {
-		repository(name: $repositoryName, owner: $repositoryOwner) {
-			defaultBranchRef {
-				target {
-					oid
-				}
-			}
-			ref(qualifiedName: $ref) {
-				target {
-					oid
-				}
-			}
-		}
-	}`
-
-	variables := map[string]interface{}{
-		"repositoryName":  repo.Name,
-		"repositoryOwner": repo.RepoOwner(),
-		"ref":             ref,
-	}
-
-	result := struct {
+func FindBaseOid(client *Client, repo ghrepo.Interface, ref string) (string, string, error) {
+	var query struct {
 		Repository struct {
 			DefaultBranchRef struct {
 				Target struct {
@@ -205,13 +117,19 @@ func FindBaseOid(client *Client, repo *Repository, ref string) (string, string, 
 				Target struct {
 					Oid string
 				}
-			}
-		}
-	}{}
+			} `graphql:"ref(qualifiedName: $ref)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
 
-	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
+	variables := map[string]interface{}{
+		"ref":   githubv4.String(ref),
+		"owner": githubv4.String(repo.RepoOwner()),
+		"name":  githubv4.String(repo.RepoName()),
+	}
+
+	if err := client.Query(repo.RepoHost(), "FindBaseOid", &query, variables); err != nil {
 		return "", "", err
 	}
 
-	return result.Repository.Ref.Target.Oid, result.Repository.DefaultBranchRef.Target.Oid, nil
+	return query.Repository.Ref.Target.Oid, query.Repository.DefaultBranchRef.Target.Oid, nil
 }
