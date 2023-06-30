@@ -26,10 +26,10 @@ type RulesetREST struct {
 	Name         string
 	Target       string
 	Enforcement  string
-	BypassMode   string `json:"bypass_mode"`
 	BypassActors []struct {
-		ActorId   int    `json:"actor_id"`
-		ActorType string `json:"actor_type"`
+		ActorId    int    `json:"actor_id"`
+		ActorType  string `json:"actor_type"`
+		BypassMode string `json:"bypass_mode"`
 	} `json:"bypass_actors"`
 	Conditions map[string]map[string]interface{}
 	// TODO is this source field used?
@@ -39,6 +39,11 @@ type RulesetREST struct {
 		Type       string
 		Parameters map[string]interface{}
 	}
+	Links struct {
+		Html struct {
+			Href string
+		}
+	} `json:"_links"`
 }
 
 // Returns the source of the ruleset in the format "owner/name (repo)" or "owner (org)"

@@ -10,7 +10,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
@@ -52,15 +51,22 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			If no ID is provided, an interactive prompt will be used to choose
 			the ruleset to view.
+			
+			Use the --parents flag to control whether rulesets configured at higher
+			levels that also apply to the provided repository or organization should
+			be returned. The default is true.
 		`),
 		Example: heredoc.Doc(`
-			# Interactively choose a ruleset to view
+			# Interactively choose a ruleset to view from all rulesets that apply to the current repository
 			$ gh ruleset view
 
-			# View a ruleset in the current repository
+			# Interactively choose a ruleset to view from only rulesets configured in the current repository
+			$ gh ruleset view --no-parents
+
+			# View a ruleset configured in the current repository or any of its parents
 			$ gh ruleset view 43
 
-			# View a ruleset in a different repository
+			# View a ruleset configured in a different repository or any of its parents
 			$ gh ruleset view 23 --repo owner/repo
 
 			# View an organization-level ruleset
@@ -98,7 +104,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the ruleset in the browser")
 	cmd.Flags().StringVarP(&opts.Organization, "org", "o", "", "Organization name if the provided ID is an organization-level ruleset")
-	cmd.Flags().BoolVarP(&opts.IncludeParents, "parents", "p", false, "When choosing interactively, include rulesets configured at higher levels that also apply")
+	cmd.Flags().BoolVarP(&opts.IncludeParents, "parents", "p", true, "Whether to include rulesets configured at higher levels that also apply")
 
 	return cmd
 }
@@ -169,18 +175,11 @@ func viewRun(opts *ViewOptions) error {
 
 	if opts.WebMode {
 		if rs != nil {
-			var rulesetURL string
-			if opts.Organization != "" {
-				rulesetURL = fmt.Sprintf("%sorganizations/%s/settings/rules/%s", ghinstance.HostPrefix(hostname), opts.Organization, opts.ID)
-			} else {
-				rulesetURL = ghrepo.GenerateRepoURL(repoI, "settings/rules/%s", opts.ID)
-			}
-
 			if opts.IO.IsStdoutTTY() {
-				fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(rulesetURL))
+				fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(rs.Links.Html.Href))
 			}
 
-			return opts.Browser.Browse(rulesetURL)
+			return opts.Browser.Browse(rs.Links.Html.Href)
 		} else {
 			fmt.Fprintf(w, "ruleset not found\n")
 		}
@@ -202,24 +201,16 @@ func viewRun(opts *ViewOptions) error {
 		fmt.Fprintf(w, "%s\n", rs.Enforcement)
 	}
 
-	fmt.Fprintf(w, "\n%s\n", cs.Bold("Bypassing"))
-	fmt.Fprintf(w, "Mode: %s\n", rs.BypassMode)
+	fmt.Fprintf(w, "\n%s\n", cs.Bold("Bypass List"))
 	if len(rs.BypassActors) == 0 {
-		fmt.Fprintf(w, "No actors configured for bypass\n")
+		fmt.Fprintf(w, "This ruleset cannot be bypassed\n")
 	} else {
-		types := make(map[string]int)
-		for _, t := range rs.BypassActors {
-			val, exists := types[t.ActorType]
-			if exists {
-				types[t.ActorType] = val + 1
-			} else {
-				types[t.ActorType] = 1
-			}
-		}
+		sort.Slice(rs.BypassActors, func(i, j int) bool {
+			return rs.BypassActors[i].ActorId < rs.BypassActors[j].ActorId
+		})
 
-		fmt.Fprintf(w, "Actor types allowed to bypass:\n")
-		for name, count := range types {
-			fmt.Fprintf(w, "- %s: %d configured\n", name, count)
+		for _, t := range rs.BypassActors {
+			fmt.Fprintf(w, "- %s (ID: %d), mode: %s\n", t.ActorType, t.ActorId, t.BypassMode)
 		}
 	}
 
@@ -227,8 +218,7 @@ func viewRun(opts *ViewOptions) error {
 	if len(rs.Conditions) == 0 {
 		fmt.Fprintf(w, "No conditions configured\n")
 	} else {
-		// sort keys for consistent responses, can't make a separate function due to
-		// mismatched types
+		// sort keys for consistent responses
 		keys := make([]string, 0, len(rs.Conditions))
 		for key := range rs.Conditions {
 			keys = append(keys, key)

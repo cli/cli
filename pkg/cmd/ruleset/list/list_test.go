@@ -66,6 +66,18 @@ func Test_NewCmdList(t *testing.T) {
 				Organization: "",
 			},
 		},
+		{
+			name:    "invalid limit",
+			args:    "--limit 0",
+			isTTY:   true,
+			wantErr: "invalid limit: 0",
+		},
+		{
+			name:    "repo and org specified",
+			args:    "--org \"my-org\" -R \"owner/repo\"",
+			isTTY:   true,
+			wantErr: "only one of --repo and --org may be specified",
+		},
 	}
 
 	for _, tt := range tests {

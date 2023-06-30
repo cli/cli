@@ -49,9 +49,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			repository's rulesets by using the --repo flag. You can also use the --org flag to list rulesets
 			configured for the provided organization.
 
-			Use the --parents flag to include rulesets configured at higher levels that also apply to the current repository.
+			Use the --parents flag to control whether rulesets configured at higher levels that also apply to the provided
+			repository or organization should be returned. The default is true.
 			
-			Your access token must have the admin:org scope, which can be granted by running "gh auth refresh -s admin:org".
+			Your access token must have the admin:org scope to use the --org flag, which can be granted by running "gh auth refresh -s admin:org".
 		`),
 		Example: heredoc.Doc(`
 			# List rulesets in the current repository
@@ -73,7 +74,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			opts.BaseRepo = f.BaseRepo
 
 			if opts.Limit < 1 {
-				return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.Limit)
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
 			if runF != nil {
@@ -86,7 +87,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of rulesets to list")
 	cmd.Flags().StringVarP(&opts.Organization, "org", "o", "", "List organization-wide rulesets for the provided organization")
-	cmd.Flags().BoolVarP(&opts.IncludeParents, "parents", "p", false, "Include rulesets configured at higher levels that also apply")
+	cmd.Flags().BoolVarP(&opts.IncludeParents, "parents", "p", true, "Whether to include rulesets configured at higher levels that also apply")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the list of rulesets in the web browser")
 
 	return cmd
