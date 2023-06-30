@@ -111,7 +111,7 @@ func TestRunCancel(t *testing.T) {
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/cancel"),
 					httpmock.StatusStringResponse(202, "{}"))
 			},
-			wantOut: "✓ Request to cancel workflow submitted.\n",
+			wantOut: "✓ Request to cancel workflow 1234 submitted.\n",
 		},
 		{
 			name: "not found",
@@ -201,7 +201,17 @@ func TestRunCancel(t *testing.T) {
 						return prompter.IndexFor(opts, "* cool commit, CI (trunk) Feb 23, 2021")
 					})
 			},
-			wantOut: "✓ Request to cancel workflow submitted.\n",
+			wantOut: "✓ Request to cancel workflow 1234 submitted.\n",
+		},
+		{
+			name: "invalid run_id",
+			opts: &CancelOptions{
+				RunID: "12\n34",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+			},
+			wantErr: true,
+			errMsg:  "invalid run_id \"12\\n34\"",
 		},
 	}
 
