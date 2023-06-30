@@ -9,8 +9,11 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -22,9 +25,11 @@ type CheckOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Git        *git.Client
+	Browser    browser.Browser
 
 	Branch  string
 	Default bool
+	WebMode bool
 }
 
 func NewCmdCheck(f *cmdutil.Factory, runF func(*CheckOptions) error) *cobra.Command {
@@ -32,33 +37,58 @@ func NewCmdCheck(f *cmdutil.Factory, runF func(*CheckOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Browser:    f.Browser,
 		Git:        f.GitClient,
 	}
 	cmd := &cobra.Command{
 		Use:   "check [<branch>]",
-		Short: "Print rules that would apply to a given branch",
+		Short: "View rules that would apply to a given branch",
 		Long: heredoc.Doc(`
-			TODO
+			View information about GitHub rules that apply to a given branch.
+
+			The provided branch name does not need to exist, rules will be displayed that would apply
+			to a branch with that name. All rules are returned regardless of where they are configured.
+
+			If no branch name is provided, then the current branch will be used.
+
+			The --default flag can be used to view rules that apply to the default branch of the current
+			repository.
 		`),
-		Example: "TODO",
-		Args:    cobra.MaximumNArgs(1),
+		Example: heredoc.Doc(`
+			# View all rules that apply to the current branch
+			$ gh ruleset check
+
+			# View all rules that apply to a branch named "my-branch" in a different repository
+			$ gh ruleset check my-branch --repo owner/repo
+
+			# View all rules that apply to the default branch in a different repository
+			$ gh ruleset check --default --repo owner/repo
+
+			# View a ruleset configured in a different repository or any of its parents
+			$ gh ruleset view 23 --repo owner/repo
+
+			# View an organization-level ruleset
+			$ gh ruleset view 23 --org my-org
+		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
-
-			// TODO flag to do a push
 
 			if len(args) > 0 {
 				opts.Branch = args[0]
 			}
 
-			if runF != nil {
-				return runF(opts)
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--default` or a branch name",
+				opts.Branch != "",
+				opts.Default,
+			); err != nil {
+				return err
 			}
 
-			if opts.Branch != "" && opts.Default {
-				return cmdutil.FlagErrorf(
-					"branch argument '%s' and --default mutually exclusive", opts.Branch)
+			if runF != nil {
+				return runF(opts)
 			}
 
 			return checkRun(opts)
@@ -71,10 +101,6 @@ func NewCmdCheck(f *cmdutil.Factory, runF func(*CheckOptions) error) *cobra.Comm
 }
 
 func checkRun(opts *CheckOptions) error {
-	// TODO ask about pushing (if interactive)
-	// TODO error if not interactive and --push not specified
-	// TODO parsing for errors on push
-
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -103,18 +129,33 @@ func checkRun(opts *CheckOptions) error {
 		}
 	}
 
-	var lol interface{}
+	rawPath := fmt.Sprintf("rules?ref=%s%s", url.QueryEscape("refs/heads/"), url.QueryEscape(opts.Branch))
+	rulesURL := ghrepo.GenerateRepoURL(repoI, rawPath)
+
+	if opts.WebMode {
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(rulesURL))
+		}
+
+		return opts.Browser.Browse(rulesURL)
+	}
+
+	var rules []shared.RulesetRule
 
 	endpoint := fmt.Sprintf("repos/%s/%s/rules/branches/%s", repoI.RepoOwner(), repoI.RepoName(), url.PathEscape(opts.Branch))
 
-	if err = client.REST(repoI.RepoHost(), "GET", endpoint, nil, &lol); err != nil {
+	if err = client.REST(repoI.RepoHost(), "GET", endpoint, nil, &rules); err != nil {
 		return fmt.Errorf("GET %s failed: %w", endpoint, err)
 	}
 
-	// TODO handle 404s gracefully
-	// TODO actually parse JSON
+	w := opts.IO.Out
 
-	fmt.Printf("DBG %#v\n", lol)
+	fmt.Fprintf(w, "%d rules apply to branch %s in repo %s/%s\n", len(rules), opts.Branch, repoI.RepoOwner(), repoI.RepoName())
+
+	if len(rules) > 0 {
+		fmt.Fprint(w, "\n")
+		fmt.Fprint(w, shared.ParseRulesForDisplay(rules))
+	}
 
 	return nil
 }

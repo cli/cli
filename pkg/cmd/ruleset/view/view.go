@@ -248,31 +248,7 @@ func viewRun(opts *ViewOptions) error {
 	if len(rs.Rules) == 0 {
 		fmt.Fprintf(w, "No rules configured\n")
 	} else {
-		// sort keys for consistent responses
-		sort.SliceStable(rs.Rules, func(i, j int) bool {
-			return rs.Rules[i].Type < rs.Rules[j].Type
-		})
-
-		for _, rule := range rs.Rules {
-			fmt.Fprintf(w, "- %s", rule.Type)
-
-			if rule.Parameters != nil && len(rule.Parameters) > 0 {
-				fmt.Fprintf(w, ": ")
-
-				// sort these keys too for consistency
-				params := make([]string, 0, len(rule.Parameters))
-				for p := range rule.Parameters {
-					params = append(params, p)
-				}
-				sort.Strings(params)
-
-				for _, n := range params {
-					fmt.Fprintf(w, "[%s: %v] ", n, rule.Parameters[n])
-				}
-			}
-
-			fmt.Fprint(w, "\n")
-		}
+		fmt.Fprint(w, shared.ParseRulesForDisplay(rs.Rules))
 	}
 
 	return nil
