@@ -32,14 +32,11 @@ func IsTenancy(h string) bool {
 	return strings.HasSuffix(normalizedHostName, "."+tenancyHost)
 }
 
-// TenantName extracts the tenant name from tenancy host name.
-// Returns an empty string if host name is not a tenancy instance.
-func TenantName(h string) string {
+// TenantName extracts the tenant name from tenancy host name and
+// reports whether it found the tenant name.
+func TenantName(h string) (string, bool) {
 	normalizedHostName := NormalizeHostname(h)
-	if before, found := cutSuffix(normalizedHostName, "."+tenancyHost); found {
-		return before
-	}
-	return ""
+	return cutSuffix(normalizedHostName, "."+tenancyHost)
 }
 
 func isGarage(h string) bool {

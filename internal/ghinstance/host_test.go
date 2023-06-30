@@ -90,38 +90,41 @@ func TestIsTenancy(t *testing.T) {
 
 func TestTenantName(t *testing.T) {
 	tests := []struct {
-		host string
-		want string
+		host       string
+		wantTenant string
+		wantFound  bool
 	}{
 		{
-			host: "github.com",
-			want: "",
+			host:       "github.com",
+			wantTenant: "github.com",
 		},
 		{
-			host: "github.localhost",
-			want: "",
+			host:       "github.localhost",
+			wantTenant: "github.localhost",
 		},
 		{
-			host: "garage.github.com",
-			want: "",
+			host:       "garage.github.com",
+			wantTenant: "github.com",
 		},
 		{
-			host: "ghe.com",
-			want: "",
+			host:       "ghe.com",
+			wantTenant: "ghe.com",
 		},
 		{
-			host: "tenant.ghe.com",
-			want: "tenant",
+			host:       "tenant.ghe.com",
+			wantTenant: "tenant",
+			wantFound:  true,
 		},
 		{
-			host: "api.tenant.ghe.com",
-			want: "tenant",
+			host:       "api.tenant.ghe.com",
+			wantTenant: "tenant",
+			wantFound:  true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.host, func(t *testing.T) {
-			if got := TenantName(tt.host); got != tt.want {
-				t.Errorf("TenantName() = %v, want %v", got, tt.want)
+			if tenant, found := TenantName(tt.host); tenant != tt.wantTenant || found != tt.wantFound {
+				t.Errorf("TenantName(%v) = %v %v, want %v %v", tt.host, tenant, found, tt.wantTenant, tt.wantFound)
 			}
 		})
 	}
