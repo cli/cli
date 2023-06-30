@@ -116,7 +116,7 @@ func listRun(opts *ListOptions) error {
 		if opts.Organization != "" {
 			rulesetURL = fmt.Sprintf("%sorganizations/%s/settings/rules", ghinstance.HostPrefix(hostname), opts.Organization)
 		} else {
-			rulesetURL = ghrepo.GenerateRepoURL(repoI, "settings/rules")
+			rulesetURL = ghrepo.GenerateRepoURL(repoI, "rules")
 		}
 
 		if opts.IO.IsStdoutTTY() {

@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -31,9 +32,10 @@ func Test_NewCmdList(t *testing.T) {
 			args:  "",
 			isTTY: true,
 			want: ListOptions{
-				Limit:        30,
-				WebMode:      false,
-				Organization: "",
+				Limit:          30,
+				IncludeParents: true,
+				WebMode:        false,
+				Organization:   "",
 			},
 		},
 		{
@@ -41,9 +43,21 @@ func Test_NewCmdList(t *testing.T) {
 			args:  "--limit 1",
 			isTTY: true,
 			want: ListOptions{
-				Limit:        1,
-				WebMode:      false,
-				Organization: "",
+				Limit:          1,
+				IncludeParents: true,
+				WebMode:        false,
+				Organization:   "",
+			},
+		},
+		{
+			name:  "include parents",
+			args:  "--parents=false",
+			isTTY: true,
+			want: ListOptions{
+				Limit:          30,
+				IncludeParents: false,
+				WebMode:        false,
+				Organization:   "",
 			},
 		},
 		{
@@ -51,9 +65,10 @@ func Test_NewCmdList(t *testing.T) {
 			args:  "--org \"my-org\"",
 			isTTY: true,
 			want: ListOptions{
-				Limit:        30,
-				WebMode:      false,
-				Organization: "my-org",
+				Limit:          30,
+				IncludeParents: true,
+				WebMode:        false,
+				Organization:   "my-org",
 			},
 		},
 		{
@@ -61,9 +76,10 @@ func Test_NewCmdList(t *testing.T) {
 			args:  "--web",
 			isTTY: true,
 			want: ListOptions{
-				Limit:        30,
-				WebMode:      true,
-				Organization: "",
+				Limit:          30,
+				IncludeParents: true,
+				WebMode:        true,
+				Organization:   "",
 			},
 		},
 		{
@@ -121,6 +137,76 @@ func Test_NewCmdList(t *testing.T) {
 	}
 }
 
+func Test_RulesetList_Web(t *testing.T) {
+	tests := []struct {
+		name       string
+		stdoutTTY  bool
+		wantStdout string
+		wantBrowse string
+	}{
+		{
+			name:       "repo tty",
+			stdoutTTY:  true,
+			wantStdout: "Opening github.com/OWNER/REPO in your browser.\n",
+			wantBrowse: "https://github.com/OWNER/REPO",
+		},
+		{
+			name:       "org tty",
+			stdoutTTY:  true,
+			wantStdout: "Opening github.com/OWNER/REPO in your browser.\n",
+			wantBrowse: "https://github.com/OWNER/REPO",
+		},
+		{
+			name:       "repo non-tty",
+			stdoutTTY:  false,
+			wantStdout: "",
+			wantBrowse: "https://github.com/OWNER/REPO",
+		},
+		{
+			name:       "org non-tty",
+			stdoutTTY:  false,
+			wantStdout: "",
+			wantBrowse: "https://github.com/OWNER/REPO",
+		},
+	}
+
+	for _, tt := range tests {
+		reg := &httpmock.Registry{}
+		reg.StubRepoInfoResponse("OWNER", "REPO", "main")
+
+		browser := &browser.Stub{}
+		opts := &ListOptions{
+			WebMode: true,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			BaseRepo: func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			},
+			Browser: browser,
+		}
+
+		io, _, stdout, _ := iostreams.Test()
+
+		opts.IO = io
+
+		t.Run(tt.name, func(t *testing.T) {
+			io.SetStdoutTTY(tt.stdoutTTY)
+
+			_, teardown := run.Stub()
+			defer teardown(t)
+
+			if err := listRun(opts); err != nil {
+				t.Errorf("listRun() error = %v", err)
+			}
+			assert.Equal(t, "", stdout.String())
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			reg.Verify(t)
+			browser.Verify(t, tt.wantBrowse)
+		})
+	}
+}
+
 func Test_listRun(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -129,6 +215,7 @@ func Test_listRun(t *testing.T) {
 		wantErr    string
 		wantStdout string
 		wantStderr string
+		wantBrowse string
 	}{
 		{
 			name:  "list repo rulesets",
@@ -143,6 +230,7 @@ func Test_listRun(t *testing.T) {
 				77  foobar  Org-Name (org)     disabled  4
 			`),
 			wantStderr: "",
+			wantBrowse: "",
 		},
 		{
 			name:  "list org rulesets",
@@ -160,6 +248,7 @@ func Test_listRun(t *testing.T) {
 				77  foobar  Org-Name (org)     disabled  4
 			`),
 			wantStderr: "",
+			wantBrowse: "",
 		},
 		{
 			name:  "machine-readable",
@@ -170,6 +259,49 @@ func Test_listRun(t *testing.T) {
 				77	foobar	Org-Name (org)	disabled	4
 			`),
 			wantStderr: "",
+			wantBrowse: "",
+		},
+		{
+			name:  "repo web mode, TTY",
+			isTTY: true,
+			opts: ListOptions{
+				WebMode: true,
+			},
+			wantStdout: "Opening github.com/OWNER/REPO/rules in your browser.\n",
+			wantStderr: "",
+			wantBrowse: "https://github.com/OWNER/REPO/rules",
+		},
+		{
+			name:  "org web mode, TTY",
+			isTTY: true,
+			opts: ListOptions{
+				WebMode:      true,
+				Organization: "my-org",
+			},
+			wantStdout: "Opening github.com/organizations/my-org/settings/rules in your browser.\n",
+			wantStderr: "",
+			wantBrowse: "https://github.com/organizations/my-org/settings/rules",
+		},
+		{
+			name:  "repo web mode, non-TTY",
+			isTTY: false,
+			opts: ListOptions{
+				WebMode: true,
+			},
+			wantStdout: "",
+			wantStderr: "",
+			wantBrowse: "https://github.com/OWNER/REPO/rules",
+		},
+		{
+			name:  "org web mode, non-TTY",
+			isTTY: false,
+			opts: ListOptions{
+				WebMode:      true,
+				Organization: "my-org",
+			},
+			wantStdout: "",
+			wantStderr: "",
+			wantBrowse: "https://github.com/organizations/my-org/settings/rules",
 		},
 	}
 
@@ -190,7 +322,8 @@ func Test_listRun(t *testing.T) {
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
-			tt.opts.Browser = &browser.Stub{}
+			browser := &browser.Stub{}
+			tt.opts.Browser = browser
 			tt.opts.Config = func() (config.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
@@ -202,6 +335,10 @@ func Test_listRun(t *testing.T) {
 				return
 			} else {
 				require.NoError(t, err)
+			}
+
+			if tt.wantBrowse != "" {
+				browser.Verify(t, tt.wantBrowse)
 			}
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
