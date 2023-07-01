@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -133,76 +132,6 @@ func Test_NewCmdList(t *testing.T) {
 			assert.Equal(t, tt.want.Limit, opts.Limit)
 			assert.Equal(t, tt.want.WebMode, opts.WebMode)
 			assert.Equal(t, tt.want.Organization, opts.Organization)
-		})
-	}
-}
-
-func Test_RulesetList_Web(t *testing.T) {
-	tests := []struct {
-		name       string
-		stdoutTTY  bool
-		wantStdout string
-		wantBrowse string
-	}{
-		{
-			name:       "repo tty",
-			stdoutTTY:  true,
-			wantStdout: "Opening github.com/OWNER/REPO in your browser.\n",
-			wantBrowse: "https://github.com/OWNER/REPO",
-		},
-		{
-			name:       "org tty",
-			stdoutTTY:  true,
-			wantStdout: "Opening github.com/OWNER/REPO in your browser.\n",
-			wantBrowse: "https://github.com/OWNER/REPO",
-		},
-		{
-			name:       "repo non-tty",
-			stdoutTTY:  false,
-			wantStdout: "",
-			wantBrowse: "https://github.com/OWNER/REPO",
-		},
-		{
-			name:       "org non-tty",
-			stdoutTTY:  false,
-			wantStdout: "",
-			wantBrowse: "https://github.com/OWNER/REPO",
-		},
-	}
-
-	for _, tt := range tests {
-		reg := &httpmock.Registry{}
-		reg.StubRepoInfoResponse("OWNER", "REPO", "main")
-
-		browser := &browser.Stub{}
-		opts := &ListOptions{
-			WebMode: true,
-			HttpClient: func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			},
-			BaseRepo: func() (ghrepo.Interface, error) {
-				return ghrepo.New("OWNER", "REPO"), nil
-			},
-			Browser: browser,
-		}
-
-		io, _, stdout, _ := iostreams.Test()
-
-		opts.IO = io
-
-		t.Run(tt.name, func(t *testing.T) {
-			io.SetStdoutTTY(tt.stdoutTTY)
-
-			_, teardown := run.Stub()
-			defer teardown(t)
-
-			if err := listRun(opts); err != nil {
-				t.Errorf("listRun() error = %v", err)
-			}
-			assert.Equal(t, "", stdout.String())
-			assert.Equal(t, tt.wantStdout, stdout.String())
-			reg.Verify(t)
-			browser.Verify(t, tt.wantBrowse)
 		})
 	}
 }

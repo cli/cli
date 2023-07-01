@@ -34,7 +34,6 @@ type RulesetREST struct {
 		BypassMode string `json:"bypass_mode"`
 	} `json:"bypass_actors"`
 	Conditions map[string]map[string]interface{}
-	// TODO is this source field used?
 	SourceType string `json:"source_type"`
 	Source     string
 	Rules      []RulesetRule

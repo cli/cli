@@ -12,12 +12,17 @@ import (
 func NewCmdRuleset(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ruleset <command>",
-		Short: "Manage repository and organization rulesets",
+		Short: "View info about repo rulesets",
 		Long: heredoc.Doc(`
-			TODO
+			Repository rulesets are a way to define a set of rules that apply to a repository.
+			These commands allow you to view information about them.
 		`),
 		Aliases: []string{"rs"},
-		Example: "TODO",
+		Example: heredoc.Doc(`
+			$ gh ruleset list
+			$ gh ruleset view --repo OWNER/REPO --web
+			$ gh ruleset check branch-name
+		`),
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)
