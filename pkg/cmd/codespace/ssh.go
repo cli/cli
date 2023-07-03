@@ -36,14 +36,15 @@ const automaticPrivateKeyName = "codespaces.auto"
 var errKeyFileNotFound = errors.New("SSH key file does not exist")
 
 type sshOptions struct {
-	selector   *CodespaceSelector
-	profile    string
-	serverPort int
-	debug      bool
-	debugFile  string
-	stdio      bool
-	config     bool
-	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
+	selector         *CodespaceSelector
+	profile          string
+	serverPort       int
+	printConnDetails bool
+	debug            bool
+	debugFile        string
+	stdio            bool
+	config           bool
+	scpArgs          []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
 func newSSHCmd(app *App) *cobra.Command {
@@ -117,6 +118,9 @@ func newSSHCmd(app *App) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flag("server-port").Changed {
+				opts.printConnDetails = true
+			}
 			if opts.config {
 				return app.printOpenSSHConfig(cmd.Context(), opts)
 			} else {
@@ -206,7 +210,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 
 	localSSHServerPort := opts.serverPort
-	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
 
 	// Ensure local port is listening before client (Shell) connects.
 	// Unless the user specifies a server port, localSSHServerPort is 0
@@ -235,7 +238,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 			// args is the correct variable to use here, we just use scpArgs as the check for which command to run
 			err = codespaces.Copy(ctx, args, localSSHServerPort, connectDestination)
 		} else {
-			err = codespaces.Shell(ctx, a.errLogger, args, localSSHServerPort, connectDestination, usingCustomPort)
+			err = codespaces.Shell(
+				ctx, a.errLogger, args, localSSHServerPort, connectDestination, opts.printConnDetails,
+			)
 		}
 		shellClosed <- err
 	}()
