@@ -147,10 +147,25 @@ func editRun(opts *EditOptions) error {
 		return errors.New("you do not own this gist")
 	}
 
+	// Transform our gist into the schema that the update endpoint expects
+	filesToupdate := make(map[string]*gistFileToUpdate, len(gist.Files))
+	for filename, file := range gist.Files {
+		filesToupdate[filename] = &gistFileToUpdate{
+			Content:     file.Content,
+			NewFilename: file.Filename,
+		}
+	}
+
+	gistToUpdate := gistToUpdate{
+		id:          gist.ID,
+		Description: gist.Description,
+		Files:       filesToupdate,
+	}
+
 	shouldUpdate := false
 	if opts.Description != "" {
 		shouldUpdate = true
-		gist.Description = opts.Description
+		gistToUpdate.Description = opts.Description
 	}
 
 	if opts.AddFilename != "" {
@@ -188,18 +203,18 @@ func editRun(opts *EditOptions) error {
 			return err
 		}
 
-		gist.Files = files
-		return updateGist(apiClient, host, gist)
+		gistToUpdate.Files = files
+		return updateGist(apiClient, host, gistToUpdate)
 	}
 
 	// Remove a file from the gist
 	if opts.RemoveFilename != "" {
-		err := removeFile(gist, opts.RemoveFilename)
+		err := removeFile(gistToUpdate, opts.RemoveFilename)
 		if err != nil {
 			return err
 		}
 
-		return updateGist(apiClient, host, gist)
+		return updateGist(apiClient, host, gistToUpdate)
 	}
 
 	filesToUpdate := map[string]string{}
@@ -207,7 +222,7 @@ func editRun(opts *EditOptions) error {
 	for {
 		filename := opts.EditFilename
 		candidates := []string{}
-		for filename := range gist.Files {
+		for filename := range gistToUpdate.Files {
 			candidates = append(candidates, filename)
 		}
 
@@ -228,7 +243,7 @@ func editRun(opts *EditOptions) error {
 			}
 		}
 
-		gistFile, found := gist.Files[filename]
+		gistFile, found := gistToUpdate.Files[filename]
 		if !found {
 			return fmt.Errorf("gist has no file %q", filename)
 		}
@@ -306,28 +321,38 @@ func editRun(opts *EditOptions) error {
 		return nil
 	}
 
-	return updateGist(apiClient, host, gist)
+	return updateGist(apiClient, host, gistToUpdate)
 }
 
-func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error {
-	body := shared.Gist{
-		Description: gist.Description,
-		Files:       gist.Files,
-	}
+// https://docs.github.com/en/rest/gists/gists?apiVersion=2022-11-28#update-a-gist
+type gistToUpdate struct {
+	// The id of the gist to update. Does not get marshalled to JSON.
+	id string
+	// The description of the gist
+	Description string `json:"description"`
+	// The gist files to be updated, renamed or deleted. The key must match the current
+	// filename of the file to change. To delete a file, set the value to nil
+	Files map[string]*gistFileToUpdate `json:"files"`
+}
 
-	path := "gists/" + gist.ID
+type gistFileToUpdate struct {
+	// The new content of the file
+	Content string `json:"content"`
+	// The new name for the file
+	NewFilename string `json:"filename,omitempty"`
+}
 
-	requestByte, err := json.Marshal(body)
+func updateGist(apiClient *api.Client, hostname string, gist gistToUpdate) error {
+	requestByte, err := json.Marshal(gist)
 	if err != nil {
 		return err
 	}
 
 	requestBody := bytes.NewReader(requestByte)
-
 	result := shared.Gist{}
 
+	path := "gists/" + gist.id
 	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
-
 	if err != nil {
 		return err
 	}
@@ -335,7 +360,7 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 	return nil
 }
 
-func getFilesToAdd(file string, content []byte) (map[string]*shared.GistFile, error) {
+func getFilesToAdd(file string, content []byte) (map[string]*gistFileToUpdate, error) {
 	if shared.IsBinaryContents(content) {
 		return nil, fmt.Errorf("failed to upload %s: binary file not supported", file)
 	}
@@ -345,20 +370,19 @@ func getFilesToAdd(file string, content []byte) (map[string]*shared.GistFile, er
 	}
 
 	filename := filepath.Base(file)
-	return map[string]*shared.GistFile{
+	return map[string]*gistFileToUpdate{
 		filename: {
-			Filename: filename,
-			Content:  string(content),
+			NewFilename: filename,
+			Content:     string(content),
 		},
 	}, nil
 }
 
-func removeFile(gist *shared.Gist, filename string) error {
+func removeFile(gist gistToUpdate, filename string) error {
 	if _, found := gist.Files[filename]; !found {
 		return fmt.Errorf("gist has no file %q", filename)
 	}
 
 	gist.Files[filename] = nil
-
 	return nil
 }
