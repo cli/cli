@@ -8,7 +8,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -253,9 +252,6 @@ func Test_listRun(t *testing.T) {
 			}
 			browser := &browser.Stub{}
 			tt.opts.Browser = browser
-			tt.opts.Config = func() (config.Config, error) {
-				return config.NewBlankConfig(), nil
-			}
 
 			err := listRun(&tt.opts)
 

@@ -9,20 +9,19 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
 	Prompter   prompter.Prompter
@@ -39,7 +38,6 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
-		Config:     f.Config,
 		Prompter:   f.Prompter,
 	}
 
@@ -120,12 +118,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	cfg, err := opts.Config()
-	if err != nil {
-		return err
-	}
-
-	hostname, _ := cfg.DefaultHost()
+	hostname, _ := ghAuth.DefaultHost()
 
 	if opts.InteractiveMode {
 		var rsList *shared.RulesetList
