@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -59,6 +60,12 @@ func NewCmdCancel(f *cmdutil.Factory, runF func(*CancelOptions) error) *cobra.Co
 }
 
 func runCancel(opts *CancelOptions) error {
+	if opts.RunID != "" {
+		_, err := strconv.Atoi(opts.RunID)
+		if err != nil {
+			return fmt.Errorf("invalid run_id %#v", opts.RunID)
+		}
+	}
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %w", err)
@@ -120,7 +127,7 @@ func runCancel(opts *CancelOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s Request to cancel workflow submitted.\n", cs.SuccessIcon())
+	fmt.Fprintf(opts.IO.Out, "%s Request to cancel workflow %s submitted.\n", cs.SuccessIcon(), runID)
 
 	return nil
 }
