@@ -46,12 +46,12 @@ func NewCmdCheck(f *cmdutil.Factory, runF func(*CheckOptions) error) *cobra.Comm
 		Long: heredoc.Doc(`
 			View information about GitHub rules that apply to a given branch.
 
-			The provided branch name does not need to exist, rules will be displayed that would apply
+			The provided branch name does not need to exist; rules will be displayed that would apply
 			to a branch with that name. All rules are returned regardless of where they are configured.
 
 			If no branch name is provided, then the current branch will be used.
 
-			The --default flag can be used to view rules that apply to the default branch of the current
+			The --default flag can be used to view rules that apply to the default branch of the
 			repository.
 		`),
 		Example: heredoc.Doc(`
@@ -96,6 +96,7 @@ func NewCmdCheck(f *cmdutil.Factory, runF func(*CheckOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().BoolVar(&opts.Default, "default", false, "Check rules on default branch")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the branch rules page in a web browser")
 
 	return cmd
 }
@@ -109,7 +110,7 @@ func checkRun(opts *CheckOptions) error {
 
 	repoI, err := opts.BaseRepo()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not determine repo to use: %w", err)
 	}
 
 	git := opts.Git
@@ -129,15 +130,16 @@ func checkRun(opts *CheckOptions) error {
 		}
 	}
 
-	rawPath := fmt.Sprintf("rules?ref=%s%s", url.QueryEscape("refs/heads/"), url.QueryEscape(opts.Branch))
-	rulesURL := ghrepo.GenerateRepoURL(repoI, rawPath)
-
 	if opts.WebMode {
+		// the query string parameter may have % signs in it, so it must be carefully used with Printf functions
+		queryString := fmt.Sprintf("?ref=%s", url.QueryEscape("refs/heads/"+opts.Branch))
+		rawUrl := ghrepo.GenerateRepoURL(repoI, "rules")
+
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(rulesURL))
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(rawUrl))
 		}
 
-		return opts.Browser.Browse(rulesURL)
+		return opts.Browser.Browse(rawUrl + queryString)
 	}
 
 	var rules []shared.RulesetRule
