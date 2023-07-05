@@ -2,7 +2,6 @@ package shared
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -85,48 +84,50 @@ func listRulesets(httpClient *http.Client, query string, variables map[string]in
 	return &res, nil
 }
 
-func rulesetsQuery(org bool) string {
-	var args string
-	var level string
-
-	if org {
-		args = "$login: String!"
-		level = "organization(login: $login)"
-	} else {
-		args = "$owner: String!, $repo: String!"
-		level = "repository(owner: $owner, name: $repo)"
-	}
-
-	str := fmt.Sprintf("query RulesetList($limit: Int!, $endCursor: String, $includeParents: Boolean, %s) { level: %s {", args, level)
-
-	return str + `
-		rulesets(first: $limit, after: $endCursor, includeParents: $includeParents) {
-			totalCount
-			nodes {
-				databaseId
-				name
-				target
-				enforcement
-				source {
-					__typename
-					... on Repository { owner: nameWithOwner }
-					... on Organization { owner: login }
-				}
-				rules {
-					totalCount
-				}
-			}
-			pageInfo {
-				hasNextPage
-				endCursor
-			}
-		}
-	}}`
-}
-
 func min(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
+
+func rulesetsQuery(org bool) string {
+	if org {
+		return orgGraphQLHeader + sharedGraphQLBody
+	} else {
+		return repoGraphQLHeader + sharedGraphQLBody
+	}
+}
+
+const repoGraphQLHeader = `
+query RulesetList($limit: Int!, $endCursor: String, $includeParents: Boolean, $owner: String!, $repo: String!) {
+	level: repository(owner: $owner, name: $repo) {
+`
+
+const orgGraphQLHeader = `
+query RulesetList($limit: Int!, $endCursor: String, $includeParents: Boolean, $login: String!) {
+	level: organization(login: $login) {
+`
+
+const sharedGraphQLBody = `
+rulesets(first: $limit, after: $endCursor, includeParents: $includeParents) {
+	totalCount
+	nodes {
+		databaseId
+		name
+		target
+		enforcement
+		source {
+			__typename
+			... on Repository { owner: nameWithOwner }
+			... on Organization { owner: login }
+		}
+		rules {
+			totalCount
+		}
+	}
+	pageInfo {
+		hasNextPage
+		endCursor
+	}
+}}}`
