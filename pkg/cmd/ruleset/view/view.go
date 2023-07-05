@@ -182,7 +182,7 @@ func viewRun(opts *ViewOptions) error {
 	fmt.Fprintf(w, "ID: %d\n", rs.Id)
 	fmt.Fprintf(w, "Source: %s (%s)\n", rs.Source, rs.SourceType)
 
-	fmt.Fprint(w, "Enforceument: ")
+	fmt.Fprint(w, "Enforcement: ")
 	switch rs.Enforcement {
 	case "disabled":
 		fmt.Fprintf(w, "%s\n", cs.Red("Disabled"))

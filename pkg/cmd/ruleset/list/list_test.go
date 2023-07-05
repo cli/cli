@@ -140,6 +140,7 @@ func Test_listRun(t *testing.T) {
 		name       string
 		isTTY      bool
 		opts       ListOptions
+		httpStubs  func(*httpmock.Registry)
 		wantErr    string
 		wantStdout string
 		wantStderr string
@@ -157,6 +158,12 @@ func Test_listRun(t *testing.T) {
 				42  asdf    OWNER/REPO (repo)  active    2
 				77  foobar  Org-Name (org)     disabled  4
 			`),
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepoRulesetList\b`),
+					httpmock.FileResponse("./fixtures/rulesetList.json"),
+				)
+			},
 			wantStderr: "",
 			wantBrowse: "",
 		},
@@ -175,6 +182,12 @@ func Test_listRun(t *testing.T) {
 				42  asdf    OWNER/REPO (repo)  active    2
 				77  foobar  Org-Name (org)     disabled  4
 			`),
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query OrgRulesetList\b`),
+					httpmock.FileResponse("./fixtures/rulesetList.json"),
+				)
+			},
 			wantStderr: "",
 			wantBrowse: "",
 		},
@@ -186,6 +199,12 @@ func Test_listRun(t *testing.T) {
 				42	asdf	OWNER/REPO (repo)	active	2
 				77	foobar	Org-Name (org)	disabled	4
 			`),
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepoRulesetList\b`),
+					httpmock.FileResponse("./fixtures/rulesetList.json"),
+				)
+			},
 			wantStderr: "",
 			wantBrowse: "",
 		},
@@ -240,12 +259,15 @@ func Test_listRun(t *testing.T) {
 			ios.SetStdinTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
 
-			fakeHTTP := &httpmock.Registry{}
-			fakeHTTP.Register(httpmock.GraphQL(`query RulesetList\b`), httpmock.FileResponse("./fixtures/rulesetList.json"))
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
 
 			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: fakeHTTP}, nil
+				return &http.Client{Transport: reg}, nil
 			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")

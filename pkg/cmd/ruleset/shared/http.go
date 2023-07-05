@@ -100,12 +100,12 @@ func rulesetsQuery(org bool) string {
 }
 
 const repoGraphQLHeader = `
-query RulesetList($limit: Int!, $endCursor: String, $includeParents: Boolean, $owner: String!, $repo: String!) {
+query RepoRulesetList($limit: Int!, $endCursor: String, $includeParents: Boolean, $owner: String!, $repo: String!) {
 	level: repository(owner: $owner, name: $repo) {
 `
 
 const orgGraphQLHeader = `
-query RulesetList($limit: Int!, $endCursor: String, $includeParents: Boolean, $login: String!) {
+query OrgRulesetList($limit: Int!, $endCursor: String, $includeParents: Boolean, $login: String!) {
 	level: organization(login: $login) {
 `
 

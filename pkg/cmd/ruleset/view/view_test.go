@@ -153,6 +153,7 @@ func Test_viewRun(t *testing.T) {
 		name       string
 		isTTY      bool
 		opts       ViewOptions
+		httpStubs  func(*httpmock.Registry)
 		wantErr    string
 		wantStdout string
 		wantStderr string
@@ -169,7 +170,7 @@ func Test_viewRun(t *testing.T) {
 			Test Ruleset
 			ID: 42
 			Source: my-owner/repo-name (Repository)
-			Enforceument: Active
+			Enforcement: Active
 			
 			Bypass List
 			- OrganizationAdmin (ID: 1), mode: always
@@ -183,30 +184,101 @@ func Test_viewRun(t *testing.T) {
 			- commit_message_pattern: [name: ] [negate: false] [operator: contains] [pattern: asdf] 
 			- creation
 			`),
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/my-owner/repo-name/rulesets/42"),
+					httpmock.FileResponse("./fixtures/rulesetViewRepo.json"),
+				)
+			},
 			wantStderr: "",
 			wantBrowse: "",
 		},
 		{
-			name:  "web mode, TTY",
+			name:  "view org ruleset",
+			isTTY: true,
+			opts: ViewOptions{
+				ID:           "74",
+				Organization: "my-owner",
+			},
+			wantStdout: heredoc.Doc(`
+
+			My Org Ruleset
+			ID: 74
+			Source: my-owner (Organization)
+			Enforcement: Disabled
+			
+			Bypass List
+			This ruleset cannot be bypassed
+			
+			Conditions
+			- ref_name: [exclude: []] [include: [~ALL]] 
+			- repository_name: [exclude: []] [include: [~ALL]] [protected: true] 
+			
+			Rules
+			- commit_author_email_pattern: [name: ] [negate: false] [operator: ends_with] [pattern: @example.com] 
+			- commit_message_pattern: [name: ] [negate: false] [operator: contains] [pattern: asdf] 
+			- creation
+			`),
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "orgs/my-owner/rulesets/74"),
+					httpmock.FileResponse("./fixtures/rulesetViewOrg.json"),
+				)
+			},
+			wantStderr: "",
+			wantBrowse: "",
+		},
+		{
+			name:  "web mode, TTY, repo",
 			isTTY: true,
 			opts: ViewOptions{
 				ID:      "42",
 				WebMode: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/my-owner/repo-name/rulesets/42"),
+					httpmock.FileResponse("./fixtures/rulesetViewRepo.json"),
+				)
 			},
 			wantStdout: "Opening github.com/my-owner/repo-name/rules/42 in your browser.\n",
 			wantStderr: "",
 			wantBrowse: "https://github.com/my-owner/repo-name/rules/42",
 		},
 		{
-			name:  "web mode, non-TTY",
+			name:  "web mode, non-TTY, repo",
 			isTTY: false,
 			opts: ViewOptions{
 				ID:      "42",
 				WebMode: true,
 			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/my-owner/repo-name/rulesets/42"),
+					httpmock.FileResponse("./fixtures/rulesetViewRepo.json"),
+				)
+			},
 			wantStdout: "",
 			wantStderr: "",
 			wantBrowse: "https://github.com/my-owner/repo-name/rules/42",
+		},
+		{
+			name:  "web mode, TTY, org",
+			isTTY: true,
+			opts: ViewOptions{
+				ID:           "74",
+				Organization: "my-owner",
+				WebMode:      true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "orgs/my-owner/rulesets/74"),
+					httpmock.FileResponse("./fixtures/rulesetViewOrg.json"),
+				)
+			},
+			wantStdout: "Opening github.com/organizations/my-owner/settings/rules/74 in your browser.\n",
+			wantStderr: "",
+			wantBrowse: "https://github.com/organizations/my-owner/settings/rules/74",
 		},
 	}
 
@@ -217,15 +289,15 @@ func Test_viewRun(t *testing.T) {
 			ios.SetStdinTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
 
-			fakeHTTP := &httpmock.Registry{}
-			fakeHTTP.Register(
-				httpmock.REST("GET", "repos/my-owner/repo-name/rulesets/42"),
-				httpmock.FileResponse("./fixtures/rulesetView.json"),
-			)
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
 
 			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: fakeHTTP}, nil
+				return &http.Client{Transport: reg}, nil
 			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("my-owner/repo-name")
