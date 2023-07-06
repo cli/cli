@@ -184,7 +184,8 @@ func StatusCheckRollupGraphQLWithoutCountByState(after string) string {
 								context,
 								state,
 								targetUrl,
-								createdAt
+								createdAt,
+								description
 							},
 							...on CheckRun {
 								name,
@@ -222,8 +223,8 @@ func RequiredStatusCheckRollupGraphQL(prID, after string) string {
 								state,
 								targetUrl,
 								createdAt,
+								description,
 								isRequired(pullRequestId: %[2]s)
-								description
 							},
 							...on CheckRun {
 								name,
