@@ -196,8 +196,8 @@ type CheckContext struct {
 	DetailsURL  string               `json:"detailsUrl"`
 
 	/* StatusContext fields */
-
-	Context string `json:"context"`
+	Context     string `json:"context"`
+	Description string `json:"description"`
 	// EXPECTED ERROR FAILURE PENDING SUCCESS
 	State     StatusState `json:"state"`
 	TargetURL string      `json:"targetUrl"`

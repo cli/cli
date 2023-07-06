@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 )
 
-func addRow(tp utils.TablePrinter, io *iostreams.IOStreams, o check) {
+func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 	cs := io.ColorScheme()
 	elapsed := ""
 
@@ -42,19 +42,21 @@ func addRow(tp utils.TablePrinter, io *iostreams.IOStreams, o check) {
 		if o.Event != "" {
 			name += fmt.Sprintf(" (%s)", o.Event)
 		}
-		tp.AddField(mark, nil, markColor)
-		tp.AddField(name, nil, nil)
-		tp.AddField(elapsed, nil, nil)
-		tp.AddField(o.Link, nil, nil)
+		tp.AddField(mark, tableprinter.WithColor(markColor))
+		tp.AddField(name)
+		tp.AddField(o.Description)
+		tp.AddField(elapsed)
+		tp.AddField(o.Link)
 	} else {
-		tp.AddField(o.Name, nil, nil)
-		tp.AddField(o.Bucket, nil, nil)
+		tp.AddField(o.Name)
+		tp.AddField(o.Bucket)
 		if elapsed == "" {
-			tp.AddField("0", nil, nil)
+			tp.AddField("0")
 		} else {
-			tp.AddField(elapsed, nil, nil)
+			tp.AddField(elapsed)
 		}
-		tp.AddField(o.Link, nil, nil)
+		tp.AddField(o.Link)
+		tp.AddField(o.Description)
 	}
 
 	tp.EndRow()
@@ -84,8 +86,7 @@ func printSummary(io *iostreams.IOStreams, counts checkCounts) {
 }
 
 func printTable(io *iostreams.IOStreams, checks []check) error {
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(io)
+	tp := tableprinter.New(io)
 
 	sort.Slice(checks, func(i, j int) bool {
 		b0 := checks[i].Bucket

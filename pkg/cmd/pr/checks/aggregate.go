@@ -17,6 +17,7 @@ type check struct {
 	Bucket      string    `json:"bucket"`
 	Event       string    `json:"event"`
 	Workflow    string    `json:"workflow"`
+	Description string    `json:"description"`
 }
 
 type checkCounts struct {
@@ -59,6 +60,7 @@ func aggregateChecks(checkContexts []api.CheckContext, requiredChecks bool) (che
 			Link:        link,
 			Event:       c.CheckSuite.WorkflowRun.Event,
 			Workflow:    c.CheckSuite.WorkflowRun.Workflow.Name,
+			Description: c.Description,
 		}
 
 		switch state {
