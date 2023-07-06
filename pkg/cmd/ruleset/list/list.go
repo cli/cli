@@ -158,7 +158,7 @@ func listRun(opts *ListOptions) error {
 	tp.HeaderRow("ID", "NAME", "SOURCE", "STATUS", "RULES")
 
 	for _, rs := range result.Rulesets {
-		tp.AddField(strconv.Itoa(rs.DatabaseId))
+		tp.AddField(strconv.Itoa(rs.DatabaseId), tableprinter.WithColor(cs.Cyan))
 		tp.AddField(rs.Name, tableprinter.WithColor(cs.Bold))
 		tp.AddField(shared.RulesetSource(rs))
 		tp.AddField(strings.ToLower(rs.Enforcement))

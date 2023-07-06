@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -149,15 +150,36 @@ func Test_NewCmdView(t *testing.T) {
 }
 
 func Test_viewRun(t *testing.T) {
+	repoRulesetStdout := heredoc.Doc(`
+
+	Test Ruleset
+	ID: 42
+	Source: my-owner/repo-name (Repository)
+	Enforcement: Active
+	
+	Bypass List
+	- OrganizationAdmin (ID: 1), mode: always
+	- RepositoryRole (ID: 5), mode: always
+	
+	Conditions
+	- ref_name: [exclude: []] [include: [~ALL]] 
+	
+	Rules
+	- commit_author_email_pattern: [name: ] [negate: false] [operator: ends_with] [pattern: @example.com] 
+	- commit_message_pattern: [name: ] [negate: false] [operator: contains] [pattern: asdf] 
+	- creation
+	`)
+
 	tests := []struct {
-		name       string
-		isTTY      bool
-		opts       ViewOptions
-		httpStubs  func(*httpmock.Registry)
-		wantErr    string
-		wantStdout string
-		wantStderr string
-		wantBrowse string
+		name          string
+		isTTY         bool
+		opts          ViewOptions
+		httpStubs     func(*httpmock.Registry)
+		prompterStubs func(*prompter.MockPrompter)
+		wantErr       string
+		wantStdout    string
+		wantStderr    string
+		wantBrowse    string
 	}{
 		{
 			name:  "view repo ruleset",
@@ -165,25 +187,7 @@ func Test_viewRun(t *testing.T) {
 			opts: ViewOptions{
 				ID: "42",
 			},
-			wantStdout: heredoc.Doc(`
-
-			Test Ruleset
-			ID: 42
-			Source: my-owner/repo-name (Repository)
-			Enforcement: Active
-			
-			Bypass List
-			- OrganizationAdmin (ID: 1), mode: always
-			- RepositoryRole (ID: 5), mode: always
-			
-			Conditions
-			- ref_name: [exclude: []] [include: [~ALL]] 
-			
-			Rules
-			- commit_author_email_pattern: [name: ] [negate: false] [operator: ends_with] [pattern: @example.com] 
-			- commit_message_pattern: [name: ] [negate: false] [operator: contains] [pattern: asdf] 
-			- creation
-			`),
+			wantStdout: repoRulesetStdout,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/my-owner/repo-name/rulesets/42"),
@@ -205,7 +209,7 @@ func Test_viewRun(t *testing.T) {
 			My Org Ruleset
 			ID: 74
 			Source: my-owner (Organization)
-			Enforcement: Disabled
+			Enforcement: Evaluate Mode (not enforced)
 			
 			Bypass List
 			This ruleset cannot be bypassed
@@ -227,6 +231,35 @@ func Test_viewRun(t *testing.T) {
 			},
 			wantStderr: "",
 			wantBrowse: "",
+		},
+		{
+			name:  "prompter",
+			isTTY: true,
+			opts: ViewOptions{
+				InteractiveMode: true,
+			},
+			wantStdout: repoRulesetStdout,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepoRulesetList\b`),
+					httpmock.FileResponse("./fixtures/rulesetViewMultiple.json"),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/my-owner/repo-name/rulesets/42"),
+					httpmock.FileResponse("./fixtures/rulesetViewRepo.json"),
+				)
+			},
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				const repoRuleset = "42: Test Ruleset | active | contains 3 rules | configured in my-owner/repo-name (repo)"
+				pm.RegisterSelect("Which ruleset would you like to view?",
+					[]string{
+						"74: My Org Ruleset | evaluate | contains 3 rules | configured in my-owner (org)",
+						repoRuleset,
+					},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, repoRuleset)
+					})
+			},
 		},
 		{
 			name:  "web mode, TTY, repo",
@@ -288,6 +321,12 @@ func Test_viewRun(t *testing.T) {
 			ios.SetStdoutTTY(tt.isTTY)
 			ios.SetStdinTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
+
+			pm := prompter.NewMockPrompter(t)
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
+			}
+			tt.opts.Prompter = pm
 
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)

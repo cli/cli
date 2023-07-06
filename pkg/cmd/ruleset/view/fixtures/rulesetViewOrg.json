@@ -4,7 +4,7 @@
 	"target": "branch",
 	"source_type": "Organization",
 	"source": "my-owner",
-	"enforcement": "disabled",
+	"enforcement": "evaluate",
 	"conditions": {
 		"ref_name": {
 			"exclude": [],

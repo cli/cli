@@ -119,6 +119,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	hostname, _ := ghAuth.DefaultHost()
+	cs := opts.IO.ColorScheme()
 
 	if opts.InteractiveMode {
 		var rsList *shared.RulesetList
@@ -137,7 +138,7 @@ func viewRun(opts *ViewOptions) error {
 			return shared.NoRulesetsFoundError(opts.Organization, repoI, opts.IncludeParents)
 		}
 
-		rs, err := selectRulesetID(rsList, opts.Prompter)
+		rs, err := selectRulesetID(rsList, opts.Prompter, cs)
 		if err != nil {
 			return err
 		}
@@ -163,7 +164,6 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	cs := opts.IO.ColorScheme()
 	w := opts.IO.Out
 
 	if opts.WebMode {
@@ -179,7 +179,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	fmt.Fprintf(w, "\n%s\n", cs.Bold(rs.Name))
-	fmt.Fprintf(w, "ID: %d\n", rs.Id)
+	fmt.Fprintf(w, "ID: %s\n", cs.Cyan(strconv.Itoa(rs.Id)))
 	fmt.Fprintf(w, "Source: %s (%s)\n", rs.Source, rs.SourceType)
 
 	fmt.Fprint(w, "Enforcement: ")
@@ -247,12 +247,12 @@ func viewRun(opts *ViewOptions) error {
 	return nil
 }
 
-func selectRulesetID(rsList *shared.RulesetList, p prompter.Prompter) (*shared.RulesetGraphQL, error) {
+func selectRulesetID(rsList *shared.RulesetList, p prompter.Prompter, cs *iostreams.ColorScheme) (*shared.RulesetGraphQL, error) {
 	rulesets := make([]string, len(rsList.Rulesets))
 	for i, rs := range rsList.Rulesets {
 		s := fmt.Sprintf(
-			"%d: %s | %s | contains %s | configured in %s",
-			rs.DatabaseId,
+			"%s: %s | %s | contains %s | configured in %s",
+			cs.Cyan(strconv.Itoa(rs.DatabaseId)),
 			rs.Name,
 			strings.ToLower(rs.Enforcement),
 			text.Pluralize(rs.Rules.TotalCount, "rule"),
