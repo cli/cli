@@ -179,9 +179,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		},
 		Args: cobra.ExactArgs(1),
 		PreRun: func(c *cobra.Command, args []string) {
-			if repoOverride := os.Getenv("GH_REPO"); repoOverride != "" {
-				opts.BaseRepo = cmdutil.OverrideBaseRepoFunc(f, "")
-			}
+			opts.BaseRepo = cmdutil.OverrideBaseRepoFunc(f, "")
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]
