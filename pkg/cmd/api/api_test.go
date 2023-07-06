@@ -1096,11 +1096,11 @@ func Test_fillPlaceholders(t *testing.T) {
 		opts  *ApiOptions
 	}
 	tests := []struct {
-		name      string
-		args      args
-		ghRepoSet bool
-		want      string
-		wantErr   bool
+		name         string
+		args         args
+		repoOverride bool
+		want         string
+		wantErr      bool
 	}{
 		{
 			name: "no changes",
@@ -1238,8 +1238,8 @@ func Test_fillPlaceholders(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:      "branch can't be filled when GH_REPO is set",
-			ghRepoSet: true,
+			name:         "branch can't be filled when GH_REPO is set",
+			repoOverride: true,
 			args: args{
 				value: "repos/:owner/:repo/branches/:branch",
 				opts: &ApiOptions{
@@ -1254,7 +1254,7 @@ func Test_fillPlaceholders(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.ghRepoSet {
+			if tt.repoOverride {
 				t.Setenv("GH_REPO", "hubot/robot-uprising")
 			}
 			got, err := fillPlaceholders(tt.args.value, tt.args.opts)
