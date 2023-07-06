@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -469,6 +470,11 @@ func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
 				err = e
 			}
 		case "branch":
+			if os.Getenv("GH_REPO") != "" {
+				err = errors.New("unable to determine an appropriate value for the 'branch' placeholder")
+				return m
+			}
+
 			if branch, e := opts.Branch(); e == nil {
 				return branch
 			} else {
