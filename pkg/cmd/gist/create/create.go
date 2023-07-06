@@ -112,29 +112,18 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
 
+	errOut := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()
 	gistName := guessGistName(files)
 
 	processMessage := "Creating gist..."
-
-	var completionMessage string
-	if opts.Public {
-		completionMessage = fmt.Sprintf("Created %s gist", cs.Red("public"))
-	} else {
-		completionMessage = fmt.Sprintf("Created %s gist", cs.Green("secret"))
-	}
-
 	if gistName != "" {
 		if len(files) > 1 {
 			processMessage = "Creating gist with multiple files"
 		} else {
 			processMessage = fmt.Sprintf("Creating gist %s", gistName)
 		}
-
-		completionMessage += " " + gistName
 	}
-
-	errOut := opts.IO.ErrOut
 	fmt.Fprintf(errOut, "%s %s\n", cs.Gray("-"), processMessage)
 
 	httpClient, err := opts.HttpClient()
@@ -165,6 +154,13 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("%s Failed to create gist: %w", cs.Red("X"), err)
 	}
 
+	completionMessage := fmt.Sprintf("Created %s gist", cs.Green("secret"))
+	if opts.Public {
+		completionMessage = fmt.Sprintf("Created %s gist", cs.Red("public"))
+	}
+	if gistName != "" {
+		completionMessage += " " + gistName
+	}
 	fmt.Fprintf(errOut, "%s %s\n", cs.SuccessIconWithColor(cs.Green), completionMessage)
 
 	if opts.WebMode {
