@@ -12,7 +12,7 @@ type LinkedBranch struct {
 	URL        string
 }
 
-func CreateLinkedBranch(client *Client, host string, issueID, branchName, oid string) (string, error) {
+func CreateLinkedBranch(client *Client, host string, repoID, issueID, branchID, branchName string) (string, error) {
 	var mutation struct {
 		CreateLinkedBranch struct {
 			LinkedBranch struct {
@@ -26,7 +26,11 @@ func CreateLinkedBranch(client *Client, host string, issueID, branchName, oid st
 
 	input := githubv4.CreateLinkedBranchInput{
 		IssueID: githubv4.ID(issueID),
-		Oid:     githubv4.GitObjectID(oid),
+		Oid:     githubv4.GitObjectID(branchID),
+	}
+	if repoID != "" {
+		repo := githubv4.ID(repoID)
+		input.RepositoryID = &repo
 	}
 	if branchName != "" {
 		name := githubv4.String(branchName)
@@ -105,9 +109,10 @@ func CheckLinkedBranchFeature(client *Client, host string) error {
 	return nil
 }
 
-func FindBaseOid(client *Client, repo ghrepo.Interface, ref string) (string, string, error) {
+func FindRepoBranchID(client *Client, repo ghrepo.Interface, ref string) (string, string, error) {
 	var query struct {
 		Repository struct {
+			Id               string
 			DefaultBranchRef struct {
 				Target struct {
 					Oid string
@@ -127,9 +132,14 @@ func FindBaseOid(client *Client, repo ghrepo.Interface, ref string) (string, str
 		"name":  githubv4.String(repo.RepoName()),
 	}
 
-	if err := client.Query(repo.RepoHost(), "FindBaseOid", &query, variables); err != nil {
+	if err := client.Query(repo.RepoHost(), "FindRepoBranchID", &query, variables); err != nil {
 		return "", "", err
 	}
 
-	return query.Repository.Ref.Target.Oid, query.Repository.DefaultBranchRef.Target.Oid, nil
+	branchID := query.Repository.Ref.Target.Oid
+	if branchID == "" {
+		branchID = query.Repository.DefaultBranchRef.Target.Oid
+	}
+
+	return query.Repository.Id, branchID, nil
 }
