@@ -141,12 +141,12 @@ func Test_NewCmdEdit(t *testing.T) {
 			},
 		},
 		{
-			name:  "with verify-tag",
-			args:  "v1.2.0 --tag=v1.1.0 --verify-tag=true",
+			name:  "verify-tag",
+			args:  "v1.2.0 --tag=v1.1.0 --verify-tag",
 			isTTY: false,
 			want: EditOptions{
 				TagName:   "v1.1.0",
-				VerifyTag: boolPtr(true),
+				VerifyTag: true,
 			},
 		},
 	}
@@ -421,27 +421,13 @@ func Test_editRun(t *testing.T) {
 			isTTY: true,
 			opts: EditOptions{
 				TagName:   "v1.2.4",
-				VerifyTag: boolPtr(true),
+				VerifyTag: true,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
 					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": ""}}}}`))
 			},
-			wantErr:    "Tag v1.2.4 doesn't exist in the repo OWNER/REPO, aborting due to --verify-tag flag",
-			wantStdout: "",
-			wantStderr: "",
-		},
-		{
-			name:  "error when tag name is not provided and verify-tag flag is set",
-			isTTY: true,
-			opts: EditOptions{
-				VerifyTag: boolPtr(true),
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
-					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": ""}}}}`))
-			},
-			wantErr:    "No tag provided",
+			wantErr:    "tag v1.2.4 doesn't exist in the repo OWNER/REPO, aborting due to --verify-tag flag",
 			wantStdout: "",
 			wantStderr: "",
 		},
@@ -455,7 +441,7 @@ func Test_editRun(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 
 			fakeHTTP := &httpmock.Registry{}
-			// defer reg.Verify(t) // FIXME: intermittetly fails due to StubFetchRelease internals
+			defer fakeHTTP.Verify(t)
 			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", "v1.2.3", `{
 				"id": 12345,
 				"tag_name": "v1.2.3"
