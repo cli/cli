@@ -481,8 +481,19 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
+	if err := fetchGitTagToLocal(opts.GitClient, opts.TagName); err != nil {
+		fmt.Fprintf(opts.IO.Out, "warning: failed to fetch tag to local repo")
+	}
 	fmt.Fprintf(opts.IO.Out, "%s\n", newRelease.URL)
 
+	return nil
+}
+
+func fetchGitTagToLocal(gitClient *git.Client, tagName string) error {
+	ctx := context.Background()
+	if err := gitClient.Fetch(ctx, "origin", fmt.Sprintf("refs/tags/%s", tagName)); err != nil {
+		return fmt.Errorf("failed to fetch tag")
+	}
 	return nil
 }
 
