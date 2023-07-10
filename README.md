@@ -52,12 +52,13 @@ Additional Conda installation options available on the [gh-feedstock page](https
 ### Linux & BSD
 
 `gh` is available via:
-- [our Debian and RPM repositories](./docs/install_linux.md);
+
+- [our Debian and RPM repositories][def];
 - community-maintained repositories in various Linux distros;
 - OS-agnostic package managers such as [Homebrew](#homebrew), [Conda](#conda), and [Spack](#spack); and
 - our [releases page][] as precompiled binaries.
 
-For more information, see [Linux & BSD installation](./docs/install_linux.md).
+For more information, see [Linux & BSD installation][def].
 
 ### Windows
 
@@ -131,3 +132,4 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [gh-vs-hub]: ./docs/gh-vs-hub.md
 [build from source]: ./docs/source.md
 [intake-doc]: ./docs/working-with-us.md
+[def]: ./docs/install_linux.md
