@@ -63,7 +63,7 @@ func runCancel(opts *CancelOptions) error {
 	if opts.RunID != "" {
 		_, err := strconv.Atoi(opts.RunID)
 		if err != nil {
-			return fmt.Errorf("invalid run_id %#v", opts.RunID)
+			return fmt.Errorf("invalid run-id %#v", opts.RunID)
 		}
 	}
 	httpClient, err := opts.HttpClient()
