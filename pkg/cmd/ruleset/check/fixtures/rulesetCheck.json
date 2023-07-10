@@ -1,0 +1,62 @@
+[
+	{
+		"type": "commit_author_email_pattern",
+		"parameters": {
+			"name": "",
+			"negate": false,
+			"pattern": "@example.com",
+			"operator": "ends_with"
+		},
+		"ruleset_source_type": "Organization",
+		"ruleset_source": "my-org",
+		"ruleset_id": 1234
+	},
+	{
+		"type": "commit_message_pattern",
+		"parameters": {
+			"name": "",
+			"negate": false,
+			"pattern": "fff",
+			"operator": "starts_with"
+		},
+		"ruleset_source_type": "Organization",
+		"ruleset_source": "my-org",
+		"ruleset_id": 1234
+	},
+	{
+		"type": "required_signatures",
+		"ruleset_source_type": "Organization",
+		"ruleset_source": "my-org",
+		"ruleset_id": 1234
+	},
+	{
+		"type": "commit_message_pattern",
+		"parameters": {
+			"name": "",
+			"negate": false,
+			"pattern": "asdf",
+			"operator": "contains"
+		},
+		"ruleset_source_type": "Repository",
+		"ruleset_source": "my-org/repo-name",
+		"ruleset_id": 5678
+	},
+	{
+		"type": "commit_author_email_pattern",
+		"parameters": {
+			"name": "",
+			"negate": false,
+			"pattern": "@example.com",
+			"operator": "ends_with"
+		},
+		"ruleset_source_type": "Repository",
+		"ruleset_source": "my-org/repo-name",
+		"ruleset_id": 5678
+	},
+	{
+		"type": "creation",
+		"ruleset_source_type": "Repository",
+		"ruleset_source": "my-org/repo-name",
+		"ruleset_id": 5678
+	}
+]
