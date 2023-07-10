@@ -188,7 +188,7 @@ func runBrowse(opts *BrowseOptions) error {
 			return err
 		}
 		if !exist {
-			return fmt.Errorf("%s doesn't exists", text.DisplayURL(url))
+			return fmt.Errorf("%s doesn't exist", text.DisplayURL(url))
 		}
 		_, err = fmt.Fprintln(opts.IO.Out, url)
 		return err
