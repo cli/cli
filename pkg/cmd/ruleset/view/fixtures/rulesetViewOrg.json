@@ -1,0 +1,58 @@
+{
+	"id": 74,
+	"name": "My Org Ruleset",
+	"target": "branch",
+	"source_type": "Organization",
+	"source": "my-owner",
+	"enforcement": "evaluate",
+	"conditions": {
+		"ref_name": {
+			"exclude": [],
+			"include": [
+				"~ALL"
+			]
+		},
+		"repository_name": {
+			"exclude": [],
+			"include": [
+				"~ALL"
+			],
+			"protected": true
+		}
+	},
+	"rules": [
+		{
+			"type": "commit_message_pattern",
+			"parameters": {
+				"name": "",
+				"negate": false,
+				"pattern": "asdf",
+				"operator": "contains"
+			}
+		},
+		{
+			"type": "commit_author_email_pattern",
+			"parameters": {
+				"name": "",
+				"negate": false,
+				"pattern": "@example.com",
+				"operator": "ends_with"
+			}
+		},
+		{
+			"type": "creation"
+		}
+	],
+	"node_id": "RRS_lACqUmVwb3NpdG9yec4dwx_uzSNG",
+	"_links": {
+		"self": {
+			"href": "https://api.github.com/repos/my-owner/repo-name/rulesets/74"
+		},
+		"html": {
+			"href": "https://github.com/organizations/my-owner/settings/rules/74"
+		}
+	},
+	"created_at": "2023-05-01T13:53:37.185-04:00",
+	"updated_at": "2023-06-29T17:38:03.722-04:00",
+	"bypass_actors": []
+}
