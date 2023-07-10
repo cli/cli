@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -31,7 +32,8 @@ func latestCommit(client *api.Client, repo ghrepo.Interface, branch string) (com
 
 type upstreamMergeErr struct{ error }
 
-var upstreamMergeUnavailableErr = upstreamMergeErr{errors.New("upstream merge API is unavailable")}
+var missingWorkflowScopeRE = regexp.MustCompile("refusing to allow.*without `workflow` scope")
+var missingWorkflowScopeErr = errors.New("Upstream commits contain workflow changes, which require the `workflow` scope to merge. To request it, run: gh auth refresh -s workflow")
 
 func triggerUpstreamMerge(client *api.Client, repo ghrepo.Interface, branch string) (string, error) {
 	var payload bytes.Buffer
@@ -52,9 +54,10 @@ func triggerUpstreamMerge(client *api.Client, repo ghrepo.Interface, branch stri
 		if errors.As(err, &httpErr) {
 			switch httpErr.StatusCode {
 			case http.StatusUnprocessableEntity, http.StatusConflict:
+				if missingWorkflowScopeRE.MatchString(httpErr.Message) {
+					return "", missingWorkflowScopeErr
+				}
 				return "", upstreamMergeErr{errors.New(httpErr.Message)}
-			case http.StatusNotFound:
-				return "", upstreamMergeUnavailableErr
 			}
 		}
 		return "", err

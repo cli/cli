@@ -292,7 +292,7 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 				reg.Register(
 					httpmock.REST("POST", "repos/FORKOWNER/REPO-FORK/merge-upstream"),
-					httpmock.StatusStringResponse(404, `{}`))
+					httpmock.StatusStringResponse(422, `{}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
@@ -456,6 +456,24 @@ func Test_SyncRun(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "trunk branch does not exist on OWNER/REPO-FORK repository",
+		},
+		{
+			name: "sync remote fork with missing workflow scope on token",
+			opts: &SyncOptions{
+				DestArg: "FORKOWNER/REPO-FORK",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
+				reg.Register(
+					httpmock.REST("POST", "repos/FORKOWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusJSONResponse(422, struct {
+						Message string `json:"message"`
+					}{Message: "refusing to allow an OAuth App to create or update workflow `.github/workflows/unimportant.yml` without `workflow` scope"}))
+			},
+			wantErr: true,
+			errMsg:  "Upstream commits contain workflow changes, which require the `workflow` scope to merge. To request it, run: gh auth refresh -s workflow",
 		},
 	}
 	for _, tt := range tests {

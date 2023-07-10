@@ -7,13 +7,14 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/surveyext"
 )
 
 //go:generate moq -rm -out prompter_mock.go . Prompter
 type Prompter interface {
 	Select(string, string, []string) (int, error)
-	MultiSelect(string, string, []string) ([]string, error)
+	MultiSelect(string, []string, []string) ([]int, error)
 	Input(string, string) (string, error)
 	InputHostname() (string, error)
 	Password(string) (string, error)
@@ -49,11 +50,24 @@ type surveyPrompter struct {
 	stderr    io.Writer
 }
 
+// LatinMatchingFilter returns whether the value matches the input filter.
+// The strings are compared normalized in case.
+// The filter's diactritics are kept as-is, but the value's are normalized,
+// so that a missing diactritic in the filter still returns a result.
+func LatinMatchingFilter(filter, value string, index int) bool {
+	filter = strings.ToLower(filter)
+	value = strings.ToLower(value)
+
+	// include this option if it matches.
+	return strings.Contains(value, filter) || strings.Contains(text.RemoveDiacritics(value), filter)
+}
+
 func (p *surveyPrompter) Select(message, defaultValue string, options []string) (result int, err error) {
 	q := &survey.Select{
 		Message:  message,
 		Options:  options,
 		PageSize: 20,
+		Filter:   LatinMatchingFilter,
 	}
 
 	if defaultValue != "" {
@@ -72,15 +86,25 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 	return
 }
 
-func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []string) (result []string, err error) {
+func (p *surveyPrompter) MultiSelect(message string, defaultValues, options []string) (result []int, err error) {
 	q := &survey.MultiSelect{
 		Message:  message,
 		Options:  options,
 		PageSize: 20,
+		Filter:   LatinMatchingFilter,
 	}
 
-	if defaultValue != "" {
-		q.Default = defaultValue
+	if len(defaultValues) > 0 {
+		// TODO I don't actually know that this is needed, just being extra cautious
+		validatedDefault := []string{}
+		for _, x := range defaultValues {
+			for _, y := range options {
+				if x == y {
+					validatedDefault = append(validatedDefault, x)
+				}
+			}
+		}
+		q.Default = validatedDefault
 	}
 
 	err = p.ask(q, &result)

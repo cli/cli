@@ -36,14 +36,15 @@ const automaticPrivateKeyName = "codespaces.auto"
 var errKeyFileNotFound = errors.New("SSH key file does not exist")
 
 type sshOptions struct {
-	selector   *CodespaceSelector
-	profile    string
-	serverPort int
-	debug      bool
-	debugFile  string
-	stdio      bool
-	config     bool
-	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
+	selector         *CodespaceSelector
+	profile          string
+	serverPort       int
+	printConnDetails bool
+	debug            bool
+	debugFile        string
+	stdio            bool
+	config           bool
+	scpArgs          []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
 func newSSHCmd(app *App) *cobra.Command {
@@ -56,8 +57,14 @@ func newSSHCmd(app *App) *cobra.Command {
 			The 'ssh' command is used to SSH into a codespace. In its simplest form, you can
 			run 'gh cs ssh', select a codespace interactively, and connect.
 			
-			By default, the 'ssh' command will create a public/private ssh key pair to  
-			authenticate with the codespace inside the ~/.ssh directory.
+			The 'ssh' command will automatically create a public/private ssh key pair in the
+			~/.ssh directory if you do not have an existing valid key pair. When selecting the
+			key pair to use, the preferred order is:
+			  
+			1. Key specified by -i in <ssh-flags>
+			2. Automatic key, if it already exists
+			3. First valid key pair in ssh config (according to ssh -G)
+			4. Automatic key, newly created
 
 			The 'ssh' command also supports deeper integration with OpenSSH using a '--config'
 			option that generates per-codespace ssh configuration in OpenSSH format.
@@ -111,6 +118,9 @@ func newSSHCmd(app *App) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flag("server-port").Changed {
+				opts.printConnDetails = true
+			}
 			if opts.config {
 				return app.printOpenSSHConfig(cmd.Context(), opts)
 			} else {
@@ -200,12 +210,11 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 
 	localSSHServerPort := opts.serverPort
-	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
 
 	// Ensure local port is listening before client (Shell) connects.
 	// Unless the user specifies a server port, localSSHServerPort is 0
 	// and thus the client will pick a random port.
-	listen, localSSHServerPort, err := codespaces.ListenTCP(localSSHServerPort)
+	listen, localSSHServerPort, err := codespaces.ListenTCP(localSSHServerPort, false)
 	if err != nil {
 		return err
 	}
@@ -229,7 +238,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 			// args is the correct variable to use here, we just use scpArgs as the check for which command to run
 			err = codespaces.Copy(ctx, args, localSSHServerPort, connectDestination)
 		} else {
-			err = codespaces.Shell(ctx, a.errLogger, args, localSSHServerPort, connectDestination, usingCustomPort)
+			err = codespaces.Shell(
+				ctx, a.errLogger, args, localSSHServerPort, connectDestination, opts.printConnDetails,
+			)
 		}
 		shellClosed <- err
 	}()

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -17,6 +18,7 @@ type CancelOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   shared.Prompter
 
 	Prompt bool
 
@@ -27,6 +29,7 @@ func NewCmdCancel(f *cmdutil.Factory, runF func(*CancelOptions) error) *cobra.Co
 	opts := &CancelOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -57,6 +60,12 @@ func NewCmdCancel(f *cmdutil.Factory, runF func(*CancelOptions) error) *cobra.Co
 }
 
 func runCancel(opts *CancelOptions) error {
+	if opts.RunID != "" {
+		_, err := strconv.Atoi(opts.RunID)
+		if err != nil {
+			return fmt.Errorf("invalid run-id %#v", opts.RunID)
+		}
+	}
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %w", err)
@@ -83,11 +92,10 @@ func runCancel(opts *CancelOptions) error {
 		if len(runs) == 0 {
 			return fmt.Errorf("found no in progress runs to cancel")
 		}
-		runID, err = shared.PromptForRun(cs, runs)
-		if err != nil {
+		if runID, err = shared.SelectRun(opts.Prompter, cs, runs); err != nil {
 			return err
 		}
-		// TODO silly stopgap until dust settles and PromptForRun can just return a run
+		// TODO silly stopgap until dust settles and SelectRun can just return a run
 		for _, r := range runs {
 			if fmt.Sprintf("%d", r.ID) == runID {
 				run = &r
@@ -119,7 +127,7 @@ func runCancel(opts *CancelOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s Request to cancel workflow submitted.\n", cs.SuccessIcon())
+	fmt.Fprintf(opts.IO.Out, "%s Request to cancel workflow %s submitted.\n", cs.SuccessIcon(), runID)
 
 	return nil
 }

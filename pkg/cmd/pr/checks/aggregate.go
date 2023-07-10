@@ -15,6 +15,9 @@ type check struct {
 	CompletedAt time.Time `json:"completedAt"`
 	Link        string    `json:"link"`
 	Bucket      string    `json:"bucket"`
+	Event       string    `json:"event"`
+	Workflow    string    `json:"workflow"`
+	Description string    `json:"description"`
 }
 
 type checkCounts struct {
@@ -30,10 +33,10 @@ func aggregateChecks(checkContexts []api.CheckContext, requiredChecks bool) (che
 			continue
 		}
 
-		state := c.State
+		state := string(c.State)
 		if state == "" {
 			if c.Status == "COMPLETED" {
-				state = c.Conclusion
+				state = string(c.Conclusion)
 			} else {
 				state = c.Status
 			}
@@ -55,7 +58,11 @@ func aggregateChecks(checkContexts []api.CheckContext, requiredChecks bool) (che
 			StartedAt:   c.StartedAt,
 			CompletedAt: c.CompletedAt,
 			Link:        link,
+			Event:       c.CheckSuite.WorkflowRun.Event,
+			Workflow:    c.CheckSuite.WorkflowRun.Workflow.Name,
+			Description: c.Description,
 		}
+
 		switch state {
 		case "SUCCESS":
 			item.Bucket = "pass"
@@ -91,7 +98,7 @@ func eliminateDuplicates(checkContexts []api.CheckContext) []api.CheckContext {
 			}
 			mapContexts[ctx.Context] = struct{}{}
 		} else {
-			key := fmt.Sprintf("%s/%s", ctx.Name, ctx.CheckSuite.WorkflowRun.Workflow.Name)
+			key := fmt.Sprintf("%s/%s/%s", ctx.Name, ctx.CheckSuite.WorkflowRun.Workflow.Name, ctx.CheckSuite.WorkflowRun.Event)
 			if _, exists := mapChecks[key]; exists {
 				continue
 			}

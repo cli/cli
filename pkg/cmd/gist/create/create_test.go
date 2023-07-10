@@ -275,7 +275,7 @@ func Test_createRun(t *testing.T) {
 			},
 			stdin:      "cool stdin content",
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist...\n✓ Created gist\n",
+			wantStderr: "- Creating gist...\n✓ Created secret gist\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"description": "",

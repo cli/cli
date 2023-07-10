@@ -662,8 +662,8 @@ func localInit(gitClient *git.Client, remoteURL, path string) error {
 		return err
 	}
 
-	// Clone the client so we do not modify the original client's RepoDir.
-	gc := cloneGitClient(gitClient)
+	// Copy the client so we do not modify the original client's RepoDir.
+	gc := gitClient.Copy()
 	gc.RepoDir = path
 
 	gitRemoteAdd, err := gc.Command(ctx, "remote", "add", "origin", remoteURL)
@@ -730,7 +730,7 @@ func interactiveRepoInfo(client *http.Client, hostname string, prompter iprompte
 		name = fmt.Sprintf("%s/%s", owner, name)
 	}
 
-	description, err := prompter.Input("Description", defaultName)
+	description, err := prompter.Input("Description", "")
 	if err != nil {
 		return "", "", "", err
 	}
@@ -793,15 +793,4 @@ func splitNameAndOwner(name string) (string, string, error) {
 		return "", "", fmt.Errorf("argument error: %w", err)
 	}
 	return repo.RepoName(), repo.RepoOwner(), nil
-}
-
-func cloneGitClient(c *git.Client) *git.Client {
-	return &git.Client{
-		GhPath:  c.GhPath,
-		RepoDir: c.RepoDir,
-		GitPath: c.GitPath,
-		Stderr:  c.Stderr,
-		Stdin:   c.Stdin,
-		Stdout:  c.Stdout,
-	}
 }

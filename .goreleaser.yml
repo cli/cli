@@ -7,56 +7,76 @@ release:
 
 before:
   hooks:
-    - go mod tidy
-    - make manpages GH_VERSION={{.Version}}
+    - >-
+      {{ if eq .Runtime.Goos "windows" }}echo{{ end }} make manpages GH_VERSION={{.Version}}
+    - >-
+      {{ if ne .Runtime.Goos "linux" }}echo{{ end }} make completions
 
 builds:
-  - <<: &build_defaults
-      binary: bin/gh
-      main: ./cmd/gh
-      ldflags:
-        - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
-    id: macos
+  - id: macos #build:macos
     goos: [darwin]
     goarch: [amd64, arm64]
+    hooks:
+      post:
+        - cmd: ./script/sign '{{ .Path }}'
+          output: true
+    binary: bin/gh
+    main: ./cmd/gh
+    ldflags:
+      - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
 
-  - <<: *build_defaults
-    id: linux
+  - id: linux #build:linux
     goos: [linux]
     goarch: [386, arm, amd64, arm64]
     env:
       - CGO_ENABLED=0
+    binary: bin/gh
+    main: ./cmd/gh
+    ldflags:
+      - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
 
-  - <<: *build_defaults
-    id: windows
+  - id: windows #build:windows
     goos: [windows]
     goarch: [386, amd64, arm64]
     hooks:
       post:
-        - cmd: ./script/sign-windows-executable.sh '{{ .Path }}'
-          output: false
+        - cmd: >-
+            {{ if eq .Runtime.Goos "windows" }}.\script\sign{{ else }}./script/sign{{ end }} '{{ .Path }}'
+          output: true
+    binary: bin/gh
+    main: ./cmd/gh
+    ldflags:
+      - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
 
 archives:
-  - id: nix
-    builds: [macos, linux]
-    <<: &archive_defaults
-      name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+  - id: linux-archive
+    builds: [linux]
+    name_template: "gh_{{ .Version }}_linux_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     wrap_in_directory: true
-    replacements:
-      darwin: macOS
     format: tar.gz
+    rlcp: true
     files:
       - LICENSE
       - ./share/man/man1/gh*.1
-  - id: windows
+  - id: macos-archive
+    builds: [macos]
+    name_template: "gh_{{ .Version }}_macOS_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    wrap_in_directory: true
+    format: zip
+    rlcp: true
+    files:
+      - LICENSE
+      - ./share/man/man1/gh*.1
+  - id: windows-archive
     builds: [windows]
-    <<: *archive_defaults
+    name_template: "gh_{{ .Version }}_windows_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     wrap_in_directory: false
     format: zip
+    rlcp: true
     files:
       - LICENSE
 
-nfpms:
+nfpms: #build:linux
   - license: MIT
     maintainer: GitHub
     homepage: https://github.com/cli/cli
@@ -70,3 +90,9 @@ nfpms:
     contents:
       - src: "./share/man/man1/gh*.1"
         dst: "/usr/share/man/man1"
+      - src: "./share/bash-completion/completions/gh"
+        dst: "/usr/share/bash-completion/completions/gh"
+      - src: "./share/fish/vendor_completions.d/gh.fish"
+        dst: "/usr/share/fish/vendor_completions.d/gh.fish"
+      - src: "./share/zsh/site-functions/_gh"
+        dst: "/usr/share/zsh/site-functions/_gh"

@@ -46,16 +46,9 @@ func (g *gitExecuter) Fetch(remote string, refspec string) error {
 }
 
 func (g *gitExecuter) ForRepo(repoDir string) gitClient {
-	return &gitExecuter{
-		client: &git.Client{
-			GhPath:  g.client.GhPath,
-			RepoDir: repoDir,
-			GitPath: g.client.GitPath,
-			Stderr:  g.client.Stderr,
-			Stdin:   g.client.Stdin,
-			Stdout:  g.client.Stdout,
-		},
-	}
+	gc := g.client.Copy()
+	gc.RepoDir = repoDir
+	return &gitExecuter{client: gc}
 }
 
 func (g *gitExecuter) Pull(remote, branch string) error {
