@@ -93,6 +93,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 			# Set multiple secrets imported from the ".env" file
 			$ gh secret set -f .env
+
+			# Set multiple secrets from stdin
+			$ gh secret set -f - < myfile.txt
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
