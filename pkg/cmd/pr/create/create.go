@@ -145,13 +145,19 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.IsDraft && opts.WebMode {
-				return errors.New("the `--draft` flag is not supported with `--web`")
+				return cmdutil.FlagErrorf("the `--draft` flag is not supported with `--web`")
 			}
+
 			if len(opts.Reviewers) > 0 && opts.WebMode {
-				return errors.New("the `--reviewer` flag is not supported with `--web`")
+				return cmdutil.FlagErrorf("the `--reviewer` flag is not supported with `--web`")
 			}
+
 			if cmd.Flags().Changed("no-maintainer-edit") && opts.WebMode {
-				return errors.New("the `--no-maintainer-edit` flag is not supported with `--web`")
+				return cmdutil.FlagErrorf("the `--no-maintainer-edit` flag is not supported with `--web`")
+			}
+
+			if opts.Autofill && opts.FillFirst {
+				return cmdutil.FlagErrorf("`--fill` is not supported with `--fill-first`")
 			}
 
 			opts.BodyProvided = cmd.Flags().Changed("body")
@@ -165,7 +171,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.Template != "" && opts.BodyProvided {
-				return errors.New("`--template` is not supported when using `--body` or `--body-file`")
+				return cmdutil.FlagErrorf("`--template` is not supported when using `--body` or `--body-file`")
 			}
 
 			if !opts.IO.CanPrompt() && !opts.WebMode && !(opts.Autofill || opts.FillFirst) && (!opts.TitleProvided || !opts.BodyProvided) {
@@ -198,8 +204,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 
-	cmd.MarkFlagsMutuallyExclusive("fill", "fill-first")
-
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
 	_ = cmd.RegisterFlagCompletionFunc("reviewer", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -229,7 +233,7 @@ func createRun(opts *CreateOptions) (err error) {
 	var openURL string
 
 	if opts.WebMode {
-		if !opts.Autofill {
+		if !(opts.Autofill || opts.FillFirst) {
 			state.Title = opts.Title
 			state.Body = opts.Body
 		}
@@ -396,7 +400,7 @@ func createRun(opts *CreateOptions) (err error) {
 	return
 }
 
-func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, opts *CreateOptions) error {
+func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool) error {
 	baseRef := ctx.BaseTrackingBranch
 	headRef := ctx.HeadBranch
 	gitClient := ctx.GitClient
@@ -405,24 +409,16 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, o
 	if err != nil {
 		return err
 	}
-	if opts.FillFirst {
-		firstCommitIndex := len(commits) - 1
-		state.Title = commits[firstCommitIndex].Title
-		body, err := gitClient.CommitBody(context.Background(), commits[firstCommitIndex].Sha)
-		if err != nil {
-			return err
-		}
-		state.Body = body
-	} else if len(commits) == 1 {
-		state.Title = commits[0].Title
-		body, err := gitClient.CommitBody(context.Background(), commits[0].Sha)
+	if len(commits) == 1 || useFirstCommit {
+		commitIndex := len(commits) - 1
+		state.Title = commits[commitIndex].Title
+		body, err := gitClient.CommitBody(context.Background(), commits[commitIndex].Sha)
 		if err != nil {
 			return err
 		}
 		state.Body = body
 	} else {
 		state.Title = humanize(headRef)
-
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
 			fmt.Fprintf(&body, "- %s\n", commits[i].Title)
@@ -497,7 +493,7 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 	}
 
 	if opts.Autofill || opts.FillFirst || !opts.TitleProvided || !opts.BodyProvided {
-		err := initDefaultTitleBody(ctx, state, &opts)
+		err := initDefaultTitleBody(ctx, state, opts.FillFirst)
 		if err != nil && (opts.Autofill || opts.FillFirst) {
 			return nil, fmt.Errorf("could not compute title or body defaults: %w", err)
 		}
