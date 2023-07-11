@@ -169,7 +169,7 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:     "with fill-first option",
+			name:     "fill-first",
 			tty:      false,
 			cli:      "--fill-first",
 			wantsErr: false,
@@ -189,7 +189,7 @@ func TestNewCmdCreate(t *testing.T) {
 			},
 		},
 		{
-			name:     "fill and fill-first is mutually exclusive",
+			name:     "fill and fill-first",
 			tty:      false,
 			cli:      "--fill --fill-first",
 			wantsErr: true,
@@ -1000,7 +1000,6 @@ func Test_createRun(t *testing.T) {
 			name: "fill-first flag provided",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
-				opts.TitleProvided = false
 				opts.FillFirst = true
 				opts.HeadBranch = "feature"
 				return func() {}
