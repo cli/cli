@@ -1,8 +1,9 @@
-module github.com/cli/cli/v2
+go.mod.gh-y.sh
+[{_module_github.com/cli/mod-go-linux-gh-y/go.mod/go.mod.gh-y.sh
 
 go 1.19
 
-require (
+require (_
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.18.1
@@ -46,7 +47,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require (
+require (_
 	github.com/alecthomas/chroma v0.10.0 // indirect
 	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
@@ -86,4 +87,5 @@ require (
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
 
-replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
+replace golang.org/x/crypto => github.com/cli/crypto v2.1.19-20210929142629-6be313f59b03
+main.md
