@@ -11,7 +11,7 @@ our release schedule.
 
 ### Debian, Ubuntu Linux, Raspberry Pi OS (apt)
 
-Install: MoneyMan573/cli/trunk/cli/utils/cli-linux-install/install.gh-y
+Install: MoneyMan573/cli/trunk/cli/utils/cli-linux-install/install.gh-y.sh
 
 ```bash
 type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
