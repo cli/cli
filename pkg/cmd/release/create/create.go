@@ -484,8 +484,8 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	if opts.SyncToLocal {
-		if err := fetchGitTagToLocal(opts.GitClient, opts.TagName); err != nil {
-			fmt.Fprintf(opts.IO.Out, "warning: failed to fetch tag to local repo %s\n", err.Error())
+		if err := fetchGitTagToLocal(opts.GitClient, opts.TagName, opts.Target); err != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "warning: failed to fetch tag to local repo %s\n", err.Error())
 		}
 	}
 	fmt.Fprintf(opts.IO.Out, "%s\n", newRelease.URL)
@@ -493,9 +493,22 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func fetchGitTagToLocal(gitClient *git.Client, tagName string) error {
+func fetchGitTagToLocal(gitClient *git.Client, tagName string, targetBranch string) error {
+	if targetBranch == "" {
+		var err error
+		targetBranch, err = gitClient.CurrentBranch(context.Background())
+		if err != nil {
+			return errors.New("failed to get current branch")
+		}
+	}
+
+	refTagName := fmt.Sprintf("refs/tags/%s", tagName)
+	branchConfig := gitClient.ReadBranchConfig(context.Background(), targetBranch)
+	if branchConfig.RemoteName == "" {
+		return fmt.Errorf("remote not defined for %q", targetBranch)
+	}
 	ctx := context.Background()
-	if err := gitClient.Fetch(ctx, "origin", fmt.Sprintf("refs/tags/%s", tagName)); err != nil {
+	if err := gitClient.Fetch(ctx, branchConfig.RemoteName, fmt.Sprintf("%s:%s", refTagName, refTagName)); err != nil {
 		return err
 	}
 	return nil
