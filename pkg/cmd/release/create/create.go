@@ -59,6 +59,7 @@ type CreateOptions struct {
 	GenerateNotes      bool
 	NotesStartTag      string
 	VerifyTag          bool
+	SyncToLocal        bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -176,6 +177,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
 	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
 	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
+	cmd.Flags().BoolVarP(&opts.SyncToLocal, "sync-tag-to-local", "", false, "If set then sync the tag to your local repository")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
 
@@ -481,8 +483,10 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	if err := fetchGitTagToLocal(opts.GitClient, opts.TagName); err != nil {
-		fmt.Fprintf(opts.IO.Out, "warning: failed to fetch tag to local repo")
+	if opts.SyncToLocal {
+		if err := fetchGitTagToLocal(opts.GitClient, opts.TagName); err != nil {
+			fmt.Fprintf(opts.IO.Out, "warning: failed to fetch tag to local repo %s\n", err.Error())
+		}
 	}
 	fmt.Fprintf(opts.IO.Out, "%s\n", newRelease.URL)
 
@@ -492,7 +496,7 @@ func createRun(opts *CreateOptions) error {
 func fetchGitTagToLocal(gitClient *git.Client, tagName string) error {
 	ctx := context.Background()
 	if err := gitClient.Fetch(ctx, "origin", fmt.Sprintf("refs/tags/%s", tagName)); err != nil {
-		return fmt.Errorf("failed to fetch tag")
+		return err
 	}
 	return nil
 }
