@@ -281,6 +281,8 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 			var milestoneDefault string
 			if len(state.Milestones) > 0 {
 				milestoneDefault = state.Milestones[0]
+			} else {
+				milestoneDefault = milestones[1]
 			}
 			mqs = append(mqs, &survey.Question{
 				Name: "milestone",

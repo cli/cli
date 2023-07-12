@@ -168,6 +168,32 @@ func TestNewCmdCreate(t *testing.T) {
 			cli:      "-t mytitle --template bug_fix.md --body-file body_file.md",
 			wantsErr: true,
 		},
+		{
+			name:     "fill-first",
+			tty:      false,
+			cli:      "--fill-first",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "",
+				TitleProvided:       false,
+				Body:                "",
+				BodyProvided:        false,
+				Autofill:            false,
+				FillFirst:           true,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+			},
+		},
+		{
+			name:     "fill and fill-first",
+			tty:      false,
+			cli:      "--fill --fill-first",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -210,6 +236,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.Title, opts.Title)
 			assert.Equal(t, tt.wantsOpts.TitleProvided, opts.TitleProvided)
 			assert.Equal(t, tt.wantsOpts.Autofill, opts.Autofill)
+			assert.Equal(t, tt.wantsOpts.FillFirst, opts.FillFirst)
 			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
 			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
 			assert.Equal(t, tt.wantsOpts.IsDraft, opts.IsDraft)
@@ -968,6 +995,47 @@ func Test_createRun(t *testing.T) {
 					`))
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
+		},
+		{
+			name: "fill-first flag provided",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.FillFirst = true
+				opts.HeadBranch = "feature"
+				return func() {}
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(
+					"git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature",
+					0,
+					"56b6f8bb7c9e3a30093cd17e48934ce354148e80,second commit of pr\n"+
+						"343jdfe47c9e3a30093cd17e48934ce354148e80,first commit of pr",
+				)
+				cs.Register(
+					"git -c log.ShowSignature=false show -s --pretty=format:%b 343jdfe47c9e3a30093cd17e48934ce354148e80",
+					0,
+					"first commit description",
+				)
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ 
+						"data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+							} } } 
+						}
+						`,
+						func(input map[string]interface{}) {
+							assert.Equal(t, "first commit of pr", input["title"], "pr title should be first commit message")
+							assert.Equal(t, "first commit description", input["body"], "pr body should be first commit description")
+						},
+					),
+				)
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 	}
 	for _, tt := range tests {

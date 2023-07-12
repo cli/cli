@@ -178,7 +178,19 @@ func runBrowse(opts *BrowseOptions) error {
 	url := ghrepo.GenerateRepoURL(baseRepo, "%s", section)
 
 	if opts.NoBrowserFlag {
-		_, err := fmt.Fprintln(opts.IO.Out, url)
+		client, err := opts.HttpClient()
+		if err != nil {
+			return err
+		}
+
+		exist, err := api.RepoExists(api.NewClientFromHTTP(client), baseRepo)
+		if err != nil {
+			return err
+		}
+		if !exist {
+			return fmt.Errorf("%s doesn't exist", text.DisplayURL(url))
+		}
+		_, err = fmt.Fprintln(opts.IO.Out, url)
 		return err
 	}
 

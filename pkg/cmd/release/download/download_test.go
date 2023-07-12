@@ -516,7 +516,7 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			tt.opts.IO = ios
 
 			reg := &httpmock.Registry{}
-			// defer reg.Verify(t) // FIXME: intermittetly fails due to StubFetchRelease internals
+			defer reg.Verify(t)
 			shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
 				"assets": [
 					{ "name": "windows-64bit.zip", "size": 34,
