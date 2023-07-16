@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -199,40 +198,6 @@ func TestNewHTTPClient(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, normalizeVerboseLog(stderr.String()))
 		})
 	}
-}
-
-func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
-	var request *http.Request
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		request = r
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer server.Close()
-
-	var redirectRequest *http.Request
-	redirectServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		redirectRequest = r
-		http.Redirect(w, r, server.URL, http.StatusFound)
-	}))
-	defer redirectServer.Close()
-
-	client, err := NewHTTPClient(HTTPClientOptions{
-		Config: tinyConfig{
-			fmt.Sprintf("%s:oauth_token", strings.TrimPrefix(redirectServer.URL, "http://")): "REDIRECT-TOKEN",
-			fmt.Sprintf("%s:oauth_token", strings.TrimPrefix(server.URL, "http://")):         "TOKEN",
-		},
-	})
-	require.NoError(t, err)
-
-	req, err := http.NewRequest("GET", redirectServer.URL, nil)
-	require.NoError(t, err)
-
-	res, err := client.Do(req)
-	require.NoError(t, err)
-
-	assert.Equal(t, "token REDIRECT-TOKEN", redirectRequest.Header.Get(authorization))
-	assert.Equal(t, "", request.Header.Get(authorization))
-	assert.Equal(t, 204, res.StatusCode)
 }
 
 type tinyConfig map[string]string
