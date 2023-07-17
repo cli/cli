@@ -6,7 +6,10 @@ package asciisanitizer
 
 import (
 	"bytes"
+	"errors"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/text/transform"
 )
@@ -20,87 +23,74 @@ type Sanitizer struct {
 // them with equivalent inert characters. Bytes that are not part of a control character are not modified.
 // C0 control characters can be either encoded or unencoded. C1 control characters are not encoded.
 // Encoded C0 control characters are six byte strings, representing the unicode code point, ranging from \u0000 to \u001F.
-// C0 control characters are one byte ranging from 0x00 to 0x1F.
-// C1 control characters are two byte sequences, the first being 0xC2 and the second ranging from 0x80 to 0x9F.
 func (t *Sanitizer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
-	lSrc := len(src)
-	lDst := len(dst)
+	transfer := func(write, read []byte) error {
+		readLength := len(read)
+		writeLength := len(write)
+		if writeLength > len(dst) {
+			return transform.ErrShortDst
+		}
+		copy(dst, write)
+		nDst += writeLength
+		dst = dst[writeLength:]
+		nSrc += readLength
+		src = src[readLength:]
+		return nil
+	}
 
-	for nSrc < lSrc && nDst < lDst {
-		var window []byte
-		if nSrc+6 <= lSrc {
-			window = src[nSrc : nSrc+6]
-		} else if !atEOF {
+	for len(src) > 0 {
+		// Make sure we always have 6 bytes if there are 6 bytes available.
+		// This is necessary for encoded C0 control characters.
+		if len(src) < 6 && !atEOF {
 			err = transform.ErrShortSrc
 			return
-		} else {
-			window = src[nSrc:]
 		}
-
-		// Replace C0 control characters.
-		if repl, found := mapC0ToCaret(window[:1]); found {
-			if len(repl)+nDst > lDst {
-				err = transform.ErrShortDst
+		// Only support UTF-8 encoded data.
+		r, size := utf8.DecodeRune(src)
+		if r == utf8.RuneError {
+			if !atEOF {
+				err = transform.ErrShortSrc
+				return
+			} else {
+				err = errors.New("invalid UTF-8 string")
 				return
 			}
-			for j := 0; j < len(repl); j++ {
-				dst[nDst] = repl[j]
-				nDst++
-			}
-			nSrc += 1
-			continue
 		}
-
-		// Replace C1 control characters.
-		if repl, found := mapC1ToCaret(window[:2]); found {
-			if len(repl)+nDst > lDst {
-				err = transform.ErrShortDst
-				return
+		// Replace C0 and C1 control characters.
+		if unicode.IsControl(r) {
+			if repl, found := mapControlToCaret(r); found {
+				err = transfer(repl, src[:size])
+				if err != nil {
+					return
+				}
+				continue
 			}
-			for j := 0; j < len(repl); j++ {
-				dst[nDst] = repl[j]
-				nDst++
-			}
-			nSrc += 2
-			continue
 		}
-
 		// Replace encoded C0 control characters.
-		if repl, found := mapEncodedC0ToCaret(window); found {
-			if t.addEscape {
-				// Add an escape character when necessary to prevent creating
-				// invalid JSON with our replacements.
-				repl = append([]byte{'\\'}, repl...)
+		if len(src) >= 6 {
+			if repl, found := mapEncodedControlToCaret(src[:6]); found {
+				if t.addEscape {
+					// Add an escape character when necessary to prevent creating
+					// invalid JSON with our replacements.
+					repl = append([]byte{'\\'}, repl...)
+				}
+				err = transfer(repl, src[:6])
+				if err != nil {
+					return
+				}
+				continue
 			}
-			if len(repl)+nDst > lDst {
-				err = transform.ErrShortDst
-				return
-			}
-			for j := 0; j < len(repl); j++ {
-				dst[nDst] = repl[j]
-				nDst++
-			}
-			t.addEscape = false
-			nSrc += 6
-			continue
 		}
-
-		if window[0] == '\\' {
+		err = transfer(src[:size], src[:size])
+		if err != nil {
+			return
+		}
+		if r == '\\' {
 			t.addEscape = !t.addEscape
 		} else {
 			t.addEscape = false
 		}
-
-		dst[nDst] = src[nSrc]
-		nDst++
-		nSrc++
 	}
-
-	if nDst == lDst && nSrc != lSrc {
-		err = transform.ErrShortDst
-		return
-	}
-
 	return
 }
 
@@ -109,14 +99,85 @@ func (t *Sanitizer) Reset() {
 	t.addEscape = false
 }
 
-// mapEncodedC0ToCaret maps encoded C0 control characters to their caret notation.
+// mapControlToCaret maps C0 and C1 control characters to their caret notation.
+func mapControlToCaret(r rune) ([]byte, bool) {
+	//\t (09), \n (10), \v (11), \r (13) are valid C0 characters and are not sanitized.
+	m := map[rune]string{
+		0:   `^@`,
+		1:   `^A`,
+		2:   `^B`,
+		3:   `^C`,
+		4:   `^D`,
+		5:   `^E`,
+		6:   `^F`,
+		7:   `^G`,
+		8:   `^H`,
+		12:  `^L`,
+		14:  `^N`,
+		15:  `^O`,
+		16:  `^P`,
+		17:  `^Q`,
+		18:  `^R`,
+		19:  `^S`,
+		20:  `^T`,
+		21:  `^U`,
+		22:  `^V`,
+		23:  `^W`,
+		24:  `^X`,
+		25:  `^Y`,
+		26:  `^Z`,
+		27:  `^[`,
+		28:  `^\\`,
+		29:  `^]`,
+		30:  `^^`,
+		31:  `^_`,
+		128: `^@`,
+		129: `^A`,
+		130: `^B`,
+		131: `^C`,
+		132: `^D`,
+		133: `^E`,
+		134: `^F`,
+		135: `^G`,
+		136: `^H`,
+		137: `^I`,
+		138: `^J`,
+		139: `^K`,
+		140: `^L`,
+		141: `^M`,
+		142: `^N`,
+		143: `^O`,
+		144: `^P`,
+		145: `^Q`,
+		146: `^R`,
+		147: `^S`,
+		148: `^T`,
+		149: `^U`,
+		150: `^V`,
+		151: `^W`,
+		152: `^X`,
+		153: `^Y`,
+		154: `^Z`,
+		155: `^[`,
+		156: `^\\`,
+		157: `^]`,
+		158: `^^`,
+		159: `^_`,
+	}
+	if c, ok := m[r]; ok {
+		return []byte(c), true
+	}
+	return nil, false
+}
+
+// mapEncodedControlToCaret maps encoded C0 control characters to their caret notation.
 // Encoded C0 control characters are six byte strings, representing the unicode code point, ranging from \u0000 to \u001F.
-func mapEncodedC0ToCaret(b []byte) ([]byte, bool) {
+func mapEncodedControlToCaret(b []byte) ([]byte, bool) {
 	if len(b) != 6 {
-		return b, false
+		return nil, false
 	}
 	if !bytes.HasPrefix(b, []byte(`\u00`)) {
-		return b, false
+		return nil, false
 	}
 	m := map[string]string{
 		`\u0000`: `^@`,
@@ -155,96 +216,5 @@ func mapEncodedC0ToCaret(b []byte) ([]byte, bool) {
 	if c, ok := m[strings.ToLower(string(b))]; ok {
 		return []byte(c), true
 	}
-	return b, false
-}
-
-// mapC0ToCaret maps C0 control characters to their caret notation.
-// C0 control characters are one byte ranging from 0x00 to 0x1F.
-func mapC0ToCaret(b []byte) ([]byte, bool) {
-	if len(b) != 1 {
-		return b, false
-	}
-	// \0 (00), \t (09), \n (10), \v (11), \r (13) are valid C0 characters and are not sanitized.
-	m := map[byte]string{
-		1:  `^A`,
-		2:  `^B`,
-		3:  `^C`,
-		4:  `^D`,
-		5:  `^E`,
-		6:  `^F`,
-		7:  `^G`,
-		8:  `^H`,
-		12: `^L`,
-		14: `^N`,
-		15: `^O`,
-		16: `^P`,
-		17: `^Q`,
-		18: `^R`,
-		19: `^S`,
-		20: `^T`,
-		21: `^U`,
-		22: `^V`,
-		23: `^W`,
-		24: `^X`,
-		25: `^Y`,
-		26: `^Z`,
-		27: `^[`,
-		28: `^\\`,
-		29: `^]`,
-		30: `^^`,
-		31: `^_`,
-	}
-	if c, ok := m[b[0]]; ok {
-		return []byte(c), true
-	}
-	return b, false
-}
-
-// mapC1ToCaret maps C1 control characters to their caret notation.
-// C1 control characters are two byte sequences, the first being 0xC2 and the second ranging from 0x80 to 0x9F.
-func mapC1ToCaret(b []byte) ([]byte, bool) {
-	if len(b) != 2 {
-		return b, false
-	}
-	if b[0] != 0xC2 {
-		return b, false
-	}
-	m := map[byte]string{
-		128: `^@`,
-		129: `^A`,
-		130: `^B`,
-		131: `^C`,
-		132: `^D`,
-		133: `^E`,
-		134: `^F`,
-		135: `^G`,
-		136: `^H`,
-		137: `^I`,
-		138: `^J`,
-		139: `^K`,
-		140: `^L`,
-		141: `^M`,
-		142: `^N`,
-		143: `^O`,
-		144: `^P`,
-		145: `^Q`,
-		146: `^R`,
-		147: `^S`,
-		148: `^T`,
-		149: `^U`,
-		150: `^V`,
-		151: `^W`,
-		152: `^X`,
-		153: `^Y`,
-		154: `^Z`,
-		155: `^[`,
-		156: `^\\`,
-		157: `^]`,
-		158: `^^`,
-		159: `^_`,
-	}
-	if c, ok := m[b[1]]; ok {
-		return []byte(c), true
-	}
-	return b, false
+	return nil, false
 }

@@ -51,7 +51,7 @@ func TestSanitizerTransform(t *testing.T) {
 				"A\x0A B\x0B C\x0C D\x0D E\x0E F\x0F " +
 				"10\x10 11\x11 12\x12 13\x13 14\x14 15\x15 16\x16 17\x17 18\x18 19\x19 " +
 				"1A\x1A 1B\x1B 1C\x1C 1D\x1D 1E\x1E 1F\x1F ",
-			want: "0\x00 1^A 2^B 3^C 4^D 5^E 6^F 7^G 8^H 9\t " +
+			want: "0^@ 1^A 2^B 3^C 4^D 5^E 6^F 7^G 8^H 9\t " +
 				"A\n B\v C^L D\r E^N F^O " +
 				"10^P 11^Q 12^R 13^S 14^T 15^U 16^V 17^W 18^X 19^Y " +
 				"1A^Z 1B^[ 1C^\\\\ 1D^] 1E^^ 1F^_ ",
