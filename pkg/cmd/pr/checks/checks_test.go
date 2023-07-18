@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -123,14 +124,15 @@ func TestNewCmdChecks(t *testing.T) {
 
 func Test_checksRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		tty       bool
-		watch     bool
-		failFast  bool
-		required  bool
-		httpStubs func(*httpmock.Registry)
-		wantOut   string
-		wantErr   string
+		name            string
+		tty             bool
+		watch           bool
+		failFast        bool
+		required        bool
+		disableDetector bool
+		httpStubs       func(*httpmock.Registry)
+		wantOut         string
+		wantErr         string
 	}{
 		{
 			name: "no commits tty",
@@ -393,6 +395,54 @@ func Test_checksRun(t *testing.T) {
 			wantOut: "awesome tests\tpass\t1m26s\tsweet link\tawesome description\ncool tests\tpass\t1m26s\tsweet link\tcool description\nrad tests\tpass\t1m26s\tsweet link\trad description\n",
 			wantErr: "",
 		},
+		{
+			name: "events tty",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withEvents.json"),
+				)
+			},
+			wantOut: "All checks were successful\n0 failing, 2 successful, 0 skipped, and 0 pending checks\n\n✓  tests/cool tests (pull_request)  cool description  1m26s  sweet link\n✓  tests/cool tests (push)          cool description  1m26s  sweet link\n",
+			wantErr: "",
+		},
+		{
+			name:            "events not supported tty",
+			tty:             true,
+			disableDetector: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withoutEvents.json"),
+				)
+			},
+			wantOut: "All checks were successful\n0 failing, 1 successful, 0 skipped, and 0 pending checks\n\n✓  tests/cool tests  cool description  1m26s  sweet link\n",
+			wantErr: "",
+		},
+		{
+			name: "events",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withEvents.json"),
+				)
+			},
+			wantOut: "cool tests\tpass\t1m26s\tsweet link\tcool description\ncool tests\tpass\t1m26s\tsweet link\tcool description\n",
+			wantErr: "",
+		},
+		{
+			name:            "events not supported",
+			disableDetector: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withoutEvents.json"),
+				)
+			},
+			wantOut: "cool tests\tpass\t1m26s\tsweet link\tcool description\n",
+			wantErr: "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -407,7 +457,14 @@ func Test_checksRun(t *testing.T) {
 				tt.httpStubs(reg)
 			}
 
+			var detector fd.Detector
+			detector = &fd.EnabledDetectorMock{}
+			if tt.disableDetector {
+				detector = &fd.DisabledDetectorMock{}
+			}
+
 			response := &api.PullRequest{Number: 123, HeadRefName: "trunk"}
+
 			opts := &ChecksOptions{
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
@@ -415,6 +472,7 @@ func Test_checksRun(t *testing.T) {
 				IO:          ios,
 				SelectorArg: "123",
 				Finder:      shared.NewMockFinder("123", response, ghrepo.New("OWNER", "REPO")),
+				Detector:    detector,
 				Watch:       tt.watch,
 				FailFast:    tt.failFast,
 				Required:    tt.required,
