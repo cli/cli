@@ -200,6 +200,10 @@ func viewRun(opts *ViewOptions) error {
 		fmt.Fprintf(w, "%s\n", rs.Enforcement)
 	}
 
+	if rs.CurrentUserCanBypass != "" {
+		fmt.Fprintf(w, "You can bypass: %s\n", strings.ReplaceAll(rs.CurrentUserCanBypass, "_", " "))
+	}
+
 	fmt.Fprintf(w, "\n%s\n", cs.Bold("Bypass List"))
 	if len(rs.BypassActors) == 0 {
 		fmt.Fprintf(w, "This ruleset cannot be bypassed\n")

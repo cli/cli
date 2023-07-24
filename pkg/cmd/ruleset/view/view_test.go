@@ -157,6 +157,7 @@ func Test_viewRun(t *testing.T) {
 	ID: 42
 	Source: my-owner/repo-name (Repository)
 	Enforcement: Active
+	You can bypass: pull requests only
 	
 	Bypass List
 	- OrganizationAdmin (ID: 1), mode: always
