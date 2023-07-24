@@ -97,9 +97,15 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	repoI, err := opts.BaseRepo()
-	if err != nil {
-		return err
+	var repoI ghrepo.Interface
+
+	// only one of the repo or org context is necessary
+	if opts.Organization == "" {
+		var repoErr error
+		repoI, repoErr = opts.BaseRepo()
+		if repoErr != nil {
+			return repoErr
+		}
 	}
 
 	hostname, _ := ghAuth.DefaultHost()

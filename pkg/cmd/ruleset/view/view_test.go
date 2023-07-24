@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -233,7 +234,48 @@ func Test_viewRun(t *testing.T) {
 			wantBrowse: "",
 		},
 		{
-			name:  "prompter",
+			name:  "interactive mode, repo, no rulesets found",
+			isTTY: true,
+			opts: ViewOptions{
+				InteractiveMode: true,
+			},
+			wantStdout: "",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepoRulesetList\b`),
+					httpmock.JSONResponse(shared.RulesetList{
+						TotalCount: 0,
+						Rulesets:   []shared.RulesetGraphQL{},
+					}),
+				)
+			},
+			wantErr:    "no rulesets found in my-owner/repo-name",
+			wantStderr: "",
+			wantBrowse: "",
+		},
+		{
+			name:  "interactive mode, org, no rulesets found",
+			isTTY: true,
+			opts: ViewOptions{
+				InteractiveMode: true,
+				Organization:    "my-owner",
+			},
+			wantStdout: "",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query OrgRulesetList\b`),
+					httpmock.JSONResponse(shared.RulesetList{
+						TotalCount: 0,
+						Rulesets:   []shared.RulesetGraphQL{},
+					}),
+				)
+			},
+			wantErr:    "no rulesets found in my-owner",
+			wantStderr: "",
+			wantBrowse: "",
+		},
+		{
+			name:  "interactive mode, prompter",
 			isTTY: true,
 			opts: ViewOptions{
 				InteractiveMode: true,
@@ -338,9 +380,15 @@ func Test_viewRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
-			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-				return ghrepo.FromFullName("my-owner/repo-name")
+
+			// only set this if org is not set, because the repo isn't needed if --org is provided and
+			// leaving it undefined will catch potential errors
+			if tt.opts.Organization == "" {
+				tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("my-owner/repo-name")
+				}
 			}
+
 			browser := &browser.Stub{}
 			tt.opts.Browser = browser
 
