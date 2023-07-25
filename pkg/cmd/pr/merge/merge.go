@@ -199,7 +199,6 @@ type mergeContext struct {
 	autoMerge          bool
 	crossRepoPR        bool
 	deleteBranch       bool
-	switchedToBranch   string
 	mergeQueueRequired bool
 }
 
@@ -374,7 +373,7 @@ func (m *mergeContext) deleteLocalBranch() error {
 		return nil
 	}
 
-	if !m.crossRepoPR && m.merged {
+	if m.merged {
 		if m.opts.IO.CanPrompt() && !m.opts.IsDeleteBranchIndicated {
 			confirmed, err := m.opts.Prompter.Confirm(fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", m.pr.Number), false)
 			if err != nil {
@@ -394,6 +393,8 @@ func (m *mergeContext) deleteLocalBranch() error {
 	if err != nil {
 		return err
 	}
+
+	switchedToBranch := ""
 
 	ctx := context.Background()
 
@@ -424,7 +425,7 @@ func (m *mergeContext) deleteLocalBranch() error {
 			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
 		}
 
-		m.switchedToBranch = targetBranch
+		switchedToBranch = targetBranch
 	}
 
 	if err := m.opts.GitClient.DeleteLocalBranch(ctx, m.pr.HeadRefName); err != nil {
@@ -432,8 +433,8 @@ func (m *mergeContext) deleteLocalBranch() error {
 	}
 
 	branch := ""
-	if m.switchedToBranch != "" {
-		branch = fmt.Sprintf(" and switched to branch %s", m.cs.Cyan(m.switchedToBranch))
+	if switchedToBranch != "" {
+		branch = fmt.Sprintf(" and switched to branch %s", m.cs.Cyan(switchedToBranch))
 	}
 
 	return m.infof("%s Deleted local branch %s%s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName), branch)

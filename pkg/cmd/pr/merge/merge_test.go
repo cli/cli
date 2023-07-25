@@ -1194,7 +1194,17 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, nil, "blueberries", true, "pr merge 4 --merge")
+	pm := &prompter.PrompterMock{
+		ConfirmFunc: func(p string, d bool) (bool, error) {
+			if p == "Pull request #4 was already merged. Delete the branch locally?" {
+				return d, nil
+			} else {
+				return false, prompter.NoSuchPromptErr(p)
+			}
+		},
+	}
+
+	output, err := runCommand(http, pm, "blueberries", true, "pr merge 4 --merge")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
