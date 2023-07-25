@@ -175,13 +175,12 @@ func runBrowse(opts *BrowseOptions) error {
 	if err != nil {
 		return err
 	}
-	url := ghrepo.GenerateRepoURL(baseRepo, "%s", section)
 
 	wantsWiki := strings.HasSuffix(baseRepo.RepoName(), ".wiki")
 	if wantsWiki {
 		if section == "wiki" {
 			repoName := strings.TrimSuffix(baseRepo.RepoName(), ".wiki")
-			baseRepo = ghrepo.NewWithHost(baseRepo.RepoName(), repoName, baseRepo.RepoHost())
+			baseRepo = ghrepo.NewWithHost(baseRepo.RepoOwner(), repoName, baseRepo.RepoHost())
 		}
 	}
 	httpClient, err := opts.HttpClient()
@@ -199,6 +198,7 @@ func runBrowse(opts *BrowseOptions) error {
 			return fmt.Errorf("The '%s' repository does not have a wiki", ghrepo.FullName(canonicalRepo))
 		}
 	}
+	url := ghrepo.GenerateRepoURL(baseRepo, "%s", section)
 
 	if opts.NoBrowserFlag {
 		client, err := opts.HttpClient()
