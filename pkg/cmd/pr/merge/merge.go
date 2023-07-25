@@ -432,12 +432,12 @@ func (m *mergeContext) deleteLocalBranch() error {
 		return fmt.Errorf("failed to delete local branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
 	}
 
-	branch := ""
+	switchedStatement := ""
 	if switchedToBranch != "" {
-		branch = fmt.Sprintf(" and switched to branch %s", m.cs.Cyan(switchedToBranch))
+		switchedStatement = fmt.Sprintf(" and switched to branch %s", m.cs.Cyan(switchedToBranch))
 	}
 
-	return m.infof("%s Deleted local branch %s%s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName), branch)
+	return m.infof("%s Deleted local branch %s%s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName), switchedStatement)
 }
 
 // Delete the remote branch if requested and if allowed.
