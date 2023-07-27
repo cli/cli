@@ -2,6 +2,7 @@ package githubtemplate
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"regexp"
@@ -28,7 +29,6 @@ mainLoop:
 		if err != nil {
 			continue
 		}
-
 		// detect multiple templates in a subdirectory
 		for _, file := range files {
 			if strings.EqualFold(file.Name(), name) && file.IsDir() {
@@ -37,7 +37,8 @@ mainLoop:
 					break
 				}
 				for _, tf := range templates {
-					if strings.HasSuffix(tf.Name(), ".md") {
+					if strings.HasSuffix(tf.Name(), ".md") &&
+						file.Type() != fs.ModeSymlink {
 						results = append(results, path.Join(dir, file.Name(), tf.Name()))
 					}
 				}
@@ -48,6 +49,7 @@ mainLoop:
 			}
 		}
 	}
+
 	sort.Strings(results)
 	return results
 }
@@ -62,19 +64,22 @@ func FindLegacy(rootDir string, name string) string {
 		rootDir,
 		path.Join(rootDir, "docs"),
 	}
+
 	for _, dir := range candidateDirs {
 		files, err := os.ReadDir(dir)
 		if err != nil {
 			continue
 		}
-
 		// detect a single template file
 		for _, file := range files {
-			if namePattern.MatchString(file.Name()) && !file.IsDir() {
+			if namePattern.MatchString(file.Name()) &&
+				!file.IsDir() &&
+				file.Type() != fs.ModeSymlink {
 				return path.Join(dir, file.Name())
 			}
 		}
 	}
+
 	return ""
 }
 
