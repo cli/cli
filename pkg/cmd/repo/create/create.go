@@ -411,6 +411,7 @@ func createFromScratch(opts *CreateOptions) error {
 		} else if err := cloneWithRetry(opts, remoteURL, templateRepoMainBranch); err != nil {
 			return err
 		}
+
 	}
 
 	return nil
@@ -796,6 +797,9 @@ func interactiveRepoTemplate(client *http.Client, hostname, owner string, prompt
 	repoTemplates, err := listRepositoryTemplates(client, hostname, owner)
 	if err != nil {
 		return nil, err
+	}
+	if len(repoTemplates.Repositories) == 0 {
+		return nil, fmt.Errorf("%s has no template repositories", owner)
 	}
 
 	var templates []string
