@@ -248,23 +248,33 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	fromScratch := opts.Source == ""
+	var selectedNum int
+	if opts.Source == "" {
+		selectedNum = 0
+	} else {
+		selectedNum = 2
+	}
 
 	if opts.Interactive {
-		selected, err := opts.Prompter.Select("What would you like to do?", "", []string{
+		answer, err := opts.Prompter.Select("What would you like to do?", "", []string{
 			"Create a new repository on GitHub from scratch",
+			"Create a new repository on GitHub from a template repository",
 			"Push an existing local repository to GitHub",
 		})
 		if err != nil {
 			return err
 		}
-		fromScratch = selected == 0
+		selectedNum = answer
 	}
 
-	if fromScratch {
+	switch selectedNum {
+	case 0:
 		return createFromScratch(opts)
+	case 1:
+		return createFromTemplate(opts)
+	default:
+		return createFromLocal(opts)
 	}
-	return createFromLocal(opts)
 }
 
 // create new repo on remote host
