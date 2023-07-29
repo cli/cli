@@ -238,13 +238,14 @@ func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug str
 	return &response, err
 }
 
-func listRepositoryTemplates(client *http.Client, hostname string) (*list.RepositoryList, error) {
-	ownerConnection := "repositoryOwner: viewer"
+func listRepositoryTemplates(client *http.Client, hostname, owner string) (*list.RepositoryList, error) {
+	ownerConnection := "repositoryOwner(login: $owner)"
 
 	variables := map[string]interface{}{
 		"perPage": githubv4.Int(100),
+		"owner":   githubv4.String(owner),
 	}
-	inputs := []string{"$perPage:Int!", "$endCursor:String"}
+	inputs := []string{"$perPage:Int!", "$endCursor:String", "$owner:String!"}
 
 	type result struct {
 		RepositoryOwner struct {

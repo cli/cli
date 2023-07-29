@@ -441,14 +441,16 @@ func createFromTemplate(opts *CreateOptions) error {
 		return err
 	}
 
-	if strings.Contains(opts.Name, "/") {
-		var err error
-		repoToCreate, err = ghrepo.FromFullName(opts.Name)
+	if !strings.Contains(opts.Name, "/") {
+		username, _, err := userAndOrgs(httpClient, host)
 		if err != nil {
-			return fmt.Errorf("argument error: %w", err)
+			return err
 		}
-	} else {
-		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
+		opts.Name = fmt.Sprintf("%s/%s", username, opts.Name)
+	}
+	repoToCreate, err = ghrepo.FromFullName(opts.Name)
+	if err != nil {
+		return fmt.Errorf("argument error: %w", err)
 	}
 
 	input := repoCreateInput{
@@ -466,7 +468,7 @@ func createFromTemplate(opts *CreateOptions) error {
 		InitReadme:         opts.AddReadme,
 	}
 
-	templateRepo, err := interactiveRepoTemplate(httpClient, host, opts.Prompter)
+	templateRepo, err := interactiveRepoTemplate(httpClient, host, repoToCreate.RepoOwner(), opts.Prompter)
 	if err != nil {
 		return err
 	}
@@ -790,8 +792,8 @@ func localInit(gitClient *git.Client, remoteURL, path string) error {
 	return nil
 }
 
-func interactiveRepoTemplate(client *http.Client, hostname string, prompter iprompter) (*api.Repository, error) {
-	repoTemplates, err := listRepositoryTemplates(client, hostname)
+func interactiveRepoTemplate(client *http.Client, hostname, owner string, prompter iprompter) (*api.Repository, error) {
+	repoTemplates, err := listRepositoryTemplates(client, hostname, owner)
 	if err != nil {
 		return nil, err
 	}
