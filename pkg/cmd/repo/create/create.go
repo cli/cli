@@ -793,6 +793,24 @@ func localInit(gitClient *git.Client, remoteURL, path string) error {
 	return nil
 }
 
+func interactiveRepoTemplate(client *http.Client, hostname string, prompter iprompter) (*api.Repository, error) {
+	repoTemplates, err := listRepositoryTemplates(client, hostname)
+	if err != nil {
+		return nil, err
+	}
+
+	var templates []string
+	for _, repo := range repoTemplates.Repositories {
+		templates = append(templates, repo.Name)
+	}
+
+	selected, err := prompter.Select("Choose a template repository", "", templates)
+	if err != nil {
+		return nil, err
+	}
+	return &repoTemplates.Repositories[selected], nil
+}
+
 func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompter) (string, error) {
 	confirmed, err := prompter.Confirm("Would you like to add a .gitignore?", false)
 	if err != nil {
