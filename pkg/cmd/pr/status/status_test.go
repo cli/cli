@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -22,6 +23,10 @@ import (
 )
 
 func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
+	return runCommandWithDetector(rt, branch, isTTY, cli, &fd.DisabledDetectorMock{})
+}
+
+func runCommandWithDetector(rt http.RoundTripper, branch string, isTTY bool, cli string, detector fd.Detector) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
@@ -55,7 +60,12 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 		GitClient: &git.Client{GitPath: "some/path/git"},
 	}
 
-	cmd := NewCmdStatus(factory, nil)
+	withProvidedDetector := func(opts *StatusOptions) error {
+		opts.Detector = detector
+		return statusRun(opts)
+	}
+
+	cmd := NewCmdStatus(factory, withProvidedDetector)
 	cmd.PersistentFlags().StringP("repo", "R", "", "")
 
 	argv, err := shlex.Split(cli)
@@ -91,7 +101,7 @@ func TestPRStatus(t *testing.T) {
 
 	expectedPrs := []*regexp.Regexp{
 		regexp.MustCompile(`#8.*\[strawberries\]`),
-		regexp.MustCompile(`#9.*\[apples\]`),
+		regexp.MustCompile(`#9.*\[apples\].*✓ Auto-merge enabled`),
 		regexp.MustCompile(`#10.*\[blueberries\]`),
 		regexp.MustCompile(`#11.*\[figs\]`),
 	}
@@ -106,9 +116,35 @@ func TestPRStatus(t *testing.T) {
 func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.FileResponse("./fixtures/prStatusChecks.json"))
+	// status,conclusion matches the old StatusContextRollup query
+	http.Register(httpmock.GraphQL(`status,conclusion`), httpmock.FileResponse("./fixtures/prStatusChecks.json"))
 
 	output, err := runCommand(http, "blueberries", true, "")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expected := []string{
+		"✓ Checks passing + Changes requested ! Merge conflict status unknown",
+		"- Checks pending ✓ 2 Approved",
+		"× 1/3 checks failing - Review required ✓ No merge conflicts",
+		"✓ Checks passing × Merge conflicts",
+	}
+
+	for _, line := range expected {
+		if !strings.Contains(output.String(), line) {
+			t.Errorf("output did not contain %q: %q", line, output.String())
+		}
+	}
+}
+
+func TestPRStatus_reviewsAndChecksWithStatesByCount(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+	// checkRunCount,checkRunCountsByState matches the new StatusContextRollup query
+	http.Register(httpmock.GraphQL(`checkRunCount,checkRunCountsByState`), httpmock.FileResponse("./fixtures/prStatusChecksWithStatesByCount.json"))
+
+	output, err := runCommandWithDetector(http, "blueberries", true, "", &fd.EnabledDetectorMock{})
 	if err != nil {
 		t.Errorf("error running command `pr status`: %v", err)
 	}

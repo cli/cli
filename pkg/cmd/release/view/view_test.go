@@ -215,6 +215,7 @@ func Test_viewRun(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 
 			fakeHTTP := &httpmock.Registry{}
+			defer fakeHTTP.Verify(t)
 			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", tt.opts.TagName, fmt.Sprintf(`{
 				"tag_name": "v1.2.3",
 				"draft": false,

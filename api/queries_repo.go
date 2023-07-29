@@ -1370,3 +1370,21 @@ func GetRepoIDs(client *Client, host string, repositories []ghrepo.Interface) ([
 	}
 	return result, nil
 }
+
+func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
+	path := fmt.Sprintf("%srepos/%s/%s", ghinstance.RESTPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
+
+	resp, err := client.HTTP().Head(path)
+	if err != nil {
+		return false, err
+	}
+
+	switch resp.StatusCode {
+	case 200:
+		return true, nil
+	case 404:
+		return false, nil
+	default:
+		return false, ghAPI.HandleHTTPError(resp)
+	}
+}

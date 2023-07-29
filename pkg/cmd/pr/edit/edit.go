@@ -260,6 +260,10 @@ func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, id
 	if err != nil {
 		return err
 	}
+	if (userIds == nil || len(*userIds) == 0) &&
+		(teamIds == nil || len(*teamIds) == 0) {
+		return nil
+	}
 	union := githubv4.Boolean(false)
 	reviewsRequestParams := githubv4.RequestReviewsInput{
 		PullRequestID: id,

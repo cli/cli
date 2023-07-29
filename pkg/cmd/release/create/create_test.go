@@ -1029,6 +1029,61 @@ func Test_createRun_interactive(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
 		{
+			name: "create a release from new tag (with leading space)",
+			opts: &CreateOptions{},
+			prompterStubs: func(t *testing.T, pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Choose a tag",
+					[]string{"v1.2.2", "v1.0.0", "v0.1.2", "Create a new tag"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "Create a new tag")
+					})
+				pm.RegisterSelect("Release notes",
+					[]string{"Write my own", "Write using generated notes as template", "Leave blank"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "Leave blank")
+					})
+				pm.RegisterSelect("Submit?",
+					[]string{"Publish release", "Save as draft", "Cancel"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "Publish release")
+					})
+				pm.RegisterInput("Tag name", func(_, d string) (string, error) {
+					return "  v1.2.3", nil
+				})
+				pm.RegisterInput("Title (optional)", func(_, d string) (string, error) {
+					return d, nil
+				})
+				pm.RegisterConfirm("Is this a prerelease?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 1, "")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
+					{ "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
+				]`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.StatusStringResponse(200, `{
+						"name": "generated name",
+						"body": "generated body"
+					}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`))
+			},
+			wantParams: map[string]interface{}{
+				"draft":      false,
+				"name":       "generated name",
+				"prerelease": false,
+				"tag_name":   "v1.2.3",
+			},
+			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+		},
+		{
 			name: "create a release using generated notes",
 			opts: &CreateOptions{
 				TagName: "v1.2.3",

@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -321,6 +322,7 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
+	isFirstPage := true
 	hasNextPage := true
 	for hasNextPage {
 		resp, err := httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
@@ -328,10 +330,16 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, tmpl)
+		if !isGraphQL {
+			requestPath, hasNextPage = findNextPage(resp)
+			requestBody = nil // prevent repeating GET parameters
+		}
+
+		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, tmpl, isFirstPage, !hasNextPage)
 		if err != nil {
 			return err
 		}
+		isFirstPage = false
 
 		if !opts.Paginate {
 			break
@@ -342,9 +350,6 @@ func apiRun(opts *ApiOptions) error {
 			if hasNextPage {
 				params["endCursor"] = endCursor
 			}
-		} else {
-			requestPath, hasNextPage = findNextPage(resp)
-			requestBody = nil // prevent repeating GET parameters
 		}
 
 		if hasNextPage && opts.ShowResponseHeaders {
@@ -355,7 +360,7 @@ func apiRun(opts *ApiOptions) error {
 	return tmpl.Flush()
 }
 
-func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template) (endCursor string, err error) {
+func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template, isFirstPage, isLastPage bool) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
 		printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
@@ -403,6 +408,13 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	} else if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
 	} else {
+		if isJSON && opts.Paginate && !isGraphQLPaginate && !opts.ShowResponseHeaders {
+			responseBody = &paginatedArrayReader{
+				Reader:      responseBody,
+				isFirstPage: isFirstPage,
+				isLastPage:  isLastPage,
+			}
+		}
 		_, err = io.Copy(bodyWriter, responseBody)
 	}
 	if err != nil {
@@ -458,6 +470,11 @@ func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
 				err = e
 			}
 		case "branch":
+			if os.Getenv("GH_REPO") != "" {
+				err = errors.New("unable to determine an appropriate value for the 'branch' placeholder")
+				return m
+			}
+
 			if branch, e := opts.Branch(); e == nil {
 				return branch
 			} else {

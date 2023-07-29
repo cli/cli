@@ -4,9 +4,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cli/cli/v2/internal/keyring"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
-	"github.com/zalando/go-keyring"
 )
 
 const (

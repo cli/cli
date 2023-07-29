@@ -49,6 +49,87 @@ func TestIsEnterprise(t *testing.T) {
 	}
 }
 
+func TestIsTenancy(t *testing.T) {
+	tests := []struct {
+		host string
+		want bool
+	}{
+		{
+			host: "github.com",
+			want: false,
+		},
+		{
+			host: "github.localhost",
+			want: false,
+		},
+		{
+			host: "garage.github.com",
+			want: false,
+		},
+		{
+			host: "ghe.com",
+			want: false,
+		},
+		{
+			host: "tenant.ghe.com",
+			want: true,
+		},
+		{
+			host: "api.tenant.ghe.com",
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			if got := IsTenancy(tt.host); got != tt.want {
+				t.Errorf("IsTenancy() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTenantName(t *testing.T) {
+	tests := []struct {
+		host       string
+		wantTenant string
+		wantFound  bool
+	}{
+		{
+			host:       "github.com",
+			wantTenant: "github.com",
+		},
+		{
+			host:       "github.localhost",
+			wantTenant: "github.localhost",
+		},
+		{
+			host:       "garage.github.com",
+			wantTenant: "github.com",
+		},
+		{
+			host:       "ghe.com",
+			wantTenant: "ghe.com",
+		},
+		{
+			host:       "tenant.ghe.com",
+			wantTenant: "tenant",
+			wantFound:  true,
+		},
+		{
+			host:       "api.tenant.ghe.com",
+			wantTenant: "tenant",
+			wantFound:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			if tenant, found := TenantName(tt.host); tenant != tt.wantTenant || found != tt.wantFound {
+				t.Errorf("TenantName(%v) = %v %v, want %v %v", tt.host, tenant, found, tt.wantTenant, tt.wantFound)
+			}
+		})
+	}
+}
+
 func TestNormalizeHostname(t *testing.T) {
 	tests := []struct {
 		host string
@@ -89,6 +170,18 @@ func TestNormalizeHostname(t *testing.T) {
 		{
 			host: "git.my.org",
 			want: "git.my.org",
+		},
+		{
+			host: "ghe.com",
+			want: "ghe.com",
+		},
+		{
+			host: "tenant.ghe.com",
+			want: "tenant.ghe.com",
+		},
+		{
+			host: "api.tenant.ghe.com",
+			want: "tenant.ghe.com",
 		},
 	}
 	for _, tt := range tests {
@@ -139,6 +232,7 @@ func TestHostnameValidator(t *testing.T) {
 		})
 	}
 }
+
 func TestGraphQLEndpoint(t *testing.T) {
 	tests := []struct {
 		host string

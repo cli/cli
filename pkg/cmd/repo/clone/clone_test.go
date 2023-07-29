@@ -250,6 +250,7 @@ func Test_RepoClone_hasParent(t *testing.T) {
 	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
 	cs.Register(`git -C REPO remote add -t trunk upstream https://github.com/hubot/ORIG.git`, 0, "")
 	cs.Register(`git -C REPO fetch upstream`, 0, "")
+	cs.Register(`git -C REPO remote set-branches upstream *`, 0, "")
 	cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO")
@@ -291,6 +292,7 @@ func Test_RepoClone_hasParent_upstreamRemoteName(t *testing.T) {
 	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
 	cs.Register(`git -C REPO remote add -t trunk test https://github.com/hubot/ORIG.git`, 0, "")
 	cs.Register(`git -C REPO fetch test`, 0, "")
+	cs.Register(`git -C REPO remote set-branches test *`, 0, "")
 	cs.Register(`git -C REPO config --add remote.test.gh-resolved base`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO --upstream-remote-name test")

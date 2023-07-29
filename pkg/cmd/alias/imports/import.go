@@ -21,7 +21,8 @@ type ImportOptions struct {
 	Filename          string
 	OverwriteExisting bool
 
-	existingCommand func(string) bool
+	validAliasName      func(string) bool
+	validAliasExpansion func(string) bool
 }
 
 func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Command {
@@ -74,7 +75,8 @@ func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Co
 				opts.Filename = args[0]
 			}
 
-			opts.existingCommand = shared.ExistingCommandFunc(f, cmd)
+			opts.validAliasName = shared.ValidAliasNameFunc(cmd)
+			opts.validAliasExpansion = shared.ValidAliasExpansionFunc(cmd)
 
 			if runF != nil {
 				return runF(opts)
@@ -120,51 +122,55 @@ func importRun(opts *ImportOptions) error {
 	var msg strings.Builder
 
 	for _, alias := range getSortedKeys(aliasMap) {
-		if opts.existingCommand(alias) {
-			msg.WriteString(
-				fmt.Sprintf("%s Could not import alias %s: already a gh command\n",
-					cs.FailureIcon(),
-					cs.Bold(alias),
-				),
-			)
-
-			continue
-		}
-
-		expansion := aliasMap[alias]
-
-		if !(strings.HasPrefix(expansion, "!") || opts.existingCommand(expansion)) {
-			msg.WriteString(
-				fmt.Sprintf("%s Could not import alias %s: expansion does not correspond to a gh command\n",
-					cs.FailureIcon(),
-					cs.Bold(alias),
-				),
-			)
-
-			continue
-		}
-
+		var existingAlias bool
 		if _, err := aliasCfg.Get(alias); err == nil {
-			if opts.OverwriteExisting {
-				aliasCfg.Add(alias, expansion)
+			existingAlias = true
+		}
 
+		if !opts.validAliasName(alias) {
+			if !existingAlias {
 				msg.WriteString(
-					fmt.Sprintf("%s Changed alias %s\n",
-						cs.WarningIcon(),
+					fmt.Sprintf("%s Could not import alias %s: already a gh command or extension\n",
+						cs.FailureIcon(),
 						cs.Bold(alias),
 					),
 				)
-			} else {
+				continue
+			}
+
+			if existingAlias && !opts.OverwriteExisting {
 				msg.WriteString(
 					fmt.Sprintf("%s Could not import alias %s: name already taken\n",
 						cs.FailureIcon(),
 						cs.Bold(alias),
 					),
 				)
+				continue
 			}
-		} else {
-			aliasCfg.Add(alias, expansion)
+		}
 
+		expansion := aliasMap[alias]
+
+		if !opts.validAliasExpansion(expansion) {
+			msg.WriteString(
+				fmt.Sprintf("%s Could not import alias %s: expansion does not correspond to a gh command, extension, or alias\n",
+					cs.FailureIcon(),
+					cs.Bold(alias),
+				),
+			)
+			continue
+		}
+
+		aliasCfg.Add(alias, expansion)
+
+		if existingAlias && opts.OverwriteExisting {
+			msg.WriteString(
+				fmt.Sprintf("%s Changed alias %s\n",
+					cs.WarningIcon(),
+					cs.Bold(alias),
+				),
+			)
+		} else {
 			msg.WriteString(
 				fmt.Sprintf("%s Added alias %s\n",
 					cs.SuccessIcon(),

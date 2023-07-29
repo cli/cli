@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
@@ -113,13 +112,14 @@ func TestImportRun(t *testing.T) {
 	importStdinMsg := "- Importing aliases from standard input"
 
 	tests := []struct {
-		name         string
-		opts         *ImportOptions
-		stdin        string
-		fileContents string
-		initConfig   string
-		wantConfig   string
-		wantStderr   string
+		name          string
+		opts          *ImportOptions
+		stdin         string
+		fileContents  string
+		initConfig    string
+		aliasCommands []*cobra.Command
+		wantConfig    string
+		wantStderr    string
 	}{
 		{
 			name: "with no existing aliases",
@@ -159,6 +159,9 @@ func TestImportRun(t *testing.T) {
                     igrep: '!gh issue list --label="$1" | grep "$2"'
                 editor: vim
             `),
+			aliasCommands: []*cobra.Command{
+				{Use: "igrep"},
+			},
 			wantConfig: heredoc.Doc(`
                 aliases:
                     igrep: '!gh issue list --label="$1" | grep "$2"'
@@ -212,6 +215,9 @@ func TestImportRun(t *testing.T) {
                     co: pr checkout
                 editor: vim
             `),
+			aliasCommands: []*cobra.Command{
+				{Use: "co"},
+			},
 			wantConfig: heredoc.Doc(`
                 aliases:
                     co: pr checkout
@@ -235,6 +241,9 @@ func TestImportRun(t *testing.T) {
                     co: pr checkout
                 editor: vim
             `),
+			aliasCommands: []*cobra.Command{
+				{Use: "co"},
+			},
 			wantConfig: heredoc.Doc(`
                 aliases:
                     co: pr checkout -R cool/repo
@@ -257,9 +266,9 @@ func TestImportRun(t *testing.T) {
 			wantStderr: strings.Join(
 				[]string{
 					importFileMsg,
-					"X Could not import alias api: already a gh command",
-					"X Could not import alias issue: already a gh command",
-					"X Could not import alias pr: already a gh command\n\n",
+					"X Could not import alias api: already a gh command or extension",
+					"X Could not import alias issue: already a gh command or extension",
+					"X Could not import alias pr: already a gh command or extension\n\n",
 				},
 				"\n",
 			),
@@ -277,8 +286,8 @@ func TestImportRun(t *testing.T) {
 			wantStderr: strings.Join(
 				[]string{
 					importFileMsg,
-					"X Could not import alias alias1: expansion does not correspond to a gh command",
-					"X Could not import alias alias2: expansion does not correspond to a gh command\n\n",
+					"X Could not import alias alias1: expansion does not correspond to a gh command, extension, or alias",
+					"X Could not import alias alias2: expansion does not correspond to a gh command, extension, or alias\n\n",
 				},
 				"\n",
 			),
@@ -304,16 +313,6 @@ func TestImportRun(t *testing.T) {
 				return cfg, nil
 			}
 
-			// Create fake command factory for testing.
-			f := &cmdutil.Factory{
-				IOStreams: ios,
-				ExtensionManager: &extensions.ExtensionManagerMock{
-					ListFunc: func() []extensions.Extension {
-						return []extensions.Extension{}
-					},
-				},
-			}
-
 			// Create fake command structure for testing.
 			rootCmd := &cobra.Command{}
 			prCmd := &cobra.Command{Use: "pr"}
@@ -326,8 +325,12 @@ func TestImportRun(t *testing.T) {
 			apiCmd := &cobra.Command{Use: "api"}
 			apiCmd.AddCommand(&cobra.Command{Use: "graphql"})
 			rootCmd.AddCommand(apiCmd)
+			for _, cmd := range tt.aliasCommands {
+				rootCmd.AddCommand(cmd)
+			}
 
-			tt.opts.existingCommand = shared.ExistingCommandFunc(f, rootCmd)
+			tt.opts.validAliasName = shared.ValidAliasNameFunc(rootCmd)
+			tt.opts.validAliasExpansion = shared.ValidAliasExpansionFunc(rootCmd)
 
 			if tt.stdin != "" {
 				stdin.WriteString(tt.stdin)

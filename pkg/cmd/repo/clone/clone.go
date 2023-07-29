@@ -178,12 +178,19 @@ func cloneRun(opts *CloneOptions) error {
 			upstreamName = canonicalRepo.Parent.RepoOwner()
 		}
 
+		gc := gitClient.Copy()
+		gc.RepoDir = cloneDir
+
 		addedRemote, err := gitClient.AddRemote(ctx, upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name}, git.WithRepoDir(cloneDir))
 		if err != nil {
 			return err
 		}
 
-		if err := gitClient.Fetch(ctx, upstreamName, "", git.WithRepoDir(cloneDir)); err != nil {
+		if err := gc.Fetch(ctx, upstreamName, ""); err != nil {
+			return err
+		}
+
+		if err := gc.SetRemoteBranches(ctx, upstreamName, `*`); err != nil {
 			return err
 		}
 		// make parent the default repo

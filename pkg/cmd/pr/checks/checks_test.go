@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -123,17 +124,18 @@ func TestNewCmdChecks(t *testing.T) {
 
 func Test_checksRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		tty       bool
-		watch     bool
-		failFast  bool
-		required  bool
-		httpStubs func(*httpmock.Registry)
-		wantOut   string
-		wantErr   string
+		name            string
+		tty             bool
+		watch           bool
+		failFast        bool
+		required        bool
+		disableDetector bool
+		httpStubs       func(*httpmock.Registry)
+		wantOut         string
+		wantErr         string
 	}{
 		{
-			name: "no commits",
+			name: "no commits tty",
 			tty:  true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -145,7 +147,7 @@ func Test_checksRun(t *testing.T) {
 			wantErr: "no commit found on the pull request",
 		},
 		{
-			name: "no checks",
+			name: "no checks tty",
 			tty:  true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -157,7 +159,7 @@ func Test_checksRun(t *testing.T) {
 			wantErr: "no checks reported on the 'trunk' branch",
 		},
 		{
-			name: "some failing",
+			name: "some failing tty",
 			tty:  true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -165,11 +167,11 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someFailing.json"),
 				)
 			},
-			wantOut: "Some checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
+			wantOut: "Some checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests     1m26s  sweet link\n✓  cool tests    1m26s  sweet link\n*  slow tests    1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
-			name: "some pending",
+			name: "some pending tty",
 			tty:  true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -177,11 +179,11 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/somePending.json"),
 				)
 			},
-			wantOut: "Some checks are still pending\n0 failing, 2 successful, 0 skipped, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
+			wantOut: "Some checks are still pending\n0 failing, 2 successful, 0 skipped, and 1 pending checks\n\n✓  cool tests    1m26s  sweet link\n✓  rad tests     1m26s  sweet link\n*  slow tests    1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
-			name: "all passing",
+			name: "all passing tty",
 			tty:  true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -189,11 +191,11 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/allPassing.json"),
 				)
 			},
-			wantOut: "All checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
+			wantOut: "All checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests    1m26s  sweet link\n✓  cool tests       1m26s  sweet link\n✓  rad tests        1m26s  sweet link\n",
 			wantErr: "",
 		},
 		{
-			name:  "watch all passing",
+			name:  "watch all passing tty",
 			tty:   true,
 			watch: true,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -202,11 +204,11 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/allPassing.json"),
 				)
 			},
-			wantOut: "\x1b[?1049hAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n\x1b[?1049lAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
+			wantOut: "\x1b[?1049hAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests    1m26s  sweet link\n✓  cool tests       1m26s  sweet link\n✓  rad tests        1m26s  sweet link\n\x1b[?1049lAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests    1m26s  sweet link\n✓  cool tests       1m26s  sweet link\n✓  rad tests        1m26s  sweet link\n",
 			wantErr: "",
 		},
 		{
-			name:     "watch some failing with fail fast",
+			name:     "watch some failing with fail fast tty",
 			tty:      true,
 			watch:    true,
 			failFast: true,
@@ -216,11 +218,11 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someFailing.json"),
 				)
 			},
-			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing checks status every 0 seconds. Press Ctrl+C to quit.\n\nSome checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n*  slow tests  1m26s  sweet link\n\x1b[?1049lSome checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
+			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing checks status every 0 seconds. Press Ctrl+C to quit.\n\nSome checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests     1m26s  sweet link\n✓  cool tests    1m26s  sweet link\n*  slow tests    1m26s  sweet link\n\x1b[?1049lSome checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests     1m26s  sweet link\n✓  cool tests    1m26s  sweet link\n*  slow tests    1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
-			name: "with statuses",
+			name: "with statuses tty",
 			tty:  true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -228,8 +230,19 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withStatuses.json"),
 				)
 			},
-			wantOut: "Some checks were not successful\n1 failing, 2 successful, 0 skipped, and 0 pending checks\n\nX  a status           sweet link\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n",
+			wantOut: "Some checks were not successful\n1 failing, 2 successful, 0 skipped, and 0 pending checks\n\nX  a status             sweet link\n✓  cool tests    1m26s  sweet link\n✓  rad tests     1m26s  sweet link\n",
 			wantErr: "SilentError",
+		},
+		{
+			name: "no commits",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.StringResponse(`{"data":{"node":{}}}`),
+				)
+			},
+			wantOut: "",
+			wantErr: "no commit found on the pull request",
 		},
 		{
 			name: "no checks",
@@ -250,7 +263,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someFailing.json"),
 				)
 			},
-			wantOut: "sad tests\tfail\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
+			wantOut: "sad tests\tfail\t1m26s\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\n",
 			wantErr: "SilentError",
 		},
 		{
@@ -261,7 +274,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/somePending.json"),
 				)
 			},
-			wantOut: "cool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
+			wantOut: "cool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\n",
 			wantErr: "SilentError",
 		},
 		{
@@ -272,7 +285,7 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/allPassing.json"),
 				)
 			},
-			wantOut: "awesome tests\tpass\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
+			wantOut: "awesome tests\tpass\t1m26s\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\n",
 			wantErr: "",
 		},
 		{
@@ -283,8 +296,20 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withStatuses.json"),
 				)
 			},
-			wantOut: "a status\tfail\t0\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
+			wantOut: "a status\tfail\t0\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\n",
 			wantErr: "SilentError",
+		},
+		{
+			name: "some skipped tty",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/someSkipping.json"),
+				)
+			},
+			wantOut: "All checks were successful\n0 failing, 1 successful, 2 skipped, and 0 pending checks\n\n✓  cool tests    1m26s  sweet link\n-  rad tests     1m26s  sweet link\n-  skip tests    1m26s  sweet link\n",
+			wantErr: "",
 		},
 		{
 			name: "some skipped",
@@ -294,34 +319,129 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someSkipping.json"),
 				)
 			},
-			tty:     true,
-			wantOut: "All checks were successful\n0 failing, 1 successful, 2 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n-  rad tests   1m26s  sweet link\n-  skip tests  1m26s  sweet link\n",
+			wantOut: "cool tests\tpass\t1m26s\tsweet link\t\nrad tests\tskipping\t1m26s\tsweet link\t\nskip tests\tskipping\t1m26s\tsweet link\t\n",
 			wantErr: "",
 		},
 		{
-			name: "only required",
+			name:     "only required tty",
+			tty:      true,
+			required: true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
 					httpmock.FileResponse("./fixtures/onlyRequired.json"),
 				)
 			},
-			tty:      true,
-			wantOut:  "All checks were successful\n0 failing, 1 successful, 0 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n",
-			wantErr:  "",
-			required: true,
+			wantOut: "All checks were successful\n0 failing, 1 successful, 0 skipped, and 0 pending checks\n\n✓  cool tests    1m26s  sweet link\n",
+			wantErr: "",
 		},
 		{
-			name: "no required checks",
+			name:     "only required",
+			required: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/onlyRequired.json"),
+				)
+			},
+			wantOut: "cool tests\tpass\t1m26s\tsweet link\t\n",
+			wantErr: "",
+		},
+		{
+			name:     "only required but no required checks tty",
+			tty:      true,
+			required: true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
 					httpmock.FileResponse("./fixtures/someSkipping.json"),
 				)
 			},
-			wantOut:  "",
-			wantErr:  "no required checks reported on the 'trunk' branch",
+			wantOut: "",
+			wantErr: "no required checks reported on the 'trunk' branch",
+		},
+		{
+			name:     "only required but no required checks",
 			required: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/someSkipping.json"),
+				)
+			},
+			wantOut: "",
+			wantErr: "no required checks reported on the 'trunk' branch",
+		},
+		{
+			name: "descriptions tty",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withDescriptions.json"),
+				)
+			},
+			wantOut: "All checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  awesome description  1m26s  sweet link\n✓  cool tests     cool description     1m26s  sweet link\n✓  rad tests      rad description      1m26s  sweet link\n",
+			wantErr: "",
+		},
+		{
+			name: "descriptions",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withDescriptions.json"),
+				)
+			},
+			wantOut: "awesome tests\tpass\t1m26s\tsweet link\tawesome description\ncool tests\tpass\t1m26s\tsweet link\tcool description\nrad tests\tpass\t1m26s\tsweet link\trad description\n",
+			wantErr: "",
+		},
+		{
+			name: "events tty",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withEvents.json"),
+				)
+			},
+			wantOut: "All checks were successful\n0 failing, 2 successful, 0 skipped, and 0 pending checks\n\n✓  tests/cool tests (pull_request)  cool description  1m26s  sweet link\n✓  tests/cool tests (push)          cool description  1m26s  sweet link\n",
+			wantErr: "",
+		},
+		{
+			name:            "events not supported tty",
+			tty:             true,
+			disableDetector: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withoutEvents.json"),
+				)
+			},
+			wantOut: "All checks were successful\n0 failing, 1 successful, 0 skipped, and 0 pending checks\n\n✓  tests/cool tests  cool description  1m26s  sweet link\n",
+			wantErr: "",
+		},
+		{
+			name: "events",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withEvents.json"),
+				)
+			},
+			wantOut: "cool tests\tpass\t1m26s\tsweet link\tcool description\ncool tests\tpass\t1m26s\tsweet link\tcool description\n",
+			wantErr: "",
+		},
+		{
+			name:            "events not supported",
+			disableDetector: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withoutEvents.json"),
+				)
+			},
+			wantOut: "cool tests\tpass\t1m26s\tsweet link\tcool description\n",
+			wantErr: "",
 		},
 	}
 
@@ -337,7 +457,14 @@ func Test_checksRun(t *testing.T) {
 				tt.httpStubs(reg)
 			}
 
+			var detector fd.Detector
+			detector = &fd.EnabledDetectorMock{}
+			if tt.disableDetector {
+				detector = &fd.DisabledDetectorMock{}
+			}
+
 			response := &api.PullRequest{Number: 123, HeadRefName: "trunk"}
+
 			opts := &ChecksOptions{
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
@@ -345,6 +472,7 @@ func Test_checksRun(t *testing.T) {
 				IO:          ios,
 				SelectorArg: "123",
 				Finder:      shared.NewMockFinder("123", response, ghrepo.New("OWNER", "REPO")),
+				Detector:    detector,
 				Watch:       tt.watch,
 				FailFast:    tt.failFast,
 				Required:    tt.required,
@@ -607,6 +735,156 @@ func TestEliminateDuplicates(t *testing.T) {
 					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
 					DetailsURL:  "",
 					TargetURL:   "https://github.com/cli/cli/3",
+				},
+			},
+		},
+		{
+			name: "unique workflow name",
+			checkContexts: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/1",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "some builds",
+							},
+						},
+					},
+				},
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/2",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "some other builds",
+							},
+						},
+					},
+				},
+			},
+			want: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/1",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "some builds",
+							},
+						},
+					},
+				},
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/2",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "some other builds",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "unique workflow run event",
+			checkContexts: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/1",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "builds",
+							},
+						},
+					},
+				},
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/2",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "pull_request",
+							Workflow: api.Workflow{
+								Name: "builds",
+							},
+						},
+					},
+				},
+			},
+			want: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/1",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "push",
+							Workflow: api.Workflow{
+								Name: "builds",
+							},
+						},
+					},
+				},
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/2",
+					CheckSuite: api.CheckSuite{
+						WorkflowRun: api.WorkflowRun{
+							Event: "pull_request",
+							Workflow: api.Workflow{
+								Name: "builds",
+							},
+						},
+					},
 				},
 			},
 		},

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -44,6 +45,7 @@ type CreateOptions struct {
 	RepoOverride    string
 
 	Autofill    bool
+	FillFirst   bool
 	WebMode     bool
 	RecoverFile string
 
@@ -129,6 +131,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
+			// Workaround: Due to the way this command is implemented, we need to manually check GH_REPO.
+			// Commands should use the standard BaseRepoOverride functionality to handle this behavior instead.
+			if opts.RepoOverride == "" {
+				opts.RepoOverride = os.Getenv("GH_REPO")
+			}
+
 			noMaintainerEdit, _ := cmd.Flags().GetBool("no-maintainer-edit")
 			opts.MaintainerCanModify = !noMaintainerEdit
 
@@ -137,13 +145,19 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.IsDraft && opts.WebMode {
-				return errors.New("the `--draft` flag is not supported with `--web`")
+				return cmdutil.FlagErrorf("the `--draft` flag is not supported with `--web`")
 			}
+
 			if len(opts.Reviewers) > 0 && opts.WebMode {
-				return errors.New("the `--reviewer` flag is not supported with `--web`")
+				return cmdutil.FlagErrorf("the `--reviewer` flag is not supported with `--web`")
 			}
+
 			if cmd.Flags().Changed("no-maintainer-edit") && opts.WebMode {
-				return errors.New("the `--no-maintainer-edit` flag is not supported with `--web`")
+				return cmdutil.FlagErrorf("the `--no-maintainer-edit` flag is not supported with `--web`")
+			}
+
+			if opts.Autofill && opts.FillFirst {
+				return cmdutil.FlagErrorf("`--fill` is not supported with `--fill-first`")
 			}
 
 			opts.BodyProvided = cmd.Flags().Changed("body")
@@ -157,11 +171,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.Template != "" && opts.BodyProvided {
-				return errors.New("`--template` is not supported when using `--body` or `--body-file`")
+				return cmdutil.FlagErrorf("`--template` is not supported when using `--body` or `--body-file`")
 			}
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.Autofill && (!opts.TitleProvided || !opts.BodyProvided) {
-				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill`) when not running interactively")
+			if !opts.IO.CanPrompt() && !opts.WebMode && !(opts.Autofill || opts.FillFirst) && (!opts.TitleProvided || !opts.BodyProvided) {
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `fill-first`) when not running interactively")
 			}
 
 			if runF != nil {
@@ -180,6 +194,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
+	fl.BoolVar(&opts.FillFirst, "fill-first", false, "Do not prompt for title/body and just use first commit info")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
 	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
@@ -218,7 +233,7 @@ func createRun(opts *CreateOptions) (err error) {
 	var openURL string
 
 	if opts.WebMode {
-		if !opts.Autofill {
+		if !(opts.Autofill || opts.FillFirst) {
 			state.Title = opts.Title
 			state.Body = opts.Body
 		}
@@ -274,7 +289,7 @@ func createRun(opts *CreateOptions) (err error) {
 			ghrepo.FullName(ctx.BaseRepo))
 	}
 
-	if opts.Autofill || (opts.TitleProvided && opts.BodyProvided) {
+	if opts.Autofill || opts.FillFirst || (opts.TitleProvided && opts.BodyProvided) {
 		err = handlePush(*opts, *ctx)
 		if err != nil {
 			return
@@ -318,8 +333,6 @@ func createRun(opts *CreateOptions) (err error) {
 
 			if template != nil {
 				templateContent = string(template.Body())
-			} else {
-				templateContent = string(tpl.LegacyBody())
 			}
 		}
 
@@ -387,7 +400,7 @@ func createRun(opts *CreateOptions) (err error) {
 	return
 }
 
-func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) error {
+func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool) error {
 	baseRef := ctx.BaseTrackingBranch
 	headRef := ctx.HeadBranch
 	gitClient := ctx.GitClient
@@ -396,17 +409,16 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) e
 	if err != nil {
 		return err
 	}
-
-	if len(commits) == 1 {
-		state.Title = commits[0].Title
-		body, err := gitClient.CommitBody(context.Background(), commits[0].Sha)
+	if len(commits) == 1 || useFirstCommit {
+		commitIndex := len(commits) - 1
+		state.Title = commits[commitIndex].Title
+		body, err := gitClient.CommitBody(context.Background(), commits[commitIndex].Sha)
 		if err != nil {
 			return err
 		}
 		state.Body = body
 	} else {
 		state.Title = humanize(headRef)
-
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
 			fmt.Fprintf(&body, "- %s\n", commits[i].Title)
@@ -480,9 +492,9 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 		Draft:      opts.IsDraft,
 	}
 
-	if opts.Autofill || !opts.TitleProvided || !opts.BodyProvided {
-		err := initDefaultTitleBody(ctx, state)
-		if err != nil && opts.Autofill {
+	if opts.Autofill || opts.FillFirst || !opts.TitleProvided || !opts.BodyProvided {
+		err := initDefaultTitleBody(ctx, state, opts.FillFirst)
+		if err != nil && (opts.Autofill || opts.FillFirst) {
 			return nil, fmt.Errorf("could not compute title or body defaults: %w", err)
 		}
 	}
@@ -731,24 +743,51 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// missing:
 	// 1. the head repo was just created by auto-forking;
 	// 2. an existing fork was discovered by querying the API.
-	//
 	// In either case, we want to add the head repo as a new git remote so we
-	// can push to it.
+	// can push to it. We will try to add the head repo as the "origin" remote
+	// and fallback to the "fork" remote if it is unavailable. Also, if the
+	// base repo is the "origin" remote we will rename it "upstream".
 	if headRemote == nil && ctx.IsPushEnabled {
 		cfg, err := opts.Config()
 		if err != nil {
 			return err
 		}
+
+		remotes, err := opts.Remotes()
+		if err != nil {
+			return err
+		}
+
 		cloneProtocol, _ := cfg.GetOrDefault(headRepo.RepoHost(), "git_protocol")
-
 		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
-
-		// TODO: prevent clashes with another remote of a same name
 		gitClient := ctx.GitClient
-		gitRemote, err := gitClient.AddRemote(context.Background(), "fork", headRepoURL, []string{})
+		origin, _ := remotes.FindByName("origin")
+		upstream, _ := remotes.FindByName("upstream")
+		remoteName := "origin"
+
+		if origin != nil {
+			remoteName = "fork"
+		}
+
+		if origin != nil && upstream == nil && ghrepo.IsSame(origin, ctx.BaseRepo) {
+			renameCmd, err := gitClient.Command(context.Background(), "remote", "rename", "origin", "upstream")
+			if err != nil {
+				return err
+			}
+			if _, err = renameCmd.Output(); err != nil {
+				return fmt.Errorf("error renaming origin remote: %w", err)
+			}
+			remoteName = "origin"
+			fmt.Fprintf(opts.IO.ErrOut, "Changed %s remote to %q\n", ghrepo.FullName(ctx.BaseRepo), "upstream")
+		}
+
+		gitRemote, err := gitClient.AddRemote(context.Background(), remoteName, headRepoURL, []string{})
 		if err != nil {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
+
+		fmt.Fprintf(opts.IO.ErrOut, "Added %s as remote %q\n", ghrepo.FullName(headRepo), remoteName)
+
 		headRemote = &ghContext.Remote{
 			Remote: gitRemote,
 			Repo:   headRepo,
