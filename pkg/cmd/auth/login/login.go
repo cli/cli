@@ -129,7 +129,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
-	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store.")
+	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store")
 	_ = cmd.Flags().MarkHidden("secure-storage")
 
 	cmd.Flags().BoolVar(&opts.InsecureStorage, "insecure-storage", false, "Save authentication credentials in plain text instead of credential store")
