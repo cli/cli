@@ -59,6 +59,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 			The default authentication mode is a web-based browser flow. After completion, an
 			authentication token will be stored internally.
+			If a credential store is not found or there is an issue using it we will fallback to writing the token in plain text.
+			See %[1]sgh auth status%[1]s for its stored location.
 
 			Alternatively, use %[1]s--with-token%[1]s to pass in a token on standard input.
 			The minimum required scopes for the token are: "repo", "read:org".
@@ -127,7 +129,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
-	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store")
+	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store.")
 	_ = cmd.Flags().MarkHidden("secure-storage")
 
 	cmd.Flags().BoolVar(&opts.InsecureStorage, "insecure-storage", false, "Save authentication credentials in plain text instead of credential store")
@@ -172,7 +174,8 @@ func loginRun(opts *LoginOptions) error {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 		// Adding a user key ensures that a nonempty host section gets written to the config file.
-		return authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
+		configWriteError, _ := authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
+		return configWriteError
 	}
 
 	existingToken, _ := authCfg.Token(hostname)

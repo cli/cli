@@ -220,7 +220,7 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 // Login will set user, git protocol, and auth token for the given hostname.
 // If the encrypt option is specified it will first try to store the auth token
 // in encrypted storage and will fall back to the plain text config file.
-func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secureStorage bool) error {
+func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secureStorage bool) (configWriteErr error, insecureStorageUsed bool) {
 	var setErr error
 	if secureStorage {
 		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
@@ -230,6 +230,9 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	}
 	if !secureStorage || setErr != nil {
 		c.cfg.Set([]string{hosts, hostname, oauthToken}, token)
+		insecureStorageUsed = true
+	} else {
+		insecureStorageUsed = false
 	}
 	if username != "" {
 		c.cfg.Set([]string{hosts, hostname, "user"}, username)
@@ -237,7 +240,7 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	if gitProtocol != "" {
 		c.cfg.Set([]string{hosts, hostname, "git_protocol"}, gitProtocol)
 	}
-	return ghConfig.Write(c.cfg)
+	return ghConfig.Write(c.cfg), insecureStorageUsed
 }
 
 // Logout will remove user, git protocol, and auth token for the given hostname.

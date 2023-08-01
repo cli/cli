@@ -22,7 +22,7 @@ import (
 const defaultSSHKeyTitle = "GitHub CLI"
 
 type iconfig interface {
-	Login(string, string, string, string, bool) error
+	Login(string, string, string, string, bool) (error, bool)
 }
 
 type LoginOptions struct {
@@ -188,8 +188,12 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	if err := cfg.Login(hostname, username, authToken, gitProtocol, opts.SecureStorage); err != nil {
-		return err
+	configWriteError, insecureStorageUsed := cfg.Login(hostname, username, authToken, gitProtocol, opts.SecureStorage)
+	if configWriteError != nil {
+		return configWriteError
+	}
+	if insecureStorageUsed {
+		fmt.Fprintf(opts.IO.ErrOut, "The authentication credentials were written in plain text.\n")
 	}
 
 	if credentialFlow.ShouldSetup() {
