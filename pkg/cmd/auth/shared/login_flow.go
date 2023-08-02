@@ -193,7 +193,7 @@ func Login(opts *LoginOptions) error {
 		return err
 	}
 	if insecureStorageUsed {
-		fmt.Fprintf(opts.IO.ErrOut, "The authentication credentials were written in plain text.\n")
+		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication credentials saved in plain text", cs.Yellow("!"))
 	}
 
 	if credentialFlow.ShouldSetup() {

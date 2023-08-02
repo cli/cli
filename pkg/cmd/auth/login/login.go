@@ -58,8 +58,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			Authenticate with a GitHub host.
 
 			The default authentication mode is a web-based browser flow. After completion, an
-			authentication token will be stored internally.
-			If a credential store is not found or there is an issue using it we will fallback to writing the token in plain text.
+			authentication token will be stored securely in the system credential store.
+			If a credential store is not found or there is an issue using it gh will fallback to writing the token to a plain text file.
 			See %[1]sgh auth status%[1]s for its stored location.
 
 			Alternatively, use %[1]s--with-token%[1]s to pass in a token on standard input.
@@ -174,7 +174,7 @@ func loginRun(opts *LoginOptions) error {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 		// Adding a user key ensures that a nonempty host section gets written to the config file.
-		_, err1 := authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
+		_, loginErr := authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
 		return err1
 	}
 
