@@ -17,9 +17,10 @@ type SetOptions struct {
 	Config func() (config.Config, error)
 	IO     *iostreams.IOStreams
 
-	Name      string
-	Expansion string
-	IsShell   bool
+	Name              string
+	Expansion         string
+	IsShell           bool
+	OverwriteExisting bool
 
 	validAliasName      func(string) bool
 	validAliasExpansion func(string) bool
@@ -86,6 +87,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	}
 
 	cmd.Flags().BoolVarP(&opts.IsShell, "shell", "s", false, "Declare an alias to be passed through a shell interpreter")
+	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing aliases of the same name")
 
 	return cmd
 }
@@ -113,8 +115,23 @@ func setRun(opts *SetOptions) error {
 		expansion = "!" + expansion
 	}
 
+	var existingAlias bool
+	oldExpansion, err := aliasCfg.Get(opts.Name)
+	if err == nil {
+		existingAlias = true
+	}
+
 	if !opts.validAliasName(opts.Name) {
-		return fmt.Errorf("could not create alias: %q is already a gh command, extension, or alias", opts.Name)
+		if !existingAlias {
+			return fmt.Errorf("could not create alias: %q is already a gh command, extension, or alias", opts.Name)
+		}
+
+		if existingAlias && !opts.OverwriteExisting {
+			return fmt.Errorf("%s Could not create alias %q: name already taken. Add --clobber flag to overwrite",
+				cs.FailureIcon(),
+				cs.Bold(opts.Name),
+			)
+		}
 	}
 
 	if !opts.validAliasExpansion(expansion) {
@@ -122,7 +139,7 @@ func setRun(opts *SetOptions) error {
 	}
 
 	successMsg := fmt.Sprintf("%s Added alias.", cs.SuccessIcon())
-	if oldExpansion, err := aliasCfg.Get(opts.Name); err == nil {
+	if existingAlias && opts.OverwriteExisting {
 		successMsg = fmt.Sprintf("%s Changed alias %s from %s to %s",
 			cs.SuccessIcon(),
 			cs.Bold(opts.Name),
