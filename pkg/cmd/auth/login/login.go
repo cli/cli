@@ -174,8 +174,8 @@ func loginRun(opts *LoginOptions) error {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 		// Adding a user key ensures that a nonempty host section gets written to the config file.
-		configWriteError, _ := authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
-		return configWriteError
+		_, err1 := authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
+		return err1
 	}
 
 	existingToken, _ := authCfg.Token(hostname)
