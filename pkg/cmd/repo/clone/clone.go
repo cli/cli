@@ -181,7 +181,7 @@ func cloneRun(opts *CloneOptions) error {
 		gc := gitClient.Copy()
 		gc.RepoDir = cloneDir
 
-		addedRemote, err := gitClient.AddRemote(ctx, upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name}, git.WithRepoDir(cloneDir))
+		addedRemote, err := gc.AddRemote(ctx, upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name}, git.WithRepoDir(gc.RepoDir))
 		if err != nil {
 			return err
 		}
@@ -198,8 +198,8 @@ func cloneRun(opts *CloneOptions) error {
 		if err != nil {
 			return err
 		}
-		if err = gitClient.SetRemoteResolution(
-			ctx, addedRemote.Name, "base", git.WithRepoDir(cloneDir)); err != nil {
+		if err = gc.SetRemoteResolution(
+			ctx, addedRemote.Name, "base", git.WithRepoDir(gc.RepoDir)); err != nil {
 			return err
 		}
 
