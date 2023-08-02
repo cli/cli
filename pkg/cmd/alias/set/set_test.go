@@ -113,7 +113,7 @@ func TestAliasSet_existing_alias(t *testing.T) {
 		  co: pr checkout
 	`))
 
-	output, err := runCommand(cfg, true, "co 'pr checkout -Rcool/repo'", "")
+	output, err := runCommand(cfg, true, "co 'pr checkout -Rcool/repo' --clobber", "")
 	require.NoError(t, err)
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
