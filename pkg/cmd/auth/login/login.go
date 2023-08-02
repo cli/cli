@@ -175,7 +175,7 @@ func loginRun(opts *LoginOptions) error {
 		}
 		// Adding a user key ensures that a nonempty host section gets written to the config file.
 		_, loginErr := authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
-		return err1
+		return loginErr
 	}
 
 	existingToken, _ := authCfg.Token(hostname)
