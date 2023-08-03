@@ -63,6 +63,8 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
 	}
 
+	client.Transport = AddASCIISanitizer(client.Transport)
+
 	return client, nil
 }
 
