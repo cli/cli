@@ -3,12 +3,17 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strconv"
 	"testing"
+
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
 func generateCodespaceList(start int, end int) []*Codespace {
@@ -128,6 +133,88 @@ func createFakeCreateEndpointServer(t *testing.T, wantStatus int) *httptest.Serv
 
 func createHttpClient() (*http.Client, error) {
 	return &http.Client{}, nil
+}
+
+func TestNewApiServerUrl_dotcomConfig(t *testing.T) {
+	os.Setenv("GITHUB_API_URL", "")
+	cfg := &config.ConfigMock{
+		AuthenticationFunc: func() *config.AuthConfig {
+			return &config.AuthConfig{}
+		},
+	}
+	f := &cmdutil.Factory{
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+	}
+	api := New(f)
+
+	if api.githubAPI != "https://api.github.com" {
+		t.Fatalf("expected https://api.github.com, got %s", api.githubAPI)
+	}
+	if len(cfg.AuthenticationCalls()) != 1 {
+		t.Fatalf("Server url was not pulled from the config")
+	}
+}
+
+func TestNewApiServerUrl_customConfig(t *testing.T) {
+	os.Setenv("GITHUB_API_URL", "")
+	cfg := &config.ConfigMock{
+		AuthenticationFunc: func() *config.AuthConfig {
+			authCfg := &config.AuthConfig{}
+			authCfg.SetDefaultHost("github.mycompany.com", "GH_HOST")
+			return authCfg
+		},
+	}
+	f := &cmdutil.Factory{
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+	}
+	api := New(f)
+
+	if api.githubAPI != "https://github.mycompany.com/api/v3" {
+		t.Fatalf("expected https://github.mycompany.com/api/v3, got %s", api.githubAPI)
+	}
+	if len(cfg.AuthenticationCalls()) != 1 {
+		t.Fatalf("Server url was not pulled from the config")
+	}
+}
+
+func TestNewApiServerUrl_env(t *testing.T) {
+	os.Setenv("GITHUB_API_URL", "https://api.mycompany.com")
+	cfg := &config.ConfigMock{
+		AuthenticationFunc: func() *config.AuthConfig {
+			return &config.AuthConfig{}
+		},
+	}
+	f := &cmdutil.Factory{
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+	}
+	api := New(f)
+
+	if api.githubAPI != "https://api.mycompany.com" {
+		t.Fatalf("expected https://api.mycompany.com, got %s", api.githubAPI)
+	}
+	if len(cfg.AuthenticationCalls()) != 0 {
+		t.Fatalf("Configuration was checked instead of using the GITHUB_API_URL environment variable")
+	}
+}
+
+func TestNewApiServerUrl_dotcomFallback(t *testing.T) {
+	os.Setenv("GITHUB_API_URL", "")
+	f := &cmdutil.Factory{
+		Config: func() (config.Config, error) {
+			return nil, errors.New("Failed to load")
+		},
+	}
+	api := New(f)
+
+	if api.githubAPI != "https://api.github.com" {
+		t.Fatalf("expected https://api.github.com, got %s", api.githubAPI)
+	}
 }
 
 func TestCreateCodespaces(t *testing.T) {
