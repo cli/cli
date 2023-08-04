@@ -223,7 +223,6 @@ func createRun(opts *CreateOptions) error {
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
-			opts.TagName = strings.TrimSpace(opts.TagName)
 		}
 	}
 
