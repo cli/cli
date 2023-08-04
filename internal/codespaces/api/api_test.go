@@ -126,13 +126,17 @@ func createFakeCreateEndpointServer(t *testing.T, wantStatus int) *httptest.Serv
 	}))
 }
 
+func createHttpClient() (*http.Client, error) {
+	return &http.Client{}, nil
+}
+
 func TestCreateCodespaces(t *testing.T) {
 	svr := createFakeCreateEndpointServer(t, http.StatusCreated)
 	defer svr.Close()
 
 	api := API{
 		githubAPI: svr.URL,
-		client:    &http.Client{},
+		client:    createHttpClient,
 	}
 
 	ctx := context.TODO()
@@ -161,7 +165,7 @@ func TestCreateCodespaces_displayName(t *testing.T) {
 
 	api := API{
 		githubAPI: svr.URL,
-		client:    &http.Client{},
+		client:    createHttpClient,
 	}
 
 	retentionPeriod := 0
@@ -186,7 +190,7 @@ func TestCreateCodespaces_Pending(t *testing.T) {
 
 	api := API{
 		githubAPI:    svr.URL,
-		client:       &http.Client{},
+		client:       createHttpClient,
 		retryBackoff: 0,
 	}
 
@@ -213,7 +217,7 @@ func TestListCodespaces_limited(t *testing.T) {
 
 	api := API{
 		githubAPI: svr.URL,
-		client:    &http.Client{},
+		client:    createHttpClient,
 	}
 	ctx := context.TODO()
 	codespaces, err := api.ListCodespaces(ctx, ListCodespacesOptions{Limit: 200})
@@ -238,7 +242,7 @@ func TestListCodespaces_unlimited(t *testing.T) {
 
 	api := API{
 		githubAPI: svr.URL,
-		client:    &http.Client{},
+		client:    createHttpClient,
 	}
 	ctx := context.TODO()
 	codespaces, err := api.ListCodespaces(ctx, ListCodespacesOptions{})
@@ -329,7 +333,7 @@ func runRepoSearchTest(t *testing.T, searchText, wantQueryText, wantSort, wantMa
 
 	api := API{
 		githubAPI: svr.URL,
-		client:    &http.Client{},
+		client:    createHttpClient,
 	}
 
 	ctx := context.Background()
@@ -374,7 +378,7 @@ func TestRetries(t *testing.T) {
 	t.Cleanup(srv.Close)
 	a := &API{
 		githubAPI: srv.URL,
-		client:    &http.Client{},
+		client:    createHttpClient,
 	}
 	cs, err := a.GetCodespace(context.Background(), "test", false)
 	if err != nil {
@@ -562,7 +566,7 @@ func TestAPI_EditCodespace(t *testing.T) {
 			defer svr.Close()
 
 			a := &API{
-				client:    &http.Client{},
+				client:    createHttpClient,
 				githubAPI: svr.URL,
 			}
 			got, err := a.EditCodespace(tt.args.ctx, tt.args.codespaceName, tt.args.params)
@@ -602,7 +606,7 @@ func TestAPI_EditCodespacePendingOperation(t *testing.T) {
 	defer svr.Close()
 
 	a := &API{
-		client:    &http.Client{},
+		client:    createHttpClient,
 		githubAPI: svr.URL,
 	}
 
