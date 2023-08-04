@@ -34,6 +34,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -42,13 +43,13 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/opentracing/opentracing-go"
 )
 
 const (
-	githubServer = "https://github.com"
-	githubAPI    = "https://api.github.com"
-	vscsAPI      = "https://online.visualstudio.com"
+	defaultApiUrl = "https://api.github.com"
 )
 
 const (
@@ -60,33 +61,28 @@ const (
 
 // API is the interface to the codespace service.
 type API struct {
-	client       httpClient
-	vscsAPI      string
+	client       func() (*http.Client, error)
 	githubAPI    string
-	githubServer string
 	retryBackoff time.Duration
 }
 
-type httpClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
 // New creates a new API client connecting to the configured endpoints with the HTTP client.
-func New(serverURL, apiURL, vscsURL string, httpClient httpClient) *API {
-	if serverURL == "" {
-		serverURL = githubServer
-	}
+func New(f *cmdutil.Factory) *API {
+	apiURL := os.Getenv("GITHUB_API_URL")
 	if apiURL == "" {
-		apiURL = githubAPI
+		cfg, err := f.Config()
+		if err != nil {
+			// fallback to the default endpoint
+			apiURL = defaultApiUrl
+		} else {
+			host, _ := cfg.Authentication().DefaultHost()
+			apiURL = ghinstance.RESTPrefix(host)
+		}
 	}
-	if vscsURL == "" {
-		vscsURL = vscsAPI
-	}
+
 	return &API{
-		client:       httpClient,
-		vscsAPI:      strings.TrimSuffix(vscsURL, "/"),
+		client:       f.HttpClient,
 		githubAPI:    strings.TrimSuffix(apiURL, "/"),
-		githubServer: strings.TrimSuffix(serverURL, "/"),
 		retryBackoff: 100 * time.Millisecond,
 	}
 }
@@ -1119,7 +1115,13 @@ func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http
 	span, ctx := opentracing.StartSpanFromContext(ctx, spanName)
 	defer span.Finish()
 	req = req.WithContext(ctx)
-	return a.client.Do(req)
+
+	httpClient, err := a.client()
+	if err != nil {
+		return nil, err
+	}
+
+	return httpClient.Do(req)
 }
 
 // setHeaders sets the required headers for the API.
