@@ -1,23 +1,28 @@
 package review
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
+	"github.com/waigani/diffparser"
 )
 
 type ReviewOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	Prompter   prompter.Prompter
@@ -28,12 +33,14 @@ type ReviewOptions struct {
 	InteractiveMode bool
 	ReviewType      api.PullRequestReviewState
 	Body            string
+	CreateSuggestions bool
 }
 
 func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Command {
 	opts := &ReviewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Prompter:   f.Prompter,
 	}
@@ -42,6 +49,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 		flagApprove        bool
 		flagRequestChanges bool
 		flagComment        bool
+		flagSuggest        bool
 	)
 
 	var bodyFile string
@@ -66,6 +74,10 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 
 			# request changes on a specific pull request
 			$ gh pr review 123 -r -b "needs more ASCII art"
+
+			# suggest changes to the current pull request
+			$ git add path/to/file/with/changes
+			$ gh pr review -s
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -117,6 +129,10 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 				}
 			}
 
+			if flagSuggest {
+				opts.CreateSuggestions = true
+			}
+
 			if found == 0 && opts.Body == "" {
 				if !opts.IO.CanPrompt() {
 					return cmdutil.FlagErrorf("--approve, --request-changes, or --comment required when not running interactively")
@@ -138,6 +154,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&flagApprove, "approve", "a", false, "Approve pull request")
 	cmd.Flags().BoolVarP(&flagRequestChanges, "request-changes", "r", false, "Request changes on a pull request")
 	cmd.Flags().BoolVarP(&flagComment, "comment", "c", false, "Comment on a pull request")
+	cmd.Flags().BoolVarP(&flagSuggest, "suggest", "s", false, "Make suggestions on a pull request")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Specify the body of a review")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 
@@ -153,6 +170,8 @@ func reviewRun(opts *ReviewOptions) error {
 	if err != nil {
 		return err
 	}
+
+	createReviewSuggestions(opts, baseRepo, pr)
 
 	var reviewData *api.PullRequestReviewInput
 	if opts.InteractiveMode {
@@ -265,4 +284,64 @@ func reviewSurvey(opts *ReviewOptions, editorCommand string) (*api.PullRequestRe
 		Body:  body,
 		State: reviewState,
 	}, nil
+}
+
+func createReviewSuggestions(opts *ReviewOptions, baseRepo ghrepo.Interface, pr *api.PullRequest) error {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	gitClient := opts.GitClient
+	stagedDiffString, err := gitClient.StagedDiff(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to compute staged diff: %w", err)
+	}
+
+	stagedDiff, err := diffparser.Parse(stagedDiffString)
+	if err != nil {
+		return fmt.Errorf("failed to parse staged diff: %w", err)
+	}
+
+	for _, file := range stagedDiff.Files {
+		origFileName := file.OrigName
+
+		for _, hunk := range file.Hunks {
+			origStart := hunk.OrigRange.Start
+			origLength := hunk.OrigRange.Length
+			reviewThreadBody := makeSuggestionBody(hunk)
+
+			reviewThreadData := &api.PullRequestReviewThreadInput{
+				Body: reviewThreadBody,
+				Path: origFileName,
+			}
+
+			// The origStart == origLength is a hack to get around a bug in diffparser
+			// which doesn't correctly recognize one line diffs. This could absolutely
+			// create false positives, so it needs to be fixed properly upstream at
+			// some point.
+			if origLength == 1 || origStart == origLength {
+				reviewThreadData.Line = origStart
+			} else {
+				reviewThreadData.StartLine = origStart
+				reviewThreadData.Line = origStart + origLength - 1
+			}
+
+			err = api.AddReviewThread(apiClient, baseRepo, pr, reviewThreadData)
+			if err != nil {
+				return fmt.Errorf("failed to create review thread: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func makeSuggestionBody(hunk *diffparser.DiffHunk) string {
+	bodyString := "```suggestion\n"
+	for _, line := range hunk.NewRange.Lines {
+		bodyString += line.Content + "\n"
+	}
+	return bodyString + "```"
 }
