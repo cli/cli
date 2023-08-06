@@ -227,6 +227,20 @@ func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+func (c *Client) StagedDiff(ctx context.Context) (string, error) {
+	args := []string{"diff", "--staged", "-U0"}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return "", err
+	}
+	outputBytes, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return string(outputBytes), nil
+}
+
 func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commit, error) {
 	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
 	cmd, err := c.Command(ctx, args...)
