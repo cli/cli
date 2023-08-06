@@ -10,8 +10,8 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -29,10 +29,10 @@ type ReviewOptions struct {
 
 	Finder shared.PRFinder
 
-	SelectorArg     string
-	InteractiveMode bool
-	ReviewType      api.PullRequestReviewState
-	Body            string
+	SelectorArg       string
+	InteractiveMode   bool
+	ReviewType        api.PullRequestReviewState
+	Body              string
 	CreateSuggestions bool
 }
 
