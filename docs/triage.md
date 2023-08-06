@@ -16,7 +16,10 @@ To be considered triaged, `enhancement` issues require at least one of the follo
 - `needs-investigation`: work that requires a mystery be solved by the core team before it can move forward
 - `needs-user-input`: we need more information from our users before the task can move forward
 
-To be considered triaged, `bug` issues require a severity label: one of `p1`, `p2`, or `p3`
+To be considered triaged, `bug` issues require a severity label: one of `p1`, `p2`, or `p3`, which are defined as follows:
+ - `p1`: Affects a large population and inhibits work
+ - `p2`: Affects more than a few users but doesn't prevent core functions
+ - `p3`: Affects a small number of users or is largely cosmetic
 
 ## Expectations for community pull requests
 

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -75,47 +76,51 @@ func Test_getExtensionRepos(t *testing.T) {
 	}
 	cfg := config.NewBlankConfig()
 
-	cfg.DefaultHostFunc = func() (string, string) { return "github.com", "" }
+	cfg.AuthenticationFunc = func() *config.AuthConfig {
+		authCfg := &config.AuthConfig{}
+		authCfg.SetDefaultHost("github.com", "")
+		return authCfg
+	}
 
 	reg.Register(
 		httpmock.QueryMatcher("GET", "search/repositories", values),
-		httpmock.JSONResponse(search.RepositoriesResult{
-			IncompleteResults: false,
-			Items: []search.Repository{
-				{
-					FullName:    "vilmibm/gh-screensaver",
-					Name:        "gh-screensaver",
-					Description: "terminal animations",
-					Owner: search.User{
-						Login: "vilmibm",
+		httpmock.JSONResponse(map[string]interface{}{
+			"incomplete_results": false,
+			"total_count":        4,
+			"items": []interface{}{
+				map[string]interface{}{
+					"name":        "gh-screensaver",
+					"full_name":   "vilmibm/gh-screensaver",
+					"description": "terminal animations",
+					"owner": map[string]interface{}{
+						"login": "vilmibm",
 					},
 				},
-				{
-					FullName:    "cli/gh-cool",
-					Name:        "gh-cool",
-					Description: "it's just cool ok",
-					Owner: search.User{
-						Login: "cli",
+				map[string]interface{}{
+					"name":        "gh-cool",
+					"full_name":   "cli/gh-cool",
+					"description": "it's just cool ok",
+					"owner": map[string]interface{}{
+						"login": "cli",
 					},
 				},
-				{
-					FullName:    "samcoe/gh-triage",
-					Name:        "gh-triage",
-					Description: "helps with triage",
-					Owner: search.User{
-						Login: "samcoe",
+				map[string]interface{}{
+					"name":        "gh-triage",
+					"full_name":   "samcoe/gh-triage",
+					"description": "helps with triage",
+					"owner": map[string]interface{}{
+						"login": "samcoe",
 					},
 				},
-				{
-					FullName:    "github/gh-gei",
-					Name:        "gh-gei",
-					Description: "something something enterprise",
-					Owner: search.User{
-						Login: "github",
+				map[string]interface{}{
+					"name":        "gh-gei",
+					"full_name":   "github/gh-gei",
+					"description": "something something enterprise",
+					"owner": map[string]interface{}{
+						"login": "github",
 					},
 				},
 			},
-			Total: 4,
 		}),
 	)
 
@@ -274,11 +279,15 @@ func Test_extList(t *testing.T) {
 			},
 		},
 	}
+	cmdFlex := tview.NewFlex()
 	app := tview.NewApplication()
 	list := tview.NewList()
+	pages := tview.NewPages()
 	ui := uiRegistry{
-		List: list,
-		App:  app,
+		List:    list,
+		App:     app,
+		CmdFlex: cmdFlex,
+		Pages:   pages,
 	}
 	extEntries := []extEntry{
 		{
@@ -313,6 +322,13 @@ func Test_extList(t *testing.T) {
 
 	extList := newExtList(opts, ui, extEntries)
 
+	extList.QueueUpdateDraw = func(f func()) *tview.Application {
+		f()
+		return app
+	}
+
+	extList.WaitGroup = &sync.WaitGroup{}
+
 	extList.Filter("cool")
 	assert.Equal(t, 1, extList.ui.List.GetItemCount())
 
@@ -321,6 +337,8 @@ func Test_extList(t *testing.T) {
 
 	extList.InstallSelected()
 	assert.True(t, extList.extEntries[0].Installed)
+
+	// so I think the goroutines are causing a later failure because the toggleInstalled isn't seen.
 
 	extList.Refresh()
 	assert.Equal(t, 1, extList.ui.List.GetItemCount())

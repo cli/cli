@@ -5,12 +5,15 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/spf13/cobra"
 )
 
 func newRebuildCmd(app *App) *cobra.Command {
-	var codespace string
-	var fullRebuild bool
+	var (
+		selector    *CodespaceSelector
+		fullRebuild bool
+	)
 
 	rebuildCmd := &cobra.Command{
 		Use:   "rebuild",
@@ -20,21 +23,22 @@ preserved. Your codespace will be rebuilt using your working directory's
 dev container. A full rebuild also removes cached Docker images.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Rebuild(cmd.Context(), codespace, fullRebuild)
+			return app.Rebuild(cmd.Context(), selector, fullRebuild)
 		},
 	}
 
-	rebuildCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "name of the codespace")
+	selector = AddCodespaceSelector(rebuildCmd, app.apiClient)
+
 	rebuildCmd.Flags().BoolVar(&fullRebuild, "full", false, "perform a full rebuild")
 
 	return rebuildCmd
 }
 
-func (a *App) Rebuild(ctx context.Context, codespaceName string, full bool) (err error) {
+func (a *App) Rebuild(ctx context.Context, selector *CodespaceSelector, full bool) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
+	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err
 	}
@@ -51,7 +55,13 @@ func (a *App) Rebuild(ctx context.Context, codespaceName string, full bool) (err
 	}
 	defer safeClose(session, &err)
 
-	err = session.RebuildContainer(ctx, full)
+	invoker, err := rpc.CreateInvoker(ctx, session)
+	if err != nil {
+		return err
+	}
+	defer safeClose(invoker, &err)
+
+	err = invoker.RebuildContainer(ctx, full)
 	if err != nil {
 		return fmt.Errorf("rebuilding codespace via session: %w", err)
 	}

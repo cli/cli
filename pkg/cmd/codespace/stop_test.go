@@ -22,7 +22,7 @@ func TestApp_StopCodespace(t *testing.T) {
 		{
 			name: "Stop a codespace I own",
 			opts: &stopOptions{
-				codespaceName: "test-codespace",
+				selector: &CodespaceSelector{codespaceName: "test-codespace"},
 			},
 			fields: fields{
 				apiClient: &apiClientMock{
@@ -52,9 +52,9 @@ func TestApp_StopCodespace(t *testing.T) {
 		{
 			name: "Stop a codespace as an org admin",
 			opts: &stopOptions{
-				codespaceName: "test-codespace",
-				orgName:       "test-org",
-				userName:      "test-user",
+				selector: &CodespaceSelector{codespaceName: "test-codespace"},
+				orgName:  "test-org",
+				userName: "test-user",
 			},
 			fields: fields{
 				apiClient: &apiClientMock{

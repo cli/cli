@@ -115,18 +115,16 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				opts.Editable.Milestone.Edited = true
 			}
 
-			if !opts.Editable.Dirty() {
+			if cmd.Flags().NFlag() == 0 {
+				if !opts.IO.CanPrompt() {
+					return cmdutil.FlagErrorf("flags required when not running interactively")
+				}
 				opts.Interactive = true
-			}
-
-			if opts.Interactive && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("--tile, --body, --reviewer, --assignee, --label, --project, or --milestone required when not running interactively")
 			}
 
 			if runF != nil {
 				return runF(opts)
 			}
-
 			return editRun(opts)
 		},
 	}
@@ -149,16 +147,30 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 }
 
 func editRun(opts *EditOptions) error {
+	editable := opts.Editable
+	lookupFields := []string{"id", "url", "title", "body", "baseRefName"}
+	if opts.Interactive {
+		lookupFields = append(lookupFields, "assignees", "labels")
+	}
+	if opts.Interactive || editable.Reviewers.Edited {
+		lookupFields = append(lookupFields, "reviewRequests")
+	}
+	if opts.Interactive || editable.Projects.Edited {
+		lookupFields = append(lookupFields, "projectCards")
+	}
+	if opts.Interactive || editable.Milestone.Edited {
+		lookupFields = append(lookupFields, "milestone")
+	}
+
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "url", "title", "body", "baseRefName", "reviewRequests", "assignees", "labels", "projectCards", "milestone"},
+		Fields:   lookupFields,
 	}
 	pr, repo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
 
-	editable := opts.Editable
 	editable.Reviewers.Allowed = true
 	editable.Title.Default = pr.Title
 	editable.Body.Default = pr.Body

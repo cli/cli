@@ -3,6 +3,7 @@ package extension
 import (
 	"errors"
 	"fmt"
+	gio "io"
 	"os"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ import (
 func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
+	gc := f.GitClient
 	prompter := f.Prompter
 	config := f.Config
 	browser := f.Browser
@@ -45,6 +47,33 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			See the list of available extensions at <https://github.com/topics/gh-extension>.
 		`, "`"),
 		Aliases: []string{"extensions", "ext"},
+	}
+
+	upgradeFunc := func(name string, flagForce, flagDryRun bool) error {
+		cs := io.ColorScheme()
+		err := m.Upgrade(name, flagForce)
+		if err != nil {
+			if name != "" {
+				fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
+			} else if errors.Is(err, noExtensionsInstalledError) {
+				return cmdutil.NewNoResultsError("no installed extensions found")
+			} else {
+				fmt.Fprintf(io.ErrOut, "%s Failed upgrading extensions\n", cs.FailureIcon())
+			}
+			return cmdutil.SilentError
+		}
+		if io.IsStdoutTTY() {
+			successStr := "Successfully"
+			if flagDryRun {
+				successStr = "Would have"
+			}
+			extensionStr := "extension"
+			if name == "" {
+				extensionStr = "extensions"
+			}
+			fmt.Fprintf(io.Out, "%s %s upgraded %s\n", cs.SuccessIcon(), successStr, extensionStr)
+		}
+		return nil
 	}
 
 	extCmd.AddCommand(
@@ -135,7 +164,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					query.Keywords = args
 					query.Qualifiers = qualifiers
 
-					host, _ := cfg.DefaultHost()
+					host, _ := cfg.Authentication().DefaultHost()
 					searcher := search.NewSearcher(client, host)
 
 					if webMode {
@@ -224,7 +253,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 			// Qualifier flags
 			cmd.Flags().StringSliceVar(&qualifiers.License, "license", nil, "Filter based on license type")
-			cmd.Flags().StringVar(&qualifiers.User, "owner", "", "Filter on owner")
+			cmd.Flags().StringSliceVar(&qualifiers.User, "owner", nil, "Filter on owner")
 
 			return cmd
 		}(),
@@ -265,6 +294,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			},
 		},
 		func() *cobra.Command {
+			var forceFlag bool
 			var pinFlag string
 			cmd := &cobra.Command{
 				Use:   "install <repository>",
@@ -303,7 +333,12 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return err
 					}
 
-					if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
+					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
+						// If an existing extension was found and --force was specified, attempt to upgrade.
+						if forceFlag && ext != nil {
+							return upgradeFunc(ext.Name(), forceFlag, false)
+						}
+
 						return err
 					}
 
@@ -331,6 +366,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return nil
 				},
 			}
+			cmd.Flags().BoolVar(&forceFlag, "force", false, "force upgrade extension, or ignore if latest already installed")
 			cmd.Flags().StringVar(&pinFlag, "pin", "", "pin extension to a release tag or commit ref")
 			return cmd
 		}(),
@@ -361,30 +397,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if flagDryRun {
 						m.EnableDryRunMode()
 					}
-					cs := io.ColorScheme()
-					err := m.Upgrade(name, flagForce)
-					if err != nil {
-						if name != "" {
-							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
-						} else if errors.Is(err, noExtensionsInstalledError) {
-							return cmdutil.NewNoResultsError("no installed extensions found")
-						} else {
-							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extensions\n", cs.FailureIcon())
-						}
-						return cmdutil.SilentError
-					}
-					if io.IsStdoutTTY() {
-						successStr := "Successfully"
-						if flagDryRun {
-							successStr = "Would have"
-						}
-						extensionStr := "extension"
-						if name == "" {
-							extensionStr = "extensions"
-						}
-						fmt.Fprintf(io.Out, "%s %s upgraded %s\n", cs.SuccessIcon(), successStr, extensionStr)
-					}
-					return nil
+					return upgradeFunc(name, flagForce, flagDryRun)
 				},
 			}
 			cmd.Flags().BoolVar(&flagAll, "all", false, "Upgrade all extensions")
@@ -410,33 +423,25 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		},
 		func() *cobra.Command {
 			var debug bool
+			var singleColumn bool
 			cmd := &cobra.Command{
 				Use:   "browse",
 				Short: "Enter a UI for browsing, adding, and removing extensions",
 				Long: heredoc.Doc(`
 					This command will take over your terminal and run a fully interactive
-					interface for browsing, adding, and removing gh extensions.
+					interface for browsing, adding, and removing gh extensions. A terminal
+					width greater than 100 columns is recommended.
 
-					The extension list is navigated with the arrow keys or with j/k.
-					Space and control+space (or control + j/k) page the list up and down.
-					Extension readmes can be scrolled with page up/page down keys
-					(fn + arrow up/down on a mac keyboard).
-
-					For highlighted extensions, you can press:
-
-					- w to open the extension in your web browser
-					- i to install the extension
-					- r to remove the extension
-
-					Press / to focus the filter input. Press enter to scroll the results.
-					Press Escape to clear the filter and return to the full list.
+					To learn how to control this interface, press ? after running to see
+					the help text.
 
 					Press q to quit.
 
-					The output of this command may be difficult to navigate for screen reader
-					users, users operating at high zoom and other users of assistive technology. It
-					is also not advised for automation scripts. We advise those users to use the
-					alternative command:
+					Running this command with --single-column should make this command
+					more intelligible for users who rely on assistive technology like screen
+					readers or high zoom.
+
+					For a more traditional way to discover extensions, see:
 
 						gh ext search
 
@@ -451,7 +456,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if err != nil {
 						return err
 					}
-					host, _ := cfg.DefaultHost()
+					host, _ := cfg.Authentication().DefaultHost()
 					client, err := f.HttpClient()
 					if err != nil {
 						return err
@@ -459,21 +464,25 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					searcher := search.NewSearcher(api.NewCachedHTTPClient(client, time.Hour*24), host)
 
+					gc.Stderr = gio.Discard
+
 					opts := browse.ExtBrowseOpts{
-						Cmd:      cmd,
-						IO:       io,
-						Browser:  browser,
-						Searcher: searcher,
-						Em:       m,
-						Client:   client,
-						Cfg:      cfg,
-						Debug:    debug,
+						Cmd:          cmd,
+						IO:           io,
+						Browser:      browser,
+						Searcher:     searcher,
+						Em:           m,
+						Client:       client,
+						Cfg:          cfg,
+						Debug:        debug,
+						SingleColumn: singleColumn,
 					}
 
 					return browse.ExtBrowse(opts)
 				},
 			}
 			cmd.Flags().BoolVar(&debug, "debug", false, "log to /tmp/extBrowse-*")
+			cmd.Flags().BoolVarP(&singleColumn, "single-column", "s", false, "Render TUI with only one column of text")
 			return cmd
 		}(),
 		&cobra.Command{
@@ -564,9 +573,18 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					} else {
 						fullName = "gh-" + extName
 					}
+
+					cs := io.ColorScheme()
+
+					commitIcon := cs.SuccessIcon()
 					if err := m.Create(fullName, tmplType); err != nil {
-						return err
+						if errors.Is(err, ErrInitialCommitFailed) {
+							commitIcon = cs.FailureIcon()
+						} else {
+							return err
+						}
 					}
+
 					if !io.IsStdoutTTY() {
 						return nil
 					}
@@ -577,7 +595,6 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						"- run 'cd %[1]s; gh extension install .; gh %[2]s' to see your new extension in action",
 						fullName, extName)
 
-					cs := io.ColorScheme()
 					if tmplType == extensions.GoBinTemplateType {
 						goBinChecks = heredoc.Docf(`
 						%[1]s Downloaded Go dependencies
@@ -585,7 +602,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						`, cs.SuccessIcon(), fullName)
 						steps = heredoc.Docf(`
 						- run 'cd %[1]s; gh extension install .; gh %[2]s' to see your new extension in action
-						- use 'go build && gh %[2]s' to see changes in your code as you develop`, fullName, extName)
+						- run 'go build && gh %[2]s' to see changes in your code as you develop`, fullName, extName)
 					} else if tmplType == extensions.OtherBinTemplateType {
 						steps = heredoc.Docf(`
 						- run 'cd %[1]s; gh extension install .' to install your extension locally
@@ -596,17 +613,18 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					out := heredoc.Docf(`
 						%[1]s Created directory %[2]s
 						%[1]s Initialized git repository
+						%[7]s Made initial commit
 						%[1]s Set up extension scaffolding
 						%[6]s
 						%[2]s is ready for development!
 
 						%[4]s
 						%[5]s
-						- commit and use 'gh repo create' to share your extension with others
+						- run 'gh repo create' to share your extension with others
 
 						For more information on writing extensions:
 						%[3]s
-					`, cs.SuccessIcon(), fullName, link, cs.Bold("Next Steps"), steps, goBinChecks)
+					`, cs.SuccessIcon(), fullName, link, cs.Bold("Next Steps"), steps, goBinChecks, commitIcon)
 					fmt.Fprint(io.Out, out)
 					return nil
 				},
@@ -619,25 +637,23 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	return &extCmd
 }
 
-func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName string) error {
+func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName string) (extensions.Extension, error) {
 	if !strings.HasPrefix(extName, "gh-") {
-		return errors.New("extension repository name must start with `gh-`")
+		return nil, errors.New("extension repository name must start with `gh-`")
 	}
 
 	commandName := strings.TrimPrefix(extName, "gh-")
-	if c, _, err := rootCmd.Traverse([]string{commandName}); err != nil {
-		return err
-	} else if c != rootCmd {
-		return fmt.Errorf("%q matches the name of a built-in command", commandName)
+	if c, _, _ := rootCmd.Find([]string{commandName}); c != rootCmd && c.GroupID != "extension" {
+		return nil, fmt.Errorf("%q matches the name of a built-in command or alias", commandName)
 	}
 
 	for _, ext := range m.List() {
 		if ext.Name() == commandName {
-			return fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
+			return ext, fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func normalizeExtensionSelector(n string) string {

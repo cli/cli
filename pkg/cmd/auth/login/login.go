@@ -8,12 +8,13 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	ghAuth "github.com/cli/go-gh/pkg/auth"
+	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -23,16 +24,18 @@ type LoginOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
 	Prompter   shared.Prompt
+	Browser    browser.Browser
 
 	MainExecutable string
 
 	Interactive bool
 
-	Hostname    string
-	Scopes      []string
-	Token       string
-	Web         bool
-	GitProtocol string
+	Hostname        string
+	Scopes          []string
+	Token           string
+	Web             bool
+	GitProtocol     string
+	InsecureStorage bool
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -42,6 +45,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		HttpClient: f.HttpClient,
 		GitClient:  f.GitClient,
 		Prompter:   f.Prompter,
+		Browser:    f.Browser,
 	}
 
 	var tokenStdin bool
@@ -121,6 +125,13 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
 	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
 
+	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
+	var secureStorage bool
+	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store")
+	_ = cmd.Flags().MarkHidden("secure-storage")
+
+	cmd.Flags().BoolVar(&opts.InsecureStorage, "insecure-storage", false, "Save authentication credentials in plain text instead of credential store")
+
 	return cmd
 }
 
@@ -129,6 +140,7 @@ func loginRun(opts *LoginOptions) error {
 	if err != nil {
 		return err
 	}
+	authCfg := cfg.Authentication()
 
 	hostname := opts.Hostname
 	if opts.Interactive && hostname == "" {
@@ -139,7 +151,12 @@ func loginRun(opts *LoginOptions) error {
 		}
 	}
 
-	if src, writeable := shared.AuthTokenWriteable(cfg, hostname); !writeable {
+	// The go-gh Config object currently does not support case-insensitive lookups for host names,
+	// so normalize the host name case here before performing any lookups with it or persisting it.
+	// https://github.com/cli/go-gh/pull/105
+	hostname = strings.ToLower(hostname)
+
+	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
 		fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment.\n")
 		return cmdutil.SilentError
@@ -151,18 +168,14 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if opts.Token != "" {
-		cfg.Set(hostname, "oauth_token", opts.Token)
-
 		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
-		if opts.GitProtocol != "" {
-			cfg.Set(hostname, "git_protocol", opts.GitProtocol)
-		}
-		return cfg.Write()
+		// Adding a user key ensures that a nonempty host section gets written to the config file.
+		return authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
 	}
 
-	existingToken, _ := cfg.AuthToken(hostname)
+	existingToken, _ := authCfg.Token(hostname)
 	if existingToken != "" && opts.Interactive {
 		if err := shared.HasMinimumScopes(httpClient, hostname, existingToken); err == nil {
 			keepGoing, err := opts.Prompter.Confirm(fmt.Sprintf("You're already logged into %s. Do you want to re-authenticate?", hostname), false)
@@ -176,17 +189,19 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	return shared.Login(&shared.LoginOptions{
-		IO:          opts.IO,
-		Config:      cfg,
-		HTTPClient:  httpClient,
-		Hostname:    hostname,
-		Interactive: opts.Interactive,
-		Web:         opts.Web,
-		Scopes:      opts.Scopes,
-		Executable:  opts.MainExecutable,
-		GitProtocol: opts.GitProtocol,
-		Prompter:    opts.Prompter,
-		GitClient:   opts.GitClient,
+		IO:            opts.IO,
+		Config:        authCfg,
+		HTTPClient:    httpClient,
+		Hostname:      hostname,
+		Interactive:   opts.Interactive,
+		Web:           opts.Web,
+		Scopes:        opts.Scopes,
+		Executable:    opts.MainExecutable,
+		GitProtocol:   opts.GitProtocol,
+		Prompter:      opts.Prompter,
+		GitClient:     opts.GitClient,
+		Browser:       opts.Browser,
+		SecureStorage: !opts.InsecureStorage,
 	})
 }
 

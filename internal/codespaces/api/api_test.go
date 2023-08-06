@@ -21,7 +21,7 @@ func generateCodespaceList(start int, end int) []*Codespace {
 	return codespacesList
 }
 
-func createFakeListEndpointServer(t *testing.T, initalTotal int, finalTotal int) *httptest.Server {
+func createFakeListEndpointServer(t *testing.T, initialTotal int, finalTotal int) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/user/codespaces" {
 			t.Fatal("Incorrect path")
@@ -48,7 +48,7 @@ func createFakeListEndpointServer(t *testing.T, initalTotal int, finalTotal int)
 		switch page {
 		case 1:
 			response.Codespaces = generateCodespaceList(0, per_page)
-			response.TotalCount = initalTotal
+			response.TotalCount = initialTotal
 			w.Header().Set("Link", fmt.Sprintf(`<http://%[1]s/user/codespaces?page=3&per_page=%[2]d>; rel="last", <http://%[1]s/user/codespaces?page=2&per_page=%[2]d>; rel="next"`, r.Host, per_page))
 		case 2:
 			response.Codespaces = generateCodespaceList(per_page, per_page*2)
@@ -96,16 +96,17 @@ func createFakeCreateEndpointServer(t *testing.T, wantStatus int) *httptest.Serv
 			}
 
 			response := Codespace{
-				Name: "codespace-1",
+				Name:        "codespace-1",
+				DisplayName: params.DisplayName,
 			}
 
 			if wantStatus == 0 {
 				wantStatus = http.StatusCreated
 			}
 
-			data, _ := json.Marshal(response)
 			w.WriteHeader(wantStatus)
-			fmt.Fprint(w, string(data))
+			enc := json.NewEncoder(w)
+			_ = enc.Encode(&response)
 			return
 		}
 
@@ -115,9 +116,9 @@ func createFakeCreateEndpointServer(t *testing.T, wantStatus int) *httptest.Serv
 				Name:  "codespace-1",
 				State: CodespaceStateAvailable,
 			}
-			data, _ := json.Marshal(response)
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, string(data))
+			enc := json.NewEncoder(w)
+			_ = enc.Encode(&response)
 			return
 		}
 
@@ -149,6 +150,34 @@ func TestCreateCodespaces(t *testing.T) {
 	if codespace.Name != "codespace-1" {
 		t.Fatalf("expected codespace-1, got %s", codespace.Name)
 	}
+	if codespace.DisplayName != "" {
+		t.Fatalf("expected display name empty, got %q", codespace.DisplayName)
+	}
+}
+
+func TestCreateCodespaces_displayName(t *testing.T) {
+	svr := createFakeCreateEndpointServer(t, http.StatusCreated)
+	defer svr.Close()
+
+	api := API{
+		githubAPI: svr.URL,
+		client:    &http.Client{},
+	}
+
+	retentionPeriod := 0
+	codespace, err := api.CreateCodespace(context.Background(), &CreateCodespaceParams{
+		RepositoryID:           1,
+		IdleTimeoutMinutes:     10,
+		RetentionPeriodMinutes: &retentionPeriod,
+		DisplayName:            "clucky cuckoo",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if codespace.DisplayName != "clucky cuckoo" {
+		t.Fatalf("expected display name %q, got %q", "clucky cuckoo", codespace.DisplayName)
+	}
 }
 
 func TestCreateCodespaces_Pending(t *testing.T) {
@@ -156,8 +185,9 @@ func TestCreateCodespaces_Pending(t *testing.T) {
 	defer svr.Close()
 
 	api := API{
-		githubAPI: svr.URL,
-		client:    &http.Client{},
+		githubAPI:    svr.URL,
+		client:       &http.Client{},
+		retryBackoff: 0,
 	}
 
 	ctx := context.TODO()

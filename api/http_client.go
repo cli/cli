@@ -9,12 +9,11 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/utils"
-	"github.com/cli/go-gh"
-	ghAPI "github.com/cli/go-gh/pkg/api"
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 )
 
 type tokenGetter interface {
-	AuthToken(string) (string, string)
+	Token(string) (string, string)
 }
 
 type HTTPClientOptions struct {
@@ -55,7 +54,7 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		clientOpts.CacheTTL = opts.CacheTTL
 	}
 
-	client, err := gh.HTTPClient(&clientOpts)
+	client, err := ghAPI.NewHTTPClient(clientOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +89,17 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
 		if req.Header.Get(authorization) == "" {
-			hostname := ghinstance.NormalizeHostname(getHost(req))
-			if token, _ := cfg.AuthToken(hostname); token != "" {
-				req.Header.Set(authorization, fmt.Sprintf("token %s", token))
+			var redirectHostnameChange bool
+			if req.Response != nil && req.Response.Request != nil {
+				redirectHostnameChange = getHost(req) != getHost(req.Response.Request)
+			}
+			// Only set header if an initial request or redirect request to the same host as the initial request.
+			// If the host has changed during a redirect do not add the authentication token header.
+			if !redirectHostnameChange {
+				hostname := ghinstance.NormalizeHostname(getHost(req))
+				if token, _ := cfg.Token(hostname); token != "" {
+					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
+				}
 			}
 		}
 		return rt.RoundTrip(req)
@@ -127,5 +134,5 @@ func getHost(r *http.Request) string {
 	if r.Host != "" {
 		return r.Host
 	}
-	return r.URL.Hostname()
+	return r.URL.Host
 }

@@ -11,18 +11,6 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 
 	for _, f := range fields {
 		switch f {
-		case "author":
-			author := map[string]interface{}{
-				"is_bot": issue.Author.IsBot(),
-			}
-			if issue.Author.IsBot() {
-				author["login"] = "app/" + issue.Author.Login
-			} else {
-				author["login"] = issue.Author.Login
-				author["name"] = issue.Author.Name
-				author["id"] = issue.Author.ID
-			}
-			data[f] = author
 		case "comments":
 			data[f] = issue.Comments.Nodes
 		case "assignees":
@@ -31,6 +19,14 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 			data[f] = issue.Labels.Nodes
 		case "projectCards":
 			data[f] = issue.ProjectCards.Nodes
+		case "projectItems":
+			items := make([]map[string]interface{}, 0, len(issue.ProjectItems.Nodes))
+			for _, n := range issue.ProjectItems.Nodes {
+				items = append(items, map[string]interface{}{
+					"title": n.Project.Title,
+				})
+			}
+			data[f] = items
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
@@ -46,18 +42,6 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 
 	for _, f := range fields {
 		switch f {
-		case "author":
-			author := map[string]interface{}{
-				"is_bot": pr.Author.IsBot(),
-			}
-			if pr.Author.IsBot() {
-				author["login"] = "app/" + pr.Author.Login
-			} else {
-				author["login"] = pr.Author.Login
-				author["name"] = pr.Author.Name
-				author["id"] = pr.Author.ID
-			}
-			data[f] = author
 		case "headRepository":
 			data[f] = pr.HeadRepository
 		case "statusCheckRollup":
@@ -120,6 +104,14 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 			data[f] = pr.Labels.Nodes
 		case "projectCards":
 			data[f] = pr.ProjectCards.Nodes
+		case "projectItems":
+			items := make([]map[string]interface{}, 0, len(pr.ProjectItems.Nodes))
+			for _, n := range pr.ProjectItems.Nodes {
+				items = append(items, map[string]interface{}{
+					"title": n.Project.Title,
+				})
+			}
+			data[f] = items
 		case "reviews":
 			data[f] = pr.Reviews.Nodes
 		case "latestReviews":

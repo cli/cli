@@ -9,13 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 )
+
+type Prompter interface {
+	Select(string, string, []string) (int, error)
+}
 
 const (
 	// Run statuses
@@ -43,6 +45,23 @@ const (
 type Status string
 type Conclusion string
 type Level string
+
+var AllStatuses = []string{
+	"queued",
+	"completed",
+	"in_progress",
+	"requested",
+	"waiting",
+	"action_required",
+	"cancelled",
+	"failure",
+	"neutral",
+	"skipped",
+	"stale",
+	"startup_failure",
+	"success",
+	"timed_out",
+}
 
 var RunFields = []string{
 	"name",
@@ -77,7 +96,7 @@ type Run struct {
 	workflowName   string // cache column
 	WorkflowID     int64  `json:"workflow_id"`
 	Number         int64  `json:"run_number"`
-	Attempts       uint8  `json:"run_attempt"`
+	Attempts       uint64 `json:"run_attempt"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
@@ -284,6 +303,9 @@ type FilterOptions struct {
 	WorkflowID int64
 	// avoid loading workflow name separately and use the provided one
 	WorkflowName string
+	Status       string
+	Event        string
+	Created      string
 }
 
 // GetRunsWithFilter fetches 50 runs from the API and filters them in-memory
@@ -325,6 +347,15 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 		}
 		if opts.Actor != "" {
 			path += fmt.Sprintf("&actor=%s", url.QueryEscape(opts.Actor))
+		}
+		if opts.Status != "" {
+			path += fmt.Sprintf("&status=%s", url.QueryEscape(opts.Status))
+		}
+		if opts.Event != "" {
+			path += fmt.Sprintf("&event=%s", url.QueryEscape(opts.Event))
+		}
+		if opts.Created != "" {
+			path += fmt.Sprintf("&created=%s", url.QueryEscape(opts.Created))
 		}
 	}
 
@@ -420,8 +451,8 @@ func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, erro
 	return &result, nil
 }
 
-func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
-	var selected int
+// SelectRun prompts the user to select a run from a list of runs by using the recommended prompter interface
+func SelectRun(p Prompter, cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	now := time.Now()
 
 	candidates := []string{}
@@ -433,14 +464,7 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.Title(), run.WorkflowName(), run.HeadBranch, preciseAgo(now, run.StartedTime())))
 	}
 
-	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
-	// become contiguous
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message:  "Select a workflow run",
-		Options:  candidates,
-		PageSize: 10,
-	}, &selected)
+	selected, err := p.Select("Select a workflow run", "", candidates)
 
 	if err != nil {
 		return "", err
@@ -449,14 +473,25 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	return fmt.Sprintf("%d", runs[selected].ID), nil
 }
 
-func GetRun(client *api.Client, repo ghrepo.Interface, runID string) (*Run, error) {
+func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uint64) (*Run, error) {
 	var result Run
 
 	path := fmt.Sprintf("repos/%s/actions/runs/%s?exclude_pull_requests=true", ghrepo.FullName(repo), runID)
 
+	if attempt > 0 {
+		path = fmt.Sprintf("repos/%s/actions/runs/%s/attempts/%d?exclude_pull_requests=true", ghrepo.FullName(repo), runID, attempt)
+	}
+
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
 		return nil, err
+	}
+
+	if attempt > 0 {
+		result.URL, err = url.JoinPath(result.URL, fmt.Sprintf("/attempts/%d", attempt))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Set name to workflow name

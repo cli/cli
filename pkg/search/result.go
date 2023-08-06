@@ -1,10 +1,37 @@
 package search
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"time"
 )
+
+var CodeFields = []string{
+	"path",
+	"repository",
+	"sha",
+	"textMatches",
+	"url",
+}
+
+var textMatchFields = []string{
+	"fragment",
+	"matches",
+	"type",
+	"property",
+}
+
+var CommitFields = []string{
+	"author",
+	"commit",
+	"committer",
+	"sha",
+	"id",
+	"parents",
+	"repository",
+	"url",
+}
 
 var RepositoryFields = []string{
 	"createdAt",
@@ -61,6 +88,18 @@ var PullRequestFields = append(IssueFields,
 	"isDraft",
 )
 
+type CodeResult struct {
+	IncompleteResults bool   `json:"incomplete_results"`
+	Items             []Code `json:"items"`
+	Total             int    `json:"total_count"`
+}
+
+type CommitsResult struct {
+	IncompleteResults bool     `json:"incomplete_results"`
+	Items             []Commit `json:"items"`
+	Total             int      `json:"total_count"`
+}
+
 type RepositoriesResult struct {
 	IncompleteResults bool         `json:"incomplete_results"`
 	Items             []Repository `json:"items"`
@@ -71,6 +110,61 @@ type IssuesResult struct {
 	IncompleteResults bool    `json:"incomplete_results"`
 	Items             []Issue `json:"items"`
 	Total             int     `json:"total_count"`
+}
+
+type Code struct {
+	Name        string      `json:"name"`
+	Path        string      `json:"path"`
+	Repository  Repository  `json:"repository"`
+	Sha         string      `json:"sha"`
+	TextMatches []TextMatch `json:"text_matches"`
+	URL         string      `json:"html_url"`
+}
+
+type TextMatch struct {
+	Fragment string  `json:"fragment"`
+	Matches  []Match `json:"matches"`
+	Type     string  `json:"object_type"`
+	Property string  `json:"property"`
+}
+
+type Match struct {
+	Indices []int  `json:"indices"`
+	Text    string `json:"text"`
+}
+
+type Commit struct {
+	Author    User       `json:"author"`
+	Committer User       `json:"committer"`
+	ID        string     `json:"node_id"`
+	Info      CommitInfo `json:"commit"`
+	Parents   []Parent   `json:"parents"`
+	Repo      Repository `json:"repository"`
+	Sha       string     `json:"sha"`
+	URL       string     `json:"html_url"`
+}
+
+type CommitInfo struct {
+	Author       CommitUser `json:"author"`
+	CommentCount int        `json:"comment_count"`
+	Committer    CommitUser `json:"committer"`
+	Message      string     `json:"message"`
+	Tree         Tree       `json:"tree"`
+}
+
+type CommitUser struct {
+	Date  time.Time `json:"date"`
+	Email string    `json:"email"`
+	Name  string    `json:"name"`
+}
+
+type Tree struct {
+	Sha string `json:"sha"`
+}
+
+type Parent struct {
+	Sha string `json:"sha"`
+	URL string `json:"html_url"`
 }
 
 type Repository struct {
@@ -120,13 +214,6 @@ type User struct {
 	URL        string `json:"html_url"`
 }
 
-func (u *User) IsBot() bool {
-	// copied from api/queries_issue.go
-	// would ideally be shared, but it would require coordinating a "user"
-	// abstraction in a bunch of places.
-	return u.ID == ""
-}
-
 type Issue struct {
 	Assignees         []User    `json:"assignees"`
 	Author            User      `json:"user"`
@@ -157,23 +244,120 @@ type PullRequest struct {
 	MergedAt time.Time `json:"merged_at"`
 }
 
-// the state of an issue or a pull request,
-// may be either open or closed.
-// for a pull request, the "merged" state is
-// inferred from a value for merged_at and
-// which we take return instead of the "closed" state.
-func (issue Issue) State() string {
-	if !issue.PullRequest.MergedAt.IsZero() {
-		return "merged"
-	}
-	return issue.StateInternal
-}
-
 type Label struct {
 	Color       string `json:"color"`
 	Description string `json:"description"`
 	ID          string `json:"node_id"`
 	Name        string `json:"name"`
+}
+
+func (u User) IsBot() bool {
+	// copied from api/queries_issue.go
+	// would ideally be shared, but it would require coordinating a "user"
+	// abstraction in a bunch of places.
+	return u.ID == ""
+}
+
+func (u User) ExportData() map[string]interface{} {
+	isBot := u.IsBot()
+	login := u.Login
+	if isBot {
+		login = "app/" + login
+	}
+	return map[string]interface{}{
+		"id":     u.ID,
+		"login":  login,
+		"type":   u.Type,
+		"url":    u.URL,
+		"is_bot": isBot,
+	}
+}
+
+func (code Code) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(code)
+	data := map[string]interface{}{}
+	for _, f := range fields {
+		switch f {
+		case "textMatches":
+			matches := make([]interface{}, 0, len(code.TextMatches))
+			for _, match := range code.TextMatches {
+				matches = append(matches, match.ExportData(textMatchFields))
+			}
+			data[f] = matches
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+	return data
+}
+
+func (textMatch TextMatch) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(textMatch)
+	data := map[string]interface{}{}
+	for _, f := range fields {
+		switch f {
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+	return data
+}
+
+func (commit Commit) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(commit)
+	data := map[string]interface{}{}
+	for _, f := range fields {
+		switch f {
+		case "author":
+			data[f] = commit.Author.ExportData()
+		case "commit":
+			info := commit.Info
+			data[f] = map[string]interface{}{
+				"author": map[string]interface{}{
+					"date":  info.Author.Date,
+					"email": info.Author.Email,
+					"name":  info.Author.Name,
+				},
+				"committer": map[string]interface{}{
+					"date":  info.Committer.Date,
+					"email": info.Committer.Email,
+					"name":  info.Committer.Name,
+				},
+				"comment_count": info.CommentCount,
+				"message":       info.Message,
+				"tree":          map[string]interface{}{"sha": info.Tree.Sha},
+			}
+		case "committer":
+			data[f] = commit.Committer.ExportData()
+		case "parents":
+			parents := make([]interface{}, 0, len(commit.Parents))
+			for _, parent := range commit.Parents {
+				parents = append(parents, map[string]interface{}{
+					"sha": parent.Sha,
+					"url": parent.URL,
+				})
+			}
+			data[f] = parents
+		case "repository":
+			repo := commit.Repo
+			data[f] = map[string]interface{}{
+				"description": repo.Description,
+				"fullName":    repo.FullName,
+				"name":        repo.Name,
+				"id":          repo.ID,
+				"isFork":      repo.IsFork,
+				"isPrivate":   repo.IsPrivate,
+				"owner":       repo.Owner.ExportData(),
+				"url":         repo.URL,
+			}
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+	return data
 }
 
 func (repo Repository) ExportData(fields []string) map[string]interface{} {
@@ -188,18 +372,33 @@ func (repo Repository) ExportData(fields []string) map[string]interface{} {
 				"url":  repo.License.URL,
 			}
 		case "owner":
-			data[f] = map[string]interface{}{
-				"id":    repo.Owner.ID,
-				"login": repo.Owner.Login,
-				"type":  repo.Owner.Type,
-				"url":   repo.Owner.URL,
-			}
+			data[f] = repo.Owner.ExportData()
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
 		}
 	}
 	return data
+}
+
+func (repo Repository) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"id":            repo.ID,
+		"nameWithOwner": repo.FullName,
+		"url":           repo.URL,
+		"isPrivate":     repo.IsPrivate,
+		"isFork":        repo.IsFork,
+	})
+}
+
+// The state of an issue or a pull request, may be either open or closed.
+// For a pull request, the "merged" state is inferred from a value for merged_at and
+// which we take return instead of the "closed" state.
+func (issue Issue) State() string {
+	if !issue.PullRequest.MergedAt.IsZero() {
+		return "merged"
+	}
+	return issue.StateInternal
 }
 
 func (issue Issue) IsPullRequest() bool {
@@ -214,31 +413,11 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 		case "assignees":
 			assignees := make([]interface{}, 0, len(issue.Assignees))
 			for _, assignee := range issue.Assignees {
-				isBot := assignee.IsBot()
-				login := assignee.Login
-				if isBot {
-					login = "app/" + login
-				}
-				assignees = append(assignees, map[string]interface{}{
-					"id":     assignee.ID,
-					"login":  login,
-					"type":   assignee.Type,
-					"is_bot": isBot,
-				})
+				assignees = append(assignees, assignee.ExportData())
 			}
 			data[f] = assignees
 		case "author":
-			isBot := issue.Author.IsBot()
-			login := issue.Author.Login
-			if isBot {
-				login = "app/" + login
-			}
-			data[f] = map[string]interface{}{
-				"id":     issue.Author.ID,
-				"login":  login,
-				"type":   issue.Author.Type,
-				"is_bot": isBot,
-			}
+			data[f] = issue.Author.ExportData()
 		case "isPullRequest":
 			data[f] = issue.IsPullRequest()
 		case "labels":

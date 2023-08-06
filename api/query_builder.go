@@ -24,7 +24,7 @@ var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
 			id,
-			author{login},
+			author{login,...on User{id,name}},
 			authorAssociation,
 			body,
 			createdAt,
@@ -43,7 +43,7 @@ var issueComments = shortenQuery(`
 var issueCommentLast = shortenQuery(`
 	comments(last: 1) {
 		nodes {
-			author{login},
+			author{login,...on User{id,name}},
 			authorAssociation,
 			body,
 			createdAt,
@@ -132,7 +132,42 @@ var prCommits = shortenQuery(`
 	}
 `)
 
-func StatusCheckRollupGraphQL(after string) string {
+var autoMergeRequest = shortenQuery(`
+	autoMergeRequest {
+		authorEmail,
+		commitBody,
+		commitHeadline,
+		mergeMethod,
+		enabledAt,
+		enabledBy{login,...on User{id,name}}
+	}
+`)
+
+func StatusCheckRollupGraphQLWithCountByState() string {
+	return shortenQuery(`
+	statusCheckRollup: commits(last: 1) {
+		nodes {
+			commit {
+				statusCheckRollup {
+					contexts {
+						checkRunCount,
+						checkRunCountsByState {
+						  state,
+						  count
+						},
+						statusContextCount,
+						statusContextCountsByState {
+						  state,
+						  count
+						}
+					}
+				}
+			}
+		}
+	}`)
+}
+
+func StatusCheckRollupGraphQLWithoutCountByState(after string) string {
 	var afterClause string
 	if after != "" {
 		afterClause = ",after:" + after
@@ -149,7 +184,8 @@ func StatusCheckRollupGraphQL(after string) string {
 								context,
 								state,
 								targetUrl,
-								createdAt
+								createdAt,
+								description
 							},
 							...on CheckRun {
 								name,
@@ -169,10 +205,14 @@ func StatusCheckRollupGraphQL(after string) string {
 	}`), afterClause)
 }
 
-func RequiredStatusCheckRollupGraphQL(prID, after string) string {
+func RequiredStatusCheckRollupGraphQL(prID, after string, includeEvent bool) string {
 	var afterClause string
 	if after != "" {
 		afterClause = ",after:" + after
+	}
+	eventField := "event,"
+	if !includeEvent {
+		eventField = ""
 	}
 	return fmt.Sprintf(shortenQuery(`
 	statusCheckRollup: commits(last: 1) {
@@ -187,11 +227,12 @@ func RequiredStatusCheckRollupGraphQL(prID, after string) string {
 								state,
 								targetUrl,
 								createdAt,
+								description,
 								isRequired(pullRequestId: %[2]s)
 							},
 							...on CheckRun {
 								name,
-								checkSuite{workflowRun{workflow{name}}},
+								checkSuite{workflowRun{%[3]sworkflow{name}}},
 								status,
 								conclusion,
 								startedAt,
@@ -205,7 +246,7 @@ func RequiredStatusCheckRollupGraphQL(prID, after string) string {
 				}
 			}
 		}
-	}`), afterClause, prID)
+	}`), afterClause, prID, eventField)
 }
 
 var IssueFields = []string{
@@ -221,6 +262,7 @@ var IssueFields = []string{
 	"milestone",
 	"number",
 	"projectCards",
+	"projectItems",
 	"reactionGroups",
 	"state",
 	"title",
@@ -230,6 +272,7 @@ var IssueFields = []string{
 
 var PullRequestFields = append(IssueFields,
 	"additions",
+	"autoMergeRequest",
 	"baseRefName",
 	"changedFiles",
 	"commits",
@@ -263,7 +306,7 @@ func IssueGraphQL(fields []string) string {
 		case "author":
 			q = append(q, `author{login,...on User{id,name}}`)
 		case "mergedBy":
-			q = append(q, `mergedBy{login}`)
+			q = append(q, `mergedBy{login,...on User{id,name}}`)
 		case "headRepositoryOwner":
 			q = append(q, `headRepositoryOwner{id,login,...on User{name}}`)
 		case "headRepository":
@@ -274,6 +317,8 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `labels(first:100){nodes{id,name,description,color},totalCount}`)
 		case "projectCards":
 			q = append(q, `projectCards(first:100){nodes{project{name}column{name}},totalCount}`)
+		case "projectItems":
+			q = append(q, `projectItems(first:100){nodes{id, project{id,title}},totalCount}`)
 		case "milestone":
 			q = append(q, `milestone{number,title,description,dueOn}`)
 		case "reactionGroups":
@@ -282,6 +327,8 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `mergeCommit{oid}`)
 		case "potentialMergeCommit":
 			q = append(q, `potentialMergeCommit{oid}`)
+		case "autoMergeRequest":
+			q = append(q, autoMergeRequest)
 		case "comments":
 			q = append(q, issueComments)
 		case "lastComment": // pseudo-field
@@ -303,7 +350,9 @@ func IssueGraphQL(fields []string) string {
 		case "requiresStrictStatusChecks": // pseudo-field
 			q = append(q, `baseRef{branchProtectionRule{requiresStrictStatusChecks}}`)
 		case "statusCheckRollup":
-			q = append(q, StatusCheckRollupGraphQL(""))
+			q = append(q, StatusCheckRollupGraphQLWithoutCountByState(""))
+		case "statusCheckRollupWithCountByState": // pseudo-field
+			q = append(q, StatusCheckRollupGraphQLWithCountByState())
 		default:
 			q = append(q, field)
 		}
@@ -346,6 +395,7 @@ var RepositoryFields = []string{
 	"hasIssuesEnabled",
 	"hasProjectsEnabled",
 	"hasWikiEnabled",
+	"hasDiscussionsEnabled",
 	"mergeCommitAllowed",
 	"squashMergeAllowed",
 	"rebaseMergeAllowed",
@@ -368,6 +418,7 @@ var RepositoryFields = []string{
 	"isInOrganization",
 	"isMirror",
 	"isPrivate",
+	"visibility",
 	"isTemplate",
 	"isUserConfigurationRepository",
 	"licenseInfo",

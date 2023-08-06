@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,7 +26,7 @@ func TestNewCmdArchive(t *testing.T) {
 		{
 			name:    "no arguments no tty",
 			input:   "",
-			errMsg:  "--confirm required when not running interactively",
+			errMsg:  "--yes required when not running interactively",
 			wantErr: true,
 		},
 		{
@@ -68,20 +68,21 @@ func TestNewCmdArchive(t *testing.T) {
 func Test_ArchiveRun(t *testing.T) {
 	queryResponse := `{ "data": { "repository": { "id": "THE-ID","isArchived": %s} } }`
 	tests := []struct {
-		name       string
-		opts       ArchiveOptions
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		isTTY      bool
-		wantStdout string
-		wantStderr string
+		name          string
+		opts          ArchiveOptions
+		httpStubs     func(*httpmock.Registry)
+		prompterStubs func(pm *prompter.MockPrompter)
+		isTTY         bool
+		wantStdout    string
+		wantStderr    string
 	}{
 		{
 			name:       "unarchived repo tty",
 			wantStdout: "✓ Archived repository OWNER/REPO\n",
-			askStubs: func(q *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne(true)
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Archive OWNER/REPO?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
 			},
 			isTTY: true,
 			opts:  ArchiveOptions{RepoArg: "OWNER/REPO"},
@@ -98,9 +99,10 @@ func Test_ArchiveRun(t *testing.T) {
 			name:       "infer base repo",
 			wantStdout: "✓ Archived repository OWNER/REPO\n",
 			opts:       ArchiveOptions{},
-			askStubs: func(q *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne(true)
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Archive OWNER/REPO?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
 			},
 			isTTY: true,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -140,12 +142,11 @@ func Test_ArchiveRun(t *testing.T) {
 		ios, _, stdout, stderr := iostreams.Test()
 		tt.opts.IO = ios
 
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-		q, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(q)
+		pm := prompter.NewMockPrompter(t)
+		if tt.prompterStubs != nil {
+			tt.prompterStubs(pm)
 		}
+		tt.opts.Prompter = pm
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)

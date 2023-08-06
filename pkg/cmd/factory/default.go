@@ -69,7 +69,7 @@ func SmartBaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 		if err != nil {
 			return nil, err
 		}
-		baseRepo, err := repoContext.BaseRepo(f.IOStreams, f.Prompter)
+		baseRepo, err := repoContext.BaseRepo(f.IOStreams)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +96,7 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 			return nil, err
 		}
 		opts := api.HTTPClientOptions{
-			Config:      cfg,
+			Config:      cfg.Authentication(),
 			Log:         io.ErrOut,
 			LogColorize: io.ColorEnabled(),
 			AppVersion:  appVersion,

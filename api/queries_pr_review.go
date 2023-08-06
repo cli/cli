@@ -31,7 +31,7 @@ type PullRequestReviews struct {
 
 type PullRequestReview struct {
 	ID                  string         `json:"id"`
-	Author              Author         `json:"author"`
+	Author              CommentAuthor  `json:"author"`
 	AuthorAssociation   string         `json:"authorAssociation"`
 	Body                string         `json:"body"`
 	SubmittedAt         *time.Time     `json:"submittedAt"`

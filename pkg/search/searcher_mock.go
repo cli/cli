@@ -13,26 +13,38 @@ var _ Searcher = &SearcherMock{}
 
 // SearcherMock is a mock implementation of Searcher.
 //
-// 	func TestSomethingThatUsesSearcher(t *testing.T) {
+//	func TestSomethingThatUsesSearcher(t *testing.T) {
 //
-// 		// make and configure a mocked Searcher
-// 		mockedSearcher := &SearcherMock{
-// 			IssuesFunc: func(query Query) (IssuesResult, error) {
-// 				panic("mock out the Issues method")
-// 			},
-// 			RepositoriesFunc: func(query Query) (RepositoriesResult, error) {
-// 				panic("mock out the Repositories method")
-// 			},
-// 			URLFunc: func(query Query) string {
-// 				panic("mock out the URL method")
-// 			},
-// 		}
+//		// make and configure a mocked Searcher
+//		mockedSearcher := &SearcherMock{
+//			CodeFunc: func(query Query) (CodeResult, error) {
+//				panic("mock out the Code method")
+//			},
+//			CommitsFunc: func(query Query) (CommitsResult, error) {
+//				panic("mock out the Commits method")
+//			},
+//			IssuesFunc: func(query Query) (IssuesResult, error) {
+//				panic("mock out the Issues method")
+//			},
+//			RepositoriesFunc: func(query Query) (RepositoriesResult, error) {
+//				panic("mock out the Repositories method")
+//			},
+//			URLFunc: func(query Query) string {
+//				panic("mock out the URL method")
+//			},
+//		}
 //
-// 		// use mockedSearcher in code that requires Searcher
-// 		// and then make assertions.
+//		// use mockedSearcher in code that requires Searcher
+//		// and then make assertions.
 //
-// 	}
+//	}
 type SearcherMock struct {
+	// CodeFunc mocks the Code method.
+	CodeFunc func(query Query) (CodeResult, error)
+
+	// CommitsFunc mocks the Commits method.
+	CommitsFunc func(query Query) (CommitsResult, error)
+
 	// IssuesFunc mocks the Issues method.
 	IssuesFunc func(query Query) (IssuesResult, error)
 
@@ -44,6 +56,16 @@ type SearcherMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// Code holds details about calls to the Code method.
+		Code []struct {
+			// Query is the query argument value.
+			Query Query
+		}
+		// Commits holds details about calls to the Commits method.
+		Commits []struct {
+			// Query is the query argument value.
+			Query Query
+		}
 		// Issues holds details about calls to the Issues method.
 		Issues []struct {
 			// Query is the query argument value.
@@ -60,9 +82,75 @@ type SearcherMock struct {
 			Query Query
 		}
 	}
+	lockCode         sync.RWMutex
+	lockCommits      sync.RWMutex
 	lockIssues       sync.RWMutex
 	lockRepositories sync.RWMutex
 	lockURL          sync.RWMutex
+}
+
+// Code calls CodeFunc.
+func (mock *SearcherMock) Code(query Query) (CodeResult, error) {
+	if mock.CodeFunc == nil {
+		panic("SearcherMock.CodeFunc: method is nil but Searcher.Code was just called")
+	}
+	callInfo := struct {
+		Query Query
+	}{
+		Query: query,
+	}
+	mock.lockCode.Lock()
+	mock.calls.Code = append(mock.calls.Code, callInfo)
+	mock.lockCode.Unlock()
+	return mock.CodeFunc(query)
+}
+
+// CodeCalls gets all the calls that were made to Code.
+// Check the length with:
+//
+//	len(mockedSearcher.CodeCalls())
+func (mock *SearcherMock) CodeCalls() []struct {
+	Query Query
+} {
+	var calls []struct {
+		Query Query
+	}
+	mock.lockCode.RLock()
+	calls = mock.calls.Code
+	mock.lockCode.RUnlock()
+	return calls
+}
+
+// Commits calls CommitsFunc.
+func (mock *SearcherMock) Commits(query Query) (CommitsResult, error) {
+	if mock.CommitsFunc == nil {
+		panic("SearcherMock.CommitsFunc: method is nil but Searcher.Commits was just called")
+	}
+	callInfo := struct {
+		Query Query
+	}{
+		Query: query,
+	}
+	mock.lockCommits.Lock()
+	mock.calls.Commits = append(mock.calls.Commits, callInfo)
+	mock.lockCommits.Unlock()
+	return mock.CommitsFunc(query)
+}
+
+// CommitsCalls gets all the calls that were made to Commits.
+// Check the length with:
+//
+//	len(mockedSearcher.CommitsCalls())
+func (mock *SearcherMock) CommitsCalls() []struct {
+	Query Query
+} {
+	var calls []struct {
+		Query Query
+	}
+	mock.lockCommits.RLock()
+	calls = mock.calls.Commits
+	mock.lockCommits.RUnlock()
+	return calls
 }
 
 // Issues calls IssuesFunc.
@@ -83,7 +171,8 @@ func (mock *SearcherMock) Issues(query Query) (IssuesResult, error) {
 
 // IssuesCalls gets all the calls that were made to Issues.
 // Check the length with:
-//     len(mockedSearcher.IssuesCalls())
+//
+//	len(mockedSearcher.IssuesCalls())
 func (mock *SearcherMock) IssuesCalls() []struct {
 	Query Query
 } {
@@ -114,7 +203,8 @@ func (mock *SearcherMock) Repositories(query Query) (RepositoriesResult, error) 
 
 // RepositoriesCalls gets all the calls that were made to Repositories.
 // Check the length with:
-//     len(mockedSearcher.RepositoriesCalls())
+//
+//	len(mockedSearcher.RepositoriesCalls())
 func (mock *SearcherMock) RepositoriesCalls() []struct {
 	Query Query
 } {
@@ -145,7 +235,8 @@ func (mock *SearcherMock) URL(query Query) string {
 
 // URLCalls gets all the calls that were made to URL.
 // Check the length with:
-//     len(mockedSearcher.URLCalls())
+//
+//	len(mockedSearcher.URLCalls())
 func (mock *SearcherMock) URLCalls() []struct {
 	Query Query
 } {

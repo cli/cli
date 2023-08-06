@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -25,6 +26,7 @@ type EditOptions struct {
 	Draft              *bool
 	Prerelease         *bool
 	IsLatest           *bool
+	VerifyTag          bool
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -80,6 +82,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
 	cmd.Flags().StringVar(&opts.TagName, "tag", "", "The name of the tag")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
+	cmd.Flags().BoolVar(&opts.VerifyTag, "verify-tag", false, "Abort in case the git tag doesn't already exist in the remote repository")
+
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
 
 	return cmd
 }
@@ -95,7 +100,7 @@ func editRun(tag string, opts *EditOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(httpClient, baseRepo, tag)
+	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, tag)
 	if err != nil {
 		return err
 	}
@@ -105,6 +110,17 @@ func editRun(tag string, opts *EditOptions) error {
 	// If we don't provide any tag name, the API will remove the current tag from the release
 	if _, ok := params["tag_name"]; !ok {
 		params["tag_name"] = release.TagName
+	}
+
+	if opts.VerifyTag && opts.TagName != "" {
+		remoteTagPresent, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
+		if err != nil {
+			return err
+		}
+		if !remoteTagPresent {
+			return fmt.Errorf("tag %s doesn't exist in the repo %s, aborting due to --verify-tag flag",
+				opts.TagName, ghrepo.FullName(baseRepo))
+		}
 	}
 
 	editedRelease, err := editRelease(httpClient, baseRepo, release.DatabaseID, params)

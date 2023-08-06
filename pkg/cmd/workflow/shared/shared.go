@@ -1,9 +1,11 @@
 package shared
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"path"
 	"strconv"
@@ -14,6 +16,8 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
+	"golang.org/x/text/transform"
 )
 
 const (
@@ -243,5 +247,10 @@ func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Work
 		return nil, fmt.Errorf("failed to decode workflow file: %w", err)
 	}
 
-	return decoded, nil
+	sanitized, err := io.ReadAll(transform.NewReader(bytes.NewReader(decoded), &asciisanitizer.Sanitizer{}))
+	if err != nil {
+		return nil, err
+	}
+
+	return sanitized, nil
 }

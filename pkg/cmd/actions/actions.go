@@ -26,6 +26,7 @@ func actionsExplainer(cs *iostreams.ColorScheme) string {
 	header := cs.Bold("Welcome to GitHub Actions on the command line.")
 	runHeader := cs.Bold("Interacting with workflow runs")
 	workflowHeader := cs.Bold("Interacting with workflow files")
+	cacheHeader := cs.Bold("Interacting with the Actions cache")
 
 	return heredoc.Docf(`
 			%s
@@ -42,12 +43,19 @@ func actionsExplainer(cs *iostreams.ColorScheme) string {
 			To see more help, run 'gh help run <subcommand>'
 
 			%s  
-			gh workflow list:     List all the workflow files in your repository  
+			gh workflow list:     List workflow files in your repository
 			gh workflow view:     View details for a workflow file  
 			gh workflow enable:   Enable a workflow file  
 			gh workflow disable:  Disable a workflow file  
 			gh workflow run:      Trigger a workflow_dispatch run for a workflow file
 
 			To see more help, run 'gh help workflow <subcommand>'
-		`, header, runHeader, workflowHeader)
+
+			%s
+			gh cache list:    List all the caches saved in Actions for a repository
+			gh cache delete:  Delete one or all saved caches in Actions for a repository
+
+			To see more help, run 'gh help cache <subcommand>'
+
+		`, header, runHeader, workflowHeader, cacheHeader)
 }

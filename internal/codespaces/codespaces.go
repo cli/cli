@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -36,7 +37,7 @@ type logger interface {
 
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
+func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
 	if codespace.State != api.CodespaceStateAvailable {
 		progress.StartProgressIndicatorWithLabel("Starting codespace")
 		defer progress.StopProgressIndicator()
@@ -44,25 +45,33 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
 	}
-	expBackoff := backoff.NewExponentialBackOff()
 
-	expBackoff.Multiplier = 1.1
-	expBackoff.MaxInterval = 10 * time.Second
-	expBackoff.MaxElapsedTime = 5 * time.Minute
+	if !connectionReady(codespace) {
+		expBackoff := backoff.NewExponentialBackOff()
+		expBackoff.Multiplier = 1.1
+		expBackoff.MaxInterval = 10 * time.Second
+		expBackoff.MaxElapsedTime = 5 * time.Minute
 
-	for retries := 0; !connectionReady(codespace); retries++ {
-		if retries > 1 {
-			duration := expBackoff.NextBackOff()
-			time.Sleep(duration)
-		}
+		err := backoff.Retry(func() error {
+			var err error
+			codespace, err = apiClient.GetCodespace(ctx, codespace.Name, true)
+			if err != nil {
+				return backoff.Permanent(fmt.Errorf("error getting codespace: %w", err))
+			}
 
-		if expBackoff.GetElapsedTime() >= expBackoff.MaxElapsedTime {
-			return nil, errors.New("timed out while waiting for the codespace to start")
-		}
+			if connectionReady(codespace) {
+				return nil
+			}
 
-		codespace, err = apiClient.GetCodespace(ctx, codespace.Name, true)
+			return errors.New("codespace not ready yet")
+		}, backoff.WithContext(expBackoff, ctx))
 		if err != nil {
-			return nil, fmt.Errorf("error getting codespace: %w", err)
+			var permErr *backoff.PermanentError
+			if errors.As(err, &permErr) {
+				return nil, err
+			}
+
+			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 	}
 
@@ -70,7 +79,6 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 	defer progress.StopProgressIndicator()
 
 	return liveshare.Connect(ctx, liveshare.Options{
-		ClientName:     "gh",
 		SessionID:      codespace.Connection.SessionID,
 		SessionToken:   codespace.Connection.SessionToken,
 		RelaySAS:       codespace.Connection.RelaySAS,
@@ -78,4 +86,24 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 		HostPublicKeys: codespace.Connection.HostPublicKeys,
 		Logger:         sessionLogger,
 	})
+}
+
+// ListenTCP starts a localhost tcp listener on 127.0.0.1 (unless allInterfaces is true) and returns the listener and bound port
+func ListenTCP(port int, allInterfaces bool) (*net.TCPListener, int, error) {
+	host := "127.0.0.1"
+	if allInterfaces {
+		host = ""
+	}
+
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", host, port))
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to build tcp address: %w", err)
+	}
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to listen to local port over tcp: %w", err)
+	}
+	port = listener.Addr().(*net.TCPAddr).Port
+
+	return listener, port, nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/zalando/go-keyring"
 )
 
 func TestNewCmdToken(t *testing.T) {
@@ -33,6 +34,11 @@ func TestNewCmdToken(t *testing.T) {
 			name:   "with shorthand hostname",
 			input:  "-h github.mycompany.com",
 			output: TokenOptions{Hostname: "github.mycompany.com"},
+		},
+		{
+			name:   "with secure-storage",
+			input:  "--secure-storage",
+			output: TokenOptions{SecureStorage: true},
 		},
 	}
 
@@ -71,11 +77,12 @@ func TestNewCmdToken(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.output.Hostname, cmdOpts.Hostname)
+			assert.Equal(t, tt.output.SecureStorage, cmdOpts.SecureStorage)
 		})
 	}
 }
 
-func Test_tokenRun(t *testing.T) {
+func TestTokenRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		opts       TokenOptions
@@ -118,20 +125,96 @@ func Test_tokenRun(t *testing.T) {
 			wantErr:    true,
 			wantErrMsg: "no oauth token",
 		},
+		{
+			name: "uses default host when one is not provided",
+			opts: TokenOptions{
+				Config: func() (config.Config, error) {
+					cfg := config.NewBlankConfig()
+					cfg.AuthenticationFunc = func() *config.AuthConfig {
+						authCfg := &config.AuthConfig{}
+						authCfg.SetDefaultHost("github.mycompany.com", "GH_HOST")
+						authCfg.SetToken("gho_1234567", "default")
+						return authCfg
+					}
+					return cfg, nil
+				},
+			},
+			wantStdout: "gho_1234567\n",
+		},
 	}
 
 	for _, tt := range tests {
-		ios, _, stdout, _ := iostreams.Test()
-		tt.opts.IO = ios
-
 		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, _ := iostreams.Test()
+			tt.opts.IO = ios
 			err := tokenRun(&tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.EqualError(t, err, tt.wantErrMsg)
 				return
 			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantStdout, stdout.String())
+		})
+	}
+}
 
+func TestTokenRunSecureStorage(t *testing.T) {
+	tests := []struct {
+		name       string
+		opts       TokenOptions
+		wantStdout string
+		wantErr    bool
+		wantErrMsg string
+	}{
+		{
+			name: "token",
+			opts: TokenOptions{
+				Config: func() (config.Config, error) {
+					cfg := config.NewBlankConfig()
+					_ = keyring.Set("gh:github.com", "", "gho_ABCDEFG")
+					return cfg, nil
+				},
+			},
+			wantStdout: "gho_ABCDEFG\n",
+		},
+		{
+			name: "token by hostname",
+			opts: TokenOptions{
+				Config: func() (config.Config, error) {
+					cfg := config.NewBlankConfig()
+					_ = keyring.Set("gh:mycompany.com", "", "gho_1234567")
+					return cfg, nil
+				},
+				Hostname: "mycompany.com",
+			},
+			wantStdout: "gho_1234567\n",
+		},
+		{
+			name: "no token",
+			opts: TokenOptions{
+				Config: func() (config.Config, error) {
+					cfg := config.NewBlankConfig()
+					return cfg, nil
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "no oauth token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyring.MockInit()
+			ios, _, stdout, _ := iostreams.Test()
+			tt.opts.IO = ios
+			tt.opts.SecureStorage = true
+			err := tokenRun(&tt.opts)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.EqualError(t, err, tt.wantErrMsg)
+				return
+			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
 		})

@@ -7,6 +7,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 )
@@ -203,8 +204,11 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 		labels = append(labels, l.Name)
 	}
 	var projects []string
-	for _, l := range metadataResult.Projects {
-		projects = append(projects, l.Name)
+	for _, p := range metadataResult.Projects {
+		projects = append(projects, p.Name)
+	}
+	for _, p := range metadataResult.ProjectsV2 {
+		projects = append(projects, p.Title)
 	}
 	milestones := []string{noMilestone}
 	for _, m := range metadataResult.Milestones {
@@ -220,6 +224,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 					Message: "Reviewers",
 					Options: reviewers,
 					Default: state.Reviewers,
+					Filter:  prompter.LatinMatchingFilter,
 				},
 			})
 		} else {
@@ -234,6 +239,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 					Message: "Assignees",
 					Options: assignees,
 					Default: state.Assignees,
+					Filter:  prompter.LatinMatchingFilter,
 				},
 			})
 		} else {
@@ -248,6 +254,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 					Message: "Labels",
 					Options: labels,
 					Default: state.Labels,
+					Filter:  prompter.LatinMatchingFilter,
 				},
 			})
 		} else {
@@ -262,6 +269,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 					Message: "Projects",
 					Options: projects,
 					Default: state.Projects,
+					Filter:  prompter.LatinMatchingFilter,
 				},
 			})
 		} else {
@@ -273,6 +281,8 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 			var milestoneDefault string
 			if len(state.Milestones) > 0 {
 				milestoneDefault = state.Milestones[0]
+			} else {
+				milestoneDefault = milestones[1]
 			}
 			mqs = append(mqs, &survey.Question{
 				Name: "milestone",

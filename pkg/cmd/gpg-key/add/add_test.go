@@ -27,12 +27,31 @@ func Test_runAdd(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "user/gpg_keys"),
-					httpmock.StatusStringResponse(200, ``))
+					httpmock.RESTPayload(200, ``, func(payload map[string]interface{}) {
+						assert.Contains(t, payload, "armored_public_key")
+						assert.NotContains(t, payload, "title")
+					}))
 			},
 			wantStdout: "✓ GPG key added to your account\n",
 			wantStderr: "",
 			wantErrMsg: "",
 			opts:       AddOptions{KeyFile: "-"},
+		},
+		{
+			name:  "valid key with title",
+			stdin: "-----BEGIN PGP PUBLIC KEY BLOCK-----",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "user/gpg_keys"),
+					httpmock.RESTPayload(200, ``, func(payload map[string]interface{}) {
+						assert.Contains(t, payload, "armored_public_key")
+						assert.Contains(t, payload, "name")
+					}))
+			},
+			wantStdout: "✓ GPG key added to your account\n",
+			wantStderr: "",
+			wantErrMsg: "",
+			opts:       AddOptions{KeyFile: "-", Title: "some title"},
 		},
 		{
 			name:  "binary format fails",

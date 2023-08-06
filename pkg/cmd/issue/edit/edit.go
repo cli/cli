@@ -99,18 +99,16 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				opts.Editable.Milestone.Edited = true
 			}
 
-			if !opts.Editable.Dirty() {
+			if cmd.Flags().NFlag() == 0 {
+				if !opts.IO.CanPrompt() {
+					return cmdutil.FlagErrorf("flags required when not running interactively")
+				}
 				opts.Interactive = true
-			}
-
-			if opts.Interactive && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("field to edit flag required when not running interactively")
 			}
 
 			if runF != nil {
 				return runF(opts)
 			}
-
 			return editRun(opts)
 		},
 	}
@@ -137,11 +135,8 @@ func editRun(opts *EditOptions) error {
 
 	editable := opts.Editable
 	lookupFields := []string{"id", "number", "title", "body", "url"}
-	if opts.Interactive || editable.Assignees.Edited {
-		lookupFields = append(lookupFields, "assignees")
-	}
-	if opts.Interactive || editable.Labels.Edited {
-		lookupFields = append(lookupFields, "labels")
+	if opts.Interactive {
+		lookupFields = append(lookupFields, "assignees", "labels")
 	}
 	if opts.Interactive || editable.Projects.Edited {
 		lookupFields = append(lookupFields, "projectCards")

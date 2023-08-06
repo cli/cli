@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -19,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/transform"
 )
 
 type DiffOptions struct {
@@ -125,11 +128,16 @@ func diffRun(opts *DiffOptions) error {
 		opts.Patch = false
 	}
 
-	diff, err := fetchDiff(httpClient, baseRepo, pr.Number, opts.Patch)
+	diffReadCloser, err := fetchDiff(httpClient, baseRepo, pr.Number, opts.Patch)
 	if err != nil {
 		return fmt.Errorf("could not find pull request diff: %w", err)
 	}
-	defer diff.Close()
+	defer diffReadCloser.Close()
+
+	var diff io.Reader = diffReadCloser
+	if opts.IO.IsStdoutTTY() {
+		diff = sanitizedReader(diff)
+	}
 
 	if err := opts.IO.StartPager(); err == nil {
 		defer opts.IO.StopPager()
@@ -277,4 +285,57 @@ func changedFilesNames(w io.Writer, r io.Reader) error {
 	}
 
 	return nil
+}
+
+func sanitizedReader(r io.Reader) io.Reader {
+	return transform.NewReader(r, sanitizer{})
+}
+
+// sanitizer replaces non-printable characters with their printable representations
+type sanitizer struct{ transform.NopResetter }
+
+// Transform implements transform.Transformer.
+func (t sanitizer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
+	for r, size := rune(0), 0; nSrc < len(src); {
+		if r = rune(src[nSrc]); r < utf8.RuneSelf {
+			size = 1
+		} else if r, size = utf8.DecodeRune(src[nSrc:]); size == 1 && !atEOF && !utf8.FullRune(src[nSrc:]) {
+			// Invalid rune.
+			err = transform.ErrShortSrc
+			break
+		}
+
+		if isPrint(r) {
+			if nDst+size > len(dst) {
+				err = transform.ErrShortDst
+				break
+			}
+			for i := 0; i < size; i++ {
+				dst[nDst] = src[nSrc]
+				nDst++
+				nSrc++
+			}
+			continue
+		} else {
+			nSrc += size
+		}
+
+		replacement := fmt.Sprintf("\\u{%02x}", r)
+
+		if nDst+len(replacement) > len(dst) {
+			err = transform.ErrShortDst
+			break
+		}
+
+		for _, c := range replacement {
+			dst[nDst] = byte(c)
+			nDst++
+		}
+	}
+	return
+}
+
+// isPrint reports if a rune is safe to be printed to a terminal
+func isPrint(r rune) bool {
+	return r == '\n' || r == '\r' || r == '\t' || unicode.IsPrint(r)
 }

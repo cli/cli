@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -139,6 +140,15 @@ func Test_NewCmdEdit(t *testing.T) {
 				Body:    stringPtr("MY NOTES"),
 			},
 		},
+		{
+			name:  "verify-tag",
+			args:  "v1.2.0 --tag=v1.1.0 --verify-tag",
+			isTTY: false,
+			want: EditOptions{
+				TagName:   "v1.1.0",
+				VerifyTag: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -188,6 +198,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			assert.Equal(t, tt.want.Draft, opts.Draft)
 			assert.Equal(t, tt.want.Prerelease, opts.Prerelease)
 			assert.Equal(t, tt.want.IsLatest, opts.IsLatest)
+			assert.Equal(t, tt.want.VerifyTag, opts.VerifyTag)
 		})
 	}
 }
@@ -405,6 +416,21 @@ func Test_editRun(t *testing.T) {
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
 		},
+		{
+			name:  "error when remote tag does not exist and verify-tag flag is set",
+			isTTY: true,
+			opts: EditOptions{
+				TagName:   "v1.2.4",
+				VerifyTag: true,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": ""}}}}`))
+			},
+			wantErr:    "tag v1.2.4 doesn't exist in the repo OWNER/REPO, aborting due to --verify-tag flag",
+			wantStdout: "",
+			wantStderr: "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -415,14 +441,14 @@ func Test_editRun(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 
 			fakeHTTP := &httpmock.Registry{}
-			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.JSONResponse(map[string]interface{}{
-				"id":       12345,
-				"tag_name": "v1.2.3",
-			}))
+			defer fakeHTTP.Verify(t)
+			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", "v1.2.3", `{
+				"id": 12345,
+				"tag_name": "v1.2.3"
+			}`)
 			if tt.httpStubs != nil {
 				tt.httpStubs(t, fakeHTTP)
 			}
-			defer fakeHTTP.Verify(t)
 
 			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,8 +11,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/go-gh"
-	ghAPI "github.com/cli/go-gh/pkg/api"
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 )
 
 const (
@@ -39,11 +39,11 @@ func (c *Client) HTTP() *http.Client {
 }
 
 type GraphQLError struct {
-	ghAPI.GQLError
+	*ghAPI.GraphQLError
 }
 
 type HTTPError struct {
-	ghAPI.HTTPError
+	*ghAPI.HTTPError
 	scopesSuggestion string
 }
 
@@ -51,46 +51,58 @@ func (err HTTPError) ScopesSuggestion() string {
 	return err.scopesSuggestion
 }
 
-// GraphQL performs a GraphQL request and parses the response. If there are errors in the response,
-// GraphQLError will be returned, but the data will also be parsed into the receiver.
+// GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
+// GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
-	gqlClient, err := gh.GQLClient(&opts)
+	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
 		return err
 	}
 	return handleResponse(gqlClient.Do(query, variables, data))
 }
 
-// GraphQL performs a GraphQL mutation and parses the response. If there are errors in the response,
-// GraphQLError will be returned, but the data will also be parsed into the receiver.
+// Mutate performs a GraphQL mutation based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
+// GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) Mutate(hostname, name string, mutation interface{}, variables map[string]interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
-	gqlClient, err := gh.GQLClient(&opts)
+	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
 		return err
 	}
 	return handleResponse(gqlClient.Mutate(name, mutation, variables))
 }
 
-// GraphQL performs a GraphQL query and parses the response. If there are errors in the response,
-// GraphQLError will be returned, but the data will also be parsed into the receiver.
+// Query performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
+// GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) Query(hostname, name string, query interface{}, variables map[string]interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
 	opts.Headers[graphqlFeatures] = features
-	gqlClient, err := gh.GQLClient(&opts)
+	gqlClient, err := ghAPI.NewGraphQLClient(opts)
 	if err != nil {
 		return err
 	}
 	return handleResponse(gqlClient.Query(name, query, variables))
 }
 
+// QueryWithContext performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
+// GraphQLError will be returned, but the receiver will also be partially populated.
+func (c Client) QueryWithContext(ctx context.Context, hostname, name string, query interface{}, variables map[string]interface{}) error {
+	opts := clientOptions(hostname, c.http.Transport)
+	opts.Headers[graphqlFeatures] = features
+	gqlClient, err := ghAPI.NewGraphQLClient(opts)
+	if err != nil {
+		return err
+	}
+	return handleResponse(gqlClient.QueryWithContext(ctx, name, query, variables))
+}
+
 // REST performs a REST request and parses the response.
 func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
-	restClient, err := gh.RESTClient(&opts)
+	restClient, err := ghAPI.NewRESTClient(opts)
 	if err != nil {
 		return err
 	}
@@ -99,7 +111,7 @@ func (c Client) REST(hostname string, method string, p string, body io.Reader, d
 
 func (c Client) RESTWithNext(hostname string, method string, p string, body io.Reader, data interface{}) (string, error) {
 	opts := clientOptions(hostname, c.http.Transport)
-	restClient, err := gh.RESTClient(&opts)
+	restClient, err := ghAPI.NewRESTClient(opts)
 	if err != nil {
 		return "", err
 	}
@@ -144,14 +156,14 @@ func HandleHTTPError(resp *http.Response) error {
 	return handleResponse(ghAPI.HandleHTTPError(resp))
 }
 
-// handleResponse takes a ghAPI.HTTPError or ghAPI.GQLError and converts it into an
+// handleResponse takes a ghAPI.HTTPError or ghAPI.GraphQLError and converts it into an
 // HTTPError or GraphQLError respectively.
 func handleResponse(err error) error {
 	if err == nil {
 		return nil
 	}
 
-	var restErr ghAPI.HTTPError
+	var restErr *ghAPI.HTTPError
 	if errors.As(err, &restErr) {
 		return HTTPError{
 			HTTPError: restErr,
@@ -162,10 +174,10 @@ func handleResponse(err error) error {
 		}
 	}
 
-	var gqlErr ghAPI.GQLError
+	var gqlErr *ghAPI.GraphQLError
 	if errors.As(err, &gqlErr) {
 		return GraphQLError{
-			GQLError: gqlErr,
+			GraphQLError: gqlErr,
 		}
 	}
 

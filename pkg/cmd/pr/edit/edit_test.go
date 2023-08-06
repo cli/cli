@@ -3,8 +3,8 @@ package edit
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -21,7 +21,7 @@ import (
 
 func TestNewCmdEdit(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
-	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -255,17 +255,17 @@ func TestNewCmdEdit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, stdin, _, _ := iostreams.Test()
-			ios.SetStdoutTTY(true)
-			ios.SetStdinTTY(true)
-			ios.SetStderrTTY(true)
+			io, stdin, _, _ := iostreams.Test()
+			io.SetStdoutTTY(true)
+			io.SetStdinTTY(true)
+			io.SetStderrTTY(true)
 
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
 			}
 
 			f := &cmdutil.Factory{
-				IOStreams: ios,
+				IOStreams: io,
 			}
 
 			argv, err := shlex.Split(tt.input)
@@ -358,6 +358,12 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestReviewersUpdate(t, reg)
 				mockPullRequestUpdateLabels(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation AssigneeAdd\b`),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation AssigneeRemove\b`),
+					httpmock.StringResponse(`{}`))
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -408,6 +414,12 @@ func Test_editRun(t *testing.T) {
 				mockRepoMetadata(t, reg, true)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestUpdateLabels(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation AssigneeAdd\b`),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation AssigneeRemove\b`),
+					httpmock.StringResponse(`{}`))
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -450,10 +462,10 @@ func Test_editRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		ios, _, stdout, stderr := iostreams.Test()
-		ios.SetStdoutTTY(true)
-		ios.SetStdinTTY(true)
-		ios.SetStderrTTY(true)
+		io, _, stdout, stderr := iostreams.Test()
+		io.SetStdoutTTY(true)
+		io.SetStdinTTY(true)
+		io.SetStderrTTY(true)
 
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
@@ -461,7 +473,7 @@ func Test_editRun(t *testing.T) {
 
 		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 
-		tt.input.IO = ios
+		tt.input.IO = io
 		tt.input.HttpClient = httpClient
 
 		t.Run(tt.name, func(t *testing.T) {
@@ -480,6 +492,7 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) 
 		{ "data": { "repository": { "assignableUsers": {
 			"nodes": [
 				{ "login": "hubot", "id": "HUBOTID" },
+				{ "login": "octocat", "id": "OCTOCATID" },
 				{ "login": "MonaLisa", "id": "MONAID" }
 			],
 			"pageInfo": { "hasNextPage": false }
@@ -534,18 +547,13 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) 
 		reg.Register(
 			httpmock.GraphQL(`query OrganizationTeamList\b`),
 			httpmock.StringResponse(`
-      { "data": { "organization": { "teams": {
-        "nodes": [
-          { "slug": "external", "id": "EXTERNALID" },
-          { "slug": "core", "id": "COREID" }
-        ],
-        "pageInfo": { "hasNextPage": false }
-      } } } }
-		`))
-		reg.Register(
-			httpmock.GraphQL(`query UserCurrent\b`),
-			httpmock.StringResponse(`
-		  { "data": { "viewer": { "login": "monalisa" } } }
+		{ "data": { "organization": { "teams": {
+			"nodes": [
+				{ "slug": "external", "id": "EXTERNALID" },
+				{ "slug": "core", "id": "COREID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
 		`))
 	}
 }

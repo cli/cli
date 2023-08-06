@@ -93,6 +93,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 			# Set multiple secrets imported from the ".env" file
 			$ gh secret set -f .env
+
+			# Set multiple secrets from stdin
+			$ gh secret set -f - < myfile.txt
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -178,7 +181,7 @@ func setRun(opts *SetOptions) error {
 	if orgName == "" && !opts.UserSecrets {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
-			return fmt.Errorf("could not determine base repo: %w", err)
+			return err
 		}
 		host = baseRepo.RepoHost()
 	} else {
@@ -186,7 +189,7 @@ func setRun(opts *SetOptions) error {
 		if err != nil {
 			return err
 		}
-		host, _ = cfg.DefaultHost()
+		host, _ = cfg.Authentication().DefaultHost()
 	}
 
 	secretEntity, err := shared.GetSecretEntity(orgName, envName, opts.UserSecrets)
@@ -407,7 +410,7 @@ func mapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repository
 		}
 		repos = append(repos, repo)
 	}
-	repositoryIDs, err := mapRepoToID(client, host, repos)
+	repositoryIDs, err := api.GetRepoIDs(client, host, repos)
 	if err != nil {
 		return nil, fmt.Errorf("failed to look up IDs for repositories %v: %w", repositoryNames, err)
 	}

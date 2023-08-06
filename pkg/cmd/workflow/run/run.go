@@ -128,6 +128,8 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Read workflow inputs as JSON via STDIN")
 
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "ref")
+
 	return cmd
 }
 
@@ -248,7 +250,7 @@ func runRun(opts *RunOptions) error {
 
 	repo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
+		return err
 	}
 
 	ref := opts.Ref

@@ -1,16 +1,59 @@
 package codespace
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestCreateCmdFlagError(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     string
+		wantsErr error
+	}{
+		{
+			name:     "return error when using web flag with display-name, idle-timeout, or retention-period flags",
+			args:     "--web --display-name foo --idle-timeout 30m",
+			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not supported"),
+		},
+		{
+			name:     "return error when using web flag with one of display-name, idle-timeout or retention-period flags",
+			args:     "--web --idle-timeout 30m",
+			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not supported"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			a := &App{
+				io: ios,
+			}
+			cmd := newCreateCmd(a)
+
+			args, _ := shlex.Split(tt.args)
+			cmd.SetArgs(args)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err := cmd.ExecuteC()
+
+			assert.Error(t, err)
+			assert.EqualError(t, err, tt.wantsErr.Error())
+		})
+	}
+}
 
 func TestApp_Create(t *testing.T) {
 	type fields struct {
@@ -23,36 +66,13 @@ func TestApp_Create(t *testing.T) {
 		wantErr    error
 		wantStdout string
 		wantStderr string
+		wantURL    string
 		isTTY      bool
 	}{
 		{
 			name: "create codespace with default branch and 30m idle timeout",
 			fields: fields{
-				apiClient: &apiClientMock{
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            1234,
-							FullName:      nwo,
-							DefaultBranch: "main",
-						}, nil
-					},
-					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
-						return &api.User{
-							Login: "monalisa",
-							Type:  "User",
-						}, nil
-					},
-					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
-						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
-					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
-						return []*api.Machine{
-							{
-								Name:        "GIGA",
-								DisplayName: "Gigabits of a machine",
-							},
-						}, nil
-					},
+				apiClient: apiCreateDefaults(&apiClientMock{
 					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 						if params.Branch != "main" {
 							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
@@ -63,14 +83,14 @@ func TestApp_Create(t *testing.T) {
 						if *params.RetentionPeriodMinutes != 2880 {
 							return nil, fmt.Errorf("retention period minutes expected 2880, was %v", params.RetentionPeriodMinutes)
 						}
+						if params.DisplayName != "" {
+							return nil, fmt.Errorf("display name was %q, expected empty", params.DisplayName)
+						}
 						return &api.Codespace{
 							Name: "monalisa-dotfiles-abcd1234",
 						}, nil
 					},
-					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
-						return nil, nil // We can't ask for suggestions without a terminal.
-					},
-				},
+				}),
 			},
 			opts: createOptions{
 				repo:            "monalisa/dotfiles",
@@ -81,32 +101,34 @@ func TestApp_Create(t *testing.T) {
 				retentionPeriod: NullableDuration{durationPtr(48 * time.Hour)},
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+		},
+		{
+			name: "create with explicit display name",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						if params.DisplayName != "funky flute" {
+							return nil, fmt.Errorf("expected display name %q, got %q", "funky flute", params.DisplayName)
+						}
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:        "monalisa/dotfiles",
+				branch:      "main",
+				displayName: "funky flute",
+			},
+			wantStdout: "monalisa-dotfiles-abcd1234\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 		},
 		{
 			name: "create codespace with default branch shows idle timeout notice if present",
 			fields: fields{
-				apiClient: &apiClientMock{
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            1234,
-							FullName:      nwo,
-							DefaultBranch: "main",
-						}, nil
-					},
-					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
-						return &api.User{
-							Login: "monalisa",
-							Type:  "User",
-						}, nil
-					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
-						return []*api.Machine{
-							{
-								Name:        "GIGA",
-								DisplayName: "Gigabits of a machine",
-							},
-						}, nil
-					},
+				apiClient: apiCreateDefaults(&apiClientMock{
 					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 						if params.Branch != "main" {
 							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
@@ -124,7 +146,7 @@ func TestApp_Create(t *testing.T) {
 							Name: "monalisa-dotfiles-abcd1234",
 						}, nil
 					},
-				},
+				}),
 			},
 			opts: createOptions{
 				repo:             "monalisa/dotfiles",
@@ -135,24 +157,37 @@ func TestApp_Create(t *testing.T) {
 				devContainerPath: ".devcontainer/foobar/devcontainer.json",
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+		},
+		{
+			name: "create codespace with nonexistent machine results in error",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
+						return []*api.Machine{
+							{
+								Name:        "GIGA",
+								DisplayName: "Gigabits of a machine",
+							},
+							{
+								Name:        "TERA",
+								DisplayName: "Terabits of a machine",
+							},
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:    "monalisa/dotfiles",
+				machine: "MEGA",
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantErr:    fmt.Errorf("error getting machine type: there is no such machine for the repository: %s\nAvailable machines: %v", "MEGA", []string{"GIGA", "TERA"}),
 		},
 		{
 			name: "create codespace with devcontainer path results in selecting the correct machine type",
 			fields: fields{
-				apiClient: &apiClientMock{
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            1234,
-							FullName:      nwo,
-							DefaultBranch: "main",
-						}, nil
-					},
-					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
-						return &api.User{
-							Login: "monalisa",
-							Type:  "User",
-						}, nil
-					},
+				apiClient: apiCreateDefaults(&apiClientMock{
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 						if devcontainerPath == "" {
 							return []*api.Machine{
@@ -187,6 +222,9 @@ func TestApp_Create(t *testing.T) {
 						if params.DevContainerPath != ".devcontainer/foobar/devcontainer.json" {
 							return nil, fmt.Errorf("got dev container path %q, want %q", params.DevContainerPath, ".devcontainer/foobar/devcontainer.json")
 						}
+						if params.Machine != "MEGA" {
+							return nil, fmt.Errorf("want machine %q, got %q", "MEGA", params.Machine)
+						}
 						return &api.Codespace{
 							Name: "monalisa-dotfiles-abcd1234",
 							Machine: api.CodespaceMachine{
@@ -195,7 +233,7 @@ func TestApp_Create(t *testing.T) {
 							},
 						}, nil
 					},
-				},
+				}),
 			},
 			opts: createOptions{
 				repo:             "monalisa/dotfiles",
@@ -206,34 +244,14 @@ func TestApp_Create(t *testing.T) {
 				devContainerPath: ".devcontainer/foobar/devcontainer.json",
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 		},
 		{
 			name: "create codespace with default branch with default devcontainer if no path provided and no devcontainer files exist in the repo",
 			fields: fields{
-				apiClient: &apiClientMock{
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            1234,
-							FullName:      nwo,
-							DefaultBranch: "main",
-						}, nil
-					},
-					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
-						return &api.User{
-							Login: "monalisa",
-							Type:  "User",
-						}, nil
-					},
+				apiClient: apiCreateDefaults(&apiClientMock{
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return []api.DevContainerEntry{}, nil
-					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
-						return []*api.Machine{
-							{
-								Name:        "GIGA",
-								DisplayName: "Gigabits of a machine",
-							},
-						}, nil
 					},
 					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 						if params.Branch != "main" {
@@ -250,10 +268,7 @@ func TestApp_Create(t *testing.T) {
 							IdleTimeoutNotice: "Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy",
 						}, nil
 					},
-					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
-						return nil, nil // We can't ask for suggestions without a terminal.
-					},
-				},
+				}),
 			},
 			opts: createOptions{
 				repo:        "monalisa/dotfiles",
@@ -263,30 +278,17 @@ func TestApp_Create(t *testing.T) {
 				idleTimeout: 30 * time.Minute,
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
-			wantStderr: "Notice: Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\nNotice: Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy\n",
 			isTTY:      true,
 		},
 		{
 			name: "returns error when getting devcontainer paths fails",
 			fields: fields{
-				apiClient: &apiClientMock{
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            1234,
-							FullName:      nwo,
-							DefaultBranch: "main",
-						}, nil
-					},
-					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
-						return &api.User{
-							Login: "monalisa",
-							Type:  "User",
-						}, nil
-					},
+				apiClient: apiCreateDefaults(&apiClientMock{
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return nil, fmt.Errorf("some error")
 					},
-				},
+				}),
 			},
 			opts: createOptions{
 				repo:        "monalisa/dotfiles",
@@ -295,36 +297,13 @@ func TestApp_Create(t *testing.T) {
 				showStatus:  false,
 				idleTimeout: 30 * time.Minute,
 			},
-			wantErr: fmt.Errorf("error getting devcontainer.json paths: some error"),
+			wantErr:    fmt.Errorf("error getting devcontainer.json paths: some error"),
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 		},
 		{
 			name: "create codespace with default branch does not show idle timeout notice if not conntected to terminal",
 			fields: fields{
-				apiClient: &apiClientMock{
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            1234,
-							FullName:      nwo,
-							DefaultBranch: "main",
-						}, nil
-					},
-					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
-						return &api.User{
-							Login: "monalisa",
-							Type:  "User",
-						}, nil
-					},
-					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
-						return []api.DevContainerEntry{}, nil
-					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
-						return []*api.Machine{
-							{
-								Name:        "GIGA",
-								DisplayName: "Gigabits of a machine",
-							},
-						}, nil
-					},
+				apiClient: apiCreateDefaults(&apiClientMock{
 					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 						if params.Branch != "main" {
 							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
@@ -337,10 +316,7 @@ func TestApp_Create(t *testing.T) {
 							IdleTimeoutNotice: "Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy",
 						}, nil
 					},
-					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
-						return nil, nil // We can't ask for suggestions without a terminal.
-					},
-				},
+				}),
 			},
 			opts: createOptions{
 				repo:        "monalisa/dotfiles",
@@ -350,37 +326,13 @@ func TestApp_Create(t *testing.T) {
 				idleTimeout: 30 * time.Minute,
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
-			wantStderr: "",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 			isTTY:      false,
 		},
 		{
 			name: "create codespace that requires accepting additional permissions",
 			fields: fields{
-				apiClient: &apiClientMock{
-					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
-						return &api.User{
-							Login: "monalisa",
-							Type:  "User",
-						}, nil
-					},
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            1234,
-							FullName:      nwo,
-							DefaultBranch: "main",
-						}, nil
-					},
-					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
-						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
-					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
-						return []*api.Machine{
-							{
-								Name:        "GIGA",
-								DisplayName: "Gigabits of a machine",
-							},
-						}, nil
-					},
+				apiClient: apiCreateDefaults(&apiClientMock{
 					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 						if params.Branch != "main" {
 							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
@@ -392,10 +344,7 @@ func TestApp_Create(t *testing.T) {
 							AllowPermissionsURL: "https://example.com/permissions",
 						}
 					},
-					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
-						return nil, nil // We can't ask for suggestions without a terminal.
-					},
-				},
+				}),
 			},
 			opts: createOptions{
 				repo:        "monalisa/dotfiles",
@@ -405,7 +354,8 @@ func TestApp_Create(t *testing.T) {
 				idleTimeout: 30 * time.Minute,
 			},
 			wantErr: cmdutil.SilentError,
-			wantStderr: `You must authorize or deny additional permissions requested by this codespace before continuing.
+			wantStderr: `  ✓ Codespaces usage for this repository is paid for by monalisa
+You must authorize or deny additional permissions requested by this codespace before continuing.
 Open this URL in your browser to review and authorize additional permissions: example.com/permissions
 Alternatively, you can run "create" with the "--default-permissions" option to continue without authorizing additional permissions.
 `,
@@ -413,18 +363,11 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 		{
 			name: "returns error when user can't create codepaces for a repository",
 			fields: fields{
-				apiClient: &apiClientMock{
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            1234,
-							FullName:      nwo,
-							DefaultBranch: "main",
-						}, nil
-					},
+				apiClient: apiCreateDefaults(&apiClientMock{
 					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return nil, fmt.Errorf("some error")
 					},
-				},
+				}),
 			},
 			opts: createOptions{
 				repo:        "megacorp/private",
@@ -436,31 +379,37 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			wantErr: fmt.Errorf("error checking codespace ownership: some error"),
 		},
 		{
-			name: "mentions billable owner when org covers codepaces for a repository",
+			name: "mentions User as billable owner when org does not cover codepaces for a repository",
 			fields: fields{
-				apiClient: &apiClientMock{
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            1234,
-							FullName:      nwo,
-							DefaultBranch: "main",
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Type:  "User",
+							Login: "monalisa",
 						}, nil
 					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:   "monalisa/dotfiles",
+				branch: "main",
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantStdout: "monalisa-dotfiles-abcd1234\n",
+		},
+		{
+			name: "mentions Organization as billable owner when org covers codepaces for a repository",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
 					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return &api.User{
 							Type:  "Organization",
 							Login: "megacorp",
-						}, nil
-					},
-					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
-						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
-					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
-						return []*api.Machine{
-							{
-								Name:        "GIGA",
-								DisplayName: "Gigabits of a machine",
-							},
 						}, nil
 					},
 					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
@@ -468,7 +417,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 							Name: "megacorp-private-abcd1234",
 						}, nil
 					},
-				},
+				}),
 			},
 			opts: createOptions{
 				repo:        "megacorp/private",
@@ -481,31 +430,13 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			wantStdout: "megacorp-private-abcd1234\n",
 		},
 		{
-			name: "doesn't mention billable owner when it's the individual",
+			name: "does not mention billable owner when not an expected type",
 			fields: fields{
-				apiClient: &apiClientMock{
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            1234,
-							FullName:      nwo,
-							DefaultBranch: "main",
-						}, nil
-					},
+				apiClient: apiCreateDefaults(&apiClientMock{
 					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return &api.User{
-							Type:  "User",
-							Login: "monalisa",
-						}, nil
-					},
-					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
-						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
-					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
-						return []*api.Machine{
-							{
-								Name:        "GIGA",
-								DisplayName: "Gigabits of a machine",
-							},
+							Type:  "UnexpectedBillableOwnerType",
+							Login: "mega-owner",
 						}, nil
 					},
 					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
@@ -513,18 +444,102 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 							Name: "megacorp-private-abcd1234",
 						}, nil
 					},
-				},
+				}),
 			},
 			opts: createOptions{
-				repo:        "megacorp/private",
-				branch:      "",
-				machine:     "GIGA",
-				showStatus:  false,
-				idleTimeout: 30 * time.Minute,
+				repo: "megacorp/private",
 			},
 			wantStdout: "megacorp-private-abcd1234\n",
 		},
+		{
+			name: "return default url when using web flag without other flags",
+			opts: createOptions{
+				useWeb: true,
+			},
+			wantURL: "https://github.com/codespaces/new",
+		},
+		{
+			name: "skip machine check when using web flag and no machine provided",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            123,
+							DefaultBranch: "main",
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:     "monalisa/dotfiles",
+				useWeb:   true,
+				branch:   "custom",
+				location: "EastUS",
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantURL:    fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", 123, "custom", "", "EastUS"),
+		},
+		{
+			name: "return correct url with correct params when using web flag and repo flag",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            123,
+							DefaultBranch: "main",
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:   "monalisa/dotfiles",
+				useWeb: true,
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantURL:    fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", 123, "main", "", ""),
+		},
+		{
+			name: "return correct url with correct params when using web flag, repo, branch, location, machine flag",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            123,
+							DefaultBranch: "main",
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name:    "monalisa-dotfiles-abcd1234",
+							Machine: api.CodespaceMachine{Name: "GIGA"},
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:     "monalisa/dotfiles",
+				machine:  "GIGA",
+				branch:   "custom",
+				location: "EastUS",
+				useWeb:   true,
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantURL:    fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", 123, "custom", "GIGA", "EastUS"),
+		},
 	}
+	var a *App
+	var b *browser.Stub
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
@@ -532,9 +547,18 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			ios.SetStdinTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
 
-			a := &App{
-				io:        ios,
-				apiClient: tt.fields.apiClient,
+			if tt.opts.useWeb {
+				b = &browser.Stub{}
+				a = &App{
+					io:        ios,
+					apiClient: tt.fields.apiClient,
+					browser:   b,
+				}
+			} else {
+				a = &App{
+					io:        ios,
+					apiClient: tt.fields.apiClient,
+				}
 			}
 
 			err := a.Create(context.Background(), tt.opts)
@@ -551,6 +575,10 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			if got := stderr.String(); got != tt.wantStderr {
 				t.Logf(t.Name())
 				t.Errorf("  stderr = %v, want %v", got, tt.wantStderr)
+			}
+
+			if tt.opts.useWeb {
+				b.Verify(t, tt.wantURL)
 			}
 		})
 	}
@@ -592,6 +620,42 @@ func TestBuildDisplayName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func apiCreateDefaults(c *apiClientMock) *apiClientMock {
+	if c.GetRepositoryFunc == nil {
+		c.GetRepositoryFunc = func(ctx context.Context, nwo string) (*api.Repository, error) {
+			return &api.Repository{
+				ID:            1234,
+				FullName:      nwo,
+				DefaultBranch: "main",
+			}, nil
+		}
+	}
+	if c.GetCodespaceBillableOwnerFunc == nil {
+		c.GetCodespaceBillableOwnerFunc = func(ctx context.Context, nwo string) (*api.User, error) {
+			return &api.User{
+				Login: "monalisa",
+				Type:  "User",
+			}, nil
+		}
+	}
+	if c.ListDevContainersFunc == nil {
+		c.ListDevContainersFunc = func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+			return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
+		}
+	}
+	if c.GetCodespacesMachinesFunc == nil {
+		c.GetCodespacesMachinesFunc = func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
+			return []*api.Machine{
+				{
+					Name:        "GIGA",
+					DisplayName: "Gigabits of a machine",
+				},
+			}, nil
+		}
+	}
+	return c
 }
 
 func durationPtr(d time.Duration) *time.Duration {

@@ -11,6 +11,89 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCodeExportData(t *testing.T) {
+	tests := []struct {
+		name   string
+		fields []string
+		code   Code
+		output string
+	}{
+		{
+			name:   "exports requested fields",
+			fields: []string{"path", "textMatches"},
+			code: Code{
+				Repository: Repository{
+					Name: "repo",
+				},
+				Path: "path",
+				Name: "name",
+				TextMatches: []TextMatch{
+					{
+						Fragment: "fragment",
+						Matches: []Match{
+							{
+								Text: "fr",
+								Indices: []int{
+									0,
+									1,
+								},
+							},
+						},
+						Property: "property",
+						Type:     "type",
+					},
+				},
+			},
+			output: `{"path":"path","textMatches":[{"fragment":"fragment","matches":[{"indices":[0,1],"text":"fr"}],"property":"property","type":"type"}]}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exported := tt.code.ExportData(tt.fields)
+			buf := bytes.Buffer{}
+			enc := json.NewEncoder(&buf)
+			require.NoError(t, enc.Encode(exported))
+			assert.Equal(t, tt.output, strings.TrimSpace(buf.String()))
+		})
+	}
+}
+
+func TestCommitExportData(t *testing.T) {
+	var authoredAt = time.Date(2021, 2, 27, 11, 30, 0, 0, time.UTC)
+	var committedAt = time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
+	tests := []struct {
+		name   string
+		fields []string
+		commit Commit
+		output string
+	}{
+		{
+			name:   "exports requested fields",
+			fields: []string{"author", "commit", "committer", "sha"},
+			commit: Commit{
+				Author:    User{Login: "foo"},
+				Committer: User{Login: "bar", ID: "123"},
+				Info: CommitInfo{
+					Author:    CommitUser{Date: authoredAt, Name: "Foo"},
+					Committer: CommitUser{Date: committedAt, Name: "Bar"},
+					Message:   "test message",
+				},
+				Sha: "8dd03144ffdc6c0d",
+			},
+			output: `{"author":{"id":"","is_bot":true,"login":"app/foo","type":"","url":""},"commit":{"author":{"date":"2021-02-27T11:30:00Z","email":"","name":"Foo"},"comment_count":0,"committer":{"date":"2021-02-28T12:30:00Z","email":"","name":"Bar"},"message":"test message","tree":{"sha":""}},"committer":{"id":"123","is_bot":false,"login":"bar","type":"","url":""},"sha":"8dd03144ffdc6c0d"}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exported := tt.commit.ExportData(tt.fields)
+			buf := bytes.Buffer{}
+			enc := json.NewEncoder(&buf)
+			require.NoError(t, enc.Encode(exported))
+			assert.Equal(t, tt.output, strings.TrimSpace(buf.String()))
+		})
+	}
+}
+
 func TestRepositoryExportData(t *testing.T) {
 	var createdAt = time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
 	tests := []struct {
@@ -67,7 +150,7 @@ func TestIssueExportData(t *testing.T) {
 				Title:         "title",
 				UpdatedAt:     updatedAt,
 			},
-			output: `{"assignees":[{"id":"123","is_bot":false,"login":"test","type":""},{"id":"","is_bot":true,"login":"app/foo","type":""}],"body":"body","commentsCount":1,"isLocked":true,"labels":[{"color":"","description":"","id":"","name":"label1"},{"color":"","description":"","id":"","name":"label2"}],"repository":{"name":"repo","nameWithOwner":"owner/repo"},"title":"title","updatedAt":"2021-02-28T12:30:00Z"}`,
+			output: `{"assignees":[{"id":"123","is_bot":false,"login":"test","type":"","url":""},{"id":"","is_bot":true,"login":"app/foo","type":"","url":""}],"body":"body","commentsCount":1,"isLocked":true,"labels":[{"color":"","description":"","id":"","name":"label1"},{"color":"","description":"","id":"","name":"label2"}],"repository":{"name":"repo","nameWithOwner":"owner/repo"},"title":"title","updatedAt":"2021-02-28T12:30:00Z"}`,
 		},
 		{
 			name:   "state when issue",

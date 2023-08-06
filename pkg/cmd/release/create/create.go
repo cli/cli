@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
@@ -18,10 +17,15 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/surveyext"
 	"github.com/spf13/cobra"
 )
+
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+	Input(string, string) (string, error)
+	Confirm(string, bool) (bool, error)
+}
 
 type CreateOptions struct {
 	IO         *iostreams.IOStreams
@@ -30,6 +34,7 @@ type CreateOptions struct {
 	GitClient  *git.Client
 	BaseRepo   func() (ghrepo.Interface, error)
 	Edit       func(string, string, string, io.Reader, io.Writer, io.Writer) (string, error)
+	Prompter   iprompter
 
 	TagName      string
 	Target       string
@@ -62,6 +67,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		HttpClient: f.HttpClient,
 		GitClient:  f.GitClient,
 		Config:     f.Config,
+		Prompter:   f.Prompter,
 		Edit:       surveyext.Edit,
 	}
 
@@ -171,6 +177,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
 	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
 
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
+
 	return cmd
 }
 
@@ -199,17 +207,11 @@ func createRun(opts *CreateOptions) error {
 			}
 			createNewTagOption := "Create a new tag"
 			options = append(options, createNewTagOption)
-			var tag string
-			q := &survey.Select{
-				Message: "Choose a tag",
-				Options: options,
-				Default: options[0],
-			}
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err := prompt.SurveyAskOne(q, &tag)
+			selected, err := opts.Prompter.Select("Choose a tag", options[0], options)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
+			tag := options[selected]
 			if tag != createNewTagOption {
 				existingTag = true
 				opts.TagName = tag
@@ -217,14 +219,11 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if opts.TagName == "" {
-			q := &survey.Input{
-				Message: "Tag name",
-			}
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err := prompt.SurveyAskOne(q, &opts.TagName)
+			opts.TagName, err = opts.Prompter.Input("Tag name", "")
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
+			opts.TagName = strings.TrimSpace(opts.TagName)
 		}
 	}
 
@@ -313,27 +312,17 @@ func createRun(opts *CreateOptions) error {
 		if defaultName == "" && generatedNotes != nil {
 			defaultName = generatedNotes.Name
 		}
-		qs := []*survey.Question{
-			{
-				Name: "name",
-				Prompt: &survey.Input{
-					Message: "Title (optional)",
-					Default: defaultName,
-				},
-			},
-			{
-				Name: "releaseNotesAction",
-				Prompt: &survey.Select{
-					Message: "Release notes",
-					Options: editorOptions,
-				},
-			},
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-		err = prompt.SurveyAsk(qs, opts)
+
+		opts.Name, err = opts.Prompter.Input("Title (optional)", defaultName)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
+
+		selected, err := opts.Prompter.Select("Release notes", "", editorOptions)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
+		opts.ReleaseNotesAction = editorOptions[selected]
 
 		var openEditor bool
 		var editorContents string
@@ -372,33 +361,18 @@ func createRun(opts *CreateOptions) error {
 			defaultSubmit = saveAsDraft
 		}
 
-		qs = []*survey.Question{
-			{
-				Name: "prerelease",
-				Prompt: &survey.Confirm{
-					Message: "Is this a prerelease?",
-					Default: opts.Prerelease,
-				},
-			},
-			{
-				Name: "submitAction",
-				Prompt: &survey.Select{
-					Message: "Submit?",
-					Options: []string{
-						publishRelease,
-						saveAsDraft,
-						"Cancel",
-					},
-					Default: defaultSubmit,
-				},
-			},
+		opts.Prerelease, err = opts.Prompter.Confirm("Is this a prerelease?", opts.Prerelease)
+		if err != nil {
+			return err
 		}
 
-		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-		err = prompt.SurveyAsk(qs, opts)
+		options := []string{publishRelease, saveAsDraft, "Cancel"}
+		selected, err = opts.Prompter.Select("Submit?", defaultSubmit, options)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
+
+		opts.SubmitAction = options[selected]
 
 		switch opts.SubmitAction {
 		case "Publish release":
@@ -455,6 +429,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	hasAssets := len(opts.Assets) > 0
+	draftWhileUploading := false
 
 	if hasAssets && !opts.Draft {
 		// Check for an existing release
@@ -466,11 +441,22 @@ func createRun(opts *CreateOptions) error {
 			}
 		}
 		// Save the release initially as draft and publish it after all assets have finished uploading
+		draftWhileUploading = true
 		params["draft"] = true
 	}
 
 	newRelease, err := createRelease(httpClient, baseRepo, params)
 	if err != nil {
+		return err
+	}
+
+	cleanupDraftRelease := func(err error) error {
+		if !draftWhileUploading {
+			return err
+		}
+		if cleanupErr := deleteRelease(httpClient, newRelease); cleanupErr != nil {
+			return fmt.Errorf("%w\ncleaning up draft failed: %v", err, cleanupErr)
+		}
 		return err
 	}
 
@@ -484,13 +470,13 @@ func createRun(opts *CreateOptions) error {
 		err = shared.ConcurrentUpload(httpClient, uploadURL, opts.Concurrency, opts.Assets)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
-			return err
+			return cleanupDraftRelease(err)
 		}
 
-		if !opts.Draft {
+		if draftWhileUploading {
 			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory)
 			if err != nil {
-				return err
+				return cleanupDraftRelease(err)
 			}
 			newRelease = rel
 		}

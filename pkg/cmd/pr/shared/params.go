@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -109,11 +110,12 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	}
 	params["labelIds"] = labelIDs
 
-	projectIDs, err := tb.MetadataResult.ProjectsToIDs(tb.Projects)
+	projectIDs, projectV2IDs, err := tb.MetadataResult.ProjectsToIDs(tb.Projects)
 	if err != nil {
 		return fmt.Errorf("could not add to project: %w", err)
 	}
 	params["projectIds"] = projectIDs
+	params["projectV2Ids"] = projectV2IDs
 
 	if len(tb.Milestones) > 0 {
 		milestoneID, err := tb.MetadataResult.MilestoneToID(tb.Milestones[0])
@@ -260,6 +262,7 @@ func QueryHasStateClause(searchQuery string) bool {
 // MeReplacer resolves usages of `@me` to the handle of the currently logged in user.
 type MeReplacer struct {
 	apiClient *api.Client
+	mu        sync.Mutex
 	hostname  string
 	login     string
 }
@@ -272,6 +275,8 @@ func NewMeReplacer(apiClient *api.Client, hostname string) *MeReplacer {
 }
 
 func (r *MeReplacer) currentLogin() (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.login != "" {
 		return r.login, nil
 	}

@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,7 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	ghAuth "github.com/cli/go-gh/pkg/auth"
+	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -48,18 +49,22 @@ To authorize, run "gh auth refresh -s delete_repo"`,
 			if len(args) > 0 {
 				opts.RepoArg = args[0]
 			}
+
 			if !opts.IO.CanPrompt() && !opts.Confirmed {
-				return cmdutil.FlagErrorf("--confirm required when not running interactively")
+				return cmdutil.FlagErrorf("--yes required when not running interactively")
 			}
 
 			if runF != nil {
 				return runF(opts)
 			}
+
 			return deleteRun(opts)
 		},
 	}
 
 	cmd.Flags().BoolVar(&opts.Confirmed, "confirm", false, "confirm deletion without prompting")
+	_ = cmd.Flags().MarkDeprecated("confirm", "use `--yes` instead")
+	cmd.Flags().BoolVar(&opts.Confirmed, "yes", false, "confirm deletion without prompting")
 	return cmd
 }
 
@@ -102,6 +107,17 @@ func deleteRun(opts *DeleteOptions) error {
 
 	err = deleteRepo(httpClient, toDelete)
 	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) {
+			statusCode := httpErr.HTTPError.StatusCode
+			if statusCode == http.StatusMovedPermanently ||
+				statusCode == http.StatusTemporaryRedirect ||
+				statusCode == http.StatusPermanentRedirect {
+				cs := opts.IO.ColorScheme()
+				fmt.Fprintf(opts.IO.ErrOut, "%s Failed to delete repository: %s has changed name or transferred ownership\n", cs.FailureIcon(), fullName)
+				return cmdutil.SilentError
+			}
+		}
 		return err
 	}
 

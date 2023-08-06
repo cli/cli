@@ -130,6 +130,70 @@ func TestNewCmdCreate(t *testing.T) {
 				MaintainerCanModify: true,
 			},
 		},
+		{
+			name:     "template from file name tty",
+			tty:      true,
+			cli:      "-t mytitle --template bug_fix.md",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "",
+				BodyProvided:        false,
+				Autofill:            false,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+				Template:            "bug_fix.md",
+			},
+		},
+		{
+			name:     "template from file name non-tty",
+			tty:      false,
+			cli:      "-t mytitle --template bug_fix.md",
+			wantsErr: true,
+		},
+		{
+			name:     "template and body",
+			tty:      false,
+			cli:      `-t mytitle --template bug_fix.md --body "pr body"`,
+			wantsErr: true,
+		},
+		{
+			name:     "template and body file",
+			tty:      false,
+			cli:      "-t mytitle --template bug_fix.md --body-file body_file.md",
+			wantsErr: true,
+		},
+		{
+			name:     "fill-first",
+			tty:      false,
+			cli:      "--fill-first",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "",
+				TitleProvided:       false,
+				Body:                "",
+				BodyProvided:        false,
+				Autofill:            false,
+				FillFirst:           true,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+			},
+		},
+		{
+			name:     "fill and fill-first",
+			tty:      false,
+			cli:      "--fill --fill-first",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -172,12 +236,14 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.Title, opts.Title)
 			assert.Equal(t, tt.wantsOpts.TitleProvided, opts.TitleProvided)
 			assert.Equal(t, tt.wantsOpts.Autofill, opts.Autofill)
+			assert.Equal(t, tt.wantsOpts.FillFirst, opts.FillFirst)
 			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
 			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
 			assert.Equal(t, tt.wantsOpts.IsDraft, opts.IsDraft)
 			assert.Equal(t, tt.wantsOpts.MaintainerCanModify, opts.MaintainerCanModify)
 			assert.Equal(t, tt.wantsOpts.BaseBranch, opts.BaseBranch)
 			assert.Equal(t, tt.wantsOpts.HeadBranch, opts.HeadBranch)
+			assert.Equal(t, tt.wantsOpts.Template, opts.Template)
 		})
 	}
 }
@@ -281,6 +347,70 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 		{
+			name: "project v2",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.Projects = []string{"RoadmapV2"}
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+				mockRetrieveProjects(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"id": "PullRequest#1",
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }
+						`, func(input map[string]interface{}) {
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "my title", input["title"].(string))
+						assert.Equal(t, "my body", input["body"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "feature", input["headRefName"].(string))
+						assert.Equal(t, false, input["draft"].(bool))
+					}))
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
+					httpmock.GraphQLQuery(`
+						{ "data": { "add_000": { "item": {
+							"id": "1"
+						} } } }
+						`, func(mutations string, inputs map[string]interface{}) {
+						variables, err := json.Marshal(inputs)
+						assert.NoError(t, err)
+						expectedMutations := "mutation UpdateProjectV2Items($input_000: AddProjectV2ItemByIdInput!) {add_000: addProjectV2ItemById(input: $input_000) { item { id } }}"
+						expectedVariables := `{"input_000":{"contentId":"PullRequest#1","projectId":"ROADMAPV2ID"}}`
+						assert.Equal(t, expectedMutations, mutations)
+						assert.Equal(t, expectedVariables, string(variables))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "Where should we push the 'feature' branch?" {
+						return 0, nil
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
 			name: "no maintainer modify",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
@@ -363,8 +493,9 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-				cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
-				cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
+				cs.Register("git remote rename origin upstream", 0, "")
+				cs.Register(`git remote add origin https://github.com/monalisa/REPO.git`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
@@ -376,7 +507,7 @@ func Test_createRun(t *testing.T) {
 				}
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
-			expectedErrOut: "\nCreating pull request for monalisa:feature into master in OWNER/REPO\n\n",
+			expectedErrOut: "\nCreating pull request for monalisa:feature into master in OWNER/REPO\n\nChanged OWNER/REPO remote to \"upstream\"\nAdded monalisa/REPO as remote \"origin\"\n",
 		},
 		{
 			name: "pushed to non base repo",
@@ -564,25 +695,7 @@ func Test_createRun(t *testing.T) {
 					"pageInfo": { "hasNextPage": false }
 				} } } }
 				`))
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryProjectList\b`),
-					httpmock.StringResponse(`
-				{ "data": { "repository": { "projects": {
-					"nodes": [
-						{ "name": "Cleanup", "id": "CLEANUPID" },
-						{ "name": "Roadmap", "id": "ROADMAPID" }
-					],
-					"pageInfo": { "hasNextPage": false }
-				} } } }
-				`))
-				reg.Register(
-					httpmock.GraphQL(`query OrganizationProjectList\b`),
-					httpmock.StringResponse(`
-				{ "data": { "organization": { "projects": {
-					"nodes": [],
-					"pageInfo": { "hasNextPage": false }
-				} } } }
-				`))
+				mockRetrieveProjects(t, reg)
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
@@ -687,26 +800,7 @@ func Test_createRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryProjectList\b`),
-					httpmock.StringResponse(`
-			{ "data": { "repository": { "projects": {
-				"nodes": [
-					{ "name": "Cleanup", "id": "CLEANUPID", "resourcePath": "/OWNER/REPO/projects/1" }
-				],
-				"pageInfo": { "hasNextPage": false }
-			} } } }
-			`))
-				reg.Register(
-					httpmock.GraphQL(`query OrganizationProjectList\b`),
-					httpmock.StringResponse(`
-			{ "data": { "organization": { "projects": {
-				"nodes": [
-					{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
-				],
-				"pageInfo": { "hasNextPage": false }
-			} } } }
-			`))
+				mockRetrieveProjects(t, reg)
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
@@ -901,6 +995,47 @@ func Test_createRun(t *testing.T) {
 					`))
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
+		},
+		{
+			name: "fill-first flag provided",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.FillFirst = true
+				opts.HeadBranch = "feature"
+				return func() {}
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(
+					"git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature",
+					0,
+					"56b6f8bb7c9e3a30093cd17e48934ce354148e80,second commit of pr\n"+
+						"343jdfe47c9e3a30093cd17e48934ce354148e80,first commit of pr",
+				)
+				cs.Register(
+					"git -c log.ShowSignature=false show -s --pretty=format:%b 343jdfe47c9e3a30093cd17e48934ce354148e80",
+					0,
+					"first commit description",
+				)
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ 
+						"data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+							} } } 
+						}
+						`,
+						func(input map[string]interface{}) {
+							assert.Equal(t, "first commit of pr", input["title"], "pr title should be first commit message")
+							assert.Equal(t, "first commit description", input["body"], "pr body should be first commit description")
+						},
+					),
+				)
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 	}
 	for _, tt := range tests {
@@ -1160,6 +1295,61 @@ func Test_generateCompareURL(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mockRetrieveProjects(_ *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
+		httpmock.StringResponse(`
+				{ "data": { "repository": { "projects": {
+					"nodes": [
+						{ "name": "Cleanup", "id": "CLEANUPID", "resourcePath": "/OWNER/REPO/projects/1" },
+						{ "name": "Roadmap", "id": "ROADMAPID", "resourcePath": "/OWNER/REPO/projects/2" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+				{ "data": { "repository": { "projectsV2": {
+					"nodes": [
+						{ "title": "CleanupV2", "id": "CLEANUPV2ID", "resourcePath": "/OWNER/REPO/projects/3" },
+						{ "title": "RoadmapV2", "id": "ROADMAPV2ID", "resourcePath": "/OWNER/REPO/projects/4" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+	reg.Register(
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
+		httpmock.StringResponse(`
+				{ "data": { "organization": { "projects": {
+					"nodes": [
+						{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+	reg.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+				{ "data": { "organization": { "projectsV2": {
+					"nodes": [
+						{ "title": "TriageV2", "id": "TRIAGEV2ID", "resourcePath": "/orgs/ORG/projects/2" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+	reg.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+				{ "data": { "viewer": { "projectsV2": {
+					"nodes": [
+						{ "title": "MonalisaV2", "id": "MONALISAV2ID", "resourcePath": "/user/MONALISA/projects/2" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
 }
 
 // TODO interactive metadata tests once: 1) we have test utils for Prompter and 2) metadata questions use Prompter

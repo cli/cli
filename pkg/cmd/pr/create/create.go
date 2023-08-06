@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
@@ -43,6 +45,7 @@ type CreateOptions struct {
 	RepoOverride    string
 
 	Autofill    bool
+	FillFirst   bool
 	WebMode     bool
 	RecoverFile string
 
@@ -59,6 +62,7 @@ type CreateOptions struct {
 	Milestone string
 
 	MaintainerCanModify bool
+	Template            string
 }
 
 type CreateContext struct {
@@ -110,6 +114,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			By default, users with write access to the base repository can push new commits to the
 			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
+
+			Adding a pull request to projects requires authorization with the "project" scope.
+			To authorize, run "gh auth refresh -s project".
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
@@ -124,6 +131,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			opts.TitleProvided = cmd.Flags().Changed("title")
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
+			// Workaround: Due to the way this command is implemented, we need to manually check GH_REPO.
+			// Commands should use the standard BaseRepoOverride functionality to handle this behavior instead.
+			if opts.RepoOverride == "" {
+				opts.RepoOverride = os.Getenv("GH_REPO")
+			}
+
 			noMaintainerEdit, _ := cmd.Flags().GetBool("no-maintainer-edit")
 			opts.MaintainerCanModify = !noMaintainerEdit
 
@@ -132,13 +145,19 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.IsDraft && opts.WebMode {
-				return errors.New("the `--draft` flag is not supported with `--web`")
+				return cmdutil.FlagErrorf("the `--draft` flag is not supported with `--web`")
 			}
+
 			if len(opts.Reviewers) > 0 && opts.WebMode {
-				return errors.New("the `--reviewer` flag is not supported with `--web`")
+				return cmdutil.FlagErrorf("the `--reviewer` flag is not supported with `--web`")
 			}
+
 			if cmd.Flags().Changed("no-maintainer-edit") && opts.WebMode {
-				return errors.New("the `--no-maintainer-edit` flag is not supported with `--web`")
+				return cmdutil.FlagErrorf("the `--no-maintainer-edit` flag is not supported with `--web`")
+			}
+
+			if opts.Autofill && opts.FillFirst {
+				return cmdutil.FlagErrorf("`--fill` is not supported with `--fill-first`")
 			}
 
 			opts.BodyProvided = cmd.Flags().Changed("body")
@@ -151,8 +170,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				opts.BodyProvided = true
 			}
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.Autofill && (!opts.TitleProvided || !opts.BodyProvided) {
-				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill`) when not running interactively")
+			if opts.Template != "" && opts.BodyProvided {
+				return cmdutil.FlagErrorf("`--template` is not supported when using `--body` or `--body-file`")
+			}
+
+			if !opts.IO.CanPrompt() && !opts.WebMode && !(opts.Autofill || opts.FillFirst) && (!opts.TitleProvided || !opts.BodyProvided) {
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `fill-first`) when not running interactively")
 			}
 
 			if runF != nil {
@@ -171,6 +194,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
+	fl.BoolVar(&opts.FillFirst, "fill-first", false, "Do not prompt for title/body and just use first commit info")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
 	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
@@ -178,6 +202,17 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
+	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
+
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
+
+	_ = cmd.RegisterFlagCompletionFunc("reviewer", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		results, err := requestableReviewersForCompletion(opts)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	return cmd
 }
@@ -198,7 +233,7 @@ func createRun(opts *CreateOptions) (err error) {
 	var openURL string
 
 	if opts.WebMode {
-		if !opts.Autofill {
+		if !(opts.Autofill || opts.FillFirst) {
 			state.Title = opts.Title
 			state.Body = opts.Body
 		}
@@ -254,7 +289,7 @@ func createRun(opts *CreateOptions) (err error) {
 			ghrepo.FullName(ctx.BaseRepo))
 	}
 
-	if opts.Autofill || (opts.TitleProvided && opts.BodyProvided) {
+	if opts.Autofill || opts.FillFirst || (opts.TitleProvided && opts.BodyProvided) {
 		err = handlePush(*opts, *ctx)
 		if err != nil {
 			return
@@ -283,15 +318,21 @@ func createRun(opts *CreateOptions) (err error) {
 		if opts.RecoverFile == "" {
 			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.Prompter, opts.RootDirOverride, opts.RepoOverride == "", true)
 			var template shared.Template
-			template, err = tpl.Choose()
-			if err != nil {
-				return
+
+			if opts.Template != "" {
+				template, err = tpl.Select(opts.Template)
+				if err != nil {
+					return
+				}
+			} else {
+				template, err = tpl.Choose()
+				if err != nil {
+					return
+				}
 			}
 
 			if template != nil {
 				templateContent = string(template.Body())
-			} else {
-				templateContent = string(tpl.LegacyBody())
 			}
 		}
 
@@ -359,7 +400,7 @@ func createRun(opts *CreateOptions) (err error) {
 	return
 }
 
-func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) error {
+func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool) error {
 	baseRef := ctx.BaseTrackingBranch
 	headRef := ctx.HeadBranch
 	gitClient := ctx.GitClient
@@ -368,17 +409,16 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) e
 	if err != nil {
 		return err
 	}
-
-	if len(commits) == 1 {
-		state.Title = commits[0].Title
-		body, err := gitClient.CommitBody(context.Background(), commits[0].Sha)
+	if len(commits) == 1 || useFirstCommit {
+		commitIndex := len(commits) - 1
+		state.Title = commits[commitIndex].Title
+		body, err := gitClient.CommitBody(context.Background(), commits[commitIndex].Sha)
 		if err != nil {
 			return err
 		}
 		state.Body = body
 	} else {
 		state.Title = humanize(headRef)
-
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
 			fmt.Fprintf(&body, "- %s\n", commits[i].Title)
@@ -452,9 +492,9 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 		Draft:      opts.IsDraft,
 	}
 
-	if opts.Autofill || !opts.TitleProvided || !opts.BodyProvided {
-		err := initDefaultTitleBody(ctx, state)
-		if err != nil && opts.Autofill {
+	if opts.Autofill || opts.FillFirst || !opts.TitleProvided || !opts.BodyProvided {
+		err := initDefaultTitleBody(ctx, state, opts.FillFirst)
+		if err != nil && (opts.Autofill || opts.FillFirst) {
 			return nil, fmt.Errorf("could not compute title or body defaults: %w", err)
 		}
 	}
@@ -469,23 +509,17 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
-	// TODO: consider obtaining remotes from GitClient instead
-	remotes, err := opts.Remotes()
+	remotes, err := getRemotes(opts)
 	if err != nil {
-		// When a repo override value is given, ignore errors when fetching git remotes
-		// to support using this command outside of git repos.
-		if opts.RepoOverride == "" {
-			return nil, err
-		}
+		return nil, err
 	}
-
 	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
 	if err != nil {
 		return nil, err
 	}
 
 	var baseRepo *api.Repository
-	if br, err := repoContext.BaseRepo(opts.IO, opts.Prompter); err == nil {
+	if br, err := repoContext.BaseRepo(opts.IO); err == nil {
 		if r, ok := br.(*api.Repository); ok {
 			baseRepo = r
 		} else {
@@ -497,7 +531,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			}
 		}
 	} else {
-		return nil, fmt.Errorf("could not determine base repository: %w", err)
+		return nil, err
 	}
 
 	isPushEnabled := false
@@ -625,6 +659,19 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 
 }
 
+func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
+	// TODO: consider obtaining remotes from GitClient instead
+	remotes, err := opts.Remotes()
+	if err != nil {
+		// When a repo override value is given, ignore errors when fetching git remotes
+		// to support using this command outside of git repos.
+		if opts.RepoOverride == "" {
+			return nil, err
+		}
+	}
+	return remotes, nil
+}
+
 func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
 	client := ctx.Client
 
@@ -680,7 +727,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// one by forking the base repository
 	if headRepo == nil && ctx.IsPushEnabled {
 		opts.IO.StartProgressIndicator()
-		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "", "")
+		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "", "", false)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)
@@ -696,24 +743,51 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// missing:
 	// 1. the head repo was just created by auto-forking;
 	// 2. an existing fork was discovered by querying the API.
-	//
 	// In either case, we want to add the head repo as a new git remote so we
-	// can push to it.
+	// can push to it. We will try to add the head repo as the "origin" remote
+	// and fallback to the "fork" remote if it is unavailable. Also, if the
+	// base repo is the "origin" remote we will rename it "upstream".
 	if headRemote == nil && ctx.IsPushEnabled {
 		cfg, err := opts.Config()
 		if err != nil {
 			return err
 		}
+
+		remotes, err := opts.Remotes()
+		if err != nil {
+			return err
+		}
+
 		cloneProtocol, _ := cfg.GetOrDefault(headRepo.RepoHost(), "git_protocol")
-
 		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
-
-		// TODO: prevent clashes with another remote of a same name
 		gitClient := ctx.GitClient
-		gitRemote, err := gitClient.AddRemote(context.Background(), "fork", headRepoURL, []string{})
+		origin, _ := remotes.FindByName("origin")
+		upstream, _ := remotes.FindByName("upstream")
+		remoteName := "origin"
+
+		if origin != nil {
+			remoteName = "fork"
+		}
+
+		if origin != nil && upstream == nil && ghrepo.IsSame(origin, ctx.BaseRepo) {
+			renameCmd, err := gitClient.Command(context.Background(), "remote", "rename", "origin", "upstream")
+			if err != nil {
+				return err
+			}
+			if _, err = renameCmd.Output(); err != nil {
+				return fmt.Errorf("error renaming origin remote: %w", err)
+			}
+			remoteName = "origin"
+			fmt.Fprintf(opts.IO.ErrOut, "Changed %s remote to %q\n", ghrepo.FullName(ctx.BaseRepo), "upstream")
+		}
+
+		gitRemote, err := gitClient.AddRemote(context.Background(), remoteName, headRepoURL, []string{})
 		if err != nil {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
+
+		fmt.Fprintf(opts.IO.ErrOut, "Added %s as remote %q\n", ghrepo.FullName(headRepo), remoteName)
+
 		headRemote = &ghContext.Remote{
 			Remote: gitRemote,
 			Repo:   headRepo,
@@ -723,27 +797,23 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// automatically push the branch if it hasn't been pushed anywhere yet
 	if ctx.IsPushEnabled {
 		pushBranch := func() error {
-			pushTries := 0
-			maxPushTries := 3
-			for {
-				w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
-				defer w.Flush()
-				gitClient := ctx.GitClient
-				ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
-				if err := gitClient.Push(context.Background(), headRemote.Name, ref, git.WithStderr(w)); err != nil {
-					if didForkRepo && pushTries < maxPushTries {
-						pushTries++
-						// first wait 2 seconds after forking, then 4s, then 6s
-						waitSeconds := 2 * pushTries
-						fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", text.Pluralize(waitSeconds, "second"))
-						time.Sleep(time.Duration(waitSeconds) * time.Second)
-						continue
+			w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
+			defer w.Flush()
+			gitClient := ctx.GitClient
+			ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
+			bo := backoff.NewConstantBackOff(2 * time.Second)
+			ctx := context.Background()
+			return backoff.Retry(func() error {
+				if err := gitClient.Push(ctx, headRemote.Name, ref, git.WithStderr(w)); err != nil {
+					// Only retry if we have forked the repo else the push should succeed the first time.
+					if didForkRepo {
+						fmt.Fprintf(opts.IO.ErrOut, "waiting 2 seconds before retrying...\n")
+						return err
 					}
-					return err
+					return backoff.Permanent(err)
 				}
-				break
-			}
-			return nil
+				return nil
+			}, backoff.WithContext(backoff.WithMaxRetries(bo, 3), ctx))
 		}
 
 		err := pushBranch()
@@ -777,6 +847,28 @@ func humanize(s string) string {
 		return r
 	}
 	return strings.Map(h, s)
+}
+
+func requestableReviewersForCompletion(opts *CreateOptions) ([]string, error) {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return nil, err
+	}
+
+	remotes, err := getRemotes(opts)
+	if err != nil {
+		return nil, err
+	}
+	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, api.NewClientFromHTTP(httpClient), opts.RepoOverride)
+	if err != nil {
+		return nil, err
+	}
+	baseRepo, err := repoContext.BaseRepo(opts.IO)
+	if err != nil {
+		return nil, err
+	}
+
+	return shared.RequestableReviewersForCompletion(httpClient, baseRepo)
 }
 
 var gitPushRegexp = regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$")

@@ -1,6 +1,7 @@
 package create
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
-	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -39,6 +39,7 @@ type CreateOptions struct {
 	Labels    []string
 	Projects  []string
 	Milestone string
+	Template  string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -55,6 +56,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new issue",
+		Long: heredoc.Doc(`
+			Create an issue on GitHub.
+
+			Adding an issue to projects requires authorization with the "project" scope.
+			To authorize, run "gh auth refresh -s project".
+		`),
 		Example: heredoc.Doc(`
 			$ gh issue create --title "I found a bug" --body "Nothing works"
 			$ gh issue create --label "bug,help wanted"
@@ -85,6 +92,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--recover` only supported when running interactively")
 			}
 
+			if opts.Template != "" && bodyProvided {
+				return errors.New("`--template` is not supported when using `--body` or `--body-file`")
+			}
+
 			opts.Interactive = !(titleProvided && bodyProvided)
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
@@ -107,6 +118,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the issue to projects by `name`")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Add the issue to a milestone by `name`")
 	cmd.Flags().StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
+	cmd.Flags().StringVarP(&opts.Template, "template", "T", "", "Template `name` to use as starting body text")
 
 	return cmd
 }
@@ -130,7 +142,7 @@ func createRun(opts *CreateOptions) (err error) {
 		milestones = []string{opts.Milestone}
 	}
 
-	meReplacer := shared.NewMeReplacer(apiClient, baseRepo.RepoHost())
+	meReplacer := prShared.NewMeReplacer(apiClient, baseRepo.RepoHost())
 	assignees, err := meReplacer.ReplaceSlice(opts.Assignees)
 	if err != nil {
 		return err
@@ -154,7 +166,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
-	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.Prompter, opts.RootDirOverride, !opts.HasRepoOverride, false)
+	tpl := prShared.NewTemplateManager(httpClient, baseRepo, opts.Prompter, opts.RootDirOverride, !opts.HasRepoOverride, false)
 
 	if opts.WebMode {
 		var openURL string
@@ -209,10 +221,18 @@ func createRun(opts *CreateOptions) (err error) {
 			templateContent := ""
 
 			if opts.RecoverFile == "" {
-				var template shared.Template
-				template, err = tpl.Choose()
-				if err != nil {
-					return
+				var template prShared.Template
+
+				if opts.Template != "" {
+					template, err = tpl.Select(opts.Template)
+					if err != nil {
+						return
+					}
+				} else {
+					template, err = tpl.Choose()
+					if err != nil {
+						return
+					}
 				}
 
 				if template != nil {
@@ -304,7 +324,7 @@ func createRun(opts *CreateOptions) (err error) {
 	return
 }
 
-func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb shared.IssueMetadataState) (string, error) {
+func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb prShared.IssueMetadataState) (string, error) {
 	openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb)
 }

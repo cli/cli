@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,19 +26,20 @@ func Test_getFilesToAdd(t *testing.T) {
 	gf, err := getFilesToAdd(filename, []byte("hello"))
 	require.NoError(t, err)
 
-	assert.Equal(t, map[string]*shared.GistFile{
+	assert.Equal(t, map[string]*gistFileToUpdate{
 		filename: {
-			Filename: filename,
-			Content:  "hello",
+			NewFilename: filename,
+			Content:     "hello",
 		},
 	}, gf)
 }
 
 func TestNewCmdEdit(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants EditOptions
+		name     string
+		cli      string
+		wants    EditOptions
+		wantsErr bool
 	}{
 		{
 			name: "no flags",
@@ -80,6 +81,24 @@ func TestNewCmdEdit(t *testing.T) {
 				Description: "my new description",
 			},
 		},
+		{
+			name: "remove",
+			cli:  "123 --remove cool.md",
+			wants: EditOptions{
+				Selector:       "123",
+				RemoveFilename: "cool.md",
+			},
+		},
+		{
+			name:     "add and remove are mutually exclusive",
+			cli:      "123 --add cool.md --remove great.md",
+			wantsErr: true,
+		},
+		{
+			name:     "filename and remove are mutually exclusive",
+			cli:      "123 --filename cool.md --remove great.md",
+			wantsErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -100,11 +119,17 @@ func TestNewCmdEdit(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
-			assert.NoError(t, err)
+			if tt.wantsErr {
+				require.Error(t, err)
+				return
+			}
 
-			assert.Equal(t, tt.wants.EditFilename, gotOpts.EditFilename)
-			assert.Equal(t, tt.wants.AddFilename, gotOpts.AddFilename)
-			assert.Equal(t, tt.wants.Selector, gotOpts.Selector)
+			require.NoError(t, err)
+
+			require.Equal(t, tt.wants.EditFilename, gotOpts.EditFilename)
+			require.Equal(t, tt.wants.AddFilename, gotOpts.AddFilename)
+			require.Equal(t, tt.wants.Selector, gotOpts.Selector)
+			require.Equal(t, tt.wants.RemoveFilename, gotOpts.RemoveFilename)
 		})
 	}
 }
@@ -115,15 +140,15 @@ func Test_editRun(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name       string
-		opts       *EditOptions
-		gist       *shared.Gist
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		nontty     bool
-		stdin      string
-		wantErr    string
-		wantParams map[string]interface{}
+		name          string
+		opts          *EditOptions
+		gist          *shared.Gist
+		httpStubs     func(*httpmock.Registry)
+		prompterStubs func(*prompter.MockPrompter)
+		nontty        bool
+		stdin         string
+		wantErr       string
+		wantParams    map[string]interface{}
 	}{
 		{
 			name:    "no such gist",
@@ -148,22 +173,27 @@ func Test_editRun(t *testing.T) {
 			},
 			wantParams: map[string]interface{}{
 				"description": "",
-				"updated_at":  "0001-01-01T00:00:00Z",
-				"public":      false,
 				"files": map[string]interface{}{
 					"cicada.txt": map[string]interface{}{
 						"content":  "new file content",
 						"filename": "cicada.txt",
-						"type":     "text/plain",
 					},
 				},
 			},
 		},
 		{
 			name: "multiple files, submit",
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
-				as.StubPrompt("What next?").AnswerWith("Submit")
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Edit which file?",
+					[]string{"cicada.txt", "unix.md"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "unix.md")
+					})
+				pm.RegisterSelect("What next?",
+					editNextOptions,
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "Submit")
+					})
 			},
 			gist: &shared.Gist{
 				ID:          "1234",
@@ -172,12 +202,10 @@ func Test_editRun(t *testing.T) {
 					"cicada.txt": {
 						Filename: "cicada.txt",
 						Content:  "bwhiizzzbwhuiiizzzz",
-						Type:     "text/plain",
 					},
 					"unix.md": {
 						Filename: "unix.md",
 						Content:  "meow",
-						Type:     "application/markdown",
 					},
 				},
 				Owner: &shared.GistOwner{Login: "octocat"},
@@ -188,27 +216,31 @@ func Test_editRun(t *testing.T) {
 			},
 			wantParams: map[string]interface{}{
 				"description": "catbug",
-				"updated_at":  "0001-01-01T00:00:00Z",
-				"public":      false,
 				"files": map[string]interface{}{
 					"cicada.txt": map[string]interface{}{
 						"content":  "bwhiizzzbwhuiiizzzz",
 						"filename": "cicada.txt",
-						"type":     "text/plain",
 					},
 					"unix.md": map[string]interface{}{
 						"content":  "new file content",
 						"filename": "unix.md",
-						"type":     "application/markdown",
 					},
 				},
 			},
 		},
 		{
 			name: "multiple files, cancel",
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
-				as.StubPrompt("What next?").AnswerWith("Cancel")
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Edit which file?",
+					[]string{"cicada.txt", "unix.md"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "unix.md")
+					})
+				pm.RegisterSelect("What next?",
+					editNextOptions,
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "Cancel")
+					})
 			},
 			wantErr: "CancelError",
 			gist: &shared.Gist{
@@ -300,13 +332,10 @@ func Test_editRun(t *testing.T) {
 			},
 			wantParams: map[string]interface{}{
 				"description": "my new description",
-				"updated_at":  "0001-01-01T00:00:00Z",
-				"public":      false,
 				"files": map[string]interface{}{
 					"sample.txt": map[string]interface{}{
 						"content":  "new file content",
 						"filename": "sample.txt",
-						"type":     "text/plain",
 					},
 				},
 			},
@@ -334,8 +363,6 @@ func Test_editRun(t *testing.T) {
 			},
 			wantParams: map[string]interface{}{
 				"description": "",
-				"updated_at":  "0001-01-01T00:00:00Z",
-				"public":      false,
 				"files": map[string]interface{}{
 					"from_source.txt": map[string]interface{}{
 						"content":  "hello",
@@ -368,13 +395,65 @@ func Test_editRun(t *testing.T) {
 			stdin: "data from stdin",
 			wantParams: map[string]interface{}{
 				"description": "",
-				"updated_at":  "0001-01-01T00:00:00Z",
-				"public":      false,
 				"files": map[string]interface{}{
 					"from_source.txt": map[string]interface{}{
 						"content":  "data from stdin",
 						"filename": "from_source.txt",
 					},
+				},
+			},
+		},
+		{
+			name: "remove file, file does not exist",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			opts: &EditOptions{
+				RemoveFilename: "sample2.txt",
+			},
+			wantErr: "gist has no file \"sample2.txt\"",
+		},
+		{
+			name: "remove file from existing gist",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+					"sample2.txt": {
+						Filename: "sample2.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			opts: &EditOptions{
+				RemoveFilename: "sample2.txt",
+			},
+			wantParams: map[string]interface{}{
+				"description": "",
+				"files": map[string]interface{}{
+					"sample.txt": map[string]interface{}{
+						"filename": "sample.txt",
+						"content":  "bwhiizzzbwhuiiizzzz",
+					},
+					"sample2.txt": nil,
 				},
 			},
 		},
@@ -400,13 +479,10 @@ func Test_editRun(t *testing.T) {
 			},
 			wantParams: map[string]interface{}{
 				"description": "",
-				"updated_at":  "0001-01-01T00:00:00Z",
-				"public":      false,
 				"files": map[string]interface{}{
 					"sample.txt": map[string]interface{}{
 						"content":  "hello",
 						"filename": "sample.txt",
-						"type":     "text/plain",
 					},
 				},
 			},
@@ -434,13 +510,10 @@ func Test_editRun(t *testing.T) {
 			stdin: "data from stdin",
 			wantParams: map[string]interface{}{
 				"description": "",
-				"updated_at":  "0001-01-01T00:00:00Z",
-				"public":      false,
 				"files": map[string]interface{}{
 					"sample.txt": map[string]interface{}{
 						"content":  "data from stdin",
 						"filename": "sample.txt",
-						"type":     "text/plain",
 					},
 				},
 			},
@@ -486,11 +559,11 @@ func Test_editRun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := prompter.NewMockPrompter(t)
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
 			}
+			tt.opts.Prompter = pm
 
 			err := editRun(tt.opts)
 			reg.Verify(t)

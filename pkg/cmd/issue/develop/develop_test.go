@@ -1,541 +1,527 @@
 package develop
 
 import (
+	"bytes"
 	"errors"
 	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/test"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_developRun(t *testing.T) {
-	featureEnabledPayload := `{
-		"data": {
-			"LinkedBranch": {
-				"fields": [
-					{
-						"name": "id"
-					},
-					{
-						"name": "ref"
-					}
-				]
-			}
-		}
-	}`
+func TestNewCmdDevelop(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		output     DevelopOptions
+		wantStdout string
+		wantStderr string
+		wantErr    bool
+		errMsg     string
+	}{
+		{
+			name:    "no argument",
+			input:   "",
+			output:  DevelopOptions{},
+			wantErr: true,
+			errMsg:  "issue number or url is required",
+		},
+		{
+			name:  "issue number",
+			input: "1",
+			output: DevelopOptions{
+				IssueSelector: "1",
+			},
+		},
+		{
+			name:  "issue url",
+			input: "https://github.com/cli/cli/issues/1",
+			output: DevelopOptions{
+				IssueSelector: "https://github.com/cli/cli/issues/1",
+			},
+		},
+		{
+			name:  "branch-repo flag",
+			input: "1 --branch-repo owner/repo",
+			output: DevelopOptions{
+				IssueSelector: "1",
+				BranchRepo:    "owner/repo",
+			},
+		},
+		{
+			name:  "base flag",
+			input: "1 --base feature",
+			output: DevelopOptions{
+				IssueSelector: "1",
+				BaseBranch:    "feature",
+			},
+		},
+		{
+			name:  "checkout flag",
+			input: "1 --checkout",
+			output: DevelopOptions{
+				IssueSelector: "1",
+				Checkout:      true,
+			},
+		},
+		{
+			name:  "list flag",
+			input: "1 --list",
+			output: DevelopOptions{
+				IssueSelector: "1",
+				List:          true,
+			},
+		},
+		{
+			name:  "name flag",
+			input: "1 --name feature",
+			output: DevelopOptions{
+				IssueSelector: "1",
+				Name:          "feature",
+			},
+		},
+		{
+			name:  "issue-repo flag",
+			input: "1 --issue-repo cli/cli",
+			output: DevelopOptions{
+				IssueSelector: "1",
+			},
+			wantStdout: "Flag --issue-repo has been deprecated, use `--repo` instead\n",
+		},
+		{
+			name:    "list and branch repo flags",
+			input:   "1 --list --branch-repo owner/repo",
+			wantErr: true,
+			errMsg:  "specify only one of `--list` or `--branch-repo`",
+		},
+		{
+			name:    "list and base flags",
+			input:   "1 --list --base feature",
+			wantErr: true,
+			errMsg:  "specify only one of `--list` or `--base`",
+		},
+		{
+			name:    "list and checkout flags",
+			input:   "1 --list --checkout",
+			wantErr: true,
+			errMsg:  "specify only one of `--list` or `--checkout`",
+		},
+		{
+			name:    "list and name flags",
+			input:   "1 --list --name my-branch",
+			wantErr: true,
+			errMsg:  "specify only one of `--list` or `--name`",
+		},
+	}
 
-	featureDisabledPayload := `{ "data": { "LinkedBranch": null } }`
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdOut, stdErr := iostreams.Test()
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+			}
+			argv, err := shlex.Split(tt.input)
+			assert.NoError(t, err)
+			var gotOpts *DevelopOptions
+			cmd := NewCmdDevelop(f, func(opts *DevelopOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(stdOut)
+			cmd.SetErr(stdErr)
+
+			_, err = cmd.ExecuteC()
+			if tt.wantErr {
+				assert.EqualError(t, err, tt.errMsg)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.output.IssueSelector, gotOpts.IssueSelector)
+			assert.Equal(t, tt.output.Name, gotOpts.Name)
+			assert.Equal(t, tt.output.BaseBranch, gotOpts.BaseBranch)
+			assert.Equal(t, tt.output.Checkout, gotOpts.Checkout)
+			assert.Equal(t, tt.output.List, gotOpts.List)
+			assert.Equal(t, tt.wantStdout, stdOut.String())
+			assert.Equal(t, tt.wantStderr, stdErr.String())
+		})
+	}
+}
+
+func TestDevelopRun(t *testing.T) {
+	featureEnabledPayload := `{"data":{"LinkedBranch":{"fields":[{"name":"id"},{"name":"ref"}]}}}`
+	featureDisabledPayload := `{"data":{"LinkedBranch":null}}`
 
 	tests := []struct {
 		name           string
-		setup          func(*DevelopOptions, *testing.T) func()
+		opts           *DevelopOptions
 		cmdStubs       func(*run.CommandStubber)
 		runStubs       func(*run.CommandStubber)
 		remotes        map[string]string
-		askStubs       func(*prompt.AskStubber) // TODO eventually migrate to PrompterMock
 		httpStubs      func(*httpmock.Registry, *testing.T)
 		expectedOut    string
 		expectedErrOut string
-		expectedBrowse string
 		wantErr        string
 		tty            bool
 	}{
-		{name: "list branches for an issue",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.IssueSelector = "42"
-				opts.List = true
-				return func() {}
+		{
+			name: "returns an error when the feature is not supported by the API",
+			opts: &DevelopOptions{
+				IssueSelector: "42",
+				List:          true,
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
-					httpmock.StringResponse(featureEnabledPayload),
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":42}}}}`),
 				)
 				reg.Register(
-					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
-					httpmock.GraphQLQuery(`{
-						"data": {
-							"repository": {
-								"issue": {
-									"linkedBranches": {
-										"edges": [
-										{
-											"node": {
-												"ref": {
-													"name": "foo"
-												}
-											}
-										},
-										{
-											"node": {
-												"ref": {
-													"name": "bar"
-												}
-											}
-										}
-									]
-								}
-							}
-						}
-					}
-					}
-					`, func(query string, inputs map[string]interface{}) {
-						assert.Equal(t, float64(42), inputs["issueNumber"])
-						assert.Equal(t, "OWNER", inputs["repositoryOwner"])
-						assert.Equal(t, "REPO", inputs["repositoryName"])
-					}))
-			},
-			expectedOut: "foo\nbar\n",
-		},
-		{name: "list branches for an issue in tty",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.IssueSelector = "42"
-				opts.List = true
-				return func() {}
-			},
-			tty: true,
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
-					httpmock.StringResponse(featureEnabledPayload),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
-					httpmock.GraphQLQuery(`{
-						"data": {
-							"repository": {
-								"issue": {
-									"linkedBranches": {
-										"edges": [
-										{
-											"node": {
-												"ref": {
-													"name": "foo",
-													"repository": {
-														"url": "http://github.localhost/OWNER/REPO"
-													}
-												}
-											}
-										},
-										{
-											"node": {
-												"ref": {
-													"name": "bar",
-													"repository": {
-														"url": "http://github.localhost/OWNER/OTHER-REPO"
-													}
-												}
-											}
-										}
-									]
-								}
-							}
-						}
-					}
-					}
-					`, func(query string, inputs map[string]interface{}) {
-						assert.Equal(t, float64(42), inputs["issueNumber"])
-						assert.Equal(t, "OWNER", inputs["repositoryOwner"])
-						assert.Equal(t, "REPO", inputs["repositoryName"])
-					}))
-			},
-			expectedOut: "\nShowing linked branches for OWNER/REPO#42\n\nfoo  http://github.localhost/OWNER/REPO/tree/foo\nbar  http://github.localhost/OWNER/OTHER-REPO/tree/bar\n",
-		},
-		{name: "list branches for an issue providing an issue url",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
-				opts.List = true
-				return func() {}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
-					httpmock.StringResponse(featureEnabledPayload),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
-					httpmock.GraphQLQuery(`{
-						"data": {
-							"repository": {
-								"issue": {
-									"linkedBranches": {
-										"edges": [
-										{
-											"node": {
-												"ref": {
-													"name": "foo"
-												}
-											}
-										},
-										{
-											"node": {
-												"ref": {
-													"name": "bar"
-												}
-											}
-										}
-									]
-								}
-							}
-						}
-					}
-					}
-					`, func(query string, inputs map[string]interface{}) {
-						assert.Equal(t, float64(42), inputs["issueNumber"])
-						assert.Equal(t, "cli", inputs["repositoryOwner"])
-						assert.Equal(t, "test-repo", inputs["repositoryName"])
-					}))
-			},
-			expectedOut: "foo\nbar\n",
-		},
-		{name: "list branches for an issue providing an issue repo",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.IssueSelector = "42"
-				opts.IssueRepoSelector = "cli/test-repo"
-				opts.List = true
-				return func() {}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
-					httpmock.StringResponse(featureEnabledPayload),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
-					httpmock.GraphQLQuery(`{
-						"data": {
-							"repository": {
-								"issue": {
-									"linkedBranches": {
-										"edges": [
-										{
-											"node": {
-												"ref": {
-													"name": "foo"
-												}
-											}
-										},
-										{
-											"node": {
-												"ref": {
-													"name": "bar"
-												}
-											}
-										}
-									]
-								}
-							}
-						}
-					}
-					}
-					`, func(query string, inputs map[string]interface{}) {
-						assert.Equal(t, float64(42), inputs["issueNumber"])
-						assert.Equal(t, "cli", inputs["repositoryOwner"])
-						assert.Equal(t, "test-repo", inputs["repositoryName"])
-					}))
-			},
-			expectedOut: "foo\nbar\n",
-		},
-		{name: "list branches for an issue providing an issue url and specifying the same repo works",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
-				opts.IssueRepoSelector = "cli/test-repo"
-				opts.List = true
-				return func() {}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
-					httpmock.StringResponse(featureEnabledPayload),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
-					httpmock.GraphQLQuery(`{
-					"data": {
-						"repository": {
-							"issue": {
-								"linkedBranches": {
-									"edges": [
-									{
-										"node": {
-											"ref": {
-												"name": "foo"
-											}
-										}
-									},
-									{
-										"node": {
-											"ref": {
-												"name": "bar"
-											}
-										}
-									}
-								]
-							}
-						}
-					}
-				}
-				}
-				`, func(query string, inputs map[string]interface{}) {
-						assert.Equal(t, float64(42), inputs["issueNumber"])
-						assert.Equal(t, "cli", inputs["repositoryOwner"])
-						assert.Equal(t, "test-repo", inputs["repositoryName"])
-					}))
-			},
-			expectedOut: "foo\nbar\n",
-		},
-		{name: "list branches for an issue providing an issue url and specifying a different repo returns an error",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
-				opts.IssueRepoSelector = "cli/other"
-				opts.List = true
-				return func() {}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
-					httpmock.StringResponse(featureEnabledPayload),
-				)
-			},
-			wantErr: "issue repo in url cli/test-repo does not match the repo from --issue-repo cli/other",
-		},
-		{name: "returns an error when the feature isn't enabled in the GraphQL API",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
-				opts.List = true
-				return func() {}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
 					httpmock.StringResponse(featureDisabledPayload),
 				)
 			},
 			wantErr: "the `gh issue develop` command is not currently available",
 		},
-		{name: "develop new branch with a name provided",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.Name = "my-branch"
-				opts.BaseBranch = "main"
-				opts.IssueSelector = "123"
-				return func() {}
+		{
+			name: "list branches for an issue",
+			opts: &DevelopOptions{
+				IssueSelector: "42",
+				List:          true,
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
-					httpmock.StringResponse(featureEnabledPayload),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`
-						{ "data": { "repository": {
-							"id": "REPOID",
-							"hasIssuesEnabled": true
-						} } }`),
-				)
 				reg.Register(
 					httpmock.GraphQL(`query IssueByNumber\b`),
-					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled": true, "issue":{"id": "yar", "number":123, "title":"my issue"} }}}`))
-				reg.Register(
-					httpmock.GraphQL(`query BranchIssueReferenceFindBaseOid\b`),
-					httpmock.StringResponse(`{"data":{"repository":{"ref":{"target":{"oid":"123"}}}}}`))
-
-				reg.Register(
-					httpmock.GraphQL(`(?s)mutation CreateLinkedBranch\b.*issueId: \$issueId,\s+name: \$name,\s+oid: \$oid,`),
-					httpmock.GraphQLQuery(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": "2", "ref": {"name": "my-branch"} } } } }`,
-						func(query string, inputs map[string]interface{}) {
-							assert.Equal(t, "REPOID", inputs["repositoryId"])
-							assert.Equal(t, "my-branch", inputs["name"])
-							assert.Equal(t, "yar", inputs["issueId"])
-						}),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":42}}}}`),
 				)
-
-			},
-			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
-		},
-		{name: "develop new branch without a name provided omits the param from the mutation",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.Name = ""
-				opts.BaseBranch = "main"
-				opts.IssueSelector = "123"
-				return func() {}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
 					httpmock.StringResponse(featureEnabledPayload),
 				)
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`
-						{ "data": { "repository": {
-							"id": "REPOID",
-							"hasIssuesEnabled": true
-						} } }`),
-				)
+					httpmock.GraphQL(`query ListLinkedBranches\b`),
+					httpmock.GraphQLQuery(`
+		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[{"ref":{"name":"foo","repository":{"url":"https://github.com/OWNER/REPO"}}},{"ref":{"name":"bar","repository":{"url":"https://github.com/OWNER/REPO"}}}]}}}}}
+					`, func(query string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(42), inputs["number"])
+						assert.Equal(t, "OWNER", inputs["owner"])
+						assert.Equal(t, "REPO", inputs["name"])
+					}))
+			},
+			expectedOut: "foo\thttps://github.com/OWNER/REPO/tree/foo\nbar\thttps://github.com/OWNER/REPO/tree/bar\n",
+		},
+		{
+			name: "list branches for an issue in tty",
+			opts: &DevelopOptions{
+				IssueSelector: "42",
+				List:          true,
+			},
+			tty: true,
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query IssueByNumber\b`),
-					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled": true, "issue":{"id": "yar", "number":123, "title":"my issue"} }}}`))
-				reg.Register(
-					httpmock.GraphQL(`query BranchIssueReferenceFindBaseOid\b`),
-					httpmock.StringResponse(`{"data":{"repository":{"ref":{"target":{"oid":"123"}}}}}`))
-
-				reg.Register(
-					httpmock.GraphQL(`(?s)mutation CreateLinkedBranch\b.*\$oid: GitObjectID!, \$repositoryId:.*issueId: \$issueId,\s+oid: \$oid,`),
-					httpmock.GraphQLQuery(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": "2", "ref": {"name": "my-issue-1"} } } } }`,
-						func(query string, inputs map[string]interface{}) {
-							assert.Equal(t, "REPOID", inputs["repositoryId"])
-							assert.Equal(t, "", inputs["name"])
-							assert.Equal(t, "yar", inputs["issueId"])
-						}),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":42}}}}`),
 				)
-
-			},
-			expectedOut: "github.com/OWNER/REPO/tree/my-issue-1\n",
-		},
-		{name: "develop providing an issue url and specifying a different repo returns an error",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
-				opts.IssueRepoSelector = "cli/other"
-				return func() {}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
 					httpmock.StringResponse(featureEnabledPayload),
 				)
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`
-						{ "data": { "repository": {
-							"id": "REPOID",
-							"hasIssuesEnabled": true
-						} } }`),
-				)
+					httpmock.GraphQL(`query ListLinkedBranches\b`),
+					httpmock.GraphQLQuery(`
+		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[{"ref":{"name":"foo","repository":{"url":"https://github.com/OWNER/REPO"}}},{"ref":{"name":"bar","repository":{"url":"https://github.com/OWNER/OTHER-REPO"}}}]}}}}}
+					`, func(query string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(42), inputs["number"])
+						assert.Equal(t, "OWNER", inputs["owner"])
+						assert.Equal(t, "REPO", inputs["name"])
+					}))
 			},
-			wantErr: "issue repo in url cli/test-repo does not match the repo from --issue-repo cli/other",
+			expectedOut: "\nShowing linked branches for OWNER/REPO#42\n\nfoo  https://github.com/OWNER/REPO/tree/foo\nbar  https://github.com/OWNER/OTHER-REPO/tree/bar\n",
 		},
-		{name: "develop new branch with checkout when the branch exists locally",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.Name = "my-branch"
-				opts.BaseBranch = "main"
-				opts.IssueSelector = "123"
-				opts.Checkout = true
-				return func() {}
+		{
+			name: "list branches for an issue providing an issue url",
+			opts: &DevelopOptions{
+				IssueSelector: "https://github.com/cli/cli/issues/42",
+				List:          true,
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":42}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query ListLinkedBranches\b`),
+					httpmock.GraphQLQuery(`
+		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[{"ref":{"name":"foo","repository":{"url":"https://github.com/OWNER/REPO"}}},{"ref":{"name":"bar","repository":{"url":"https://github.com/OWNER/OTHER-REPO"}}}]}}}}}
+					`, func(query string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(42), inputs["number"])
+						assert.Equal(t, "cli", inputs["owner"])
+						assert.Equal(t, "cli", inputs["name"])
+					}))
+			},
+			expectedOut: "foo\thttps://github.com/OWNER/REPO/tree/foo\nbar\thttps://github.com/OWNER/OTHER-REPO/tree/bar\n",
+		},
+		{
+			name: "develop new branch",
+			opts: &DevelopOptions{
+				IssueSelector: "123",
 			},
 			remotes: map[string]string{
 				"origin": "OWNER/REPO",
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
 					httpmock.StringResponse(featureEnabledPayload),
 				)
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`
-						{ "data": { "repository": {
-							"id": "REPOID",
-							"hasIssuesEnabled": true
-						} } }`),
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","defaultBranchRef":{"target":{"oid":"DEFAULTOID"}},"ref":{"target":{"oid":""}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-issue-1"}}}}}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SOMEID", inputs["issueId"])
+							assert.Equal(t, "DEFAULTOID", inputs["oid"])
+						}),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-issue-1:refs/remotes/origin/my-issue-1`, 0, "")
+			},
+			expectedOut: "github.com/OWNER/REPO/tree/my-issue-1\n",
+		},
+		{
+			name: "develop new branch in diffferent repo than issue",
+			opts: &DevelopOptions{
+				IssueSelector: "123",
+				BranchRepo:    "OWNER2/REPO",
+			},
+			remotes: map[string]string{
+				"origin": "OWNER2/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
 				)
 				reg.Register(
 					httpmock.GraphQL(`query IssueByNumber\b`),
-					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled": true, "issue":{"id": "yar", "number":123, "title":"my issue"} }}}`))
-				reg.Register(
-					httpmock.GraphQL(`query BranchIssueReferenceFindBaseOid\b`),
-					httpmock.StringResponse(`{"data":{"repository":{"ref":{"target":{"oid":"123"}}}}}`))
-
-				reg.Register(
-					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
-					httpmock.GraphQLQuery(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": "2", "ref": {"name": "my-branch"} } } } }`,
-						func(query string, inputs map[string]interface{}) {
-							assert.Equal(t, "REPOID", inputs["repositoryId"])
-							assert.Equal(t, "my-branch", inputs["name"])
-							assert.Equal(t, "yar", inputs["issueId"])
+					httpmock.GraphQLQuery(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SOMEID","number":123,"title":"my issue"}}}}`,
+						func(_ string, inputs map[string]interface{}) {
+							assert.Equal(t, "OWNER", inputs["owner"])
+							assert.Equal(t, "REPO", inputs["repo"])
+							assert.Equal(t, float64(123), inputs["number"])
 						}),
 				)
-
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.GraphQLQuery(`{"data":{"repository":{"id":"REPOID","defaultBranchRef":{"target":{"oid":"DEFAULTOID"}},"ref":{"target":{"oid":""}}}}}`,
+						func(_ string, inputs map[string]interface{}) {
+							assert.Equal(t, "OWNER2", inputs["owner"])
+							assert.Equal(t, "REPO", inputs["name"])
+						}),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-issue-1"}}}}}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SOMEID", inputs["issueId"])
+							assert.Equal(t, "DEFAULTOID", inputs["oid"])
+						}),
+				)
 			},
 			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-issue-1:refs/remotes/origin/my-issue-1`, 0, "")
+			},
+			expectedOut: "github.com/OWNER2/REPO/tree/my-issue-1\n",
+		},
+		{
+			name: "develop new branch with name and base specified",
+			opts: &DevelopOptions{
+				Name:          "my-branch",
+				BaseBranch:    "main",
+				IssueSelector: "123",
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SOMEID", inputs["issueId"])
+							assert.Equal(t, "OID", inputs["oid"])
+							assert.Equal(t, "my-branch", inputs["name"])
+						}),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+			},
+			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
+		},
+		{
+			name: "develop new branch outside of local git repo",
+			opts: &DevelopOptions{
+				IssueSelector: "https://github.com/cli/cli/issues/123",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","defaultBranchRef":{"target":{"oid":"DEFAULTOID"}},"ref":{"target":{"oid":""}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-issue-1"}}}}}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SOMEID", inputs["issueId"])
+							assert.Equal(t, "DEFAULTOID", inputs["oid"])
+						}),
+				)
+			},
+			expectedOut: "github.com/cli/cli/tree/my-issue-1\n",
+		},
+		{
+			name: "develop new branch with checkout when local branch exists",
+			opts: &DevelopOptions{
+				Name:          "my-branch",
+				IssueSelector: "123",
+				Checkout:      true,
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SOMEID","number":123,"title":"my issue"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SOMEID", inputs["issueId"])
+							assert.Equal(t, "OID", inputs["oid"])
+							assert.Equal(t, "my-branch", inputs["name"])
+						}),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
 				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
 				cs.Register(`git checkout my-branch`, 0, "")
 				cs.Register(`git pull --ff-only origin my-branch`, 0, "")
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
-		{name: "develop new branch with checkout when the branch does not exist locally",
-			setup: func(opts *DevelopOptions, t *testing.T) func() {
-				opts.Name = "my-branch"
-				opts.BaseBranch = "main"
-				opts.IssueSelector = "123"
-				opts.Checkout = true
-				return func() {}
+		{
+			name: "develop new branch with checkout when local branch does not exist",
+			opts: &DevelopOptions{
+				Name:          "my-branch",
+				IssueSelector: "123",
+				Checkout:      true,
 			},
 			remotes: map[string]string{
 				"origin": "OWNER/REPO",
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
-					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
 					httpmock.StringResponse(featureEnabledPayload),
 				)
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`
-						{ "data": { "repository": {
-							"id": "REPOID",
-							"hasIssuesEnabled": true
-						} } }`),
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SOMEID","number":123,"title":"my issue"}}}}`),
 				)
 				reg.Register(
-					httpmock.GraphQL(`query IssueByNumber\b`),
-					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled": true, "issue":{"id": "yar", "number":123, "title":"my issue"} }}}`))
-				reg.Register(
-					httpmock.GraphQL(`query BranchIssueReferenceFindBaseOid\b`),
-					httpmock.StringResponse(`{"data":{"repository":{"ref":{"target":{"oid":"123"}}}}}`))
-
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","ref":{"target":{"oid":"OID"}}}}}`),
+				)
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
-					httpmock.GraphQLQuery(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": "2", "ref": {"name": "my-branch"} } } } }`,
-						func(query string, inputs map[string]interface{}) {
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"2","ref":{"name":"my-branch"}}}}}`,
+						func(inputs map[string]interface{}) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SOMEID", inputs["issueId"])
+							assert.Equal(t, "OID", inputs["oid"])
 							assert.Equal(t, "my-branch", inputs["name"])
-							assert.Equal(t, "yar", inputs["issueId"])
 						}),
 				)
-
 			},
 			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
 				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
 				cs.Register(`git checkout -b my-branch --track origin/my-branch`, 0, "")
-				cs.Register(`git pull --ff-only origin my-branch`, 0, "")
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			opts := tt.opts
+
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg, t)
 			}
-
-			opts := DevelopOptions{}
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
 
 			ios, _, stdout, stderr := iostreams.Test()
-
 			ios.SetStdoutTTY(tt.tty)
 			ios.SetStdinTTY(tt.tty)
 			ios.SetStderrTTY(tt.tty)
@@ -543,12 +529,6 @@ func Test_developRun(t *testing.T) {
 
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
-			}
-			opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
-			opts.Config = func() (config.Config, error) {
-				return config.NewBlankConfig(), nil
 			}
 
 			opts.Remotes = func() (context.Remotes, error) {
@@ -580,29 +560,14 @@ func Test_developRun(t *testing.T) {
 				tt.runStubs(cmdStubs)
 			}
 
-			cleanSetup := func() {}
-			if tt.setup != nil {
-				cleanSetup = tt.setup(&opts, t)
-			}
-			defer cleanSetup()
-
-			var err error
-			if opts.List {
-				err = developRunList(&opts)
-			} else {
-
-				err = developRunCreate(&opts)
-			}
-			output := &test.CmdOut{
-				OutBuf: stdout,
-				ErrBuf: stderr,
-			}
+			err := developRun(opts)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
+				return
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedOut, output.String())
-				assert.Equal(t, tt.expectedErrOut, output.Stderr())
+				assert.Equal(t, tt.expectedOut, stdout.String())
+				assert.Equal(t, tt.expectedErrOut, stderr.String())
 			}
 		})
 	}

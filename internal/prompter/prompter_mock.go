@@ -13,43 +13,43 @@ var _ Prompter = &PrompterMock{}
 
 // PrompterMock is a mock implementation of Prompter.
 //
-// 	func TestSomethingThatUsesPrompter(t *testing.T) {
+//	func TestSomethingThatUsesPrompter(t *testing.T) {
 //
-// 		// make and configure a mocked Prompter
-// 		mockedPrompter := &PrompterMock{
-// 			AuthTokenFunc: func() (string, error) {
-// 				panic("mock out the AuthToken method")
-// 			},
-// 			ConfirmFunc: func(s string, b bool) (bool, error) {
-// 				panic("mock out the Confirm method")
-// 			},
-// 			ConfirmDeletionFunc: func(s string) error {
-// 				panic("mock out the ConfirmDeletion method")
-// 			},
-// 			InputFunc: func(s1 string, s2 string) (string, error) {
-// 				panic("mock out the Input method")
-// 			},
-// 			InputHostnameFunc: func() (string, error) {
-// 				panic("mock out the InputHostname method")
-// 			},
-// 			MarkdownEditorFunc: func(s1 string, s2 string, b bool) (string, error) {
-// 				panic("mock out the MarkdownEditor method")
-// 			},
-// 			MultiSelectFunc: func(s1 string, s2 string, strings []string) (int, error) {
-// 				panic("mock out the MultiSelect method")
-// 			},
-// 			PasswordFunc: func(s string) (string, error) {
-// 				panic("mock out the Password method")
-// 			},
-// 			SelectFunc: func(s1 string, s2 string, strings []string) (int, error) {
-// 				panic("mock out the Select method")
-// 			},
-// 		}
+//		// make and configure a mocked Prompter
+//		mockedPrompter := &PrompterMock{
+//			AuthTokenFunc: func() (string, error) {
+//				panic("mock out the AuthToken method")
+//			},
+//			ConfirmFunc: func(s string, b bool) (bool, error) {
+//				panic("mock out the Confirm method")
+//			},
+//			ConfirmDeletionFunc: func(s string) error {
+//				panic("mock out the ConfirmDeletion method")
+//			},
+//			InputFunc: func(s1 string, s2 string) (string, error) {
+//				panic("mock out the Input method")
+//			},
+//			InputHostnameFunc: func() (string, error) {
+//				panic("mock out the InputHostname method")
+//			},
+//			MarkdownEditorFunc: func(s1 string, s2 string, b bool) (string, error) {
+//				panic("mock out the MarkdownEditor method")
+//			},
+//			MultiSelectFunc: func(s string, strings1 []string, strings2 []string) ([]int, error) {
+//				panic("mock out the MultiSelect method")
+//			},
+//			PasswordFunc: func(s string) (string, error) {
+//				panic("mock out the Password method")
+//			},
+//			SelectFunc: func(s1 string, s2 string, strings []string) (int, error) {
+//				panic("mock out the Select method")
+//			},
+//		}
 //
-// 		// use mockedPrompter in code that requires Prompter
-// 		// and then make assertions.
+//		// use mockedPrompter in code that requires Prompter
+//		// and then make assertions.
 //
-// 	}
+//	}
 type PrompterMock struct {
 	// AuthTokenFunc mocks the AuthToken method.
 	AuthTokenFunc func() (string, error)
@@ -70,7 +70,7 @@ type PrompterMock struct {
 	MarkdownEditorFunc func(s1 string, s2 string, b bool) (string, error)
 
 	// MultiSelectFunc mocks the MultiSelect method.
-	MultiSelectFunc func(s1 string, s2 string, strings []string) (int, error)
+	MultiSelectFunc func(s string, strings1 []string, strings2 []string) ([]int, error)
 
 	// PasswordFunc mocks the Password method.
 	PasswordFunc func(s string) (string, error)
@@ -116,12 +116,12 @@ type PrompterMock struct {
 		}
 		// MultiSelect holds details about calls to the MultiSelect method.
 		MultiSelect []struct {
-			// S1 is the s1 argument value.
-			S1 string
-			// S2 is the s2 argument value.
-			S2 string
-			// Strings is the strings argument value.
-			Strings []string
+			// S is the s argument value.
+			S string
+			// Strings1 is the strings1 argument value.
+			Strings1 []string
+			// Strings2 is the strings2 argument value.
+			Strings2 []string
 		}
 		// Password holds details about calls to the Password method.
 		Password []struct {
@@ -164,7 +164,8 @@ func (mock *PrompterMock) AuthToken() (string, error) {
 
 // AuthTokenCalls gets all the calls that were made to AuthToken.
 // Check the length with:
-//     len(mockedPrompter.AuthTokenCalls())
+//
+//	len(mockedPrompter.AuthTokenCalls())
 func (mock *PrompterMock) AuthTokenCalls() []struct {
 } {
 	var calls []struct {
@@ -195,7 +196,8 @@ func (mock *PrompterMock) Confirm(s string, b bool) (bool, error) {
 
 // ConfirmCalls gets all the calls that were made to Confirm.
 // Check the length with:
-//     len(mockedPrompter.ConfirmCalls())
+//
+//	len(mockedPrompter.ConfirmCalls())
 func (mock *PrompterMock) ConfirmCalls() []struct {
 	S string
 	B bool
@@ -228,7 +230,8 @@ func (mock *PrompterMock) ConfirmDeletion(s string) error {
 
 // ConfirmDeletionCalls gets all the calls that were made to ConfirmDeletion.
 // Check the length with:
-//     len(mockedPrompter.ConfirmDeletionCalls())
+//
+//	len(mockedPrompter.ConfirmDeletionCalls())
 func (mock *PrompterMock) ConfirmDeletionCalls() []struct {
 	S string
 } {
@@ -261,7 +264,8 @@ func (mock *PrompterMock) Input(s1 string, s2 string) (string, error) {
 
 // InputCalls gets all the calls that were made to Input.
 // Check the length with:
-//     len(mockedPrompter.InputCalls())
+//
+//	len(mockedPrompter.InputCalls())
 func (mock *PrompterMock) InputCalls() []struct {
 	S1 string
 	S2 string
@@ -291,7 +295,8 @@ func (mock *PrompterMock) InputHostname() (string, error) {
 
 // InputHostnameCalls gets all the calls that were made to InputHostname.
 // Check the length with:
-//     len(mockedPrompter.InputHostnameCalls())
+//
+//	len(mockedPrompter.InputHostnameCalls())
 func (mock *PrompterMock) InputHostnameCalls() []struct {
 } {
 	var calls []struct {
@@ -324,7 +329,8 @@ func (mock *PrompterMock) MarkdownEditor(s1 string, s2 string, b bool) (string, 
 
 // MarkdownEditorCalls gets all the calls that were made to MarkdownEditor.
 // Check the length with:
-//     len(mockedPrompter.MarkdownEditorCalls())
+//
+//	len(mockedPrompter.MarkdownEditorCalls())
 func (mock *PrompterMock) MarkdownEditorCalls() []struct {
 	S1 string
 	S2 string
@@ -342,37 +348,38 @@ func (mock *PrompterMock) MarkdownEditorCalls() []struct {
 }
 
 // MultiSelect calls MultiSelectFunc.
-func (mock *PrompterMock) MultiSelect(s1 string, s2 string, strings []string) (int, error) {
+func (mock *PrompterMock) MultiSelect(s string, strings1 []string, strings2 []string) ([]int, error) {
 	if mock.MultiSelectFunc == nil {
 		panic("PrompterMock.MultiSelectFunc: method is nil but Prompter.MultiSelect was just called")
 	}
 	callInfo := struct {
-		S1      string
-		S2      string
-		Strings []string
+		S        string
+		Strings1 []string
+		Strings2 []string
 	}{
-		S1:      s1,
-		S2:      s2,
-		Strings: strings,
+		S:        s,
+		Strings1: strings1,
+		Strings2: strings2,
 	}
 	mock.lockMultiSelect.Lock()
 	mock.calls.MultiSelect = append(mock.calls.MultiSelect, callInfo)
 	mock.lockMultiSelect.Unlock()
-	return mock.MultiSelectFunc(s1, s2, strings)
+	return mock.MultiSelectFunc(s, strings1, strings2)
 }
 
 // MultiSelectCalls gets all the calls that were made to MultiSelect.
 // Check the length with:
-//     len(mockedPrompter.MultiSelectCalls())
+//
+//	len(mockedPrompter.MultiSelectCalls())
 func (mock *PrompterMock) MultiSelectCalls() []struct {
-	S1      string
-	S2      string
-	Strings []string
+	S        string
+	Strings1 []string
+	Strings2 []string
 } {
 	var calls []struct {
-		S1      string
-		S2      string
-		Strings []string
+		S        string
+		Strings1 []string
+		Strings2 []string
 	}
 	mock.lockMultiSelect.RLock()
 	calls = mock.calls.MultiSelect
@@ -398,7 +405,8 @@ func (mock *PrompterMock) Password(s string) (string, error) {
 
 // PasswordCalls gets all the calls that were made to Password.
 // Check the length with:
-//     len(mockedPrompter.PasswordCalls())
+//
+//	len(mockedPrompter.PasswordCalls())
 func (mock *PrompterMock) PasswordCalls() []struct {
 	S string
 } {
@@ -433,7 +441,8 @@ func (mock *PrompterMock) Select(s1 string, s2 string, strings []string) (int, e
 
 // SelectCalls gets all the calls that were made to Select.
 // Check the length with:
-//     len(mockedPrompter.SelectCalls())
+//
+//	len(mockedPrompter.SelectCalls())
 func (mock *PrompterMock) SelectCalls() []struct {
 	S1      string
 	S2      string

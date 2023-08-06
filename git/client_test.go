@@ -303,7 +303,7 @@ func TestClientCurrentBranch(t *testing.T) {
 			wantBranch:  "branch\u00A0with\u00A0non\u00A0breaking\u00A0space",
 		},
 		{
-			name:          "detatched head",
+			name:          "detached head",
 			cmdExitStatus: 1,
 			wantCmdArgs:   `path/to/git symbolic-ref --quiet HEAD`,
 			wantErrorMsg:  "failed to run git: not on any branch",
@@ -339,7 +339,7 @@ func TestClientShowRefs(t *testing.T) {
 		wantErrorMsg  string
 	}{
 		{
-			name:          "show refs with one vaid ref and one invalid ref",
+			name:          "show refs with one valid ref and one invalid ref",
 			cmdExitStatus: 128,
 			cmdStdout:     "9ea76237a557015e73446d33268569a114c0649c refs/heads/valid",
 			cmdStderr:     "fatal: 'refs/heads/invalid' - not a valid ref",
@@ -834,6 +834,84 @@ func TestClientPathFromRoot(t *testing.T) {
 	}
 }
 
+func TestClientUnsetRemoteResolution(t *testing.T) {
+	tests := []struct {
+		name          string
+		cmdExitStatus int
+		cmdStdout     string
+		cmdStderr     string
+		wantCmdArgs   string
+		wantErrorMsg  string
+	}{
+		{
+			name:        "unset remote resolution",
+			wantCmdArgs: `path/to/git config --unset remote.origin.gh-resolved`,
+		},
+		{
+			name:          "git error",
+			cmdExitStatus: 1,
+			cmdStderr:     "git error message",
+			wantCmdArgs:   `path/to/git config --unset remote.origin.gh-resolved`,
+			wantErrorMsg:  "failed to run git: git error message",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
+			client := Client{
+				GitPath:        "path/to/git",
+				commandContext: cmdCtx,
+			}
+			err := client.UnsetRemoteResolution(context.Background(), "origin")
+			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			if tt.wantErrorMsg == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErrorMsg)
+			}
+		})
+	}
+}
+
+func TestClientSetRemoteBranches(t *testing.T) {
+	tests := []struct {
+		name          string
+		cmdExitStatus int
+		cmdStdout     string
+		cmdStderr     string
+		wantCmdArgs   string
+		wantErrorMsg  string
+	}{
+		{
+			name:        "set remote branches",
+			wantCmdArgs: `path/to/git remote set-branches origin trunk`,
+		},
+		{
+			name:          "git error",
+			cmdExitStatus: 1,
+			cmdStderr:     "git error message",
+			wantCmdArgs:   `path/to/git remote set-branches origin trunk`,
+			wantErrorMsg:  "failed to run git: git error message",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
+			client := Client{
+				GitPath:        "path/to/git",
+				commandContext: cmdCtx,
+			}
+			err := client.SetRemoteBranches(context.Background(), "origin", "trunk")
+			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			if tt.wantErrorMsg == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErrorMsg)
+			}
+		})
+	}
+}
+
 func TestClientFetch(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -1089,7 +1167,7 @@ func TestClientAddRemote(t *testing.T) {
 			url:         "URL",
 			dir:         "DIRECTORY",
 			branches:    []string{},
-			wantCmdArgs: `path/to/git -C DIRECTORY -c credential.helper= -c credential.helper=!"gh" auth git-credential remote add -f test URL`,
+			wantCmdArgs: `path/to/git -C DIRECTORY remote add test URL`,
 		},
 		{
 			title:       "fetch specific branches only",
@@ -1097,7 +1175,7 @@ func TestClientAddRemote(t *testing.T) {
 			url:         "URL",
 			dir:         "DIRECTORY",
 			branches:    []string{"trunk", "dev"},
-			wantCmdArgs: `path/to/git -C DIRECTORY -c credential.helper= -c credential.helper=!"gh" auth git-credential remote add -t trunk -t dev -f test URL`,
+			wantCmdArgs: `path/to/git -C DIRECTORY remote add -t trunk -t dev test URL`,
 		},
 	}
 	for _, tt := range tests {

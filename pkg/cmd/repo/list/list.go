@@ -119,7 +119,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	host, _ := cfg.DefaultHost()
+	host, _ := cfg.Authentication().DefaultHost()
 
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
@@ -152,6 +152,10 @@ func listRun(opts *ListOptions) error {
 	listResult, err := listRepos(httpClient, host, opts.Limit, opts.Owner, filter)
 	if err != nil {
 		return err
+	}
+
+	if opts.Owner != "" && listResult.Owner == "" && !listResult.FromSearch {
+		return fmt.Errorf("the owner handle %q was not recognized as either a GitHub user or an organization", opts.Owner)
 	}
 
 	if err := opts.IO.StartPager(); err != nil {

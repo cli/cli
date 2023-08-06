@@ -58,7 +58,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of workflows to fetch")
-	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all workflows, including disabled workflows")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Also show disabled workflows")
 
 	return cmd
 }
@@ -66,7 +66,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 func listRun(opts *ListOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
+		return err
 	}
 
 	httpClient, err := opts.HttpClient()

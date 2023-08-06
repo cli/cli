@@ -8,11 +8,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -33,6 +35,8 @@ type StatusOptions struct {
 	HasRepoOverride bool
 	Exporter        cmdutil.Exporter
 	ConflictStatus  bool
+
+	Detector fd.Detector
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -105,6 +109,16 @@ func statusRun(opts *StatusOptions) error {
 		options.Fields = opts.Exporter.Fields()
 	}
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+	prFeatures, err := opts.Detector.PullRequestFeatures()
+	if err != nil {
+		return err
+	}
+	options.CheckRunAndStatusContextCountsSupported = prFeatures.CheckRunAndStatusContextCounts
+
 	prPayload, err := pullRequestStatus(httpClient, baseRepo, options)
 	if err != nil {
 		return err
@@ -135,19 +149,21 @@ func statusRun(opts *StatusOptions) error {
 	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
-	shared.PrintHeader(opts.IO, "Current branch")
-	currentPR := prPayload.CurrentPR
-	if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
-		currentPR = nil
+	if !opts.HasRepoOverride {
+		shared.PrintHeader(opts.IO, "Current branch")
+		currentPR := prPayload.CurrentPR
+		if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
+			currentPR = nil
+		}
+		if currentPR != nil {
+			printPrs(opts.IO, 1, *currentPR)
+		} else if currentPRHeadRef == "" {
+			shared.PrintMessage(opts.IO, "  There is no current branch")
+		} else {
+			shared.PrintMessage(opts.IO, fmt.Sprintf("  There is no pull request associated with %s", cs.Cyan("["+currentPRHeadRef+"]")))
+		}
+		fmt.Fprintln(out)
 	}
-	if currentPR != nil {
-		printPrs(opts.IO, 1, *currentPR)
-	} else if currentPRHeadRef == "" {
-		shared.PrintMessage(opts.IO, "  There is no current branch")
-	} else {
-		shared.PrintMessage(opts.IO, fmt.Sprintf("  There is no pull request associated with %s", cs.Cyan("["+currentPRHeadRef+"]")))
-	}
-	fmt.Fprintln(out)
 
 	shared.PrintHeader(opts.IO, "Created by you")
 	if prPayload.ViewerCreated.TotalCount > 0 {
@@ -280,6 +296,10 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 				default:
 					fmt.Fprintf(w, " %s", cs.Green("✓ Up to date"))
 				}
+			}
+
+			if pr.AutoMergeRequest != nil {
+				fmt.Fprintf(w, " %s", cs.Green("✓ Auto-merge enabled"))
 			}
 
 		} else {

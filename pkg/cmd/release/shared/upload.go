@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,8 +13,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
+	"golang.org/x/sync/errgroup"
 )
+
+type httpDoer interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
+type errNetwork struct{ error }
 
 type AssetForUpload struct {
 	Name  string
@@ -90,64 +99,54 @@ func fileExt(fn string) string {
 	return path.Ext(fn)
 }
 
-func ConcurrentUpload(httpClient *http.Client, uploadURL string, numWorkers int, assets []*AssetForUpload) error {
+func ConcurrentUpload(httpClient httpDoer, uploadURL string, numWorkers int, assets []*AssetForUpload) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
 
-	jobs := make(chan AssetForUpload, len(assets))
-	results := make(chan error, len(assets))
-
-	if len(assets) < numWorkers {
-		numWorkers = len(assets)
-	}
-
-	for w := 1; w <= numWorkers; w++ {
-		go func() {
-			for a := range jobs {
-				results <- uploadWithDelete(httpClient, uploadURL, a)
-			}
-		}()
-	}
+	ctx := context.Background()
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(numWorkers)
 
 	for _, a := range assets {
-		jobs <- *a
+		asset := *a
+		g.Go(func() error {
+			return uploadWithDelete(gctx, httpClient, uploadURL, asset)
+		})
 	}
-	close(jobs)
 
-	var uploadError error
-	for i := 0; i < len(assets); i++ {
-		if err := <-results; err != nil {
-			uploadError = err
-		}
-	}
-	return uploadError
+	return g.Wait()
 }
 
-const maxRetries = 3
+func shouldRetry(err error) bool {
+	var networkError errNetwork
+	if errors.As(err, &networkError) {
+		return true
+	}
+	var httpError api.HTTPError
+	return errors.As(err, &httpError) && httpError.StatusCode >= 500
+}
 
-func uploadWithDelete(httpClient *http.Client, uploadURL string, a AssetForUpload) error {
+// Allow injecting backoff interval in tests.
+var retryInterval = time.Millisecond * 200
+
+func uploadWithDelete(ctx context.Context, httpClient httpDoer, uploadURL string, a AssetForUpload) error {
 	if a.ExistingURL != "" {
-		err := deleteAsset(httpClient, a.ExistingURL)
-		if err != nil {
+		if err := deleteAsset(ctx, httpClient, a.ExistingURL); err != nil {
 			return err
 		}
 	}
-
-	retries := 0
-	for {
-		var httpError api.HTTPError
-		_, err := uploadAsset(httpClient, uploadURL, a)
-		// retry upload several times upon receiving HTTP 5xx
-		if err == nil || !errors.As(err, &httpError) || httpError.StatusCode < 500 || retries < maxRetries {
+	bo := backoff.NewConstantBackOff(retryInterval)
+	return backoff.Retry(func() error {
+		_, err := uploadAsset(ctx, httpClient, uploadURL, a)
+		if err == nil || shouldRetry(err) {
 			return err
 		}
-		retries++
-		time.Sleep(time.Duration(retries) * time.Second)
-	}
+		return backoff.Permanent(err)
+	}, backoff.WithContext(backoff.WithMaxRetries(bo, 3), ctx))
 }
 
-func uploadAsset(httpClient *http.Client, uploadURL string, asset AssetForUpload) (*ReleaseAsset, error) {
+func uploadAsset(ctx context.Context, httpClient httpDoer, uploadURL string, asset AssetForUpload) (*ReleaseAsset, error) {
 	u, err := url.Parse(uploadURL)
 	if err != nil {
 		return nil, err
@@ -163,7 +162,7 @@ func uploadAsset(httpClient *http.Client, uploadURL string, asset AssetForUpload
 	}
 	defer f.Close()
 
-	req, err := http.NewRequest("POST", u.String(), f)
+	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), f)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +172,7 @@ func uploadAsset(httpClient *http.Client, uploadURL string, asset AssetForUpload
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, errNetwork{err}
 	}
 	defer resp.Body.Close()
 
@@ -182,22 +181,17 @@ func uploadAsset(httpClient *http.Client, uploadURL string, asset AssetForUpload
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
 	var newAsset ReleaseAsset
-	err = json.Unmarshal(b, &newAsset)
-	if err != nil {
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&newAsset); err != nil {
 		return nil, err
 	}
 
 	return &newAsset, nil
 }
 
-func deleteAsset(httpClient *http.Client, assetURL string) error {
-	req, err := http.NewRequest("DELETE", assetURL, nil)
+func deleteAsset(ctx context.Context, httpClient httpDoer, assetURL string) error {
+	req, err := http.NewRequestWithContext(ctx, "DELETE", assetURL, nil)
 	if err != nil {
 		return err
 	}

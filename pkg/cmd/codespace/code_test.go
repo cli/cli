@@ -28,7 +28,7 @@ func TestApp_VSCode(t *testing.T) {
 				useInsiders:   false,
 			},
 			wantErr: false,
-			wantURL: "vscode://github.codespaces/connect?name=monalisa-cli-cli-abcdef",
+			wantURL: "vscode://github.codespaces/connect?name=monalisa-cli-cli-abcdef&windowId=_blank",
 		},
 		{
 			name: "open VS Code Insiders",
@@ -37,7 +37,7 @@ func TestApp_VSCode(t *testing.T) {
 				useInsiders:   true,
 			},
 			wantErr: false,
-			wantURL: "vscode-insiders://github.codespaces/connect?name=monalisa-cli-cli-abcdef",
+			wantURL: "vscode-insiders://github.codespaces/connect?name=monalisa-cli-cli-abcdef&windowId=_blank",
 		},
 		{
 			name: "open VS Code web",
@@ -69,7 +69,9 @@ func TestApp_VSCode(t *testing.T) {
 				apiClient: testCodeApiMock(),
 				io:        ios,
 			}
-			if err := a.VSCode(context.Background(), tt.args.codespaceName, tt.args.useInsiders, tt.args.useWeb); (err != nil) != tt.wantErr {
+			selector := &CodespaceSelector{api: a.apiClient, codespaceName: tt.args.codespaceName}
+
+			if err := a.VSCode(context.Background(), selector, tt.args.useInsiders, tt.args.useWeb); (err != nil) != tt.wantErr {
 				t.Errorf("App.VSCode() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			b.Verify(t, tt.wantURL)
@@ -85,8 +87,9 @@ func TestApp_VSCode(t *testing.T) {
 
 func TestPendingOperationDisallowsCode(t *testing.T) {
 	app := testingCodeApp()
+	selector := &CodespaceSelector{api: app.apiClient, codespaceName: "disabledCodespace"}
 
-	if err := app.VSCode(context.Background(), "disabledCodespace", false, false); err != nil {
+	if err := app.VSCode(context.Background(), selector, false, false); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}
@@ -97,7 +100,7 @@ func TestPendingOperationDisallowsCode(t *testing.T) {
 
 func testingCodeApp() *App {
 	ios, _, _, _ := iostreams.Test()
-	return NewApp(ios, nil, testCodeApiMock(), nil)
+	return NewApp(ios, nil, testCodeApiMock(), nil, nil)
 }
 
 func testCodeApiMock() *apiClientMock {

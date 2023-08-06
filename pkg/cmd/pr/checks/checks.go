@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -24,12 +25,14 @@ type ChecksOptions struct {
 	IO         *iostreams.IOStreams
 	Browser    browser.Browser
 
-	Finder shared.PRFinder
+	Finder   shared.PRFinder
+	Detector fd.Detector
 
 	SelectorArg string
 	WebMode     bool
 	Interval    time.Duration
 	Watch       bool
+	FailFast    bool
 	Required    bool
 }
 
@@ -59,6 +62,10 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("argument required when using the `--repo` flag")
 			}
 
+			if opts.FailFast && !opts.Watch {
+				return cmdutil.FlagErrorf("cannot use `--fail-fast` flag without `--watch` flag")
+			}
+
 			intervalChanged := cmd.Flags().Changed("interval")
 			if !opts.Watch && intervalChanged {
 				return cmdutil.FlagErrorf("cannot use `--interval` flag without `--watch` flag")
@@ -86,6 +93,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
 	cmd.Flags().BoolVarP(&opts.Watch, "watch", "", false, "Watch checks until they finish")
+	cmd.Flags().BoolVarP(&opts.FailFast, "fail-fast", "", false, "Exit watch mode on first check failure")
 	cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds when using `--watch` flag")
 	cmd.Flags().BoolVar(&opts.Required, "required", false, "Only show checks that are required")
 
@@ -136,8 +144,19 @@ func checksRun(opts *ChecksOptions) error {
 	var checks []check
 	var counts checkCounts
 	var err error
+	var includeEvent bool
 
-	checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required)
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(client, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, repo.RepoHost())
+	}
+	if features, featuresErr := opts.Detector.PullRequestFeatures(); featuresErr != nil {
+		return featuresErr
+	} else {
+		includeEvent = features.CheckRunEvent
+	}
+
+	checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required, includeEvent)
 	if err != nil {
 		return err
 	}
@@ -171,9 +190,13 @@ func checksRun(opts *ChecksOptions) error {
 			break
 		}
 
+		if opts.FailFast && counts.Failed > 0 {
+			break
+		}
+
 		time.Sleep(opts.Interval)
 
-		checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required)
+		checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required, includeEvent)
 		if err != nil {
 			break
 		}
@@ -200,7 +223,7 @@ func checksRun(opts *ChecksOptions) error {
 	return nil
 }
 
-func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest, requiredChecks bool) ([]check, checkCounts, error) {
+func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest, requiredChecks bool, includeEvent bool) ([]check, checkCounts, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	type response struct {
@@ -214,7 +237,7 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 				%s
 			}
 		}
-	}`, api.RequiredStatusCheckRollupGraphQL("$id", "$endCursor"))
+	}`, api.RequiredStatusCheckRollupGraphQL("$id", "$endCursor", includeEvent))
 
 	variables := map[string]interface{}{
 		"id": pr.ID,
