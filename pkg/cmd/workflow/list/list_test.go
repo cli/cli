@@ -3,7 +3,7 @@ package list
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -64,12 +64,12 @@ func Test_NewCmdList(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -82,8 +82,8 @@ func Test_NewCmdList(t *testing.T) {
 			})
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
@@ -120,6 +120,7 @@ func TestListRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		opts       *ListOptions
+		wantErr    bool
 		wantOut    string
 		wantErrOut string
 		stubs      func(*httpmock.Registry)
@@ -170,7 +171,7 @@ func TestListRun(t *testing.T) {
 			wantOut: longOutput,
 		},
 		{
-			name: "no results nontty",
+			name: "no results",
 			opts: &ListOptions{
 				Limit:       defaultLimit,
 				PlainOutput: true,
@@ -181,22 +182,7 @@ func TestListRun(t *testing.T) {
 					httpmock.JSONResponse(shared.WorkflowsPayload{}),
 				)
 			},
-			wantOut: "",
-		},
-		{
-			name: "no results tty",
-			opts: &ListOptions{
-				Limit: defaultLimit,
-			},
-			tty: true,
-			stubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
-					httpmock.JSONResponse(shared.WorkflowsPayload{}),
-				)
-			},
-			wantOut:    "",
-			wantErrOut: "No workflows found\n",
+			wantErr: true,
 		},
 		{
 			name: "show all workflows",
@@ -221,6 +207,7 @@ func TestListRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 			if tt.stubs == nil {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
@@ -234,19 +221,22 @@ func TestListRun(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.tty)
-			tt.opts.IO = io
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
+			tt.opts.IO = ios
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
 
 			err := listRun(tt.opts)
-			assert.NoError(t, err)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 
 			assert.Equal(t, tt.wantOut, stdout.String())
 			assert.Equal(t, tt.wantErrOut, stderr.String())
-			reg.Verify(t)
 		})
 	}
 }

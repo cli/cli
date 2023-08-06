@@ -1,13 +1,11 @@
 package merge
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
-	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -19,14 +17,26 @@ const (
 	PullRequestMergeMethodSquash
 )
 
+const (
+	MergeStateStatusBehind   = "BEHIND"
+	MergeStateStatusBlocked  = "BLOCKED"
+	MergeStateStatusClean    = "CLEAN"
+	MergeStateStatusDirty    = "DIRTY"
+	MergeStateStatusHasHooks = "HAS_HOOKS"
+	MergeStateStatusMerged   = "MERGED"
+	MergeStateStatusUnstable = "UNSTABLE"
+)
+
 type mergePayload struct {
-	repo          ghrepo.Interface
-	pullRequestID string
-	method        PullRequestMergeMethod
-	auto          bool
-	commitSubject string
-	commitBody    string
-	setCommitBody bool
+	repo            ghrepo.Interface
+	pullRequestID   string
+	method          PullRequestMergeMethod
+	auto            bool
+	commitSubject   string
+	commitBody      string
+	setCommitBody   bool
+	expectedHeadOid string
+	authorEmail     string
 }
 
 // TODO: drop after githubv4 gets updated
@@ -51,6 +61,10 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 		input.MergeMethod = &m
 	}
 
+	if payload.authorEmail != "" {
+		authorEmail := githubv4.String(payload.authorEmail)
+		input.AuthorEmail = &authorEmail
+	}
 	if payload.commitSubject != "" {
 		commitHeadline := githubv4.String(payload.commitSubject)
 		input.CommitHeadline = &commitHeadline
@@ -60,11 +74,16 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 		input.CommitBody = &commitBody
 	}
 
+	if payload.expectedHeadOid != "" {
+		expectedHeadOid := githubv4.GitObjectID(payload.expectedHeadOid)
+		input.ExpectedHeadOid = &expectedHeadOid
+	}
+
 	variables := map[string]interface{}{
 		"input": input,
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(payload.repo.RepoHost()), client)
+	gql := api.NewClientFromHTTP(client)
 
 	if payload.auto {
 		var mutation struct {
@@ -73,7 +92,7 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 			} `graphql:"enablePullRequestAutoMerge(input: $input)"`
 		}
 		variables["input"] = EnablePullRequestAutoMergeInput{input}
-		return gql.MutateNamed(context.Background(), "PullRequestAutoMerge", &mutation, variables)
+		return gql.Mutate(payload.repo.RepoHost(), "PullRequestAutoMerge", &mutation, variables)
 	}
 
 	var mutation struct {
@@ -81,7 +100,7 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 			ClientMutationId string
 		} `graphql:"mergePullRequest(input: $input)"`
 	}
-	return gql.MutateNamed(context.Background(), "PullRequestMerge", &mutation, variables)
+	return gql.Mutate(payload.repo.RepoHost(), "PullRequestMerge", &mutation, variables)
 }
 
 func disableAutoMerge(client *http.Client, repo ghrepo.Interface, prID string) error {
@@ -95,8 +114,8 @@ func disableAutoMerge(client *http.Client, repo ghrepo.Interface, prID string) e
 		"prID": githubv4.ID(prID),
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
-	return gql.MutateNamed(context.Background(), "PullRequestAutoMergeDisable", &mutation, variables)
+	gql := api.NewClientFromHTTP(client)
+	return gql.Mutate(repo.RepoHost(), "PullRequestAutoMergeDisable", &mutation, variables)
 }
 
 func getMergeText(client *http.Client, repo ghrepo.Interface, prID string, mergeMethod PullRequestMergeMethod) (string, string, error) {
@@ -124,8 +143,8 @@ func getMergeText(client *http.Client, repo ghrepo.Interface, prID string, merge
 		"method": method,
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
-	err := gql.QueryNamed(context.Background(), "PullRequestMergeText", &query, variables)
+	gql := api.NewClientFromHTTP(client)
+	err := gql.Query(repo.RepoHost(), "PullRequestMergeText", &query, variables)
 	if err != nil {
 		// Tolerate this API missing in older GitHub Enterprise
 		if strings.Contains(err.Error(), "Field 'viewerMergeHeadlineText' doesn't exist") ||

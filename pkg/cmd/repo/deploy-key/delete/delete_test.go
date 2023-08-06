@@ -11,10 +11,10 @@ import (
 )
 
 func Test_deleteRun(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdinTTY(false)
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdinTTY(false)
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 
 	tr := httpmock.Registry{}
 	defer tr.Verify(t)
@@ -24,7 +24,7 @@ func Test_deleteRun(t *testing.T) {
 		httpmock.StringResponse(`{}`))
 
 	err := deleteRun(&DeleteOptions{
-		IO: io,
+		IO: ios,
 		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: &tr}, nil
 		},

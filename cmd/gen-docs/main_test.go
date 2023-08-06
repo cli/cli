@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 )
@@ -14,7 +14,7 @@ func Test_run(t *testing.T) {
 		t.Fatalf("got error: %v", err)
 	}
 
-	manPage, err := ioutil.ReadFile(dir + "/gh-issue-create.1")
+	manPage, err := os.ReadFile(dir + "/gh-issue-create.1")
 	if err != nil {
 		t.Fatalf("error reading `gh-issue-create.1`: %v", err)
 	}
@@ -22,7 +22,7 @@ func Test_run(t *testing.T) {
 		t.Fatal("man page corrupted")
 	}
 
-	markdownPage, err := ioutil.ReadFile(dir + "/gh_issue_create.md")
+	markdownPage, err := os.ReadFile(dir + "/gh_issue_create.md")
 	if err != nil {
 		t.Fatalf("error reading `gh_issue_create.md`: %v", err)
 	}

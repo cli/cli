@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -24,15 +24,16 @@ func MatchAny(*http.Request) bool {
 	return true
 }
 
+// REST returns a matcher to a request for the HTTP method and URL escaped path p.
+// For example, to match a GET request to `/api/v3/repos/octocat/hello-world/`
+// use REST("GET", "api/v3/repos/octocat/hello-world")
+// To match a GET request to `/user` use REST("GET", "user")
 func REST(method, p string) Matcher {
 	return func(req *http.Request) bool {
 		if !strings.EqualFold(req.Method, method) {
 			return false
 		}
-		if req.URL.Path != "/"+p {
-			return false
-		}
-		return true
+		return req.URL.EscapedPath() == "/"+p
 	}
 }
 
@@ -56,11 +57,56 @@ func GraphQL(q string) Matcher {
 	}
 }
 
+func GraphQLMutationMatcher(q string, cb func(map[string]interface{}) bool) Matcher {
+	re := regexp.MustCompile(q)
+
+	return func(req *http.Request) bool {
+		if !strings.EqualFold(req.Method, "POST") {
+			return false
+		}
+		if req.URL.Path != "/graphql" && req.URL.Path != "/api/graphql" {
+			return false
+		}
+
+		var bodyData struct {
+			Query     string
+			Variables struct {
+				Input map[string]interface{}
+			}
+		}
+		_ = decodeJSONBody(req, &bodyData)
+
+		if re.MatchString(bodyData.Query) {
+			return cb(bodyData.Variables.Input)
+		}
+
+		return false
+	}
+}
+
+func QueryMatcher(method string, path string, query url.Values) Matcher {
+	return func(req *http.Request) bool {
+		if !REST(method, path)(req) {
+			return false
+		}
+
+		actualQuery := req.URL.Query()
+
+		for param := range query {
+			if !(actualQuery.Get(param) == query.Get(param)) {
+				return false
+			}
+		}
+
+		return true
+	}
+}
+
 func readBody(req *http.Request) ([]byte, error) {
 	bodyCopy := &bytes.Buffer{}
 	r := io.TeeReader(req.Body, bodyCopy)
-	req.Body = ioutil.NopCloser(bodyCopy)
-	return ioutil.ReadAll(r)
+	req.Body = io.NopCloser(bodyCopy)
+	return io.ReadAll(r)
 }
 
 func decodeJSONBody(req *http.Request, dest interface{}) error {
@@ -97,7 +143,20 @@ func StatusStringResponse(status int, body string) Responder {
 func JSONResponse(body interface{}) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		b, _ := json.Marshal(body)
-		return httpResponse(200, req, bytes.NewBuffer(b)), nil
+		header := http.Header{
+			"Content-Type": []string{"application/json"},
+		}
+		return httpResponseWithHeader(200, req, bytes.NewBuffer(b), header), nil
+	}
+}
+
+func StatusJSONResponse(status int, body interface{}) Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		b, _ := json.Marshal(body)
+		header := http.Header{
+			"Content-Type": []string{"application/json"},
+		}
+		return httpResponseWithHeader(status, req, bytes.NewBuffer(b), header), nil
 	}
 }
 
@@ -163,16 +222,20 @@ func ScopesResponder(scopes string) func(*http.Request) (*http.Response, error) 
 			Header: map[string][]string{
 				"X-Oauth-Scopes": {scopes},
 			},
-			Body: ioutil.NopCloser(bytes.NewBufferString("")),
+			Body: io.NopCloser(bytes.NewBufferString("")),
 		}, nil
 	}
 }
 
 func httpResponse(status int, req *http.Request, body io.Reader) *http.Response {
+	return httpResponseWithHeader(status, req, body, http.Header{})
+}
+
+func httpResponseWithHeader(status int, req *http.Request, body io.Reader, header http.Header) *http.Response {
 	return &http.Response{
 		StatusCode: status,
 		Request:    req,
-		Body:       ioutil.NopCloser(body),
-		Header:     http.Header{},
+		Body:       io.NopCloser(body),
+		Header:     header,
 	}
 }

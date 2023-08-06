@@ -86,24 +86,24 @@ func TestListRun(t *testing.T) {
 		},
 		{
 			name:  "no keys",
-			isTTY: false,
+			isTTY: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/keys"),
 					httpmock.StringResponse(`[]`))
 			},
 			wantStdout: "",
-			wantStderr: "No deploy keys found in OWNER/REPO\n",
+			wantStderr: "",
 			wantErr:    true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			reg := &httpmock.Registry{}
 			if tt.httpStubs != nil {
@@ -111,7 +111,7 @@ func TestListRun(t *testing.T) {
 			}
 
 			opts := tt.opts
-			opts.IO = io
+			opts.IO = ios
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 			opts.HTTPClient = func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 

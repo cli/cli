@@ -12,24 +12,20 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type runLogCache interface {
 	Exists(string) bool
@@ -67,7 +63,8 @@ type ViewOptions struct {
 	HttpClient  func() (*http.Client, error)
 	IO          *iostreams.IOStreams
 	BaseRepo    func() (ghrepo.Interface, error)
-	Browser     browser
+	Browser     browser.Browser
+	Prompter    shared.Prompter
 	RunLogCache runLogCache
 
 	RunID      string
@@ -77,6 +74,7 @@ type ViewOptions struct {
 	Log        bool
 	LogFailed  bool
 	Web        bool
+	Attempt    uint64
 
 	Prompt   bool
 	Exporter cmdutil.Exporter
@@ -88,6 +86,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	opts := &ViewOptions{
 		IO:          f.IOStreams,
 		HttpClient:  f.HttpClient,
+		Prompter:    f.Prompter,
 		Now:         time.Now,
 		Browser:     f.Browser,
 		RunLogCache: rlc{},
@@ -103,6 +102,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			# View a specific run
 			$ gh run view 12345
+
+			# View a specific run with specific attempt number
+			$ gh run view 12345 --attempt 3
 
 			# View a specific job within a run
 			$ gh run view --job 456789
@@ -156,7 +158,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Log, "log", false, "View full log for either a run or specific job")
 	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View the log for any failed steps in a run or specific job")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
+	cmd.Flags().Uint64VarP(&opts.Attempt, "attempt", "a", 0, "The attempt number of the workflow run")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.SingleRunFields)
 
 	return cmd
 }
@@ -175,6 +178,7 @@ func runView(opts *ViewOptions) error {
 
 	jobID := opts.JobID
 	runID := opts.RunID
+	attempt := opts.Attempt
 	var selectedJob *shared.Job
 	var run *shared.Run
 	var jobs []shared.Job
@@ -183,7 +187,7 @@ func runView(opts *ViewOptions) error {
 
 	if jobID != "" {
 		opts.IO.StartProgressIndicator()
-		selectedJob, err = getJob(client, repo, jobID)
+		selectedJob, err = shared.GetJob(client, repo, jobID)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get job: %w", err)
@@ -202,31 +206,32 @@ func runView(opts *ViewOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to get runs: %w", err)
 		}
-		runID, err = shared.PromptForRun(cs, runs)
+		runID, err = shared.SelectRun(opts.Prompter, cs, runs.WorkflowRuns)
 		if err != nil {
 			return err
 		}
 	}
 
 	opts.IO.StartProgressIndicator()
-	run, err = shared.GetRun(client, repo, runID)
+	run, err = shared.GetRun(client, repo, runID, attempt)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get run: %w", err)
 	}
 
-	if opts.Prompt {
+	if shouldFetchJobs(opts) {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, *run)
+		jobs, err = shared.GetJobs(client, repo, run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
-		if len(jobs) > 1 {
-			selectedJob, err = promptForJob(cs, jobs)
-			if err != nil {
-				return err
-			}
+	}
+
+	if opts.Prompt && len(jobs) > 1 {
+		selectedJob, err = promptForJob(opts.Prompter, cs, jobs)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -246,7 +251,7 @@ func runView(opts *ViewOptions) error {
 			url = selectedJob.URL + "?check_suite_focus=true"
 		}
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(url))
 		}
 
 		return opts.Browser.Browse(url)
@@ -254,7 +259,7 @@ func runView(opts *ViewOptions) error {
 
 	if selectedJob == nil && len(jobs) == 0 {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, *run)
+		jobs, err = shared.GetJobs(client, repo, run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get jobs: %w", err)
@@ -273,14 +278,14 @@ func runView(opts *ViewOptions) error {
 		}
 
 		opts.IO.StartProgressIndicator()
-		runLogZip, err := getRunLog(opts.RunLogCache, httpClient, repo, run)
+		runLogZip, err := getRunLog(opts.RunLogCache, httpClient, repo, run, attempt)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get run log: %w", err)
 		}
 		defer runLogZip.Close()
 
-		attachRunLog(runLogZip, jobs)
+		attachRunLog(&runLogZip.Reader, jobs)
 
 		return displayRunLog(opts.IO.Out, jobs, opts.LogFailed)
 	}
@@ -319,10 +324,8 @@ func runView(opts *ViewOptions) error {
 
 	out := opts.IO.Out
 
-	ago := opts.Now().Sub(run.CreatedAt)
-
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
+	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber, attempt))
 	fmt.Fprintln(out)
 
 	if len(jobs) == 0 && run.Conclusion == shared.Failure || run.Conclusion == shared.StartupFailure {
@@ -395,16 +398,18 @@ func runView(opts *ViewOptions) error {
 	return nil
 }
 
-func getJob(client *api.Client, repo ghrepo.Interface, jobID string) (*shared.Job, error) {
-	path := fmt.Sprintf("repos/%s/actions/jobs/%s", ghrepo.FullName(repo), jobID)
-
-	var result shared.Job
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
-	if err != nil {
-		return nil, err
+func shouldFetchJobs(opts *ViewOptions) bool {
+	if opts.Prompt {
+		return true
 	}
-
-	return &result, nil
+	if opts.Exporter != nil {
+		for _, f := range opts.Exporter.Fields() {
+			if f == "jobs" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
@@ -427,13 +432,18 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run) (*zip.ReadCloser, error) {
-	filename := fmt.Sprintf("run-log-%d-%d.zip", run.ID, run.CreatedAt.Unix())
+func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run, attempt uint64) (*zip.ReadCloser, error) {
+	filename := fmt.Sprintf("run-log-%d-%d.zip", run.ID, run.StartedTime().Unix())
 	filepath := filepath.Join(os.TempDir(), "gh-cli-cache", filename)
 	if !cache.Exists(filepath) {
 		// Run log does not exist in cache so retrieve and store it
 		logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
 			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID)
+
+		if attempt > 0 {
+			logURL = fmt.Sprintf("%srepos/%s/actions/runs/%d/attempts/%d/logs",
+				ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID, attempt)
+		}
 
 		resp, err := getLog(httpClient, logURL)
 		if err != nil {
@@ -450,19 +460,14 @@ func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface
 	return cache.Open(filepath)
 }
 
-func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, error) {
+func promptForJob(prompter shared.Prompter, cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, error) {
 	candidates := []string{"View all jobs in this run"}
 	for _, job := range jobs {
 		symbol, _ := shared.Symbol(cs, job.Status, job.Conclusion)
 		candidates = append(candidates, fmt.Sprintf("%s %s", symbol, job.Name))
 	}
 
-	var selected int
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message:  "View a specific job in this run?",
-		Options:  candidates,
-		PageSize: 12,
-	}, &selected)
+	selected, err := prompter.Select("View a specific job in this run?", "", candidates)
 	if err != nil {
 		return nil, err
 	}
@@ -476,25 +481,39 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 }
 
 func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
-	re := fmt.Sprintf(`%s\/%d_.*\.txt`, regexp.QuoteMeta(job.Name), step.Number)
+	// As described in https://github.com/cli/cli/issues/5011#issuecomment-1570713070, there are a number of steps
+	// the server can take when producing the downloaded zip file that can result in a mismatch between the job name
+	// and the filename in the zip including:
+	//  * Removing characters in the job name that aren't allowed in file paths
+	//  * Truncating names that are too long for zip files
+	//  * Adding collision deduplicating numbers for jobs with the same name
+	//
+	// We are hesitant to duplicate all the server logic due to the fragility but while we explore our options, it
+	// is sensible to fix the issue that is unavoidable for users, that when a job uses a composite action, the server
+	// constructs a job name by constructing a job name of `<JOB_NAME`> / <ACTION_NAME>`. This means that logs will
+	// never be found for jobs that use composite actions.
+	sanitizedJobName := strings.ReplaceAll(job.Name, "/", "")
+	re := fmt.Sprintf(`%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
 }
 
 // This function takes a zip file of logs and a list of jobs.
 // Structure of zip file
-// zip/
-// ├── jobname1/
-// │   ├── 1_stepname.txt
-// │   ├── 2_anotherstepname.txt
-// │   ├── 3_stepstepname.txt
-// │   └── 4_laststepname.txt
-// └── jobname2/
-//     ├── 1_stepname.txt
-//     └── 2_somestepname.txt
-// It iterates through the list of jobs and trys to find the matching
+//
+//	zip/
+//	├── jobname1/
+//	│   ├── 1_stepname.txt
+//	│   ├── 2_anotherstepname.txt
+//	│   ├── 3_stepstepname.txt
+//	│   └── 4_laststepname.txt
+//	└── jobname2/
+//	    ├── 1_stepname.txt
+//	    └── 2_somestepname.txt
+//
+// It iterates through the list of jobs and tries to find the matching
 // log in the zip file. If the matching log is found it is attached
 // to the job.
-func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
+func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 	for i, job := range jobs {
 		for j, step := range job.Steps {
 			re := logFilenameRegexp(job, step)

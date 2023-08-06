@@ -2,12 +2,13 @@ package download
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -69,16 +70,39 @@ func Test_NewCmdDownload(t *testing.T) {
 				DestinationDir: ".",
 			},
 		},
+		{
+			name:  "repo level with patterns",
+			args:  "-p o*e -p tw*",
+			isTTY: true,
+			want: DownloadOptions{
+				RunID:          "",
+				DoPrompt:       false,
+				FilePatterns:   []string{"o*e", "tw*"},
+				DestinationDir: ".",
+			},
+		},
+		{
+			name:  "repo level with names and patterns",
+			args:  "-p o*e -p tw* -n three -n four",
+			isTTY: true,
+			want: DownloadOptions{
+				RunID:          "",
+				DoPrompt:       false,
+				Names:          []string{"three", "four"},
+				FilePatterns:   []string{"o*e", "tw*"},
+				DestinationDir: ".",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 				HttpClient: func() (*http.Client, error) {
 					return nil, nil
 				},
@@ -99,8 +123,8 @@ func Test_NewCmdDownload(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -112,6 +136,7 @@ func Test_NewCmdDownload(t *testing.T) {
 
 			assert.Equal(t, tt.want.RunID, opts.RunID)
 			assert.Equal(t, tt.want.Names, opts.Names)
+			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
 			assert.Equal(t, tt.want.DestinationDir, opts.DestinationDir)
 			assert.Equal(t, tt.want.DoPrompt, opts.DoPrompt)
 		})
@@ -120,11 +145,11 @@ func Test_NewCmdDownload(t *testing.T) {
 
 func Test_runDownload(t *testing.T) {
 	tests := []struct {
-		name       string
-		opts       DownloadOptions
-		mockAPI    func(*mockPlatform)
-		mockPrompt func(*mockPrompter)
-		wantErr    string
+		name        string
+		opts        DownloadOptions
+		mockAPI     func(*mockPlatform)
+		promptStubs func(*prompter.MockPrompter)
+		wantErr     string
 	}{
 		{
 			name: "download non-expired",
@@ -179,7 +204,7 @@ func Test_runDownload(t *testing.T) {
 			wantErr: "no valid artifacts found to download",
 		},
 		{
-			name: "no matches",
+			name: "no name matches",
 			opts: DownloadOptions{
 				RunID:          "2345",
 				DestinationDir: ".",
@@ -199,7 +224,30 @@ func Test_runDownload(t *testing.T) {
 					},
 				}, nil)
 			},
-			wantErr: "no artifact matches any of the names provided",
+			wantErr: "no artifact matches any of the names or patterns provided",
+		},
+		{
+			name: "no pattern matches",
+			opts: DownloadOptions{
+				RunID:          "2345",
+				DestinationDir: ".",
+				FilePatterns:   []string{"artifiction-*"},
+			},
+			mockAPI: func(p *mockPlatform) {
+				p.On("List", "2345").Return([]shared.Artifact{
+					{
+						Name:        "artifact-1",
+						DownloadURL: "http://download.com/artifact1.zip",
+						Expired:     false,
+					},
+					{
+						Name:        "artifact-2",
+						DownloadURL: "http://download.com/artifact2.zip",
+						Expired:     false,
+					},
+				}, nil)
+			},
+			wantErr: "no artifact matches any of the names or patterns provided",
 		},
 		{
 			name: "prompt to select artifact",
@@ -234,23 +282,26 @@ func Test_runDownload(t *testing.T) {
 				}, nil)
 				p.On("Download", "http://download.com/artifact2.zip", ".").Return(nil)
 			},
-			mockPrompt: func(p *mockPrompter) {
-				p.On("Prompt", "Select artifacts to download:", []string{"artifact-1", "artifact-2"}, mock.AnythingOfType("*[]string")).
-					Run(func(args mock.Arguments) {
-						result := args.Get(2).(*[]string)
-						*result = []string{"artifact-2"}
-					}).
-					Return(nil)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("Select artifacts to download:", nil, []string{"artifact-1", "artifact-2"},
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{1}, nil
+					})
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := &tt.opts
-			io, _, stdout, stderr := iostreams.Test()
-			opts.IO = io
+			ios, _, stdout, stderr := iostreams.Test()
+			opts.IO = ios
 			opts.Platform = newMockPlatform(t, tt.mockAPI)
-			opts.Prompter = newMockPrompter(t, tt.mockPrompt)
+
+			pm := prompter.NewMockPrompter(t)
+			opts.Prompter = pm
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
+			}
 
 			err := runDownload(opts)
 			if tt.wantErr != "" {
@@ -288,26 +339,5 @@ func (p *mockPlatform) List(runID string) ([]shared.Artifact, error) {
 
 func (p *mockPlatform) Download(url string, dir string) error {
 	args := p.Called(url, dir)
-	return args.Error(0)
-}
-
-type mockPrompter struct {
-	mock.Mock
-}
-
-func newMockPrompter(t *testing.T, config func(*mockPrompter)) *mockPrompter {
-	m := &mockPrompter{}
-	m.Test(t)
-	t.Cleanup(func() {
-		m.AssertExpectations(t)
-	})
-	if config != nil {
-		config(m)
-	}
-	return m
-}
-
-func (p *mockPrompter) Prompt(msg string, opts []string, res interface{}) error {
-	args := p.Called(msg, opts, res)
 	return args.Error(0)
 }

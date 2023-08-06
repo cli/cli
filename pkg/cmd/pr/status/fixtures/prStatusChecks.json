@@ -7,7 +7,7 @@
       }
     },
     "viewerCreated": {
-      "totalCount": 3,
+      "totalCount": 4,
       "edges": [
         {
           "node": {
@@ -16,6 +16,7 @@
             "state": "OPEN",
             "url": "https://github.com/cli/cli/pull/8",
             "headRefName": "strawberries",
+            "mergeable": "UNKNOWN",
             "reviewDecision": "CHANGES_REQUESTED",
             "statusCheckRollup": {
               "nodes": [
@@ -25,6 +26,7 @@
                       "contexts": {
                         "nodes": [
                           {
+                            "__typeName": "StatusContext",
                             "state": "SUCCESS"
                           }
                         ]
@@ -79,6 +81,7 @@
                       "contexts": {
                         "nodes": [
                           {
+                            "__typeName": "CheckRun",
                             "status": "IN_PROGRESS",
                             "conclusion": ""
                           }
@@ -98,6 +101,7 @@
             "state": "OPEN",
             "url": "https://github.com/cli/cli/pull/6",
             "headRefName": "avo",
+            "mergeable": "MERGEABLE",
             "reviewDecision": "REVIEW_REQUIRED",
             "statusCheckRollup": {
               "nodes": [
@@ -107,15 +111,46 @@
                       "contexts": {
                         "nodes": [
                           {
+                            "__typeName": "CheckRun",
                             "status": "IN_PROGRESS",
                             "conclusion": ""
                           },
                           {
+                            "__typeName": "StatusContext",
                             "state": "FAILURE"
                           },
                           {
+                            "__typeName": "CheckRun",
                             "status": "COMPLETED",
                             "conclusion": "NEUTRAL"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "node": {
+            "number": 5,
+            "title": "Why can't berries get along?",
+            "state": "OPEN",
+            "url": "https://github.com/cli/cli/pull/5",
+            "headRefName": "strawberries",
+            "mergeable": "CONFLICTING",
+            "statusCheckRollup": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typeName": "StatusContext",
+                            "state": "SUCCESS"
                           }
                         ]
                       }

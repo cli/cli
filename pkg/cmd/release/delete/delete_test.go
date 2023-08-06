@@ -2,12 +2,14 @@ package delete
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -31,6 +33,7 @@ func Test_NewCmdDelete(t *testing.T) {
 			want: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
+				CleanupTag:  false,
 			},
 		},
 		{
@@ -40,6 +43,17 @@ func Test_NewCmdDelete(t *testing.T) {
 			want: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: true,
+				CleanupTag:  false,
+			},
+		},
+		{
+			name:  "cleanup tag",
+			args:  "v1.2.3 --cleanup-tag",
+			isTTY: true,
+			want: DeleteOptions{
+				TagName:     "v1.2.3",
+				SkipConfirm: false,
+				CleanupTag:  true,
 			},
 		},
 		{
@@ -51,13 +65,13 @@ func Test_NewCmdDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *DeleteOptions
@@ -72,8 +86,8 @@ func Test_NewCmdDelete(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -85,25 +99,45 @@ func Test_NewCmdDelete(t *testing.T) {
 
 			assert.Equal(t, tt.want.TagName, opts.TagName)
 			assert.Equal(t, tt.want.SkipConfirm, opts.SkipConfirm)
+			assert.Equal(t, tt.want.CleanupTag, opts.CleanupTag)
 		})
 	}
 }
 
 func Test_deleteRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		isTTY      bool
-		opts       DeleteOptions
-		wantErr    string
-		wantStdout string
-		wantStderr string
+		name          string
+		isTTY         bool
+		opts          DeleteOptions
+		prompterStubs func(*prompter.PrompterMock)
+		wantErr       string
+		wantStdout    string
+		wantStderr    string
 	}{
+		{
+			name:  "interactive confirm",
+			isTTY: true,
+			opts: DeleteOptions{
+				TagName: "v1.2.3",
+			},
+			wantStdout: "",
+			wantStderr: "✓ Deleted release v1.2.3\n! Note that the v1.2.3 git tag still remains in the repository\n",
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
+					if p == "Delete release v1.2.3 in OWNER/REPO?" {
+						return true, nil
+					}
+					return false, prompter.NoSuchPromptErr(p)
+				}
+			},
+		},
 		{
 			name:  "skipping confirmation",
 			isTTY: true,
 			opts: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: true,
+				CleanupTag:  false,
 			},
 			wantStdout: ``,
 			wantStderr: heredoc.Doc(`
@@ -117,6 +151,31 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
+				CleanupTag:  false,
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+		},
+		{
+			name:  "cleanup-tag & skipping confirmation",
+			isTTY: true,
+			opts: DeleteOptions{
+				TagName:     "v1.2.3",
+				SkipConfirm: true,
+				CleanupTag:  true,
+			},
+			wantStdout: ``,
+			wantStderr: heredoc.Doc(`
+				✓ Deleted release and tag v1.2.3
+			`),
+		},
+		{
+			name:  "cleanup-tag",
+			isTTY: false,
+			opts: DeleteOptions{
+				TagName:     "v1.2.3",
+				SkipConfirm: false,
+				CleanupTag:  true,
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -124,20 +183,28 @@ func Test_deleteRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
+
+			pm := &prompter.PrompterMock{}
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
+			}
 
 			fakeHTTP := &httpmock.Registry{}
-			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StringResponse(`{
+			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", tt.opts.TagName, `{
 				"tag_name": "v1.2.3",
 				"draft": false,
 				"url": "https://api.github.com/repos/OWNER/REPO/releases/23456"
-			}`))
-			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/23456"), httpmock.StatusStringResponse(204, ""))
+			}`)
 
-			tt.opts.IO = io
+			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/23456"), httpmock.StatusStringResponse(204, ""))
+			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags/v1.2.3"), httpmock.StatusStringResponse(204, ""))
+
+			tt.opts.IO = ios
+			tt.opts.Prompter = pm
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}

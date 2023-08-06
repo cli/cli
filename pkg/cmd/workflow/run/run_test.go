@@ -5,8 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -100,16 +101,16 @@ func TestNewCmdRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
+			ios, stdin, _, _ := iostreams.Test()
 			if tt.stdin == "" {
-				io.SetStdinTTY(tt.tty)
+				ios.SetStdinTTY(tt.tty)
 			} else {
 				stdin.WriteString(tt.stdin)
 			}
-			io.SetStdoutTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -122,8 +123,8 @@ func TestNewCmdRun(t *testing.T) {
 			})
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
@@ -148,7 +149,7 @@ func TestNewCmdRun(t *testing.T) {
 }
 
 func Test_magicFieldValue(t *testing.T) {
-	f, err := ioutil.TempFile(t.TempDir(), "gh-test")
+	f, err := os.CreateTemp(t.TempDir(), "gh-test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +157,7 @@ func Test_magicFieldValue(t *testing.T) {
 
 	fmt.Fprint(f, "file contents")
 
-	io, _, _, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 
 	type args struct {
 		v    string
@@ -178,7 +179,7 @@ func Test_magicFieldValue(t *testing.T) {
 			name: "file",
 			args: args{
 				v:    "@" + f.Name(),
-				opts: RunOptions{IO: io},
+				opts: RunOptions{IO: ios},
 			},
 			want:    "file contents",
 			wantErr: false,
@@ -187,7 +188,7 @@ func Test_magicFieldValue(t *testing.T) {
 			name: "file error",
 			args: args{
 				v:    "@",
-				opts: RunOptions{IO: io},
+				opts: RunOptions{IO: ios},
 			},
 			want:    nil,
 			wantErr: true,
@@ -470,6 +471,26 @@ jobs:
 			errOut:  "could not create workflow dispatch event: HTTP 422 (https://api.github.com/repos/OWNER/REPO/actions/workflows/12345/dispatches)",
 		},
 		{
+			name: "yaml file extension",
+			tty:  false,
+			opts: &RunOptions{
+				Selector: "workflow.yaml",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/workflow.yaml"),
+					httpmock.StatusStringResponse(200, `{"id": 12345}`))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
+					httpmock.StatusStringResponse(204, ""))
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{},
+				"ref":    "trunk",
+			},
+			wantErr: false,
+		},
+		{
 			// TODO this test is somewhat silly; it's more of a placeholder in case I decide to handle the API error more elegantly
 			name: "input fields, missing required",
 			opts: &RunOptions{
@@ -618,10 +639,10 @@ jobs:
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return api.InitRepoHostname(&api.Repository{
 				Name:             "REPO",
@@ -631,6 +652,7 @@ jobs:
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
@@ -649,7 +671,7 @@ jobs:
 			if len(reg.Requests) > 0 {
 				lastRequest := reg.Requests[len(reg.Requests)-1]
 				if lastRequest.Method == "POST" {
-					bodyBytes, _ := ioutil.ReadAll(lastRequest.Body)
+					bodyBytes, _ := io.ReadAll(lastRequest.Body)
 					reqBody := make(map[string]interface{})
 					err := json.Unmarshal(bodyBytes, &reqBody)
 					if err != nil {

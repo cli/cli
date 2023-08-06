@@ -8,16 +8,14 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
-// why not just use the config stub argh
 type tinyConfig map[string]string
 
-func (c tinyConfig) GetWithSource(host, key string) (string, string, error) {
-	return c[fmt.Sprintf("%s:%s", host, key)], c["_source"], nil
+func (c tinyConfig) Token(host string) (string, string) {
+	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], c["_source"]
 }
 
-func (c tinyConfig) Get(host, key string) (val string, err error) {
-	val, _, err = c.GetWithSource(host, key)
-	return
+func (c tinyConfig) User(host string) (string, error) {
+	return c[fmt.Sprintf("%s:%s", host, "user")], nil
 }
 
 func Test_helperRun(t *testing.T) {
@@ -171,6 +169,30 @@ func Test_helperRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
+			name: "no username configured",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
+						"example.com:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=x-access-token
+				password=OTOKEN
+			`),
+			wantStderr: "",
+		},
+		{
 			name: "token from env",
 			opts: CredentialOptions{
 				Operation: "get",
@@ -195,13 +217,32 @@ func Test_helperRun(t *testing.T) {
 			`),
 			wantStderr: "",
 		},
+		{
+			name: "noop store operation",
+			opts: CredentialOptions{
+				Operation: "store",
+			},
+		},
+		{
+			name: "noop erase operation",
+			opts: CredentialOptions{
+				Operation: "erase",
+			},
+		},
+		{
+			name: "unknown operation",
+			opts: CredentialOptions{
+				Operation: "unknown",
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, stdout, stderr := iostreams.Test()
+			ios, stdin, stdout, stderr := iostreams.Test()
 			fmt.Fprint(stdin, tt.input)
 			opts := &tt.opts
-			opts.IO = io
+			opts.IO = ios
 			if err := helperRun(opts); (err != nil) != tt.wantErr {
 				t.Fatalf("helperRun() error = %v, wantErr %v", err, tt.wantErr)
 			}

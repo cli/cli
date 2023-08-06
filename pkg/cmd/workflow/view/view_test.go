@@ -2,11 +2,12 @@ package view
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	runShared "github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
@@ -123,12 +124,12 @@ func TestNewCmdView(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -141,8 +142,8 @@ func TestNewCmdView(t *testing.T) {
 			})
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
@@ -175,10 +176,10 @@ func TestViewRun(t *testing.T) {
 
 		Total runs 10
 		Recent runs
-		X  cool commit  timed out    trunk  push  1
-		*  cool commit  in progress  trunk  push  2
-		✓  cool commit  successful   trunk  push  3
-		X  cool commit  cancelled    trunk  push  4
+		X  cool commit  a workflow  trunk  push  1
+		*  cool commit  a workflow  trunk  push  2
+		✓  cool commit  a workflow  trunk  push  3
+		X  cool commit  a workflow  trunk  push  4
 
 		To see more runs for this workflow, try: gh run list --workflow flow.yml
 		To see the YAML for this workflow, try: gh workflow view flow.yml --yaml
@@ -403,16 +404,16 @@ func TestViewRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(tt.tty)
-		io.SetStdinTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(tt.tty)
+		ios.SetStdinTTY(tt.tty)
+		tt.opts.IO = ios
 
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		browser := &cmdutil.TestBrowser{}
+		browser := &browser.Stub{}
 		tt.opts.Browser = browser
 
 		t.Run(tt.name, func(t *testing.T) {

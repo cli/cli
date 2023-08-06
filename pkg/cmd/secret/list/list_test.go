@@ -3,8 +3,8 @@ package list
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -15,7 +15,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -54,13 +53,28 @@ func Test_NewCmdList(t *testing.T) {
 				UserSecrets: true,
 			},
 		},
+		{
+			name: "Dependabot repo",
+			cli:  "--app Dependabot",
+			wants: ListOptions{
+				Application: "Dependabot",
+			},
+		},
+		{
+			name: "Dependabot org",
+			cli:  "--app Dependabot --org UmbrellaCorporation",
+			wants: ListOptions{
+				Application: "Dependabot",
+				OrgName:     "UmbrellaCorporation",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -97,9 +111,10 @@ func Test_listRun(t *testing.T) {
 			tty:  true,
 			opts: &ListOptions{},
 			wantOut: []string{
-				"SECRET_ONE.*Updated 1988-10-11",
-				"SECRET_TWO.*Updated 2020-12-04",
-				"SECRET_THREE.*Updated 1975-11-30",
+				"NAME          UPDATED",
+				"SECRET_ONE    about 34 years ago",
+				"SECRET_TWO    about 2 years ago",
+				"SECRET_THREE  about 47 years ago",
 			},
 		},
 		{
@@ -107,9 +122,9 @@ func Test_listRun(t *testing.T) {
 			tty:  false,
 			opts: &ListOptions{},
 			wantOut: []string{
-				"SECRET_ONE\t1988-10-11",
-				"SECRET_TWO\t2020-12-04",
-				"SECRET_THREE\t1975-11-30",
+				"SECRET_ONE\t1988-10-11T00:00:00Z",
+				"SECRET_TWO\t2020-12-04T00:00:00Z",
+				"SECRET_THREE\t1975-11-30T00:00:00Z",
 			},
 		},
 		{
@@ -119,9 +134,10 @@ func Test_listRun(t *testing.T) {
 				OrgName: "UmbrellaCorporation",
 			},
 			wantOut: []string{
-				"SECRET_ONE.*Updated 1988-10-11.*Visible to all repositories",
-				"SECRET_TWO.*Updated 2020-12-04.*Visible to private repositories",
-				"SECRET_THREE.*Updated 1975-11-30.*Visible to 2 selected repositories",
+				"NAME          UPDATED             VISIBILITY",
+				"SECRET_ONE    about 34 years ago  Visible to all repositories",
+				"SECRET_TWO    about 2 years ago   Visible to private repositories",
+				"SECRET_THREE  about 47 years ago  Visible to 2 selected repositories",
 			},
 		},
 		{
@@ -131,9 +147,9 @@ func Test_listRun(t *testing.T) {
 				OrgName: "UmbrellaCorporation",
 			},
 			wantOut: []string{
-				"SECRET_ONE\t1988-10-11\tALL",
-				"SECRET_TWO\t2020-12-04\tPRIVATE",
-				"SECRET_THREE\t1975-11-30\tSELECTED",
+				"SECRET_ONE\t1988-10-11T00:00:00Z\tALL",
+				"SECRET_TWO\t2020-12-04T00:00:00Z\tPRIVATE",
+				"SECRET_THREE\t1975-11-30T00:00:00Z\tSELECTED",
 			},
 		},
 		{
@@ -143,9 +159,10 @@ func Test_listRun(t *testing.T) {
 				EnvName: "Development",
 			},
 			wantOut: []string{
-				"SECRET_ONE.*Updated 1988-10-11",
-				"SECRET_TWO.*Updated 2020-12-04",
-				"SECRET_THREE.*Updated 1975-11-30",
+				"NAME          UPDATED",
+				"SECRET_ONE    about 34 years ago",
+				"SECRET_TWO    about 2 years ago",
+				"SECRET_THREE  about 47 years ago",
 			},
 		},
 		{
@@ -155,9 +172,9 @@ func Test_listRun(t *testing.T) {
 				EnvName: "Development",
 			},
 			wantOut: []string{
-				"SECRET_ONE\t1988-10-11",
-				"SECRET_TWO\t2020-12-04",
-				"SECRET_THREE\t1975-11-30",
+				"SECRET_ONE\t1988-10-11T00:00:00Z",
+				"SECRET_TWO\t2020-12-04T00:00:00Z",
+				"SECRET_THREE\t1975-11-30T00:00:00Z",
 			},
 		},
 		{
@@ -167,9 +184,10 @@ func Test_listRun(t *testing.T) {
 				UserSecrets: true,
 			},
 			wantOut: []string{
-				"SECRET_ONE.*Updated 1988-10-11.*Visible to 1 selected repository",
-				"SECRET_TWO.*Updated 2020-12-04.*Visible to 2 selected repositories",
-				"SECRET_THREE.*Updated 1975-11-30.*Visible to 3 selected repositories",
+				"NAME          UPDATED             VISIBILITY",
+				"SECRET_ONE    about 34 years ago  Visible to 1 selected repository",
+				"SECRET_TWO    about 2 years ago   Visible to 2 selected repositories",
+				"SECRET_THREE  about 47 years ago  Visible to 3 selected repositories",
 			},
 		},
 		{
@@ -179,9 +197,61 @@ func Test_listRun(t *testing.T) {
 				UserSecrets: true,
 			},
 			wantOut: []string{
-				"SECRET_ONE\t1988-10-11\t",
-				"SECRET_TWO\t2020-12-04\t",
-				"SECRET_THREE\t1975-11-30\t",
+				"SECRET_ONE\t1988-10-11T00:00:00Z\tSELECTED",
+				"SECRET_TWO\t2020-12-04T00:00:00Z\tSELECTED",
+				"SECRET_THREE\t1975-11-30T00:00:00Z\tSELECTED",
+			},
+		},
+		{
+			name: "Dependabot repo tty",
+			tty:  true,
+			opts: &ListOptions{
+				Application: "Dependabot",
+			},
+			wantOut: []string{
+				"NAME          UPDATED",
+				"SECRET_ONE    about 34 years ago",
+				"SECRET_TWO    about 2 years ago",
+				"SECRET_THREE  about 47 years ago",
+			},
+		},
+		{
+			name: "Dependabot repo not tty",
+			tty:  false,
+			opts: &ListOptions{
+				Application: "Dependabot",
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11T00:00:00Z",
+				"SECRET_TWO\t2020-12-04T00:00:00Z",
+				"SECRET_THREE\t1975-11-30T00:00:00Z",
+			},
+		},
+		{
+			name: "Dependabot org tty",
+			tty:  true,
+			opts: &ListOptions{
+				Application: "Dependabot",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantOut: []string{
+				"NAME          UPDATED             VISIBILITY",
+				"SECRET_ONE    about 34 years ago  Visible to all repositories",
+				"SECRET_TWO    about 2 years ago   Visible to private repositories",
+				"SECRET_THREE  about 47 years ago  Visible to 2 selected repositories",
+			},
+		},
+		{
+			name: "Dependabot org not tty",
+			tty:  false,
+			opts: &ListOptions{
+				Application: "Dependabot",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11T00:00:00Z\tALL",
+				"SECRET_TWO\t2020-12-04T00:00:00Z\tPRIVATE",
+				"SECRET_THREE\t1975-11-30T00:00:00Z\tSELECTED",
 			},
 		},
 	}
@@ -189,32 +259,38 @@ func Test_listRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			reg.Verify(t)
 
 			path := "repos/owner/repo/actions/secrets"
 			if tt.opts.EnvName != "" {
 				path = fmt.Sprintf("repos/owner/repo/environments/%s/secrets", tt.opts.EnvName)
+			} else if tt.opts.OrgName != "" {
+				path = fmt.Sprintf("orgs/%s/actions/secrets", tt.opts.OrgName)
 			}
 
 			t0, _ := time.Parse("2006-01-02", "1988-10-11")
 			t1, _ := time.Parse("2006-01-02", "2020-12-04")
 			t2, _ := time.Parse("2006-01-02", "1975-11-30")
-			payload := secretsPayload{}
-			payload.Secrets = []*Secret{
-				{
-					Name:      "SECRET_ONE",
-					UpdatedAt: t0,
-				},
-				{
-					Name:      "SECRET_TWO",
-					UpdatedAt: t1,
-				},
-				{
-					Name:      "SECRET_THREE",
-					UpdatedAt: t2,
+			payload := struct {
+				Secrets []Secret
+			}{
+				Secrets: []Secret{
+					{
+						Name:      "SECRET_ONE",
+						UpdatedAt: t0,
+					},
+					{
+						Name:      "SECRET_TWO",
+						UpdatedAt: t1,
+					},
+					{
+						Name:      "SECRET_THREE",
+						UpdatedAt: t2,
+					},
 				},
 			}
 			if tt.opts.OrgName != "" {
-				payload.Secrets = []*Secret{
+				payload.Secrets = []Secret{
 					{
 						Name:       "SECRET_ONE",
 						UpdatedAt:  t0,
@@ -232,7 +308,6 @@ func Test_listRun(t *testing.T) {
 						SelectedReposURL: fmt.Sprintf("https://api.github.com/orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName),
 					},
 				}
-				path = fmt.Sprintf("orgs/%s/actions/secrets", tt.opts.OrgName)
 
 				if tt.tty {
 					reg.Register(
@@ -244,7 +319,7 @@ func Test_listRun(t *testing.T) {
 			}
 
 			if tt.opts.UserSecrets {
-				payload.Secrets = []*Secret{
+				payload.Secrets = []Secret{
 					{
 						Name:             "SECRET_ONE",
 						UpdatedAt:        t0,
@@ -280,13 +355,17 @@ func Test_listRun(t *testing.T) {
 				}
 			}
 
+			if tt.opts.Application == "Dependabot" {
+				path = strings.Replace(path, "actions", "dependabot", 1)
+			}
+
 			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))
 
-			io, _, stdout, _ := iostreams.Test()
+			ios, _, stdout, _ := iostreams.Test()
 
-			io.SetStdoutTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
 			}
@@ -296,43 +375,36 @@ func Test_listRun(t *testing.T) {
 			tt.opts.Config = func() (config.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
+			tt.opts.Now = func() time.Time {
+				t, _ := time.Parse(time.RFC822, "15 Mar 23 00:00 UTC")
+				return t
+			}
 
 			err := listRun(tt.opts)
 			assert.NoError(t, err)
 
-			reg.Verify(t)
-
-			//nolint:staticcheck // prefer exact matchers over ExpectLines
-			test.ExpectLines(t, stdout.String(), tt.wantOut...)
+			expected := fmt.Sprintf("%s\n", strings.Join(tt.wantOut, "\n"))
+			assert.Equal(t, expected, stdout.String())
 		})
 	}
 }
 
 func Test_getSecrets_pagination(t *testing.T) {
-	var requests []*http.Request
-	var client testClient = func(req *http.Request) (*http.Response, error) {
-		header := make(map[string][]string)
-		if len(requests) == 0 {
-			header["Link"] = []string{`<http://example.com/page/0>; rel="previous", <http://example.com/page/2>; rel="next"`}
-		}
-		requests = append(requests, req)
-		return &http.Response{
-			Request: req,
-			Body:    ioutil.NopCloser(strings.NewReader(`{"secrets":[{},{}]}`)),
-			Header:  header,
-		}, nil
-	}
-
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.QueryMatcher("GET", "path/to", url.Values{"per_page": []string{"100"}}),
+		httpmock.WithHeader(
+			httpmock.StringResponse(`{"secrets":[{},{}]}`),
+			"Link",
+			`<http://example.com/page/0>; rel="previous", <http://example.com/page/2>; rel="next"`),
+	)
+	reg.Register(
+		httpmock.REST("GET", "page/2"),
+		httpmock.StringResponse(`{"secrets":[{},{}]}`),
+	)
+	client := &http.Client{Transport: reg}
 	secrets, err := getSecrets(client, "github.com", "path/to")
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(requests))
 	assert.Equal(t, 4, len(secrets))
-	assert.Equal(t, "https://api.github.com/path/to?per_page=100", requests[0].URL.String())
-	assert.Equal(t, "http://example.com/page/2", requests[1].URL.String())
-}
-
-type testClient func(*http.Request) (*http.Response, error)
-
-func (c testClient) Do(req *http.Request) (*http.Response, error) {
-	return c(req)
 }

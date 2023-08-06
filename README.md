@@ -8,11 +8,13 @@ GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterpr
 
 ## Documentation
 
-[See the manual][manual] for setup and usage instructions.
+For [installation options see below](#installation), for usage instructions [see the manual][manual].
 
 ## Contributing
 
 If anything feels off, or if you feel that some functionality is missing, please check out the [contributing page][contributing]. There you will find instructions for sharing your feedback, building the tool locally, and submitting pull requests to the project.
+
+If you are a hubber and are interested in shipping new commands for the CLI, check out our [doc on internal contributions][intake-doc].
 
 <!-- this anchor is linked to from elsewhere, so avoid renaming it -->
 ## Installation
@@ -49,9 +51,13 @@ Additional Conda installation options available on the [gh-feedstock page](https
 
 ### Linux & BSD
 
-`gh` is available via [Homebrew](#homebrew), [Conda](#conda), [Spack](#spack), and as downloadable binaries from the [releases page][].
+`gh` is available via:
+- [our Debian and RPM repositories](./docs/install_linux.md);
+- community-maintained repositories in various Linux distros;
+- OS-agnostic package managers such as [Homebrew](#homebrew), [Conda](#conda), and [Spack](#spack); and
+- our [releases page][] as precompiled binaries.
 
-For instructions on specific distributions and package managers, see [Linux & BSD installation](./docs/install_linux.md).
+For more information, see [Linux & BSD installation](./docs/install_linux.md).
 
 ### Windows
 
@@ -62,6 +68,9 @@ For instructions on specific distributions and package managers, see [Linux & BS
 | Install:            | Upgrade:            |
 | ------------------- | --------------------|
 | `winget install --id GitHub.cli` | `winget upgrade --id GitHub.cli` |
+
+> **Note**  
+> The Windows installer modifies your PATH. When using Windows Terminal, you will need to **open a new window** for the changes to take effect. (Simply opening a new tab will _not_ be sufficient.)
 
 #### scoop
 
@@ -78,6 +87,16 @@ For instructions on specific distributions and package managers, see [Linux & BS
 #### Signed MSI
 
 MSI installers are available for download on the [releases page][].
+
+### Codespaces
+
+To add GitHub CLI to your codespace, add the following to your [devcontainer file](https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/adding-features-to-a-devcontainer-file):
+
+```json
+"features": {
+  "ghcr.io/devcontainers/features/github-cli:1": {}
+}
+```
 
 ### GitHub Actions
 
@@ -111,3 +130,4 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [contributing]: ./.github/CONTRIBUTING.md
 [gh-vs-hub]: ./docs/gh-vs-hub.md
 [build from source]: ./docs/source.md
+[intake-doc]: ./docs/working-with-us.md

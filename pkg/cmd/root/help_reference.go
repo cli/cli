@@ -11,7 +11,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func referenceHelpFn(io *iostreams.IOStreams) func(*cobra.Command, []string) {
+// longPager provides a pager over a commands Long message.
+// It is currently only used for the reference command
+func longPager(io *iostreams.IOStreams) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
 		wrapWidth := 0
 		if io.IsStdoutTTY() {
@@ -19,7 +21,9 @@ func referenceHelpFn(io *iostreams.IOStreams) func(*cobra.Command, []string) {
 			wrapWidth = io.TerminalWidth()
 		}
 
-		md, err := markdown.Render(cmd.Long, markdown.WithIO(io), markdown.WithWrap(wrapWidth))
+		md, err := markdown.Render(cmd.Long,
+			markdown.WithTheme(io.TerminalTheme()),
+			markdown.WithWrap(wrapWidth))
 		if err != nil {
 			fmt.Fprintln(io.ErrOut, err)
 			return
@@ -36,7 +40,7 @@ func referenceHelpFn(io *iostreams.IOStreams) func(*cobra.Command, []string) {
 	}
 }
 
-func referenceLong(cmd *cobra.Command) string {
+func stringifyReference(cmd *cobra.Command) string {
 	buf := bytes.NewBufferString("# gh reference\n\n")
 	for _, c := range cmd.Commands() {
 		if c.Hidden {

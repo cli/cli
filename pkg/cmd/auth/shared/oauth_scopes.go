@@ -3,7 +3,6 @@ package shared
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -32,6 +31,7 @@ type httpClient interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
+// GetScopes performs a GitHub API request and returns the value of the X-Oauth-Scopes header.
 func GetScopes(httpClient httpClient, hostname, authToken string) (string, error) {
 	apiEndpoint := ghinstance.RESTPrefix(hostname)
 
@@ -50,7 +50,7 @@ func GetScopes(httpClient httpClient, hostname, authToken string) (string, error
 	defer func() {
 		// Ensure the response body is fully read and closed
 		// before we reconnect, so that we reuse the same TCPconnection.
-		_, _ = io.Copy(ioutil.Discard, res.Body)
+		_, _ = io.Copy(io.Discard, res.Body)
 		res.Body.Close()
 	}()
 
@@ -61,12 +61,20 @@ func GetScopes(httpClient httpClient, hostname, authToken string) (string, error
 	return res.Header.Get("X-Oauth-Scopes"), nil
 }
 
+// HasMinimumScopes performs a GitHub API request and returns an error if the token used in the request
+// lacks the minimum required scopes for performing API operations with gh.
 func HasMinimumScopes(httpClient httpClient, hostname, authToken string) error {
 	scopesHeader, err := GetScopes(httpClient, hostname, authToken)
 	if err != nil {
 		return err
 	}
 
+	return HeaderHasMinimumScopes(scopesHeader)
+}
+
+// HeaderHasMinimumScopes parses the comma separated scopesHeader string and returns an error
+// if it lacks the minimum required scopes for performing API operations with gh.
+func HeaderHasMinimumScopes(scopesHeader string) error {
 	if scopesHeader == "" {
 		// if the token reports no scopes, assume that it's an integration token and give up on
 		// detecting its capabilities

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -15,6 +14,11 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
+)
+
+const (
+	notFastForwardErrorMessage     = "Update is not a fast forward"
+	branchDoesNotExistErrorMessage = "Reference does not exist"
 )
 
 type SyncOptions struct {
@@ -35,7 +39,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
-		Git:        &gitExecuter{io: f.IOStreams},
+		Git:        &gitExecuter{client: f.GitClient},
 	}
 
 	cmd := &cobra.Command{
@@ -252,7 +256,7 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	}
 	if currentBranch == branch {
 		if isDirty, err := git.IsDirty(); err == nil && isDirty {
-			return fmt.Errorf("can't sync because there are local changes; please stash them before trying again")
+			return fmt.Errorf("refusing to sync due to uncommitted/untracked local changes\ntip: use `git stash --all` before retrying the sync and run `git stash pop` afterwards")
 		} else if err != nil {
 			return err
 		}
@@ -280,6 +284,13 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	return nil
 }
 
+// ExecuteRemoteRepoSync will take several steps to sync the source and destination repositories.
+// First it will try to use the merge-upstream API endpoint. If this fails due to merge conflicts
+// or unknown merge issues then it will fallback to using the low level git references API endpoint.
+// The reason the fallback is necessary is to better support these error cases. The git references API
+// endpoint allows us to sync repositories that are not fast-forward merge compatible. Additionally,
+// the git references API endpoint gives more detailed error responses as to why the sync failed.
+// Unless the --force flag is specified we will not perform non-fast-forward merges.
 func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interface, opts *SyncOptions) (string, error) {
 	branchName := opts.Branch
 	if branchName == "" {
@@ -313,13 +324,21 @@ func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interfac
 		return "", err
 	}
 
-	// This is not a great way to detect the error returned by the API
-	// Unfortunately API returns 422 for multiple reasons
-	notFastForwardErrorMessage := regexp.MustCompile(`^Update is not a fast forward$`)
+	// Using string comparison is a brittle way to determine the error returned by the API
+	// endpoint but unfortunately the API returns 422 for many reasons so we must
+	// interpret the message provide better error messaging for our users.
 	err = syncFork(client, destRepo, branchName, commit.Object.SHA, opts.Force)
 	var httpErr api.HTTPError
-	if err != nil && errors.As(err, &httpErr) && notFastForwardErrorMessage.MatchString(httpErr.Message) {
-		return "", divergingError
+	if err != nil {
+		if errors.As(err, &httpErr) {
+			switch httpErr.Message {
+			case notFastForwardErrorMessage:
+				return "", divergingError
+			case branchDoesNotExistErrorMessage:
+				return "", fmt.Errorf("%s branch does not exist on %s repository", branchName, ghrepo.FullName(destRepo))
+			}
+		}
+		return "", err
 	}
 
 	return fmt.Sprintf("%s:%s", srcRepo.RepoOwner(), branchName), nil

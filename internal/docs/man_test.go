@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +24,7 @@ func TestGenManDoc(t *testing.T) {
 
 	// We generate on a subcommand so we have both subcommands and parents
 	buf := new(bytes.Buffer)
-	if err := GenMan(echoCmd, header, buf); err != nil {
+	if err := renderMan(echoCmd, header, buf); err != nil {
 		t.Fatal(err)
 	}
 	output := buf.String()
@@ -59,7 +58,7 @@ func TestGenManNoHiddenParents(t *testing.T) {
 		defer func() { f.Hidden = false }()
 	}
 	buf := new(bytes.Buffer)
-	if err := GenMan(echoCmd, header, buf); err != nil {
+	if err := renderMan(echoCmd, header, buf); err != nil {
 		t.Fatal(err)
 	}
 	output := buf.String()
@@ -90,7 +89,7 @@ func TestGenManSeeAlso(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	header := &GenManHeader{}
-	if err := GenMan(rootCmd, header, buf); err != nil {
+	if err := renderMan(rootCmd, header, buf); err != nil {
 		t.Fatal(err)
 	}
 	scanner := bufio.NewScanner(buf)
@@ -116,7 +115,7 @@ func TestManPrintFlagsHidesShortDeprecated(t *testing.T) {
 
 func TestGenManTree(t *testing.T) {
 	c := &cobra.Command{Use: "do [OPTIONS] arg1 arg2"}
-	tmpdir, err := ioutil.TempDir("", "test-gen-man-tree")
+	tmpdir, err := os.MkdirTemp("", "test-gen-man-tree")
 	if err != nil {
 		t.Fatalf("Failed to create tmpdir: %s", err.Error())
 	}
@@ -147,7 +146,7 @@ func assertLineFound(scanner *bufio.Scanner, expectedLine string) error {
 }
 
 func BenchmarkGenManToFile(b *testing.B) {
-	file, err := ioutil.TempFile(b.TempDir(), "")
+	file, err := os.CreateTemp(b.TempDir(), "")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -155,7 +154,7 @@ func BenchmarkGenManToFile(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := GenMan(rootCmd, nil, file); err != nil {
+		if err := renderMan(rootCmd, nil, file); err != nil {
 			b.Fatal(err)
 		}
 	}

@@ -2,13 +2,14 @@ package fork
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
@@ -45,7 +46,7 @@ func TestNewCmdFork(t *testing.T) {
 			name:    "git args without repo",
 			cli:     "-- --foo bar",
 			wantErr: true,
-			errMsg:  "repository argument required when passing 'git clone' flags",
+			errMsg:  "repository argument required when passing git clone flags",
 		},
 		{
 			name: "repo",
@@ -130,7 +131,7 @@ func TestNewCmdFork(t *testing.T) {
 			name:    "git flags in wrong place",
 			cli:     "--depth 1 OWNER/REPO",
 			wantErr: true,
-			errMsg:  "unknown flag: --depth\nSeparate git clone flags with '--'.",
+			errMsg:  "unknown flag: --depth\nSeparate git clone flags with `--`.",
 		},
 		{
 			name: "with fork name",
@@ -146,14 +147,14 @@ func TestNewCmdFork(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
-			io.SetStdoutTTY(tt.tty)
-			io.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
@@ -187,20 +188,22 @@ func TestNewCmdFork(t *testing.T) {
 }
 
 func TestRepoFork(t *testing.T) {
+	forkResult := `{
+		"node_id": "123",
+		"name": "REPO",
+		"clone_url": "https://github.com/someone/repo.git",
+		"created_at": "2011-01-26T19:01:12Z",
+		"owner": {
+			"login": "someone"
+		}
+	}`
+
 	forkPost := func(reg *httpmock.Registry) {
-		forkResult := `{
-			"node_id": "123",
-			"name": "REPO",
-			"clone_url": "https://github.com/someone/repo.git",
-			"created_at": "2011-01-26T19:01:12Z",
-			"owner": {
-				"login": "someone"
-			}
-		}`
 		reg.Register(
 			httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 			httpmock.StringResponse(forkResult))
 	}
+
 	tests := []struct {
 		name       string
 		opts       *ForkOptions
@@ -208,7 +211,7 @@ func TestRepoFork(t *testing.T) {
 		httpStubs  func(*httpmock.Registry)
 		execStubs  func(*run.CommandStubber)
 		askStubs   func(*prompt.AskStubber)
-		cfg        func(config.Config) config.Config
+		cfgStubs   func(*config.ConfigMock)
 		remotes    []*context.Remote
 		wantOut    string
 		wantErrOut string
@@ -232,7 +235,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git remote add -f fork https://github\.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git remote add fork https://github\.com/someone/REPO\.git`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote fork\n",
 		},
@@ -251,13 +254,12 @@ func TestRepoFork(t *testing.T) {
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
 			},
-			cfg: func(c config.Config) config.Config {
-				_ = c.Set("", "git_protocol", "")
-				return c
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("", "git_protocol", "")
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git remote add -f fork git@github\.com:someone/REPO\.git`, 0, "")
+				cs.Register(`git remote add fork git@github\.com:someone/REPO\.git`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote fork\n",
 		},
@@ -287,7 +289,7 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register("git remote rename origin upstream", 0, "")
-				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
+				cs.Register(`git remote add origin https://github.com/someone/REPO.git`, 0, "")
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
@@ -328,6 +330,20 @@ func TestRepoFork(t *testing.T) {
 			errMsg:    "a git remote named 'origin' already exists",
 		},
 		{
+			name: "implicit tty current owner forked",
+			tty:  true,
+			opts: &ForkOptions{
+				Repository: "someone/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "repos/someone/REPO/forks"),
+					httpmock.StringResponse(forkResult))
+			},
+			wantErr: true,
+			errMsg:  "failed to fork: someone/REPO cannot be forked",
+		},
+		{
 			name: "implicit tty already forked",
 			tty:  true,
 			opts: &ForkOptions{
@@ -349,7 +365,7 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register("git remote rename origin upstream", 0, "")
-				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
+				cs.Register(`git remote add origin https://github.com/someone/REPO.git`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote origin\n",
 		},
@@ -391,7 +407,7 @@ func TestRepoFork(t *testing.T) {
 				},
 			},
 			httpStubs:  forkPost,
-			wantErrOut: "someone/REPO already exists",
+			wantErrOut: "someone/REPO already exists\n",
 		},
 		{
 			name: "implicit nontty --remote",
@@ -403,7 +419,7 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register("git remote rename origin upstream", 0, "")
-				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
+				cs.Register(`git remote add origin https://github.com/someone/REPO.git`, 0, "")
 			},
 		},
 		{
@@ -422,7 +438,8 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone --depth 1 https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
 		},
@@ -438,7 +455,7 @@ func TestRepoFork(t *testing.T) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 					func(req *http.Request) (*http.Response, error) {
-						bb, err := ioutil.ReadAll(req.Body)
+						bb, err := io.ReadAll(req.Body)
 						if err != nil {
 							return nil, err
 						}
@@ -446,13 +463,14 @@ func TestRepoFork(t *testing.T) {
 						return &http.Response{
 							Request:    req,
 							StatusCode: 200,
-							Body:       ioutil.NopCloser(bytes.NewBufferString(`{"name":"REPO", "owner":{"login":"gamehendge"}}`)),
+							Body:       io.NopCloser(bytes.NewBufferString(`{"name":"REPO", "owner":{"login":"gamehendge"}}`)),
 						}, nil
 					})
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/gamehendge/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
 			},
 			wantErrOut: "✓ Created fork gamehendge/REPO\n✓ Cloned fork\n",
 		},
@@ -466,7 +484,8 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
 		},
@@ -498,7 +517,8 @@ func TestRepoFork(t *testing.T) {
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
 		},
@@ -519,7 +539,8 @@ func TestRepoFork(t *testing.T) {
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
 			},
 			wantErrOut: "! someone/REPO already exists\n✓ Cloned fork\n",
 		},
@@ -539,7 +560,7 @@ func TestRepoFork(t *testing.T) {
 				},
 			},
 			httpStubs:  forkPost,
-			wantErrOut: "someone/REPO already exists",
+			wantErrOut: "someone/REPO already exists\n",
 		},
 		{
 			name: "repo arg nontty clone arg already exists",
@@ -553,9 +574,10 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
 			},
-			wantErrOut: "someone/REPO already exists",
+			wantErrOut: "someone/REPO already exists\n",
 		},
 		{
 			name: "repo arg nontty clone arg",
@@ -566,7 +588,8 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
 			},
 		},
 		{
@@ -641,73 +664,111 @@ func TestRepoFork(t *testing.T) {
 			},
 			wantErrOut: "✓ Created fork OWNER/REPO\n✓ Renamed fork to OWNER/NEW_REPO\n",
 		},
+		{
+			name: "retries clone up to four times if necessary",
+			opts: &ForkOptions{
+				Repository: "OWNER/REPO",
+				Clone:      true,
+				BackOff:    &backoff.ZeroBackOff{},
+			},
+			httpStubs: forkPost,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git clone https://github.com/someone/REPO\.git`, 128, "")
+				cs.Register(`git clone https://github.com/someone/REPO\.git`, 128, "")
+				cs.Register(`git clone https://github.com/someone/REPO\.git`, 128, "")
+				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
+			},
+		},
+		{
+			name: "does not retry clone if error occurs and exit code is not 128",
+			opts: &ForkOptions{
+				Repository: "OWNER/REPO",
+				Clone:      true,
+				BackOff:    &backoff.ZeroBackOff{},
+			},
+			httpStubs: forkPost,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git clone https://github.com/someone/REPO\.git`, 128, "")
+				cs.Register(`git clone https://github.com/someone/REPO\.git`, 65, "")
+			},
+			wantErr: true,
+			errMsg:  `failed to clone fork: failed to run git: git -c credential.helper= -c credential.helper=!"[^"]+" auth git-credential clone https://github.com/someone/REPO\.git exited with status 65`,
+		},
 	}
 
 	for _, tt := range tests {
-		io, _, stdout, stderr := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		io.SetStderrTTY(tt.tty)
-		tt.opts.IO = io
-
-		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-			return ghrepo.New("OWNER", "REPO"), nil
-		}
-
-		reg := &httpmock.Registry{}
-		if tt.httpStubs != nil {
-			tt.httpStubs(reg)
-		}
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-
-		cfg := config.NewBlankConfig()
-		if tt.cfg != nil {
-			cfg = tt.cfg(cfg)
-		}
-		tt.opts.Config = func() (config.Config, error) {
-			return cfg, nil
-		}
-
-		tt.opts.Remotes = func() (context.Remotes, error) {
-			if tt.remotes == nil {
-				return []*context.Remote{
-					{
-						Remote: &git.Remote{
-							Name:     "origin",
-							FetchURL: &url.URL{},
-						},
-						Repo: ghrepo.New("OWNER", "REPO"),
-					},
-				}, nil
-			}
-			return tt.remotes, nil
-		}
-
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-		cs, restoreRun := run.Stub()
-		defer restoreRun(t)
-		if tt.execStubs != nil {
-			tt.execStubs(cs)
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+			tt.opts.IO = ios
+
+			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			}
+
+			reg := &httpmock.Registry{}
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+
+			cfg := config.NewBlankConfig()
+			if tt.cfgStubs != nil {
+				tt.cfgStubs(cfg)
+			}
+			tt.opts.Config = func() (config.Config, error) {
+				return cfg, nil
+			}
+
+			tt.opts.Remotes = func() (context.Remotes, error) {
+				if tt.remotes == nil {
+					return []*context.Remote{
+						{
+							Remote: &git.Remote{
+								Name:     "origin",
+								FetchURL: &url.URL{},
+							},
+							Repo: ghrepo.New("OWNER", "REPO"),
+						},
+					}, nil
+				}
+				return tt.remotes, nil
+			}
+
+			tt.opts.GitClient = &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
+
+			//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
+			as, teardown := prompt.InitAskStubber()
+			defer teardown()
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
+			cs, restoreRun := run.Stub()
+			defer restoreRun(t)
+			if tt.execStubs != nil {
+				tt.execStubs(cs)
+			}
+
 			if tt.opts.Since == nil {
 				tt.opts.Since = func(t time.Time) time.Duration {
 					return 2 * time.Second
 				}
 			}
+
 			defer reg.Verify(t)
 			err := forkRun(tt.opts)
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
+				assert.Error(t, err, tt.errMsg)
 				return
 			}
 

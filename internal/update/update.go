@@ -1,8 +1,11 @@
 package update
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v3"
 )
@@ -31,13 +32,13 @@ type StateEntry struct {
 }
 
 // CheckForUpdate checks whether this software has had a newer release on GitHub
-func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
+func CheckForUpdate(ctx context.Context, client *http.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
 	stateEntry, _ := getStateEntry(stateFilePath)
 	if stateEntry != nil && time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24 {
 		return nil, nil
 	}
 
-	releaseInfo, err := getLatestReleaseInfo(client, repo)
+	releaseInfo, err := getLatestReleaseInfo(ctx, client, repo)
 	if err != nil {
 		return nil, err
 	}
@@ -54,18 +55,32 @@ func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion stri
 	return nil, nil
 }
 
-func getLatestReleaseInfo(client *api.Client, repo string) (*ReleaseInfo, error) {
-	var latestRelease ReleaseInfo
-	err := client.REST(ghinstance.Default(), "GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease)
+func getLatestReleaseInfo(ctx context.Context, client *http.Client, repo string) (*ReleaseInfo, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo), nil)
 	if err != nil {
 		return nil, err
 	}
-
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		res.Body.Close()
+	}()
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf("unexpected HTTP %d", res.StatusCode)
+	}
+	dec := json.NewDecoder(res.Body)
+	var latestRelease ReleaseInfo
+	if err := dec.Decode(&latestRelease); err != nil {
+		return nil, err
+	}
 	return &latestRelease, nil
 }
 
 func getStateEntry(stateFilePath string) (*StateEntry, error) {
-	content, err := ioutil.ReadFile(stateFilePath)
+	content, err := os.ReadFile(stateFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +106,7 @@ func setStateEntry(stateFilePath string, t time.Time, r ReleaseInfo) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(stateFilePath, content, 0600)
+	err = os.WriteFile(stateFilePath, content, 0600)
 	return err
 }
 

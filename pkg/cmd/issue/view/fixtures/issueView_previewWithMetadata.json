@@ -25,19 +25,19 @@
         "labels": {
           "nodes": [
             {
-              "name": "one"
+              "name": "Closed: Won't Fix"
             },
             {
-              "name": "two"
+              "name": "Status: In Progress"
             },
             {
-              "name": "three"
+              "name": "Type: Bug"
             },
             {
-              "name": "four"
+              "name": "help wanted"
             },
             {
-              "name": "five"
+              "name": "Closed: Duplicate"
             }
           ],
           "totalCount": 5

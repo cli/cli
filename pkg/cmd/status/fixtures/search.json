@@ -1,0 +1,156 @@
+{
+    "data": {
+        "assignments": {
+            "nodes": [
+                {
+                    "updatedAt": "2022-03-15T17:10:25Z",
+                    "__typename": "PullRequest",
+                    "title": "Pin extensions",
+                    "number": 5272,
+                    "repository": {
+                        "nameWithOwner": "cli/cli"
+                    }
+                },
+                {
+                    "updatedAt": "2022-03-01T17:10:25Z",
+                    "__typename": "PullRequest",
+                    "title": "Board up RPD windows",
+                    "number": 73,
+                    "repository": {
+                        "nameWithOwner": "rpd/todo"
+                    }
+                },
+                {
+                    "__typename": "Issue",
+                    "updatedAt": "2022-03-10T21:33:57Z",
+                    "title": "yolo",
+                    "number": 157,
+                    "repository": {
+                        "nameWithOwner": "vilmibm/testing"
+                    }
+                },
+                {
+                    "updatedAt": "2022-01-06T05:05:12Z",
+                    "__typename": "PullRequest",
+                    "title": "Issue Frecency",
+                    "number": 4768,
+                    "repository": {
+                        "nameWithOwner": "cli/cli"
+                    }
+                },
+                {
+                    "__typename": "Issue",
+                    "updatedAt": "2021-08-05T20:03:07Z",
+                    "title": "Reducing zombie threat in Raccoon City",
+                    "number": 514,
+                    "repository": {
+                        "nameWithOwner": "rpd/todo"
+                    }
+                },
+                {
+                    "__typename": "Issue",
+                    "updatedAt": "2021-10-16T23:20:35Z",
+                    "title": "Repo garden for Windows",
+                    "number": 3223,
+                    "repository": {
+                        "nameWithOwner": "cli/cli"
+                    }
+                },
+                {
+                    "__typename": "Issue",
+                    "updatedAt": "2020-11-10T23:07:37Z",
+                    "title": "welp",
+                    "number": 74,
+                    "repository": {
+                        "nameWithOwner": "vilmibm/testing"
+                    }
+                },
+                {
+                    "__typename": "Issue",
+                    "updatedAt": "2019-07-20T01:30:01Z",
+                    "title": "Ability to send emails from helpdesk UI",
+                    "number": 42,
+                    "repository": {
+                        "nameWithOwner": "tildetown/tildetown-admin"
+                    }
+                },
+                {
+                    "__typename": "Issue",
+                    "updatedAt": "2019-07-22T19:37:45Z",
+                    "title": "complete move to class based views",
+                    "number": 22,
+                    "repository": {
+                        "nameWithOwner": "adreyer/arkestrator"
+                    }
+                },
+                {
+                    "__typename": "Issue",
+                    "updatedAt": "2019-02-20T17:54:24Z",
+                    "title": "`(every)` macro",
+                    "number": 145,
+                    "repository": {
+                        "nameWithOwner": "vilmibm/tildemush"
+                    }
+                },
+                {
+                    "__typename": "Issue",
+                    "updatedAt": "2019-02-20T18:10:53Z",
+                    "title": "audit move rules",
+                    "number": 79,
+                    "repository": {
+                        "nameWithOwner": "vilmibm/tildemush"
+                    }
+                }
+            ]
+        },
+        "reviewRequested": {
+            "nodes": [
+                {
+                    "updatedAt": "2022-03-15T17:10:25Z",
+                    "__typename": "PullRequest",
+                    "title": "Pin extensions",
+                    "number": 5272,
+                    "repository": {
+                        "nameWithOwner": "cli/cli"
+                    }
+                },
+                {
+                    "updatedAt": "2022-02-18T19:38:20Z",
+                    "__typename": "PullRequest",
+                    "title": "Foobar",
+                    "number": 1234,
+                    "repository": {
+                        "nameWithOwner": "vilmibm/testing"
+                    }
+                },
+                {
+                    "updatedAt": "2022-02-04T06:56:48Z",
+                    "__typename": "PullRequest",
+                    "title": "Welcome party for Leon",
+                    "number": 50,
+                    "repository": {
+                        "nameWithOwner": "rpd/todo"
+                    }
+                },
+                {
+                    "updatedAt": "2021-12-20T10:30:39Z",
+                    "__typename": "PullRequest",
+                    "title": "Haircut for Leon",
+                    "number": 49,
+                    "repository": {
+                        "nameWithOwner": "rpd/todo"
+                    }
+                },
+                {
+                    "updatedAt": "2021-12-20T16:43:15Z",
+                    "__typename": "PullRequest",
+                    "title": "This pull request adds support for json output the to `gh pr checks` …",
+                    "number": 4671,
+                    "repository": {
+                        "nameWithOwner": "cli/cli"
+                    }
+                }
+            ]
+        }
+    }
+}

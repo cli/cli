@@ -28,6 +28,12 @@ func Test_Remotes_FindByName(t *testing.T) {
 	assert.Error(t, err, "no GitHub remotes found")
 }
 
+type identityTranslator struct{}
+
+func (it identityTranslator) Translate(u *url.URL) *url.URL {
+	return u
+}
+
 func Test_translateRemotes(t *testing.T) {
 	publicURL, _ := url.Parse("https://github.com/monalisa/hello")
 	originURL, _ := url.Parse("http://example.com/repo")
@@ -43,10 +49,7 @@ func Test_translateRemotes(t *testing.T) {
 		},
 	}
 
-	identityURL := func(u *url.URL) *url.URL {
-		return u
-	}
-	result := TranslateRemotes(gitRemotes, identityURL)
+	result := TranslateRemotes(gitRemotes, identityTranslator{})
 
 	if len(result) != 1 {
 		t.Errorf("got %d results", len(result))

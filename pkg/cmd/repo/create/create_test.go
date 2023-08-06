@@ -2,15 +2,18 @@ package create
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/cenkalti/backoff/v4"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,16 +104,44 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr: true,
 			errMsg:   "the `--source` option is not supported with `--clone`, `--template`, `--license`, or `--gitignore`",
 		},
+		{
+			name:     "include all branches without template",
+			cli:      "--source=/path/to/repo --private --include-all-branches",
+			wantsErr: true,
+			errMsg:   "the `--include-all-branches` option is only supported when using `--template`",
+		},
+		{
+			name: "new remote from template with include all branches",
+			cli:  "template-repo --template https://github.com/OWNER/REPO --public --include-all-branches",
+			wantsOpts: CreateOptions{
+				Name:               "template-repo",
+				Public:             true,
+				Template:           "https://github.com/OWNER/REPO",
+				IncludeAllBranches: true,
+			},
+		},
+		{
+			name:     "template with .gitignore",
+			cli:      "template-repo --template mytemplate --gitignore ../.gitignore --public",
+			wantsErr: true,
+			errMsg:   ".gitignore and license templates are not added when template is provided",
+		},
+		{
+			name:     "template with license",
+			cli:      "template-repo --template mytemplate --license ../.license --public",
+			wantsErr: true,
+			errMsg:   ".gitignore and license templates are not added when template is provided",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *CreateOptions
@@ -155,49 +186,67 @@ func TestNewCmdCreate(t *testing.T) {
 
 func Test_createRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		tty        bool
-		opts       *CreateOptions
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		execStubs  func(*run.CommandStubber)
-		wantStdout string
-		wantErr    bool
-		errMsg     string
+		name        string
+		tty         bool
+		opts        *CreateOptions
+		httpStubs   func(*httpmock.Registry)
+		promptStubs func(*prompter.PrompterMock)
+		execStubs   func(*run.CommandStubber)
+		wantStdout  string
+		wantErr     bool
+		errMsg      string
 	}{
 		{
 			name:       "interactive create from scratch with gitignore and license",
 			opts:       &CreateOptions{Interactive: true},
 			tty:        true,
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne("Create a new repository on GitHub from scratch")
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "repoName", Value: "REPO"},
-					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "Private"},
-				})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "addGitIgnore", Value: true}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "chooseGitIgnore", Value: "Go"}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "addLicense", Value: true}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "chooseLicense", Value: "GNU Lesser General Public License v3.0"}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "confirmSubmit", Value: true}})
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(true) //clone locally?
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
+					switch message {
+					case "Would you like to add a README file?":
+						return false, nil
+					case "Would you like to add a .gitignore?":
+						return true, nil
+					case "Would you like to add a license?":
+						return true, nil
+					case `This will create "REPO" as a private repository on GitHub. Continue?`:
+						return defaultValue, nil
+					case "Clone the new repository locally?":
+						return defaultValue, nil
+					default:
+						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
+					}
+				}
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					switch message {
+					case "Repository name":
+						return "REPO", nil
+					case "Description":
+						return "my new repo", nil
+					default:
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Create a new repository on GitHub from scratch")
+					case "Visibility":
+						return prompter.IndexFor(options, "Private")
+					case "Choose a license":
+						return prompter.IndexFor(options, "GNU Lesser General Public License v3.0")
+					case "Choose a .gitignore template":
+						return prompter.IndexFor(options, "Go")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
 				reg.Register(
 					httpmock.REST("GET", "gitignore/templates"),
 					httpmock.StringResponse(`["Actionscript","Android","AppceleratorTitanium","Autotools","Bancha","C","C++","Go"]`))
@@ -214,27 +263,118 @@ func Test_createRun(t *testing.T) {
 			},
 		},
 		{
+			name:       "interactive create from scratch but with prompted owner",
+			opts:       &CreateOptions{Interactive: true},
+			tty:        true,
+			wantStdout: "✓ Created repository org1/REPO on GitHub\n",
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
+					switch message {
+					case "Would you like to add a README file?":
+						return false, nil
+					case "Would you like to add a .gitignore?":
+						return false, nil
+					case "Would you like to add a license?":
+						return false, nil
+					case `This will create "org1/REPO" as a private repository on GitHub. Continue?`:
+						return true, nil
+					case "Clone the new repository locally?":
+						return false, nil
+					default:
+						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
+					}
+				}
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					switch message {
+					case "Repository name":
+						return "REPO", nil
+					case "Description":
+						return "my new repo", nil
+					default:
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "Repository owner":
+						return prompter.IndexFor(options, "org1")
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Create a new repository on GitHub from scratch")
+					case "Visibility":
+						return prompter.IndexFor(options, "Private")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": [{"login": "org1"}, {"login": "org2"}]}}}}`))
+				reg.Register(
+					httpmock.REST("GET", "users/org1"),
+					httpmock.StringResponse(`{"login":"org1","type":"Organization"}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"org1"},
+									"url": "https://github.com/org1/REPO"
+								}
+							}
+						}
+					}`))
+			},
+		},
+		{
 			name: "interactive create from scratch but cancel before submit",
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne("Create a new repository on GitHub from scratch")
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "repoName", Value: "REPO"},
-					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "Private"},
-				})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "addGitIgnore", Value: false}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "addLicense", Value: false}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "confirmSubmit", Value: false}})
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
+					switch message {
+					case "Would you like to add a README file?":
+						return false, nil
+					case "Would you like to add a .gitignore?":
+						return false, nil
+					case "Would you like to add a license?":
+						return false, nil
+					case `This will create "REPO" as a private repository on GitHub. Continue?`:
+						return false, nil
+					default:
+						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
+					}
+				}
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					switch message {
+					case "Repository name":
+						return "REPO", nil
+					case "Description":
+						return "my new repo", nil
+					default:
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Create a new repository on GitHub from scratch")
+					case "Visibility":
+						return prompter.IndexFor(options, "Private")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
 			},
 			wantStdout: "",
 			wantErr:    true,
@@ -244,21 +384,42 @@ func Test_createRun(t *testing.T) {
 			name: "interactive with existing repository public",
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne("Push an existing local repository to GitHub")
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(".")
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "repoName", Value: "REPO"},
-					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "Private"},
-				})
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(false)
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
+					switch message {
+					case "Add a remote?":
+						return false, nil
+					default:
+						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
+					}
+				}
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					switch message {
+					case "Path to local repository":
+						return defaultValue, nil
+					case "Repository name":
+						return "REPO", nil
+					case "Description":
+						return "my new repo", nil
+					default:
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Push an existing local repository to GitHub")
+					case "Visibility":
+						return prompter.IndexFor(options, "Private")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
 				reg.Register(
 					httpmock.GraphQL(`mutation RepositoryCreate\b`),
 					httpmock.StringResponse(`
@@ -282,28 +443,49 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
 		},
 		{
-			name: "interactive with existing repository public add remote",
+			name: "interactive with existing repository public add remote and push",
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne("Push an existing local repository to GitHub")
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(".")
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "repoName", Value: "REPO"},
-					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "Private"},
-				})
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(true) //ask for adding a remote
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne("origin") //ask for remote name
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(false) //ask to push to remote
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
+					switch message {
+					case "Add a remote?":
+						return true, nil
+					case `Would you like to push commits from the current branch to "origin"?`:
+						return true, nil
+					default:
+						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
+					}
+				}
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					switch message {
+					case "Path to local repository":
+						return defaultValue, nil
+					case "Repository name":
+						return "REPO", nil
+					case "Description":
+						return "my new repo", nil
+					case "What should the new remote be called?":
+						return defaultValue, nil
+					default:
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Push an existing local repository to GitHub")
+					case "Visibility":
+						return prompter.IndexFor(options, "Private")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
 				reg.Register(
 					httpmock.GraphQL(`mutation RepositoryCreate\b`),
 					httpmock.StringResponse(`
@@ -324,53 +506,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
 				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
 				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
-			},
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n",
-		},
-		{
-			name: "interactive with existing repository public, add remote, and push",
-			opts: &CreateOptions{Interactive: true},
-			tty:  true,
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne("Push an existing local repository to GitHub")
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(".")
-				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "repoName", Value: "REPO"},
-					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "Private"},
-				})
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(true) //ask for adding a remote
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne("origin") //ask for remote name
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(true) //ask to push to remote
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`mutation RepositoryCreate\b`),
-					httpmock.StringResponse(`
-					{
-						"data": {
-							"createRepository": {
-								"repository": {
-									"id": "REPOID",
-									"name": "REPO",
-									"owner": {"login":"OWNER"},
-									"url": "https://github.com/OWNER/REPO"
-								}
-							}
-						}
-					}`))
-			},
-			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
-				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
-				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
-				cs.Register(`git -C . push -u origin HEAD`, 0, "")
+				cs.Register(`git -C . push --set-upstream origin HEAD`, 0, "")
 			},
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
 		},
@@ -434,13 +570,104 @@ func Test_createRun(t *testing.T) {
 			},
 			wantStdout: "https://github.com/OWNER/REPO\n",
 		},
+		{
+			name: "noninteractive clone from scratch",
+			opts: &CreateOptions{
+				Interactive: false,
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+				Clone:       true,
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git init REPO`, 0, "")
+				cs.Register(`git -C REPO remote add origin https://github.com/OWNER/REPO`, 0, "")
+			},
+			wantStdout: "https://github.com/OWNER/REPO\n",
+		},
+		{
+			name: "noninteractive create from template with retry",
+			opts: &CreateOptions{
+				Interactive: false,
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+				Clone:       true,
+				Template:    "mytemplate",
+				BackOff:     &backoff.ZeroBackOff{},
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				// Test resolving repo owner from repo name only.
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER"}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"id": "REPOID",
+								"defaultBranchRef": {
+									"name": "main"
+								}
+							}
+						}
+					}`, func(s string, m map[string]interface{}) {
+						assert.Equal(t, "OWNER", m["owner"])
+						assert.Equal(t, "mytemplate", m["name"])
+					}),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"id":"OWNERID"}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation CloneTemplateRepository\b`),
+					httpmock.GraphQLMutation(`
+					{
+						"data": {
+							"cloneTemplateRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`, func(m map[string]interface{}) {
+						assert.Equal(t, "REPOID", m["repositoryId"])
+					}))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				// fatal: Remote branch main not found in upstream origin
+				cs.Register(`git clone --branch main https://github.com/OWNER/REPO`, 128, "")
+				cs.Register(`git clone --branch main https://github.com/OWNER/REPO`, 0, "")
+			},
+			wantStdout: "https://github.com/OWNER/REPO\n",
+		},
 	}
 	for _, tt := range tests {
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-		q, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(q)
+		prompterMock := &prompter.PrompterMock{}
+		tt.opts.Prompter = prompterMock
+		if tt.promptStubs != nil {
+			tt.promptStubs(prompterMock)
 		}
 
 		reg := &httpmock.Registry{}
@@ -454,18 +681,23 @@ func Test_createRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		cs, restoreRun := run.Stub()
-		defer restoreRun(t)
-		if tt.execStubs != nil {
-			tt.execStubs(cs)
+		tt.opts.GitClient = &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
 		}
 
-		io, _, stdout, stderr := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
+			cs, restoreRun := run.Stub()
+			defer restoreRun(t)
+			if tt.execStubs != nil {
+				tt.execStubs(cs)
+			}
+
 			defer reg.Verify(t)
 			err := createRun(tt.opts)
 			if tt.wantErr {
@@ -477,46 +709,5 @@ func Test_createRun(t *testing.T) {
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, "", stderr.String())
 		})
-	}
-}
-
-func Test_getModifiedNormalizedName(t *testing.T) {
-	// confirmed using GitHub.com/new
-	tests := []struct {
-		LocalName      string
-		NormalizedName string
-	}{
-		{
-			LocalName:      "cli",
-			NormalizedName: "cli",
-		},
-		{
-			LocalName:      "cli.git",
-			NormalizedName: "cli",
-		},
-		{
-			LocalName:      "@-#$^",
-			NormalizedName: "---",
-		},
-		{
-			LocalName:      "[cli]",
-			NormalizedName: "-cli-",
-		},
-		{
-			LocalName:      "Hello World, I'm a new repo!",
-			NormalizedName: "Hello-World-I-m-a-new-repo-",
-		},
-		{
-			LocalName:      " @E3H*(#$#_$-ZVp,n.7lGq*_eMa-(-zAZSJYg!",
-			NormalizedName: "-E3H-_--ZVp-n.7lGq-_eMa---zAZSJYg-",
-		},
-		{
-			LocalName:      "I'm a crazy .git repo name .git.git .git",
-			NormalizedName: "I-m-a-crazy-.git-repo-name-.git.git-",
-		},
-	}
-	for _, tt := range tests {
-		output := normalizeRepoName(tt.LocalName)
-		assert.Equal(t, tt.NormalizedName, output)
 	}
 }

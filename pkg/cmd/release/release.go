@@ -5,6 +5,7 @@ import (
 	cmdDelete "github.com/cli/cli/v2/pkg/cmd/release/delete"
 	cmdDeleteAsset "github.com/cli/cli/v2/pkg/cmd/release/delete-asset"
 	cmdDownload "github.com/cli/cli/v2/pkg/cmd/release/download"
+	cmdUpdate "github.com/cli/cli/v2/pkg/cmd/release/edit"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/release/list"
 	cmdUpload "github.com/cli/cli/v2/pkg/cmd/release/upload"
 	cmdView "github.com/cli/cli/v2/pkg/cmd/release/view"
@@ -14,22 +15,26 @@ import (
 
 func NewCmdRelease(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "release <command>",
-		Short: "Manage GitHub releases",
-		Annotations: map[string]string{
-			"IsCore": "true",
-		},
+		Use:     "release <command>",
+		Short:   "Manage releases",
+		GroupID: "core",
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)
 
-	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
-	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
-	cmd.AddCommand(cmdDeleteAsset.NewCmdDeleteAsset(f, nil))
-	cmd.AddCommand(cmdDownload.NewCmdDownload(f, nil))
-	cmd.AddCommand(cmdList.NewCmdList(f, nil))
-	cmd.AddCommand(cmdView.NewCmdView(f, nil))
-	cmd.AddCommand(cmdUpload.NewCmdUpload(f, nil))
+	cmdutil.AddGroup(cmd, "General commands",
+		cmdList.NewCmdList(f, nil),
+		cmdCreate.NewCmdCreate(f, nil),
+	)
+
+	cmdutil.AddGroup(cmd, "Targeted commands",
+		cmdView.NewCmdView(f, nil),
+		cmdUpdate.NewCmdEdit(f, nil),
+		cmdUpload.NewCmdUpload(f, nil),
+		cmdDownload.NewCmdDownload(f, nil),
+		cmdDelete.NewCmdDelete(f, nil),
+		cmdDeleteAsset.NewCmdDeleteAsset(f, nil),
+	)
 
 	return cmd
 }

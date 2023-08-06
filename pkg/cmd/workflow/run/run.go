@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"sort"
@@ -97,7 +97,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			}
 
 			if opts.JSON && !opts.IO.IsStdinTTY() {
-				jsonIn, err := ioutil.ReadAll(opts.IO.In)
+				jsonIn, err := io.ReadAll(opts.IO.In)
 				if err != nil {
 					return errors.New("failed to read from STDIN")
 				}
@@ -127,6 +127,8 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a string parameter in `key=value` format, respecting @ syntax")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Read workflow inputs as JSON via STDIN")
+
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "ref")
 
 	return cmd
 }
@@ -230,6 +232,7 @@ func collectInputs(yamlContent []byte) (map[string]string, error) {
 	inputAnswer := InputAnswer{
 		providedInputs: providedInputs,
 	}
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err = prompt.SurveyAsk(qs, &inputAnswer)
 	if err != nil {
 		return nil, err
@@ -247,7 +250,7 @@ func runRun(opts *RunOptions) error {
 
 	repo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
+		return err
 	}
 
 	ref := opts.Ref

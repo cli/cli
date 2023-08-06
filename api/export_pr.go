@@ -19,6 +19,14 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 			data[f] = issue.Labels.Nodes
 		case "projectCards":
 			data[f] = issue.ProjectCards.Nodes
+		case "projectItems":
+			items := make([]map[string]interface{}, 0, len(issue.ProjectItems.Nodes))
+			for _, n := range issue.ProjectItems.Nodes {
+				items = append(items, map[string]interface{}{
+					"title": n.Project.Title,
+				})
+			}
+			data[f] = items
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
@@ -38,7 +46,30 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 			data[f] = pr.HeadRepository
 		case "statusCheckRollup":
 			if n := pr.StatusCheckRollup.Nodes; len(n) > 0 {
-				data[f] = n[0].Commit.StatusCheckRollup.Contexts.Nodes
+				checks := make([]interface{}, 0, len(n[0].Commit.StatusCheckRollup.Contexts.Nodes))
+				for _, c := range n[0].Commit.StatusCheckRollup.Contexts.Nodes {
+					if c.TypeName == "CheckRun" {
+						checks = append(checks, map[string]interface{}{
+							"__typename":   c.TypeName,
+							"name":         c.Name,
+							"workflowName": c.CheckSuite.WorkflowRun.Workflow.Name,
+							"status":       c.Status,
+							"conclusion":   c.Conclusion,
+							"startedAt":    c.StartedAt,
+							"completedAt":  c.CompletedAt,
+							"detailsUrl":   c.DetailsURL,
+						})
+					} else {
+						checks = append(checks, map[string]interface{}{
+							"__typename": c.TypeName,
+							"context":    c.Context,
+							"state":      c.State,
+							"targetUrl":  c.TargetURL,
+							"startedAt":  c.CreatedAt,
+						})
+					}
+				}
+				data[f] = checks
 			} else {
 				data[f] = nil
 			}
@@ -73,6 +104,14 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 			data[f] = pr.Labels.Nodes
 		case "projectCards":
 			data[f] = pr.ProjectCards.Nodes
+		case "projectItems":
+			items := make([]map[string]interface{}, 0, len(pr.ProjectItems.Nodes))
+			for _, n := range pr.ProjectItems.Nodes {
+				items = append(items, map[string]interface{}{
+					"title": n.Project.Title,
+				})
+			}
+			data[f] = items
 		case "reviews":
 			data[f] = pr.Reviews.Nodes
 		case "latestReviews":

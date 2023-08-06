@@ -14,7 +14,8 @@ import (
 const tokenUser = "x-access-token"
 
 type config interface {
-	GetWithSource(string, string) (string, string, error)
+	Token(string) (string, string)
+	User(string) (string, error)
 }
 
 type CredentialOptions struct {
@@ -28,7 +29,11 @@ func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *
 	opts := &CredentialOptions{
 		IO: f.IOStreams,
 		Config: func() (config, error) {
-			return f.Config()
+			cfg, err := f.Config()
+			if err != nil {
+				return nil, err
+			}
+			return cfg.Authentication(), nil
 		},
 	}
 
@@ -53,7 +58,12 @@ func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *
 func helperRun(opts *CredentialOptions) error {
 	if opts.Operation == "store" {
 		// We pretend to implement the "store" operation, but do nothing since we already have a cached token.
-		return cmdutil.SilentError
+		return nil
+	}
+
+	if opts.Operation == "erase" {
+		// We pretend to implement the "erase" operation, but do nothing since we don't want git to cause user to be logged out.
+		return nil
 	}
 
 	if opts.Operation != "get" {
@@ -102,16 +112,19 @@ func helperRun(opts *CredentialOptions) error {
 
 	lookupHost := wants["host"]
 	var gotUser string
-	gotToken, source, _ := cfg.GetWithSource(lookupHost, "oauth_token")
+	gotToken, source := cfg.Token(lookupHost)
 	if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
 		lookupHost = strings.TrimPrefix(lookupHost, "gist.")
-		gotToken, source, _ = cfg.GetWithSource(lookupHost, "oauth_token")
+		gotToken, source = cfg.Token(lookupHost)
 	}
 
 	if strings.HasSuffix(source, "_TOKEN") {
 		gotUser = tokenUser
 	} else {
-		gotUser, _, _ = cfg.GetWithSource(lookupHost, "user")
+		gotUser, _ = cfg.User(lookupHost)
+		if gotUser == "" {
+			gotUser = tokenUser
+		}
 	}
 
 	if gotUser == "" || gotToken == "" {

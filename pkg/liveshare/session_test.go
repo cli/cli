@@ -10,16 +10,13 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	livesharetest "github.com/cli/cli/v2/pkg/liveshare/test"
 	"github.com/sourcegraph/jsonrpc2"
 )
 
-const mockClientName = "liveshare-client"
-
 func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server, *Session, error) {
-	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
+	joinWorkspace := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}
 	const sessionToken = "session-token"
@@ -34,7 +31,6 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 	}
 
 	session, err := Connect(context.Background(), Options{
-		ClientName:     mockClientName,
 		SessionID:      "session-id",
 		SessionToken:   sessionToken,
 		RelayEndpoint:  "sb" + strings.TrimPrefix(testServer.URL(), "https"),
@@ -51,17 +47,20 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 
 func TestServerStartSharing(t *testing.T) {
 	serverPort, serverProtocol := 2222, "sshd"
-	startSharing := func(req *jsonrpc2.Request) (interface{}, error) {
+	sendNotification := make(chan portUpdateNotification)
+	startSharing := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		var args []interface{}
 		if err := json.Unmarshal(*req.Params, &args); err != nil {
-			return nil, fmt.Errorf("error unmarshaling request: %w", err)
+			return nil, fmt.Errorf("error unmarshalling request: %w", err)
 		}
 		if len(args) < 3 {
 			return nil, errors.New("not enough arguments to start sharing")
 		}
-		if port, ok := args[0].(float64); !ok {
+		port, ok := args[0].(float64)
+		if !ok {
 			return nil, errors.New("port argument is not an int")
-		} else if port != float64(serverPort) {
+		}
+		if port != float64(serverPort) {
 			return nil, errors.New("port does not match serverPort")
 		}
 		if protocol, ok := args[1].(string); !ok {
@@ -73,6 +72,13 @@ func TestServerStartSharing(t *testing.T) {
 			return nil, errors.New("browse url is not a string")
 		} else if browseURL != fmt.Sprintf("http://localhost:%d", serverPort) {
 			return nil, errors.New("browseURL does not match expected")
+		}
+		sendNotification <- portUpdateNotification{
+			PortNotification: PortNotification{
+				Port:       int(port),
+				ChangeKind: PortChangeKindStart,
+			},
+			conn: conn,
 		}
 		return Port{StreamName: "stream-name", StreamCondition: "stream-condition"}, nil
 	}
@@ -86,9 +92,14 @@ func TestServerStartSharing(t *testing.T) {
 	}
 	ctx := context.Background()
 
+	go func() {
+		notif := <-sendNotification
+		_, _ = notif.conn.DispatchCall(context.Background(), "serverSharing.sharingSucceeded", notif)
+	}()
+
 	done := make(chan error)
 	go func() {
-		streamID, err := session.startSharing(ctx, serverProtocol, serverPort)
+		streamID, err := session.StartSharing(ctx, serverProtocol, serverPort)
 		if err != nil {
 			done <- fmt.Errorf("error sharing server: %w", err)
 		}
@@ -114,7 +125,7 @@ func TestServerGetSharedServers(t *testing.T) {
 		StreamName:      "stream-name",
 		StreamCondition: "stream-condition",
 	}
-	getSharedServers := func(req *jsonrpc2.Request) (interface{}, error) {
+	getSharedServers := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		return []*Port{&sharedServer}, nil
 	}
 	testServer, session, err := makeMockSession(
@@ -157,7 +168,7 @@ func TestServerGetSharedServers(t *testing.T) {
 }
 
 func TestServerUpdateSharedServerPrivacy(t *testing.T) {
-	updateSharedVisibility := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+	updateSharedVisibility := func(conn *jsonrpc2.Conn, rpcReq *jsonrpc2.Request) (interface{}, error) {
 		var req []interface{}
 		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
 			return nil, fmt.Errorf("unmarshal req: %w", err)
@@ -204,7 +215,7 @@ func TestServerUpdateSharedServerPrivacy(t *testing.T) {
 }
 
 func TestInvalidHostKey(t *testing.T) {
-	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
+	joinWorkspace := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}
 	const sessionToken = "session-token"
@@ -232,156 +243,11 @@ func TestInvalidHostKey(t *testing.T) {
 func TestKeepAliveNonBlocking(t *testing.T) {
 	session := &Session{keepAliveReason: make(chan string, 1)}
 	for i := 0; i < 2; i++ {
-		session.keepAlive("io")
+		session.KeepAlive("io")
 	}
 
-	// if keepAlive blocks, we'll never reach this and timeout the test
+	// if KeepAlive blocks, we'll never reach this and timeout the test
 	// timing out
-}
-
-func TestNotifyHostOfActivity(t *testing.T) {
-	notifyHostOfActivity := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
-		var req []interface{}
-		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
-			return nil, fmt.Errorf("unmarshal req: %w", err)
-		}
-		if len(req) < 2 {
-			return nil, errors.New("request arguments is less than 2")
-		}
-
-		if clientName, ok := req[0].(string); ok {
-			if clientName != mockClientName {
-				return nil, fmt.Errorf(
-					"unexpected clientName param, expected: %q, got: %q", mockClientName, clientName,
-				)
-			}
-		} else {
-			return nil, errors.New("clientName param is not a string")
-		}
-
-		if acs, ok := req[1].([]interface{}); ok {
-			if fmt.Sprintf("%s", acs) != "[input]" {
-				return nil, fmt.Errorf("unexpected activities param, expected: [input], got: %s", acs)
-			}
-		} else {
-			return nil, errors.New("activities param is not a slice")
-		}
-
-		return nil, nil
-	}
-	svc := livesharetest.WithService(
-		"ICodespaceHostService.notifyCodespaceOfClientActivity", notifyHostOfActivity,
-	)
-	testServer, session, err := makeMockSession(svc)
-	if err != nil {
-		t.Fatalf("creating mock session: %v", err)
-	}
-	defer testServer.Close()
-	ctx := context.Background()
-	done := make(chan error)
-	go func() {
-		done <- session.notifyHostOfActivity(ctx, "input")
-	}()
-	select {
-	case err := <-testServer.Err():
-		t.Errorf("error from server: %v", err)
-	case err := <-done:
-		if err != nil {
-			t.Errorf("error from client: %v", err)
-		}
-	}
-}
-
-func TestSessionHeartbeat(t *testing.T) {
-	var (
-		requestsMu sync.Mutex
-		requests   int
-		wg         sync.WaitGroup
-	)
-	wg.Add(1)
-	notifyHostOfActivity := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
-		defer wg.Done()
-		requestsMu.Lock()
-		requests++
-		requestsMu.Unlock()
-
-		var req []interface{}
-		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
-			return nil, fmt.Errorf("unmarshal req: %w", err)
-		}
-		if len(req) < 2 {
-			return nil, errors.New("request arguments is less than 2")
-		}
-
-		if clientName, ok := req[0].(string); ok {
-			if clientName != mockClientName {
-				return nil, fmt.Errorf(
-					"unexpected clientName param, expected: %q, got: %q", mockClientName, clientName,
-				)
-			}
-		} else {
-			return nil, errors.New("clientName param is not a string")
-		}
-
-		if acs, ok := req[1].([]interface{}); ok {
-			if fmt.Sprintf("%s", acs) != "[input]" {
-				return nil, fmt.Errorf("unexpected activities param, expected: [input], got: %s", acs)
-			}
-		} else {
-			return nil, errors.New("activities param is not a slice")
-		}
-
-		return nil, nil
-	}
-	svc := livesharetest.WithService(
-		"ICodespaceHostService.notifyCodespaceOfClientActivity", notifyHostOfActivity,
-	)
-	testServer, session, err := makeMockSession(svc)
-	if err != nil {
-		t.Fatalf("creating mock session: %v", err)
-	}
-	defer testServer.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	done := make(chan struct{})
-
-	logger := newMockLogger()
-	session.logger = logger
-
-	go session.heartbeat(ctx, 50*time.Millisecond)
-	go func() {
-		session.keepAlive("input")
-		wg.Wait()
-		wg.Add(1)
-		session.keepAlive("input")
-		wg.Wait()
-		done <- struct{}{}
-	}()
-
-	select {
-	case err := <-testServer.Err():
-		t.Errorf("error from server: %v", err)
-	case <-done:
-		activityCount := strings.Count(logger.String(), "input")
-		// by design keepAlive can drop requests, and therefore there is zero guarantee
-		// that we actually get two requests if the network happened to be slow (rarely)
-		// during testing.
-		if activityCount != 1 && activityCount != 2 {
-			t.Errorf("unexpected number of activities, expected: 1-2, got: %d", activityCount)
-		}
-
-		requestsMu.Lock()
-		rc := requests
-		requestsMu.Unlock()
-		// though this could be also dropped, the sync.WaitGroup above guarantees
-		// that it gets called a second time.
-		if rc != 2 {
-			t.Errorf("unexpected number of requests, expected: 2, got: %d", requests)
-		}
-		return
-	}
 }
 
 type mockLogger struct {

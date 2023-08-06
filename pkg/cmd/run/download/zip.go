@@ -16,14 +16,9 @@ const (
 )
 
 func extractZip(zr *zip.Reader, destDir string) error {
-	destDirAbs, err := filepath.Abs(destDir)
-	if err != nil {
-		return err
-	}
-	pathPrefix := destDirAbs + string(filepath.Separator)
 	for _, zf := range zr.File {
-		fpath := filepath.Join(destDirAbs, filepath.FromSlash(zf.Name))
-		if !strings.HasPrefix(fpath, pathPrefix) {
+		fpath := filepath.Join(destDir, filepath.FromSlash(zf.Name))
+		if !filepathDescendsFrom(fpath, destDir) {
 			continue
 		}
 		if err := extractZipFile(zf, fpath); err != nil {
@@ -33,32 +28,39 @@ func extractZip(zr *zip.Reader, destDir string) error {
 	return nil
 }
 
-func extractZipFile(zf *zip.File, dest string) error {
+func extractZipFile(zf *zip.File, dest string) (extractErr error) {
 	zm := zf.Mode()
 	if zm.IsDir() {
-		return os.MkdirAll(dest, dirMode)
+		extractErr = os.MkdirAll(dest, dirMode)
+		return
 	}
 
-	f, err := zf.Open()
-	if err != nil {
-		return err
+	var f io.ReadCloser
+	f, extractErr = zf.Open()
+	if extractErr != nil {
+		return
 	}
 	defer f.Close()
 
 	if dir := filepath.Dir(dest); dir != "." {
-		if err := os.MkdirAll(dir, dirMode); err != nil {
-			return err
+		if extractErr = os.MkdirAll(dir, dirMode); extractErr != nil {
+			return
 		}
 	}
 
-	df, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, getPerm(zm))
-	if err != nil {
-		return err
+	var df *os.File
+	if df, extractErr = os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, getPerm(zm)); extractErr != nil {
+		return
 	}
-	defer df.Close()
 
-	_, err = io.Copy(df, f)
-	return err
+	defer func() {
+		if err := df.Close(); extractErr == nil && err != nil {
+			extractErr = err
+		}
+	}()
+
+	_, extractErr = io.Copy(df, f)
+	return
 }
 
 func getPerm(m os.FileMode) os.FileMode {
@@ -66,4 +68,16 @@ func getPerm(m os.FileMode) os.FileMode {
 		return fileMode
 	}
 	return execMode
+}
+
+func filepathDescendsFrom(p, dir string) bool {
+	p = filepath.Clean(p)
+	dir = filepath.Clean(dir)
+	if dir == "." && !filepath.IsAbs(p) {
+		return !strings.HasPrefix(p, ".."+string(filepath.Separator))
+	}
+	if !strings.HasSuffix(dir, string(filepath.Separator)) {
+		dir += string(filepath.Separator)
+	}
+	return strings.HasPrefix(p, dir)
 }

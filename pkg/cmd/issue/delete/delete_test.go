@@ -2,7 +2,7 @@ package delete
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"testing"
@@ -19,13 +19,13 @@ import (
 )
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -46,8 +46,8 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -76,10 +76,43 @@ func TestIssueDelete(t *testing.T) {
 			}),
 	)
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("You're going to delete issue #13. This action cannot be reversed. To confirm, type the issue number:").AnswerWith("13")
 
 	output, err := runCommand(httpRegistry, true, "13")
+	if err != nil {
+		t.Fatalf("error running command `issue delete`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Deleted issue #13 \(The title of the issue\)`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestIssueDelete_confirm(t *testing.T) {
+	httpRegistry := &httpmock.Registry{}
+	defer httpRegistry.Verify(t)
+
+	httpRegistry.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"hasIssuesEnabled": true,
+				"issue": { "id": "THE-ID", "number": 13, "title": "The title of the issue"}
+			} } }`),
+	)
+	httpRegistry.Register(
+		httpmock.GraphQL(`mutation IssueDelete\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["issueId"], "THE-ID")
+			}),
+	)
+
+	output, err := runCommand(httpRegistry, true, "13 --confirm")
 	if err != nil {
 		t.Fatalf("error running command `issue delete`: %v", err)
 	}
@@ -104,6 +137,7 @@ func TestIssueDelete_cancel(t *testing.T) {
 			} } }`),
 	)
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("You're going to delete issue #13. This action cannot be reversed. To confirm, type the issue number:").AnswerWith("14")
 

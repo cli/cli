@@ -64,7 +64,7 @@ func runEnable(opts *EnableOptions) error {
 
 	repo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
+		return err
 	}
 
 	states := []shared.WorkflowState{shared.DisabledManually, shared.DisabledInactivity}

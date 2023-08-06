@@ -11,7 +11,8 @@
             "isFork": false,
             "isPrivate": false,
             "isArchived": false,
-            "pushedAt": "2021-02-19T06:34:58Z"
+            "pushedAt": "2021-02-19T06:34:58Z",
+            "visibility": "PUBLIC"
           },
           {
             "nameWithOwner": "octocat/cli",
@@ -19,7 +20,8 @@
             "isFork": true,
             "isPrivate": false,
             "isArchived": false,
-            "pushedAt": "2021-02-19T06:06:06Z"
+            "pushedAt": "2021-02-19T06:06:06Z",
+            "visibility": "PUBLIC"
           },
           {
             "nameWithOwner": "octocat/testing",
@@ -27,7 +29,8 @@
             "isFork": false,
             "isPrivate": true,
             "isArchived": false,
-            "pushedAt": "2021-02-11T22:32:05Z"
+            "pushedAt": "2021-02-11T22:32:05Z",
+            "visibility": "PRIVATE"
           }
         ],
         "pageInfo": {

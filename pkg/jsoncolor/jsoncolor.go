@@ -1,6 +1,7 @@
 package jsoncolor
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -49,7 +50,7 @@ func Write(w io.Writer, r io.Reader, indent string) error {
 				fmt.Fprintf(w, "\x1b[%sm%s\x1b[m", colorDelim, tt)
 			}
 		default:
-			b, err := json.Marshal(tt)
+			b, err := marshalJSON(tt)
 			if err != nil {
 				return err
 			}
@@ -93,4 +94,20 @@ func Write(w io.Writer, r io.Reader, indent string) error {
 	}
 
 	return nil
+}
+
+// marshalJSON works like json.Marshal but with HTML-escaping disabled
+func marshalJSON(v interface{}) ([]byte, error) {
+	buf := bytes.Buffer{}
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	bb := buf.Bytes()
+	// omit trailing newline added by json.Encoder
+	if len(bb) > 0 && bb[len(bb)-1] == '\n' {
+		return bb[:len(bb)-1], nil
+	}
+	return bb, nil
 }

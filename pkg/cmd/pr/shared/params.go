@@ -8,7 +8,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/githubsearch"
+	"github.com/cli/cli/v2/pkg/search"
 	"github.com/google/shlex"
 )
 
@@ -43,6 +43,11 @@ func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, ba
 	}
 	u.RawQuery = q.Encode()
 	return u.String(), nil
+}
+
+// Maximum length of a URL: 8192 bytes
+func ValidURL(urlStr string) bool {
+	return len(urlStr) < 8192
 }
 
 // Ensure that tb.MetadataResult object exists and contains enough pre-fetched API data to be able
@@ -105,11 +110,12 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	}
 	params["labelIds"] = labelIDs
 
-	projectIDs, err := tb.MetadataResult.ProjectsToIDs(tb.Projects)
+	projectIDs, projectV2IDs, err := tb.MetadataResult.ProjectsToIDs(tb.Projects)
 	if err != nil {
 		return fmt.Errorf("could not add to project: %w", err)
 	}
 	params["projectIds"] = projectIDs
+	params["projectV2Ids"] = projectV2IDs
 
 	if len(tb.Milestones) > 0 {
 		milestoneID, err := tb.MetadataResult.MilestoneToID(tb.Milestones[0])
@@ -149,18 +155,19 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 }
 
 type FilterOptions struct {
-	Entity     string
-	State      string
 	Assignee   string
-	Labels     []string
 	Author     string
 	BaseBranch string
+	Draft      *bool
+	Entity     string
+	Fields     []string
 	HeadBranch string
+	Labels     []string
 	Mention    string
 	Milestone  string
+	Repo       string
 	Search     string
-	Draft      string
-	Fields     []string
+	State      string
 }
 
 func (opts *FilterOptions) IsDefault() bool {
@@ -208,49 +215,31 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 }
 
 func SearchQueryBuild(options FilterOptions) string {
-	q := githubsearch.NewQuery()
-	switch options.Entity {
-	case "issue":
-		q.SetType(githubsearch.Issue)
-	case "pr":
-		q.SetType(githubsearch.PullRequest)
-	}
-
+	var is, state string
 	switch options.State {
-	case "open":
-		q.SetState(githubsearch.Open)
-	case "closed":
-		q.SetState(githubsearch.Closed)
+	case "open", "closed":
+		state = options.State
 	case "merged":
-		q.SetState(githubsearch.Merged)
+		is = "merged"
 	}
-
-	if options.Assignee != "" {
-		q.AssignedTo(options.Assignee)
-	}
-	for _, label := range options.Labels {
-		q.AddLabel(label)
-	}
-	if options.Author != "" {
-		q.AuthoredBy(options.Author)
-	}
-	if options.BaseBranch != "" {
-		q.SetBaseBranch(options.BaseBranch)
-	}
-	if options.HeadBranch != "" {
-		q.SetHeadBranch(options.HeadBranch)
-	}
-	if options.Mention != "" {
-		q.Mentions(options.Mention)
-	}
-	if options.Milestone != "" {
-		q.InMilestone(options.Milestone)
+	q := search.Query{
+		Qualifiers: search.Qualifiers{
+			Assignee:  options.Assignee,
+			Author:    options.Author,
+			Base:      options.BaseBranch,
+			Draft:     options.Draft,
+			Head:      options.HeadBranch,
+			Label:     options.Labels,
+			Mentions:  options.Mention,
+			Milestone: options.Milestone,
+			Repo:      []string{options.Repo},
+			State:     state,
+			Is:        []string{is},
+			Type:      options.Entity,
+		},
 	}
 	if options.Search != "" {
-		q.AddQuery(options.Search)
-	}
-	if options.Draft != "" {
-		q.SetDraft(options.Draft)
+		return fmt.Sprintf("%s %s", options.Search, q.String())
 	}
 	return q.String()
 }

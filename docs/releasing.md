@@ -1,36 +1,40 @@
 # Releasing
 
-Our build system automatically compiles and attaches cross-platform binaries to any git tag named `vX.Y.Z`. The changelog is [generated from git commit log](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes).
+To initiate a new production deployment:
+```sh
+script/release vX.Y.Z
+```
+See `script/release --help` for more information.
 
-Users who run official builds of `gh` on their machines will get notified about the new version within a 24 hour period.
+> **Note:**  
+> Every production release will request an approval by the select few people before it can proceed.
 
-To test out the build system, publish a prerelease tag with a name such as `vX.Y.Z-pre.0` or `vX.Y.Z-rc.1`. Note that such a release will still be public, but it will be marked as a "prerelease", meaning that it will never show up as a "latest" release nor trigger upgrade notifications for users.
+What this does is:
+- Builds Linux binaries on Ubuntu;
+- Builds and signs Windows binaries on Windows;
+- Builds, signs, and notarizes macOS binaries on macOS;
+- Uploads all release artifacts to a new GitHub Release;
+- A new git tag `vX.Y.Z` is created in the remote repository;
+- The changelog is [generated from the list of merged pull requests](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes);
+- Updates cli.github.com with the contents of the new release;
+- Updates our Homebrew formula in the homebrew-core repo.
+
+To test out the build system while avoiding creating an actual release:
+```sh
+script/release --staging vX.Y.Z --branch patch-1 -p macos
+```
+The build artifacts will be available via `gh run download <RUN> -n macos`.
 
 ## General guidelines
 
 * Features to be released should be reviewed and approved at least one day prior to the release.
 * Feature releases should bump up the minor version number.
+* Breaking releases should bump up the major version number. These should generally be rare.
 
-## Tagging a new release
-
-1. `git tag v1.2.3 && git push origin v1.2.3`
-2. Wait several minutes for builds to run: <https://github.com/cli/cli/actions>
-3. Verify release is displayed and has correct assets: <https://github.com/cli/cli/releases>
-4. Scan generated release notes and optionally add a human touch by grouping items under topic sections
-5. Verify the marketing site was updated: <https://cli.github.com>
-6. (Optional) Delete any pre-releases related to this release
-
-A successful build will result in changes across several repositories:
-* <https://github.com/github/cli.github.com>
-* <https://github.com/Homebrew/homebrew-core/pulls>
-* <https://github.com/cli/scoop-gh>
-
-If the build fails, there is not a clean way to re-run it. The easiest way would be to start over by deleting the partial release on GitHub and re-publishing the tag. Note that this might be disruptive to users or tooling that were already notified about an upgrade. If a functional release and its binaries are already out there, it might be better to try to manually fix up only the specific workflow tasks that failed. Use your best judgement depending on the failure type.
-
-## Release locally for debugging
+## Test the build system locally
 
 A local release can be created for testing without creating anything official on the release page.
 
 1. Make sure GoReleaser is installed: `brew install goreleaser`
-2. `goreleaser --skip-validate --skip-publish --rm-dist`
+2. `script/release --local`
 3. Find the built products under `dist/`.

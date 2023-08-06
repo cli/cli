@@ -22,7 +22,7 @@ func TestListRun(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name: "list tty",
+			name: "list authentication and signing keys; in tty",
 			opts: ListOptions{
 				HTTPClient: func() (*http.Client, error) {
 					createdAt := time.Now().Add(time.Duration(-24) * time.Hour)
@@ -44,18 +44,31 @@ func TestListRun(t *testing.T) {
 							}
 						]`, createdAt.Format(time.RFC3339))),
 					)
+					reg.Register(
+						httpmock.REST("GET", "user/ssh_signing_keys"),
+						httpmock.StringResponse(fmt.Sprintf(`[
+							{
+								"id": 321,
+								"key": "ssh-rsa AAAABbBB123",
+								"title": "Mac Signing",
+								"created_at": "%[1]s"
+							}
+						]`, createdAt.Format(time.RFC3339))),
+					)
 					return &http.Client{Transport: reg}, nil
 				},
 			},
 			isTTY: true,
 			wantStdout: heredoc.Doc(`
-				Mac            ssh-rsa AAAABbBB123  1d
-				hubot@Windows  ssh-rsa EEEEEEEK247  1d
+				TITLE          ID    KEY                  TYPE            ADDED
+				Mac            1234  ssh-rsa AAAABbBB123  authentication  1d
+				hubot@Windows  5678  ssh-rsa EEEEEEEK247  authentication  1d
+				Mac Signing    321   ssh-rsa AAAABbBB123  signing         1d
 			`),
 			wantStderr: "",
 		},
 		{
-			name: "list non-tty",
+			name: "list authentication and signing keys; in non-tty",
 			opts: ListOptions{
 				HTTPClient: func() (*http.Client, error) {
 					createdAt, _ := time.Parse(time.RFC3339, "2020-08-31T15:44:24+02:00")
@@ -77,18 +90,98 @@ func TestListRun(t *testing.T) {
 							}
 						]`, createdAt.Format(time.RFC3339))),
 					)
+					reg.Register(
+						httpmock.REST("GET", "user/ssh_signing_keys"),
+						httpmock.StringResponse(fmt.Sprintf(`[
+							{
+								"id": 321,
+								"key": "ssh-rsa AAAABbBB123",
+								"title": "Mac Signing",
+								"created_at": "%[1]s"
+							}
+						]`, createdAt.Format(time.RFC3339))),
+					)
 					return &http.Client{Transport: reg}, nil
 				},
 			},
 			isTTY: false,
 			wantStdout: heredoc.Doc(`
-				Mac	ssh-rsa AAAABbBB123	2020-08-31T15:44:24+02:00
-				hubot@Windows	ssh-rsa EEEEEEEK247	2020-08-31T15:44:24+02:00
+				Mac	ssh-rsa AAAABbBB123	2020-08-31T15:44:24+02:00	1234	authentication
+				hubot@Windows	ssh-rsa EEEEEEEK247	2020-08-31T15:44:24+02:00	5678	authentication
+				Mac Signing	ssh-rsa AAAABbBB123	2020-08-31T15:44:24+02:00	321	signing
 			`),
 			wantStderr: "",
 		},
 		{
-			name: "no keys",
+			name: "only authentication ssh keys are available",
+			opts: ListOptions{
+				HTTPClient: func() (*http.Client, error) {
+					createdAt := time.Now().Add(time.Duration(-24) * time.Hour)
+					reg := &httpmock.Registry{}
+					reg.Register(
+						httpmock.REST("GET", "user/keys"),
+						httpmock.StringResponse(fmt.Sprintf(`[
+							{
+								"id": 1234,
+								"key": "ssh-rsa AAAABbBB123",
+								"title": "Mac",
+								"created_at": "%[1]s"
+							}
+						]`, createdAt.Format(time.RFC3339))),
+					)
+					reg.Register(
+						httpmock.REST("GET", "user/ssh_signing_keys"),
+						httpmock.StatusStringResponse(404, "Not Found"),
+					)
+					return &http.Client{Transport: reg}, nil
+				},
+			},
+			wantStdout: heredoc.Doc(`
+				TITLE  ID    KEY                  TYPE            ADDED
+				Mac    1234  ssh-rsa AAAABbBB123  authentication  1d
+			`),
+			wantStderr: heredoc.Doc(`
+			warning:  HTTP 404 (https://api.github.com/user/ssh_signing_keys?per_page=100)
+			`),
+			wantErr: false,
+			isTTY:   true,
+		},
+		{
+			name: "only signing ssh keys are available",
+			opts: ListOptions{
+				HTTPClient: func() (*http.Client, error) {
+					createdAt := time.Now().Add(time.Duration(-24) * time.Hour)
+					reg := &httpmock.Registry{}
+					reg.Register(
+						httpmock.REST("GET", "user/ssh_signing_keys"),
+						httpmock.StringResponse(fmt.Sprintf(`[
+							{
+								"id": 1234,
+								"key": "ssh-rsa AAAABbBB123",
+								"title": "Mac",
+								"created_at": "%[1]s"
+							}
+						]`, createdAt.Format(time.RFC3339))),
+					)
+					reg.Register(
+						httpmock.REST("GET", "user/keys"),
+						httpmock.StatusStringResponse(404, "Not Found"),
+					)
+					return &http.Client{Transport: reg}, nil
+				},
+			},
+			wantStdout: heredoc.Doc(`
+				TITLE  ID    KEY                  TYPE     ADDED
+				Mac    1234  ssh-rsa AAAABbBB123  signing  1d
+			`),
+			wantStderr: heredoc.Doc(`
+				warning:  HTTP 404 (https://api.github.com/user/keys?per_page=100)
+			`),
+			wantErr: false,
+			isTTY:   true,
+		},
+		{
+			name: "no keys tty",
 			opts: ListOptions{
 				HTTPClient: func() (*http.Client, error) {
 					reg := &httpmock.Registry{}
@@ -96,24 +189,50 @@ func TestListRun(t *testing.T) {
 						httpmock.REST("GET", "user/keys"),
 						httpmock.StringResponse(`[]`),
 					)
+					reg.Register(
+						httpmock.REST("GET", "user/ssh_signing_keys"),
+						httpmock.StringResponse(`[]`),
+					)
 					return &http.Client{Transport: reg}, nil
 				},
 			},
 			wantStdout: "",
-			wantStderr: "No SSH keys present in GitHub account.\n",
+			wantStderr: "",
 			wantErr:    true,
+			isTTY:      true,
+		},
+		{
+			name: "no keys non-tty",
+			opts: ListOptions{
+				HTTPClient: func() (*http.Client, error) {
+					reg := &httpmock.Registry{}
+					reg.Register(
+						httpmock.REST("GET", "user/keys"),
+						httpmock.StringResponse(`[]`),
+					)
+					reg.Register(
+						httpmock.REST("GET", "user/ssh_signing_keys"),
+						httpmock.StringResponse(`[]`),
+					)
+					return &http.Client{Transport: reg}, nil
+				},
+			},
+			wantStdout: "",
+			wantStderr: "",
+			wantErr:    true,
+			isTTY:      false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			opts := tt.opts
-			opts.IO = io
+			opts.IO = ios
 			opts.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
 
 			err := listRun(&opts)

@@ -1,18 +1,15 @@
 package transfer
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -110,7 +107,7 @@ func issueTransfer(httpClient *http.Client, issueID string, destRepo ghrepo.Inte
 		},
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(destRepo.RepoHost()), httpClient)
-	err := gql.MutateNamed(context.Background(), "IssueTransfer", &mutation, variables)
+	gql := api.NewClientFromHTTP(httpClient)
+	err := gql.Mutate(destRepo.RepoHost(), "IssueTransfer", &mutation, variables)
 	return mutation.TransferIssue.Issue.URL, err
 }

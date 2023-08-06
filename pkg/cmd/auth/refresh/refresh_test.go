@@ -2,21 +2,19 @@ package refresh
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
-
-// TODO prompt cfg test
 
 func Test_NewCmdRefresh(t *testing.T) {
 	tests := []struct {
@@ -85,17 +83,63 @@ func Test_NewCmdRefresh(t *testing.T) {
 				Scopes: []string{"repo:invite", "read:public_key"},
 			},
 		},
+		{
+			name:  "secure storage",
+			tty:   true,
+			cli:   "--secure-storage",
+			wants: RefreshOptions{},
+		},
+		{
+			name: "insecure storage",
+			tty:  true,
+			cli:  "--insecure-storage",
+			wants: RefreshOptions{
+				InsecureStorage: true,
+			},
+		},
+		{
+			name: "reset scopes",
+			tty:  true,
+			cli:  "--reset-scopes",
+			wants: RefreshOptions{
+				ResetScopes: true,
+			},
+		},
+		{
+			name: "remove scope",
+			tty:  true,
+			cli:  "--remove-scopes read:public_key",
+			wants: RefreshOptions{
+				RemoveScopes: []string{"read:public_key"},
+			},
+		},
+		{
+			name: "remove multiple scopes",
+			tty:  true,
+			cli:  "--remove-scopes workflow,read:public_key",
+			wants: RefreshOptions{
+				RemoveScopes: []string{"workflow", "read:public_key"},
+			},
+		},
+		{
+			name: "remove scope shorthand",
+			tty:  true,
+			cli:  "-r read:public_key",
+			wants: RefreshOptions{
+				RemoveScopes: []string{"read:public_key"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
-			io.SetNeverPrompt(tt.neverPrompt)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetNeverPrompt(tt.neverPrompt)
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
@@ -126,20 +170,23 @@ func Test_NewCmdRefresh(t *testing.T) {
 }
 
 type authArgs struct {
-	hostname string
-	scopes   []string
+	hostname      string
+	scopes        []string
+	interactive   bool
+	secureStorage bool
 }
 
 func Test_refreshRun(t *testing.T) {
 	tests := []struct {
-		name         string
-		opts         *RefreshOptions
-		askStubs     func(*prompt.AskStubber)
-		cfgHosts     []string
-		oldScopes    string
-		wantErr      string
-		nontty       bool
-		wantAuthArgs authArgs
+		name          string
+		opts          *RefreshOptions
+		prompterStubs func(*prompter.PrompterMock)
+		cfgHosts      []string
+		config        config.Config
+		oldScopes     string
+		wantErr       string
+		nontty        bool
+		wantAuthArgs  authArgs
 	}{
 		{
 			name:    "no hosts configured",
@@ -167,8 +214,9 @@ func Test_refreshRun(t *testing.T) {
 				Hostname: "obed.morton",
 			},
 			wantAuthArgs: authArgs{
-				hostname: "obed.morton",
-				scopes:   nil,
+				hostname:      "obed.morton",
+				scopes:        []string{},
+				secureStorage: true,
 			},
 		},
 		{
@@ -180,8 +228,9 @@ func Test_refreshRun(t *testing.T) {
 				Hostname: "",
 			},
 			wantAuthArgs: authArgs{
-				hostname: "github.com",
-				scopes:   nil,
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
 			},
 		},
 		{
@@ -193,12 +242,15 @@ func Test_refreshRun(t *testing.T) {
 			opts: &RefreshOptions{
 				Hostname: "",
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What account do you want to refresh auth for?").AnswerWith("github.com")
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(_, _ string, opts []string) (int, error) {
+					return prompter.IndexFor(opts, "github.com")
+				}
 			},
 			wantAuthArgs: authArgs{
-				hostname: "github.com",
-				scopes:   nil,
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
 			},
 		},
 		{
@@ -210,12 +262,13 @@ func Test_refreshRun(t *testing.T) {
 				Scopes: []string{"repo:invite", "public_key:read"},
 			},
 			wantAuthArgs: authArgs{
-				hostname: "github.com",
-				scopes:   []string{"repo:invite", "public_key:read"},
+				hostname:      "github.com",
+				scopes:        []string{"repo:invite", "public_key:read"},
+				secureStorage: true,
 			},
 		},
 		{
-			name: "scopes provided",
+			name: "more scopes provided",
 			cfgHosts: []string{
 				"github.com",
 			},
@@ -224,33 +277,162 @@ func Test_refreshRun(t *testing.T) {
 				Scopes: []string{"repo:invite", "public_key:read"},
 			},
 			wantAuthArgs: authArgs{
-				hostname: "github.com",
-				scopes:   []string{"repo:invite", "public_key:read", "delete_repo", "codespace"},
+				hostname:      "github.com",
+				scopes:        []string{"delete_repo", "codespace", "repo:invite", "public_key:read"},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "secure storage",
+			cfgHosts: []string{
+				"obed.morton",
+			},
+			opts: &RefreshOptions{
+				Hostname: "obed.morton",
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "obed.morton",
+				scopes:        []string{},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "insecure storage",
+			cfgHosts: []string{
+				"obed.morton",
+			},
+			opts: &RefreshOptions{
+				Hostname:        "obed.morton",
+				InsecureStorage: true,
+			},
+			wantAuthArgs: authArgs{
+				hostname: "obed.morton",
+				scopes:   []string{},
+			},
+		},
+		{
+			name: "reset scopes",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "delete_repo, codespace",
+			opts: &RefreshOptions{
+				Hostname:    "github.com",
+				ResetScopes: true,
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "reset scopes and add some scopes",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "repo:invite, delete_repo, codespace",
+			opts: &RefreshOptions{
+				Scopes:      []string{"public_key:read", "workflow"},
+				ResetScopes: true,
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"public_key:read", "workflow"},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove scopes",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "delete_repo, codespace, repo:invite, public_key:read",
+			opts: &RefreshOptions{
+				Hostname:     "github.com",
+				RemoveScopes: []string{"delete_repo", "repo:invite"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"codespace", "public_key:read"},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove scope but no old scope",
+			cfgHosts: []string{
+				"github.com",
+			},
+			opts: &RefreshOptions{
+				Hostname:     "github.com",
+				RemoveScopes: []string{"delete_repo"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove and add scopes at the same time",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "repo:invite, delete_repo, codespace",
+			opts: &RefreshOptions{
+				Scopes:       []string{"repo:invite", "public_key:read", "workflow"},
+				RemoveScopes: []string{"codespace", "repo:invite", "workflow"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"delete_repo", "public_key:read"},
+				secureStorage: true,
+			},
+		},
+		{
+			name: "remove scopes that don't exist",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "repo:invite, delete_repo, codespace",
+			opts: &RefreshOptions{
+				RemoveScopes: []string{"codespace", "repo:invite", "public_key:read"},
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "github.com",
+				scopes:        []string{"delete_repo"},
+				secureStorage: true,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			tt.opts.AuthFlow = func(_ config.Config, _ *iostreams.IOStreams, hostname string, scopes []string, interactive bool) error {
+			tt.opts.AuthFlow = func(_ *config.AuthConfig, _ *iostreams.IOStreams, hostname string, scopes []string, interactive, secureStorage bool) error {
 				aa.hostname = hostname
 				aa.scopes = scopes
+				aa.interactive = interactive
+				aa.secureStorage = secureStorage
 				return nil
 			}
 
-			io, _, _, _ := iostreams.Test()
-
-			io.SetStdinTTY(!tt.nontty)
-			io.SetStdoutTTY(!tt.nontty)
-
-			tt.opts.IO = io
-			cfg := config.NewBlankConfig()
+			var cfg config.Config
+			if tt.config != nil {
+				cfg = tt.config
+			} else {
+				cfg = config.NewFromString("")
+				for _, hostname := range tt.cfgHosts {
+					cfg.Set(hostname, "oauth_token", "abc123")
+				}
+			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
 			}
-			for _, hostname := range tt.cfgHosts {
-				_ = cfg.Set(hostname, "oauth_token", "abc123")
-			}
+
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(!tt.nontty)
+			ios.SetStdoutTTY(!tt.nontty)
+			tt.opts.IO = ios
 
 			httpReg := &httpmock.Registry{}
 			httpReg.Register(
@@ -263,23 +445,20 @@ func Test_refreshRun(t *testing.T) {
 					return &http.Response{
 						Request:    req,
 						StatusCode: statusCode,
-						Body:       ioutil.NopCloser(strings.NewReader(``)),
+						Body:       io.NopCloser(strings.NewReader(``)),
 						Header: http.Header{
 							"X-Oauth-Scopes": {tt.oldScopes},
 						},
 					}, nil
 				},
 			)
-			tt.opts.httpClient = &http.Client{Transport: httpReg}
+			tt.opts.HttpClient = &http.Client{Transport: httpReg}
 
-			mainBuf := bytes.Buffer{}
-			hostsBuf := bytes.Buffer{}
-			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
-
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := &prompter.PrompterMock{}
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
 			}
+			tt.opts.Prompter = pm
 
 			err := refreshRun(tt.opts)
 			if tt.wantErr != "" {
@@ -292,6 +471,8 @@ func Test_refreshRun(t *testing.T) {
 
 			assert.Equal(t, tt.wantAuthArgs.hostname, aa.hostname)
 			assert.Equal(t, tt.wantAuthArgs.scopes, aa.scopes)
+			assert.Equal(t, tt.wantAuthArgs.interactive, aa.interactive)
+			assert.Equal(t, tt.wantAuthArgs.secureStorage, aa.secureStorage)
 		})
 	}
 }

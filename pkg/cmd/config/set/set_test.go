@@ -46,9 +46,11 @@ func TestNewCmdConfigSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_ = config.StubWriteConfig(t)
+
 			f := &cmdutil.Factory{
 				Config: func() (config.Config, error) {
-					return config.ConfigStub{}, nil
+					return config.NewBlankConfig(), nil
 				},
 			}
 
@@ -94,7 +96,7 @@ func Test_setRun(t *testing.T) {
 		{
 			name: "set key value",
 			input: &SetOptions{
-				Config: config.ConfigStub{},
+				Config: config.NewBlankConfig(),
 				Key:    "editor",
 				Value:  "vim",
 			},
@@ -103,7 +105,7 @@ func Test_setRun(t *testing.T) {
 		{
 			name: "set key value scoped by host",
 			input: &SetOptions{
-				Config:   config.ConfigStub{},
+				Config:   config.NewBlankConfig(),
 				Hostname: "github.com",
 				Key:      "editor",
 				Value:    "vim",
@@ -113,7 +115,7 @@ func Test_setRun(t *testing.T) {
 		{
 			name: "set unknown key",
 			input: &SetOptions{
-				Config: config.ConfigStub{},
+				Config: config.NewBlankConfig(),
 				Key:    "unknownKey",
 				Value:  "someValue",
 			},
@@ -123,7 +125,7 @@ func Test_setRun(t *testing.T) {
 		{
 			name: "set invalid value",
 			input: &SetOptions{
-				Config: config.ConfigStub{},
+				Config: config.NewBlankConfig(),
 				Key:    "git_protocol",
 				Value:  "invalid",
 			},
@@ -132,10 +134,12 @@ func Test_setRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		io, _, stdout, stderr := iostreams.Test()
-		tt.input.IO = io
-
 		t.Run(tt.name, func(t *testing.T) {
+			_ = config.StubWriteConfig(t)
+
+			ios, _, stdout, stderr := iostreams.Test()
+			tt.input.IO = ios
+
 			err := setRun(tt.input)
 			if tt.wantsErr {
 				assert.EqualError(t, err, tt.errMsg)
@@ -148,10 +152,46 @@ func Test_setRun(t *testing.T) {
 			val, err := tt.input.Config.GetOrDefault(tt.input.Hostname, tt.input.Key)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedValue, val)
-
-			val, err = tt.input.Config.GetOrDefault("", "_written")
-			assert.NoError(t, err)
-			assert.Equal(t, "true", val)
 		})
 	}
+}
+
+func Test_ValidateValue(t *testing.T) {
+	err := ValidateValue("git_protocol", "sshpps")
+	assert.EqualError(t, err, "invalid value")
+
+	err = ValidateValue("git_protocol", "ssh")
+	assert.NoError(t, err)
+
+	err = ValidateValue("editor", "vim")
+	assert.NoError(t, err)
+
+	err = ValidateValue("got", "123")
+	assert.NoError(t, err)
+
+	err = ValidateValue("http_unix_socket", "really_anything/is/allowed/and/net.Dial\\(...\\)/will/ultimately/validate")
+	assert.NoError(t, err)
+}
+
+func Test_ValidateKey(t *testing.T) {
+	err := ValidateKey("invalid")
+	assert.EqualError(t, err, "invalid key")
+
+	err = ValidateKey("git_protocol")
+	assert.NoError(t, err)
+
+	err = ValidateKey("editor")
+	assert.NoError(t, err)
+
+	err = ValidateKey("prompt")
+	assert.NoError(t, err)
+
+	err = ValidateKey("pager")
+	assert.NoError(t, err)
+
+	err = ValidateKey("http_unix_socket")
+	assert.NoError(t, err)
+
+	err = ValidateKey("browser")
+	assert.NoError(t, err)
 }

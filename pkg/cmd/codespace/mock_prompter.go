@@ -9,19 +9,19 @@ import (
 
 // prompterMock is a mock implementation of prompter.
 //
-// 	func TestSomethingThatUsesprompter(t *testing.T) {
+//	func TestSomethingThatUsesprompter(t *testing.T) {
 //
-// 		// make and configure a mocked prompter
-// 		mockedprompter := &prompterMock{
-// 			ConfirmFunc: func(message string) (bool, error) {
-// 				panic("mock out the Confirm method")
-// 			},
-// 		}
+//		// make and configure a mocked prompter
+//		mockedprompter := &prompterMock{
+//			ConfirmFunc: func(message string) (bool, error) {
+//				panic("mock out the Confirm method")
+//			},
+//		}
 //
-// 		// use mockedprompter in code that requires prompter
-// 		// and then make assertions.
+//		// use mockedprompter in code that requires prompter
+//		// and then make assertions.
 //
-// 	}
+//	}
 type prompterMock struct {
 	// ConfirmFunc mocks the Confirm method.
 	ConfirmFunc func(message string) (bool, error)
@@ -55,7 +55,8 @@ func (mock *prompterMock) Confirm(message string) (bool, error) {
 
 // ConfirmCalls gets all the calls that were made to Confirm.
 // Check the length with:
-//     len(mockedprompter.ConfirmCalls())
+//
+//	len(mockedprompter.ConfirmCalls())
 func (mock *prompterMock) ConfirmCalls() []struct {
 	Message string
 } {

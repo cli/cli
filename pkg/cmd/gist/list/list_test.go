@@ -106,6 +106,7 @@ func Test_listRun(t *testing.T) {
 	tests := []struct {
 		name    string
 		opts    *ListOptions
+		wantErr bool
 		wantOut string
 		stubs   func(*httpmock.Registry)
 		nontty  bool
@@ -120,7 +121,7 @@ func Test_listRun(t *testing.T) {
 						"gists": { "nodes": [] }
 					} } }`))
 			},
-			wantOut: "",
+			wantErr: true,
 		},
 		{
 			name: "default behavior",
@@ -364,9 +365,9 @@ func Test_listRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(!tt.nontty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(!tt.nontty)
+		tt.opts.IO = ios
 
 		if tt.opts.Limit == 0 {
 			tt.opts.Limit = 10
@@ -377,7 +378,11 @@ func Test_listRun(t *testing.T) {
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			err := listRun(tt.opts)
-			assert.NoError(t, err)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 
 			assert.Equal(t, tt.wantOut, stdout.String())
 			reg.Verify(t)

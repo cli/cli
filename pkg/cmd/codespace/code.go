@@ -3,21 +3,16 @@ package codespace
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 
-type browser interface {
-	Browse(string) error
-}
-
 func newCodeCmd(app *App) *cobra.Command {
 	var (
-		codespace   string
+		selector    *CodespaceSelector
 		useInsiders bool
+		useWeb      bool
 	)
 
 	codeCmd := &cobra.Command{
@@ -25,32 +20,41 @@ func newCodeCmd(app *App) *cobra.Command {
 		Short: "Open a codespace in Visual Studio Code",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			b := cmdutil.NewBrowser("", ioutil.Discard, app.io.ErrOut)
-			return app.VSCode(cmd.Context(), b, codespace, useInsiders)
+			return app.VSCode(cmd.Context(), selector, useInsiders, useWeb)
 		},
 	}
 
-	codeCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	selector = AddCodespaceSelector(codeCmd, app.apiClient)
+
 	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of Visual Studio Code")
+	codeCmd.Flags().BoolVarP(&useWeb, "web", "w", false, "Use the web version of Visual Studio Code")
 
 	return codeCmd
 }
 
 // VSCode opens a codespace in the local VS VSCode application.
-func (a *App) VSCode(ctx context.Context, browser browser, codespaceName string, useInsiders bool) error {
-	if codespaceName == "" {
-		codespace, err := chooseCodespace(ctx, a.apiClient)
-		if err != nil {
-			if err == errNoCodespaces {
-				return err
-			}
-			return fmt.Errorf("error choosing codespace: %w", err)
-		}
-		codespaceName = codespace.Name
+func (a *App) VSCode(ctx context.Context, selector *CodespaceSelector, useInsiders bool, useWeb bool) error {
+	codespace, err := selector.Select(ctx)
+	if err != nil {
+		return err
 	}
 
-	url := vscodeProtocolURL(codespaceName, useInsiders)
-	if err := browser.Browse(url); err != nil {
+	browseURL := vscodeProtocolURL(codespace.Name, useInsiders)
+	if useWeb {
+		browseURL = codespace.WebURL
+		if useInsiders {
+			u, err := url.Parse(browseURL)
+			if err != nil {
+				return err
+			}
+			q := u.Query()
+			q.Set("vscodeChannel", "insiders")
+			u.RawQuery = q.Encode()
+			browseURL = u.String()
+		}
+	}
+
+	if err := a.browser.Browse(browseURL); err != nil {
 		return fmt.Errorf("error opening Visual Studio Code: %w", err)
 	}
 
@@ -62,5 +66,5 @@ func vscodeProtocolURL(codespaceName string, useInsiders bool) string {
 	if useInsiders {
 		application = "vscode-insiders"
 	}
-	return fmt.Sprintf("%s://github.codespaces/connect?name=%s", application, url.QueryEscape(codespaceName))
+	return fmt.Sprintf("%s://github.codespaces/connect?name=%s&windowId=_blank", application, url.QueryEscape(codespaceName))
 }

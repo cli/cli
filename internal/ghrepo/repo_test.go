@@ -194,7 +194,7 @@ func TestFromFullName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.hostOverride != "" {
-				SetDefaultHost(tt.hostOverride)
+				t.Setenv("GH_HOST", tt.hostOverride)
 			}
 			r, err := FromFullName(tt.input)
 			if tt.wantErr != nil {
@@ -216,6 +216,62 @@ func TestFromFullName(t *testing.T) {
 			}
 			if r.RepoName() != tt.wantName {
 				t.Errorf("expected name %q, got %q", tt.wantName, r.RepoName())
+			}
+		})
+	}
+}
+
+func TestFormatRemoteURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		repoHost  string
+		repoOwner string
+		repoName  string
+		protocol  string
+		want      string
+	}{
+		{
+			name:      "https protocol",
+			repoHost:  "github.com",
+			repoOwner: "owner",
+			repoName:  "name",
+			protocol:  "https",
+			want:      "https://github.com/owner/name.git",
+		},
+		{
+			name:      "https protocol local host",
+			repoHost:  "github.localhost",
+			repoOwner: "owner",
+			repoName:  "name",
+			protocol:  "https",
+			want:      "http://github.localhost/owner/name.git",
+		},
+		{
+			name:      "ssh protocol",
+			repoHost:  "github.com",
+			repoOwner: "owner",
+			repoName:  "name",
+			protocol:  "ssh",
+			want:      "git@github.com:owner/name.git",
+		},
+		{
+			name:      "ssh protocol tenancy host",
+			repoHost:  "tenant.ghe.com",
+			repoOwner: "owner",
+			repoName:  "name",
+			protocol:  "ssh",
+			want:      "tenant@tenant.ghe.com:owner/name.git",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := ghRepo{
+				hostname: tt.repoHost,
+				owner:    tt.repoOwner,
+				name:     tt.repoName,
+			}
+			if url := FormatRemoteURL(r, tt.protocol); url != tt.want {
+				t.Errorf("expected url %q, got %q", tt.want, url)
 			}
 		})
 	}

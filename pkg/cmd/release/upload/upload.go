@@ -1,16 +1,18 @@
 package upload
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -80,7 +82,7 @@ func uploadRun(opts *UploadOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(httpClient, baseRepo, opts.TagName)
+	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}
@@ -92,8 +94,9 @@ func uploadRun(opts *UploadOptions) error {
 
 	var existingNames []string
 	for _, a := range opts.Assets {
+		sanitizedFileName := sanitizeFileName(a.Name)
 		for _, ea := range release.Assets {
-			if ea.Name == a.Name {
+			if ea.Name == sanitizedFileName {
 				a.ExistingURL = ea.APIURL
 				existingNames = append(existingNames, ea.Name)
 				break
@@ -115,9 +118,36 @@ func uploadRun(opts *UploadOptions) error {
 	if opts.IO.IsStdoutTTY() {
 		iofmt := opts.IO.ColorScheme()
 		fmt.Fprintf(opts.IO.Out, "Successfully uploaded %s to %s\n",
-			utils.Pluralize(len(opts.Assets), "asset"),
+			text.Pluralize(len(opts.Assets), "asset"),
 			iofmt.Bold(release.TagName))
 	}
 
 	return nil
+}
+
+// this method attempts to mimic the same functionality on the client that the platform does on
+// uploaded assets in order to allow the --clobber logic work correctly, since that feature is
+// one that only exists in the client
+func sanitizeFileName(name string) string {
+	value := text.RemoveDiacritics(name)
+	// Stripped all non-ascii characters, provide default name.
+	if strings.HasPrefix(value, ".") {
+		value = "default" + value
+	}
+
+	// Replace special characters with the separator
+	value = regexp.MustCompile(`(?i)[^a-z0-9\-_\+@]+`).ReplaceAllLiteralString(value, ".")
+
+	// No more than one of the separator in a row.
+	value = regexp.MustCompile(`\.{2,}`).ReplaceAllLiteralString(value, ".")
+
+	// Remove leading/trailing separator.
+	value = strings.Trim(value, ".")
+
+	// Just file extension left, add default name.
+	if name != value && !strings.Contains(value, ".") {
+		value = "default." + value
+	}
+
+	return value
 }

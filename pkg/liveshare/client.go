@@ -1,5 +1,5 @@
 // Package liveshare is a Go client library for the Visual Studio Live Share
-// service, which provides collaborative, distibuted editing and debugging.
+// service, which provides collaborative, distributed editing and debugging.
 // See https://docs.microsoft.com/en-us/visualstudio/liveshare for an overview.
 //
 // It provides the ability for a Go program to connect to a Live Share
@@ -17,10 +17,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/opentracing/opentracing-go"
-	"golang.org/x/crypto/ssh"
 )
 
 type logger interface {
@@ -30,7 +28,6 @@ type logger interface {
 
 // An Options specifies Live Share connection parameters.
 type Options struct {
-	ClientName     string // ClientName is the name of the connecting client.
 	SessionID      string
 	SessionToken   string // token for SSH session
 	RelaySAS       string
@@ -42,9 +39,6 @@ type Options struct {
 
 // uri returns a websocket URL for the specified options.
 func (opts *Options) uri(action string) (string, error) {
-	if opts.ClientName == "" {
-		return "", errors.New("ClientName is required")
-	}
 	if opts.SessionID == "" {
 		return "", errors.New("SessionID is required")
 	}
@@ -57,7 +51,13 @@ func (opts *Options) uri(action string) (string, error) {
 
 	sas := url.QueryEscape(opts.RelaySAS)
 	uri := opts.RelayEndpoint
-	uri = strings.Replace(uri, "sb:", "wss:", -1)
+
+	if strings.HasPrefix(uri, "http:") {
+		uri = strings.Replace(uri, "http:", "ws:", 1)
+	} else {
+		uri = strings.Replace(uri, "sb:", "wss:", -1)
+	}
+
 	uri = strings.Replace(uri, ".net/", ".net:443/$hc/", 1)
 	uri = uri + "?sb-hc-action=" + action + "&sb-hc-token=" + sas
 	return uri, nil
@@ -107,11 +107,9 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 	s := &Session{
 		ssh:             ssh,
 		rpc:             rpc,
-		clientName:      opts.ClientName,
 		keepAliveReason: make(chan string, 1),
 		logger:          opts.Logger,
 	}
-	go s.heartbeat(ctx, 1*time.Minute)
 
 	return s, nil
 }
@@ -129,42 +127,4 @@ type joinWorkspaceArgs struct {
 
 type joinWorkspaceResult struct {
 	SessionNumber int `json:"sessionNumber"`
-}
-
-// A channelID is an identifier for an exposed port on a remote
-// container that may be used to open an SSH channel to it.
-type channelID struct {
-	name, condition string
-}
-
-func (s *Session) openStreamingChannel(ctx context.Context, id channelID) (ssh.Channel, error) {
-	type getStreamArgs struct {
-		StreamName string `json:"streamName"`
-		Condition  string `json:"condition"`
-	}
-	args := getStreamArgs{
-		StreamName: id.name,
-		Condition:  id.condition,
-	}
-	var streamID string
-	if err := s.rpc.do(ctx, "streamManager.getStream", args, &streamID); err != nil {
-		return nil, fmt.Errorf("error getting stream id: %w", err)
-	}
-
-	span, ctx := opentracing.StartSpanFromContext(ctx, "Session.OpenChannel+SendRequest")
-	defer span.Finish()
-	_ = ctx // ctx is not currently used
-
-	channel, reqs, err := s.ssh.conn.OpenChannel("session", nil)
-	if err != nil {
-		return nil, fmt.Errorf("error opening ssh channel for transport: %w", err)
-	}
-	go ssh.DiscardRequests(reqs)
-
-	requestType := fmt.Sprintf("stream-transport-%s", streamID)
-	if _, err = channel.SendRequest(requestType, true, nil); err != nil {
-		return nil, fmt.Errorf("error sending channel request: %w", err)
-	}
-
-	return channel, nil
 }

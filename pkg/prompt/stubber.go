@@ -18,6 +18,7 @@ type testing interface {
 	Cleanup(func())
 }
 
+// Deprecated: use PrompterMock
 func NewAskStubber(t testing) *AskStubber {
 	as, teardown := InitAskStubber()
 	t.Cleanup(func() {

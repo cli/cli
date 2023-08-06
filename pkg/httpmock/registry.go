@@ -6,6 +6,12 @@ import (
 	"sync"
 )
 
+// Replace http.Client transport layer with registry so all requests get
+// recorded.
+func ReplaceTripper(client *http.Client, reg *Registry) {
+	client.Transport = reg
+}
+
 type Registry struct {
 	mu       sync.Mutex
 	stubs    []*Stub

@@ -6,34 +6,43 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
-	"syscall"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/transform"
 )
 
 type DiffOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Browser    browser.Browser
 
 	Finder shared.PRFinder
 
 	SelectorArg string
 	UseColor    bool
 	Patch       bool
+	NameOnly    bool
+	BrowserMode bool
 }
 
 func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Command {
 	opts := &DiffOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Browser:    f.Browser,
 	}
 
 	var colorFlag string
@@ -45,7 +54,9 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			View changes in a pull request. 
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
+			
+			With '--web', open the pull request diff in a web browser instead.
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -67,7 +78,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			case "never":
 				opts.UseColor = false
 			default:
-				return cmdutil.FlagErrorf("the value for `--color` must be one of \"auto\", \"always\", or \"never\"")
+				return fmt.Errorf("unsupported color %q", colorFlag)
 			}
 
 			if runF != nil {
@@ -77,8 +88,10 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVar(&colorFlag, "color", "auto", "Use color in diff output: {always|never|auto}")
+	cmdutil.StringEnumFlag(cmd, &colorFlag, "color", "", "auto", []string{"always", "never", "auto"}, "Use color in diff output")
 	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
+	cmd.Flags().BoolVar(&opts.NameOnly, "name-only", false, "Display only names of changed files")
+	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open the pull request diff in the browser")
 
 	return cmd
 }
@@ -88,9 +101,22 @@ func diffRun(opts *DiffOptions) error {
 		Selector: opts.SelectorArg,
 		Fields:   []string{"number"},
 	}
+
+	if opts.BrowserMode {
+		findOptions.Fields = []string{"url"}
+	}
+
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
+	}
+
+	if opts.BrowserMode {
+		openUrl := fmt.Sprintf("%s/files", pr.URL)
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openUrl))
+		}
+		return opts.Browser.Browse(openUrl)
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -98,11 +124,20 @@ func diffRun(opts *DiffOptions) error {
 		return err
 	}
 
-	diff, err := fetchDiff(httpClient, baseRepo, pr.Number, opts.Patch)
+	if opts.NameOnly {
+		opts.Patch = false
+	}
+
+	diffReadCloser, err := fetchDiff(httpClient, baseRepo, pr.Number, opts.Patch)
 	if err != nil {
 		return fmt.Errorf("could not find pull request diff: %w", err)
 	}
-	defer diff.Close()
+	defer diffReadCloser.Close()
+
+	var diff io.Reader = diffReadCloser
+	if opts.IO.IsStdoutTTY() {
+		diff = sanitizedReader(diff)
+	}
 
 	if err := opts.IO.StartPager(); err == nil {
 		defer opts.IO.StopPager()
@@ -110,11 +145,12 @@ func diffRun(opts *DiffOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
+	if opts.NameOnly {
+		return changedFilesNames(opts.IO.Out, diff)
+	}
+
 	if !opts.UseColor {
 		_, err = io.Copy(opts.IO.Out, diff)
-		if errors.Is(err, syscall.EPIPE) {
-			return nil
-		}
 		return err
 	}
 
@@ -230,4 +266,76 @@ func isAdditionLine(l []byte) bool {
 
 func isRemovalLine(l []byte) bool {
 	return len(l) > 0 && l[0] == '-'
+}
+
+func changedFilesNames(w io.Writer, r io.Reader) error {
+	diff, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	pattern := regexp.MustCompile(`(?:^|\n)diff\s--git.*\sb/(.*)`)
+	matches := pattern.FindAllStringSubmatch(string(diff), -1)
+
+	for _, val := range matches {
+		name := strings.TrimSpace(val[1])
+		if _, err := w.Write([]byte(name + "\n")); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func sanitizedReader(r io.Reader) io.Reader {
+	return transform.NewReader(r, sanitizer{})
+}
+
+// sanitizer replaces non-printable characters with their printable representations
+type sanitizer struct{ transform.NopResetter }
+
+// Transform implements transform.Transformer.
+func (t sanitizer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
+	for r, size := rune(0), 0; nSrc < len(src); {
+		if r = rune(src[nSrc]); r < utf8.RuneSelf {
+			size = 1
+		} else if r, size = utf8.DecodeRune(src[nSrc:]); size == 1 && !atEOF && !utf8.FullRune(src[nSrc:]) {
+			// Invalid rune.
+			err = transform.ErrShortSrc
+			break
+		}
+
+		if isPrint(r) {
+			if nDst+size > len(dst) {
+				err = transform.ErrShortDst
+				break
+			}
+			for i := 0; i < size; i++ {
+				dst[nDst] = src[nSrc]
+				nDst++
+				nSrc++
+			}
+			continue
+		} else {
+			nSrc += size
+		}
+
+		replacement := fmt.Sprintf("\\u{%02x}", r)
+
+		if nDst+len(replacement) > len(dst) {
+			err = transform.ErrShortDst
+			break
+		}
+
+		for _, c := range replacement {
+			dst[nDst] = byte(c)
+			nDst++
+		}
+	}
+	return
+}
+
+// isPrint reports if a rune is safe to be printed to a terminal
+func isPrint(r rune) bool {
+	return r == '\n' || r == '\r' || r == '\t' || unicode.IsPrint(r)
 }

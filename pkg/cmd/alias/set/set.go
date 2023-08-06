@@ -2,14 +2,14 @@ package set
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,8 @@ type SetOptions struct {
 	Expansion string
 	IsShell   bool
 
-	validCommand func(string) bool
+	validAliasName      func(string) bool
+	validAliasExpansion func(string) bool
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -59,6 +60,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			$ gh alias set homework 'issue list --assignee @me'
 			$ gh homework
 
+			$ gh alias set 'issue mine' 'issue list --mention @me'
+			$ gh issue mine
+
 			$ gh alias set epicsBy 'issue list --author="$1" --label="epic"'
 			$ gh epicsBy vilmibm  #=> gh issue list --author="vilmibm" --label="epic"
 
@@ -70,29 +74,13 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			opts.Name = args[0]
 			opts.Expansion = args[1]
 
-			opts.validCommand = func(args string) bool {
-				split, err := shlex.Split(args)
-				if err != nil {
-					return false
-				}
-
-				rootCmd := cmd.Root()
-				cmd, _, err := rootCmd.Traverse(split)
-				if err == nil && cmd != rootCmd {
-					return true
-				}
-
-				for _, ext := range f.ExtensionManager.List(false) {
-					if ext.Name() == split[0] {
-						return true
-					}
-				}
-				return false
-			}
+			opts.validAliasName = shared.ValidAliasNameFunc(cmd)
+			opts.validAliasExpansion = shared.ValidAliasExpansionFunc(cmd)
 
 			if runF != nil {
 				return runF(opts)
 			}
+
 			return setRun(opts)
 		},
 	}
@@ -109,10 +97,7 @@ func setRun(opts *SetOptions) error {
 		return err
 	}
 
-	aliasCfg, err := cfg.Aliases()
-	if err != nil {
-		return err
-	}
+	aliasCfg := cfg.Aliases()
 
 	expansion, err := getExpansion(opts)
 	if err != nil {
@@ -124,22 +109,20 @@ func setRun(opts *SetOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "- Adding alias for %s: %s\n", cs.Bold(opts.Name), cs.Bold(expansion))
 	}
 
-	isShell := opts.IsShell
-	if isShell && !strings.HasPrefix(expansion, "!") {
+	if opts.IsShell && !strings.HasPrefix(expansion, "!") {
 		expansion = "!" + expansion
 	}
-	isShell = strings.HasPrefix(expansion, "!")
 
-	if opts.validCommand(opts.Name) {
-		return fmt.Errorf("could not create alias: %q is already a gh command", opts.Name)
+	if !opts.validAliasName(opts.Name) {
+		return fmt.Errorf("could not create alias: %q is already a gh command, extension, or alias", opts.Name)
 	}
 
-	if !isShell && !opts.validCommand(expansion) {
-		return fmt.Errorf("could not create alias: %s does not correspond to a gh command", expansion)
+	if !opts.validAliasExpansion(expansion) {
+		return fmt.Errorf("could not create alias: %s does not correspond to a gh command, extension, or alias", expansion)
 	}
 
 	successMsg := fmt.Sprintf("%s Added alias.", cs.SuccessIcon())
-	if oldExpansion, ok := aliasCfg.Get(opts.Name); ok {
+	if oldExpansion, err := aliasCfg.Get(opts.Name); err == nil {
 		successMsg = fmt.Sprintf("%s Changed alias %s from %s to %s",
 			cs.SuccessIcon(),
 			cs.Bold(opts.Name),
@@ -148,9 +131,11 @@ func setRun(opts *SetOptions) error {
 		)
 	}
 
-	err = aliasCfg.Add(opts.Name, expansion)
+	aliasCfg.Add(opts.Name, expansion)
+
+	err = cfg.Write()
 	if err != nil {
-		return fmt.Errorf("could not create alias: %s", err)
+		return err
 	}
 
 	if isTerminal {
@@ -162,7 +147,7 @@ func setRun(opts *SetOptions) error {
 
 func getExpansion(opts *SetOptions) (string, error) {
 	if opts.Expansion == "-" {
-		stdin, err := ioutil.ReadAll(opts.IO.In)
+		stdin, err := io.ReadAll(opts.IO.In)
 		if err != nil {
 			return "", fmt.Errorf("failed to read from STDIN: %w", err)
 		}

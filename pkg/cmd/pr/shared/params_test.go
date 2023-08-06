@@ -12,6 +12,9 @@ import (
 )
 
 func Test_listURLWithQuery(t *testing.T) {
+	trueBool := true
+	falseBool := false
+
 	type args struct {
 		listURL string
 		options FilterOptions
@@ -32,7 +35,7 @@ func Test_listURLWithQuery(t *testing.T) {
 					State:  "open",
 				},
 			},
-			want:    "https://example.com/path?a=b&q=is%3Aissue+is%3Aopen",
+			want:    "https://example.com/path?a=b&q=state%3Aopen+type%3Aissue",
 			wantErr: false,
 		},
 		{
@@ -42,10 +45,10 @@ func Test_listURLWithQuery(t *testing.T) {
 				options: FilterOptions{
 					Entity: "pr",
 					State:  "open",
-					Draft:  "true",
+					Draft:  &trueBool,
 				},
 			},
-			want:    "https://example.com/path?q=is%3Apr+is%3Aopen+draft%3Atrue",
+			want:    "https://example.com/path?q=draft%3Atrue+state%3Aopen+type%3Apr",
 			wantErr: false,
 		},
 		{
@@ -55,10 +58,10 @@ func Test_listURLWithQuery(t *testing.T) {
 				options: FilterOptions{
 					Entity: "pr",
 					State:  "open",
-					Draft:  "false",
+					Draft:  &falseBool,
 				},
 			},
-			want:    "https://example.com/path?q=is%3Apr+is%3Aopen+draft%3Afalse",
+			want:    "https://example.com/path?q=draft%3Afalse+state%3Aopen+type%3Apr",
 			wantErr: false,
 		},
 		{
@@ -75,7 +78,7 @@ func Test_listURLWithQuery(t *testing.T) {
 					Mention:    "nu",
 				},
 			},
-			want:    "https://example.com/path?q=is%3Aissue+is%3Aopen+assignee%3Abo+author%3Aka+mentions%3Anu+base%3Atrunk+head%3Abug-fix",
+			want:    "https://example.com/path?q=assignee%3Abo+author%3Aka+base%3Atrunk+head%3Abug-fix+mentions%3Anu+state%3Aopen+type%3Aissue",
 			wantErr: false,
 		},
 		{
@@ -89,7 +92,7 @@ func Test_listURLWithQuery(t *testing.T) {
 					Milestone: `Codename "What Was Missing"`,
 				},
 			},
-			want:    "https://example.com/path?q=is%3Apr+is%3Aopen+label%3Adocs+label%3A%22help+wanted%22+milestone%3A%22Codename+%5C%22What+Was+Missing%5C%22%22",
+			want:    "https://example.com/path?q=label%3A%22help+wanted%22+label%3Adocs+milestone%3A%22Codename+%5C%22What+Was+Missing%5C%22%22+state%3Aopen+type%3Apr",
 			wantErr: false,
 		},
 	}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
@@ -26,9 +27,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List deploy keys in a GitHub repository",
-		Args:  cobra.ExactArgs(0),
+		Use:     "list",
+		Short:   "List deploy keys in a GitHub repository",
+		Aliases: []string{"ls"},
+		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 
@@ -59,10 +61,10 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(deployKeys) == 0 {
-		fmt.Fprintf(opts.IO.ErrOut, "No deploy keys found in %s\n", ghrepo.FullName(repo))
-		return cmdutil.SilentError
+		return cmdutil.NewNoResultsError(fmt.Sprintf("no deploy keys found in %s", ghrepo.FullName(repo)))
 	}
 
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	t := utils.NewTablePrinter(opts.IO)
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
@@ -81,7 +83,7 @@ func listRun(opts *ListOptions) error {
 
 		createdAt := deployKey.CreatedAt.Format(time.RFC3339)
 		if t.IsTTY() {
-			createdAt = utils.FuzzyAgoAbbr(now, deployKey.CreatedAt)
+			createdAt = text.FuzzyAgoAbbr(now, deployKey.CreatedAt)
 		}
 		t.AddField(createdAt, nil, cs.Gray)
 		t.EndRow()

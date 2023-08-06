@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
@@ -17,7 +16,7 @@ func uploadDeployKey(httpClient *http.Client, repo ghrepo.Interface, keyFile io.
 	path := fmt.Sprintf("repos/%s/%s/keys", repo.RepoOwner(), repo.RepoName())
 	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
 
-	keyBytes, err := ioutil.ReadAll(keyFile)
+	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
 		return err
 	}
@@ -48,7 +47,7 @@ func uploadDeployKey(httpClient *http.Client, repo ghrepo.Interface, keyFile io.
 		return api.HandleHTTPError(resp)
 	}
 
-	_, err = io.Copy(ioutil.Discard, resp.Body)
+	_, err = io.Copy(io.Discard, resp.Body)
 	if err != nil {
 		return err
 	}

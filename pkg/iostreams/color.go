@@ -2,7 +2,6 @@ package iostreams
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -10,44 +9,21 @@ import (
 )
 
 var (
-	magenta  = ansi.ColorFunc("magenta")
-	cyan     = ansi.ColorFunc("cyan")
-	red      = ansi.ColorFunc("red")
-	yellow   = ansi.ColorFunc("yellow")
-	blue     = ansi.ColorFunc("blue")
-	green    = ansi.ColorFunc("green")
-	gray     = ansi.ColorFunc("black+h")
-	bold     = ansi.ColorFunc("default+b")
-	cyanBold = ansi.ColorFunc("cyan+b")
+	magenta   = ansi.ColorFunc("magenta")
+	cyan      = ansi.ColorFunc("cyan")
+	red       = ansi.ColorFunc("red")
+	yellow    = ansi.ColorFunc("yellow")
+	blue      = ansi.ColorFunc("blue")
+	green     = ansi.ColorFunc("green")
+	gray      = ansi.ColorFunc("black+h")
+	bold      = ansi.ColorFunc("default+b")
+	cyanBold  = ansi.ColorFunc("cyan+b")
+	greenBold = ansi.ColorFunc("green+b")
 
 	gray256 = func(t string) string {
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
 	}
 )
-
-func EnvColorDisabled() bool {
-	return os.Getenv("NO_COLOR") != "" || os.Getenv("CLICOLOR") == "0"
-}
-
-func EnvColorForced() bool {
-	return os.Getenv("CLICOLOR_FORCE") != "" && os.Getenv("CLICOLOR_FORCE") != "0"
-}
-
-func Is256ColorSupported() bool {
-	return IsTrueColorSupported() ||
-		strings.Contains(os.Getenv("TERM"), "256") ||
-		strings.Contains(os.Getenv("COLORTERM"), "256")
-}
-
-func IsTrueColorSupported() bool {
-	term := os.Getenv("TERM")
-	colorterm := os.Getenv("COLORTERM")
-
-	return strings.Contains(term, "24bit") ||
-		strings.Contains(term, "truecolor") ||
-		strings.Contains(colorterm, "24bit") ||
-		strings.Contains(colorterm, "truecolor")
-}
 
 func NewColorScheme(enabled, is256enabled bool, trueColor bool) *ColorScheme {
 	return &ColorScheme{
@@ -105,6 +81,13 @@ func (c *ColorScheme) Green(t string) string {
 
 func (c *ColorScheme) Greenf(t string, args ...interface{}) string {
 	return c.Green(fmt.Sprintf(t, args...))
+}
+
+func (c *ColorScheme) GreenBold(t string) string {
+	if !c.enabled {
+		return t
+	}
+	return greenBold(t)
 }
 
 func (c *ColorScheme) Gray(t string) string {
@@ -210,8 +193,17 @@ func (c *ColorScheme) ColorFromString(s string) func(string) string {
 	return fn
 }
 
+// ColorFromRGB returns a function suitable for TablePrinter.AddField
+// that calls HexToRGB, coloring text if supported by the terminal.
+func (c *ColorScheme) ColorFromRGB(hex string) func(string) string {
+	return func(s string) string {
+		return c.HexToRGB(hex, s)
+	}
+}
+
+// HexToRGB uses the given hex to color x if supported by the terminal.
 func (c *ColorScheme) HexToRGB(hex string, x string) string {
-	if !c.enabled || !c.hasTrueColor {
+	if !c.enabled || !c.hasTrueColor || len(hex) != 6 {
 		return x
 	}
 

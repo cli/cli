@@ -5,31 +5,29 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/pkg/set"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
+	Browser    browser.Browser
 
 	SelectorArg string
 	WebMode     bool
@@ -80,7 +78,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 var defaultFields = []string{
 	"number", "url", "state", "createdAt", "title", "body", "author", "milestone",
-	"assignees", "labels", "projectCards", "reactionGroups", "lastComment",
+	"assignees", "labels", "projectCards", "reactionGroups", "lastComment", "stateReason",
 }
 
 func viewRun(opts *ViewOptions) error {
@@ -96,11 +94,13 @@ func viewRun(opts *ViewOptions) error {
 		lookupFields.Add("url")
 	} else {
 		lookupFields.AddValues(defaultFields)
+		if opts.Comments {
+			lookupFields.Add("comments")
+			lookupFields.Remove("lastComment")
+		}
 	}
-	if opts.Comments {
-		lookupFields.Add("comments")
-		lookupFields.Remove("lastComment")
-	}
+
+	opts.IO.DetectTerminalTheme()
 
 	opts.IO.StartProgressIndicator()
 	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice())
@@ -117,12 +117,11 @@ func viewRun(opts *ViewOptions) error {
 	if opts.WebMode {
 		openURL := issue.URL
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}
 
-	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
@@ -155,6 +154,8 @@ func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error),
 	}
 
 	if fieldSet.Contains("comments") {
+		// FIXME: this re-fetches the comments connection even though the initial set of 100 were
+		// fetched in the previous request.
 		err = preloadIssueComments(client, repo, issue)
 	}
 	return issue, err
@@ -187,18 +188,16 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 
 func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	out := opts.IO.Out
-	now := opts.Now()
-	ago := now.Sub(issue.CreatedAt)
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
 	fmt.Fprintf(out, "%s #%d\n", cs.Bold(issue.Title), issue.Number)
 	fmt.Fprintf(out,
 		"%s • %s opened %s • %s\n",
-		issueStateTitleWithColor(cs, issue.State),
+		issueStateTitleWithColor(cs, issue),
 		issue.Author.Login,
-		utils.FuzzyAgo(ago),
-		utils.Pluralize(issue.Comments.TotalCount, "comment"),
+		text.FuzzyAgo(opts.Now(), issue.CreatedAt),
+		text.Pluralize(issue.Comments.TotalCount, "comment"),
 	)
 
 	// Reactions
@@ -231,7 +230,9 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	if issue.Body == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
 	} else {
-		md, err = markdown.Render(issue.Body, markdown.WithIO(opts.IO))
+		md, err = markdown.Render(issue.Body,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithWrap(opts.IO.TerminalWidth()))
 		if err != nil {
 			return err
 		}
@@ -254,9 +255,13 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	return nil
 }
 
-func issueStateTitleWithColor(cs *iostreams.ColorScheme, state string) string {
-	colorFunc := cs.ColorFromString(prShared.ColorForState(state))
-	return colorFunc(strings.Title(strings.ToLower(state)))
+func issueStateTitleWithColor(cs *iostreams.ColorScheme, issue *api.Issue) string {
+	colorFunc := cs.ColorFromString(prShared.ColorForIssueState(*issue))
+	state := "Open"
+	if issue.State == "CLOSED" {
+		state = "Closed"
+	}
+	return colorFunc(state)
 }
 
 func issueAssigneeList(issue api.Issue) string {
@@ -301,6 +306,11 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme) string {
 	if len(issue.Labels.Nodes) == 0 {
 		return ""
 	}
+
+	// ignore case sort
+	sort.SliceStable(issue.Labels.Nodes, func(i, j int) bool {
+		return strings.ToLower(issue.Labels.Nodes[i].Name) < strings.ToLower(issue.Labels.Nodes[j].Name)
+	})
 
 	labelNames := make([]string, len(issue.Labels.Nodes))
 	for i, label := range issue.Labels.Nodes {

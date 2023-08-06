@@ -3,18 +3,19 @@ package diff
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,13 @@ func Test_NewCmdDiff(t *testing.T) {
 		want    DiffOptions
 		wantErr string
 	}{
+		{
+			name: "name only",
+			args: "--name-only",
+			want: DiffOptions{
+				NameOnly: true,
+			},
+		},
 		{
 			name:  "number argument",
 			args:  "123",
@@ -83,19 +91,29 @@ func Test_NewCmdDiff(t *testing.T) {
 			name:    "invalid --color argument",
 			args:    "--color doublerainbow",
 			isTTY:   true,
-			wantErr: "the value for `--color` must be one of \"auto\", \"always\", or \"never\"",
+			wantErr: "invalid argument \"doublerainbow\" for \"--color\" flag: valid values are {always|never|auto}",
+		},
+		{
+			name:  "web mode",
+			args:  "123 --web",
+			isTTY: true,
+			want: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    true,
+				BrowserMode: true,
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
-			io.SetColorEnabled(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
+			ios.SetColorEnabled(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *DiffOptions
@@ -110,8 +128,8 @@ func Test_NewCmdDiff(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -123,19 +141,22 @@ func Test_NewCmdDiff(t *testing.T) {
 
 			assert.Equal(t, tt.want.SelectorArg, opts.SelectorArg)
 			assert.Equal(t, tt.want.UseColor, opts.UseColor)
+			assert.Equal(t, tt.want.BrowserMode, opts.BrowserMode)
 		})
 	}
 }
 
 func Test_diffRun(t *testing.T) {
-	pr := &api.PullRequest{Number: 123}
+	pr := &api.PullRequest{Number: 123, URL: "https://github.com/OWNER/REPO/pull/123"}
 
 	tests := []struct {
-		name       string
-		opts       DiffOptions
-		rawDiff    string
-		wantAccept string
-		wantStdout string
+		name           string
+		opts           DiffOptions
+		wantFields     []string
+		wantStdout     string
+		wantStderr     string
+		wantBrowsedURL string
+		httpStubs      func(*httpmock.Registry)
 	}{
 		{
 			name: "no color",
@@ -144,9 +165,11 @@ func Test_diffRun(t *testing.T) {
 				UseColor:    false,
 				Patch:       false,
 			},
-			rawDiff:    fmt.Sprintf(testDiff, "", "", "", ""),
-			wantAccept: "application/vnd.github.v3.diff",
+			wantFields: []string{"number"},
 			wantStdout: fmt.Sprintf(testDiff, "", "", "", ""),
+			httpStubs: func(reg *httpmock.Registry) {
+				stubDiffRequest(reg, "application/vnd.github.v3.diff", fmt.Sprintf(testDiff, "", "", "", ""))
+			},
 		},
 		{
 			name: "with color",
@@ -155,9 +178,11 @@ func Test_diffRun(t *testing.T) {
 				UseColor:    true,
 				Patch:       false,
 			},
-			rawDiff:    fmt.Sprintf(testDiff, "", "", "", ""),
-			wantAccept: "application/vnd.github.v3.diff",
+			wantFields: []string{"number"},
 			wantStdout: fmt.Sprintf(testDiff, "\x1b[m", "\x1b[1;38m", "\x1b[32m", "\x1b[31m"),
+			httpStubs: func(reg *httpmock.Registry) {
+				stubDiffRequest(reg, "application/vnd.github.v3.diff", fmt.Sprintf(testDiff, "", "", "", ""))
+			},
 		},
 		{
 			name: "patch format",
@@ -166,52 +191,65 @@ func Test_diffRun(t *testing.T) {
 				UseColor:    false,
 				Patch:       true,
 			},
-			rawDiff:    fmt.Sprintf(testDiff, "", "", "", ""),
-			wantAccept: "application/vnd.github.v3.patch",
+			wantFields: []string{"number"},
 			wantStdout: fmt.Sprintf(testDiff, "", "", "", ""),
+			httpStubs: func(reg *httpmock.Registry) {
+				stubDiffRequest(reg, "application/vnd.github.v3.patch", fmt.Sprintf(testDiff, "", "", "", ""))
+			},
+		},
+		{
+			name: "name only",
+			opts: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    false,
+				Patch:       false,
+				NameOnly:    true,
+			},
+			wantFields: []string{"number"},
+			wantStdout: ".github/workflows/releases.yml\nMakefile\n",
+			httpStubs: func(reg *httpmock.Registry) {
+				stubDiffRequest(reg, "application/vnd.github.v3.diff", fmt.Sprintf(testDiff, "", "", "", ""))
+			},
+		},
+		{
+			name: "web mode",
+			opts: DiffOptions{
+				SelectorArg: "123",
+				BrowserMode: true,
+			},
+			wantFields:     []string{"url"},
+			wantStderr:     "Opening github.com/OWNER/REPO/pull/123/files in your browser.\n",
+			wantBrowsedURL: "https://github.com/OWNER/REPO/pull/123/files",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			httpReg := &httpmock.Registry{}
 			defer httpReg.Verify(t)
-
-			var gotAccept string
-			httpReg.Register(
-				httpmock.REST("GET", "repos/OWNER/REPO/pulls/123"),
-				func(req *http.Request) (*http.Response, error) {
-					gotAccept = req.Header.Get("Accept")
-					return &http.Response{
-						StatusCode: 200,
-						Request:    req,
-						Body:       ioutil.NopCloser(strings.NewReader(tt.rawDiff)),
-					}, nil
-				})
-
-			opts := tt.opts
-			opts.HttpClient = func() (*http.Client, error) {
+			if tt.httpStubs != nil {
+				tt.httpStubs(httpReg)
+			}
+			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: httpReg}, nil
 			}
 
-			io, _, stdout, stderr := iostreams.Test()
-			opts.IO = io
+			browser := &browser.Stub{}
+			tt.opts.Browser = browser
+
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			tt.opts.IO = ios
 
 			finder := shared.NewMockFinder("123", pr, ghrepo.New("OWNER", "REPO"))
-			finder.ExpectFields([]string{"number"})
-			opts.Finder = finder
+			finder.ExpectFields(tt.wantFields)
+			tt.opts.Finder = finder
 
-			if err := diffRun(&opts); err != nil {
-				t.Fatalf("unexpected error: %s", err)
-			}
-			if diff := cmp.Diff(tt.wantStdout, stdout.String()); diff != "" {
-				t.Errorf("command output did not match:\n%s", diff)
-			}
-			if stderr.String() != "" {
-				t.Errorf("unexpected stderr output: %s", stderr.String())
-			}
-			if gotAccept != tt.wantAccept {
-				t.Errorf("unexpected Accept header: %s", gotAccept)
-			}
+			err := diffRun(&tt.opts)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
+			assert.Equal(t, tt.wantBrowsedURL, browser.BrowsedURL())
 		})
 	}
 }
@@ -239,12 +277,12 @@ const testDiff = `%[2]sdiff --git a/.github/workflows/releases.yml b/.github/wor
 @@ -22,8 +22,8 @@ test:
  	go test ./...
  .PHONY: test
- 
+
 %[4]s-site:%[1]s
 %[4]s-	git clone https://github.com/github/cli.github.com.git "$@"%[1]s
 %[3]s+site: bin/gh%[1]s
 %[3]s+	bin/gh repo clone github/cli.github.com "$@"%[1]s
- 
+
  site-docs: site
  	git -C site pull
 `
@@ -289,5 +327,75 @@ func Test_colorDiffLines(t *testing.T) {
 		if got := buf.String(); got != tt.output {
 			t.Errorf("expected: %q, got: %q", tt.output, got)
 		}
+	}
+}
+
+func Test_changedFileNames(t *testing.T) {
+	inputs := []struct {
+		input, output string
+	}{
+		{
+			input:  "",
+			output: "",
+		},
+		{
+			input:  "\n",
+			output: "",
+		},
+		{
+			input:  "diff --git a/cmd.go b/cmd.go\n--- /dev/null\n+++ b/cmd.go\n@@ -0,0 +1,313 @@",
+			output: "cmd.go\n",
+		},
+		{
+			input:  "diff --git a/cmd.go b/cmd.go\n--- a/cmd.go\n+++ /dev/null\n@@ -0,0 +1,313 @@",
+			output: "cmd.go\n",
+		},
+		{
+			input:  fmt.Sprintf("diff --git a/baz.go b/rename.go\n--- a/baz.go\n+++ b/rename.go\n+foo\n-b%sr", strings.Repeat("a", 2*lineBufferSize)),
+			output: "rename.go\n",
+		},
+		{
+			input:  fmt.Sprintf("diff --git a/baz.go b/baz.go\n--- a/baz.go\n+++ b/baz.go\n+foo\n-b%sr", strings.Repeat("a", 2*lineBufferSize)),
+			output: "baz.go\n",
+		},
+	}
+	for _, tt := range inputs {
+		buf := bytes.Buffer{}
+		if err := changedFilesNames(&buf, strings.NewReader(tt.input)); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if got := buf.String(); got != tt.output {
+			t.Errorf("expected: %q, got: %q", tt.output, got)
+		}
+	}
+}
+
+func stubDiffRequest(reg *httpmock.Registry, accept, diff string) {
+	reg.Register(
+		func(req *http.Request) bool {
+			if !strings.EqualFold(req.Method, "GET") {
+				return false
+			}
+			if req.URL.EscapedPath() != "/repos/OWNER/REPO/pulls/123" {
+				return false
+			}
+			return req.Header.Get("Accept") == accept
+		},
+		func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 200,
+				Request:    req,
+				Body:       io.NopCloser(strings.NewReader(diff)),
+			}, nil
+		})
+}
+
+func Test_sanitizedReader(t *testing.T) {
+	input := strings.NewReader("\t hello \x1B[m world! ăѣ𝔠ծề\r\n")
+	expected := "\t hello \\u{1b}[m world! ăѣ𝔠ծề\r\n"
+
+	err := iotest.TestReader(sanitizedReader(input), []byte(expected))
+	if err != nil {
+		t.Error(err)
 	}
 }

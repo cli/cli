@@ -5,8 +5,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	"github.com/cli/go-gh/v2/pkg/repository"
 )
 
 // Interface describes an object that represents a GitHub repository
@@ -35,19 +36,9 @@ func FullName(r Interface) string {
 	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
 }
 
-var defaultHostOverride string
-
 func defaultHost() string {
-	if defaultHostOverride != "" {
-		return defaultHostOverride
-	}
-	return ghinstance.Default()
-}
-
-// SetDefaultHost overrides the default GitHub hostname for FromFullName.
-// TODO: remove after FromFullName approach is revisited
-func SetDefaultHost(host string) {
-	defaultHostOverride = host
+	host, _ := ghAuth.DefaultHost()
+	return host
 }
 
 // FromFullName extracts the GitHub repository information from the following
@@ -59,28 +50,11 @@ func FromFullName(nwo string) (Interface, error) {
 // FromFullNameWithHost is like FromFullName that defaults to a specific host for values that don't
 // explicitly include a hostname.
 func FromFullNameWithHost(nwo, fallbackHost string) (Interface, error) {
-	if git.IsURL(nwo) {
-		u, err := git.ParseURL(nwo)
-		if err != nil {
-			return nil, err
-		}
-		return FromURL(u)
+	repo, err := repository.ParseWithHost(nwo, fallbackHost)
+	if err != nil {
+		return nil, err
 	}
-
-	parts := strings.SplitN(nwo, "/", 4)
-	for _, p := range parts {
-		if len(p) == 0 {
-			return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
-		}
-	}
-	switch len(parts) {
-	case 3:
-		return NewWithHost(parts[1], parts[2], parts[0]), nil
-	case 2:
-		return NewWithHost(parts[0], parts[1], fallbackHost), nil
-	default:
-		return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
-	}
+	return NewWithHost(repo.Owner, repo.Name, repo.Host), nil
 }
 
 // FromURL extracts the GitHub repository information from a git remote URL
@@ -118,12 +92,13 @@ func GenerateRepoURL(repo Interface, p string, args ...interface{}) string {
 	return baseURL
 }
 
-// TODO there is a parallel implementation for non-isolated commands
 func FormatRemoteURL(repo Interface, protocol string) string {
 	if protocol == "ssh" {
+		if tenant, found := ghinstance.TenantName(repo.RepoHost()); found {
+			return fmt.Sprintf("%s@%s:%s/%s.git", tenant, repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+		}
 		return fmt.Sprintf("git@%s:%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
 	}
-
 	return fmt.Sprintf("%s%s/%s.git", ghinstance.HostPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
 }
 

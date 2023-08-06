@@ -2,7 +2,7 @@ package sync
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -66,11 +66,11 @@ func TestNewCmdSync(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
@@ -229,7 +229,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(true, nil).Once()
 			},
 			wantErr: true,
-			errMsg:  "can't sync because there are local changes; please stash them before trying again",
+			errMsg:  "refusing to sync due to uncommitted/untracked local changes\ntip: use `git stash --all` before retrying the sync and run `git stash pop` afterwards",
 		},
 		{
 			name: "sync local repo with parent - existing branch, non-current",
@@ -292,7 +292,7 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 				reg.Register(
 					httpmock.REST("POST", "repos/FORKOWNER/REPO-FORK/merge-upstream"),
-					httpmock.StatusStringResponse(404, `{}`))
+					httpmock.StatusStringResponse(422, `{}`))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
@@ -417,12 +417,63 @@ func Test_SyncRun(t *testing.T) {
 							StatusCode: 422,
 							Request:    req,
 							Header:     map[string][]string{"Content-Type": {"application/json"}},
-							Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message":"Update is not a fast forward"}`)),
+							Body:       io.NopCloser(bytes.NewBufferString(`{"message":"Update is not a fast forward"}`)),
 						}, nil
 					})
 			},
 			wantErr: true,
 			errMsg:  "can't sync because there are diverging changes; use `--force` to overwrite the destination branch",
+		},
+		{
+			name: "sync remote fork with parent and no existing branch on fork",
+			tty:  true,
+			opts: &SyncOptions{
+				DestArg: "OWNER/REPO-FORK",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryFindParent\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"parent":{"name":"REPO","owner":{"login": "OWNER"}}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusStringResponse(409, `{"message": "Merge conflict"}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
+					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
+					func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: 422,
+							Request:    req,
+							Header:     map[string][]string{"Content-Type": {"application/json"}},
+							Body:       io.NopCloser(bytes.NewBufferString(`{"message":"Reference does not exist"}`)),
+						}, nil
+					})
+			},
+			wantErr: true,
+			errMsg:  "trunk branch does not exist on OWNER/REPO-FORK repository",
+		},
+		{
+			name: "sync remote fork with missing workflow scope on token",
+			opts: &SyncOptions{
+				DestArg: "FORKOWNER/REPO-FORK",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
+				reg.Register(
+					httpmock.REST("POST", "repos/FORKOWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusJSONResponse(422, struct {
+						Message string `json:"message"`
+					}{Message: "refusing to allow an OAuth App to create or update workflow `.github/workflows/unimportant.yml` without `workflow` scope"}))
+			},
+			wantErr: true,
+			errMsg:  "Upstream commits contain workflow changes, which require the `workflow` scope to merge. To request it, run: gh auth refresh -s workflow",
 		},
 	}
 	for _, tt := range tests {
@@ -434,10 +485,10 @@ func Test_SyncRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 
 		repo1, _ := ghrepo.FromFullName("OWNER/REPO")
 		repo2, _ := ghrepo.FromFullName("OWNER2/REPO2")

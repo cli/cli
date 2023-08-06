@@ -7,12 +7,46 @@ import (
 	"net"
 
 	"github.com/opentracing/opentracing-go"
+	"golang.org/x/crypto/ssh"
 )
+
+type portForwardingSession interface {
+	StartSharing(context.Context, string, int) (ChannelID, error)
+	OpenStreamingChannel(context.Context, ChannelID) (ssh.Channel, error)
+	KeepAlive(string)
+}
+
+type ReadWriteHalfCloser interface {
+	io.ReadWriteCloser
+	CloseWrite() error
+}
+
+type combinedReadWriteHalfCloser struct {
+	io.ReadCloser
+	io.WriteCloser
+}
+
+func NewReadWriteHalfCloser(reader io.ReadCloser, writer io.WriteCloser) ReadWriteHalfCloser {
+	return &combinedReadWriteHalfCloser{reader, writer}
+}
+
+func (crwc *combinedReadWriteHalfCloser) Close() error {
+	werr := crwc.WriteCloser.Close()
+	rerr := crwc.ReadCloser.Close()
+	if werr != nil {
+		return werr
+	}
+	return rerr
+}
+
+func (crwc *combinedReadWriteHalfCloser) CloseWrite() error {
+	return crwc.WriteCloser.Close()
+}
 
 // A PortForwarder forwards TCP traffic over a Live Share session from a port on a remote
 // container to a local destination such as a network port or Go reader/writer.
 type PortForwarder struct {
-	session    *Session
+	session    portForwardingSession
 	name       string
 	remotePort int
 	keepAlive  bool
@@ -22,7 +56,7 @@ type PortForwarder struct {
 // remote port and Live Share session. The name describes the purpose
 // of the remote port or service. The keepAlive flag indicates whether
 // the session should be kept alive with port forwarding traffic.
-func NewPortForwarder(session *Session, name string, remotePort int, keepAlive bool) *PortForwarder {
+func NewPortForwarder(session portForwardingSession, name string, remotePort int, keepAlive bool) *PortForwarder {
 	return &PortForwarder{
 		session:    session,
 		name:       name,
@@ -41,7 +75,7 @@ func NewPortForwarder(session *Session, name string, remotePort int, keepAlive b
 // until it encounters the first error, which may include context
 // cancellation. Its error result is always non-nil. The caller is
 // responsible for closing the listening port.
-func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.Listener) (err error) {
+func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen *net.TCPListener) (err error) {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
 		return err
@@ -58,7 +92,7 @@ func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.List
 	}
 	go func() {
 		for {
-			conn, err := listen.Accept()
+			conn, err := listen.AcceptTCP()
 			if err != nil {
 				sendError(err)
 				return
@@ -77,7 +111,7 @@ func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.List
 
 // Forward forwards traffic between the container's remote port and
 // the specified read/write stream. On return, the stream is closed.
-func (fwd *PortForwarder) Forward(ctx context.Context, conn io.ReadWriteCloser) error {
+func (fwd *PortForwarder) Forward(ctx context.Context, conn ReadWriteHalfCloser) error {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
 		conn.Close()
@@ -92,11 +126,12 @@ func (fwd *PortForwarder) Forward(ctx context.Context, conn io.ReadWriteCloser) 
 	return awaitError(ctx, errc)
 }
 
-func (fwd *PortForwarder) shareRemotePort(ctx context.Context) (channelID, error) {
-	id, err := fwd.session.startSharing(ctx, fwd.name, fwd.remotePort)
+func (fwd *PortForwarder) shareRemotePort(ctx context.Context) (ChannelID, error) {
+	id, err := fwd.session.StartSharing(ctx, fwd.name, fwd.remotePort)
 	if err != nil {
 		err = fmt.Errorf("failed to share remote port %d: %w", fwd.remotePort, err)
 	}
+
 	return id, err
 }
 
@@ -109,35 +144,39 @@ func awaitError(ctx context.Context, errc <-chan error) error {
 	}
 }
 
+type trafficMonitorSession interface {
+	KeepAlive(string)
+}
+
 // trafficMonitor implements io.Reader. It keeps the session alive by notifying
 // it of the traffic type during Read operations.
 type trafficMonitor struct {
 	reader io.Reader
 
-	session     *Session
+	session     trafficMonitorSession
 	trafficType string
 }
 
 // newTrafficMonitor returns a new trafficMonitor for the specified
 // session and traffic type. It wraps the provided io.Reader with its own
 // Read method.
-func newTrafficMonitor(reader io.Reader, session *Session, trafficType string) *trafficMonitor {
+func newTrafficMonitor(reader io.Reader, session trafficMonitorSession, trafficType string) *trafficMonitor {
 	return &trafficMonitor{reader, session, trafficType}
 }
 
 func (t *trafficMonitor) Read(p []byte) (n int, err error) {
-	t.session.keepAlive(t.trafficType)
+	t.session.KeepAlive(t.trafficType)
 	return t.reader.Read(p)
 }
 
 // handleConnection handles forwarding for a single accepted connection, then closes it.
-func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, conn io.ReadWriteCloser) (err error) {
+func (fwd *PortForwarder) handleConnection(ctx context.Context, id ChannelID, conn ReadWriteHalfCloser) (err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PortForwarder.handleConnection")
 	defer span.Finish()
 
 	defer safeClose(conn, &err)
 
-	channel, err := fwd.session.openStreamingChannel(ctx, id)
+	channel, err := fwd.session.OpenStreamingChannel(ctx, id)
 	if err != nil {
 		return fmt.Errorf("error opening streaming channel for new connection: %w", err)
 	}
@@ -153,9 +192,12 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, co
 
 	// bi-directional copy of data.
 	errs := make(chan error, 2)
-	copyConn := func(w io.Writer, r io.Reader) {
+	copyConn := func(w ReadWriteHalfCloser, r io.Reader) {
 		_, err := io.Copy(w, r)
 		errs <- err
+
+		// Ignore errors here, we call the full Close() later and catch that error
+		_ = w.CloseWrite()
 	}
 
 	var (

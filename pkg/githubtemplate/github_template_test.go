@@ -1,7 +1,6 @@
 package githubtemplate
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -9,7 +8,7 @@ import (
 )
 
 func TestFindNonLegacy(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "gh-cli")
+	tmpdir, err := os.MkdirTemp("", "gh-cli")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +140,7 @@ func TestFindNonLegacy(t *testing.T) {
 }
 
 func TestFindLegacy(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "gh-cli")
+	tmpdir, err := os.MkdirTemp("", "gh-cli")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +260,7 @@ func TestFindLegacy(t *testing.T) {
 }
 
 func TestExtractName(t *testing.T) {
-	tmpfile, err := ioutil.TempFile(t.TempDir(), "gh-cli")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "gh-cli")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +311,7 @@ about: This is how you report bugs
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = ioutil.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
+			_ = os.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
 			if got := ExtractName(tt.args.filePath); got != tt.want {
 				t.Errorf("ExtractName() = %v, want %v", got, tt.want)
 			}
@@ -321,7 +320,7 @@ about: This is how you report bugs
 }
 
 func TestExtractContents(t *testing.T) {
-	tmpfile, err := ioutil.TempFile(t.TempDir(), "gh-cli")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "gh-cli")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +375,7 @@ Even more
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = ioutil.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
+			_ = os.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
 			if got := ExtractContents(tt.args.filePath); string(got) != tt.want {
 				t.Errorf("ExtractContents() = %v, want %v", string(got), tt.want)
 			}
