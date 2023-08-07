@@ -47,7 +47,8 @@ import (
 )
 
 const (
-	defaultAPIURL = "https://api.github.com"
+	defaultAPIURL    = "https://api.github.com"
+	defaultServerURL = "https://github.com"
 )
 
 const (
@@ -61,6 +62,7 @@ const (
 type API struct {
 	client       func() (*http.Client, error)
 	githubAPI    string
+	githubServer string
 	retryBackoff time.Duration
 }
 
@@ -70,7 +72,7 @@ func New(f *cmdutil.Factory) *API {
 	if apiURL == "" {
 		cfg, err := f.Config()
 		if err != nil {
-			// fallback to the default endpoint
+			// fallback to the default api endpoint
 			apiURL = defaultAPIURL
 		} else {
 			host, _ := cfg.Authentication().DefaultHost()
@@ -78,9 +80,22 @@ func New(f *cmdutil.Factory) *API {
 		}
 	}
 
+	serverURL := os.Getenv("GITHUB_SERVER_URL")
+	if serverURL == "" {
+		cfg, err := f.Config()
+		if err != nil {
+			// fallback to the default server endpoint
+			serverURL = defaultServerURL
+		} else {
+			host, _ := cfg.Authentication().DefaultHost()
+			serverURL = ghinstance.HostPrefix(host)
+		}
+	}
+
 	return &API{
 		client:       f.HttpClient,
 		githubAPI:    strings.TrimSuffix(apiURL, "/"),
+		githubServer: strings.TrimSuffix(serverURL, "/"),
 		retryBackoff: 100 * time.Millisecond,
 	}
 }
@@ -89,6 +104,11 @@ func New(f *cmdutil.Factory) *API {
 type User struct {
 	Login string `json:"login"`
 	Type  string `json:"type"`
+}
+
+// GetServerURL returns the server url (not the API url), such as https://github.com
+func (a *API) GetServerURL() string {
+	return a.githubServer
 }
 
 // GetUser returns the user associated with the given token.

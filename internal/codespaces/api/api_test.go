@@ -134,7 +134,7 @@ func createHttpClient() (*http.Client, error) {
 	return &http.Client{}, nil
 }
 
-func TestNewApiServerUrl_dotcomConfig(t *testing.T) {
+func TestNew_APIURL_dotcomConfig(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
@@ -152,11 +152,11 @@ func TestNewApiServerUrl_dotcomConfig(t *testing.T) {
 		t.Fatalf("expected https://api.github.com, got %s", api.githubAPI)
 	}
 	if len(cfg.AuthenticationCalls()) != 1 {
-		t.Fatalf("Server url was not pulled from the config")
+		t.Fatalf("API url was not pulled from the config")
 	}
 }
 
-func TestNewApiServerUrl_customConfig(t *testing.T) {
+func TestNew_APIURL_customConfig(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
@@ -176,11 +176,11 @@ func TestNewApiServerUrl_customConfig(t *testing.T) {
 		t.Fatalf("expected https://github.mycompany.com/api/v3, got %s", api.githubAPI)
 	}
 	if len(cfg.AuthenticationCalls()) != 1 {
-		t.Fatalf("Server url was not pulled from the config")
+		t.Fatalf("API url was not pulled from the config")
 	}
 }
 
-func TestNewApiServerUrl_env(t *testing.T) {
+func TestNew_APIURL_env(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "https://api.mycompany.com")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
@@ -202,7 +202,7 @@ func TestNewApiServerUrl_env(t *testing.T) {
 	}
 }
 
-func TestNewApiServerUrl_dotcomFallback(t *testing.T) {
+func TestNew_APIURL_dotcomFallback(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "")
 	f := &cmdutil.Factory{
 		Config: func() (config.Config, error) {
@@ -213,6 +213,88 @@ func TestNewApiServerUrl_dotcomFallback(t *testing.T) {
 
 	if api.githubAPI != "https://api.github.com" {
 		t.Fatalf("expected https://api.github.com, got %s", api.githubAPI)
+	}
+}
+
+func TestNew_ServerURL_dotcomConfig(t *testing.T) {
+	t.Setenv("GITHUB_SERVER_URL", "")
+	cfg := &config.ConfigMock{
+		AuthenticationFunc: func() *config.AuthConfig {
+			return &config.AuthConfig{}
+		},
+	}
+	f := &cmdutil.Factory{
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+	}
+	api := New(f)
+
+	if api.githubServer != "https://github.com" {
+		t.Fatalf("expected https://github.com, got %s", api.githubServer)
+	}
+	if len(cfg.AuthenticationCalls()) != 1 {
+		t.Fatalf("Server url was not pulled from the config")
+	}
+}
+
+func TestNew_ServerURL_customConfig(t *testing.T) {
+	t.Setenv("GITHUB_SERVER_URL", "")
+	cfg := &config.ConfigMock{
+		AuthenticationFunc: func() *config.AuthConfig {
+			authCfg := &config.AuthConfig{}
+			authCfg.SetDefaultHost("github.mycompany.com", "GH_HOST")
+			return authCfg
+		},
+	}
+	f := &cmdutil.Factory{
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+	}
+	api := New(f)
+
+	if api.githubServer != "https://github.mycompany.com" {
+		t.Fatalf("expected https://github.mycompany.com, got %s", api.githubServer)
+	}
+	if len(cfg.AuthenticationCalls()) != 1 {
+		t.Fatalf("Server url was not pulled from the config")
+	}
+}
+
+func TestNew_ServerURL_env(t *testing.T) {
+	t.Setenv("GITHUB_SERVER_URL", "https://mycompany.com")
+	cfg := &config.ConfigMock{
+		AuthenticationFunc: func() *config.AuthConfig {
+			return &config.AuthConfig{}
+		},
+	}
+	f := &cmdutil.Factory{
+		Config: func() (config.Config, error) {
+			return cfg, nil
+		},
+	}
+	api := New(f)
+
+	if api.githubServer != "https://mycompany.com" {
+		t.Fatalf("expected https://mycompany.com, got %s", api.githubServer)
+	}
+	if len(cfg.AuthenticationCalls()) != 0 {
+		t.Fatalf("Configuration was checked instead of using the GITHUB_SERVER_URL environment variable")
+	}
+}
+
+func TestNew_ServerURL_dotcomFallback(t *testing.T) {
+	t.Setenv("GITHUB_SERVER_URL", "")
+	f := &cmdutil.Factory{
+		Config: func() (config.Config, error) {
+			return nil, errors.New("Failed to load")
+		},
+	}
+	api := New(f)
+
+	if api.githubServer != "https://github.com" {
+		t.Fatalf("expected https://github.com, got %s", api.githubServer)
 	}
 }
 
