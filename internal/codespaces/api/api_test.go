@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"strconv"
 	"testing"
@@ -136,7 +135,7 @@ func createHttpClient() (*http.Client, error) {
 }
 
 func TestNewApiServerUrl_dotcomConfig(t *testing.T) {
-	os.Setenv("GITHUB_API_URL", "")
+	t.Setenv("GITHUB_API_URL", "")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
 			return &config.AuthConfig{}
@@ -158,7 +157,7 @@ func TestNewApiServerUrl_dotcomConfig(t *testing.T) {
 }
 
 func TestNewApiServerUrl_customConfig(t *testing.T) {
-	os.Setenv("GITHUB_API_URL", "")
+	t.Setenv("GITHUB_API_URL", "")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
 			authCfg := &config.AuthConfig{}
@@ -182,7 +181,7 @@ func TestNewApiServerUrl_customConfig(t *testing.T) {
 }
 
 func TestNewApiServerUrl_env(t *testing.T) {
-	os.Setenv("GITHUB_API_URL", "https://api.mycompany.com")
+	t.Setenv("GITHUB_API_URL", "https://api.mycompany.com")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
 			return &config.AuthConfig{}
@@ -204,7 +203,7 @@ func TestNewApiServerUrl_env(t *testing.T) {
 }
 
 func TestNewApiServerUrl_dotcomFallback(t *testing.T) {
-	os.Setenv("GITHUB_API_URL", "")
+	t.Setenv("GITHUB_API_URL", "")
 	f := &cmdutil.Factory{
 		Config: func() (config.Config, error) {
 			return nil, errors.New("Failed to load")
