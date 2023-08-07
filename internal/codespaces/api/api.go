@@ -1,13 +1,12 @@
 package api
 
 // For descriptions of service interfaces, see:
-// - https://online.visualstudio.com/api/swagger (for visualstudio.com)
 // - https://docs.github.com/en/rest/reference/repos (for api.github.com)
 // - https://github.com/github/github/blob/master/app/api/codespaces.rb (for vscs_internal)
 // TODO(adonovan): replace the last link with a public doc URL when available.
 
 // TODO(adonovan): a possible reorganization would be to split this
-// file into three internal packages, one per backend service, and to
+// file into two internal packages, one per backend service, and to
 // rename api.API to github.Client:
 //
 // - github.GetUser(github.Client)
@@ -20,7 +19,6 @@ package api
 // - codespaces.GetToken(Client, login, name)
 // - codespaces.List(Client, user)
 // - codespaces.Start(Client, token, codespace)
-// - visualstudio.GetRegionLocation(http.Client) // no dependency on github
 //
 // This would make the meaning of each operation clearer.
 
@@ -49,7 +47,7 @@ import (
 )
 
 const (
-	defaultApiUrl = "https://api.github.com"
+	defaultAPIURL = "https://api.github.com"
 )
 
 const (
@@ -73,7 +71,7 @@ func New(f *cmdutil.Factory) *API {
 		cfg, err := f.Config()
 		if err != nil {
 			// fallback to the default endpoint
-			apiURL = defaultApiUrl
+			apiURL = defaultAPIURL
 		} else {
 			host, _ := cfg.Authentication().DefaultHost()
 			apiURL = ghinstance.RESTPrefix(host)
