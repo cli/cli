@@ -172,7 +172,7 @@ func TestApp_List(t *testing.T) {
 			name: "list codespaces,--web",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetServerURLFunc: func() string {
+					ServerURLFunc: func() string {
 						return "https://github.com"
 					},
 				},
@@ -186,7 +186,7 @@ func TestApp_List(t *testing.T) {
 			name: "list codespaces,--web with custom server url",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetServerURLFunc: func() string {
+					ServerURLFunc: func() string {
 						return "https://github.mycompany.com"
 					},
 				},
@@ -220,7 +220,7 @@ func TestApp_List(t *testing.T) {
 							},
 						}, nil
 					},
-					GetServerURLFunc: func() string {
+					ServerURLFunc: func() string {
 						return "https://github.com"
 					},
 				},

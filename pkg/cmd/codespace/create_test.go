@@ -455,7 +455,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			name: "return default url when using web flag without other flags",
 			fields: fields{
 				apiClient: apiCreateDefaults(&apiClientMock{
-					GetServerURLFunc: func() string {
+					ServerURLFunc: func() string {
 						return "https://github.com"
 					},
 				}),
@@ -469,7 +469,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			name: "return custom server url when using web flag",
 			fields: fields{
 				apiClient: apiCreateDefaults(&apiClientMock{
-					GetServerURLFunc: func() string {
+					ServerURLFunc: func() string {
 						return "https://github.mycompany.com"
 					},
 				}),
@@ -494,7 +494,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 							Name: "monalisa-dotfiles-abcd1234",
 						}, nil
 					},
-					GetServerURLFunc: func() string {
+					ServerURLFunc: func() string {
 						return "https://github.com"
 					},
 				}),
@@ -523,7 +523,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 							Name: "monalisa-dotfiles-abcd1234",
 						}, nil
 					},
-					GetServerURLFunc: func() string {
+					ServerURLFunc: func() string {
 						return "https://github.com"
 					},
 				}),
@@ -551,7 +551,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 							Machine: api.CodespaceMachine{Name: "GIGA"},
 						}, nil
 					},
-					GetServerURLFunc: func() string {
+					ServerURLFunc: func() string {
 						return "https://github.com"
 					},
 				}),

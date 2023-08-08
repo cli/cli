@@ -106,8 +106,8 @@ type User struct {
 	Type  string `json:"type"`
 }
 
-// GetServerURL returns the server url (not the API url), such as https://github.com
-func (a *API) GetServerURL() string {
+// ServerURL returns the server url (not the API url), such as https://github.com
+func (a *API) ServerURL() string {
 	return a.githubServer
 }
 

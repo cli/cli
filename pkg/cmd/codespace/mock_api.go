@@ -46,8 +46,8 @@ import (
 //			GetRepositoryFunc: func(ctx context.Context, nwo string) (*codespacesAPI.Repository, error) {
 //				panic("mock out the GetRepository method")
 //			},
-//			GetServerURLFunc: func() string {
-//				panic("mock out the GetServerURL method")
+//			ServerURLFunc: func() string {
+//				panic("mock out the ServerURL method")
 //			},
 //			GetUserFunc: func(ctx context.Context) (*codespacesAPI.User, error) {
 //				panic("mock out the GetUser method")
@@ -101,8 +101,8 @@ type apiClientMock struct {
 	// GetRepositoryFunc mocks the GetRepository method.
 	GetRepositoryFunc func(ctx context.Context, nwo string) (*codespacesAPI.Repository, error)
 
-	// GetServerURLFunc mocks the GetServerURL method.
-	GetServerURLFunc func() string
+	// ServerURLFunc mocks the ServerURL method.
+	ServerURLFunc func() string
 
 	// GetUserFunc mocks the GetUser method.
 	GetUserFunc func(ctx context.Context) (*codespacesAPI.User, error)
@@ -213,8 +213,8 @@ type apiClientMock struct {
 			// Nwo is the nwo argument value.
 			Nwo string
 		}
-		// GetServerURL holds details about calls to the GetServerURL method.
-		GetServerURL []struct {
+		// ServerURL holds details about calls to the ServerURL method.
+		ServerURL []struct {
 		}
 		// GetUser holds details about calls to the GetUser method.
 		GetUser []struct {
@@ -268,7 +268,7 @@ type apiClientMock struct {
 	lockGetCodespacesMachines          sync.RWMutex
 	lockGetOrgMemberCodespace          sync.RWMutex
 	lockGetRepository                  sync.RWMutex
-	lockGetServerURL                   sync.RWMutex
+	lockServerURL                      sync.RWMutex
 	lockGetUser                        sync.RWMutex
 	lockListCodespaces                 sync.RWMutex
 	lockListDevContainers              sync.RWMutex
@@ -680,30 +680,30 @@ func (mock *apiClientMock) GetRepositoryCalls() []struct {
 	return calls
 }
 
-// GetServerURL calls GetServerURLFunc.
-func (mock *apiClientMock) GetServerURL() string {
-	if mock.GetServerURLFunc == nil {
-		panic("apiClientMock.GetServerURLFunc: method is nil but apiClient.GetServerURL was just called")
+// ServerURL calls ServerURLFunc.
+func (mock *apiClientMock) ServerURL() string {
+	if mock.ServerURLFunc == nil {
+		panic("apiClientMock.ServerURLFunc: method is nil but apiClient.ServerURL was just called")
 	}
 	callInfo := struct {
 	}{}
-	mock.lockGetServerURL.Lock()
-	mock.calls.GetServerURL = append(mock.calls.GetServerURL, callInfo)
-	mock.lockGetServerURL.Unlock()
-	return mock.GetServerURLFunc()
+	mock.lockServerURL.Lock()
+	mock.calls.ServerURL = append(mock.calls.ServerURL, callInfo)
+	mock.lockServerURL.Unlock()
+	return mock.ServerURLFunc()
 }
 
-// GetServerURLCalls gets all the calls that were made to GetServerURL.
+// ServerURLCalls gets all the calls that were made to ServerURL.
 // Check the length with:
 //
-//	len(mockedapiClient.GetServerURLCalls())
-func (mock *apiClientMock) GetServerURLCalls() []struct {
+//	len(mockedapiClient.ServerURLCalls())
+func (mock *apiClientMock) ServerURLCalls() []struct {
 } {
 	var calls []struct {
 	}
-	mock.lockGetServerURL.RLock()
-	calls = mock.calls.GetServerURL
-	mock.lockGetServerURL.RUnlock()
+	mock.lockServerURL.RLock()
+	calls = mock.calls.ServerURL
+	mock.lockServerURL.RUnlock()
 	return calls
 }
 
