@@ -441,14 +441,16 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			if r.RebaseMergeAllowed {
 				defaultMergeOptions = append(defaultMergeOptions, allowRebaseMerge)
 			}
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.MultiSelect{
-				Message: "Allowed merge strategies",
-				Default: defaultMergeOptions,
-				Options: []string{allowMergeCommits, allowSquashMerge, allowRebaseMerge},
-			}, &selectedMergeOptions)
+			mergeOpts := []string{allowMergeCommits, allowSquashMerge, allowRebaseMerge}
+			selected, err := opts.Prompter.MultiSelect(
+				"Allowed merge strategies",
+				defaultMergeOptions,
+				mergeOpts)
 			if err != nil {
 				return err
+			}
+			for _, i := range selected {
+				selectedMergeOptions = append(selectedMergeOptions, mergeOpts[i])
 			}
 			enableMergeCommit := isIncluded(allowMergeCommits, selectedMergeOptions)
 			opts.Edits.EnableMergeCommit = &enableMergeCommit
