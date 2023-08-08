@@ -458,24 +458,19 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 
 			opts.Edits.EnableAutoMerge = &r.AutoMergeAllowed
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Enable Auto Merge?",
-				Default: r.AutoMergeAllowed,
-			}, opts.Edits.EnableAutoMerge)
+			c, err := opts.Prompter.Confirm("Enable Auto Merge?", r.AutoMergeAllowed)
 			if err != nil {
 				return err
 			}
+			opts.Edits.EnableAutoMerge = &c
 
 			opts.Edits.DeleteBranchOnMerge = &r.DeleteBranchOnMerge
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Automatically delete head branches after merging?",
-				Default: r.DeleteBranchOnMerge,
-			}, opts.Edits.DeleteBranchOnMerge)
+			c, err = opts.Prompter.Confirm(
+				"Automatically delete head branches after merging?", r.DeleteBranchOnMerge)
 			if err != nil {
 				return err
 			}
+			opts.Edits.DeleteBranchOnMerge = &c
 		case optionTemplateRepo:
 			opts.Edits.IsTemplate = &r.IsTemplate
 			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter

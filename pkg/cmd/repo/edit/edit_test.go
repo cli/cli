@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/pkg/prompt"
-
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -193,7 +191,6 @@ func Test_editRun_interactive(t *testing.T) {
 	tests := []struct {
 		name        string
 		opts        EditOptions
-		askStubs    func(*prompt.AskStubber)
 		promptStubs func(*prompter.MockPrompter)
 		httpStubs   func(*testing.T, *httpmock.Registry)
 		wantsStderr string
@@ -205,7 +202,6 @@ func Test_editRun_interactive(t *testing.T) {
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
 					func(_ string, _, opts []string) ([]int, error) {
@@ -252,7 +248,6 @@ func Test_editRun_interactive(t *testing.T) {
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
 					func(_ string, _, opts []string) ([]int, error) {
@@ -312,11 +307,22 @@ func Test_editRun_interactive(t *testing.T) {
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Merge Options"})
-				as.StubPrompt("Allowed merge strategies").AnswerWith([]string{allowMergeCommits, allowRebaseMerge})
-				as.StubPrompt("Enable Auto Merge?").AnswerWith(false)
-				as.StubPrompt("Automatically delete head branches after merging?").AnswerWith(false)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{4}, nil
+					})
+				pm.RegisterMultiSelect("Allowed merge strategies", nil,
+					[]string{allowMergeCommits, allowSquashMerge, allowRebaseMerge},
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{0, 2}, nil
+					})
+				pm.RegisterConfirm("Enable Auto Merge?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
+				pm.RegisterConfirm("Automatically delete head branches after merging?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -378,11 +384,6 @@ func Test_editRun_interactive(t *testing.T) {
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
 			opts.IO = ios
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
-			}
 
 			err := editRun(context.Background(), opts)
 			if tt.wantsErr == "" {
