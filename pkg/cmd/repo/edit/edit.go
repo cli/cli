@@ -279,7 +279,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 	return nil
 }
 
-func interactiveChoice(r *api.Repository) ([]string, error) {
+func interactiveChoice(opts EditOptions, r *api.Repository) ([]string, error) {
 	options := []string{
 		optionDefaultBranchName,
 		optionDescription,
@@ -298,11 +298,14 @@ func interactiveChoice(r *api.Repository) ([]string, error) {
 		options = append(options, optionAllowForking)
 	}
 	var answers []string
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(&survey.MultiSelect{
-		Message: "What do you want to edit?",
-		Options: options,
-	}, &answers, survey.WithPageSize(11))
+	selected, err := opts.Prompter.MultiSelect("What do you want to edit?", nil, options)
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range selected {
+		answers = append(answers, options[i])
+	}
+
 	return answers, err
 }
 
@@ -310,7 +313,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 	for _, v := range r.RepositoryTopics.Nodes {
 		opts.topicsCache = append(opts.topicsCache, v.Topic.Name)
 	}
-	choices, err := interactiveChoice(r)
+	choices, err := interactiveChoice(*opts, r)
 	if err != nil {
 		return err
 	}
@@ -318,14 +321,11 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 		switch c {
 		case optionDescription:
 			opts.Edits.Description = &r.Description
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Description of the repository",
-				Default: r.Description,
-			}, opts.Edits.Description)
+			answer, err := opts.Prompter.Input("Description of the repository", r.Description)
 			if err != nil {
 				return err
 			}
+			opts.Edits.Description = &answer
 		case optionHomePageURL:
 			opts.Edits.Homepage = &r.HomepageURL
 			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
@@ -337,11 +337,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				return err
 			}
 		case optionTopics:
-			var addTopics string
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Add topics?(csv format)",
-			}, &addTopics)
+			addTopics, err := opts.Prompter.Input("Add topics?(csv format)", "")
 			if err != nil {
 				return err
 			}
@@ -350,13 +346,12 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 
 			if len(opts.topicsCache) > 0 {
-				//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-				err = prompt.SurveyAskOne(&survey.MultiSelect{
-					Message: "Remove Topics",
-					Options: opts.topicsCache,
-				}, &opts.RemoveTopics)
+				selected, err := opts.Prompter.MultiSelect("Remove Topics", nil, opts.topicsCache)
 				if err != nil {
 					return err
+				}
+				for _, i := range selected {
+					opts.RemoveTopics = append(opts.RemoveTopics, opts.topicsCache[i])
 				}
 			}
 		case optionDefaultBranchName:

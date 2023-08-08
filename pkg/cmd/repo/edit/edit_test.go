@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/prompt"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -174,11 +175,26 @@ func Test_editRun(t *testing.T) {
 	}
 }
 
+// TODO consider unit test for interactiveRepoEdit that exercises every prompt type
+
 func Test_editRun_interactive(t *testing.T) {
+	editList := []string{
+		"Default Branch Name",
+		"Description",
+		"Home Page URL",
+		"Issues",
+		"Merge Options",
+		"Projects",
+		"Template Repository",
+		"Topics",
+		"Visibility",
+		"Wikis"}
+
 	tests := []struct {
 		name        string
 		opts        EditOptions
 		askStubs    func(*prompt.AskStubber)
+		promptStubs func(*prompter.MockPrompter)
 		httpStubs   func(*testing.T, *httpmock.Registry)
 		wantsStderr string
 		wantsErr    string
@@ -189,9 +205,16 @@ func Test_editRun_interactive(t *testing.T) {
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description"})
-				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
+			askStubs: func(as *prompt.AskStubber) {},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{1}, nil
+					})
+				pm.RegisterInput("Description of the repository",
+					func(_, _ string) (string, error) {
+						return "awesome repo description", nil
+					})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -229,11 +252,24 @@ func Test_editRun_interactive(t *testing.T) {
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description", "Topics"})
-				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
-				as.StubPrompt("Add topics?(csv format)").AnswerWith("a, b,c,d ")
-				as.StubPrompt("Remove Topics").AnswerWith([]string{"x"})
+			askStubs: func(as *prompt.AskStubber) {},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{1, 7}, nil
+					})
+				pm.RegisterInput("Description of the repository",
+					func(_, _ string) (string, error) {
+						return "awesome repo description", nil
+					})
+				pm.RegisterInput("Add topics?(csv format)",
+					func(_, _ string) (string, error) {
+						return "a, b,c,d ", nil
+					})
+				pm.RegisterMultiSelect("Remove Topics", nil, []string{"x"},
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{0}, nil
+					})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -331,6 +367,12 @@ func Test_editRun_interactive(t *testing.T) {
 			defer httpReg.Verify(t)
 			if tt.httpStubs != nil {
 				tt.httpStubs(t, httpReg)
+			}
+
+			pm := prompter.NewMockPrompter(t)
+			tt.opts.Prompter = pm
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
 			}
 
 			opts := &tt.opts
