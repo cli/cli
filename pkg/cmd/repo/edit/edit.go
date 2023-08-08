@@ -394,16 +394,6 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			if err != nil {
 				return err
 			}
-		case optionDiscussions:
-			opts.Edits.EnableDiscussions = &r.HasDiscussionsEnabled
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Enable Discussions?",
-				Default: r.HasDiscussionsEnabled,
-			}, opts.Edits.EnableDiscussions)
-			if err != nil {
-				return err
-			}
 		case optionVisibility:
 			opts.Edits.Visibility = &r.Visibility
 			visibilityOptions := []string{"public", "private", "internal"}
