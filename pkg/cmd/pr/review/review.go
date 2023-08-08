@@ -28,6 +28,9 @@ type ReviewOptions struct {
 	InteractiveMode bool
 	ReviewType      api.PullRequestReviewState
 	Body            string
+	File            string
+	Line            int
+	StartLine       *int
 }
 
 func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Command {
@@ -45,6 +48,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 	)
 
 	var bodyFile string
+	var linesSlice []int
 
 	cmd := &cobra.Command{
 		Use:   "review [<number> | <url> | <branch>]",
@@ -66,6 +70,9 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 
 			# request changes on a specific pull request
 			$ gh pr review 123 -r -b "needs more ASCII art"
+
+			# leave a comment on specific lines in a file
+			$ gh pr review --file README.md --lines 5,6 --body "this is great"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -128,6 +135,23 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("need exactly one of --approve, --request-changes, or --comment")
 			}
 
+			if opts.File != 0 && found > 0 {
+				return cmdutil.FlagErrorf("cannot specify --approve, --request-changes, or --comment when commenting on a file")
+			}
+
+			if len(linesSlice) > 0 && opts.File == "" {
+				return cmdutil.FlagErrorf("must specify --file if --lines is given")
+			}
+
+			if len(linesSlice) == 1 {
+				opts.Line = linesSlice[0]
+			} else if len(linesSlice) == 2 {
+				opts.StartLine = &linesSlice[0]
+				opts.Line = linesSlice[1]
+			} else {
+				return cmdutil.FlagErrorf("--lines must be either a single line, or a range")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -140,6 +164,8 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&flagComment, "comment", "c", false, "Comment on a pull request")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Specify the body of a review")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
+	cmd.Flags().StringVarP(&opts.File, "file", "f", "", "Specify the file to which the comment pertains")
+	cmd.Flags().IntSliceVarP(&linesSlice, "lines", "l", []int{}, "Specify the lines in `file` to which the comment pertains")
 
 	return cmd
 }
@@ -154,25 +180,24 @@ func reviewRun(opts *ReviewOptions) error {
 		return err
 	}
 
-	var reviewData *api.PullRequestReviewInput
+	var body string
+	var reviewState *api.PullRequestReviewState
 	if opts.InteractiveMode {
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
 		}
-		reviewData, err = reviewSurvey(opts, editorCommand)
+		body, reviewState, err = reviewSurvey(opts, editorCommand)
 		if err != nil {
 			return err
 		}
-		if reviewData == nil && err == nil {
+		if reviewState == nil && err == nil {
 			fmt.Fprint(opts.IO.ErrOut, "Discarding.\n")
 			return nil
 		}
 	} else {
-		reviewData = &api.PullRequestReviewInput{
-			State: opts.ReviewType,
-			Body:  opts.Body,
-		}
+		body = opts.Body
+		reviewState = &opts.ReviewType
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -181,50 +206,74 @@ func reviewRun(opts *ReviewOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	err = api.AddReview(apiClient, baseRepo, pr, reviewData)
-	if err != nil {
-		return fmt.Errorf("failed to create review: %w", err)
-	}
+	if opts.File == "" {
+		reviewData := &api.PullRequestReviewInput{
+			State: *reviewState,
+			Body:  body,
+		}
+		err = api.AddReview(apiClient, baseRepo, pr, reviewData)
+		if err != nil {
+			return fmt.Errorf("failed to create review: %w", err)
+		}
 
-	if !opts.IO.IsStdoutTTY() || !opts.IO.IsStderrTTY() {
-		return nil
-	}
+		if !opts.IO.IsStdoutTTY() || !opts.IO.IsStderrTTY() {
+			return nil
+		}
 
-	cs := opts.IO.ColorScheme()
+		cs := opts.IO.ColorScheme()
 
-	switch reviewData.State {
-	case api.ReviewComment:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Reviewed pull request #%d\n", cs.Gray("-"), pr.Number)
-	case api.ReviewApprove:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Approved pull request #%d\n", cs.SuccessIcon(), pr.Number)
-	case api.ReviewRequestChanges:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Requested changes to pull request #%d\n", cs.Red("+"), pr.Number)
+		switch *reviewState {
+		case api.ReviewComment:
+			fmt.Fprintf(opts.IO.ErrOut, "%s Reviewed pull request #%d\n", cs.Gray("-"), pr.Number)
+		case api.ReviewApprove:
+			fmt.Fprintf(opts.IO.ErrOut, "%s Approved pull request #%d\n", cs.SuccessIcon(), pr.Number)
+		case api.ReviewRequestChanges:
+			fmt.Fprintf(opts.IO.ErrOut, "%s Requested changes to pull request #%d\n", cs.Red("+"), pr.Number)
+		}
+	} else {
+		reviewThreadData := &api.PullRequestReviewThreadInput{
+			Body:      body,
+			Path:      opts.File,
+			Line:      opts.Line,
+			StartLine: opts.StartLine,
+		}
+		err = api.AddReviewThread(apiClient, baseRepo, pr, reviewThreadData)
+		if err != nil {
+			return fmt.Errorf("failed to create review thread: %w", err)
+		}
+
+		if !opts.IO.IsStdoutTTY() || !opts.IO.IsStderrTTY() {
+			return nil
+		}
 	}
 
 	return nil
 }
 
-func reviewSurvey(opts *ReviewOptions, editorCommand string) (*api.PullRequestReviewInput, error) {
-	options := []string{"Comment", "Approve", "Request Changes"}
-	reviewType, err := opts.Prompter.Select(
-		"What kind of review do you want to give?",
-		options[0],
-		options)
-	if err != nil {
-		return nil, err
-	}
-
+func reviewSurvey(opts *ReviewOptions, editorCommand string) (string, *api.PullRequestReviewState, error) {
 	var reviewState api.PullRequestReviewState
+	if opts.File == "" {
+		options := []string{"Comment", "Approve", "Request Changes"}
+		reviewType, err := opts.Prompter.Select(
+			"What kind of review do you want to give?",
+			options[0],
+			options)
+		if err != nil {
+			return "", nil, err
+		}
 
-	switch reviewType {
-	case 0:
+		switch reviewType {
+		case 0:
+			reviewState = api.ReviewComment
+		case 1:
+			reviewState = api.ReviewApprove
+		case 2:
+			reviewState = api.ReviewRequestChanges
+		default:
+			panic("unreachable state")
+		}
+	} else {
 		reviewState = api.ReviewComment
-	case 1:
-		reviewState = api.ReviewApprove
-	case 2:
-		reviewState = api.ReviewRequestChanges
-	default:
-		panic("unreachable state")
 	}
 
 	blankAllowed := false
@@ -234,11 +283,11 @@ func reviewSurvey(opts *ReviewOptions, editorCommand string) (*api.PullRequestRe
 
 	body, err := opts.Prompter.MarkdownEditor("Review body", "", blankAllowed)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	if body == "" && (reviewState == api.ReviewComment || reviewState == api.ReviewRequestChanges) {
-		return nil, errors.New("this type of review cannot be blank")
+		return "", nil, errors.New("this type of review cannot be blank")
 	}
 
 	if len(body) > 0 {
@@ -246,7 +295,7 @@ func reviewSurvey(opts *ReviewOptions, editorCommand string) (*api.PullRequestRe
 			markdown.WithTheme(opts.IO.TerminalTheme()),
 			markdown.WithWrap(opts.IO.TerminalWidth()))
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 
 		fmt.Fprintf(opts.IO.Out, "Got:\n%s", renderedBody)
@@ -254,15 +303,12 @@ func reviewSurvey(opts *ReviewOptions, editorCommand string) (*api.PullRequestRe
 
 	confirm, err := opts.Prompter.Confirm("Submit?", true)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	if !confirm {
-		return nil, nil
+		return "", nil, nil
 	}
 
-	return &api.PullRequestReviewInput{
-		Body:  body,
-		State: reviewState,
-	}, nil
+	return body, &reviewState, nil
 }
