@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -18,6 +19,13 @@ const (
 type PullRequestReviewInput struct {
 	Body  string
 	State PullRequestReviewState
+}
+
+type PullRequestReviewThreadInput struct {
+	Path      string
+	Body      string
+	Line      int
+	StartLine *int
 }
 
 type PullRequestReviews struct {
@@ -67,6 +75,49 @@ func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *Pu
 	}
 
 	return client.Mutate(repo.RepoHost(), "PullRequestReviewAdd", &mutation, variables)
+}
+
+func AddReviewThread(client *Client, repo ghrepo.Interface, pr *PullRequest, input *PullRequestReviewThreadInput) error {
+	var mutation struct {
+		AddPullRequestReviewThread struct {
+			Thread struct {
+				ID string
+			}
+		} `graphql:"addPullRequestReviewThread(input:$input)"`
+	}
+
+	id := githubv4.ID(pr.ID)
+	path := githubv4.String(input.Path)
+	body := githubv4.String(input.Body)
+	line := githubv4.Int(input.Line)
+	var startLine *githubv4.Int
+	if input.StartLine == nil {
+		startLine = nil
+	} else {
+		startLineInt := githubv4.Int(*input.StartLine)
+		startLine = &startLineInt
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.AddPullRequestReviewThreadInput{
+			PullRequestID: &id,
+			Path:          path,
+			Body:          body,
+			Line:          &line,
+			StartLine:     startLine,
+		},
+	}
+
+	err := client.Mutate(repo.RepoHost(), "PullRequestReviewAddThread", &mutation, variables)
+	if err != nil {
+		return err
+	}
+
+	if mutation.AddPullRequestReviewThread.Thread.ID == "" {
+		return errors.New("failed to create review thread")
+	}
+
+	return nil
 }
 
 func (prr PullRequestReview) Identifier() string {
