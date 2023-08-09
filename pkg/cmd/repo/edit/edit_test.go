@@ -173,8 +173,6 @@ func Test_editRun(t *testing.T) {
 	}
 }
 
-// TODO consider unit test for interactiveRepoEdit that exercises every prompt type
-
 func Test_editRun_interactive(t *testing.T) {
 	editList := []string{
 		"Default Branch Name",
@@ -196,6 +194,82 @@ func Test_editRun_interactive(t *testing.T) {
 		wantsStderr string
 		wantsErr    string
 	}{
+		// TODO forking of an org repo
+		{
+			name: "the rest",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{0, 2, 3, 5, 6, 8, 9}, nil
+					})
+				pm.RegisterInput("Default branch name", func(_, _ string) (string, error) {
+					return "trunk", nil
+				})
+				pm.RegisterInput("Repository home page URL", func(_, _ string) (string, error) {
+					return "https://zombo.com", nil
+				})
+				pm.RegisterConfirm("Enable Issues?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+				pm.RegisterConfirm("Enable Projects?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+				pm.RegisterConfirm("Convert into a template repository?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+				pm.RegisterSelect("Visibility", []string{"public", "private", "internal"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "private")
+					})
+				pm.RegisterConfirm("Do you want to change visibility to private?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+				pm.RegisterConfirm("Enable Wikis?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"visibility": "public",
+								"description": "description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"stargazerCount": 10,
+								"isInOrganization": false,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "trunk", payload["default_branch"])
+						assert.Equal(t, "https://zombo.com", payload["homepage"])
+						assert.Equal(t, true, payload["has_issues"])
+						assert.Equal(t, true, payload["has_projects"])
+						assert.Equal(t, "private", payload["visibility"])
+						assert.Equal(t, true, payload["is_template"])
+						assert.Equal(t, true, payload["has_wiki"])
+					}))
+			},
+		},
 		{
 			name: "updates repo description",
 			opts: EditOptions{

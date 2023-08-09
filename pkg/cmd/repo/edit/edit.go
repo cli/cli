@@ -319,6 +319,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 	}
 	for _, c := range choices {
 		switch c {
+		// TODO these initial assignments are no-ops; delete them
 		case optionDescription:
 			opts.Edits.Description = &r.Description
 			answer, err := opts.Prompter.Input("Description of the repository", r.Description)
@@ -328,14 +329,11 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			opts.Edits.Description = &answer
 		case optionHomePageURL:
 			opts.Edits.Homepage = &r.HomepageURL
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Repository home page URL",
-				Default: r.HomepageURL,
-			}, opts.Edits.Homepage)
+			a, err := opts.Prompter.Input("Repository home page URL", r.HomepageURL)
 			if err != nil {
 				return err
 			}
+			opts.Edits.Homepage = &a
 		case optionTopics:
 			addTopics, err := opts.Prompter.Input("Add topics?(csv format)", "")
 			if err != nil {
@@ -356,44 +354,32 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 		case optionDefaultBranchName:
 			opts.Edits.DefaultBranch = &r.DefaultBranchRef.Name
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Default branch name",
-				Default: r.DefaultBranchRef.Name,
-			}, opts.Edits.DefaultBranch)
+			name, err := opts.Prompter.Input("Default branch name", r.DefaultBranchRef.Name)
 			if err != nil {
 				return err
 			}
+			opts.Edits.DefaultBranch = &name
 		case optionWikis:
 			opts.Edits.EnableWiki = &r.HasWikiEnabled
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Enable Wikis?",
-				Default: r.HasWikiEnabled,
-			}, opts.Edits.EnableWiki)
+			c, err := opts.Prompter.Confirm("Enable Wikis?", r.HasWikiEnabled)
 			if err != nil {
 				return err
 			}
+			opts.Edits.EnableWiki = &c
 		case optionIssues:
 			opts.Edits.EnableIssues = &r.HasIssuesEnabled
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Enable Issues?",
-				Default: r.HasIssuesEnabled,
-			}, opts.Edits.EnableIssues)
+			a, err := opts.Prompter.Confirm("Enable Issues?", r.HasIssuesEnabled)
 			if err != nil {
 				return err
 			}
+			opts.Edits.EnableIssues = &a
 		case optionProjects:
 			opts.Edits.EnableProjects = &r.HasProjectsEnabled
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Enable Projects?",
-				Default: r.HasProjectsEnabled,
-			}, opts.Edits.EnableProjects)
+			a, err := opts.Prompter.Confirm("Enable Projects?", r.HasProjectsEnabled)
 			if err != nil {
 				return err
 			}
+			opts.Edits.EnableProjects = &a
 		case optionVisibility:
 			opts.Edits.Visibility = &r.Visibility
 			visibilityOptions := []string{"public", "private", "internal"}
@@ -463,14 +449,11 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			opts.Edits.DeleteBranchOnMerge = &c
 		case optionTemplateRepo:
 			opts.Edits.IsTemplate = &r.IsTemplate
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Convert into a template repository?",
-				Default: r.IsTemplate,
-			}, opts.Edits.IsTemplate)
+			c, err := opts.Prompter.Confirm("Convert into a template repository?", r.IsTemplate)
 			if err != nil {
 				return err
 			}
+			opts.Edits.IsTemplate = &c
 		case optionAllowForking:
 			opts.Edits.AllowForking = &r.ForkingAllowed
 			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
