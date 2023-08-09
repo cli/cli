@@ -70,6 +70,7 @@ type createOptions struct {
 	retentionPeriod   NullableDuration
 	displayName       string
 	useWeb            bool
+	connect           bool
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -107,6 +108,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
 	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "display name for the codespace")
+	createCmd.Flags().BoolVarP(&opts.connect, "connect", "c", false, "connect to the newly created codespace")
 
 	return createCmd
 }
@@ -327,6 +329,23 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	if a.io.IsStderrTTY() && codespace.IdleTimeoutNotice != "" {
 		fmt.Fprintln(a.io.ErrOut, cs.Yellow("Notice:"), codespace.IdleTimeoutNotice)
+	}
+
+	// if the user provided a connect argument, we should ssh to the codespace after creating it
+	if opts.connect {
+		sshArgs := []string{}
+		sshOpts := sshOptions{
+			selector: &CodespaceSelector{
+				api: a.apiClient,
+
+				repoName:      userInputs.Repository,
+				codespaceName: codespace.Name,
+				repoOwner:     repository.Owner.Login,
+			},
+		}
+		if err := a.SSH(ctx, sshArgs, sshOpts); err != nil {
+			return fmt.Errorf("error connecting to codespace: %w", err)
+		}
 	}
 
 	return nil
