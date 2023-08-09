@@ -319,16 +319,13 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 	}
 	for _, c := range choices {
 		switch c {
-		// TODO these initial assignments are no-ops; delete them
 		case optionDescription:
-			opts.Edits.Description = &r.Description
 			answer, err := opts.Prompter.Input("Description of the repository", r.Description)
 			if err != nil {
 				return err
 			}
 			opts.Edits.Description = &answer
 		case optionHomePageURL:
-			opts.Edits.Homepage = &r.HomepageURL
 			a, err := opts.Prompter.Input("Repository home page URL", r.HomepageURL)
 			if err != nil {
 				return err
@@ -353,35 +350,30 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				}
 			}
 		case optionDefaultBranchName:
-			opts.Edits.DefaultBranch = &r.DefaultBranchRef.Name
 			name, err := opts.Prompter.Input("Default branch name", r.DefaultBranchRef.Name)
 			if err != nil {
 				return err
 			}
 			opts.Edits.DefaultBranch = &name
 		case optionWikis:
-			opts.Edits.EnableWiki = &r.HasWikiEnabled
 			c, err := opts.Prompter.Confirm("Enable Wikis?", r.HasWikiEnabled)
 			if err != nil {
 				return err
 			}
 			opts.Edits.EnableWiki = &c
 		case optionIssues:
-			opts.Edits.EnableIssues = &r.HasIssuesEnabled
 			a, err := opts.Prompter.Confirm("Enable Issues?", r.HasIssuesEnabled)
 			if err != nil {
 				return err
 			}
 			opts.Edits.EnableIssues = &a
 		case optionProjects:
-			opts.Edits.EnableProjects = &r.HasProjectsEnabled
 			a, err := opts.Prompter.Confirm("Enable Projects?", r.HasProjectsEnabled)
 			if err != nil {
 				return err
 			}
 			opts.Edits.EnableProjects = &a
 		case optionVisibility:
-			opts.Edits.Visibility = &r.Visibility
 			visibilityOptions := []string{"public", "private", "internal"}
 			selected, err := opts.Prompter.Select("Visibility", strings.ToLower(r.Visibility), visibilityOptions)
 			if err != nil {
@@ -448,7 +440,6 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 			opts.Edits.DeleteBranchOnMerge = &c
 		case optionTemplateRepo:
-			opts.Edits.IsTemplate = &r.IsTemplate
 			c, err := opts.Prompter.Confirm("Convert into a template repository?", r.IsTemplate)
 			if err != nil {
 				return err
