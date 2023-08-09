@@ -194,7 +194,53 @@ func Test_editRun_interactive(t *testing.T) {
 		wantsStderr string
 		wantsErr    string
 	}{
-		// TODO forking of an org repo
+		{
+			name: "forking of org repo",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				el := append(editList, optionAllowForking)
+				pm.RegisterMultiSelect("What do you want to edit?", nil, el,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{10}, nil
+					})
+				pm.RegisterConfirm("Allow forking (of an organization repository)?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"visibility": "public",
+								"description": "description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"isInOrganization": true,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, true, payload["allow_forking"])
+					}))
+			},
+		},
 		{
 			name: "the rest",
 			opts: EditOptions{

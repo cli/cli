@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
@@ -19,7 +18,6 @@ import (
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -446,15 +444,13 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 			opts.Edits.IsTemplate = &c
 		case optionAllowForking:
-			opts.Edits.AllowForking = &r.ForkingAllowed
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Allow forking (of an organization repository)?",
-				Default: r.ForkingAllowed,
-			}, opts.Edits.AllowForking)
+			c, err := opts.Prompter.Confirm(
+				"Allow forking (of an organization repository)?",
+				r.ForkingAllowed)
 			if err != nil {
 				return err
 			}
+			opts.Edits.AllowForking = &c
 		}
 	}
 	return nil
