@@ -62,7 +62,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			# List rulesets in an organization
 			$ gh ruleset list --org org-name
 		`),
-		Args: cobra.ExactArgs(0),
+		Aliases: []string{"ls"},
+		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && opts.Organization != "" {
 				return cmdutil.FlagErrorf("only one of --repo and --org may be specified")
