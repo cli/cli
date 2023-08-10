@@ -335,31 +335,19 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		fmt.Fprintln(a.io.ErrOut, cs.Yellow("Notice:"), codespace.IdleTimeoutNotice)
 	}
 
-	// if the user provided a --open ssh argument, we should ssh to the codespace after creating it
-	if opts.open == "ssh" {
-		sshArgs := []string{}
-		sshOpts := sshOptions{
-			selector: &CodespaceSelector{
-				api: a.apiClient,
-
-				repoName:      userInputs.Repository,
-				codespaceName: codespace.Name,
-				repoOwner:     repository.Owner.Login,
-			},
-		}
-		if err := a.SSH(ctx, sshArgs, sshOpts); err != nil {
-			return fmt.Errorf("error connecting to codespace: %w", err)
-		}
-	}
-	// if the user provided a --open code argument, we should open in VS Code after creating it
 	selector := &CodespaceSelector{
-		api: a.apiClient,
-
+		api:           a.apiClient,
 		repoName:      userInputs.Repository,
 		codespaceName: codespace.Name,
 		repoOwner:     repository.Owner.Login,
 	}
-	if opts.open == "code" {
+
+	switch opts.open {
+	case "ssh":
+		if err := a.SSH(ctx, []string{}, sshOptions{selector: selector}); err != nil {
+			return fmt.Errorf("error connecting to codespace: %w", err)
+		}
+	case "code":
 		if err := a.VSCode(ctx, selector, false, false); err != nil {
 			return fmt.Errorf("error opening codespace in VS Code: %w", err)
 		}
