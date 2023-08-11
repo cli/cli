@@ -80,6 +80,21 @@ func Test_NewCmdReview(t *testing.T) {
 			},
 		},
 		{
+			name:  "single line comment",
+			args:  "--file test-file.txt --lines 5",
+			isTTY: true,
+			want: ReviewOptions{
+				File: "test-file.txt",
+				Line: 5,
+			},
+		},
+		{
+			name:    "lines parse error",
+			args:    "--file test-file.txt --lines 1,2,3",
+			isTTY:   true,
+			wantErr: "--lines must be either a single line, or a range",
+		},
+		{
 			name:    "no argument with --repo override",
 			args:    "-R owner/repo",
 			isTTY:   true,
@@ -120,6 +135,24 @@ func Test_NewCmdReview(t *testing.T) {
 			args:    "--body 'test' --body-file 'test-file.txt'",
 			isTTY:   true,
 			wantErr: "specify only one of `--body` or `--body-file`",
+		},
+		{
+			name:    "file with no lines",
+			args:    "--file test-file.txt",
+			isTTY:   true,
+			wantErr: "either both or neither of --file and --lines must be given",
+		},
+		{
+			name:    "lines with no file",
+			args:    "--lines 5,10",
+			isTTY:   true,
+			wantErr: "either both or neither of --file and --lines must be given",
+		},
+		{
+			name:    "file comment with approve",
+			args:    "--file test-file.txt --lines 5,10 --approve",
+			isTTY:   true,
+			wantErr: "cannot specify --approve, --request-changes, or --comment when commenting on a file",
 		},
 	}
 	for _, tt := range tests {

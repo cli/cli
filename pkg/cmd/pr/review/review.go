@@ -139,8 +139,8 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("cannot specify --approve, --request-changes, or --comment when commenting on a file")
 			}
 
-			if len(linesSlice) > 0 && opts.File == "" {
-				return cmdutil.FlagErrorf("must specify --file if --lines is given")
+			if (len(linesSlice) > 0) == (opts.File == "") {
+				return cmdutil.FlagErrorf("either both or neither of --file and --lines must be given")
 			}
 
 			if len(linesSlice) == 1 {
