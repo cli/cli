@@ -18,12 +18,14 @@ import (
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/update"
+	credhelper "github.com/cli/cli/v2/pkg/cmd/auth/docker-cred-helper"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 	"github.com/cli/safeexec"
+	"github.com/docker/docker-credential-helpers/credentials"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
@@ -85,6 +87,13 @@ func mainRun() exitCode {
 	// terminal. With this, a user can clone a repo (or take other actions) directly from explorer.
 	if len(os.Args) > 1 && os.Args[1] != "" {
 		cobra.MousetrapHelpText = ""
+	}
+
+	if filepath.Base(os.Args[0]) == "docker-credential-gh" {
+		// We're being invoked as the Docker credential helper.
+		// Run the credhelper command to print the token, and exit.
+		credentials.Serve(credhelper.CredHelper())
+		return exitOK
 	}
 
 	rootCmd, err := root.NewCmdRoot(cmdFactory, buildVersion, buildDate)

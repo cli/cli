@@ -26,3 +26,6 @@
 *.swp
 
 vendor/
+
+gh
+docker-credential-gh

@@ -63,7 +63,7 @@ func GetScopes(httpClient httpClient, hostname, authToken string) (string, error
 
 // HasMinimumScopes performs a GitHub API request and returns an error if the token used in the request
 // lacks the minimum required scopes for performing API operations with gh.
-func HasMinimumScopes(httpClient httpClient, hostname, authToken string) error {
+func HasMinimumScopes(httpClient httpClient, hostname, authToken string, extraScopes ...string) error {
 	scopesHeader, err := GetScopes(httpClient, hostname, authToken)
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func HasMinimumScopes(httpClient httpClient, hostname, authToken string) error {
 
 // HeaderHasMinimumScopes parses the comma separated scopesHeader string and returns an error
 // if it lacks the minimum required scopes for performing API operations with gh.
-func HeaderHasMinimumScopes(scopesHeader string) error {
+func HeaderHasMinimumScopes(scopesHeader string, extraScopes ...string) error {
 	if scopesHeader == "" {
 		// if the token reports no scopes, assume that it's an integration token and give up on
 		// detecting its capabilities
@@ -85,6 +85,9 @@ func HeaderHasMinimumScopes(scopesHeader string) error {
 		"repo":      false,
 		"read:org":  false,
 		"admin:org": false,
+	}
+	for _, s := range extraScopes {
+		search[s] = false
 	}
 	for _, s := range strings.Split(scopesHeader, ",") {
 		search[strings.TrimSpace(s)] = true
@@ -97,6 +100,11 @@ func HeaderHasMinimumScopes(scopesHeader string) error {
 
 	if !search["read:org"] && !search["write:org"] && !search["admin:org"] {
 		missingScopes = append(missingScopes, "read:org")
+	}
+	for _, s := range extraScopes {
+		if !search[s] {
+			missingScopes = append(missingScopes, s)
+		}
 	}
 
 	if len(missingScopes) > 0 {
