@@ -135,7 +135,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("need exactly one of --approve, --request-changes, or --comment")
 			}
 
-			if opts.File != 0 && found > 0 {
+			if opts.File != "" && found > 0 {
 				return cmdutil.FlagErrorf("cannot specify --approve, --request-changes, or --comment when commenting on a file")
 			}
 
@@ -148,7 +148,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 			} else if len(linesSlice) == 2 {
 				opts.StartLine = &linesSlice[0]
 				opts.Line = linesSlice[1]
-			} else {
+			} else if len(linesSlice) > 2 {
 				return cmdutil.FlagErrorf("--lines must be either a single line, or a range")
 			}
 
