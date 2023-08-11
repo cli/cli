@@ -7,9 +7,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/pkg/prompt"
-
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -175,23 +174,163 @@ func Test_editRun(t *testing.T) {
 }
 
 func Test_editRun_interactive(t *testing.T) {
+	editList := []string{
+		"Default Branch Name",
+		"Description",
+		"Home Page URL",
+		"Issues",
+		"Merge Options",
+		"Projects",
+		"Template Repository",
+		"Topics",
+		"Visibility",
+		"Wikis"}
+
 	tests := []struct {
 		name        string
 		opts        EditOptions
-		askStubs    func(*prompt.AskStubber)
+		promptStubs func(*prompter.MockPrompter)
 		httpStubs   func(*testing.T, *httpmock.Registry)
 		wantsStderr string
 		wantsErr    string
 	}{
+		{
+			name: "forking of org repo",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				el := append(editList, optionAllowForking)
+				pm.RegisterMultiSelect("What do you want to edit?", nil, el,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{10}, nil
+					})
+				pm.RegisterConfirm("Allow forking (of an organization repository)?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"visibility": "public",
+								"description": "description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"isInOrganization": true,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, true, payload["allow_forking"])
+					}))
+			},
+		},
+		{
+			name: "the rest",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{0, 2, 3, 5, 6, 8, 9}, nil
+					})
+				pm.RegisterInput("Default branch name", func(_, _ string) (string, error) {
+					return "trunk", nil
+				})
+				pm.RegisterInput("Repository home page URL", func(_, _ string) (string, error) {
+					return "https://zombo.com", nil
+				})
+				pm.RegisterConfirm("Enable Issues?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+				pm.RegisterConfirm("Enable Projects?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+				pm.RegisterConfirm("Convert into a template repository?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+				pm.RegisterSelect("Visibility", []string{"public", "private", "internal"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "private")
+					})
+				pm.RegisterConfirm("Do you want to change visibility to private?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+				pm.RegisterConfirm("Enable Wikis?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"visibility": "public",
+								"description": "description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"stargazerCount": 10,
+								"isInOrganization": false,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "trunk", payload["default_branch"])
+						assert.Equal(t, "https://zombo.com", payload["homepage"])
+						assert.Equal(t, true, payload["has_issues"])
+						assert.Equal(t, true, payload["has_projects"])
+						assert.Equal(t, "private", payload["visibility"])
+						assert.Equal(t, true, payload["is_template"])
+						assert.Equal(t, true, payload["has_wiki"])
+					}))
+			},
+		},
 		{
 			name: "updates repo description",
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description"})
-				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{1}, nil
+					})
+				pm.RegisterInput("Description of the repository",
+					func(_, _ string) (string, error) {
+						return "awesome repo description", nil
+					})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -229,11 +368,23 @@ func Test_editRun_interactive(t *testing.T) {
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description", "Topics"})
-				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
-				as.StubPrompt("Add topics?(csv format)").AnswerWith("a, b,c,d ")
-				as.StubPrompt("Remove Topics").AnswerWith([]string{"x"})
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{1, 7}, nil
+					})
+				pm.RegisterInput("Description of the repository",
+					func(_, _ string) (string, error) {
+						return "awesome repo description", nil
+					})
+				pm.RegisterInput("Add topics?(csv format)",
+					func(_, _ string) (string, error) {
+						return "a, b,c,d ", nil
+					})
+				pm.RegisterMultiSelect("Remove Topics", nil, []string{"x"},
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{0}, nil
+					})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -276,11 +427,22 @@ func Test_editRun_interactive(t *testing.T) {
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Merge Options"})
-				as.StubPrompt("Allowed merge strategies").AnswerWith([]string{allowMergeCommits, allowRebaseMerge})
-				as.StubPrompt("Enable Auto Merge?").AnswerWith(false)
-				as.StubPrompt("Automatically delete head branches after merging?").AnswerWith(false)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{4}, nil
+					})
+				pm.RegisterMultiSelect("Allowed merge strategies", nil,
+					[]string{allowMergeCommits, allowSquashMerge, allowRebaseMerge},
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{0, 2}, nil
+					})
+				pm.RegisterConfirm("Enable Auto Merge?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
+				pm.RegisterConfirm("Automatically delete head branches after merging?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -333,14 +495,15 @@ func Test_editRun_interactive(t *testing.T) {
 				tt.httpStubs(t, httpReg)
 			}
 
+			pm := prompter.NewMockPrompter(t)
+			tt.opts.Prompter = pm
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
+			}
+
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
 			opts.IO = ios
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
-			}
 
 			err := editRun(context.Background(), opts)
 			if tt.wantsErr == "" {

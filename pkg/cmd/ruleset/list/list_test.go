@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -171,11 +172,12 @@ func Test_listRun(t *testing.T) {
 			name:  "list org rulesets",
 			isTTY: true,
 			opts: ListOptions{
-				Organization: "my-org",
+				IncludeParents: true,
+				Organization:   "my-org",
 			},
 			wantStdout: heredoc.Doc(`
 
-				Showing 3 of 3 rulesets in my-org
+				Showing 3 of 3 rulesets in my-org and its parents
 
 				ID  NAME    SOURCE             STATUS    RULES
 				4   test    OWNER/REPO (repo)  evaluate  1
@@ -189,6 +191,45 @@ func Test_listRun(t *testing.T) {
 				)
 			},
 			wantStderr: "",
+			wantBrowse: "",
+		},
+		{
+			name:  "list repo rulesets, no rulesets",
+			isTTY: true,
+			opts: ListOptions{
+				IncludeParents: true,
+			},
+			wantStdout: "",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepoRulesetList\b`),
+					httpmock.JSONResponse(shared.RulesetList{
+						TotalCount: 0,
+						Rulesets:   []shared.RulesetGraphQL{},
+					}),
+				)
+			},
+			wantErr:    "no rulesets found in OWNER/REPO or its parents",
+			wantStderr: "",
+			wantBrowse: "",
+		},
+		{
+			name:  "list org rulesets, no rulesets",
+			isTTY: true,
+			opts: ListOptions{
+				Organization: "my-org",
+			},
+			wantStdout: "",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query OrgRulesetList\b`),
+					httpmock.JSONResponse(shared.RulesetList{
+						TotalCount: 0,
+						Rulesets:   []shared.RulesetGraphQL{},
+					}),
+				)
+			},
+			wantErr:    "no rulesets found in my-org",
 			wantBrowse: "",
 		},
 		{
@@ -269,9 +310,15 @@ func Test_listRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
-			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-				return ghrepo.FromFullName("OWNER/REPO")
+
+			// only set this if org is not set, because the repo isn't needed if --org is provided and
+			// leaving it undefined will catch potential errors
+			if tt.opts.Organization == "" {
+				tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("OWNER/REPO")
+				}
 			}
+
 			browser := &browser.Stub{}
 			tt.opts.Browser = browser
 

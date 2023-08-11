@@ -24,11 +24,12 @@ type RulesetGraphQL struct {
 }
 
 type RulesetREST struct {
-	Id           int
-	Name         string
-	Target       string
-	Enforcement  string
-	BypassActors []struct {
+	Id                   int
+	Name                 string
+	Target               string
+	Enforcement          string
+	CurrentUserCanBypass string `json:"current_user_can_bypass"`
+	BypassActors         []struct {
 		ActorId    int    `json:"actor_id"`
 		ActorType  string `json:"actor_type"`
 		BypassMode string `json:"bypass_mode"`
