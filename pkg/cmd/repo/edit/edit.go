@@ -15,13 +15,19 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
+
+type iprompter interface {
+	MultiSelect(prompt string, defaults []string, options []string) ([]int, error)
+	Input(string, string) (string, error)
+	Confirm(string, bool) (bool, error)
+	Select(string, string, []string) (int, error)
+}
 
 const (
 	allowMergeCommits = "Allow Merge Commits"
@@ -51,7 +57,7 @@ type EditOptions struct {
 	RemoveTopics    []string
 	InteractiveMode bool
 	Detector        fd.Detector
-	Prompter        prompter.Prompter
+	Prompter        iprompter
 	// Cache of current repo topics to avoid retrieving them
 	// in multiple flows.
 	topicsCache []string
@@ -277,7 +283,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 	return nil
 }
 
-func interactiveChoice(opts EditOptions, r *api.Repository) ([]string, error) {
+func interactiveChoice(p iprompter, r *api.Repository) ([]string, error) {
 	options := []string{
 		optionDefaultBranchName,
 		optionDescription,
@@ -296,7 +302,7 @@ func interactiveChoice(opts EditOptions, r *api.Repository) ([]string, error) {
 		options = append(options, optionAllowForking)
 	}
 	var answers []string
-	selected, err := opts.Prompter.MultiSelect("What do you want to edit?", nil, options)
+	selected, err := p.MultiSelect("What do you want to edit?", nil, options)
 	if err != nil {
 		return nil, err
 	}
@@ -311,26 +317,27 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 	for _, v := range r.RepositoryTopics.Nodes {
 		opts.topicsCache = append(opts.topicsCache, v.Topic.Name)
 	}
-	choices, err := interactiveChoice(*opts, r)
+	p := opts.Prompter
+	choices, err := interactiveChoice(p, r)
 	if err != nil {
 		return err
 	}
 	for _, c := range choices {
 		switch c {
 		case optionDescription:
-			answer, err := opts.Prompter.Input("Description of the repository", r.Description)
+			answer, err := p.Input("Description of the repository", r.Description)
 			if err != nil {
 				return err
 			}
 			opts.Edits.Description = &answer
 		case optionHomePageURL:
-			a, err := opts.Prompter.Input("Repository home page URL", r.HomepageURL)
+			a, err := p.Input("Repository home page URL", r.HomepageURL)
 			if err != nil {
 				return err
 			}
 			opts.Edits.Homepage = &a
 		case optionTopics:
-			addTopics, err := opts.Prompter.Input("Add topics?(csv format)", "")
+			addTopics, err := p.Input("Add topics?(csv format)", "")
 			if err != nil {
 				return err
 			}
@@ -339,7 +346,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 
 			if len(opts.topicsCache) > 0 {
-				selected, err := opts.Prompter.MultiSelect("Remove Topics", nil, opts.topicsCache)
+				selected, err := p.MultiSelect("Remove Topics", nil, opts.topicsCache)
 				if err != nil {
 					return err
 				}
@@ -348,32 +355,32 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				}
 			}
 		case optionDefaultBranchName:
-			name, err := opts.Prompter.Input("Default branch name", r.DefaultBranchRef.Name)
+			name, err := p.Input("Default branch name", r.DefaultBranchRef.Name)
 			if err != nil {
 				return err
 			}
 			opts.Edits.DefaultBranch = &name
 		case optionWikis:
-			c, err := opts.Prompter.Confirm("Enable Wikis?", r.HasWikiEnabled)
+			c, err := p.Confirm("Enable Wikis?", r.HasWikiEnabled)
 			if err != nil {
 				return err
 			}
 			opts.Edits.EnableWiki = &c
 		case optionIssues:
-			a, err := opts.Prompter.Confirm("Enable Issues?", r.HasIssuesEnabled)
+			a, err := p.Confirm("Enable Issues?", r.HasIssuesEnabled)
 			if err != nil {
 				return err
 			}
 			opts.Edits.EnableIssues = &a
 		case optionProjects:
-			a, err := opts.Prompter.Confirm("Enable Projects?", r.HasProjectsEnabled)
+			a, err := p.Confirm("Enable Projects?", r.HasProjectsEnabled)
 			if err != nil {
 				return err
 			}
 			opts.Edits.EnableProjects = &a
 		case optionVisibility:
 			visibilityOptions := []string{"public", "private", "internal"}
-			selected, err := opts.Prompter.Select("Visibility", strings.ToLower(r.Visibility), visibilityOptions)
+			selected, err := p.Select("Visibility", strings.ToLower(r.Visibility), visibilityOptions)
 			if err != nil {
 				return err
 			}
@@ -382,7 +389,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				(r.StargazerCount > 0 || r.Watchers.TotalCount > 0) {
 				cs := opts.IO.ColorScheme()
 				fmt.Fprintf(opts.IO.ErrOut, "%s Changing the repository visibility to private will cause permanent loss of stars and watchers.\n", cs.WarningIcon())
-				confirmed, err = opts.Prompter.Confirm("Do you want to change visibility to private?", false)
+				confirmed, err = p.Confirm("Do you want to change visibility to private?", false)
 				if err != nil {
 					return err
 				}
@@ -403,7 +410,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				defaultMergeOptions = append(defaultMergeOptions, allowRebaseMerge)
 			}
 			mergeOpts := []string{allowMergeCommits, allowSquashMerge, allowRebaseMerge}
-			selected, err := opts.Prompter.MultiSelect(
+			selected, err := p.MultiSelect(
 				"Allowed merge strategies",
 				defaultMergeOptions,
 				mergeOpts)
@@ -424,27 +431,27 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 
 			opts.Edits.EnableAutoMerge = &r.AutoMergeAllowed
-			c, err := opts.Prompter.Confirm("Enable Auto Merge?", r.AutoMergeAllowed)
+			c, err := p.Confirm("Enable Auto Merge?", r.AutoMergeAllowed)
 			if err != nil {
 				return err
 			}
 			opts.Edits.EnableAutoMerge = &c
 
 			opts.Edits.DeleteBranchOnMerge = &r.DeleteBranchOnMerge
-			c, err = opts.Prompter.Confirm(
+			c, err = p.Confirm(
 				"Automatically delete head branches after merging?", r.DeleteBranchOnMerge)
 			if err != nil {
 				return err
 			}
 			opts.Edits.DeleteBranchOnMerge = &c
 		case optionTemplateRepo:
-			c, err := opts.Prompter.Confirm("Convert into a template repository?", r.IsTemplate)
+			c, err := p.Confirm("Convert into a template repository?", r.IsTemplate)
 			if err != nil {
 				return err
 			}
 			opts.Edits.IsTemplate = &c
 		case optionAllowForking:
-			c, err := opts.Prompter.Confirm(
+			c, err := p.Confirm(
 				"Allow forking (of an organization repository)?",
 				r.ForkingAllowed)
 			if err != nil {
