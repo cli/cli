@@ -23,6 +23,7 @@ type HTTPClientOptions struct {
 	EnableCache       bool
 	Log               io.Writer
 	LogColorize       bool
+	LogVerboseHTTP    bool
 	SkipAcceptHeaders bool
 }
 
@@ -35,10 +36,11 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		LogIgnoreEnv: true,
 	}
 
-	if debugEnabled, debugValue := utils.IsDebugEnabled(); debugEnabled {
+	debugEnabled, debugValue := utils.IsDebugEnabled()
+	if debugEnabled || opts.LogVerboseHTTP {
 		clientOpts.Log = opts.Log
 		clientOpts.LogColorize = opts.LogColorize
-		clientOpts.LogVerboseHTTP = strings.Contains(debugValue, "api")
+		clientOpts.LogVerboseHTTP = strings.Contains(debugValue, "api") || opts.LogVerboseHTTP
 	}
 
 	headers := map[string]string{

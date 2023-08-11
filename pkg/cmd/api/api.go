@@ -32,6 +32,7 @@ import (
 type ApiOptions struct {
 	IO *iostreams.IOStreams
 
+	Version             string
 	Hostname            string
 	RequestMethod       string
 	RequestMethodPassed bool
@@ -46,6 +47,9 @@ type ApiOptions struct {
 	Silent              bool
 	Template            string
 	CacheTTL            time.Duration
+	Log                 io.Writer
+	LogColorize         bool
+	Verbose             bool
 	FilterOutput        string
 
 	Config     func() (config.Config, error)
@@ -54,13 +58,16 @@ type ApiOptions struct {
 	Branch     func() (string, error)
 }
 
-func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
+func NewCmdApi(f *cmdutil.Factory, version string, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
-		IO:         f.IOStreams,
-		Config:     f.Config,
-		HttpClient: f.HttpClient,
-		BaseRepo:   f.BaseRepo,
-		Branch:     f.Branch,
+		Version:     version,
+		IO:          f.IOStreams,
+		Config:      f.Config,
+		HttpClient:  f.HttpClient,
+		BaseRepo:    f.BaseRepo,
+		Branch:      f.Branch,
+		Log:         f.IOStreams.ErrOut,
+		LogColorize: f.IOStreams.ColorEnabled(),
 	}
 
 	cmd := &cobra.Command{
@@ -237,6 +244,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
+	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Output debugging information for API request")
 	return cmd
 }
 
@@ -283,9 +291,21 @@ func apiRun(opts *ApiOptions) error {
 		requestHeaders = append(requestHeaders, "Accept: "+previewNamesToMIMETypes(opts.Previews))
 	}
 
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
+	}
+	if opts.Verbose {
+		newHttpClient, err := newHTTPClientWithVerbose(opts.Version, cfg, opts.Log, opts.LogColorize, opts.Verbose)
+		if err != nil {
+			return err
+		}
+		httpClient = newHttpClient
 	}
 	if opts.CacheTTL > 0 {
 		httpClient = api.NewCachedHTTPClient(httpClient, opts.CacheTTL)
@@ -303,11 +323,6 @@ func apiRun(opts *ApiOptions) error {
 	var headersWriter io.Writer = opts.IO.Out
 	if opts.Silent {
 		bodyWriter = io.Discard
-	}
-
-	cfg, err := opts.Config()
-	if err != nil {
-		return err
 	}
 
 	host, _ := cfg.Authentication().DefaultHost()
@@ -602,4 +617,16 @@ func previewNamesToMIMETypes(names []string) string {
 		types = append(types, fmt.Sprintf("application/vnd.github.%s-preview", p))
 	}
 	return strings.Join(types, ", ")
+}
+
+func newHTTPClientWithVerbose(version string, cfg config.Config, log io.Writer, logColorize, verbose bool) (*http.Client, error) {
+	opts := api.HTTPClientOptions{
+		AppVersion:        version,
+		Config:            cfg.Authentication(),
+		Log:               log,
+		LogColorize:       logColorize,
+		LogVerboseHTTP:    verbose,
+		SkipAcceptHeaders: true,
+	}
+	return api.NewHTTPClient(opts)
 }

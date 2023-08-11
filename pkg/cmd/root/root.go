@@ -156,7 +156,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	bareHTTPCmdFactory.HttpClient = bareHTTPClient(f, version)
 	bareHTTPCmdFactory.BaseRepo = factory.SmartBaseRepoFunc(&bareHTTPCmdFactory)
 
-	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, nil))
+	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, version, nil))
 
 	// Help topics
 	var referenceCmd *cobra.Command

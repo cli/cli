@@ -320,7 +320,7 @@ func Test_NewCmdApi(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var opts *ApiOptions
-			cmd := NewCmdApi(f, func(o *ApiOptions) error {
+			cmd := NewCmdApi(f, "", func(o *ApiOptions) error {
 				opts = o
 				return nil
 			})
@@ -361,7 +361,7 @@ func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
 		t.SkipNow()
 	}
 
-	cmd := NewCmdApi(&cmdutil.Factory{}, func(opts *ApiOptions) error {
+	cmd := NewCmdApi(&cmdutil.Factory{}, "", func(opts *ApiOptions) error {
 		return nil
 	})
 
