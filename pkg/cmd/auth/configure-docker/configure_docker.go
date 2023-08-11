@@ -18,6 +18,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	dockerconfig "github.com/docker/cli/cli/config"
 	"github.com/spf13/cobra"
 )
 
@@ -213,7 +214,28 @@ func configureDockerRun(opts *ConfigureDockerOptions) error {
 		return fmt.Errorf("creating symlink: %w", err)
 	}
 
-	// TODO: update ~/.docker/config.json to add .credHelpers.[ghcr.io] = "gh"
+	// Update the user's docker config to configure the cred helper for the registry endpoint.
+	cf, err := dockerconfig.Load(os.Getenv("DOCKER_CONFIG"))
+	if err != nil {
+		return err
+	}
+	if cf.CredentialHelpers == nil {
+		cf.CredentialHelpers = map[string]string{}
+	}
+	registry := "ghcr.io" // TODO: use configured hostname
+	if cf.CredentialHelpers[registry] != "gh" {
+		cf.CredentialHelpers[registry] = "gh"
+		fmt.Fprintf(opts.IO.ErrOut, "Updated auth config for %s\n", registry)
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "Credential helper already configured for %s\n", registry)
+	}
+	if _, ok := cf.AuthConfigs[registry]; ok {
+		delete(cf.AuthConfigs, registry)
+		fmt.Fprintf(opts.IO.ErrOut, "Removed existing token for %s\n", registry)
+	}
+	if err := cf.Save(); err != nil {
+		return fmt.Errorf("writing docker config: %w", err)
+	}
 
 	return nil
 }
