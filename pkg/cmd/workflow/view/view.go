@@ -26,6 +26,7 @@ type ViewOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
+	Prompter   iprompter
 
 	Selector string
 	Ref      string
@@ -37,11 +38,16 @@ type ViewOptions struct {
 	now time.Time
 }
 
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
+
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		Prompter:   f.Prompter,
 		now:        time.Now(),
 	}
 
@@ -104,7 +110,7 @@ func runView(opts *ViewOptions) error {
 
 	var workflow *shared.Workflow
 	states := []shared.WorkflowState{shared.Active}
-	workflow, err = shared.ResolveWorkflow(opts.IO, client, repo, opts.Prompt, opts.Selector, states)
+	workflow, err = shared.ResolveWorkflow(opts.Prompter, opts.IO, client, repo, opts.Prompt, opts.Selector, states)
 	if err != nil {
 		return err
 	}
