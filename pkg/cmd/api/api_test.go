@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/template"
@@ -26,7 +27,7 @@ import (
 )
 
 func Test_NewCmdApi(t *testing.T) {
-	f := &cmdutil.Factory{}
+	f := factory.New("")
 
 	tests := []struct {
 		name     string
@@ -52,6 +53,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -73,6 +75,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -94,6 +97,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -115,6 +119,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -136,6 +141,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -157,6 +163,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -183,6 +190,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -209,6 +217,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -235,6 +244,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -256,6 +266,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            time.Minute * 5,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -277,6 +288,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "hello {{.name}}",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -298,6 +310,29 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        ".name",
+				Verbose:             false,
+			},
+			wantsErr: false,
+		},
+		{
+			name: "with verbose",
+			cli:  "user --verbose",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
+				Verbose:             true,
 			},
 			wantsErr: false,
 		},
@@ -352,6 +387,7 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.CacheTTL, opts.CacheTTL)
 			assert.Equal(t, tt.wants.Template, opts.Template)
 			assert.Equal(t, tt.wants.FilterOutput, opts.FilterOutput)
+			assert.Equal(t, tt.wants.Verbose, opts.Verbose)
 		})
 	}
 }
