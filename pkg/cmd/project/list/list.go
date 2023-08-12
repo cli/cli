@@ -15,11 +15,12 @@ import (
 )
 
 type listOpts struct {
-	limit  int
-	web    bool
-	owner  string
-	closed bool
-	format string
+	limit    int
+	web      bool
+	owner    string
+	closed   bool
+	format   string
+	exporter cmdutil.Exporter
 }
 
 type listConfig struct {
@@ -71,6 +72,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser")
 	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of projects to fetch")
+	format.AddJSONFlags(listCmd, &opts.format, &opts.exporter, format.ProjectFields)
 
 	return listCmd
 }
@@ -103,7 +105,7 @@ func runList(config listConfig) error {
 	}
 	projects = filterProjects(projects, config)
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printJSON(config, projects, totalCount)
 	}
 
@@ -174,11 +176,6 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 }
 
 func printJSON(config listConfig, projects []queries.Project, totalCount int) error {
-	b, err := format.JSONProjects(projects, totalCount)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
+	projectsJSON := format.JSONProjects(projects, totalCount)
+	return config.opts.exporter.Write(config.io, projectsJSON)
 }

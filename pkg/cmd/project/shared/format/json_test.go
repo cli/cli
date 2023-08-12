@@ -1,6 +1,7 @@
 package format
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -76,7 +77,8 @@ func TestJSONProjects(t *testing.T) {
 	orgProject.Fields.TotalCount = 2
 	orgProject.Owner.TypeName = "Organization"
 	orgProject.Owner.Organization.Login = "github"
-	b, err := JSONProjects([]queries.Project{userProject, orgProject}, 2)
+	projectsJSON := JSONProjects([]queries.Project{userProject, orgProject}, 2)
+	b, err := json.Marshal(projectsJSON)
 	assert.NoError(t, err)
 
 	assert.Equal(

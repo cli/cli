@@ -5,11 +5,50 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
+
+func AddJSONFlags(cmd *cobra.Command, format *string, exportTarget *cmdutil.Exporter, fields []string) {
+	oldPreRun := cmd.PreRunE
+	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		if oldPreRun != nil {
+			if err := oldPreRun(cmd, args); err != nil {
+				return err
+			}
+		}
+
+		jsonFlag := cmd.Flags().Lookup("json")
+		if err := cmdutil.MutuallyExclusive(
+			"specify only one of `--format` or `--json`",
+			format != nil,
+			jsonFlag.Changed,
+		); err != nil {
+			return err
+		}
+
+		// Check legacy "format" and use consistent "json" flag instead
+		if *format == "json" {
+			jv := jsonFlag.Value.(pflag.SliceValue)
+			if err := jv.Replace(fields); err != nil {
+				return err
+			}
+			jsonFlag.Changed = true
+		}
+
+		return nil
+	}
+
+	_ = cmd.Flags().MarkDeprecated("format", "use `--json` instead")
+
+	// TODO: Implement filtering on specified fields; likely requires rewrite to use string queries instead of graphql tags.
+	cmdutil.AddJSONFlags(cmd, exportTarget, fields)
+}
 
 // JSONProject serializes a Project to JSON.
 func JSONProject(project queries.Project) ([]byte, error) {
-	return json.Marshal(projectJSON{
+	return json.Marshal(ProjectJSON{
 		Number:           project.Number,
 		URL:              project.URL,
 		ShortDescription: project.ShortDescription,
@@ -44,10 +83,10 @@ func JSONProject(project queries.Project) ([]byte, error) {
 
 // JSONProjects serializes a slice of Projects to JSON.
 // JSON fields are `totalCount` and `projects`.
-func JSONProjects(projects []queries.Project, totalCount int) ([]byte, error) {
-	var result []projectJSON
+func JSONProjects(projects []queries.Project, totalCount int) ProjectsJSON {
+	var result []ProjectJSON
 	for _, p := range projects {
-		result = append(result, projectJSON{
+		result = append(result, ProjectJSON{
 			Number:           p.Number,
 			URL:              p.URL,
 			ShortDescription: p.ShortDescription,
@@ -80,16 +119,27 @@ func JSONProjects(projects []queries.Project, totalCount int) ([]byte, error) {
 		})
 	}
 
-	return json.Marshal(struct {
-		Projects   []projectJSON `json:"projects"`
-		TotalCount int           `json:"totalCount"`
-	}{
+	return ProjectsJSON{
 		Projects:   result,
 		TotalCount: totalCount,
-	})
+	}
 }
 
-type projectJSON struct {
+var ProjectFields = []string{
+	"number",
+	"url",
+	"shortDescription",
+	"public",
+	"closed",
+	"title",
+	"id",
+	"readme",
+	"items",
+	"fields",
+	"owner",
+}
+
+type ProjectJSON struct {
 	Number           int32  `json:"number"`
 	URL              string `json:"url"`
 	ShortDescription string `json:"shortDescription"`
@@ -112,6 +162,11 @@ type projectJSON struct {
 		Type  string `json:"type"`
 		Login string `json:"login"`
 	} `json:"owner"`
+}
+
+type ProjectsJSON struct {
+	Projects   []ProjectJSON `json:"projects"`
+	TotalCount int           `json:"totalCount"`
 }
 
 // JSONProjectField serializes a ProjectField to JSON.
