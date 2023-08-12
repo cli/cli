@@ -28,6 +28,7 @@ type WatchOptions struct {
 	RunID      string
 	Interval   int
 	ExitStatus bool
+	Attempt    uint64
 
 	Prompt bool
 
@@ -73,6 +74,7 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 	}
 	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if run fails")
 	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", defaultInterval, "Refresh interval in seconds")
+	cmd.Flags().Uint64VarP(&opts.Attempt, "attempt", "a", 0, "The attempt number of the workflow run")
 
 	return cmd
 }
@@ -200,6 +202,7 @@ func watchRun(opts *WatchOptions) error {
 func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo.Interface, run *shared.Run, prNumber string, annotationCache map[int64][]shared.Annotation) (*shared.Run, error) {
 	cs := opts.IO.ColorScheme()
 
+	attempt := opts.Attempt
 	var err error
 
 	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID), 0)
@@ -207,7 +210,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	jobs, err := shared.GetJobs(client, repo, run)
+	jobs, err := shared.GetJobs(client, repo, run, attempt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}

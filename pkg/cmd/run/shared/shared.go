@@ -429,7 +429,7 @@ type JobsPayload struct {
 	Jobs       []Job
 }
 
-func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error) {
+func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run, attempt uint64) ([]Job, error) {
 	if run.Jobs != nil {
 		return run.Jobs, nil
 	}
@@ -437,6 +437,10 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error)
 	query := url.Values{}
 	query.Set("per_page", "100")
 	jobsPath := fmt.Sprintf("%s?%s", run.JobsURL, query.Encode())
+
+	if attempt > 0 {
+		jobsPath = fmt.Sprintf("repos/%s/actions/runs/%d/attempts/%d/jobs?%s", ghrepo.FullName(repo), run.ID, attempt, query.Encode())
+	}
 
 	for jobsPath != "" {
 		var resp JobsPayload
