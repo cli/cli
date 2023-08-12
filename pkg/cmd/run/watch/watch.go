@@ -86,6 +86,11 @@ func watchRun(opts *WatchOptions) error {
 	}
 	client := api.NewClientFromHTTP(c)
 
+	var attempt uint64 = 0
+	if opts.Attempt > 0 {
+		attempt = opts.Attempt
+	}
+
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("failed to determine base repo: %w", err)
@@ -117,7 +122,7 @@ func watchRun(opts *WatchOptions) error {
 			}
 		}
 	} else {
-		run, err = shared.GetRun(client, repo, runID, 0)
+		run, err = shared.GetRun(client, repo, runID, attempt)
 		if err != nil {
 			return fmt.Errorf("failed to get run: %w", err)
 		}
@@ -202,10 +207,14 @@ func watchRun(opts *WatchOptions) error {
 func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo.Interface, run *shared.Run, prNumber string, annotationCache map[int64][]shared.Annotation) (*shared.Run, error) {
 	cs := opts.IO.ColorScheme()
 
-	attempt := opts.Attempt
+	var attempt uint64 = 0
 	var err error
 
-	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID), 0)
+	if opts.Attempt > 0 {
+		attempt = opts.Attempt
+	}
+
+	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID), attempt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
