@@ -23,7 +23,7 @@ Please avoid:
 ## Building the project
 
 Prerequisites:
-- Go 1.19+
+- Go 1.21+
 
 Build with:
 * Unix-like systems: `make`
