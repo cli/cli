@@ -106,28 +106,29 @@ func setRun(opts *SetOptions) error {
 		return fmt.Errorf("did not understand expansion: %w", err)
 	}
 
-	isTerminal := opts.IO.IsStdoutTTY()
-	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "- Adding alias for %s: %s\n", cs.Bold(opts.Name), cs.Bold(expansion))
-	}
-
 	if opts.IsShell && !strings.HasPrefix(expansion, "!") {
 		expansion = "!" + expansion
 	}
 
+	isTerminal := opts.IO.IsStdoutTTY()
+	if isTerminal {
+		fmt.Fprintf(opts.IO.ErrOut, "- Creating alias for %s: %s\n", cs.Bold(opts.Name), cs.Bold(expansion))
+	}
+
 	var existingAlias bool
-	oldExpansion, err := aliasCfg.Get(opts.Name)
-	if err == nil {
+	if _, err := aliasCfg.Get(opts.Name); err == nil {
 		existingAlias = true
 	}
 
 	if !opts.validAliasName(opts.Name) {
 		if !existingAlias {
-			return fmt.Errorf("could not create alias: %q is already a gh command, extension, or alias", opts.Name)
+			return fmt.Errorf("%s Could not create alias %s: already a gh command or extension",
+				cs.FailureIcon(),
+				cs.Bold(opts.Name))
 		}
 
 		if existingAlias && !opts.OverwriteExisting {
-			return fmt.Errorf("%s Could not create alias %q: name already taken. Add --clobber flag to overwrite",
+			return fmt.Errorf("%s Could not create alias %s: name already taken, use the --clobber flag to overwrite it",
 				cs.FailureIcon(),
 				cs.Bold(opts.Name),
 			)
@@ -135,17 +136,9 @@ func setRun(opts *SetOptions) error {
 	}
 
 	if !opts.validAliasExpansion(expansion) {
-		return fmt.Errorf("could not create alias: %s does not correspond to a gh command, extension, or alias", expansion)
-	}
-
-	successMsg := fmt.Sprintf("%s Added alias.", cs.SuccessIcon())
-	if existingAlias && opts.OverwriteExisting {
-		successMsg = fmt.Sprintf("%s Changed alias %s from %s to %s",
-			cs.SuccessIcon(),
-			cs.Bold(opts.Name),
-			cs.Bold(oldExpansion),
-			cs.Bold(expansion),
-		)
+		return fmt.Errorf("%s Could not create alias %s: expansion does not correspond to a gh command, extension, or alias",
+			cs.FailureIcon(),
+			cs.Bold(opts.Name))
 	}
 
 	aliasCfg.Add(opts.Name, expansion)
@@ -153,6 +146,13 @@ func setRun(opts *SetOptions) error {
 	err = cfg.Write()
 	if err != nil {
 		return err
+	}
+
+	successMsg := fmt.Sprintf("%s Added alias %s", cs.SuccessIcon(), cs.Bold(opts.Name))
+	if existingAlias && opts.OverwriteExisting {
+		successMsg = fmt.Sprintf("%s Changed alias %s",
+			cs.WarningIcon(),
+			cs.Bold(opts.Name))
 	}
 
 	if isTerminal {
