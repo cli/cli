@@ -102,8 +102,8 @@ func createRun(opts *createOptions) error {
 	}
 
 	if opts.Color == "" {
-		rand.Seed(time.Now().UnixNano())
-		opts.Color = randomColors[rand.Intn(len(randomColors)-1)]
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		opts.Color = randomColors[r.Intn(len(randomColors)-1)]
 	}
 
 	opts.IO.StartProgressIndicator()
