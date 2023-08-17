@@ -47,9 +47,11 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 	pm := prompter.NewMockPrompter(t)
 	pm.RegisterMultiSelect("What would you like to add?",
 		[]string{}, []string{"Reviewers", "Assignees", "Labels", "Projects", "Milestone"}, func(_ string, _, _ []string) ([]int, error) {
-			// []string{"Labels", "Projects", "Assignees", "Reviewers", "Milestone"},
 			return []int{0, 1, 2, 3, 4}, nil
 		})
+	pm.RegisterMultiSelect("Reviewers", []string{}, []string{"hubot", "monalisa"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{1}, nil
+	})
 
 	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, restoreAsk := prompt.InitAskStubber()
@@ -57,10 +59,10 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 
 	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "reviewers",
-			Value: []string{"monalisa"},
-		},
+		//{
+		//	Name:  "reviewers",
+		//	Value: []string{"monalisa"},
+		//},
 		{
 			Name:  "assignees",
 			Value: []string{"hubot"},
@@ -115,10 +117,8 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 	}
 
 	pm := prompter.NewMockPrompter(t)
-
 	pm.RegisterMultiSelect("What would you like to add?", []string{}, []string{"Assignees", "Labels", "Projects", "Milestone"}, func(_ string, _, _ []string) ([]int, error) {
 		return []int{1, 2}, nil
-
 	})
 
 	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber

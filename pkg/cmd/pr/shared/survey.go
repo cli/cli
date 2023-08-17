@@ -210,22 +210,28 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		milestones = append(milestones, m.Title)
 	}
 
-	var mqs []*survey.Question
+	values := struct {
+		Reviewers []string
+		Assignees []string
+		Labels    []string
+		Projects  []string
+		Milestone string
+	}{}
+
 	if isChosen("Reviewers") {
 		if len(reviewers) > 0 {
-			mqs = append(mqs, &survey.Question{
-				Name: "reviewers",
-				Prompt: &survey.MultiSelect{
-					Message: "Reviewers",
-					Options: reviewers,
-					Default: state.Reviewers,
-					Filter:  prompter.LatinMatchingFilter,
-				},
-			})
+			selected, err := p.MultiSelect("Reviewers", state.Reviewers, reviewers)
+			if err != nil {
+				return err
+			}
+			for _, i := range selected {
+				values.Reviewers = append(values.Reviewers, reviewers[i])
+			}
 		} else {
 			fmt.Fprintln(io.ErrOut, "warning: no available reviewers")
 		}
 	}
+	var mqs []*survey.Question
 	if isChosen("Assignees") {
 		if len(assignees) > 0 {
 			mqs = append(mqs, &survey.Question{
@@ -291,15 +297,6 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 			fmt.Fprintln(io.ErrOut, "warning: no milestones in the repository")
 		}
 	}
-
-	values := struct {
-		Reviewers []string
-		Assignees []string
-		Labels    []string
-		Projects  []string
-		Milestone string
-	}{}
-
 	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err = prompt.SurveyAsk(mqs, &values)
 	if err != nil {
