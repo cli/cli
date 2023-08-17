@@ -5,6 +5,7 @@
 	"source_type": "Repository",
 	"source": "my-owner/repo-name",
 	"enforcement": "active",
+	"current_user_can_bypass": "pull_requests_only",
 	"conditions": {
 		"ref_name": {
 			"exclude": [],

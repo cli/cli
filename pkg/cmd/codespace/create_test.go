@@ -453,10 +453,31 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 		},
 		{
 			name: "return default url when using web flag without other flags",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					ServerURLFunc: func() string {
+						return "https://github.com"
+					},
+				}),
+			},
 			opts: createOptions{
 				useWeb: true,
 			},
 			wantURL: "https://github.com/codespaces/new",
+		},
+		{
+			name: "return custom server url when using web flag",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					ServerURLFunc: func() string {
+						return "https://github.mycompany.com"
+					},
+				}),
+			},
+			opts: createOptions{
+				useWeb: true,
+			},
+			wantURL: "https://github.mycompany.com/codespaces/new",
 		},
 		{
 			name: "skip machine check when using web flag and no machine provided",
@@ -472,6 +493,9 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 						return &api.Codespace{
 							Name: "monalisa-dotfiles-abcd1234",
 						}, nil
+					},
+					ServerURLFunc: func() string {
+						return "https://github.com"
 					},
 				}),
 			},
@@ -499,6 +523,9 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 							Name: "monalisa-dotfiles-abcd1234",
 						}, nil
 					},
+					ServerURLFunc: func() string {
+						return "https://github.com"
+					},
 				}),
 			},
 			opts: createOptions{
@@ -523,6 +550,9 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 							Name:    "monalisa-dotfiles-abcd1234",
 							Machine: api.CodespaceMachine{Name: "GIGA"},
 						}, nil
+					},
+					ServerURLFunc: func() string {
+						return "https://github.com"
 					},
 				}),
 			},

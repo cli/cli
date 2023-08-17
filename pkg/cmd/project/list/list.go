@@ -33,8 +33,8 @@ type listConfig struct {
 func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.Command {
 	opts := listOpts{}
 	listCmd := &cobra.Command{
-		Short: "List the projects for an owner",
 		Use:   "list",
+		Short: "List the projects for an owner",
 		Example: heredoc.Doc(`
 			# list the current user's projects
 			gh project list
@@ -42,6 +42,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 			# list the projects for org github including closed projects
 			gh project list --owner github --closed
 		`),
+		Aliases: []string{"ls"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := client.New(f)
 			if err != nil {
