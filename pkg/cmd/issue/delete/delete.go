@@ -3,16 +3,13 @@ package delete
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -22,9 +19,14 @@ type DeleteOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   iprompter
 
 	SelectorArg string
 	Confirmed   bool
+}
+
+type iprompter interface {
+	ConfirmDeletion(string) error
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
@@ -32,6 +34,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -79,21 +82,11 @@ func deleteRun(opts *DeleteOptions) error {
 	// When executed in an interactive shell, require confirmation, unless
 	// already provided. Otherwise skip confirmation.
 	if opts.IO.CanPrompt() && !opts.Confirmed {
-		answer := ""
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(
-			&survey.Input{
-				Message: fmt.Sprintf("You're going to delete issue #%d. This action cannot be reversed. To confirm, type the issue number:", issue.Number),
-			},
-			&answer,
-		)
+		cs := opts.IO.ColorScheme()
+		fmt.Printf("%s Deleted issues cannot be recovered.\n", cs.WarningIcon())
+		err := opts.Prompter.ConfirmDeletion(fmt.Sprintf("%d", issue.Number))
 		if err != nil {
 			return err
-		}
-		answerInt, err := strconv.Atoi(answer)
-		if err != nil || answerInt != issue.Number {
-			fmt.Fprintf(opts.IO.Out, "Issue #%d was not deleted.\n", issue.Number)
-			return nil
 		}
 	}
 
