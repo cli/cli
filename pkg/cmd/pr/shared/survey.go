@@ -7,7 +7,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 )
@@ -260,15 +259,13 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	var mqs []*survey.Question
 	if isChosen("Projects") {
 		if len(projects) > 0 {
-			mqs = append(mqs, &survey.Question{
-				Name: "projects",
-				Prompt: &survey.MultiSelect{
-					Message: "Projects",
-					Options: projects,
-					Default: state.Projects,
-					Filter:  prompter.LatinMatchingFilter,
-				},
-			})
+			selected, err := p.MultiSelect("Projects", state.Projects, projects)
+			if err != nil {
+				return err
+			}
+			for _, i := range selected {
+				values.Projects = append(values.Projects, projects[i])
+			}
 		} else {
 			fmt.Fprintln(io.ErrOut, "warning: no projects to choose from")
 		}
