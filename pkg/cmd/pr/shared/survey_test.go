@@ -5,6 +5,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/stretchr/testify/assert"
@@ -43,17 +44,17 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		},
 	}
 
+	pm := prompter.NewMockPrompter(t)
+	pm.RegisterMultiSelect("What would you like to add?",
+		[]string{}, []string{"Reviewers", "Assignees", "Labels", "Projects", "Milestone"}, func(_ string, _, _ []string) ([]int, error) {
+			// []string{"Labels", "Projects", "Assignees", "Reviewers", "Milestone"},
+			return []int{0, 1, 2, 3, 4}, nil
+		})
+
 	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, restoreAsk := prompt.InitAskStubber()
 	defer restoreAsk()
 
-	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "metadata",
-			Value: []string{"Labels", "Projects", "Assignees", "Reviewers", "Milestone"},
-		},
-	})
 	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
@@ -80,8 +81,9 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
+		Type:      PRMetadata,
 	}
-	err := MetadataSurvey(ios, repo, fetcher, state)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -112,17 +114,17 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 		},
 	}
 
+	pm := prompter.NewMockPrompter(t)
+
+	pm.RegisterMultiSelect("What would you like to add?", []string{}, []string{"Assignees", "Labels", "Projects", "Milestone"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{1, 2}, nil
+
+	})
+
 	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, restoreAsk := prompt.InitAskStubber()
 	defer restoreAsk()
 
-	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "metadata",
-			Value: []string{"Labels", "Projects"},
-		},
-	})
 	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
@@ -138,7 +140,7 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
 	}
-	err := MetadataSurvey(ios, repo, fetcher, state)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())

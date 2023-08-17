@@ -37,6 +37,7 @@ type Prompt interface {
 	Select(string, string, []string) (int, error)
 	MarkdownEditor(string, string, bool) (string, error)
 	Confirm(string, bool) (bool, error)
+	MultiSelect(string, []string, []string) ([]int, error)
 }
 
 func ConfirmIssueSubmission(p Prompt, allowPreview bool, allowMetadata bool) (Action, error) {
@@ -142,7 +143,7 @@ type RepoMetadataFetcher interface {
 	RepoMetadataFetch(api.RepoMetadataInput) (*api.RepoMetadataResult, error)
 }
 
-func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState) error {
+func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState) error {
 	isChosen := func(m string) bool {
 		for _, c := range state.Metadata {
 			if m == c {
@@ -160,18 +161,12 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 	}
 	extraFieldsOptions = append(extraFieldsOptions, "Assignees", "Labels", "Projects", "Milestone")
 
-	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-	err := prompt.SurveyAsk([]*survey.Question{
-		{
-			Name: "metadata",
-			Prompt: &survey.MultiSelect{
-				Message: "What would you like to add?",
-				Options: extraFieldsOptions,
-			},
-		},
-	}, state)
+	selected, err := p.MultiSelect("What would you like to add?", nil, extraFieldsOptions)
 	if err != nil {
-		return fmt.Errorf("could not prompt: %w", err)
+		return err
+	}
+	for _, i := range selected {
+		state.Metadata = append(state.Metadata, extraFieldsOptions[i])
 	}
 
 	metadataInput := api.RepoMetadataInput{
