@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 )
 
 type Action int
@@ -256,7 +254,6 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 			fmt.Fprintln(io.ErrOut, "warning: no labels in the repository")
 		}
 	}
-	var mqs []*survey.Question
 	if isChosen("Projects") {
 		if len(projects) > 0 {
 			selected, err := p.MultiSelect("Projects", state.Projects, projects)
@@ -278,22 +275,14 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 			} else {
 				milestoneDefault = milestones[1]
 			}
-			mqs = append(mqs, &survey.Question{
-				Name: "milestone",
-				Prompt: &survey.Select{
-					Message: "Milestone",
-					Options: milestones,
-					Default: milestoneDefault,
-				},
-			})
+			selected, err := p.Select("Milestone", milestoneDefault, milestones)
+			if err != nil {
+				return err
+			}
+			values.Milestone = milestones[selected]
 		} else {
 			fmt.Fprintln(io.ErrOut, "warning: no milestones in the repository")
 		}
-	}
-	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-	err = prompt.SurveyAsk(mqs, &values)
-	if err != nil {
-		return fmt.Errorf("could not prompt: %w", err)
 	}
 
 	if isChosen("Reviewers") {
