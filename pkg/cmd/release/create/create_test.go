@@ -321,6 +321,43 @@ func Test_NewCmdCreate(t *testing.T) {
 				VerifyTag:     true,
 			},
 		},
+		{
+			name:  "tag and --notes-from-tag",
+			args:  "v1.2.3 --notes-from-tag",
+			isTTY: false,
+			want: CreateOptions{
+				TagName:       "v1.2.3",
+				Target:        "",
+				Name:          "",
+				Body:          "",
+				BodyProvided:  true,
+				Draft:         false,
+				Prerelease:    false,
+				RepoOverride:  "",
+				Concurrency:   5,
+				Assets:        []*shared.AssetForUpload(nil),
+				GenerateNotes: false,
+				NotesFromTag:  true,
+			},
+		},
+		{
+			name:    "--notes-from-tag only ",
+			args:    "--notes-from-tag",
+			isTTY:   false,
+			wantErr: "tag required when not running interactively",
+		},
+		{
+			name:    "tag and --notes-from-tag and --generate-notes",
+			args:    "v1.2.3 --notes-from-tag --generate-notes",
+			isTTY:   false,
+			wantErr: "using `--notes-from-tag` with `--generate-notes` or `notes-start-tag` is not supported",
+		},
+		{
+			name:    "tag and --notes-from-tag and --notes-start-tag",
+			args:    "v1.2.3 --notes-from-tag --notes-start-tag v1.2.3",
+			isTTY:   false,
+			wantErr: "using `--notes-from-tag` with `--generate-notes` or `notes-start-tag` is not supported",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
