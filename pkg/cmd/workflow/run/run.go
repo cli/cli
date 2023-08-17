@@ -412,7 +412,6 @@ func findInputs(yamlContent []byte) ([]WorkflowInput, error) {
 	}
 
 	for name, input := range m {
-		input.Name = name
 		out = append(out, WorkflowInput{
 			Name:        name,
 			Default:     input.Default,
