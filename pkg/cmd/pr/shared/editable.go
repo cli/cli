@@ -277,6 +277,9 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 	if editable.Reviewers.Edited {
 		editable.Reviewers.Value, err = multiSelectSurvey(
 			p, "Reviewers", editable.Reviewers.Default, editable.Reviewers.Options)
+		if err != nil {
+			return err
+		}
 	}
 	if editable.Assignees.Edited {
 		editable.Assignees.Value, err = multiSelectSurvey(
