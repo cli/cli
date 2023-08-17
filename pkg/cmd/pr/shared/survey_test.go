@@ -7,7 +7,6 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -61,17 +60,8 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 	pm.RegisterMultiSelect("Projects", []string{}, []string{"Huge Refactoring", "The road to 1.0"}, func(_ string, _, _ []string) ([]int, error) {
 		return []int{1}, nil
 	})
-
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, restoreAsk := prompt.InitAskStubber()
-	defer restoreAsk()
-
-	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "milestone",
-			Value: "(none)",
-		},
+	pm.RegisterSelect("Milestone", []string{"(none)", "1.2 patch release"}, func(_, _ string, _ []string) (int, error) {
+		return 0, nil
 	})
 
 	state := &IssueMetadataState{
