@@ -14,7 +14,7 @@ import (
 //go:generate moq -rm -out prompter_mock.go . Prompter
 type Prompter interface {
 	Select(string, string, []string) (int, error)
-	MultiSelect(string, []string, []string) ([]int, error)
+	MultiSelect(prompt string, defaults []string, options []string) ([]int, error)
 	Input(string, string) (string, error)
 	InputHostname() (string, error)
 	Password(string) (string, error)

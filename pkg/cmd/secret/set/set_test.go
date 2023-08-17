@@ -12,11 +12,11 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -595,12 +595,14 @@ func Test_getBodyPrompt(t *testing.T) {
 	ios.SetStdinTTY(true)
 	ios.SetStdoutTTY(true)
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("Paste your secret").AnswerWith("cool secret")
+	pm := prompter.NewMockPrompter(t)
+	pm.RegisterPassword("Paste your secret", func(_ string) (string, error) {
+		return "cool secret", nil
+	})
 
 	body, err := getBody(&SetOptions{
-		IO: ios,
+		IO:       ios,
+		Prompter: pm,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, string(body), "cool secret")

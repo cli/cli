@@ -12,11 +12,11 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -215,7 +215,7 @@ func Test_findInputs(t *testing.T) {
 		YAML    []byte
 		wantErr bool
 		errMsg  string
-		wantOut map[string]WorkflowInput
+		wantOut []WorkflowInput
 	}{
 		{
 			name:    "blank",
@@ -244,12 +244,12 @@ func Test_findInputs(t *testing.T) {
 		{
 			name:    "short syntax",
 			YAML:    []byte("name: workflow\non: workflow_dispatch"),
-			wantOut: map[string]WorkflowInput{},
+			wantOut: []WorkflowInput{},
 		},
 		{
 			name:    "array of events",
 			YAML:    []byte("name: workflow\non: [pull_request, workflow_dispatch]\n"),
-			wantOut: map[string]WorkflowInput{},
+			wantOut: []WorkflowInput{},
 		},
 		{
 			name: "inputs",
@@ -274,18 +274,22 @@ jobs:
       - name: echo
         run: |
           echo "echo"`),
-			wantOut: map[string]WorkflowInput{
-				"foo": {
+			wantOut: []WorkflowInput{
+				{
+					Name:    "bar",
+					Default: "boo",
+				},
+				{
+					Name:        "baz",
+					Description: "it's baz",
+				},
+				{
+					Name:        "foo",
 					Required:    true,
 					Description: "good foo",
 				},
-				"bar": {
-					Default: "boo",
-				},
-				"baz": {
-					Description: "it's baz",
-				},
-				"quux": {
+				{
+					Name:     "quux",
 					Required: true,
 					Default:  "cool",
 				},
@@ -359,15 +363,15 @@ jobs:
 	}
 
 	tests := []struct {
-		name      string
-		opts      *RunOptions
-		tty       bool
-		wantErr   bool
-		errOut    string
-		wantOut   string
-		wantBody  map[string]interface{}
-		httpStubs func(*httpmock.Registry)
-		askStubs  func(*prompt.AskStubber)
+		name        string
+		opts        *RunOptions
+		tty         bool
+		wantErr     bool
+		errOut      string
+		wantOut     string
+		wantBody    map[string]interface{}
+		httpStubs   func(*httpmock.Registry)
+		promptStubs func(*prompter.MockPrompter)
 	}{
 		{
 			name: "bad JSON",
@@ -577,8 +581,10 @@ jobs:
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/1/dispatches"),
 					httpmock.StatusStringResponse(204, "cool"))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Select a workflow").AnswerDefault()
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow", []string{"minimal workflow (minimal.yml)"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{},
@@ -614,10 +620,16 @@ jobs:
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
 					httpmock.StatusStringResponse(204, "cool"))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Select a workflow").AnswerDefault()
-				as.StubPrompt("greeting").AnswerWith("hi")
-				as.StubPrompt("name").AnswerWith("scully")
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow", []string{"a workflow (workflow.yml)"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+				pm.RegisterInput("greeting", func(_, _ string) (string, error) {
+					return "hi", nil
+				})
+				pm.RegisterInput("name (required)", func(_, _ string) (string, error) {
+					return "scully", nil
+				})
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -652,10 +664,10 @@ jobs:
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := prompter.NewMockPrompter(t)
+			tt.opts.Prompter = pm
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
 			}
 
 			err := runRun(tt.opts)
