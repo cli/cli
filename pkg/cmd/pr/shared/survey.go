@@ -244,22 +244,20 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 			fmt.Fprintln(io.ErrOut, "warning: no assignable users")
 		}
 	}
-	var mqs []*survey.Question
 	if isChosen("Labels") {
 		if len(labels) > 0 {
-			mqs = append(mqs, &survey.Question{
-				Name: "labels",
-				Prompt: &survey.MultiSelect{
-					Message: "Labels",
-					Options: labels,
-					Default: state.Labels,
-					Filter:  prompter.LatinMatchingFilter,
-				},
-			})
+			selected, err := p.MultiSelect("Labels", state.Labels, labels)
+			if err != nil {
+				return err
+			}
+			for _, i := range selected {
+				values.Labels = append(values.Labels, labels[i])
+			}
 		} else {
 			fmt.Fprintln(io.ErrOut, "warning: no labels in the repository")
 		}
 	}
+	var mqs []*survey.Question
 	if isChosen("Projects") {
 		if len(projects) > 0 {
 			mqs = append(mqs, &survey.Question{

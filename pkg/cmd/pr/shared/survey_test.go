@@ -55,6 +55,9 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 	pm.RegisterMultiSelect("Assignees", []string{}, []string{"hubot", "monalisa"}, func(_ string, _, _ []string) ([]int, error) {
 		return []int{0}, nil
 	})
+	pm.RegisterMultiSelect("Labels", []string{}, []string{"help wanted", "good first issue"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{1}, nil
+	})
 
 	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, restoreAsk := prompt.InitAskStubber()
@@ -62,10 +65,6 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 
 	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "labels",
-			Value: []string{"good first issue"},
-		},
 		{
 			Name:  "projects",
 			Value: []string{"The road to 1.0"},
@@ -115,6 +114,9 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 	pm.RegisterMultiSelect("What would you like to add?", []string{}, []string{"Assignees", "Labels", "Projects", "Milestone"}, func(_ string, _, _ []string) ([]int, error) {
 		return []int{1, 2}, nil
 	})
+	pm.RegisterMultiSelect("Labels", []string{}, []string{"help wanted", "good first issue"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{1}, nil
+	})
 
 	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, restoreAsk := prompt.InitAskStubber()
@@ -122,10 +124,6 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 
 	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "labels",
-			Value: []string{"good first issue"},
-		},
 		{
 			Name:  "projects",
 			Value: []string{"The road to 1.0"},
