@@ -52,6 +52,9 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 	pm.RegisterMultiSelect("Reviewers", []string{}, []string{"hubot", "monalisa"}, func(_ string, _, _ []string) ([]int, error) {
 		return []int{1}, nil
 	})
+	pm.RegisterMultiSelect("Assignees", []string{}, []string{"hubot", "monalisa"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{0}, nil
+	})
 
 	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, restoreAsk := prompt.InitAskStubber()
@@ -59,14 +62,6 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 
 	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
-		//{
-		//	Name:  "reviewers",
-		//	Value: []string{"monalisa"},
-		//},
-		{
-			Name:  "assignees",
-			Value: []string{"hubot"},
-		},
 		{
 			Name:  "labels",
 			Value: []string{"good first issue"},
