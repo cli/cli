@@ -35,6 +35,14 @@ type logger interface {
 	Printf(f string, v ...interface{})
 }
 
+type TimeoutError struct {
+	message string
+}
+
+func (e *TimeoutError) Error() string {
+	return e.message
+}
+
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
 func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
@@ -63,15 +71,15 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 				return nil
 			}
 
-			return errors.New("codespace not ready yet")
+			return &TimeoutError{message: "codespace not ready yet"}
 		}, backoff.WithContext(expBackoff, ctx))
 		if err != nil {
-			var permErr *backoff.PermanentError
-			if errors.As(err, &permErr) {
-				return nil, err
+			var timeoutErr *TimeoutError
+			if errors.As(err, &timeoutErr) {
+				return nil, errors.New("timed out while waiting for the codespace to start")
 			}
 
-			return nil, errors.New("timed out while waiting for the codespace to start")
+			return nil, err
 		}
 	}
 

@@ -88,6 +88,7 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
 type apiClient interface {
+	ServerURL() string
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
