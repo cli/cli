@@ -35,7 +35,7 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		LogIgnoreEnv: true,
 	}
 
-	if debugEnabled, _ := utils.IsDebugEnabled(); debugEnabled {
+	if debugEnabled, _ := utils.IsDebugEnabled(); debugEnabled || opts.LogVerboseHTTP {
 		clientOpts.Log = opts.Log
 		clientOpts.LogColorize = opts.LogColorize
 		clientOpts.LogVerboseHTTP = opts.LogVerboseHTTP
