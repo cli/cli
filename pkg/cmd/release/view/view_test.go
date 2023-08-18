@@ -54,6 +54,58 @@ func Test_NewCmdView(t *testing.T) {
 				WebMode: true,
 			},
 		},
+		{
+			name:  "interval",
+			args:  "v1.2.3..v1.2.4",
+			isTTY: true,
+			want: ViewOptions{
+				TagName: "v1.2.3..v1.2.4",
+			},
+		},
+		{
+			name:  "interval limit",
+			args:  "-L 10 v1.2.3..v1.2.4",
+			isTTY: true,
+			want: ViewOptions{
+				TagName:      "v1.2.3..v1.2.4",
+				LimitResults: 10,
+			},
+		},
+		{
+			name:  "interval web mode",
+			args:  "-w v1.2.3..v1.2.4",
+			isTTY: true,
+			want: ViewOptions{
+				WebMode: true,
+				TagName: "v1.2.3..v1.2.4",
+			},
+		},
+		{
+			name:  "with asterisk",
+			args:  "v1.2.*",
+			isTTY: true,
+			want: ViewOptions{
+				TagName: "v1.2.*",
+			},
+		},
+		{
+			name:  "with asterisk limit",
+			args:  "-L 10 v1.2.*",
+			isTTY: true,
+			want: ViewOptions{
+				TagName:      "v1.2.*",
+				LimitResults: 10,
+			},
+		},
+		{
+			name:  "with asterisk web mode",
+			args:  "-w v1.2.*",
+			isTTY: true,
+			want: ViewOptions{
+				WebMode: true,
+				TagName: "v1.2.*",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -308,6 +360,83 @@ func Test_humanFileSize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := humanFileSize(tt.size); got != tt.want {
 				t.Errorf("humanFileSize() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_isRange(t *testing.T) {
+	tests := []struct {
+		name      string
+		tag       string
+		wantError bool
+	}{
+		{
+			name:      "tag range asterisk",
+			tag:       "*",
+			wantError: true,
+		},
+		{
+			name:      "tag range asterisk prefix",
+			tag:       "v*.1.0",
+			wantError: false,
+		},
+		{
+			name:      "tag range asterisk prefix without v",
+			tag:       "*.1.0",
+			wantError: true,
+		},
+		{
+			name:      "tag range asterisk interfix",
+			tag:       "v1.*.0",
+			wantError: false,
+		},
+		{
+			name:      "tag range asterisk interfix without v",
+			tag:       "1.*.0",
+			wantError: true,
+		},
+		{
+			name:      "tag range asterisk sufix",
+			tag:       "v1.1.*",
+			wantError: false,
+		},
+		{
+			name:      "tag range asterisk sufix without v",
+			tag:       "1.1.*",
+			wantError: true,
+		},
+		{
+			name:      "tag range dots",
+			tag:       "v1.1.0..v1.1.2",
+			wantError: false,
+		},
+		{
+			name:      "tag range dots 1st wtihout v",
+			tag:       "1.1.0..v1.1.2",
+			wantError: true,
+		},
+		{
+			name:      "tag range dots 2nd without v",
+			tag:       "v1.1.0..1.1.2",
+			wantError: true,
+		},
+		{
+			name:      "tag range dots with asterisk right",
+			tag:       "1.*.0..1.1.2",
+			wantError: true,
+		},
+		{
+			name:      "tag range dots with asterisk left",
+			tag:       "1.1.0..1.1.*",
+			wantError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ret, err := isRange(tt.tag)
+			if (err != nil) != tt.wantError {
+				t.Errorf("isRange(%s) = %v | want error == %v (%v)", tt.tag, ret, tt.wantError, err)
 			}
 		})
 	}
