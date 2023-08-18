@@ -180,7 +180,7 @@ func Test_checksRun(t *testing.T) {
 				)
 			},
 			wantOut: "Some checks are still pending\n0 failing, 2 successful, 0 skipped, and 1 pending checks\n\n✓  cool tests    1m26s  sweet link\n✓  rad tests     1m26s  sweet link\n*  slow tests    1m26s  sweet link\n",
-			wantErr: "SilentError",
+			wantErr: "PendingError",
 		},
 		{
 			name: "all passing tty",
@@ -275,7 +275,7 @@ func Test_checksRun(t *testing.T) {
 				)
 			},
 			wantOut: "cool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\n",
-			wantErr: "SilentError",
+			wantErr: "PendingError",
 		},
 		{
 			name: "all passing",

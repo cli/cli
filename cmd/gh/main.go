@@ -34,10 +34,11 @@ var updaterEnabled = ""
 type exitCode int
 
 const (
-	exitOK     exitCode = 0
-	exitError  exitCode = 1
-	exitCancel exitCode = 2
-	exitAuth   exitCode = 4
+	exitOK      exitCode = 0
+	exitError   exitCode = 1
+	exitCancel  exitCode = 2
+	exitAuth    exitCode = 4
+	exitPending exitCode = 5
 )
 
 func main() {
@@ -113,6 +114,8 @@ func mainRun() exitCode {
 		var authError *root.AuthError
 		if err == cmdutil.SilentError {
 			return exitError
+		} else if err == cmdutil.PendingError {
+			return exitPending
 		} else if cmdutil.IsUserCancellation(err) {
 			if errors.Is(err, terminal.InterruptErr) {
 				// ensure the next shell prompt will start on its own line
