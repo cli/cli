@@ -21,10 +21,11 @@ type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   prShared.EditPrompter
 
 	DetermineEditor    func() (string, error)
-	FieldsToEditSurvey func(*prShared.Editable) error
-	EditFieldsSurvey   func(*prShared.Editable, string) error
+	FieldsToEditSurvey func(prShared.EditPrompter, *prShared.Editable) error
+	EditFieldsSurvey   func(prShared.EditPrompter, *prShared.Editable, string) error
 	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable) error
 
 	SelectorArgs []string
@@ -41,6 +42,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		FieldsToEditSurvey: prShared.FieldsToEditSurvey,
 		EditFieldsSurvey:   prShared.EditFieldsSurvey,
 		FetchOptions:       prShared.FetchOptions,
+		Prompter:           f.Prompter,
 	}
 
 	var bodyFile string
@@ -152,7 +154,7 @@ func editRun(opts *EditOptions) error {
 	// Prompt the user which fields they'd like to edit.
 	editable := opts.Editable
 	if opts.Interactive {
-		err = opts.FieldsToEditSurvey(&editable)
+		err = opts.FieldsToEditSurvey(opts.Prompter, &editable)
 		if err != nil {
 			return err
 		}
@@ -222,7 +224,7 @@ func editRun(opts *EditOptions) error {
 			if err != nil {
 				return err
 			}
-			err = opts.EditFieldsSurvey(&editable, editorCommand)
+			err = opts.EditFieldsSurvey(opts.Prompter, &editable, editorCommand)
 			if err != nil {
 				return err
 			}

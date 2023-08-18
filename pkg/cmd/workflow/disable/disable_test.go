@@ -7,11 +7,11 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -91,14 +91,14 @@ func TestNewCmdDisable(t *testing.T) {
 
 func TestDisableRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		opts       *DisableOptions
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		tty        bool
-		wantOut    string
-		wantErrOut string
-		wantErr    bool
+		name        string
+		opts        *DisableOptions
+		httpStubs   func(*httpmock.Registry)
+		promptStubs func(*prompter.MockPrompter)
+		tty         bool
+		wantOut     string
+		wantErrOut  string
+		wantErr     bool
 	}{
 		{
 			name: "tty no arg",
@@ -120,8 +120,10 @@ func TestDisableRun(t *testing.T) {
 					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/789/disable"),
 					httpmock.StatusStringResponse(204, "{}"))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Select a workflow").AnswerWith("another workflow (another.yml)")
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow", []string{"a workflow (flow.yml)", "another workflow (another.yml)"}, func(_, _ string, opts []string) (int, error) {
+					return prompter.IndexFor(opts, "another workflow (another.yml)")
+				})
 			},
 			wantOut: "✓ Disabled another workflow\n",
 		},
@@ -169,8 +171,10 @@ func TestDisableRun(t *testing.T) {
 					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/1011/disable"),
 					httpmock.StatusStringResponse(204, "{}"))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Which workflow do you mean?").AnswerWith("another workflow (yetanother.yml)")
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Which workflow do you mean?", []string{"another workflow (another.yml)", "another workflow (yetanother.yml)"}, func(_, _ string, opts []string) (int, error) {
+					return prompter.IndexFor(opts, "another workflow (yetanother.yml)")
+				})
 			},
 			wantOut: "✓ Disabled another workflow\n",
 		},
@@ -269,10 +273,10 @@ func TestDisableRun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := prompter.NewMockPrompter(t)
+			tt.opts.Prompter = pm
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
 			}
 
 			err := runDisable(tt.opts)
