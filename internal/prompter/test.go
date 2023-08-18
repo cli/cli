@@ -258,7 +258,7 @@ func (m *MockPrompter) RegisterInputHostname(stub func() (string, error)) {
 }
 
 func (m *MockPrompter) RegisterPassword(prompt string, stub func(string) (string, error)) {
-	m.PasswordStubs = append(m.PasswordStubs, PasswordStub{Fn: stub})
+	m.PasswordStubs = append(m.PasswordStubs, PasswordStub{Prompt: prompt, Fn: stub})
 }
 
 func (m *MockPrompter) RegisterConfirmDeletion(prompt string, stub func(string) error) {

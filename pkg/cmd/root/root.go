@@ -5,11 +5,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
@@ -134,7 +132,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(variableCmd.NewCmdVariable(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
-	cmd.AddCommand(newCodespaceCmd(f))
+	cmd.AddCommand(codespaceCmd.NewCmdCodespace(f))
 	cmd.AddCommand(projectCmd.NewCmdProject(f))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
@@ -240,52 +238,4 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 		}
 		return api.NewHTTPClient(opts)
 	}
-}
-
-func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
-	serverURL := os.Getenv("GITHUB_SERVER_URL")
-	apiURL := os.Getenv("GITHUB_API_URL")
-	vscsURL := os.Getenv("INTERNAL_VSCS_TARGET_URL")
-	app := codespaceCmd.NewApp(
-		f.IOStreams,
-		f,
-		codespacesAPI.New(
-			serverURL,
-			apiURL,
-			vscsURL,
-			&lazyLoadedHTTPClient{factory: f},
-		),
-		f.Browser,
-		f.Remotes,
-	)
-	cmd := codespaceCmd.NewRootCmd(app)
-	cmd.Use = "codespace"
-	cmd.Aliases = []string{"cs"}
-	cmd.GroupID = "core"
-	return cmd
-}
-
-type lazyLoadedHTTPClient struct {
-	factory *cmdutil.Factory
-
-	httpClientMu sync.RWMutex // guards httpClient
-	httpClient   *http.Client
-}
-
-func (l *lazyLoadedHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	l.httpClientMu.RLock()
-	httpClient := l.httpClient
-	l.httpClientMu.RUnlock()
-
-	if httpClient == nil {
-		var err error
-		l.httpClientMu.Lock()
-		l.httpClient, err = l.factory.HttpClient()
-		l.httpClientMu.Unlock()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return l.httpClient.Do(req)
 }

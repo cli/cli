@@ -1,6 +1,6 @@
 name: Deployment
 
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
@@ -17,7 +17,7 @@ on:
         default: production
         type: environment
       go_version:
-        default: "1.19"
+        default: "1.21"
         type: string
       platforms:
         default: "linux,macos,windows"
@@ -61,7 +61,7 @@ jobs:
             dist/*.tar.gz
             dist/*.rpm
             dist/*.deb
-  
+
   macos:
     runs-on: macos-latest
     environment: ${{ inputs.environment }}
@@ -118,7 +118,7 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.zip
-  
+
   windows:
     runs-on: windows-latest
     environment: ${{ inputs.environment }}
