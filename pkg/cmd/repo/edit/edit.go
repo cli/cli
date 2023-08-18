@@ -10,20 +10,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
+
+type iprompter interface {
+	MultiSelect(prompt string, defaults []string, options []string) ([]int, error)
+	Input(string, string) (string, error)
+	Confirm(string, bool) (bool, error)
+	Select(string, string, []string) (int, error)
+}
 
 const (
 	allowMergeCommits = "Allow Merge Commits"
@@ -53,7 +57,7 @@ type EditOptions struct {
 	RemoveTopics    []string
 	InteractiveMode bool
 	Detector        fd.Detector
-	Prompter        prompter.Prompter
+	Prompter        iprompter
 	// Cache of current repo topics to avoid retrieving them
 	// in multiple flows.
 	topicsCache []string
@@ -279,7 +283,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 	return nil
 }
 
-func interactiveChoice(r *api.Repository) ([]string, error) {
+func interactiveChoice(p iprompter, r *api.Repository) ([]string, error) {
 	options := []string{
 		optionDefaultBranchName,
 		optionDescription,
@@ -298,11 +302,14 @@ func interactiveChoice(r *api.Repository) ([]string, error) {
 		options = append(options, optionAllowForking)
 	}
 	var answers []string
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(&survey.MultiSelect{
-		Message: "What do you want to edit?",
-		Options: options,
-	}, &answers, survey.WithPageSize(11))
+	selected, err := p.MultiSelect("What do you want to edit?", nil, options)
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range selected {
+		answers = append(answers, options[i])
+	}
+
 	return answers, err
 }
 
@@ -310,38 +317,27 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 	for _, v := range r.RepositoryTopics.Nodes {
 		opts.topicsCache = append(opts.topicsCache, v.Topic.Name)
 	}
-	choices, err := interactiveChoice(r)
+	p := opts.Prompter
+	choices, err := interactiveChoice(p, r)
 	if err != nil {
 		return err
 	}
 	for _, c := range choices {
 		switch c {
 		case optionDescription:
-			opts.Edits.Description = &r.Description
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Description of the repository",
-				Default: r.Description,
-			}, opts.Edits.Description)
+			answer, err := p.Input("Description of the repository", r.Description)
 			if err != nil {
 				return err
 			}
+			opts.Edits.Description = &answer
 		case optionHomePageURL:
-			opts.Edits.Homepage = &r.HomepageURL
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Repository home page URL",
-				Default: r.HomepageURL,
-			}, opts.Edits.Homepage)
+			a, err := p.Input("Repository home page URL", r.HomepageURL)
 			if err != nil {
 				return err
 			}
+			opts.Edits.Homepage = &a
 		case optionTopics:
-			var addTopics string
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Add topics?(csv format)",
-			}, &addTopics)
+			addTopics, err := p.Input("Add topics?(csv format)", "")
 			if err != nil {
 				return err
 			}
@@ -350,69 +346,41 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 
 			if len(opts.topicsCache) > 0 {
-				//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-				err = prompt.SurveyAskOne(&survey.MultiSelect{
-					Message: "Remove Topics",
-					Options: opts.topicsCache,
-				}, &opts.RemoveTopics)
+				selected, err := p.MultiSelect("Remove Topics", nil, opts.topicsCache)
 				if err != nil {
 					return err
 				}
+				for _, i := range selected {
+					opts.RemoveTopics = append(opts.RemoveTopics, opts.topicsCache[i])
+				}
 			}
 		case optionDefaultBranchName:
-			opts.Edits.DefaultBranch = &r.DefaultBranchRef.Name
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Default branch name",
-				Default: r.DefaultBranchRef.Name,
-			}, opts.Edits.DefaultBranch)
+			name, err := p.Input("Default branch name", r.DefaultBranchRef.Name)
 			if err != nil {
 				return err
 			}
+			opts.Edits.DefaultBranch = &name
 		case optionWikis:
-			opts.Edits.EnableWiki = &r.HasWikiEnabled
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Enable Wikis?",
-				Default: r.HasWikiEnabled,
-			}, opts.Edits.EnableWiki)
+			c, err := p.Confirm("Enable Wikis?", r.HasWikiEnabled)
 			if err != nil {
 				return err
 			}
+			opts.Edits.EnableWiki = &c
 		case optionIssues:
-			opts.Edits.EnableIssues = &r.HasIssuesEnabled
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Enable Issues?",
-				Default: r.HasIssuesEnabled,
-			}, opts.Edits.EnableIssues)
+			a, err := p.Confirm("Enable Issues?", r.HasIssuesEnabled)
 			if err != nil {
 				return err
 			}
+			opts.Edits.EnableIssues = &a
 		case optionProjects:
-			opts.Edits.EnableProjects = &r.HasProjectsEnabled
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Enable Projects?",
-				Default: r.HasProjectsEnabled,
-			}, opts.Edits.EnableProjects)
+			a, err := p.Confirm("Enable Projects?", r.HasProjectsEnabled)
 			if err != nil {
 				return err
 			}
-		case optionDiscussions:
-			opts.Edits.EnableDiscussions = &r.HasDiscussionsEnabled
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Enable Discussions?",
-				Default: r.HasDiscussionsEnabled,
-			}, opts.Edits.EnableDiscussions)
-			if err != nil {
-				return err
-			}
+			opts.Edits.EnableProjects = &a
 		case optionVisibility:
-			opts.Edits.Visibility = &r.Visibility
 			visibilityOptions := []string{"public", "private", "internal"}
-			selected, err := opts.Prompter.Select("Visibility", strings.ToLower(r.Visibility), visibilityOptions)
+			selected, err := p.Select("Visibility", strings.ToLower(r.Visibility), visibilityOptions)
 			if err != nil {
 				return err
 			}
@@ -421,7 +389,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				(r.StargazerCount > 0 || r.Watchers.TotalCount > 0) {
 				cs := opts.IO.ColorScheme()
 				fmt.Fprintf(opts.IO.ErrOut, "%s Changing the repository visibility to private will cause permanent loss of stars and watchers.\n", cs.WarningIcon())
-				confirmed, err = opts.Prompter.Confirm("Do you want to change visibility to private?", false)
+				confirmed, err = p.Confirm("Do you want to change visibility to private?", false)
 				if err != nil {
 					return err
 				}
@@ -441,14 +409,16 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			if r.RebaseMergeAllowed {
 				defaultMergeOptions = append(defaultMergeOptions, allowRebaseMerge)
 			}
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.MultiSelect{
-				Message: "Allowed merge strategies",
-				Default: defaultMergeOptions,
-				Options: []string{allowMergeCommits, allowSquashMerge, allowRebaseMerge},
-			}, &selectedMergeOptions)
+			mergeOpts := []string{allowMergeCommits, allowSquashMerge, allowRebaseMerge}
+			selected, err := p.MultiSelect(
+				"Allowed merge strategies",
+				defaultMergeOptions,
+				mergeOpts)
 			if err != nil {
 				return err
+			}
+			for _, i := range selected {
+				selectedMergeOptions = append(selectedMergeOptions, mergeOpts[i])
 			}
 			enableMergeCommit := isIncluded(allowMergeCommits, selectedMergeOptions)
 			opts.Edits.EnableMergeCommit = &enableMergeCommit
@@ -461,44 +431,33 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 
 			opts.Edits.EnableAutoMerge = &r.AutoMergeAllowed
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Enable Auto Merge?",
-				Default: r.AutoMergeAllowed,
-			}, opts.Edits.EnableAutoMerge)
+			c, err := p.Confirm("Enable Auto Merge?", r.AutoMergeAllowed)
 			if err != nil {
 				return err
 			}
+			opts.Edits.EnableAutoMerge = &c
 
 			opts.Edits.DeleteBranchOnMerge = &r.DeleteBranchOnMerge
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Automatically delete head branches after merging?",
-				Default: r.DeleteBranchOnMerge,
-			}, opts.Edits.DeleteBranchOnMerge)
+			c, err = p.Confirm(
+				"Automatically delete head branches after merging?", r.DeleteBranchOnMerge)
 			if err != nil {
 				return err
 			}
+			opts.Edits.DeleteBranchOnMerge = &c
 		case optionTemplateRepo:
-			opts.Edits.IsTemplate = &r.IsTemplate
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Convert into a template repository?",
-				Default: r.IsTemplate,
-			}, opts.Edits.IsTemplate)
+			c, err := p.Confirm("Convert into a template repository?", r.IsTemplate)
 			if err != nil {
 				return err
 			}
+			opts.Edits.IsTemplate = &c
 		case optionAllowForking:
-			opts.Edits.AllowForking = &r.ForkingAllowed
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: "Allow forking (of an organization repository)?",
-				Default: r.ForkingAllowed,
-			}, opts.Edits.AllowForking)
+			c, err := p.Confirm(
+				"Allow forking (of an organization repository)?",
+				r.ForkingAllowed)
 			if err != nil {
 				return err
 			}
+			opts.Edits.AllowForking = &c
 		}
 	}
 	return nil

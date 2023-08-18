@@ -14,11 +14,11 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -205,18 +205,18 @@ func TestRepoFork(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		opts       *ForkOptions
-		tty        bool
-		httpStubs  func(*httpmock.Registry)
-		execStubs  func(*run.CommandStubber)
-		askStubs   func(*prompt.AskStubber)
-		cfgStubs   func(*config.ConfigMock)
-		remotes    []*context.Remote
-		wantOut    string
-		wantErrOut string
-		wantErr    bool
-		errMsg     string
+		name        string
+		opts        *ForkOptions
+		tty         bool
+		httpStubs   func(*httpmock.Registry)
+		execStubs   func(*run.CommandStubber)
+		promptStubs func(*prompter.MockPrompter)
+		cfgStubs    func(*config.ConfigMock)
+		remotes     []*context.Remote
+		wantOut     string
+		wantErrOut  string
+		wantErr     bool
+		errMsg      string
 	}{
 		{
 			name: "implicit match, configured protocol overrides provided",
@@ -272,9 +272,10 @@ func TestRepoFork(t *testing.T) {
 				RemoteName:   defaultRemoteName,
 			},
 			httpStubs: forkPost,
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(false)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Would you like to add a remote for the fork?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n",
 		},
@@ -291,9 +292,10 @@ func TestRepoFork(t *testing.T) {
 				cs.Register("git remote rename origin upstream", 0, "")
 				cs.Register(`git remote add origin https://github.com/someone/REPO.git`, 0, "")
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(true)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Would you like to add a remote for the fork?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote origin\n",
 		},
@@ -440,8 +442,9 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone --depth 1 https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\nOWNER/REPO selected as default repo for querying issues, pull requests, etc.\nTo learn more or change this selection, see: gh repo set-default\n",
 		},
 		{
 			name: "repo arg fork to org",
@@ -471,8 +474,9 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/gamehendge/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantErrOut: "✓ Created fork gamehendge/REPO\n✓ Cloned fork\n",
+			wantErrOut: "✓ Created fork gamehendge/REPO\n✓ Cloned fork\nOWNER/REPO selected as default repo for querying issues, pull requests, etc.\nTo learn more or change this selection, see: gh repo set-default\n",
 		},
 		{
 			name: "repo arg url arg",
@@ -486,8 +490,9 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\nOWNER/REPO selected as default repo for querying issues, pull requests, etc.\nTo learn more or change this selection, see: gh repo set-default\n",
 		},
 		{
 			name: "repo arg interactive no clone",
@@ -497,9 +502,10 @@ func TestRepoFork(t *testing.T) {
 				PromptClone: true,
 			},
 			httpStubs: forkPost,
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(false)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Would you like to clone the fork?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n",
 		},
@@ -511,16 +517,18 @@ func TestRepoFork(t *testing.T) {
 				PromptClone: true,
 			},
 			httpStubs: forkPost,
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(true)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Would you like to clone the fork?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\nOWNER/REPO selected as default repo for querying issues, pull requests, etc.\nTo learn more or change this selection, see: gh repo set-default\n",
 		},
 		{
 			name: "repo arg interactive already forked",
@@ -533,16 +541,18 @@ func TestRepoFork(t *testing.T) {
 				},
 			},
 			httpStubs: forkPost,
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(true)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Would you like to clone the fork?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantErrOut: "! someone/REPO already exists\n✓ Cloned fork\n",
+			wantErrOut: "! someone/REPO already exists\n✓ Cloned fork\nOWNER/REPO selected as default repo for querying issues, pull requests, etc.\nTo learn more or change this selection, see: gh repo set-default\n",
 		},
 		{
 			name: "repo arg nontty no flags",
@@ -576,6 +586,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
 			wantErrOut: "someone/REPO already exists\n",
 		},
@@ -590,6 +601,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
 		},
 		{
@@ -679,6 +691,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
 		},
 		{
@@ -746,11 +759,10 @@ func TestRepoFork(t *testing.T) {
 				GitPath: "some/path/git",
 			}
 
-			//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-			as, teardown := prompt.InitAskStubber()
-			defer teardown()
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := prompter.NewMockPrompter(t)
+			tt.opts.Prompter = pm
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
 			}
 
 			cs, restoreRun := run.Stub()

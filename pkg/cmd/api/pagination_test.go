@@ -2,9 +2,11 @@ package api
 
 import (
 	"bytes"
-	"io"
+	"encoding/json"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_findNextPage(t *testing.T) {
@@ -57,35 +59,35 @@ func Test_findNextPage(t *testing.T) {
 func Test_findEndCursor(t *testing.T) {
 	tests := []struct {
 		name string
-		json io.Reader
+		json string
 		want string
 	}{
 		{
 			name: "blank",
-			json: bytes.NewBufferString(`{}`),
+			json: `{}`,
 			want: "",
 		},
 		{
 			name: "unrelated fields",
-			json: bytes.NewBufferString(`{
+			json: `{
 				"hasNextPage": true,
 				"endCursor": "THE_END"
-			}`),
+			}`,
 			want: "",
 		},
 		{
 			name: "has next page",
-			json: bytes.NewBufferString(`{
+			json: `{
 				"pageInfo": {
 					"hasNextPage": true,
 					"endCursor": "THE_END"
 				}
-			}`),
+			}`,
 			want: "THE_END",
 		},
 		{
 			name: "more pageInfo blocks",
-			json: bytes.NewBufferString(`{
+			json: `{
 				"pageInfo": {
 					"hasNextPage": true,
 					"endCursor": "THE_END"
@@ -94,23 +96,24 @@ func Test_findEndCursor(t *testing.T) {
 					"hasNextPage": true,
 					"endCursor": "NOT_THIS"
 				}
-			}`),
+			}`,
 			want: "THE_END",
 		},
 		{
 			name: "no next page",
-			json: bytes.NewBufferString(`{
+			json: `{
 				"pageInfo": {
 					"hasNextPage": false,
 					"endCursor": "THE_END"
 				}
-			}`),
+			}`,
 			want: "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := findEndCursor(tt.json); got != tt.want {
+			json := bytes.NewReader([]byte(tt.json))
+			if got := findEndCursor(json); got != tt.want {
 				t.Errorf("findEndCursor() = %v, want %v", got, tt.want)
 			}
 		})
@@ -166,4 +169,156 @@ func Test_addPerPage(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_mergeJSON_object(t *testing.T) {
+	page1 := `{
+		"data": {
+			"repository": {
+				"labels": {
+					"nodes": [
+						{
+							"name": "bug",
+							"description": "Something isn't working"
+						},
+						{
+							"name": "tracking issue",
+							"description": ""
+						}
+					],
+					"pageInfo": {
+						"hasNextPage": true,
+						"endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMC0xMFQxMTozODowMy0wNjowMM5f3HZq"
+					}
+				}
+			}
+		}
+	}`
+
+	page2 := `{
+		"data": {
+			"repository": {
+				"labels": {
+					"nodes": [
+						{
+							"name": "blocked",
+							"description": ""
+						},
+						{
+							"name": "needs-design",
+							"description": "An engineering task needs design to proceed"
+						}
+					],
+					"pageInfo": {
+						"hasNextPage": false,
+						"endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMS0xOFQxMDowMzoxNi0wNzowMM5kXbLp"
+					}
+				}
+			}
+		}
+	}`
+
+	var data interface{}
+	for _, page := range []string{page1, page2} {
+		err := mergeJSON(&data, bytes.NewReader([]byte(page)))
+		if !assert.NoError(t, err) {
+			return
+		}
+	}
+
+	actual, err := json.Marshal(data)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	expected := `{
+		"data": {
+			"repository": {
+				"labels": {
+					"nodes": [
+						{
+							"name": "bug",
+							"description": "Something isn't working"
+						},
+						{
+							"name": "tracking issue",
+							"description": ""
+						},
+						{
+							"name": "blocked",
+							"description": ""
+						},
+						{
+							"name": "needs-design",
+							"description": "An engineering task needs design to proceed"
+						}
+					],
+					"pageInfo": {
+						"hasNextPage": false,
+						"endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMS0xOFQxMDowMzoxNi0wNzowMM5kXbLp"
+					}
+				}
+			}
+		}
+	}`
+
+	assert.JSONEq(t, expected, string(actual))
+}
+
+func Test_mergeJSON_array(t *testing.T) {
+	page1 := `[
+		{
+			"name": "bug",
+			"description": "Something isn't working"
+		},
+		{
+			"name": "tracking issue",
+			"description": ""
+		}
+	]`
+
+	page2 := `[
+		{
+			"name": "blocked",
+			"description": ""
+		},
+		{
+			"name": "needs-design",
+			"description": "An engineering task needs design to proceed"
+		}
+	]`
+
+	var data interface{}
+	for _, page := range []string{page1, page2} {
+		err := mergeJSON(&data, bytes.NewReader([]byte(page)))
+		if !assert.NoError(t, err) {
+			return
+		}
+	}
+
+	actual, err := json.Marshal(data)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	expected := `[
+		{
+			"name": "bug",
+			"description": "Something isn't working"
+		},
+		{
+			"name": "tracking issue",
+			"description": ""
+		},
+		{
+			"name": "blocked",
+			"description": ""
+		},
+		{
+			"name": "needs-design",
+			"description": "An engineering task needs design to proceed"
+		}
+	]`
+
+	assert.JSONEq(t, expected, string(actual))
 }

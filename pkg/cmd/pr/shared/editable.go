@@ -7,7 +7,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/cli/cli/v2/pkg/surveyext"
 )
@@ -19,7 +18,7 @@ type Editable struct {
 	Reviewers EditableSlice
 	Assignees EditableSlice
 	Labels    EditableSlice
-	Projects  EditableProjects
+	Projects  EditableSlice
 	Milestone EditableString
 	Metadata  api.RepoMetadataResult
 }
@@ -41,22 +40,10 @@ type EditableSlice struct {
 	Allowed bool
 }
 
-// ProjectsV2 mutations require a mapping of an item ID to a project ID.
-// Keep that map along with standard EditableSlice data.
-type EditableProjects struct {
-	EditableSlice
-	ProjectItems map[string]string
-}
-
-func (e Editable) Dirty() bool {
-	return e.Title.Edited ||
-		e.Body.Edited ||
-		e.Base.Edited ||
-		e.Reviewers.Edited ||
-		e.Assignees.Edited ||
-		e.Labels.Edited ||
-		e.Projects.Edited ||
-		e.Milestone.Edited
+func (s *EditableSlice) ReplaceValue(v []string) {
+	s.Value = v
+	s.Add = set.NewFromSlice(v).Difference(set.NewFromSlice(s.Default)).ToSlice()
+	s.Remove = set.NewFromSlice(s.Default).Difference(set.NewFromSlice(v)).ToSlice()
 }
 
 func (e Editable) TitleValue() *string {
@@ -104,31 +91,6 @@ func (e Editable) ReviewerIds() (*[]string, *[]string, error) {
 	return &userIds, &teamIds, nil
 }
 
-func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]string, error) {
-	if !e.Assignees.Edited {
-		return nil, nil
-	}
-	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
-		meReplacer := NewMeReplacer(client, repo.RepoHost())
-		s := set.NewStringSet()
-		s.AddValues(e.Assignees.Default)
-		add, err := meReplacer.ReplaceSlice(e.Assignees.Add)
-		if err != nil {
-			return nil, err
-		}
-		s.AddValues(add)
-		remove, err := meReplacer.ReplaceSlice(e.Assignees.Remove)
-		if err != nil {
-			return nil, err
-		}
-		s.RemoveValues(remove)
-		e.Assignees.Value = s.ToSlice()
-	}
-	a, err := e.Metadata.MembersToIDs(e.Assignees.Value)
-	return &a, err
-}
-
-// ProjectIds returns a slice containing IDs of projects v1 that the issue or a PR has to be linked to.
 func (e Editable) ProjectIds() (*[]string, error) {
 	if !e.Projects.Edited {
 		return nil, nil
@@ -140,54 +102,8 @@ func (e Editable) ProjectIds() (*[]string, error) {
 		s.RemoveValues(e.Projects.Remove)
 		e.Projects.Value = s.ToSlice()
 	}
-	p, _, err := e.Metadata.ProjectsToIDs(e.Projects.Value)
+	p, err := e.Metadata.ProjectsToIDs(e.Projects.Value)
 	return &p, err
-}
-
-// ProjectV2Ids returns a pair of slices.
-// The first is the projects the item should be added to.
-// The second is the projects the items should be removed from.
-func (e Editable) ProjectV2Ids() (*[]string, *[]string, error) {
-	if !e.Projects.Edited {
-		return nil, nil, nil
-	}
-
-	// titles of projects to add
-	addTitles := set.NewStringSet()
-	// titles of projects to remove
-	removeTitles := set.NewStringSet()
-
-	if len(e.Projects.Add) != 0 || len(e.Projects.Remove) != 0 {
-		// Projects were selected using flags.
-		addTitles.AddValues(e.Projects.Add)
-		removeTitles.AddValues(e.Projects.Remove)
-	} else {
-		// Projects were selected interactively.
-		addTitles.AddValues(e.Projects.Value)
-		addTitles.RemoveValues(e.Projects.Default)
-		removeTitles.AddValues(e.Projects.Default)
-		removeTitles.RemoveValues(e.Projects.Value)
-	}
-
-	var addIds []string
-	var removeIds []string
-	var err error
-
-	if addTitles.Len() > 0 {
-		_, addIds, err = e.Metadata.ProjectsToIDs(addTitles.ToSlice())
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	if removeTitles.Len() > 0 {
-		_, removeIds, err = e.Metadata.ProjectsToIDs(removeTitles.ToSlice())
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	return &addIds, &removeIds, nil
 }
 
 func (e Editable) MilestoneId() (*string, error) {
@@ -200,59 +116,6 @@ func (e Editable) MilestoneId() (*string, error) {
 	}
 	m, err := e.Metadata.MilestoneToID(e.Milestone.Value)
 	return &m, err
-}
-
-// Clone creates a mostly-shallow copy of Editable suitable for use in parallel
-// go routines. Fields that would be mutated will be copied.
-func (e *Editable) Clone() Editable {
-	return Editable{
-		Title:     e.Title.clone(),
-		Body:      e.Body.clone(),
-		Base:      e.Base.clone(),
-		Reviewers: e.Reviewers.clone(),
-		Assignees: e.Assignees.clone(),
-		Labels:    e.Labels.clone(),
-		Projects:  e.Projects.clone(),
-		Milestone: e.Milestone.clone(),
-		// Shallow copy since no mutation.
-		Metadata: e.Metadata,
-	}
-}
-
-func (es *EditableString) clone() EditableString {
-	return EditableString{
-		Value:   es.Value,
-		Default: es.Default,
-		Edited:  es.Edited,
-		// Shallow copies since no mutation.
-		Options: es.Options,
-	}
-}
-
-func (es *EditableSlice) clone() EditableSlice {
-	cpy := EditableSlice{
-		Edited:  es.Edited,
-		Allowed: es.Allowed,
-		// Shallow copies since no mutation.
-		Options: es.Options,
-		// Copy mutable string slices.
-		Add:     make([]string, len(es.Add)),
-		Remove:  make([]string, len(es.Remove)),
-		Value:   make([]string, len(es.Value)),
-		Default: make([]string, len(es.Default)),
-	}
-	copy(cpy.Add, es.Add)
-	copy(cpy.Remove, es.Remove)
-	copy(cpy.Value, es.Value)
-	copy(cpy.Default, es.Default)
-	return cpy
-}
-
-func (ep *EditableProjects) clone() EditableProjects {
-	return EditableProjects{
-		EditableSlice: ep.EditableSlice.clone(),
-		ProjectItems:  ep.ProjectItems,
-	}
 }
 
 func EditFieldsSurvey(editable *Editable, editorCommand string) error {
@@ -270,34 +133,25 @@ func EditFieldsSurvey(editable *Editable, editorCommand string) error {
 		}
 	}
 	if editable.Reviewers.Edited {
-		editable.Reviewers.Value, err = multiSelectSurvey("Reviewers", editable.Reviewers.Default, editable.Reviewers.Options)
+		selectedReviewers, err := multiSelectSurvey("Reviewers", editable.Reviewers.Default, editable.Reviewers.Options)
 		if err != nil {
 			return err
 		}
+		editable.Reviewers.ReplaceValue(selectedReviewers)
 	}
 	if editable.Assignees.Edited {
-		editable.Assignees.Value, err = multiSelectSurvey("Assignees", editable.Assignees.Default, editable.Assignees.Options)
+		selectedAssignees, err := multiSelectSurvey("Assignees", editable.Assignees.Default, editable.Assignees.Options)
 		if err != nil {
 			return err
 		}
+		editable.Assignees.ReplaceValue(selectedAssignees)
 	}
 	if editable.Labels.Edited {
-		editable.Labels.Add, err = multiSelectSurvey("Labels", editable.Labels.Default, editable.Labels.Options)
+		selectedLabels, err := multiSelectSurvey("Labels", editable.Labels.Default, editable.Labels.Options)
 		if err != nil {
 			return err
 		}
-		for _, prev := range editable.Labels.Default {
-			var found bool
-			for _, selected := range editable.Labels.Add {
-				if prev == selected {
-					found = true
-					break
-				}
-			}
-			if !found {
-				editable.Labels.Remove = append(editable.Labels.Remove, prev)
-			}
-		}
+		editable.Labels.ReplaceValue(selectedLabels)
 	}
 	if editable.Projects.Edited {
 		editable.Projects.Value, err = multiSelectSurvey("Projects", editable.Projects.Default, editable.Projects.Options)
@@ -393,11 +247,8 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 		labels = append(labels, l.Name)
 	}
 	var projects []string
-	for _, p := range metadata.Projects {
-		projects = append(projects, p.Name)
-	}
-	for _, p := range metadata.ProjectsV2 {
-		projects = append(projects, p.Title)
+	for _, l := range metadata.Projects {
+		projects = append(projects, l.Name)
 	}
 	milestones := []string{noMilestone}
 	for _, m := range metadata.Milestones {
@@ -449,7 +300,6 @@ func multiSelectSurvey(message string, defaults, options []string) ([]string, er
 		Message: message,
 		Options: options,
 		Default: defaults,
-		Filter:  prompter.LatinMatchingFilter,
 	}
 	err := survey.AskOne(q, &results)
 	return results, err

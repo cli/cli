@@ -136,6 +136,7 @@ func createHttpClient() (*http.Client, error) {
 
 func TestNew_APIURL_dotcomConfig(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "")
+	t.Setenv("GITHUB_SERVER_URL", "https://github.com")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
 			return &config.AuthConfig{}
@@ -158,6 +159,7 @@ func TestNew_APIURL_dotcomConfig(t *testing.T) {
 
 func TestNew_APIURL_customConfig(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "")
+	t.Setenv("GITHUB_SERVER_URL", "https://github.mycompany.com")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
 			authCfg := &config.AuthConfig{}
@@ -182,6 +184,7 @@ func TestNew_APIURL_customConfig(t *testing.T) {
 
 func TestNew_APIURL_env(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "https://api.mycompany.com")
+	t.Setenv("GITHUB_SERVER_URL", "https://mycompany.com")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
 			return &config.AuthConfig{}
@@ -218,6 +221,7 @@ func TestNew_APIURL_dotcomFallback(t *testing.T) {
 
 func TestNew_ServerURL_dotcomConfig(t *testing.T) {
 	t.Setenv("GITHUB_SERVER_URL", "")
+	t.Setenv("GITHUB_API_URL", "https://api.github.com")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
 			return &config.AuthConfig{}
@@ -240,6 +244,7 @@ func TestNew_ServerURL_dotcomConfig(t *testing.T) {
 
 func TestNew_ServerURL_customConfig(t *testing.T) {
 	t.Setenv("GITHUB_SERVER_URL", "")
+	t.Setenv("GITHUB_API_URL", "https://github.mycompany.com/api/v3")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
 			authCfg := &config.AuthConfig{}
@@ -264,6 +269,7 @@ func TestNew_ServerURL_customConfig(t *testing.T) {
 
 func TestNew_ServerURL_env(t *testing.T) {
 	t.Setenv("GITHUB_SERVER_URL", "https://mycompany.com")
+	t.Setenv("GITHUB_API_URL", "https://api.mycompany.com")
 	cfg := &config.ConfigMock{
 		AuthenticationFunc: func() *config.AuthConfig {
 			return &config.AuthConfig{}

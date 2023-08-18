@@ -19,12 +19,15 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
 const defaultRemoteName = "origin"
+
+type iprompter interface {
+	Confirm(string, bool) (bool, error)
+}
 
 type ForkOptions struct {
 	HttpClient func() (*http.Client, error)
@@ -35,6 +38,7 @@ type ForkOptions struct {
 	Remotes    func() (ghContext.Remotes, error)
 	Since      func(time.Time) time.Duration
 	BackOff    backoff.BackOff
+	Prompter   iprompter
 
 	GitArgs           []string
 	Repository        string
@@ -65,6 +69,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
+		Prompter:   f.Prompter,
 		Since:      time.Since,
 	}
 
@@ -86,6 +91,8 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 			By default, the new fork is set to be your "origin" remote and any existing
 			origin remote is renamed to "upstream". To alter this behavior, you can set
 			a name for the new fork's remote with %[1]s--remote-name%[1]s.
+
+			The "upstream" remote will be set as the default remote repository. See: gh repo set-default
 
 			Additional git clone flags can be passed after %[1]s--%[1]s.
 		`, "`"),
@@ -273,10 +280,9 @@ func forkRun(opts *ForkOptions) error {
 
 		remoteDesired := opts.Remote
 		if opts.PromptRemote {
-			//nolint:staticcheck // SA1019: prompt.Confirm is deprecated: use Prompter
-			err = prompt.Confirm("Would you like to add a remote for the fork?", &remoteDesired)
+			remoteDesired, err = opts.Prompter.Confirm("Would you like to add a remote for the fork?", false)
 			if err != nil {
-				return fmt.Errorf("failed to prompt: %w", err)
+				return err
 			}
 		}
 
@@ -317,10 +323,9 @@ func forkRun(opts *ForkOptions) error {
 	} else {
 		cloneDesired := opts.Clone
 		if opts.PromptClone {
-			//nolint:staticcheck // SA1019: prompt.Confirm is deprecated: use Prompter
-			err = prompt.Confirm("Would you like to clone the fork?", &cloneDesired)
+			cloneDesired, err = opts.Prompter.Confirm("Would you like to clone the fork?", false)
 			if err != nil {
-				return fmt.Errorf("failed to prompt: %w", err)
+				return err
 			}
 		}
 		if cloneDesired {
@@ -348,7 +353,7 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
-			_, err = gitClient.AddRemote(ctx, "upstream", upstreamURL, []string{}, git.WithRepoDir(cloneDir))
+			addedRemote, err := gitClient.AddRemote(ctx, "upstream", upstreamURL, []string{}, git.WithRepoDir(cloneDir))
 			if err != nil {
 				return err
 			}
@@ -359,6 +364,14 @@ func forkRun(opts *ForkOptions) error {
 
 			if connectedToTerminal {
 				fmt.Fprintf(stderr, "%s Cloned fork\n", cs.SuccessIcon())
+			}
+
+			if err = gitClient.SetRemoteResolution(
+				ctx, addedRemote.Name, "base", git.WithRepoDir(cloneDir)); err != nil {
+				return err
+			}
+			if connectedToTerminal {
+				fmt.Fprintf(stderr, "%s selected as default repo for querying issues, pull requests, etc.\nTo learn more or change this selection, see: gh repo set-default\n", ghrepo.FullName(repoToFork))
 			}
 		}
 	}
