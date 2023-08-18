@@ -40,6 +40,7 @@ import (
 	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
 	workflowCmd "github.com/cli/cli/v2/pkg/cmd/workflow"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/utils"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
@@ -156,7 +157,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	bareHTTPCmdFactory.HttpClient = bareHTTPClient(f, version)
 	bareHTTPCmdFactory.BaseRepo = factory.SmartBaseRepoFunc(&bareHTTPCmdFactory)
 
-	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, version, nil))
+	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, nil))
 
 	// Help topics
 	var referenceCmd *cobra.Command
@@ -235,6 +236,9 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 			Log:               f.IOStreams.ErrOut,
 			LogColorize:       f.IOStreams.ColorEnabled(),
 			SkipAcceptHeaders: true,
+		}
+		if debugEnabled, debugValue := utils.IsDebugEnabled(); debugEnabled {
+			opts.LogVerboseHTTP = strings.Contains(debugValue, "api") || f.LogVerboseHTTP
 		}
 		return api.NewHTTPClient(opts)
 	}

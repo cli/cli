@@ -30,6 +30,7 @@ type Factory struct {
 
 	ExtensionManager extensions.ExtensionManager
 	ExecutableName   string
+	LogVerboseHTTP   bool
 }
 
 // Executable is the path to the currently invoked binary

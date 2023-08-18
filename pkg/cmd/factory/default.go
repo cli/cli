@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -18,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 )
 
 var ssoHeader string
@@ -100,6 +102,9 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 			Log:         io.ErrOut,
 			LogColorize: io.ColorEnabled(),
 			AppVersion:  appVersion,
+		}
+		if debugEnabled, debugValue := utils.IsDebugEnabled(); debugEnabled {
+			opts.LogVerboseHTTP = strings.Contains(debugValue, "api") || f.LogVerboseHTTP
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {

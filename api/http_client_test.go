@@ -19,10 +19,9 @@ import (
 
 func TestNewHTTPClient(t *testing.T) {
 	type args struct {
-		config         tokenGetter
-		appVersion     string
-		LogVerboseHTTP bool
-		setAccept      bool
+		config     tokenGetter
+		appVersion string
+		setAccept  bool
 	}
 	tests := []struct {
 		name       string
@@ -37,10 +36,9 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "github.com with Accept header",
 			args: args{
-				config:         tinyConfig{"github.com:oauth_token": "MYTOKEN"},
-				appVersion:     "v1.2.3",
-				LogVerboseHTTP: false,
-				setAccept:      true,
+				config:     tinyConfig{"github.com:oauth_token": "MYTOKEN"},
+				appVersion: "v1.2.3",
+				setAccept:  true,
 			},
 			host: "github.com",
 			wantHeader: map[string]string{
@@ -53,10 +51,9 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "github.com no Accept header",
 			args: args{
-				config:         tinyConfig{"github.com:oauth_token": "MYTOKEN"},
-				appVersion:     "v1.2.3",
-				LogVerboseHTTP: false,
-				setAccept:      false,
+				config:     tinyConfig{"github.com:oauth_token": "MYTOKEN"},
+				appVersion: "v1.2.3",
+				setAccept:  false,
 			},
 			host: "github.com",
 			wantHeader: map[string]string{
@@ -69,10 +66,9 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "github.com no authentication token",
 			args: args{
-				config:         tinyConfig{"example.com:oauth_token": "MYTOKEN"},
-				appVersion:     "v1.2.3",
-				LogVerboseHTTP: false,
-				setAccept:      true,
+				config:     tinyConfig{"example.com:oauth_token": "MYTOKEN"},
+				appVersion: "v1.2.3",
+				setAccept:  true,
 			},
 			host: "github.com",
 			wantHeader: map[string]string{
@@ -85,10 +81,9 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "github.com in verbose mode",
 			args: args{
-				config:         tinyConfig{"github.com:oauth_token": "MYTOKEN"},
-				appVersion:     "v1.2.3",
-				LogVerboseHTTP: false,
-				setAccept:      true,
+				config:     tinyConfig{"github.com:oauth_token": "MYTOKEN"},
+				appVersion: "v1.2.3",
+				setAccept:  true,
 			},
 			host:       "github.com",
 			envDebug:   "api",
@@ -118,10 +113,9 @@ func TestNewHTTPClient(t *testing.T) {
 		{
 			name: "github.com in verbose mode",
 			args: args{
-				config:         tinyConfig{"github.com:oauth_token": "MYTOKEN"},
-				appVersion:     "v1.2.3",
-				LogVerboseHTTP: false,
-				setAccept:      true,
+				config:     tinyConfig{"github.com:oauth_token": "MYTOKEN"},
+				appVersion: "v1.2.3",
+				setAccept:  true,
 			},
 			host:       "github.com",
 			envGhDebug: "api",
@@ -149,43 +143,11 @@ func TestNewHTTPClient(t *testing.T) {
 			`),
 		},
 		{
-			name: "github.com in verbose mode",
-			args: args{
-				config:         tinyConfig{"github.com:oauth_token": "MYTOKEN"},
-				appVersion:     "v1.2.3",
-				LogVerboseHTTP: true,
-				setAccept:      true,
-			},
-			host: "github.com",
-			wantHeader: map[string]string{
-				"authorization": "token MYTOKEN",
-				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
-			},
-			wantStderr: heredoc.Doc(`
-				* Request at <time>
-				* Request to http://<host>:<port>
-				> GET / HTTP/1.1
-				> Host: github.com
-				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
-				> Authorization: token ████████████████████
-				> Content-Type: application/json; charset=utf-8
-				> Time-Zone: <timezone>
-				> User-Agent: GitHub CLI v1.2.3
-
-				< HTTP/1.1 204 No Content
-				< Date: <time>
-
-				* Request took <duration>
-			`),
-		},
-		{
 			name: "GHES Accept header",
 			args: args{
-				config:         tinyConfig{"example.com:oauth_token": "GHETOKEN"},
-				appVersion:     "v1.2.3",
-				LogVerboseHTTP: false,
-				setAccept:      true,
+				config:     tinyConfig{"example.com:oauth_token": "GHETOKEN"},
+				appVersion: "v1.2.3",
+				setAccept:  true,
 			},
 			host: "example.com",
 			wantHeader: map[string]string{
@@ -218,7 +180,6 @@ func TestNewHTTPClient(t *testing.T) {
 				AppVersion:        tt.args.appVersion,
 				Config:            tt.args.config,
 				Log:               ios.ErrOut,
-				LogVerboseHTTP:    tt.args.LogVerboseHTTP,
 				SkipAcceptHeaders: !tt.args.setAccept,
 			})
 			require.NoError(t, err)

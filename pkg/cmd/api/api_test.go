@@ -17,7 +17,6 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/template"
@@ -27,7 +26,7 @@ import (
 )
 
 func Test_NewCmdApi(t *testing.T) {
-	f := factory.New("")
+	f := &cmdutil.Factory{}
 
 	tests := []struct {
 		name     string
@@ -53,7 +52,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -75,7 +74,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -97,7 +96,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -119,7 +118,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -141,7 +140,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -163,7 +162,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -190,7 +189,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -217,7 +216,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -244,7 +243,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -266,7 +265,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            time.Minute * 5,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -288,7 +287,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "hello {{.name}}",
 				FilterOutput:        "",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
 		},
@@ -310,9 +309,24 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        ".name",
-				Verbose:             false,
+				LogVerboseHTTP:      false,
 			},
 			wantsErr: false,
+		},
+		{
+			name:     "--silent with --jq",
+			cli:      "user --silent -q .foo",
+			wantsErr: true,
+		},
+		{
+			name:     "--silent with --template",
+			cli:      "user --silent -t '{{.foo}}'",
+			wantsErr: true,
+		},
+		{
+			name:     "--jq with --template",
+			cli:      "user --jq .foo -t '{{.foo}}'",
+			wantsErr: true,
 		},
 		{
 			name: "with verbose",
@@ -332,30 +346,15 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
-				Verbose:             true,
+				LogVerboseHTTP:      true,
 			},
 			wantsErr: false,
-		},
-		{
-			name:     "--silent with --jq",
-			cli:      "user --silent -q .foo",
-			wantsErr: true,
-		},
-		{
-			name:     "--silent with --template",
-			cli:      "user --silent -t '{{.foo}}'",
-			wantsErr: true,
-		},
-		{
-			name:     "--jq with --template",
-			cli:      "user --jq .foo -t '{{.foo}}'",
-			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var opts *ApiOptions
-			cmd := NewCmdApi(f, "", func(o *ApiOptions) error {
+			cmd := NewCmdApi(f, func(o *ApiOptions) error {
 				opts = o
 				return nil
 			})
@@ -387,7 +386,7 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.CacheTTL, opts.CacheTTL)
 			assert.Equal(t, tt.wants.Template, opts.Template)
 			assert.Equal(t, tt.wants.FilterOutput, opts.FilterOutput)
-			assert.Equal(t, tt.wants.Verbose, opts.Verbose)
+			assert.Equal(t, tt.wants.LogVerboseHTTP, opts.LogVerboseHTTP)
 		})
 	}
 }
@@ -397,7 +396,7 @@ func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
 		t.SkipNow()
 	}
 
-	cmd := NewCmdApi(&cmdutil.Factory{}, "", func(opts *ApiOptions) error {
+	cmd := NewCmdApi(&cmdutil.Factory{}, func(opts *ApiOptions) error {
 		return nil
 	})
 
@@ -611,21 +610,6 @@ func Test_apiRun(t *testing.T) {
 			stdout: "[\n  {\n    \"name\": \"Mona\"\n  },\n  {\n    \"name\": \"Hubot\"\n  }\n]\n",
 			stderr: ``,
 			isatty: true,
-		},
-		{
-			name: "output debugging information when REST error",
-			options: ApiOptions{
-				Verbose: true,
-			},
-			httpResponse: &http.Response{
-				StatusCode: 400,
-				Body:       io.NopCloser(bytes.NewBufferString(`[{"name":"Mona"},{"name":"Hubot"}]`)),
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-			},
-			err:    nil,
-			stdout: `{"current_user_url":"https://api.github.com/user","current_user_authorizations_html_url":"https://github.com/settings/connections/applications{/client_id}","authorizations_url":"https://api.github.com/authorizations","code_search_url":"https://api.github.com/search/code?q={query}{&page,per_page,sort,order}","commit_search_url":"https://api.github.com/search/commits?q={query}{&page,per_page,sort,order}","emails_url":"https://api.github.com/user/emails","emojis_url":"https://api.github.com/emojis","events_url":"https://api.github.com/events","feeds_url":"https://api.github.com/feeds","followers_url":"https://api.github.com/user/followers","following_url":"https://api.github.com/user/following{/target}","gists_url":"https://api.github.com/gists{/gist_id}","hub_url":"https://api.github.com/hub","issue_search_url":"https://api.github.com/search/issues?q={query}{&page,per_page,sort,order}","issues_url":"https://api.github.com/issues","keys_url":"https://api.github.com/user/keys","label_search_url":"https://api.github.com/search/labels?q={query}&repository_id={repository_id}{&page,per_page}","notifications_url":"https://api.github.com/notifications","organization_url":"https://api.github.com/orgs/{org}","organization_repositories_url":"https://api.github.com/orgs/{org}/repos{?type,page,per_page,sort}","organization_teams_url":"https://api.github.com/orgs/{org}/teams","public_gists_url":"https://api.github.com/gists/public","rate_limit_url":"https://api.github.com/rate_limit","repository_url":"https://api.github.com/repos/{owner}/{repo}","repository_search_url":"https://api.github.com/search/repositories?q={query}{&page,per_page,sort,order}","current_user_repositories_url":"https://api.github.com/user/repos{?type,page,per_page,sort}","starred_url":"https://api.github.com/user/starred{/owner}{/repo}","starred_gists_url":"https://api.github.com/gists/starred","topic_search_url":"https://api.github.com/search/topics?q={query}{&page,per_page}","user_url":"https://api.github.com/users/{user}","user_organizations_url":"https://api.github.com/user/orgs","user_repositories_url":"https://api.github.com/users/{user}/repos{?type,page,per_page,sort}","user_search_url":"https://api.github.com/search/users?q={query}{&page,per_page,sort,order}"}`,
-			stderr: "",
-			isatty: false,
 		},
 	}
 
