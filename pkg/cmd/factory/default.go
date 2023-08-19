@@ -103,7 +103,7 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 			LogColorize: io.ColorEnabled(),
 			AppVersion:  appVersion,
 		}
-		if debugEnabled, debugValue := utils.IsDebugEnabled(); debugEnabled {
+		if debugEnabled, debugValue := utils.IsDebugEnabled(); debugEnabled || f.LogVerboseHTTP {
 			opts.LogVerboseHTTP = strings.Contains(debugValue, "api") || f.LogVerboseHTTP
 		}
 		client, err := api.NewHTTPClient(opts)

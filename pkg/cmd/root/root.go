@@ -237,7 +237,7 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 			LogColorize:       f.IOStreams.ColorEnabled(),
 			SkipAcceptHeaders: true,
 		}
-		if debugEnabled, debugValue := utils.IsDebugEnabled(); debugEnabled {
+		if debugEnabled, debugValue := utils.IsDebugEnabled(); debugEnabled || f.LogVerboseHTTP {
 			opts.LogVerboseHTTP = strings.Contains(debugValue, "api") || f.LogVerboseHTTP
 		}
 		return api.NewHTTPClient(opts)
