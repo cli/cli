@@ -424,7 +424,8 @@ func preloadWorkflowNames(client *api.Client, repo ghrepo.Interface, runs []Run)
 }
 
 type JobsPayload struct {
-	Jobs []Job
+	TotalCount int `json:"total_count"`
+	Jobs       []Job
 }
 
 func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error) {
@@ -432,10 +433,23 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error)
 		return run.Jobs, nil
 	}
 	var result JobsPayload
-	if err := client.REST(repo.RepoHost(), "GET", run.JobsURL, nil, &result); err != nil {
-		return nil, err
+	perPage := 100
+	v := url.Values{}
+	v.Set("per_page", fmt.Sprintf("%d", perPage))
+
+	// Fetch all the pages until total fetched jobs == result.TotalCount
+	maxPages := 10
+	for p := 1; p < maxPages; p++ {
+		v.Set("page", fmt.Sprintf("%d", p))
+		jobsPath := fmt.Sprintf("%s?%s", run.JobsURL, v.Encode())
+		if err := client.REST(repo.RepoHost(), "GET", jobsPath, nil, &result); err != nil {
+			return run.Jobs, err
+		}
+		run.Jobs = append(run.Jobs, result.Jobs...)
+		if len(run.Jobs) >= result.TotalCount {
+			break
+		}
 	}
-	run.Jobs = result.Jobs
 	return result.Jobs, nil
 }
 

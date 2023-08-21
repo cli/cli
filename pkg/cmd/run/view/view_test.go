@@ -1242,6 +1242,51 @@ func TestViewRun(t *testing.T) {
 			},
 			wantOut: "\nX trunk CI · 123\nTriggered via push about 59 minutes ago\n\nX This run likely failed because of a workflow file issue.\n\nFor more information, see: https://github.com/runs/123\n",
 		},
+		{
+			name: "Fetches all of a run's jobs with --json flag",
+			opts: &ViewOptions{
+				RunID: "3",
+				Exporter: shared.MakeTestExporter(
+					[]string{"jobs"},
+					func(io *iostreams.IOStreams, data interface{}) error {
+						run, ok := data.(*shared.Run)
+						if !ok {
+							return fmt.Errorf("expected data type *shared.Run")
+						}
+						fmt.Fprintf(io.Out, "fetched %d jobs\n", len(run.Jobs))
+						return nil
+					},
+				),
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				jobs := []shared.Job{}
+				for i := 0; i < 115; i++ {
+					jobs = append(jobs, shared.Job{
+						ID:   int64(i),
+						Name: fmt.Sprintf("job %d", i),
+					})
+				}
+
+				limit := 100
+				firstPage := jobs[:limit]
+				secondPage := jobs[limit:]
+
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{TotalCount: len(jobs), Jobs: firstPage}))
+				// /runs/:runID/jobs endpoint should be called once more to fetch the remaining jobs
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{TotalCount: len(jobs), Jobs: secondPage}))
+			},
+			wantOut: "fetched 115 jobs\n",
+		},
 	}
 
 	for _, tt := range tests {
