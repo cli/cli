@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -35,7 +36,12 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		LogIgnoreEnv: true,
 	}
 
-	if debugEnabled, _ := utils.IsDebugEnabled(); debugEnabled || opts.LogVerboseHTTP {
+	debugEnabled, debugValue := utils.IsDebugEnabled()
+	if strings.Contains(debugValue, "api") {
+		opts.LogVerboseHTTP = true
+	}
+
+	if opts.LogVerboseHTTP || debugEnabled {
 		clientOpts.Log = opts.Log
 		clientOpts.LogColorize = opts.LogColorize
 		clientOpts.LogVerboseHTTP = opts.LogVerboseHTTP

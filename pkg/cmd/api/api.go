@@ -30,7 +30,12 @@ import (
 )
 
 type ApiOptions struct {
-	IO *iostreams.IOStreams
+	AppVersion string
+	BaseRepo   func() (ghrepo.Interface, error)
+	Branch     func() (string, error)
+	Config     func() (config.Config, error)
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
 
 	Hostname            string
 	RequestMethod       string
@@ -47,21 +52,16 @@ type ApiOptions struct {
 	Template            string
 	CacheTTL            time.Duration
 	FilterOutput        string
-	LogVerboseHTTP      bool
-
-	Config     func() (config.Config, error)
-	HttpClient func() (*http.Client, error)
-	BaseRepo   func() (ghrepo.Interface, error)
-	Branch     func() (string, error)
+	Verbose             bool
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
-		IO:         f.IOStreams,
-		Config:     f.Config,
-		HttpClient: f.HttpClient,
+		AppVersion: f.AppVersion,
 		BaseRepo:   f.BaseRepo,
 		Branch:     f.Branch,
+		Config:     f.Config,
+		IO:         f.IOStreams,
 	}
 
 	cmd := &cobra.Command{
@@ -210,16 +210,13 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"only one of `--template`, `--jq`, or `--silent` may be used",
+				"only one of `--template`, `--jq`, `--silent`, or `--verbose` may be used",
+				opts.Verbose,
 				opts.Silent,
 				opts.FilterOutput != "",
 				opts.Template != "",
 			); err != nil {
 				return err
-			}
-
-			if c.Flags().Changed("verbose") {
-				f.LogVerboseHTTP = opts.LogVerboseHTTP
 			}
 
 			if runF != nil {
@@ -242,7 +239,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
-	cmd.Flags().BoolVar(&opts.LogVerboseHTTP, "verbose", false, "Output debugging information for API request")
+	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 	return cmd
 }
 
@@ -289,12 +286,33 @@ func apiRun(opts *ApiOptions) error {
 		requestHeaders = append(requestHeaders, "Accept: "+previewNamesToMIMETypes(opts.Previews))
 	}
 
-	httpClient, err := opts.HttpClient()
+	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
-	if opts.CacheTTL > 0 {
-		httpClient = api.NewCachedHTTPClient(httpClient, opts.CacheTTL)
+
+	if opts.HttpClient == nil {
+		opts.HttpClient = func() (*http.Client, error) {
+			log := opts.IO.ErrOut
+			if opts.Verbose {
+				log = opts.IO.Out
+			}
+			opts := api.HTTPClientOptions{
+				AppVersion:        opts.AppVersion,
+				CacheTTL:          opts.CacheTTL,
+				Config:            cfg.Authentication(),
+				EnableCache:       opts.CacheTTL > 0,
+				Log:               log,
+				LogColorize:       opts.IO.ColorEnabled(),
+				LogVerboseHTTP:    opts.Verbose,
+				SkipAcceptHeaders: true,
+			}
+			return api.NewHTTPClient(opts)
+		}
+	}
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
 	}
 
 	if !opts.Silent {
@@ -310,10 +328,10 @@ func apiRun(opts *ApiOptions) error {
 	if opts.Silent {
 		bodyWriter = io.Discard
 	}
-
-	cfg, err := opts.Config()
-	if err != nil {
-		return err
+	if opts.Verbose {
+		// httpClient handles output when verbose flag is specified.
+		bodyWriter = io.Discard
+		headersWriter = io.Discard
 	}
 
 	host, _ := cfg.Authentication().DefaultHost()
