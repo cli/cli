@@ -361,7 +361,7 @@ func createRun(opts *CreateOptions) (err error) {
 			Repo:      ctx.BaseRepo,
 			State:     state,
 		}
-		err = shared.MetadataSurvey(opts.IO, ctx.BaseRepo, fetcher, state)
+		err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.BaseRepo, fetcher, state)
 		if err != nil {
 			return
 		}
