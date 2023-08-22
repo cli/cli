@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -20,6 +21,7 @@ type iprompter interface {
 
 type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   iprompter
@@ -33,6 +35,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Prompter:   f.Prompter,
 	}
 
@@ -96,6 +99,10 @@ func deleteRun(opts *DeleteOptions) error {
 	mustCleanupTag := opts.CleanupTag
 	if mustCleanupTag {
 		err = deleteTag(httpClient, baseRepo, release.TagName)
+		if err != nil {
+			return err
+		}
+		err = opts.GitClient.DeleteLocalTag(context.Background(), release.TagName)
 		if err != nil {
 			return err
 		}
