@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,8 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/imdario/mergo"
 )
 
 var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
@@ -21,8 +24,13 @@ func findNextPage(resp *http.Response) (string, bool) {
 	return "", false
 }
 
-func findEndCursor(r io.Reader) string {
-	dec := json.NewDecoder(r)
+func findEndCursor(responseBody io.ReadSeeker) string {
+	_, err := responseBody.Seek(0, io.SeekStart)
+	if err != nil {
+		return ""
+	}
+
+	dec := json.NewDecoder(responseBody)
 
 	var idx int
 	var stack []json.Delim
@@ -107,42 +115,34 @@ func addPerPage(p string, perPage int, params map[string]interface{}) string {
 	return fmt.Sprintf("%s%sper_page=%d", p, sep, perPage)
 }
 
-// paginatedArrayReader wraps a Reader to omit the opening and/or the closing square bracket of a
-// JSON array in order to apply pagination context between multiple API requests.
-type paginatedArrayReader struct {
-	io.Reader
-	isFirstPage bool
-	isLastPage  bool
-
-	isSubsequentRead bool
-	cachedByte       byte
-}
-
-func (r *paginatedArrayReader) Read(p []byte) (int, error) {
-	var n int
-	var err error
-	if r.cachedByte != 0 && len(p) > 0 {
-		p[0] = r.cachedByte
-		n, err = r.Reader.Read(p[1:])
-		n += 1
-		r.cachedByte = 0
-	} else {
-		n, err = r.Reader.Read(p)
+func mergeJSON(v *interface{}, responseBody io.ReadSeeker) error {
+	_, err := responseBody.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
 	}
-	if !r.isSubsequentRead && !r.isFirstPage && n > 0 && p[0] == '[' {
-		if n > 1 && p[1] == ']' {
-			// empty array case
-			p[0] = ' '
-		} else {
-			// avoid starting a new array and continue with a comma instead
-			p[0] = ','
+
+	b, err := io.ReadAll(responseBody)
+	if err != nil {
+		return err
+	}
+
+	var m interface{}
+	if bytes.HasPrefix(b, []byte("{")) {
+		if *v == nil {
+			*v = new(map[string]interface{})
 		}
+		m = new(map[string]interface{})
+	} else if bytes.HasPrefix(b, []byte("[")) {
+		if *v == nil {
+			*v = new([]interface{})
+		}
+		m = new([]interface{})
 	}
-	if !r.isLastPage && n > 0 && p[n-1] == ']' {
-		// avoid closing off an array in case we determine we are at EOF
-		r.cachedByte = p[n-1]
-		n -= 1
+
+	err = json.Unmarshal(b, &m)
+	if err != nil {
+		return err
 	}
-	r.isSubsequentRead = true
-	return n, err
+
+	return mergo.Merge(*v, m, mergo.WithAppendSlice, mergo.WithOverride)
 }

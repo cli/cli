@@ -4,7 +4,7 @@ package keyring
 import (
 	"time"
 
-	"github.com/zalando/go-keyring"
+	"github.com/99designs/keyring"
 )
 
 type TimeoutError struct {
@@ -15,12 +15,32 @@ func (e *TimeoutError) Error() string {
 	return e.message
 }
 
+var GetKeyring = func(service string) (keyring.Keyring, error) {
+	return keyring.Open(keyring.Config{ServiceName: service})
+}
+
+func MockInit() {
+	keyrings := make(map[string]keyring.Keyring)
+	GetKeyring = func(service string) (keyring.Keyring, error) {
+		kr, ok := keyrings[service]
+		if !ok {
+			kr = keyring.NewArrayKeyring(nil)
+			keyrings[service] = kr
+		}
+		return kr, nil
+	}
+}
+
 // Set secret in keyring for user.
 func Set(service, user, secret string) error {
+	kr, err := GetKeyring(service)
+	if err != nil {
+		return err
+	}
 	ch := make(chan error, 1)
 	go func() {
 		defer close(ch)
-		ch <- keyring.Set(service, user, secret)
+		ch <- kr.Set(keyring.Item{Key: user, Data: []byte(secret)})
 	}()
 	select {
 	case err := <-ch:
@@ -32,17 +52,21 @@ func Set(service, user, secret string) error {
 
 // Get secret from keyring given service and user name.
 func Get(service, user string) (string, error) {
+	kr, err := GetKeyring(service)
+	if err != nil {
+		return "", err
+	}
 	ch := make(chan struct {
 		val string
 		err error
 	}, 1)
 	go func() {
 		defer close(ch)
-		val, err := keyring.Get(service, user)
+		val, err := kr.Get(user)
 		ch <- struct {
 			val string
 			err error
-		}{val, err}
+		}{string(val.Data), err}
 	}()
 	select {
 	case res := <-ch:
@@ -54,10 +78,14 @@ func Get(service, user string) (string, error) {
 
 // Delete secret from keyring.
 func Delete(service, user string) error {
+	kr, err := GetKeyring(service)
+	if err != nil {
+		return err
+	}
 	ch := make(chan error, 1)
 	go func() {
 		defer close(ch)
-		ch <- keyring.Delete(service, user)
+		ch <- kr.Remove(user)
 	}()
 	select {
 	case err := <-ch:

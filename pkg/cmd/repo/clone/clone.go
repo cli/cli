@@ -53,6 +53,8 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 			git remote called "upstream". The remote name can be configured using %[1]s--upstream-remote-name%[1]s.
 			The %[1]s--upstream-remote-name%[1]s option supports an "@owner" value which will name
 			the remote after the owner of the parent repository.
+
+			If the repository is a fork, the parent repository will be set as the default remote repository. See: gh repo set-default
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Repository = args[0]
@@ -162,8 +164,9 @@ func cloneRun(opts *CloneOptions) error {
 		return err
 	}
 
-	// If the repo is a fork, add the parent as an upstream
+	// If the repo is a fork, add the parent as an upstream and the default repo
 	if canonicalRepo.Parent != nil {
+		// add the parent as an upstream
 		protocol, err := cfg.GetOrDefault(canonicalRepo.Parent.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
@@ -178,7 +181,7 @@ func cloneRun(opts *CloneOptions) error {
 		gc := gitClient.Copy()
 		gc.RepoDir = cloneDir
 
-		_, err = gc.AddRemote(ctx, upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
+		addedRemote, err := gc.AddRemote(ctx, upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name}, git.WithRepoDir(gc.RepoDir))
 		if err != nil {
 			return err
 		}
@@ -189,6 +192,21 @@ func cloneRun(opts *CloneOptions) error {
 
 		if err := gc.SetRemoteBranches(ctx, upstreamName, `*`); err != nil {
 			return err
+		}
+		// make parent the default repo
+		parentRepo, err := api.RepoParent(apiClient, repo)
+		if err != nil {
+			return err
+		}
+		if err = gc.SetRemoteResolution(
+			ctx, addedRemote.Name, "base", git.WithRepoDir(gc.RepoDir)); err != nil {
+			return err
+		}
+
+		connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY() && opts.IO.IsStdinTTY()
+		stderr := opts.IO.ErrOut
+		if connectedToTerminal {
+			fmt.Fprintf(stderr, "%s selected as default repo for querying issues, pull requests, etc.\nTo learn more or change this selection, see: gh repo set-default\n", ghrepo.FullName(parentRepo))
 		}
 	}
 	return nil

@@ -92,6 +92,8 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 			origin remote is renamed to "upstream". To alter this behavior, you can set
 			a name for the new fork's remote with %[1]s--remote-name%[1]s.
 
+			The "upstream" remote will be set as the default remote repository. See: gh repo set-default
+
 			Additional git clone flags can be passed after %[1]s--%[1]s.
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -351,7 +353,7 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
-			_, err = gitClient.AddRemote(ctx, "upstream", upstreamURL, []string{}, git.WithRepoDir(cloneDir))
+			addedRemote, err := gitClient.AddRemote(ctx, "upstream", upstreamURL, []string{}, git.WithRepoDir(cloneDir))
 			if err != nil {
 				return err
 			}
@@ -362,6 +364,14 @@ func forkRun(opts *ForkOptions) error {
 
 			if connectedToTerminal {
 				fmt.Fprintf(stderr, "%s Cloned fork\n", cs.SuccessIcon())
+			}
+
+			if err = gitClient.SetRemoteResolution(
+				ctx, addedRemote.Name, "base", git.WithRepoDir(cloneDir)); err != nil {
+				return err
+			}
+			if connectedToTerminal {
+				fmt.Fprintf(stderr, "%s selected as default repo for querying issues, pull requests, etc.\nTo learn more or change this selection, see: gh repo set-default\n", ghrepo.FullName(repoToFork))
 			}
 		}
 	}

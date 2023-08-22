@@ -238,6 +238,9 @@ func Test_RepoClone_hasParent(t *testing.T) {
 					}
 				} } }
 				`))
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryFindParent\b`),
+		httpmock.StringResponse(`{"data":{"repository":{"parent":{"name":"REPO","owner":{"login": "OWNER"}}}}}`))
 
 	httpClient := &http.Client{Transport: reg}
 
@@ -248,6 +251,7 @@ func Test_RepoClone_hasParent(t *testing.T) {
 	cs.Register(`git -C REPO remote add -t trunk upstream https://github.com/hubot/ORIG.git`, 0, "")
 	cs.Register(`git -C REPO fetch upstream`, 0, "")
 	cs.Register(`git -C REPO remote set-branches upstream *`, 0, "")
+	cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO")
 	if err != nil {
@@ -276,6 +280,9 @@ func Test_RepoClone_hasParent_upstreamRemoteName(t *testing.T) {
 					}
 				} } }
 				`))
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryFindParent\b`),
+		httpmock.StringResponse(`{"data":{"repository":{"parent":{"name":"REPO","owner":{"login": "OWNER"}}}}}`))
 
 	httpClient := &http.Client{Transport: reg}
 
@@ -286,6 +293,7 @@ func Test_RepoClone_hasParent_upstreamRemoteName(t *testing.T) {
 	cs.Register(`git -C REPO remote add -t trunk test https://github.com/hubot/ORIG.git`, 0, "")
 	cs.Register(`git -C REPO fetch test`, 0, "")
 	cs.Register(`git -C REPO remote set-branches test *`, 0, "")
+	cs.Register(`git -C REPO config --add remote.test.gh-resolved base`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO --upstream-remote-name test")
 	if err != nil {
@@ -326,4 +334,86 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
+}
+
+func Test_RepoClone_RepoTypo(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": {
+			"login": "OWNER"
+		}}}`))
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+				{ "data": {} }
+				`))
+
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryList\b`),
+		httpmock.StringResponse(`
+		{
+			"data": {
+				"repositoryOwner": {
+					"repositories": {
+						"totalCount": 3,
+						"pageInfo": {
+							"hasNextPage": false,
+							"endCursor": ""
+						}
+					}
+				}
+			}
+	    }`))
+
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryList\b`),
+		httpmock.StringResponse(`
+		{
+			"data": {
+				"repositoryOwner": {
+					"repositories": {
+						"totalCount": 3,
+						"nodes": [
+							{
+								"name": "hello-world",
+								"isFork": false,
+								"isPrivate": false,
+								"isArchived": false,
+								"visibility": "PUBLIC"
+							},
+							{
+								"name": "cli",
+								"isFork": true,
+								"isPrivate": false,
+								"isArchived": false,
+								"visibility": "PUBLIC"
+							},
+							{
+								"name": "REPO",
+								"isFork": false,
+								"isPrivate": true,
+								"isArchived": false,
+								"visibility": "PRIVATE"
+							}
+						],
+						"pageInfo": {
+							"hasNextPage": false,
+							"endCursor": ""
+						}
+					}
+				}
+			}
+	}`))
+	httpClient := &http.Client{Transport: reg}
+
+	_, err := runCloneCommand(httpClient, "REPOO") // typo
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+
+	assert.ErrorContains(t, err, `Did you mean this?`)
+	assert.ErrorContains(t, err, "gh repo clone OWNER/REPO")
 }

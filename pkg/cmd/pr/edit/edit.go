@@ -52,9 +52,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
-
-			Editing a pull request's projects requires authorization with the "project" scope.
-			To authorize, run "gh auth refresh -s project".
 		`),
 		Example: heredoc.Doc(`
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
@@ -120,18 +117,16 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				opts.Editable.Milestone.Edited = true
 			}
 
-			if !opts.Editable.Dirty() {
+			if cmd.Flags().NFlag() == 0 {
+				if !opts.IO.CanPrompt() {
+					return cmdutil.FlagErrorf("flags required when not running interactively")
+				}
 				opts.Interactive = true
-			}
-
-			if opts.Interactive && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("--tile, --body, --reviewer, --assignee, --label, --project, or --milestone required when not running interactively")
 			}
 
 			if runF != nil {
 				return runF(opts)
 			}
-
 			return editRun(opts)
 		},
 	}
@@ -150,40 +145,34 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the pull request from projects by `name`")
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the pull request belongs to by `name`")
 
-	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base")
-
-	for _, flagName := range []string{"add-reviewer", "remove-reviewer"} {
-		_ = cmd.RegisterFlagCompletionFunc(flagName, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			baseRepo, err := f.BaseRepo()
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			httpClient, err := f.HttpClient()
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			results, err := shared.RequestableReviewersForCompletion(httpClient, baseRepo)
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveError
-			}
-			return results, cobra.ShellCompDirectiveNoFileComp
-		})
-	}
-
 	return cmd
 }
 
 func editRun(opts *EditOptions) error {
+	editable := opts.Editable
+	lookupFields := []string{"id", "url", "title", "body", "baseRefName"}
+	if opts.Interactive {
+		lookupFields = append(lookupFields, "assignees", "labels")
+	}
+	if opts.Interactive || editable.Reviewers.Edited {
+		lookupFields = append(lookupFields, "reviewRequests")
+	}
+	if opts.Interactive || editable.Projects.Edited {
+		lookupFields = append(lookupFields, "projectCards")
+	}
+	if opts.Interactive || editable.Milestone.Edited {
+		lookupFields = append(lookupFields, "milestone")
+	}
+
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "url", "title", "body", "baseRefName", "reviewRequests", "assignees", "labels", "projectCards", "projectItems", "milestone"},
+		Fields:   lookupFields,
 	}
 	pr, repo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
 
-	editable := opts.Editable
 	editable.Reviewers.Allowed = true
 	editable.Title.Default = pr.Title
 	editable.Body.Default = pr.Body
@@ -191,12 +180,7 @@ func editRun(opts *EditOptions) error {
 	editable.Reviewers.Default = pr.ReviewRequests.Logins()
 	editable.Assignees.Default = pr.Assignees.Logins()
 	editable.Labels.Default = pr.Labels.Names()
-	editable.Projects.Default = append(pr.ProjectCards.ProjectNames(), pr.ProjectItems.ProjectTitles()...)
-	projectItems := map[string]string{}
-	for _, n := range pr.ProjectItems.Nodes {
-		projectItems[n.Project.ID] = n.ID
-	}
-	editable.Projects.ProjectItems = projectItems
+	editable.Projects.Default = pr.ProjectCards.ProjectNames()
 	if pr.Milestone != nil {
 		editable.Milestone.Default = pr.Milestone.Title
 	}
@@ -261,10 +245,6 @@ func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, id
 	userIds, teamIds, err := editable.ReviewerIds()
 	if err != nil {
 		return err
-	}
-	if (userIds == nil || len(*userIds) == 0) &&
-		(teamIds == nil || len(*teamIds) == 0) {
-		return nil
 	}
 	union := githubv4.Boolean(false)
 	reviewsRequestParams := githubv4.RequestReviewsInput{
