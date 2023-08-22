@@ -17,15 +17,21 @@ type DisableOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   iprompter
 
 	Selector string
 	Prompt   bool
+}
+
+type iprompter interface {
+	Select(string, string, []string) (int, error)
 }
 
 func NewCmdDisable(f *cmdutil.Factory, runF func(*DisableOptions) error) *cobra.Command {
 	opts := &DisableOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -69,7 +75,7 @@ func runDisable(opts *DisableOptions) error {
 
 	states := []shared.WorkflowState{shared.Active}
 	workflow, err := shared.ResolveWorkflow(
-		opts.IO, client, repo, opts.Prompt, opts.Selector, states)
+		opts.Prompter, opts.IO, client, repo, opts.Prompt, opts.Selector, states)
 	if err != nil {
 		var fae shared.FilteredAllError
 		if errors.As(err, &fae) {
