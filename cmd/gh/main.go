@@ -38,7 +38,7 @@ const (
 	exitError   exitCode = 1
 	exitCancel  exitCode = 2
 	exitAuth    exitCode = 4
-	exitPending exitCode = 5
+	exitPending exitCode = 8
 )
 
 func main() {
