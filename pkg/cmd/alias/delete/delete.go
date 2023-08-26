@@ -14,6 +14,7 @@ type DeleteOptions struct {
 	IO     *iostreams.IOStreams
 
 	Name string
+	All  bool
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
@@ -25,9 +26,11 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "delete <alias>",
 		Short: "Delete an alias",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Name = args[0]
+			if len(args) > 0 {
+				opts.Name = args[0]
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -35,6 +38,8 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			return deleteRun(opts)
 		},
 	}
+
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Delete all registered aliases")
 
 	return cmd
 }
@@ -44,28 +49,39 @@ func deleteRun(opts *DeleteOptions) error {
 	if err != nil {
 		return err
 	}
-
 	aliasCfg := cfg.Aliases()
 
-	expansion, err := aliasCfg.Get(opts.Name)
-	if err != nil {
-		return fmt.Errorf("no such alias %s", opts.Name)
-
+	var names, expansions []string
+	if opts.All {
+		aliases := aliasCfg.All()
+		for name, expansion := range aliases {
+			names = append(names, name)
+			expansions = append(expansions, expansion)
+		}
+	} else {
+		expansion, err := aliasCfg.Get(opts.Name)
+		if err != nil {
+			return fmt.Errorf("no such alias %s", opts.Name)
+		}
+		names = append(names, opts.Name)
+		expansions = append(expansions, expansion)
 	}
 
-	err = aliasCfg.Delete(opts.Name)
-	if err != nil {
-		return fmt.Errorf("failed to delete alias %s: %w", opts.Name, err)
-	}
+	for i := 0; i < len(names); i++ {
+		err = aliasCfg.Delete(names[i])
+		if err != nil {
+			return fmt.Errorf("failed to delete alias %s: %w", names[i], err)
+		}
 
-	err = cfg.Write()
-	if err != nil {
-		return err
-	}
+		err = cfg.Write()
+		if err != nil {
+			return err
+		}
 
-	if opts.IO.IsStdoutTTY() {
-		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted alias %s; was %s\n", cs.SuccessIconWithColor(cs.Red), opts.Name, expansion)
+		if opts.IO.IsStdoutTTY() {
+			cs := opts.IO.ColorScheme()
+			fmt.Fprintf(opts.IO.ErrOut, "%s Deleted alias %s; was %s\n", cs.SuccessIconWithColor(cs.Red), names[i], expansions[i])
+		}
 	}
 
 	return nil
