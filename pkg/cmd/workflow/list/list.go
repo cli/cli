@@ -16,14 +16,21 @@ import (
 const defaultLimit = 50
 
 type ListOptions struct {
-	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
-	BaseRepo   func() (ghrepo.Interface, error)
-
+	IO          *iostreams.IOStreams
+	HttpClient  func() (*http.Client, error)
+	BaseRepo    func() (ghrepo.Interface, error)
+	Exporter    cmdutil.Exporter
 	PlainOutput bool
 
 	All   bool
 	Limit int
+}
+
+var workflowFields = []string{
+	"id",
+	"name",
+	"path",
+	"state",
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -59,7 +66,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of workflows to fetch")
 	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Also show disabled workflows")
-
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, workflowFields)
 	return cmd
 }
 
@@ -91,7 +98,12 @@ func listRun(opts *ListOptions) error {
 	} else {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
-
+	if opts.Exporter != nil {
+		if !opts.All {
+			workflows = shared.GetActiveWorkflows(workflows)
+		}
+		return opts.Exporter.Write(opts.IO, workflows)
+	}
 	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 	cs := opts.IO.ColorScheme()

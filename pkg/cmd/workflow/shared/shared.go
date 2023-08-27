@@ -249,3 +249,14 @@ func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Work
 
 	return sanitized, nil
 }
+
+func GetActiveWorkflows(workflows []Workflow) []Workflow {
+	active := []Workflow{}
+	for _, workflow := range workflows {
+		if workflow.Disabled() {
+			continue
+		}
+		active = append(active, workflow)
+	}
+	return active
+}
