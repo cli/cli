@@ -511,7 +511,7 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				SelectorArgs: []string{"123"},
 				Interactive:  true,
-				FieldsToEditSurvey: func(eo *prShared.Editable) error {
+				FieldsToEditSurvey: func(p prShared.EditPrompter, eo *prShared.Editable) error {
 					eo.Title.Edited = true
 					eo.Body.Edited = true
 					eo.Assignees.Edited = true
@@ -520,7 +520,7 @@ func Test_editRun(t *testing.T) {
 					eo.Milestone.Edited = true
 					return nil
 				},
-				EditFieldsSurvey: func(eo *prShared.Editable, _ string) error {
+				EditFieldsSurvey: func(p prShared.EditPrompter, eo *prShared.Editable, _ string) error {
 					eo.Title.Value = "new title"
 					eo.Body.Value = "new body"
 					eo.Assignees.Value = []string{"monalisa", "hubot"}

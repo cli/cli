@@ -51,7 +51,7 @@ type IOStreams struct {
 
 	In     fileReader
 	Out    fileWriter
-	ErrOut io.Writer
+	ErrOut fileWriter
 
 	terminalTheme string
 
@@ -396,19 +396,30 @@ func System() *IOStreams {
 
 	var stdout fileWriter = os.Stdout
 	// On Windows with no virtual terminal processing support, translate ANSI escape
-	// sequences to console syscalls
+	// sequences to console syscalls.
 	if colorableStdout := colorable.NewColorable(os.Stdout); colorableStdout != os.Stdout {
-		// ensure that the file descriptor of the original stdout is preserved
+		// Ensure that the file descriptor of the original stdout is preserved.
 		stdout = &fdWriter{
 			fd:     os.Stdout.Fd(),
 			Writer: colorableStdout,
 		}
 	}
 
+	var stderr fileWriter = os.Stderr
+	// On Windows with no virtual terminal processing support, translate ANSI escape
+	// sequences to console syscalls.
+	if colorableStderr := colorable.NewColorable(os.Stderr); colorableStderr != os.Stderr {
+		// Ensure that the file descriptor of the original stderr is preserved.
+		stderr = &fdWriter{
+			fd:     os.Stderr.Fd(),
+			Writer: colorableStderr,
+		}
+	}
+
 	io := &IOStreams{
 		In:           os.Stdin,
 		Out:          stdout,
-		ErrOut:       colorable.NewColorable(os.Stderr),
+		ErrOut:       stderr,
 		pagerCommand: os.Getenv("PAGER"),
 		term:         &terminal,
 	}
@@ -463,7 +474,7 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 			ReadCloser: io.NopCloser(in),
 		},
 		Out:    &fdWriter{fd: 1, Writer: out},
-		ErrOut: errOut,
+		ErrOut: &fdWriter{fd: 2, Writer: errOut},
 		term:   &fakeTerm{},
 	}
 	io.SetStdinTTY(false)
