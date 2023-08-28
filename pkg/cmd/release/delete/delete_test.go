@@ -168,6 +168,7 @@ func Test_deleteRun(t *testing.T) {
 				CleanupTag:  true,
 			},
 			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag -l v1.2.3`, 0, "v1.2.3\n")
 				rs.Register(`git tag -d v1.2.3`, 0, "")
 			},
 			wantStdout: ``,
@@ -184,6 +185,7 @@ func Test_deleteRun(t *testing.T) {
 				CleanupTag:  true,
 			},
 			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag -l v1.2.3`, 0, "v1.2.3\n")
 				rs.Register(`git tag -d v1.2.3`, 0, "")
 			},
 			wantStdout: ``,

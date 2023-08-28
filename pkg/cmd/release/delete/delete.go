@@ -102,7 +102,7 @@ func deleteRun(opts *DeleteOptions) error {
 		if err != nil {
 			return err
 		}
-		err = opts.GitClient.DeleteLocalTag(context.Background(), release.TagName)
+		err = deleteLocalTag(opts.GitClient, release.TagName)
 		if err != nil {
 			return err
 		}
@@ -157,6 +157,27 @@ func deleteTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName strin
 
 	if resp.StatusCode > 299 {
 		return api.HandleHTTPError(resp)
+	}
+	return nil
+}
+
+func deleteLocalTag(client *git.Client, tagName string) error {
+	ctx := context.Background()
+	cmd, err := client.Command(ctx, "tag", "-l", tagName)
+	if err != nil {
+		return err
+	}
+	b, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+	// this tag doesn't exist locally, so nothing needs to be done
+	if len(b) == 0 {
+		return nil
+	}
+	err = client.DeleteLocalTag(ctx, tagName)
+	if err != nil {
+		return err
 	}
 	return nil
 }
