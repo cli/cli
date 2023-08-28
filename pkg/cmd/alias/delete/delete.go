@@ -17,6 +17,7 @@ type DeleteOptions struct {
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
+	var deleteAll bool
 	opts := &DeleteOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
@@ -25,21 +26,21 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "delete <alias>",
 		Short: "Delete an alias",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Name = args[0]
 
 			if runF != nil {
 				return runF(opts)
 			}
-			return deleteRun(opts)
+			return deleteRun(opts, deleteAll)
 		},
 	}
-
+	cmd.Flags().BoolVarP(&deleteAll, "all", "a", false, "deletes all aliases")
 	return cmd
 }
 
-func deleteRun(opts *DeleteOptions) error {
+func deleteRun(opts *DeleteOptions, deleteAll bool) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -53,9 +54,19 @@ func deleteRun(opts *DeleteOptions) error {
 
 	}
 
-	err = aliasCfg.Delete(opts.Name)
-	if err != nil {
-		return fmt.Errorf("failed to delete alias %s: %w", opts.Name, err)
+	if deleteAll {
+
+		err := aliasCfg.DeleteAll()
+		if err != nil {
+			return fmt.Errorf("failed to delete all aliases")
+		}
+
+	} else {
+
+		err = aliasCfg.Delete(opts.Name)
+		if err != nil {
+			return fmt.Errorf("failed to delete alias %s: %w", opts.Name, err)
+		}
 	}
 
 	err = cfg.Write()

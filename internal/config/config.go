@@ -271,6 +271,22 @@ func (a *AliasConfig) Delete(alias string) error {
 	return a.cfg.Remove([]string{aliases, alias})
 }
 
+func (a *AliasConfig) DeleteAll() error {
+	keys, err := a.cfg.Keys([]string{aliases})
+	if err != nil {
+		return err
+	}
+
+	for _, key := range keys {
+		err = a.cfg.Remove([]string{aliases, key})
+
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (a *AliasConfig) All() map[string]string {
 	out := map[string]string{}
 	keys, err := a.cfg.Keys([]string{aliases})
