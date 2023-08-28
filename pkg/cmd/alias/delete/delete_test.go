@@ -57,7 +57,7 @@ func TestAliasDelete(t *testing.T) {
 			cli:        "--all",
 			isTTY:      true,
 			wantStdout: "",
-			wantStderr: "",
+			wantStderr: "✓ Deleted alias il; was issue list\n✓ Deleted alias co; was pr checkout\n",
 		},
 	}
 	for _, tt := range tests {

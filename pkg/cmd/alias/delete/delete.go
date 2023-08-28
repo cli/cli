@@ -37,12 +37,12 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				if runF != nil {
 					return runF(opts)
 				}
-				return deleteRun(opts, deleteAll)
+				return deleteRun(opts)
 			}
 
 		},
 	}
-	cmd.Flags().BoolVarP(&deleteAll, "all", "a", false, "deletes all aliases")
+	cmd.Flags().BoolVar(&deleteAll, "all", false, "deletes all aliases")
 	return cmd
 }
 
@@ -55,11 +55,29 @@ func deleteAllAliases(opts *DeleteOptions) error {
 
 	aliasCfg := cfg.Aliases()
 
-	err = aliasCfg.DeleteAll()
-	return err
+	out := aliasCfg.All()
+
+	for alias, expansion := range out {
+		err = aliasCfg.Delete(alias)
+
+		if err != nil {
+			return fmt.Errorf("failed to delete alias %s: %w", alias, err)
+		}
+
+		err = cfg.Write()
+		if err != nil {
+			return err
+		}
+
+		if opts.IO.IsStdoutTTY() {
+			cs := opts.IO.ColorScheme()
+			fmt.Fprintf(opts.IO.ErrOut, "%s Deleted alias %s; was %s\n", cs.SuccessIconWithColor(cs.Red), alias, expansion)
+		}
+	}
+	return nil
 }
 
-func deleteRun(opts *DeleteOptions, deleteAll bool) error {
+func deleteRun(opts *DeleteOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
