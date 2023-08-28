@@ -621,7 +621,6 @@ func Test_createRun(t *testing.T) {
 							payload["owner"] = map[string]interface{}{"login": "OWNER"}
 							payload["auto_init"] = true
 							payload["private"] = true
-							fmt.Printf("%#v", payload)
 						},
 					),
 				)
