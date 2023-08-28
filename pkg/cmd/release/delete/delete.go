@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
@@ -174,6 +175,9 @@ func deleteLocalTag(client *git.Client, tagName string) error {
 	// this tag doesn't exist locally, so nothing needs to be done
 	if len(b) == 0 {
 		return nil
+	}
+	if !strings.Contains(string(b), tagName) {
+		return fmt.Errorf("failed to get the tag %s locally", tagName)
 	}
 	err = client.DeleteLocalTag(ctx, tagName)
 	if err != nil {
