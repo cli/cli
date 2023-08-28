@@ -228,28 +228,6 @@ func Test_repoCreate(t *testing.T) {
 							}, inputs)
 						}),
 				)
-				r.Register(
-					httpmock.GraphQL(`mutation UpdateRepository\b`),
-					httpmock.GraphQLMutation(
-						`{
-							"data": {
-								"updateRepository": {
-									"repository": {
-										"id": "REPOID",
-										"name": "REPO",
-										"owner": {"login":"OWNER"},
-										"url": "the://URL"
-									}
-								}
-							}
-						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
-								"repositoryId":   "REPOID",
-								"hasWikiEnabled": true,
-							}, inputs)
-						}),
-				)
 			},
 			wantRepo: "https://github.com/OWNER/REPO",
 		},
@@ -293,28 +271,6 @@ func Test_repoCreate(t *testing.T) {
 								"ownerId":            "ORGID",
 								"repositoryId":       "TPLID",
 								"includeAllBranches": false,
-							}, inputs)
-						}),
-				)
-				r.Register(
-					httpmock.GraphQL(`mutation UpdateRepository\b`),
-					httpmock.GraphQLMutation(
-						`{
-							"data": {
-								"updateRepository": {
-									"repository": {
-										"id": "REPOID",
-										"name": "REPO",
-										"owner": {"login":"OWNER"},
-										"url": "the://URL"
-									}
-								}
-							}
-						}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, map[string]interface{}{
-								"repositoryId":   "REPOID",
-								"hasWikiEnabled": true,
 							}, inputs)
 						}),
 				)

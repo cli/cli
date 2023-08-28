@@ -654,23 +654,6 @@ func Test_createRun(t *testing.T) {
 					}`, func(m map[string]interface{}) {
 						assert.Equal(t, "REPOID", m["repositoryId"])
 					}))
-				reg.Register(
-					httpmock.GraphQL(`mutation UpdateRepository\b`),
-					httpmock.GraphQLMutation(`
-					{
-						"data": {
-							"updateRepository": {
-								"repository": {
-									"id": "REPOID",
-									"name": "REPO",
-									"owner": {"login":"OWNER"},
-									"url": "https://github.com/OWNER/REPO"
-								}
-							}
-						}
-					}`, func(m map[string]interface{}) {
-						assert.Equal(t, "REPOID", m["repositoryId"])
-					}))
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				// fatal: Remote branch main not found in upstream origin
