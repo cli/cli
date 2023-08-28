@@ -7,9 +7,9 @@ require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.18.1
 	github.com/cenkalti/backoff/v4 v4.2.1
-	github.com/charmbracelet/glamour v0.5.1-0.20220727184942-e70ff2d969da
+	github.com/charmbracelet/glamour v0.6.0
 	github.com/charmbracelet/lipgloss v0.5.0
-	github.com/cli/go-gh/v2 v2.1.0
+	github.com/cli/go-gh/v2 v2.3.0
 	github.com/cli/oauth v1.0.1
 	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.2
@@ -49,6 +49,7 @@ require (
 require (
 	github.com/alecthomas/chroma v0.10.0 // indirect
 	github.com/alessio/shellescape v1.4.1 // indirect
+	github.com/aymanbagabas/go-osc52 v1.0.3 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cli/browser v1.2.0 // indirect
 	github.com/cli/shurcooL-graphql v0.0.3 // indirect
@@ -68,9 +69,9 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
-	github.com/microcosm-cc/bluemonday v1.0.20 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.21 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
-	github.com/muesli/termenv v0.12.0 // indirect
+	github.com/muesli/termenv v0.13.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
@@ -78,7 +79,7 @@ require (
 	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/thlib/go-timezone-local v0.0.0-20210907160436-ef149e42d28e // indirect
-	github.com/yuin/goldmark v1.4.13 // indirect
+	github.com/yuin/goldmark v1.5.2 // indirect
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
 	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
