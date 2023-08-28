@@ -396,7 +396,7 @@ func createFromScratch(opts *CreateOptions) error {
 
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
-		if opts.LicenseTemplate == "" && opts.GitIgnoreTemplate == "" && opts.Template == "" {
+		if !opts.AddReadme && opts.LicenseTemplate == "" && opts.GitIgnoreTemplate == "" && opts.Template == "" {
 			// cloning empty repository or template
 			if err := localInit(opts.GitClient, remoteURL, repo.RepoName()); err != nil {
 				return err
