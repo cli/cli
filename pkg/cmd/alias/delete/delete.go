@@ -62,26 +62,21 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 	aliasCfg := cfg.Aliases()
 
-	var names, expansions []string
+	aliases := make(map[string]string)
 	if opts.All {
-		aliases := aliasCfg.All()
-		for name, expansion := range aliases {
-			names = append(names, name)
-			expansions = append(expansions, expansion)
-		}
+		aliases = aliasCfg.All()
 	} else {
 		expansion, err := aliasCfg.Get(opts.Name)
 		if err != nil {
 			return fmt.Errorf("no such alias %s", opts.Name)
 		}
-		names = append(names, opts.Name)
-		expansions = append(expansions, expansion)
+		aliases[opts.Name] = expansion
 	}
 
-	for i := 0; i < len(names); i++ {
-		err = aliasCfg.Delete(names[i])
+	for name, expansion := range aliases {
+		err = aliasCfg.Delete(name)
 		if err != nil {
-			return fmt.Errorf("failed to delete alias %s: %w", names[i], err)
+			return fmt.Errorf("failed to delete alias %s: %w", name, err)
 		}
 
 		err = cfg.Write()
@@ -91,7 +86,7 @@ func deleteRun(opts *DeleteOptions) error {
 
 		if opts.IO.IsStdoutTTY() {
 			cs := opts.IO.ColorScheme()
-			fmt.Fprintf(opts.IO.ErrOut, "%s Deleted alias %s; was %s\n", cs.SuccessIconWithColor(cs.Red), names[i], expansions[i])
+			fmt.Fprintf(opts.IO.ErrOut, "%s Deleted alias %s; was %s\n", cs.SuccessIconWithColor(cs.Red), name, expansion)
 		}
 	}
 
