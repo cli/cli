@@ -280,7 +280,7 @@ func Test_repoCreate(t *testing.T) {
 							"data": {
 								"updateRepository": {
 									"repository": {
-										"id": "REPOID",
+										"id": "REPOID"
 									}
 								}
 							}
