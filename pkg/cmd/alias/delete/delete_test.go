@@ -47,6 +47,57 @@ func TestAliasDelete(t *testing.T) {
 			wantStdout: "",
 			wantStderr: "✓ Deleted alias co; was pr checkout\n",
 		},
+		{
+			name: "delete all aliases",
+			config: heredoc.Doc(`
+				aliases:
+				  il: issue list
+				  co: pr checkout
+			`),
+			cli:        "--all",
+			isTTY:      true,
+			wantStdout: "",
+			wantStderr: "✓ Deleted alias il; was issue list\n✓ Deleted alias co; was pr checkout\n",
+		},
+		{
+			name: "delete too many arguments error",
+			config: heredoc.Doc(`
+				aliases:
+				  il: issue list
+				  co: pr checkout
+			`),
+			cli:        "il co",
+			isTTY:      true,
+			wantStdout: "",
+			wantStderr: "",
+			wantErr:    "too many arguments",
+		},
+		{
+			name: "delete --all with alias name error",
+			config: heredoc.Doc(`
+				aliases:
+				  il: issue list
+				  co: pr checkout
+			`),
+			cli:        "il --all",
+			isTTY:      true,
+			wantStdout: "",
+			wantStderr: "",
+			wantErr:    "cannot use `--all` with alias name",
+		},
+		{
+			name: "delete without specification error",
+			config: heredoc.Doc(`
+				aliases:
+				  il: issue list
+				  co: pr checkout
+			`),
+			cli:        "",
+			isTTY:      true,
+			wantStdout: "",
+			wantStderr: "",
+			wantErr:    "specify an alias to delete or `--all`",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
