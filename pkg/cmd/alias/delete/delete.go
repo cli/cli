@@ -24,9 +24,20 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "delete <alias>",
-		Short: "Delete an alias",
-		Args:  cobra.MaximumNArgs(1),
+		Use:   "delete {<alias> | --all}",
+		Short: "Delete set aliases",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 && !opts.All {
+				return cmdutil.FlagErrorf("specify an alias to delete or `--all`")
+			}
+			if len(args) > 0 && opts.All {
+				return cmdutil.FlagErrorf("cannot use `--all` with alias name")
+			}
+			if len(args) > 1 {
+				return cmdutil.FlagErrorf("too many arguments")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.Name = args[0]
