@@ -151,9 +151,6 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 					updateRepository(input: $input) {
 						repository {
 							id
-							name
-							owner { login }
-							url
 						}
 					}
 				}

@@ -281,9 +281,6 @@ func Test_repoCreate(t *testing.T) {
 								"updateRepository": {
 									"repository": {
 										"id": "REPOID",
-										"name": "REPO",
-										"owner": {"login":"OWNER"},
-										"url": "the://URL"
 									}
 								}
 							}
