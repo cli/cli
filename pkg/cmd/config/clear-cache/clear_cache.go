@@ -24,8 +24,9 @@ func NewCmdConfigClearCache(f *cmdutil.Factory, runF func(*ClearCacheOptions) er
 
 	cmd := &cobra.Command{
 		Use:   "clear-cache",
-		Short: "Clear the gh cli cache",
+		Short: "Clear the cli cache",
 		Example: heredoc.Doc(`
+			# Clear the cli cache
 			$ gh config clear-cache
 		`),
 		Args: cobra.ExactArgs(0),
@@ -33,7 +34,6 @@ func NewCmdConfigClearCache(f *cmdutil.Factory, runF func(*ClearCacheOptions) er
 			if runF != nil {
 				return runF(opts)
 			}
-
 			return clearCacheRun(opts)
 		},
 	}
@@ -42,13 +42,10 @@ func NewCmdConfigClearCache(f *cmdutil.Factory, runF func(*ClearCacheOptions) er
 }
 
 func clearCacheRun(opts *ClearCacheOptions) error {
-	err := os.RemoveAll(opts.CacheDir)
-
-	if err != nil {
+	if err := os.RemoveAll(opts.CacheDir); err != nil {
 		return err
 	}
-
-	fmt.Fprintf(opts.IO.Out, "Cleared cache dir: %s\n", opts.CacheDir)
-
+	cs := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.Out, "%s Cleared the cache\n", cs.SuccessIcon())
 	return nil
 }
