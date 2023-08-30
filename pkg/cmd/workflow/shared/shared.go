@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -47,6 +48,24 @@ func (w *Workflow) Disabled() bool {
 
 func (w *Workflow) Base() string {
 	return path.Base(w.Path)
+}
+
+func (w *Workflow) ExportData(fields []string) map[string]interface{} {
+	fieldByName := func(v reflect.Value, field string) reflect.Value {
+		return v.FieldByNameFunc(func(s string) bool {
+			return strings.EqualFold(field, s)
+		})
+	}
+	v := reflect.ValueOf(w).Elem()
+	data := map[string]interface{}{}
+	for _, f := range fields {
+		switch f {
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+	return data
 }
 
 func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workflow, error) {
@@ -248,15 +267,4 @@ func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Work
 	}
 
 	return sanitized, nil
-}
-
-func GetActiveWorkflows(workflows []Workflow) []Workflow {
-	active := []Workflow{}
-	for _, workflow := range workflows {
-		if workflow.Disabled() {
-			continue
-		}
-		active = append(active, workflow)
-	}
-	return active
 }
