@@ -3,11 +3,11 @@ package clearcache
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/go-gh/v2/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +19,7 @@ type ClearCacheOptions struct {
 func NewCmdConfigClearCache(f *cmdutil.Factory, runF func(*ClearCacheOptions) error) *cobra.Command {
 	opts := &ClearCacheOptions{
 		IO:       f.IOStreams,
-		CacheDir: filepath.Join(os.TempDir(), "gh-cli-cache"),
+		CacheDir: config.CacheDir(),
 	}
 
 	cmd := &cobra.Command{
