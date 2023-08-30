@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -24,7 +25,8 @@ type ChecksOptions struct {
 	IO         *iostreams.IOStreams
 	Browser    browser.Browser
 
-	Finder shared.PRFinder
+	Finder   shared.PRFinder
+	Detector fd.Detector
 
 	SelectorArg string
 	WebMode     bool
@@ -142,8 +144,19 @@ func checksRun(opts *ChecksOptions) error {
 	var checks []check
 	var counts checkCounts
 	var err error
+	var includeEvent bool
 
-	checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required)
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(client, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, repo.RepoHost())
+	}
+	if features, featuresErr := opts.Detector.PullRequestFeatures(); featuresErr != nil {
+		return featuresErr
+	} else {
+		includeEvent = features.CheckRunEvent
+	}
+
+	checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required, includeEvent)
 	if err != nil {
 		return err
 	}
@@ -183,7 +196,7 @@ func checksRun(opts *ChecksOptions) error {
 
 		time.Sleep(opts.Interval)
 
-		checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required)
+		checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required, includeEvent)
 		if err != nil {
 			break
 		}
@@ -203,14 +216,16 @@ func checksRun(opts *ChecksOptions) error {
 		}
 	}
 
-	if counts.Failed+counts.Pending > 0 {
+	if counts.Failed > 0 {
 		return cmdutil.SilentError
+	} else if counts.Pending > 0 {
+		return cmdutil.PendingError
 	}
 
 	return nil
 }
 
-func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest, requiredChecks bool) ([]check, checkCounts, error) {
+func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest, requiredChecks bool, includeEvent bool) ([]check, checkCounts, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	type response struct {
@@ -224,7 +239,7 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 				%s
 			}
 		}
-	}`, api.RequiredStatusCheckRollupGraphQL("$id", "$endCursor"))
+	}`, api.RequiredStatusCheckRollupGraphQL("$id", "$endCursor", includeEvent))
 
 	variables := map[string]interface{}{
 		"id": pr.ID,

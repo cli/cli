@@ -17,19 +17,20 @@ import (
 )
 
 type Factory struct {
-	IOStreams *iostreams.IOStreams
-	Prompter  prompter.Prompter
-	Browser   browser.Browser
-	GitClient *git.Client
+	AppVersion     string
+	ExecutableName string
 
-	HttpClient func() (*http.Client, error)
-	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
-	Config     func() (config.Config, error)
-	Branch     func() (string, error)
-
+	Browser          browser.Browser
 	ExtensionManager extensions.ExtensionManager
-	ExecutableName   string
+	GitClient        *git.Client
+	IOStreams        *iostreams.IOStreams
+	Prompter         prompter.Prompter
+
+	BaseRepo   func() (ghrepo.Interface, error)
+	Branch     func() (string, error)
+	Config     func() (config.Config, error)
+	HttpClient func() (*http.Client, error)
+	Remotes    func() (context.Remotes, error)
 }
 
 // Executable is the path to the currently invoked binary

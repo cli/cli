@@ -24,6 +24,7 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   iprompter
 
 	Exporter cmdutil.Exporter
 
@@ -38,10 +39,15 @@ type ListOptions struct {
 	now time.Time
 }
 
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
+
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
 		now:        time.Now(),
 	}
 
@@ -103,7 +109,9 @@ func listRun(opts *ListOptions) error {
 	opts.IO.StartProgressIndicator()
 	if opts.WorkflowSelector != "" {
 		states := []workflowShared.WorkflowState{workflowShared.Active}
-		if workflow, err := workflowShared.ResolveWorkflow(opts.IO, client, baseRepo, false, opts.WorkflowSelector, states); err == nil {
+		if workflow, err := workflowShared.ResolveWorkflow(
+			opts.Prompter, opts.IO, client, baseRepo, false, opts.WorkflowSelector,
+			states); err == nil {
 			filters.WorkflowID = workflow.ID
 			filters.WorkflowName = workflow.Name
 		} else {

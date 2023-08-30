@@ -1,14 +1,27 @@
 package codespace
 
 import (
+	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
+
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 
-func NewRootCmd(app *App) *cobra.Command {
+func NewCmdCodespace(f *cmdutil.Factory) *cobra.Command {
 	root := &cobra.Command{
-		Use:   "codespace",
-		Short: "Connect to and manage codespaces",
+		Use:     "codespace",
+		Short:   "Connect to and manage codespaces",
+		Aliases: []string{"cs"},
+		GroupID: "core",
 	}
+
+	app := NewApp(
+		f.IOStreams,
+		f,
+		codespacesAPI.New(f),
+		f.Browser,
+		f.Remotes,
+	)
 
 	root.AddCommand(newCodeCmd(app))
 	root.AddCommand(newCreateCmd(app))

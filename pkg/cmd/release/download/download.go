@@ -290,7 +290,7 @@ func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL, f
 			return fmt.Errorf("unable to parse file name of archive: %w", err)
 		}
 		if serverFileName, ok := params["filename"]; ok {
-			fileName = serverFileName
+			fileName = filepath.Base(serverFileName)
 		} else {
 			return errors.New("unable to determine file name of archive")
 		}

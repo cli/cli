@@ -129,7 +129,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	}
 
 	if opts.useWeb && userInputs.Repository == "" {
-		return a.browser.Browse("https://github.com/codespaces/new")
+		return a.browser.Browse(fmt.Sprintf("%s/codespaces/new", a.apiClient.ServerURL()))
 	}
 
 	promptForRepoAndBranch := userInputs.Repository == "" && !opts.useWeb
@@ -293,7 +293,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	}
 
 	if opts.useWeb {
-		return a.browser.Browse(fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", createParams.RepositoryID, createParams.Branch, createParams.Machine, createParams.Location))
+		return a.browser.Browse(fmt.Sprintf("%s/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", a.apiClient.ServerURL(), createParams.RepositoryID, createParams.Branch, createParams.Machine, createParams.Location))
 	}
 
 	var codespace *api.Codespace

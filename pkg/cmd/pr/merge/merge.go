@@ -199,7 +199,6 @@ type mergeContext struct {
 	autoMerge          bool
 	crossRepoPR        bool
 	deleteBranch       bool
-	switchedToBranch   string
 	mergeQueueRequired bool
 }
 
@@ -370,7 +369,7 @@ func (m *mergeContext) merge() error {
 
 // Delete local branch if requested and if allowed.
 func (m *mergeContext) deleteLocalBranch() error {
-	if m.crossRepoPR || m.autoMerge {
+	if m.autoMerge {
 		return nil
 	}
 
@@ -394,6 +393,8 @@ func (m *mergeContext) deleteLocalBranch() error {
 	if err != nil {
 		return err
 	}
+
+	switchedToBranch := ""
 
 	ctx := context.Background()
 
@@ -424,14 +425,19 @@ func (m *mergeContext) deleteLocalBranch() error {
 			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
 		}
 
-		m.switchedToBranch = targetBranch
+		switchedToBranch = targetBranch
 	}
 
 	if err := m.opts.GitClient.DeleteLocalBranch(ctx, m.pr.HeadRefName); err != nil {
 		return fmt.Errorf("failed to delete local branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
 	}
 
-	return nil
+	switchedStatement := ""
+	if switchedToBranch != "" {
+		switchedStatement = fmt.Sprintf(" and switched to branch %s", m.cs.Cyan(switchedToBranch))
+	}
+
+	return m.infof("%s Deleted local branch %s%s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName), switchedStatement)
 }
 
 // Delete the remote branch if requested and if allowed.
@@ -451,11 +457,7 @@ func (m *mergeContext) deleteRemoteBranch() error {
 		}
 	}
 
-	branch := ""
-	if m.switchedToBranch != "" {
-		branch = fmt.Sprintf(" and switched to branch %s", m.cs.Cyan(m.switchedToBranch))
-	}
-	return m.infof("%s Deleted branch %s%s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName), branch)
+	return m.infof("%s Deleted remote branch %s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName))
 }
 
 // Add the Pull Request to a merge queue
@@ -577,11 +579,16 @@ func mergeMethodSurvey(p shared.Prompt, baseRepo *api.Repository) (PullRequestMe
 }
 
 func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool) (bool, error) {
-	if !crossRepoPR && !opts.IsDeleteBranchIndicated {
+	if !opts.IsDeleteBranchIndicated {
 		var message string
+
 		if opts.CanDeleteLocalBranch && localBranchExists {
-			message = "Delete the branch locally and on GitHub?"
-		} else {
+			if crossRepoPR {
+				message = "Delete the branch locally?"
+			} else {
+				message = "Delete the branch locally and on GitHub?"
+			}
+		} else if !crossRepoPR {
 			message = "Delete the branch on GitHub?"
 		}
 

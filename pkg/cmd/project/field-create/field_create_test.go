@@ -1,7 +1,6 @@
 package fieldcreate
 
 import (
-	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -79,8 +78,7 @@ func TestNewCmdCreateField(t *testing.T) {
 		},
 	}
 
-	os.Setenv("GH_TOKEN", "auth-token")
-	defer os.Unsetenv("GH_TOKEN")
+	t.Setenv("GH_TOKEN", "auth-token")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
