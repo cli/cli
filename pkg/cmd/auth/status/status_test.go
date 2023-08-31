@@ -160,7 +160,7 @@ func Test_statusRun(t *testing.T) {
 			wantErrOut: heredoc.Doc(`
 				joel.miller
 				  X joel.miller: authentication failed
-				  - The joel.miller token in GH_CONFIG_DIR/hosts.yml is no longer valid.
+				  - The joel.miller token in GH_CONFIG_DIR/hosts.yml is invalid.
 				  - To re-authenticate, run: gh auth login -h joel.miller
 				  - To forget about this host, run: gh auth logout -h joel.miller
 				

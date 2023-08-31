@@ -232,6 +232,70 @@ func Test_repoCreate(t *testing.T) {
 			wantRepo: "https://github.com/OWNER/REPO",
 		},
 		{
+			name:     "create personal repo from template repo, and disable wiki",
+			hostname: "github.com",
+			input: repoCreateInput{
+				Name:                 "gen-project",
+				Description:          "my generated project",
+				Visibility:           "private",
+				TemplateRepositoryID: "TPLID",
+				HasIssuesEnabled:     true,
+				HasWikiEnabled:       false,
+				IncludeAllBranches:   false,
+			},
+			stubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"id":"USERID"} } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation CloneTemplateRepository\b`),
+					httpmock.GraphQLMutation(
+						`{
+							"data": {
+								"cloneTemplateRepository": {
+									"repository": {
+										"id": "REPOID",
+										"name": "REPO",
+										"owner": {"login":"OWNER"},
+										"url": "the://URL"
+									}
+								}
+							}
+						}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, map[string]interface{}{
+								"name":               "gen-project",
+								"description":        "my generated project",
+								"visibility":         "PRIVATE",
+								"ownerId":            "USERID",
+								"repositoryId":       "TPLID",
+								"includeAllBranches": false,
+							}, inputs)
+						}),
+				)
+				r.Register(
+					httpmock.GraphQL(`mutation UpdateRepository\b`),
+					httpmock.GraphQLMutation(
+						`{
+							"data": {
+								"updateRepository": {
+									"repository": {
+										"id": "REPOID"
+									}
+								}
+							}
+						}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, map[string]interface{}{
+								"repositoryId":   "REPOID",
+								"hasWikiEnabled": false,
+							}, inputs)
+						}),
+				)
+			},
+			wantRepo: "https://github.com/OWNER/REPO",
+		},
+		{
 			name:     "create org repo from template repo",
 			hostname: "github.com",
 			input: repoCreateInput{
