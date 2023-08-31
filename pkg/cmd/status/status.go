@@ -299,9 +299,8 @@ func (s *StatusGetter) LoadNotifications() error {
 						switch httpStatusCode {
 						case 403:
 							s.addAuthError(httpErr.Message, factory.SSOURL())
-							return nil
 						case 404:
-							actual = "(could not fetch comment)"
+							return nil
 						default:
 							abortFetching()
 							return fmt.Errorf("could not fetch comment: %w", err)
