@@ -216,8 +216,10 @@ func checksRun(opts *ChecksOptions) error {
 		}
 	}
 
-	if counts.Failed+counts.Pending > 0 {
+	if counts.Failed > 0 {
 		return cmdutil.SilentError
+	} else if counts.Pending > 0 {
+		return cmdutil.PendingError
 	}
 
 	return nil
