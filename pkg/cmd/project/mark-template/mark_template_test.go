@@ -1,4 +1,4 @@
-package template
+package marktemplate
 
 import (
 	"testing"
@@ -11,11 +11,11 @@ import (
 	"gopkg.in/h2non/gock.v1"
 )
 
-func TestNewCmdTemplate(t *testing.T) {
+func TestNewCmdMarkTemplate(t *testing.T) {
 	tests := []struct {
 		name        string
 		cli         string
-		wants       templateOpts
+		wants       markTemplateOpts
 		wantsErr    bool
 		wantsErrMsg string
 	}{
@@ -28,21 +28,21 @@ func TestNewCmdTemplate(t *testing.T) {
 		{
 			name: "number",
 			cli:  "123",
-			wants: templateOpts{
+			wants: markTemplateOpts{
 				number: 123,
 			},
 		},
 		{
 			name: "owner",
 			cli:  "--owner monalisa",
-			wants: templateOpts{
+			wants: markTemplateOpts{
 				owner: "monalisa",
 			},
 		},
 		{
 			name: "undo",
 			cli:  "--undo",
-			wants: templateOpts{
+			wants: markTemplateOpts{
 				undo: true,
 			},
 		},
@@ -50,7 +50,7 @@ func TestNewCmdTemplate(t *testing.T) {
 		{
 			name: "json",
 			cli:  "--format json",
-			wants: templateOpts{
+			wants: markTemplateOpts{
 				format: "json",
 			},
 		},
@@ -68,8 +68,8 @@ func TestNewCmdTemplate(t *testing.T) {
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
 
-			var gotOpts templateOpts
-			cmd := NewCmdTemplate(f, func(config templateConfig) error {
+			var gotOpts markTemplateOpts
+			cmd := NewCmdMarkTemplate(f, func(config markTemplateConfig) error {
 				gotOpts = config.opts
 				return nil
 			})
@@ -164,8 +164,8 @@ func TestRunMarkTemplate_Org(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
-	config := templateConfig{
-		opts: templateOpts{
+	config := markTemplateConfig{
+		opts: markTemplateOpts{
 			owner:  "github",
 			number: 1,
 		},
@@ -173,7 +173,7 @@ func TestRunMarkTemplate_Org(t *testing.T) {
 		io:     ios,
 	}
 
-	err := runTemplate(config)
+	err := runMarkTemplate(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -256,8 +256,8 @@ func TestRunUnmarkTemplate_Org(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
-	config := templateConfig{
-		opts: templateOpts{
+	config := markTemplateConfig{
+		opts: markTemplateOpts{
 			owner:  "github",
 			number: 1,
 			undo:   true,
@@ -266,7 +266,7 @@ func TestRunUnmarkTemplate_Org(t *testing.T) {
 		io:     ios,
 	}
 
-	err := runTemplate(config)
+	err := runMarkTemplate(config)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
