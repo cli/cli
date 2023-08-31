@@ -287,8 +287,9 @@ func Test_repoCreate(t *testing.T) {
 						}`,
 						func(inputs map[string]interface{}) {
 							assert.Equal(t, map[string]interface{}{
-								"repositoryId":   "REPOID",
-								"hasWikiEnabled": false,
+								"repositoryId":     "REPOID",
+								"hasWikiEnabled":   false,
+								"hasIssuesEnabled": true,
 							}, inputs)
 						}),
 				)
