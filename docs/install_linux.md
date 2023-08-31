@@ -1,3 +1,7 @@
+![Internet_20230818_203602_2](https://github.com/cli/cli/assets/110314069/8a2ce601-a012-43b8-8270-3aad1e542fcc)
+[jpeg.md](https://github.com/cli/cli/files/12481457/jpeg.md)
+[jpeg.md](https://github.com/cli/cli/files/12481455/jpeg.md)
+[jpeg.md](https://github.com/cli/cli/files/12481452/jpeg.md)
 # Installing gh on Linux and BSD
 
 Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
