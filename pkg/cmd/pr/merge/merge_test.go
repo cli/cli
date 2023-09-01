@@ -654,8 +654,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
 		✓ Merged pull request #10 (Blueberries are a good fruit)
-		✓ Deleted local branch blueberries and switched to branch main
-		✓ Deleted remote branch blueberries
+		✓ Deleted branch blueberries and switched to branch main
 	`), output.Stderr())
 }
 
@@ -705,56 +704,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
 		✓ Merged pull request #10 (Blueberries are a good fruit)
-		✓ Deleted local branch blueberries and switched to branch fruit
-		✓ Deleted remote branch blueberries
-	`), output.Stderr())
-}
-
-func TestPrMerge_deleteBranch_onlyLocally(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	shared.RunCommandFinder(
-		"",
-		&api.PullRequest{
-			ID:                  "PR_10",
-			Number:              10,
-			State:               "OPEN",
-			Title:               "Blueberries are a good fruit",
-			HeadRefName:         "blueberries",
-			BaseRefName:         "main",
-			MergeStateStatus:    "CLEAN",
-			HeadRepositoryOwner: api.Owner{Login: "HEAD"}, // Not the same owner as the base repo
-		},
-		baseRepo("OWNER", "REPO", "main"),
-	)
-
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestMerge\b`),
-		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
-			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
-			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
-			assert.NotContains(t, input, "commitHeadline")
-		}))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
-	cs.Register(`git checkout main`, 0, "")
-	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
-	cs.Register(`git branch -D blueberries`, 0, "")
-	cs.Register(`git pull --ff-only`, 0, "")
-
-	output, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
-	if err != nil {
-		t.Fatalf("Got unexpected error running `pr merge` %s", err)
-	}
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, heredoc.Doc(`
-		✓ Merged pull request #10 (Blueberries are a good fruit)
-		✓ Deleted local branch blueberries and switched to branch main
+		✓ Deleted branch blueberries and switched to branch fruit
 	`), output.Stderr())
 }
 
@@ -804,8 +754,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
 		✓ Merged pull request #10 (Blueberries are a good fruit)
-		✓ Deleted local branch blueberries and switched to branch fruit
-		✓ Deleted remote branch blueberries
+		✓ Deleted branch blueberries and switched to branch fruit
 	`), output.Stderr())
 }
 
@@ -851,8 +800,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
 		✓ Merged pull request #10 (Blueberries are a good fruit)
-		✓ Deleted local branch blueberries
-		✓ Deleted remote branch blueberries
+		✓ Deleted branch blueberries
 	`), output.Stderr())
 }
 
@@ -1096,10 +1044,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	output, err := runCommand(http, pm, "blueberries", true, "pr merge 4")
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, heredoc.Doc(`
-		✓ Deleted local branch blueberries and switched to branch main
-		✓ Deleted remote branch blueberries
-	`), output.Stderr())
+	assert.Equal(t, "✓ Deleted branch blueberries and switched to branch main\n", output.Stderr())
 }
 
 func TestPrMerge_alreadyMerged_withMergeStrategy(t *testing.T) {
@@ -1170,7 +1115,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Deleted local branch \n✓ Deleted remote branch \n", output.Stderr())
+	assert.Equal(t, "✓ Deleted branch \n", output.Stderr())
 }
 
 func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {
@@ -1194,17 +1139,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	pm := &prompter.PrompterMock{
-		ConfirmFunc: func(p string, d bool) (bool, error) {
-			if p == "Pull request #4 was already merged. Delete the branch locally?" {
-				return d, nil
-			} else {
-				return false, prompter.NoSuchPromptErr(p)
-			}
-		},
-	}
-
-	output, err := runCommand(http, pm, "blueberries", true, "pr merge 4 --merge")
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge 4 --merge")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -1347,8 +1282,7 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
 		✓ Merged pull request #3 (It was the best of times)
-		✓ Deleted local branch blueberries and switched to branch main
-		✓ Deleted remote branch blueberries
+		✓ Deleted branch blueberries and switched to branch main
 	`), output.Stderr())
 }
 
