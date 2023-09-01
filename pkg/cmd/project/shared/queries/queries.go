@@ -616,6 +616,18 @@ func (p ProjectField) Type() string {
 	return p.TypeName
 }
 
+// DataType is the dataType of the project field.
+func (p ProjectField) DataType() string {
+	if p.TypeName == "ProjectV2Field" {
+		return p.Field.DataType
+	} else if p.TypeName == "ProjectV2IterationField" {
+		return p.IterationField.DataType
+	} else if p.TypeName == "ProjectV2SingleSelectField" {
+		return p.SingleSelectField.DataType
+	}
+	return ""
+}
+
 type SingleSelectFieldOptions struct {
 	ID   string
 	Name string

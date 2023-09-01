@@ -109,11 +109,12 @@ func printResults(config listConfig, fields []queries.ProjectField, login string
 		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for owner %s has no fields", config.opts.number, login))
 	}
 
-	config.tp.HeaderRow("Name", "Data type", "ID")
+	config.tp.HeaderRow("Name", "Field type", "Data type", "ID")
 
 	for _, f := range fields {
 		config.tp.AddField(f.Name())
 		config.tp.AddField(f.Type())
+		config.tp.AddField(f.DataType())
 		config.tp.AddField(f.ID(), tableprinter.WithTruncate(nil))
 		config.tp.EndRow()
 	}
