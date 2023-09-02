@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
@@ -432,25 +433,26 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error)
 	if run.Jobs != nil {
 		return run.Jobs, nil
 	}
-	var result JobsPayload
-	perPage := 100
-	v := url.Values{}
-	v.Set("per_page", fmt.Sprintf("%d", perPage))
 
-	// Fetch all the pages until total fetched jobs == result.TotalCount
-	maxPages := 10
-	for p := 1; p < maxPages; p++ {
-		v.Set("page", fmt.Sprintf("%d", p))
-		jobsPath := fmt.Sprintf("%s?%s", run.JobsURL, v.Encode())
-		if err := client.REST(repo.RepoHost(), "GET", jobsPath, nil, &result); err != nil {
+	v := url.Values{}
+	v.Set("per_page", "100")
+
+	jobsPath := fmt.Sprintf("%s?%s", run.JobsURL, v.Encode())
+
+	for jobsPath != "" {
+		var resp JobsPayload
+		var err error
+		jobsPath, err = client.RESTWithNext(repo.RepoHost(), http.MethodGet, jobsPath, nil, &resp)
+		if err != nil {
 			return run.Jobs, err
 		}
-		run.Jobs = append(run.Jobs, result.Jobs...)
-		if len(run.Jobs) >= result.TotalCount {
-			break
+
+		run.Jobs = append(run.Jobs, resp.Jobs...)
+		if len(run.Jobs) >= resp.TotalCount {
+			return run.Jobs, nil
 		}
 	}
-	return result.Jobs, nil
+	return run.Jobs, nil
 }
 
 func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, error) {
