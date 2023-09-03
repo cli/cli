@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -1278,9 +1279,12 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
 					httpmock.JSONResponse(shared.TestWorkflow))
 				reg.Register(
-					httpmock.REST("GET", "runs/3/jobs"),
-					httpmock.JSONResponse(shared.JobsPayload{TotalCount: len(jobs), Jobs: firstPage}))
-				// /runs/:runID/jobs endpoint should be called once more to fetch the remaining jobs
+					httpmock.QueryMatcher("GET", "runs/3/jobs", url.Values{"per_page": []string{"100"}}),
+					httpmock.WithHeader(
+						httpmock.JSONResponse(shared.JobsPayload{TotalCount: len(jobs), Jobs: firstPage}),
+						"Link",
+						`<https://api.github.com/runs/3/jobs?page=2>; rel="next", <https://api.github.com/runs/3/jobs?page=2>; rel="last"`),
+				)
 				reg.Register(
 					httpmock.REST("GET", "runs/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{TotalCount: len(jobs), Jobs: secondPage}))
