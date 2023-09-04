@@ -1260,18 +1260,6 @@ func TestViewRun(t *testing.T) {
 				),
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				jobs := []shared.Job{}
-				for i := 0; i < 115; i++ {
-					jobs = append(jobs, shared.Job{
-						ID:   int64(i),
-						Name: fmt.Sprintf("job %d", i),
-					})
-				}
-
-				limit := 100
-				firstPage := jobs[:limit]
-				secondPage := jobs[limit:]
-
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
@@ -1281,15 +1269,15 @@ func TestViewRun(t *testing.T) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "runs/3/jobs", url.Values{"per_page": []string{"100"}}),
 					httpmock.WithHeader(
-						httpmock.JSONResponse(shared.JobsPayload{TotalCount: len(jobs), Jobs: firstPage}),
+						httpmock.StringResponse(`{"jobs":[{},{},{}]}`),
 						"Link",
 						`<https://api.github.com/runs/3/jobs?page=2>; rel="next", <https://api.github.com/runs/3/jobs?page=2>; rel="last"`),
 				)
 				reg.Register(
 					httpmock.REST("GET", "runs/3/jobs"),
-					httpmock.JSONResponse(shared.JobsPayload{TotalCount: len(jobs), Jobs: secondPage}))
+					httpmock.StringResponse(`{"jobs":[{},{}]}`))
 			},
-			wantOut: "fetched 115 jobs\n",
+			wantOut: "fetched 5 jobs\n",
 		},
 	}
 
