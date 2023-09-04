@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -224,11 +225,7 @@ func fetchReleasePath(ctx context.Context, httpClient *http.Client, host string,
 	return &release, nil
 }
 
-type testingT interface {
-	Errorf(format string, args ...interface{})
-}
-
-func StubFetchRelease(t testingT, reg *httpmock.Registry, owner, repoName, tagName, responseBody string) {
+func StubFetchRelease(t *testing.T, reg *httpmock.Registry, owner, repoName, tagName, responseBody string) {
 	path := "repos/OWNER/REPO/releases/tags/v1.2.3"
 	if tagName == "" {
 		path = "repos/OWNER/REPO/releases/latest"
@@ -239,10 +236,12 @@ func StubFetchRelease(t testingT, reg *httpmock.Registry, owner, repoName, tagNa
 	if tagName != "" {
 		reg.Register(
 			httpmock.GraphQL(`query RepositoryReleaseByTag\b`),
-			httpmock.GraphQLQuery(`{ "data": { "repository": { "release": null }}}`, func(q string, vars map[string]interface{}) {
-				assert.Equal(t, owner, vars["owner"])
-				assert.Equal(t, repoName, vars["name"])
-				assert.Equal(t, tagName, vars["tagName"])
-			}))
+			httpmock.GraphQLQuery(`{ "data": { "repository": { "release": null }}}`,
+				func(q string, vars map[string]interface{}) {
+					assert.Equal(t, owner, vars["owner"])
+					assert.Equal(t, repoName, vars["name"])
+					assert.Equal(t, tagName, vars["tagName"])
+				}),
+		)
 	}
 }

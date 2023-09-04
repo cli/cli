@@ -1,0 +1,63 @@
+{
+	"id": 42,
+	"name": "Test Ruleset",
+	"target": "branch",
+	"source_type": "Repository",
+	"source": "my-owner/repo-name",
+	"enforcement": "active",
+	"current_user_can_bypass": "pull_requests_only",
+	"conditions": {
+		"ref_name": {
+			"exclude": [],
+			"include": [
+				"~ALL"
+			]
+		}
+	},
+	"rules": [
+		{
+			"type": "commit_message_pattern",
+			"parameters": {
+				"name": "",
+				"negate": false,
+				"pattern": "asdf",
+				"operator": "contains"
+			}
+		},
+		{
+			"type": "commit_author_email_pattern",
+			"parameters": {
+				"name": "",
+				"negate": false,
+				"pattern": "@example.com",
+				"operator": "ends_with"
+			}
+		},
+		{
+			"type": "creation"
+		}
+	],
+	"node_id": "RRS_lACqUmVwb3NpdG9yec4dwx_uzSNG",
+	"_links": {
+		"self": {
+			"href": "https://api.github.com/repos/my-owner/repo-name/rulesets/42"
+		},
+		"html": {
+			"href": "https://github.com/my-owner/repo-name/rules/42"
+		}
+	},
+	"created_at": "2023-05-01T13:53:37.185-04:00",
+	"updated_at": "2023-06-29T17:38:03.722-04:00",
+	"bypass_actors": [
+		{
+			"actor_id": 5,
+			"actor_type": "RepositoryRole",
+			"bypass_mode": "always"
+		},
+		{
+			"actor_id": 1,
+			"actor_type": "OrganizationAdmin",
+			"bypass_mode": "always"
+		}
+	]
+}

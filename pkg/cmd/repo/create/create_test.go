@@ -603,6 +603,35 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "https://github.com/OWNER/REPO\n",
 		},
 		{
+			name: "noninteractive clone with readme",
+			opts: &CreateOptions{
+				Interactive: false,
+				Name:        "ElliotAlderson",
+				Visibility:  "PRIVATE",
+				Clone:       true,
+				AddReadme:   true,
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "user/repos"),
+					httpmock.RESTPayload(200, "{\"name\":\"ElliotAlderson\", \"owner\":{\"login\": \"OWNER\"}, \"html_url\":\"https://github.com/OWNER/ElliotAlderson\"}",
+						func(payload map[string]interface{}) {
+							payload["name"] = "ElliotAlderson"
+							payload["owner"] = map[string]interface{}{"login": "OWNER"}
+							payload["auto_init"] = true
+							payload["private"] = true
+						},
+					),
+				)
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git clone https://github.com/OWNER/ElliotAlderson`, 128, "")
+				cs.Register(`git clone https://github.com/OWNER/ElliotAlderson`, 0, "")
+			},
+			wantStdout: "https://github.com/OWNER/ElliotAlderson\n",
+		},
+		{
 			name: "noninteractive create from template with retry",
 			opts: &CreateOptions{
 				Interactive: false,

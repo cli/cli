@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
@@ -17,7 +16,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/hashicorp/go-multierror"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
@@ -29,6 +27,7 @@ type SetOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   iprompter
 
 	RandomOverride func() io.Reader
 
@@ -44,11 +43,16 @@ type SetOptions struct {
 	Application     string
 }
 
+type iprompter interface {
+	Password(string) (string, error)
+}
+
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
 	opts := &SetOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -93,6 +97,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 			# Set multiple secrets imported from the ".env" file
 			$ gh secret set -f .env
+
+			# Set multiple secrets from stdin
+			$ gh secret set -f - < myfile.txt
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -372,11 +379,7 @@ func getBody(opts *SetOptions) ([]byte, error) {
 	}
 
 	if opts.IO.CanPrompt() {
-		var bodyInput string
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err := prompt.SurveyAskOne(&survey.Password{
-			Message: "Paste your secret",
-		}, &bodyInput)
+		bodyInput, err := opts.Prompter.Password("Paste your secret")
 		if err != nil {
 			return nil, err
 		}

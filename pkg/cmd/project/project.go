@@ -17,6 +17,7 @@ import (
 	cmdItemEdit "github.com/cli/cli/v2/pkg/cmd/project/item-edit"
 	cmdItemList "github.com/cli/cli/v2/pkg/cmd/project/item-list"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/project/list"
+	cmdTemplate "github.com/cli/cli/v2/pkg/cmd/project/template"
 	cmdView "github.com/cli/cli/v2/pkg/cmd/project/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -24,7 +25,7 @@ import (
 
 func NewCmdProject(f *cmdutil.Factory) *cobra.Command {
 	var cmd = &cobra.Command{
-		Use:   "project <command> [flags]",
+		Use:   "project <command>",
 		Short: "Work with GitHub Projects.",
 		Long:  "Work with GitHub Projects. Note that the token you are using must have 'project' scope, which is not set by default. You can verify your token scope by running 'gh auth status' and add the project scope by running 'gh auth refresh -s project'.",
 		Example: heredoc.Doc(`
@@ -43,6 +44,7 @@ func NewCmdProject(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
 	cmd.AddCommand(cmdEdit.NewCmdEdit(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
+	cmd.AddCommand(cmdTemplate.NewCmdTemplate(f, nil))
 
 	// items
 	cmd.AddCommand(cmdItemList.NewCmdList(f, nil))

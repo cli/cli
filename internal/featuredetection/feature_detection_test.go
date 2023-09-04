@@ -82,7 +82,7 @@ func TestPullRequestFeatures(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name:     "github.com with merge queue and status check counts by state",
+			name:     "github.com with all features",
 			hostname: "github.com",
 			queryResponse: map[string]string{
 				`query PullRequest_fields\b`: heredoc.Doc(`
@@ -104,10 +104,21 @@ func TestPullRequestFeatures(t *testing.T) {
 						}
 					}
 				}`),
+				`query PullRequest_fields2\b`: heredoc.Doc(`
+				{
+					"data": {
+						"WorkflowRun": {
+							"fields": [
+								{"name": "event"}
+							]
+						}
+					}
+				}`),
 			},
 			wantFeatures: PullRequestFeatures{
 				MergeQueue:                     true,
 				CheckRunAndStatusContextCounts: true,
+				CheckRunEvent:                  true,
 			},
 			wantErr: false,
 		},
@@ -131,15 +142,26 @@ func TestPullRequestFeatures(t *testing.T) {
 						}
 					}
 				}`),
+				`query PullRequest_fields2\b`: heredoc.Doc(`
+				{
+					"data": {
+						"WorkflowRun": {
+							"fields": [
+								{"name": "event"}
+							]
+						}
+					}
+				}`),
 			},
 			wantFeatures: PullRequestFeatures{
 				MergeQueue:                     false,
 				CheckRunAndStatusContextCounts: true,
+				CheckRunEvent:                  true,
 			},
 			wantErr: false,
 		},
 		{
-			name:     "GHE with merge queue and status check counts by state",
+			name:     "GHE with all features",
 			hostname: "git.my.org",
 			queryResponse: map[string]string{
 				`query PullRequest_fields\b`: heredoc.Doc(`
@@ -161,15 +183,26 @@ func TestPullRequestFeatures(t *testing.T) {
 						}
 					}
 				}`),
+				`query PullRequest_fields2\b`: heredoc.Doc(`
+				{
+					"data": {
+						"WorkflowRun": {
+							"fields": [
+								{"name": "event"}
+							]
+						}
+					}
+				}`),
 			},
 			wantFeatures: PullRequestFeatures{
 				MergeQueue:                     true,
 				CheckRunAndStatusContextCounts: true,
+				CheckRunEvent:                  true,
 			},
 			wantErr: false,
 		},
 		{
-			name:     "GHE without merge queue and status check counts by state",
+			name:     "GHE with no features",
 			hostname: "git.my.org",
 			queryResponse: map[string]string{
 				`query PullRequest_fields\b`: heredoc.Doc(`
@@ -183,10 +216,19 @@ func TestPullRequestFeatures(t *testing.T) {
 						}
 					}
 				}`),
+				`query PullRequest_fields2\b`: heredoc.Doc(`
+				{
+					"data": {
+						"WorkflowRun": {
+							"fields": []
+						}
+					}
+				}`),
 			},
 			wantFeatures: PullRequestFeatures{
 				MergeQueue:                     false,
 				CheckRunAndStatusContextCounts: false,
+				CheckRunEvent:                  false,
 			},
 			wantErr: false,
 		},

@@ -1,19 +1,22 @@
 package shared
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
+	"golang.org/x/text/transform"
 )
 
 const (
@@ -21,6 +24,10 @@ const (
 	DisabledManually   WorkflowState = "disabled_manually"
 	DisabledInactivity WorkflowState = "disabled_inactivity"
 )
+
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
 
 type WorkflowState string
 
@@ -41,6 +48,24 @@ func (w *Workflow) Disabled() bool {
 
 func (w *Workflow) Base() string {
 	return path.Base(w.Path)
+}
+
+func (w *Workflow) ExportData(fields []string) map[string]interface{} {
+	fieldByName := func(v reflect.Value, field string) reflect.Value {
+		return v.FieldByNameFunc(func(s string) bool {
+			return strings.EqualFold(field, s)
+		})
+	}
+	v := reflect.ValueOf(w).Elem()
+	data := map[string]interface{}{}
+	for _, f := range fields {
+		switch f {
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+	return data
 }
 
 func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workflow, error) {
@@ -86,7 +111,7 @@ type FilteredAllError struct {
 	error
 }
 
-func SelectWorkflow(workflows []Workflow, promptMsg string, states []WorkflowState) (*Workflow, error) {
+func selectWorkflow(p iprompter, workflows []Workflow, promptMsg string, states []WorkflowState) (*Workflow, error) {
 	filtered := []Workflow{}
 	candidates := []string{}
 	for _, workflow := range workflows {
@@ -103,14 +128,7 @@ func SelectWorkflow(workflows []Workflow, promptMsg string, states []WorkflowSta
 		return nil, FilteredAllError{errors.New("")}
 	}
 
-	var selected int
-
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message:  promptMsg,
-		Options:  candidates,
-		PageSize: 15,
-	}, &selected)
+	selected, err := p.Select(promptMsg, "", candidates)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +196,7 @@ func getWorkflowsByName(client *api.Client, repo ghrepo.Interface, name string, 
 	return filtered, nil
 }
 
-func ResolveWorkflow(io *iostreams.IOStreams, client *api.Client, repo ghrepo.Interface, prompt bool, workflowSelector string, states []WorkflowState) (*Workflow, error) {
+func ResolveWorkflow(p iprompter, io *iostreams.IOStreams, client *api.Client, repo ghrepo.Interface, prompt bool, workflowSelector string, states []WorkflowState) (*Workflow, error) {
 	if prompt {
 		workflows, err := GetWorkflows(client, repo, 0)
 		if len(workflows) == 0 {
@@ -194,7 +212,7 @@ func ResolveWorkflow(io *iostreams.IOStreams, client *api.Client, repo ghrepo.In
 			return nil, fmt.Errorf("could not fetch workflows for %s: %w", ghrepo.FullName(repo), err)
 		}
 
-		return SelectWorkflow(workflows, "Select a workflow", states)
+		return selectWorkflow(p, workflows, "Select a workflow", states)
 	}
 
 	workflows, err := FindWorkflow(client, repo, workflowSelector, states)
@@ -218,7 +236,7 @@ func ResolveWorkflow(io *iostreams.IOStreams, client *api.Client, repo ghrepo.In
 		return nil, errors.New(errMsg)
 	}
 
-	return SelectWorkflow(workflows, "Which workflow do you mean?", states)
+	return selectWorkflow(p, workflows, "Which workflow do you mean?", states)
 }
 
 func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Workflow, ref string) ([]byte, error) {
@@ -243,5 +261,10 @@ func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Work
 		return nil, fmt.Errorf("failed to decode workflow file: %w", err)
 	}
 
-	return decoded, nil
+	sanitized, err := io.ReadAll(transform.NewReader(bytes.NewReader(decoded), &asciisanitizer.Sanitizer{}))
+	if err != nil {
+		return nil, err
+	}
+
+	return sanitized, nil
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"golang.org/x/sync/errgroup"
 )
 
 type Detector interface {
@@ -27,11 +28,13 @@ type PullRequestFeatures struct {
 	// the checkRunCount, checkRunCountsByState, statusContextCount and stausContextCountsByState
 	// fields on the StatusCheckRollupContextConnection
 	CheckRunAndStatusContextCounts bool
+	CheckRunEvent                  bool
 }
 
 var allPullRequestFeatures = PullRequestFeatures{
 	MergeQueue:                     true,
 	CheckRunAndStatusContextCounts: true,
+	CheckRunEvent:                  true,
 }
 
 type RepositoryFeatures struct {
@@ -111,8 +114,26 @@ func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
 		} `graphql:"StatusCheckRollupContextConnection: __type(name: \"StatusCheckRollupContextConnection\")"`
 	}
 
+	// Break feature detection down into two separate queries because the platform
+	// only supports two `__type` expressions in one query.
+	var pullRequestFeatureDetection2 struct {
+		WorkflowRun struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"WorkflowRun: __type(name: \"WorkflowRun\")"`
+	}
+
 	gql := api.NewClientFromHTTP(d.httpClient)
-	if err := gql.Query(d.host, "PullRequest_fields", &pullRequestFeatureDetection, nil); err != nil {
+
+	var wg errgroup.Group
+	wg.Go(func() error {
+		return gql.Query(d.host, "PullRequest_fields", &pullRequestFeatureDetection, nil)
+	})
+	wg.Go(func() error {
+		return gql.Query(d.host, "PullRequest_fields2", &pullRequestFeatureDetection2, nil)
+	})
+	if err := wg.Wait(); err != nil {
 		return PullRequestFeatures{}, err
 	}
 
@@ -129,6 +150,12 @@ func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
 		// were all introduced in the same version of the API.
 		if field.Name == "checkRunCount" {
 			features.CheckRunAndStatusContextCounts = true
+		}
+	}
+
+	for _, field := range pullRequestFeatureDetection2.WorkflowRun.Fields {
+		if field.Name == "event" {
+			features.CheckRunEvent = true
 		}
 	}
 

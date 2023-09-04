@@ -24,6 +24,7 @@ type EditOptions struct {
 	Surveyor        Surveyor
 	Fetcher         EditableOptionsFetcher
 	EditorRetriever EditorRetriever
+	Prompter        shared.EditPrompter
 
 	SelectorArg string
 	Interactive bool
@@ -35,9 +36,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	opts := &EditOptions{
 		IO:              f.IOStreams,
 		HttpClient:      f.HttpClient,
-		Surveyor:        surveyor{},
+		Surveyor:        surveyor{P: f.Prompter},
 		Fetcher:         fetcher{},
 		EditorRetriever: editorRetriever{config: f.Config},
+		Prompter:        f.Prompter,
 	}
 
 	var bodyFile string
@@ -260,6 +262,10 @@ func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, id
 	if err != nil {
 		return err
 	}
+	if (userIds == nil || len(*userIds) == 0) &&
+		(teamIds == nil || len(*teamIds) == 0) {
+		return nil
+	}
 	union := githubv4.Boolean(false)
 	reviewsRequestParams := githubv4.RequestReviewsInput{
 		PullRequestID: id,
@@ -276,14 +282,16 @@ type Surveyor interface {
 	EditFields(*shared.Editable, string) error
 }
 
-type surveyor struct{}
+type surveyor struct {
+	P shared.EditPrompter
+}
 
 func (s surveyor) FieldsToEdit(editable *shared.Editable) error {
-	return shared.FieldsToEditSurvey(editable)
+	return shared.FieldsToEditSurvey(s.P, editable)
 }
 
 func (s surveyor) EditFields(editable *shared.Editable, editorCmd string) error {
-	return shared.EditFieldsSurvey(editable, editorCmd)
+	return shared.EditFieldsSurvey(s.P, editable, editorCmd)
 }
 
 type EditableOptionsFetcher interface {

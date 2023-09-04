@@ -23,6 +23,7 @@ type HTTPClientOptions struct {
 	EnableCache       bool
 	Log               io.Writer
 	LogColorize       bool
+	LogVerboseHTTP    bool
 	SkipAcceptHeaders bool
 }
 
@@ -35,10 +36,15 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		LogIgnoreEnv: true,
 	}
 
-	if debugEnabled, debugValue := utils.IsDebugEnabled(); debugEnabled {
+	debugEnabled, debugValue := utils.IsDebugEnabled()
+	if strings.Contains(debugValue, "api") {
+		opts.LogVerboseHTTP = true
+	}
+
+	if opts.LogVerboseHTTP || debugEnabled {
 		clientOpts.Log = opts.Log
 		clientOpts.LogColorize = opts.LogColorize
-		clientOpts.LogVerboseHTTP = strings.Contains(debugValue, "api")
+		clientOpts.LogVerboseHTTP = opts.LogVerboseHTTP
 	}
 
 	headers := map[string]string{
@@ -62,8 +68,6 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	if opts.Config != nil {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
 	}
-
-	client.Transport = AddASCIISanitizer(client.Transport)
 
 	return client, nil
 }
@@ -91,9 +95,17 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
 		if req.Header.Get(authorization) == "" {
-			hostname := ghinstance.NormalizeHostname(getHost(req))
-			if token, _ := cfg.Token(hostname); token != "" {
-				req.Header.Set(authorization, fmt.Sprintf("token %s", token))
+			var redirectHostnameChange bool
+			if req.Response != nil && req.Response.Request != nil {
+				redirectHostnameChange = getHost(req) != getHost(req.Response.Request)
+			}
+			// Only set header if an initial request or redirect request to the same host as the initial request.
+			// If the host has changed during a redirect do not add the authentication token header.
+			if !redirectHostnameChange {
+				hostname := ghinstance.NormalizeHostname(getHost(req))
+				if token, _ := cfg.Token(hostname); token != "" {
+					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
+				}
 			}
 		}
 		return rt.RoundTrip(req)
@@ -128,5 +140,5 @@ func getHost(r *http.Request) string {
 	if r.Host != "" {
 		return r.Host
 	}
-	return r.URL.Hostname()
+	return r.URL.Host
 }
