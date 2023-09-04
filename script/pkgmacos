@@ -44,7 +44,7 @@ amd64_bin="dist/macos_darwin_amd64_v1$bin_path"
 payload_root="pkg_payload"
 payload_local_bin="${payload_root}/usr/local/bin"
 payload_zsh_site_functions="${payload_root}/usr/local/share/zsh/site-functions"
-payload_man1="${pkg_payload}/usr/local/share/man/man1"
+payload_man1="${payload_root}/usr/local/share/man/man1"
 
 merge_binaries() {
     lipo -create -output "${payload_local_bin}/gh" "$arm64_bin" "$amd64_bin"
@@ -57,7 +57,7 @@ build_pkg() {
     mkdir -p "${payload_zsh_site_functions}"
 
     # copy man pages
-    for file in "./share/man/man1/gh*.1"; do
+    for file in ./share/man/man1/gh*.1; do
         cp "$file" "${payload_man1}"
     done
     # Include only Zsh completions,
@@ -78,6 +78,7 @@ build_pkg() {
     # setup resources
     mkdir "build/macOS/resources"
     cp "LICENSE" "build/macOS/resources"
+    touch .gi
 
     # build distribution
     if [ -n "$APPLE_DEVELOPER_INSTALLER_ID" ]; then
