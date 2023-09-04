@@ -448,9 +448,6 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error)
 		}
 
 		run.Jobs = append(run.Jobs, resp.Jobs...)
-		if len(run.Jobs) >= resp.TotalCount {
-			return run.Jobs, nil
-		}
 	}
 	return run.Jobs, nil
 }
