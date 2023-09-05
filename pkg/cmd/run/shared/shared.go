@@ -434,17 +434,17 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error)
 		return run.Jobs, nil
 	}
 
-	v := url.Values{}
-	v.Set("per_page", "100")
-
-	jobsPath := fmt.Sprintf("%s?%s", run.JobsURL, v.Encode())
+	query := url.Values{}
+	query.Set("per_page", "100")
+	jobsPath := fmt.Sprintf("%s?%s", run.JobsURL, query.Encode())
 
 	for jobsPath != "" {
 		var resp JobsPayload
 		var err error
 		jobsPath, err = client.RESTWithNext(repo.RepoHost(), http.MethodGet, jobsPath, nil, &resp)
 		if err != nil {
-			return run.Jobs, err
+			run.Jobs = nil
+			return nil, err
 		}
 
 		run.Jobs = append(run.Jobs, resp.Jobs...)
