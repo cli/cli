@@ -17,7 +17,7 @@ import (
 	cmdItemEdit "github.com/cli/cli/v2/pkg/cmd/project/item-edit"
 	cmdItemList "github.com/cli/cli/v2/pkg/cmd/project/item-list"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/project/list"
-	cmdTemplate "github.com/cli/cli/v2/pkg/cmd/project/template"
+	cmdTemplate "github.com/cli/cli/v2/pkg/cmd/project/mark-template"
 	cmdView "github.com/cli/cli/v2/pkg/cmd/project/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -44,7 +44,7 @@ func NewCmdProject(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
 	cmd.AddCommand(cmdEdit.NewCmdEdit(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
-	cmd.AddCommand(cmdTemplate.NewCmdTemplate(f, nil))
+	cmd.AddCommand(cmdTemplate.NewCmdMarkTemplate(f, nil))
 
 	// items
 	cmd.AddCommand(cmdItemList.NewCmdList(f, nil))
