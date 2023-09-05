@@ -1,4 +1,4 @@
-package template
+package marktemplate
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type templateOpts struct {
+type markTemplateOpts struct {
 	owner     string
 	undo      bool
 	number    int32
@@ -22,9 +22,9 @@ type templateOpts struct {
 	format    string
 }
 
-type templateConfig struct {
+type markTemplateConfig struct {
 	client *queries.Client
-	opts   templateOpts
+	opts   markTemplateOpts
 	io     *iostreams.IOStreams
 }
 
@@ -39,17 +39,17 @@ type unmarkProjectTemplateMutation struct {
 	} `graphql:"unmarkProjectV2AsTemplate(input:$input)"`
 }
 
-func NewCmdTemplate(f *cmdutil.Factory, runF func(config templateConfig) error) *cobra.Command {
-	opts := templateOpts{}
-	templateCmd := &cobra.Command{
+func NewCmdMarkTemplate(f *cmdutil.Factory, runF func(config markTemplateConfig) error) *cobra.Command {
+	opts := markTemplateOpts{}
+	markTemplateCmd := &cobra.Command{
 		Short: "Mark a project as a template",
-		Use:   "template [<number>]",
+		Use:   "mark-template [<number>]",
 		Example: heredoc.Doc(`
 			# mark the github org's project "1" as a template
-			gh project template 1 --owner "github"
+			gh project mark-template 1 --owner "github"
 
 			# unmark the github org's project "1" as a template
-			gh project template 1 --owner "github" --undo
+			gh project mark-template 1 --owner "github" --undo
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -66,7 +66,7 @@ func NewCmdTemplate(f *cmdutil.Factory, runF func(config templateConfig) error) 
 				opts.number = int32(num)
 			}
 
-			config := templateConfig{
+			config := markTemplateConfig{
 				client: client,
 				opts:   opts,
 				io:     f.IOStreams,
@@ -76,18 +76,18 @@ func NewCmdTemplate(f *cmdutil.Factory, runF func(config templateConfig) error) 
 			if runF != nil {
 				return runF(config)
 			}
-			return runTemplate(config)
+			return runMarkTemplate(config)
 		},
 	}
 
-	templateCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the org owner.")
-	templateCmd.Flags().BoolVar(&opts.undo, "undo", false, "Unmark the project as a template.")
-	cmdutil.StringEnumFlag(templateCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	markTemplateCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the org owner.")
+	markTemplateCmd.Flags().BoolVar(&opts.undo, "undo", false, "Unmark the project as a template.")
+	cmdutil.StringEnumFlag(markTemplateCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
 
-	return templateCmd
+	return markTemplateCmd
 }
 
-func runTemplate(config templateConfig) error {
+func runMarkTemplate(config markTemplateConfig) error {
 	canPrompt := config.io.CanPrompt()
 	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
@@ -127,7 +127,7 @@ func runTemplate(config templateConfig) error {
 	return printResults(config, query.TemplateProject.Project)
 }
 
-func markTemplateArgs(config templateConfig) (*markProjectTemplateMutation, map[string]interface{}) {
+func markTemplateArgs(config markTemplateConfig) (*markProjectTemplateMutation, map[string]interface{}) {
 	return &markProjectTemplateMutation{}, map[string]interface{}{
 		"input": githubv4.MarkProjectV2AsTemplateInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
@@ -139,7 +139,7 @@ func markTemplateArgs(config templateConfig) (*markProjectTemplateMutation, map[
 	}
 }
 
-func unmarkTemplateArgs(config templateConfig) (*unmarkProjectTemplateMutation, map[string]interface{}) {
+func unmarkTemplateArgs(config markTemplateConfig) (*unmarkProjectTemplateMutation, map[string]interface{}) {
 	return &unmarkProjectTemplateMutation{}, map[string]interface{}{
 		"input": githubv4.UnmarkProjectV2AsTemplateInput{
 			ProjectID: githubv4.ID(config.opts.projectID),
@@ -151,7 +151,7 @@ func unmarkTemplateArgs(config templateConfig) (*unmarkProjectTemplateMutation, 
 	}
 }
 
-func printResults(config templateConfig, project queries.Project) error {
+func printResults(config markTemplateConfig, project queries.Project) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
@@ -165,7 +165,7 @@ func printResults(config templateConfig, project queries.Project) error {
 	return err
 }
 
-func printJSON(config templateConfig, project queries.Project) error {
+func printJSON(config markTemplateConfig, project queries.Project) error {
 	b, err := format.JSONProject(project)
 	if err != nil {
 		return err
