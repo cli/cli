@@ -1,0 +1,22 @@
+name: homebrewbump
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  homebrewbump:
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bump homebrew-core formula
+        uses: mislav/bump-homebrew-formula-action@v2
+        with:
+          formula-name: gh
+          formula-path: Formula/g/gh.rb
+          tag-name: v2.34.0
+          push-to: cli/homebrew-core
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_PR_PAT }}
