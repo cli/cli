@@ -342,6 +342,6 @@ jobs:
           formula-name: gh
           formula-path: Formula/g/gh.rb
           tag-name: ${{ inputs.tag_name }}
-          push-to: cli/homebrew-core
+          push-to: williammartin/homebrew-core
         env:
           COMMITTER_TOKEN: ${{ secrets.HOMEBREW_PR_PAT }}
