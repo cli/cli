@@ -5,6 +5,7 @@ import (
 	"time"
 
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 var TestRunStartTime, _ = time.Parse("2006-01-02 15:04:05", "2021-02-23 04:51:00")
@@ -121,4 +122,21 @@ var FailedJobAnnotations []Annotation = []Annotation{
 var TestWorkflow workflowShared.Workflow = workflowShared.Workflow{
 	Name: "CI",
 	ID:   123,
+}
+
+type TestExporter struct {
+	fields       []string
+	writeHandler func(io *iostreams.IOStreams, data interface{}) error
+}
+
+func MakeTestExporter(fields []string, wh func(io *iostreams.IOStreams, data interface{}) error) *TestExporter {
+	return &TestExporter{fields: fields, writeHandler: wh}
+}
+
+func (t *TestExporter) Fields() []string {
+	return t.fields
+}
+
+func (t *TestExporter) Write(io *iostreams.IOStreams, data interface{}) error {
+	return t.writeHandler(io, data)
 }
