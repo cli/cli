@@ -16,48 +16,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_NewCmdList(t *testing.T) {
+func TestNewCmdList(t *testing.T) {
 	tests := []struct {
 		name     string
 		cli      string
-		tty      bool
 		wants    ListOptions
 		wantsErr bool
 	}{
 		{
-			name: "blank tty",
-			tty:  true,
+			name: "no arguments",
 			wants: ListOptions{
 				Limit: defaultLimit,
 			},
 		},
 		{
-			name: "blank nontty",
-			wants: ListOptions{
-				Limit:       defaultLimit,
-				PlainOutput: true,
-			},
-		},
-		{
-			name: "all",
+			name: "all flag",
 			cli:  "--all",
 			wants: ListOptions{
-				Limit:       defaultLimit,
-				PlainOutput: true,
-				All:         true,
+				Limit: defaultLimit,
+				All:   true,
 			},
 		},
 		{
-			name: "limit",
+			name: "limit flag",
 			cli:  "--limit 100",
 			wants: ListOptions{
-				Limit:       100,
-				PlainOutput: true,
+				Limit: 100,
 			},
 		},
 		{
-			name:     "bad limit",
-			cli:      "--limit hi",
+			name:     "invalid limit flag",
+			cli:      "--limit 0",
 			wantsErr: true,
 		},
 	}
@@ -65,8 +54,6 @@ func Test_NewCmdList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
-			ios.SetStdinTTY(tt.tty)
-			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
 				IOStreams: ios,
@@ -80,6 +67,7 @@ func Test_NewCmdList(t *testing.T) {
 				gotOpts = opts
 				return nil
 			})
+
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
 			cmd.SetOut(io.Discard)
@@ -91,8 +79,9 @@ func Test_NewCmdList(t *testing.T) {
 				return
 			}
 
+			assert.NoError(t, err)
 			assert.Equal(t, tt.wants.Limit, gotOpts.Limit)
-			assert.Equal(t, tt.wants.PlainOutput, gotOpts.PlainOutput)
+			assert.Equal(t, tt.wants.All, gotOpts.All)
 		})
 	}
 }
@@ -127,23 +116,52 @@ func TestListRun(t *testing.T) {
 		tty        bool
 	}{
 		{
-			name: "blank tty",
-			tty:  true,
+			name: "lists worrkflows nontty",
 			opts: &ListOptions{
 				Limit: defaultLimit,
-			},
-			wantOut: "Go      active  707\nLinter  active  666\n",
-		},
-		{
-			name: "blank nontty",
-			opts: &ListOptions{
-				Limit:       defaultLimit,
-				PlainOutput: true,
 			},
 			wantOut: "Go\tactive\t707\nLinter\tactive\t666\n",
 		},
 		{
-			name: "pagination",
+			name: "lists workflows tty",
+			opts: &ListOptions{
+				Limit: defaultLimit,
+			},
+			tty:     true,
+			wantOut: "NAME    STATE   ID\nGo      active  707\nLinter  active  666\n",
+		},
+		{
+			name: "lists workflows with limit tty",
+			opts: &ListOptions{
+				Limit: 1,
+			},
+			tty:     true,
+			wantOut: "NAME  STATE   ID\nGo    active  707\n",
+		},
+		{
+			name: "show all workflows tty",
+			opts: &ListOptions{
+				Limit: defaultLimit,
+				All:   true,
+			},
+			tty:     true,
+			wantOut: "NAME     STATE              ID\nGo       active             707\nLinter   active             666\nRelease  disabled_manually  451\n",
+		},
+		{
+			name: "no results nontty",
+			opts: &ListOptions{
+				Limit: defaultLimit,
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{}),
+				)
+			},
+			wantErr: true,
+		},
+		{
+			name: "paginates workflows nontty",
 			opts: &ListOptions{
 				Limit: 101,
 			},
@@ -170,38 +188,6 @@ func TestListRun(t *testing.T) {
 			},
 			wantOut: longOutput,
 		},
-		{
-			name: "no results",
-			opts: &ListOptions{
-				Limit:       defaultLimit,
-				PlainOutput: true,
-			},
-			stubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
-					httpmock.JSONResponse(shared.WorkflowsPayload{}),
-				)
-			},
-			wantErr: true,
-		},
-		{
-			name: "show all workflows",
-			opts: &ListOptions{
-				Limit: defaultLimit,
-				All:   true,
-			},
-			tty:     true,
-			wantOut: "Go       active             707\nLinter   active             666\nRelease  disabled_manually  451\n",
-		},
-		{
-			name: "respects limit",
-			opts: &ListOptions{
-				Limit: 1,
-				All:   true,
-			},
-			tty:     true,
-			wantOut: "Go  active  707\n",
-		},
 	}
 
 	for _, tt := range tests {
@@ -224,6 +210,7 @@ func TestListRun(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdoutTTY(tt.tty)
 			tt.opts.IO = ios
+
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
