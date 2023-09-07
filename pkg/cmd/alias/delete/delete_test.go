@@ -11,147 +11,91 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestAliasDelete(t *testing.T) {
-	_ = config.StubWriteConfig(t)
-
+func TestNewCmdDelete(t *testing.T) {
 	tests := []struct {
-		name       string
-		config     string
-		cli        string
-		isTTY      bool
-		wantStdout string
-		wantStderr string
-		wantErr    string
+		name    string
+		input   string
+		output  DeleteOptions
+		wantErr bool
+		errMsg  string
 	}{
 		{
-			name:       "no aliases",
-			config:     "",
-			cli:        "co",
-			isTTY:      true,
-			wantStdout: "",
-			wantStderr: "",
-			wantErr:    "no such alias co",
+			name:    "no arguments",
+			input:   "",
+			wantErr: true,
+			errMsg:  "specify an alias to delete or `--all`",
 		},
 		{
-			name: "delete one",
-			config: heredoc.Doc(`
-				aliases:
-				  il: issue list
-				  co: pr checkout
-			`),
-			cli:        "co",
-			isTTY:      true,
-			wantStdout: "",
-			wantStderr: "✓ Deleted alias co; was pr checkout\n",
+			name:  "specified alias",
+			input: "co",
+			output: DeleteOptions{
+				Name: "co",
+			},
 		},
 		{
-			name: "delete all aliases",
-			config: heredoc.Doc(`
-				aliases:
-				  il: issue list
-				  co: pr checkout
-			`),
-			cli:        "--all",
-			isTTY:      true,
-			wantStdout: "",
-			wantStderr: "✓ Deleted alias il; was issue list\n✓ Deleted alias co; was pr checkout\n",
+			name:  "all flag",
+			input: "--all",
+			output: DeleteOptions{
+				All: true,
+			},
 		},
 		{
-			name: "delete too many arguments error",
-			config: heredoc.Doc(`
-				aliases:
-				  il: issue list
-				  co: pr checkout
-			`),
-			cli:        "il co",
-			isTTY:      true,
-			wantStdout: "",
-			wantStderr: "",
-			wantErr:    "too many arguments",
+			name:    "specified alias and all flag",
+			input:   "co --all",
+			wantErr: true,
+			errMsg:  "cannot use `--all` with alias name",
 		},
 		{
-			name: "delete --all with alias name error",
-			config: heredoc.Doc(`
-				aliases:
-				  il: issue list
-				  co: pr checkout
-			`),
-			cli:        "il --all",
-			isTTY:      true,
-			wantStdout: "",
-			wantStderr: "",
-			wantErr:    "cannot use `--all` with alias name",
-		},
-		{
-			name: "delete without specification error",
-			config: heredoc.Doc(`
-				aliases:
-				  il: issue list
-				  co: pr checkout
-			`),
-			cli:        "",
-			isTTY:      true,
-			wantStdout: "",
-			wantStderr: "",
-			wantErr:    "specify an alias to delete or `--all`",
+			name:    "too many arguments",
+			input:   "il co",
+			wantErr: true,
+			errMsg:  "accepts at most 1 arg(s), received 2",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config.NewFromString(tt.config)
-
-			ios, _, stdout, stderr := iostreams.Test()
-			ios.SetStdoutTTY(tt.isTTY)
-			ios.SetStdinTTY(tt.isTTY)
-			ios.SetStderrTTY(tt.isTTY)
-
-			factory := &cmdutil.Factory{
+			ios, _, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{
 				IOStreams: ios,
-				Config: func() (config.Config, error) {
-					return cfg, nil
-				},
 			}
-
-			cmd := NewCmdDelete(factory, nil)
-
-			argv, err := shlex.Split(tt.cli)
-			require.NoError(t, err)
+			argv, err := shlex.Split(tt.input)
+			assert.NoError(t, err)
+			var gotOpts *DeleteOptions
+			cmd := NewCmdDelete(f, func(opts *DeleteOptions) error {
+				gotOpts = opts
+				return nil
+			})
 			cmd.SetArgs(argv)
-
 			cmd.SetIn(&bytes.Buffer{})
 			cmd.SetOut(io.Discard)
 			cmd.SetErr(io.Discard)
-
 			_, err = cmd.ExecuteC()
-			if tt.wantErr != "" {
-				assert.EqualError(t, err, tt.wantErr)
+			if tt.wantErr {
+				assert.EqualError(t, err, tt.errMsg)
 				return
 			}
-			require.NoError(t, err)
-
-			assert.Equal(t, tt.wantStdout, stdout.String())
-			assert.Equal(t, tt.wantStderr, stderr.String())
+			assert.NoError(t, err)
+			assert.Equal(t, tt.output.Name, gotOpts.Name)
+			assert.Equal(t, tt.output.All, gotOpts.All)
 		})
 	}
 }
 
 func TestDeleteRun(t *testing.T) {
 	tests := []struct {
-		name               string
-		config             string
-		isTTY              bool
-		opts               *DeleteOptions
-		wantWriteCallCount int
-		wantAliases        map[string]string
-		wantStdout         string
-		wantStderr         string
-		wantErrMsg         string
+		name        string
+		config      string
+		isTTY       bool
+		opts        *DeleteOptions
+		wantAliases map[string]string
+		wantStdout  string
+		wantStderr  string
+		wantErrMsg  string
 	}{
 		{
-			name: "delete one alias",
+			name: "delete alias",
 			config: heredoc.Doc(`
 				aliases:
 				  il: issue list
@@ -165,13 +109,10 @@ func TestDeleteRun(t *testing.T) {
 			wantAliases: map[string]string{
 				"il": "issue list",
 			},
-			wantWriteCallCount: 1,
-			wantStdout:         "",
-			wantStderr:         "✓ Deleted alias co; was pr checkout\n",
-			wantErrMsg:         "",
+			wantStderr: "✓ Deleted alias co; was pr checkout\n",
 		},
 		{
-			name: "delete all aliases with all flag",
+			name: "delete all aliases",
 			config: heredoc.Doc(`
 				aliases:
 				  il: issue list
@@ -181,16 +122,39 @@ func TestDeleteRun(t *testing.T) {
 			opts: &DeleteOptions{
 				All: true,
 			},
-			wantWriteCallCount: 2,
-			wantAliases:        map[string]string{},
-			wantStdout:         "",
-			wantStderr:         "✓ Deleted alias il; was issue list\n✓ Deleted alias co; was pr checkout\n",
-			wantErrMsg:         "",
+			wantAliases: map[string]string{},
+			wantStderr:  "✓ Deleted alias co; was pr checkout\n✓ Deleted alias il; was issue list\n",
+		},
+		{
+			name: "delete alias that does not exist",
+			config: heredoc.Doc(`
+				aliases:
+				  il: issue list
+				  co: pr checkout
+			`),
+			isTTY: true,
+			opts: &DeleteOptions{
+				Name: "unknown",
+			},
+			wantAliases: map[string]string{
+				"il": "issue list",
+				"co": "pr checkout",
+			},
+			wantErrMsg: "no such alias unknown",
+		},
+		{
+			name:  "delete all aliases when none exist",
+			isTTY: true,
+			opts: &DeleteOptions{
+				All: true,
+			},
+			wantAliases: map[string]string{},
+			wantErrMsg:  "no aliases configured",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, _, _ := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdinTTY(tt.isTTY)
 			ios.SetStdoutTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
@@ -209,18 +173,12 @@ func TestDeleteRun(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				writeCalls := cfg.WriteCalls()
-				assert.Equal(t, tt.wantWriteCallCount, len(writeCalls))
+				assert.Equal(t, 1, len(writeCalls))
 			}
 
-			aliasCfg := cfg.Aliases()
-			aliases := aliasCfg.All()
-			for name, expansion := range aliases {
-				wantExpansion, ok := tt.wantAliases[name]
-				if !ok {
-					t.Errorf("expected not to have alias '%s', but it was registered", name)
-				}
-				assert.Equal(t, wantExpansion, expansion)
-			}
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
+			assert.Equal(t, tt.wantAliases, cfg.Aliases().All())
 		})
 	}
 }
