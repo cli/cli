@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
@@ -21,11 +20,12 @@ type iprompter interface {
 }
 
 type DeleteOptions struct {
-	HttpClient func() (*http.Client, error)
-	GitClient  *git.Client
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Prompter   iprompter
+	HttpClient   func() (*http.Client, error)
+	GitClient    *git.Client
+	IO           *iostreams.IOStreams
+	BaseRepo     func() (ghrepo.Interface, error)
+	RepoOverride string
+	Prompter     iprompter
 
 	TagName     string
 	SkipConfirm bool
@@ -47,6 +47,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
 			opts.TagName = args[0]
 
@@ -97,15 +98,12 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	var cleanupMessage string
-	mustCleanupTag := opts.CleanupTag
-	if mustCleanupTag {
-		err = deleteTag(httpClient, baseRepo, release.TagName)
-		if err != nil {
+	if opts.CleanupTag {
+		if err := deleteTag(httpClient, baseRepo, release.TagName); err != nil {
 			return err
 		}
-		err = deleteLocalTag(opts.GitClient, release.TagName)
-		if err != nil {
-			return err
+		if opts.RepoOverride == "" {
+			_ = opts.GitClient.DeleteLocalTag(context.Background(), release.TagName)
 		}
 		cleanupMessage = " and tag"
 	}
@@ -116,7 +114,7 @@ func deleteRun(opts *DeleteOptions) error {
 
 	iofmt := opts.IO.ColorScheme()
 	fmt.Fprintf(opts.IO.ErrOut, "%s Deleted release%s %s\n", iofmt.SuccessIconWithColor(iofmt.Red), cleanupMessage, release.TagName)
-	if !release.IsDraft && !mustCleanupTag {
+	if !release.IsDraft && !opts.CleanupTag {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Note that the %s git tag still remains in the repository\n", iofmt.WarningIcon(), release.TagName)
 	}
 
@@ -158,30 +156,6 @@ func deleteTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName strin
 
 	if resp.StatusCode > 299 {
 		return api.HandleHTTPError(resp)
-	}
-	return nil
-}
-
-func deleteLocalTag(client *git.Client, tagName string) error {
-	ctx := context.Background()
-	cmd, err := client.Command(ctx, "tag", "-l", tagName)
-	if err != nil {
-		return err
-	}
-	b, err := cmd.Output()
-	if err != nil {
-		return err
-	}
-	// this tag doesn't exist locally, so nothing needs to be done
-	if len(b) == 0 {
-		return nil
-	}
-	if !strings.Contains(string(b), tagName) {
-		return fmt.Errorf("failed to get the tag %s locally", tagName)
-	}
-	err = client.DeleteLocalTag(ctx, tagName)
-	if err != nil {
-		return err
 	}
 	return nil
 }
