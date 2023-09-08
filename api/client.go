@@ -246,6 +246,13 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 		if _, gotScope := gotScopes[s]; s == "" || gotScope {
 			continue
 		}
+		if s == "codespace" {
+			return fmt.Sprintf(
+				"This API operation needs the %[1]q scope. To request it, run:  gh auth login -s %[1]s",
+				s,
+				ghinstance.NormalizeHostname(hostname),
+			)
+		}
 		return fmt.Sprintf(
 			"This API operation needs the %[1]q scope. To request it, run:  gh auth refresh -h %[2]s -s %[1]s",
 			s,
