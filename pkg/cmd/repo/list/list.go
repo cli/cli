@@ -55,6 +55,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:     "list [<owner>]",
 		Args:    cobra.MaximumNArgs(1),
 		Short:   "List repositories owned by user or organization",
+		Long: heredoc.Docf(`
+                  List and filter repositories owned by a user or organization.
+
+                  When listing repositories for an organization, this will not include repositories owned by members of the organization.
+		  This also applies when using the %[1]s--archived%[1]s, %[1]s--no-archived%[1]s, %[1]s--fork%[1]s, and %[1]s--source%[1]s options.
+		`, "`"),
 		Aliases: []string{"ls"},
 		RunE: func(c *cobra.Command, args []string) error {
 			if opts.Limit < 1 {
