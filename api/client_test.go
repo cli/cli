@@ -199,6 +199,11 @@ func TestHTTPError_ScopesSuggestion(t *testing.T) {
 			want: `This API operation needs the "gist" scope. To request it, run:  gh auth refresh -h github.com -s gist`,
 		},
 		{
+			name: "missing a codespace scope",
+			resp: makeResponse(404, "https://api.github.com/gists", "repo, read:org", "codespace"),
+			want: `This API operation needs the "codespace" scope. To request it, run:  gh auth login -s codespace`,
+		},
+		{
 			name: "server error",
 			resp: makeResponse(500, "https://api.github.com/gists", "repo", "gist"),
 			want: ``,
