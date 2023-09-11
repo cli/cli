@@ -1159,6 +1159,6 @@ func (a *API) withRetry(f func() (*http.Response, error)) (*http.Response, error
 		if resp.StatusCode < 500 {
 			return resp, nil
 		}
-		return nil, errors.New("retry")
+		return nil, fmt.Errorf("received response with status code %d", resp.StatusCode)
 	}, backoff.WithMaxRetries(bo, 3))
 }

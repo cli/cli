@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
@@ -424,19 +425,31 @@ func preloadWorkflowNames(client *api.Client, repo ghrepo.Interface, runs []Run)
 }
 
 type JobsPayload struct {
-	Jobs []Job
+	TotalCount int `json:"total_count"`
+	Jobs       []Job
 }
 
 func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error) {
 	if run.Jobs != nil {
 		return run.Jobs, nil
 	}
-	var result JobsPayload
-	if err := client.REST(repo.RepoHost(), "GET", run.JobsURL, nil, &result); err != nil {
-		return nil, err
+
+	query := url.Values{}
+	query.Set("per_page", "100")
+	jobsPath := fmt.Sprintf("%s?%s", run.JobsURL, query.Encode())
+
+	for jobsPath != "" {
+		var resp JobsPayload
+		var err error
+		jobsPath, err = client.RESTWithNext(repo.RepoHost(), http.MethodGet, jobsPath, nil, &resp)
+		if err != nil {
+			run.Jobs = nil
+			return nil, err
+		}
+
+		run.Jobs = append(run.Jobs, resp.Jobs...)
 	}
-	run.Jobs = result.Jobs
-	return result.Jobs, nil
+	return run.Jobs, nil
 }
 
 func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, error) {
