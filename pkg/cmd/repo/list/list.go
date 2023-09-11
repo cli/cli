@@ -58,8 +58,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Long: heredoc.Docf(`
                   List and filter repositories owned by a user or organization.
 
-                  When listing repositories for an organization, this will not include repositories owned by members of the organization.
-		  This also applies when using the %[1]s--archived%[1]s, %[1]s--no-archived%[1]s, %[1]s--fork%[1]s, and %[1]s--source%[1]s options.
+                  Note that the list will only include repositories owned by the provided argument, and the %[1]s--fork%[1]s or %[1]s--source%[1]s flags will not traverse ownership boundaries.
+		  For example, when listing the forks in an organization, the output would not include those owned by individual users.
 		`, "`"),
 		Aliases: []string{"ls"},
 		RunE: func(c *cobra.Command, args []string) error {
