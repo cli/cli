@@ -921,6 +921,89 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final\n",
 			wantStderr: ``,
 		},
+		{
+			name:  "with tag and --notes-from-tag",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName:       "v1.2.3",
+				Target:        "",
+				Name:          "",
+				Body:          "",
+				BodyProvided:  true,
+				Draft:         false,
+				Prerelease:    false,
+				RepoOverride:  "",
+				Concurrency:   5,
+				Assets:        []*shared.AssetForUpload(nil),
+				GenerateNotes: false,
+				NotesFromTag:  true,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+						"url": "https://api.github.com/releases/123",
+						"upload_url": "https://api.github.com/assets/upload",
+						"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+					}`))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: "",
+		},
+		{
+			name:  "with tag and --notes-from-tag and --notes",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName:       "v1.2.3",
+				Target:        "",
+				Name:          "",
+				Body:          "Notes from --notes here",
+				BodyProvided:  true,
+				Draft:         false,
+				Prerelease:    false,
+				RepoOverride:  "",
+				Concurrency:   5,
+				Assets:        []*shared.AssetForUpload(nil),
+				GenerateNotes: false,
+				NotesFromTag:  true,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: "",
+		},
+		{
+			name:  "tag and --notes-from-tag but tag does not exist in repo",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName:       "v1.2.4",
+				Target:        "",
+				Name:          "",
+				Body:          "",
+				BodyProvided:  true,
+				Draft:         false,
+				Prerelease:    false,
+				RepoOverride:  "",
+				Concurrency:   5,
+				Assets:        []*shared.AssetForUpload(nil),
+				GenerateNotes: false,
+				NotesFromTag:  true,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": ""}}}}`))
+			},
+			wantStdout: "",
+			wantStderr: "",
+			wantErr:    "tag v1.2.4 doesn't exist in the repo OWNER/REPO, cannot populate release notes with annotated git tag message using the `--notes-from-tag` flag",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

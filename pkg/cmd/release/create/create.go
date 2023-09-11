@@ -248,7 +248,6 @@ func createRun(opts *CreateOptions) error {
 	var tagDescription string
 	if opts.RepoOverride == "" {
 		tagDescription, _ = gitTagInfo(opts.GitClient, opts.TagName)
-		remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
 		// If there is a local tag with the same name as specified
 		// the user may not want to create a new tag on the remote
 		// as the local one might be annotated or signed.
@@ -258,6 +257,7 @@ func createRun(opts *CreateOptions) error {
 		// If a remote tag with the same name as specified exists already
 		// then a new tag will not be created so ignore local tag status.
 		if tagDescription != "" && !existingTag && opts.Target == "" && !opts.VerifyTag {
+			remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
 			if err != nil {
 				return err
 			}
@@ -268,6 +268,10 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if opts.NotesFromTag {
+			remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
+			if err != nil {
+				return err
+			}
 			if !remoteExists {
 				return fmt.Errorf("tag %s doesn't exist in the repo %s, cannot populate release notes with annotated git tag message using the `--notes-from-tag` flag",
 					opts.TagName, ghrepo.FullName(baseRepo))
