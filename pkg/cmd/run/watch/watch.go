@@ -28,7 +28,6 @@ type WatchOptions struct {
 	RunID      string
 	Interval   int
 	ExitStatus bool
-	Attempt    uint64
 
 	Prompt bool
 
@@ -74,7 +73,6 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 	}
 	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if run fails")
 	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", defaultInterval, "Refresh interval in seconds")
-	cmd.Flags().Uint64VarP(&opts.Attempt, "attempt", "a", 0, "The attempt number of the workflow run")
 
 	return cmd
 }
@@ -85,11 +83,6 @@ func watchRun(opts *WatchOptions) error {
 		return fmt.Errorf("failed to create http client: %w", err)
 	}
 	client := api.NewClientFromHTTP(c)
-
-	var attempt uint64 = 0
-	if opts.Attempt > 0 {
-		attempt = opts.Attempt
-	}
 
 	repo, err := opts.BaseRepo()
 	if err != nil {
@@ -122,7 +115,7 @@ func watchRun(opts *WatchOptions) error {
 			}
 		}
 	} else {
-		run, err = shared.GetRun(client, repo, runID, attempt)
+		run, err = shared.GetRun(client, repo, runID, 0)
 		if err != nil {
 			return fmt.Errorf("failed to get run: %w", err)
 		}
@@ -207,19 +200,14 @@ func watchRun(opts *WatchOptions) error {
 func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo.Interface, run *shared.Run, prNumber string, annotationCache map[int64][]shared.Annotation) (*shared.Run, error) {
 	cs := opts.IO.ColorScheme()
 
-	var attempt uint64 = 0
 	var err error
 
-	if opts.Attempt > 0 {
-		attempt = opts.Attempt
-	}
-
-	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID), attempt)
+	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID), 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	jobs, err := shared.GetJobs(client, repo, run, attempt)
+	jobs, err := shared.GetJobs(client, repo, run, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}
