@@ -40,7 +40,7 @@ jobs:
         with:
           go-version: ${{ inputs.go_version }}
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           version: "~1.17.1"
           install-only: true
@@ -92,7 +92,7 @@ jobs:
           security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
           rm "$RUNNER_TEMP/cert.p12"
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           version: "~1.17.1"
           install-only: true
@@ -140,7 +140,7 @@ jobs:
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           version: "~1.17.1"
           install-only: true
