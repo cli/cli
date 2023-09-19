@@ -49,7 +49,11 @@ func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 		tp.AddField(o.Link)
 	} else {
 		tp.AddField(o.Name)
-		tp.AddField(o.Bucket)
+		if o.Bucket == "cancelled" {
+			tp.AddField("failed")
+		} else {
+			tp.AddField(o.Bucket)
+		}
 		if elapsed == "" {
 			tp.AddField("0")
 		} else {
