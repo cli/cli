@@ -201,6 +201,7 @@ type Codespace struct {
 	GitStatus                      CodespaceGitStatus  `json:"git_status"`
 	Connection                     CodespaceConnection `json:"connection"`
 	Machine                        CodespaceMachine    `json:"machine"`
+	RuntimeConstraints             RuntimeConstraints  `json:"runtime_constraints"`
 	VSCSTarget                     string              `json:"vscs_target"`
 	PendingOperation               bool                `json:"pending_operation"`
 	PendingOperationDisabledReason string              `json:"pending_operation_disabled_reason"`
@@ -246,11 +247,25 @@ const (
 )
 
 type CodespaceConnection struct {
-	SessionID      string   `json:"sessionId"`
-	SessionToken   string   `json:"sessionToken"`
-	RelayEndpoint  string   `json:"relayEndpoint"`
-	RelaySAS       string   `json:"relaySas"`
-	HostPublicKeys []string `json:"hostPublicKeys"`
+	SessionID        string           `json:"sessionId"`
+	SessionToken     string           `json:"sessionToken"`
+	RelayEndpoint    string           `json:"relayEndpoint"`
+	RelaySAS         string           `json:"relaySas"`
+	HostPublicKeys   []string         `json:"hostPublicKeys"`
+	TunnelProperties TunnelProperties `json:"tunnelProperties"`
+}
+
+type TunnelProperties struct {
+	ConnectAccessToken     string `json:"connectAccessToken"`
+	ManagePortsAccessToken string `json:"managePortsAccessToken"`
+	ServiceUri             string `json:"serviceUri"`
+	TunnelId               string `json:"tunnelId"`
+	ClusterId              string `json:"clusterId"`
+	Domain                 string `json:"domain"`
+}
+
+type RuntimeConstraints struct {
+	AllowedPortPrivacySettings []string `json:"allowed_port_privacy_settings"`
 }
 
 // ListCodespaceFields is the list of exportable fields for a codespace when using the `gh cs list` command.
@@ -1161,4 +1176,14 @@ func (a *API) withRetry(f func() (*http.Response, error)) (*http.Response, error
 		}
 		return nil, fmt.Errorf("received response with status code %d", resp.StatusCode)
 	}, backoff.WithMaxRetries(bo, 3))
+}
+
+// HTTPClient returns the HTTP client used to make requests to the API.
+func (a *API) HTTPClient() (*http.Client, error) {
+	httpClient, err := a.client()
+	if err != nil {
+		return nil, err
+	}
+
+	return httpClient, nil
 }

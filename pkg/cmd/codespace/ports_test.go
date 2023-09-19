@@ -2,17 +2,33 @@ package codespace
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
+	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/connection"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/liveshare"
-	livesharetest "github.com/cli/cli/v2/pkg/liveshare/test"
-	"github.com/sourcegraph/jsonrpc2"
 )
+
+func TestListPorts(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mockApi := GetMockApi(false)
+	ios, _, _, _ := iostreams.Test()
+
+	a := &App{
+		io:        ios,
+		apiClient: mockApi,
+	}
+
+	selector := &CodespaceSelector{api: a.apiClient, codespaceName: "codespace-name"}
+	err := a.ListPorts(ctx, selector, nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
 
 func TestPortsUpdateVisibilitySuccess(t *testing.T) {
 	portVisibilities := []portVisibility{
@@ -26,175 +42,35 @@ func TestPortsUpdateVisibilitySuccess(t *testing.T) {
 		},
 	}
 
-	eventResponses := []string{
-		"serverSharing.sharingSucceeded",
-		"serverSharing.sharingSucceeded",
-	}
-
-	portsData := []liveshare.PortNotification{
-		{
-			Success:    true,
-			Port:       80,
-			ChangeKind: liveshare.PortChangeKindUpdate,
-		},
-		{
-			Success:    true,
-			Port:       9999,
-			ChangeKind: liveshare.PortChangeKindUpdate,
-		},
-	}
-
-	err := runUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
-
+	err := runUpdateVisibilityTest(t, portVisibilities, true)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestPortsUpdateVisibilityFailure403(t *testing.T) {
-	portVisibilities := []portVisibility{
-		{
-			number:     80,
-			visibility: "org",
-		},
-		{
-			number:     9999,
-			visibility: "public",
-		},
-	}
-
-	eventResponses := []string{
-		"serverSharing.sharingSucceeded",
-		"serverSharing.sharingFailed",
-	}
-
-	portsData := []liveshare.PortNotification{
-		{
-			Success:    true,
-			Port:       80,
-			ChangeKind: liveshare.PortChangeKindUpdate,
-		},
-		{
-			Success:     false,
-			Port:        9999,
-			ChangeKind:  liveshare.PortChangeKindUpdate,
-			ErrorDetail: "test error",
-			StatusCode:  403,
-		},
-	}
-
-	err := runUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
-	if err == nil {
-		t.Fatalf("runUpdateVisibilityTest succeeded unexpectedly")
-	}
-
-	if errors.Unwrap(err) != errUpdatePortVisibilityForbidden {
-		t.Errorf("expected: %v, got: %v", errUpdatePortVisibilityForbidden, errors.Unwrap(err))
 	}
 }
 
 func TestPortsUpdateVisibilityFailure(t *testing.T) {
 	portVisibilities := []portVisibility{
 		{
-			number:     80,
-			visibility: "org",
-		},
-		{
 			number:     9999,
 			visibility: "public",
 		},
-	}
-
-	eventResponses := []string{
-		"serverSharing.sharingSucceeded",
-		"serverSharing.sharingFailed",
-	}
-
-	portsData := []liveshare.PortNotification{
 		{
-			Success:    true,
-			Port:       80,
-			ChangeKind: liveshare.PortChangeKindUpdate,
-		},
-		{
-			Success:     false,
-			Port:        9999,
-			ChangeKind:  liveshare.PortChangeKindUpdate,
-			ErrorDetail: "test error",
+			number:     80,
+			visibility: "org",
 		},
 	}
 
-	err := runUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
+	err := runUpdateVisibilityTest(t, portVisibilities, false)
 	if err == nil {
 		t.Fatalf("runUpdateVisibilityTest succeeded unexpectedly")
 	}
-
-	var expectedErr *ErrUpdatingPortVisibility
-	if !errors.As(err, &expectedErr) {
-		t.Errorf("expected: %v, got: %v", expectedErr, err)
-	}
 }
 
-type joinWorkspaceResult struct {
-	SessionNumber int `json:"sessionNumber"`
-}
-
-func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, eventResponses []string, portsData []liveshare.PortNotification) error {
-	t.Helper()
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		t.Skip("fails intermittently in CI: https://github.com/cli/cli/issues/5663")
-	}
-
-	joinWorkspace := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
-		return joinWorkspaceResult{1}, nil
-	}
-	const sessionToken = "session-token"
-
-	ch := make(chan *jsonrpc2.Conn, 1)
-	updateSharedVisibility := func(conn *jsonrpc2.Conn, rpcReq *jsonrpc2.Request) (interface{}, error) {
-		ch <- conn
-		return nil, nil
-	}
-	testServer, err := livesharetest.NewServer(
-		livesharetest.WithNonSecure(),
-		livesharetest.WithPassword(sessionToken),
-		livesharetest.WithService("workspace.joinWorkspace", joinWorkspace),
-		livesharetest.WithService("serverSharing.updateSharedServerPrivacy", updateSharedVisibility),
-	)
-	if err != nil {
-		return fmt.Errorf("unable to create test server: %w", err)
-	}
-
+func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, allowOrgPorts bool) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go func() {
-		for i, pd := range portsData {
-			select {
-			case <-ctx.Done():
-				return
-			case conn := <-ch:
-				_, _ = conn.DispatchCall(ctx, eventResponses[i], pd, nil)
-			}
-		}
-	}()
-
-	mockApi := &apiClientMock{
-		GetCodespaceFunc: func(ctx context.Context, codespaceName string, includeConnection bool) (*api.Codespace, error) {
-			return &api.Codespace{
-				Name:  "codespace-name",
-				State: api.CodespaceStateAvailable,
-				Connection: api.CodespaceConnection{
-					SessionID:      "session-id",
-					SessionToken:   sessionToken,
-					RelayEndpoint:  testServer.URL(),
-					RelaySAS:       "relay-sas",
-					HostPublicKeys: []string{livesharetest.SSHPublicKey},
-				},
-			}, nil
-		},
-	}
-
+	mockApi := GetMockApi(allowOrgPorts)
 	ios, _, _, _ := iostreams.Test()
 
 	a := &App{
@@ -248,6 +124,44 @@ func TestPendingOperationDisallowsForwardPorts(t *testing.T) {
 		}
 	} else {
 		t.Error("expected pending operation error, but got nothing")
+	}
+}
+
+func GetMockApi(allowOrgPorts bool) *apiClientMock {
+	return &apiClientMock{
+		GetCodespaceFunc: func(ctx context.Context, codespaceName string, includeConnection bool) (*api.Codespace, error) {
+			allowedPortPrivacySettings := []string{"public", "private"}
+			if allowOrgPorts {
+				allowedPortPrivacySettings = append(allowedPortPrivacySettings, "org")
+			}
+
+			return &api.Codespace{
+				Name:  "codespace-name",
+				State: api.CodespaceStateAvailable,
+				Connection: api.CodespaceConnection{
+					TunnelProperties: api.TunnelProperties{
+						ConnectAccessToken:     "tunnel access-token",
+						ManagePortsAccessToken: "manage-ports-token",
+						ServiceUri:             "http://global.rel.tunnels.api.visualstudio.com/",
+						TunnelId:               "tunnel-id",
+						ClusterId:              "usw2",
+						Domain:                 "domain.com",
+					},
+				},
+				RuntimeConstraints: api.RuntimeConstraints{
+					AllowedPortPrivacySettings: allowedPortPrivacySettings,
+				},
+			}, nil
+		},
+		StartCodespaceFunc: func(ctx context.Context, codespaceName string) error {
+			return nil
+		},
+		GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
+			return nil, nil
+		},
+		HTTPClientFunc: func() (*http.Client, error) {
+			return connection.NewMockHttpClient()
+		},
 	}
 }
 
