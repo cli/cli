@@ -253,6 +253,12 @@ func createRun(opts *CreateOptions) error {
 	var tagDescription string
 	if opts.RepoOverride == "" {
 		tagDescription, _ = gitTagInfo(opts.GitClient, opts.TagName)
+
+		if opts.NotesFromTag && tagDescription == "" {
+			return fmt.Errorf("cannot generate release notes from tag %s as it does not exist locally",
+				opts.TagName)
+		}
+
 		// If there is a local tag with the same name as specified
 		// the user may not want to create a new tag on the remote
 		// as the local one might be annotated or signed.

@@ -1025,6 +1025,21 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
 		},
+		{
+			name:  "with generate notes from tag and tag does not exist",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName:      "v1.2.3",
+				BodyProvided: true,
+				Concurrency:  5,
+				Assets:       []*shared.AssetForUpload(nil),
+				NotesFromTag: true,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
+			},
+			wantErr: "cannot generate release notes from tag v1.2.3 as it does not exist locally",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
