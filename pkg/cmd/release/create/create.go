@@ -93,7 +93,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a release from an annotated git tag, first create one locally with
 			git, push the tag to GitHub, then run this command.
-			You may also use %[1]s--notes-from-tag%[1]s to create it noninteractively.
+			Use %[1]s--notes-from-tag%[1]s to automatically generate the release notes
+ 			from the annotated git tag.
 
 			When using automatically generated release notes, a release title will also be automatically
 			generated unless a title was explicitly passed. Additional release notes can be prepended to
@@ -149,7 +150,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.NotesFromTag && (opts.GenerateNotes || opts.NotesStartTag != "") {
-				return cmdutil.FlagErrorf("using `--notes-from-tag` with `--generate-notes` or `notes-start-tag` is not supported")
+				return cmdutil.FlagErrorf("using `--notes-from-tag` with `--generate-notes` or `--notes-start-tag` is not supported")
+			}
+
+			if opts.NotesFromTag && opts.RepoOverride != "" {
+				return cmdutil.FlagErrorf("using `--notes-from-tag` with `--repo` is not supported")
 			}
 
 			opts.Concurrency = 5
@@ -182,7 +187,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
 	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
 	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
-	cmd.Flags().BoolVarP(&opts.NotesFromTag, "notes-from-tag", "", false, "Automatically populate the release notes with the message in the tag specified by `gh release create [<tag>]`")
+	cmd.Flags().BoolVarP(&opts.NotesFromTag, "notes-from-tag", "", false, "Automatically generate notes from annotated tag")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
 
@@ -248,6 +253,12 @@ func createRun(opts *CreateOptions) error {
 	var tagDescription string
 	if opts.RepoOverride == "" {
 		tagDescription, _ = gitTagInfo(opts.GitClient, opts.TagName)
+
+		if opts.NotesFromTag && tagDescription == "" {
+			return fmt.Errorf("cannot generate release notes from tag %s as it does not exist locally",
+				opts.TagName)
+		}
+
 		// If there is a local tag with the same name as specified
 		// the user may not want to create a new tag on the remote
 		// as the local one might be annotated or signed.
@@ -263,17 +274,6 @@ func createRun(opts *CreateOptions) error {
 			}
 			if !remoteExists {
 				return fmt.Errorf("tag %s exists locally but has not been pushed to %s, please push it before continuing or specify the `--target` flag to create a new tag",
-					opts.TagName, ghrepo.FullName(baseRepo))
-			}
-		}
-
-		if opts.NotesFromTag {
-			remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
-			if err != nil {
-				return err
-			}
-			if !remoteExists {
-				return fmt.Errorf("tag %s doesn't exist in the repo %s, cannot populate release notes with annotated git tag message using the `--notes-from-tag` flag",
 					opts.TagName, ghrepo.FullName(baseRepo))
 			}
 		}
