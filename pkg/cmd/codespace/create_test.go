@@ -356,7 +356,39 @@ func TestApp_Create(t *testing.T) {
 			wantErr: cmdutil.SilentError,
 			wantStderr: `  ✓ Codespaces usage for this repository is paid for by monalisa
 You must authorize or deny additional permissions requested by this codespace before continuing.
-Open this URL in your browser to review and authorize additional permissions: example.com/permissions
+Open this URL in your browser to review and authorize additional permissions: https://example.com/permissions
+Alternatively, you can run "create" with the "--default-permissions" option to continue without authorizing additional permissions.
+`,
+		},
+		{
+			name: "create codespace that requires accepting additional permissions for devcontainer path",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						if params.Branch != "feature-branch" {
+							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
+						}
+						if params.IdleTimeoutMinutes != 30 {
+							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
+						}
+						return &api.Codespace{}, api.AcceptPermissionsRequiredError{
+							AllowPermissionsURL: "https://example.com/permissions?ref=feature-branch&devcontainer_path=.devcontainer/actions/devcontainer.json",
+						}
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:             "monalisa/dotfiles",
+				branch:           "feature-branch",
+				devContainerPath: ".devcontainer/actions/devcontainer.json",
+				machine:          "GIGA",
+				showStatus:       false,
+				idleTimeout:      30 * time.Minute,
+			},
+			wantErr: cmdutil.SilentError,
+			wantStderr: `  ✓ Codespaces usage for this repository is paid for by monalisa
+You must authorize or deny additional permissions requested by this codespace before continuing.
+Open this URL in your browser to review and authorize additional permissions: https://example.com/permissions?ref=feature-branch&devcontainer_path=.devcontainer/actions/devcontainer.json
 Alternatively, you can run "create" with the "--default-permissions" option to continue without authorizing additional permissions.
 `,
 		},

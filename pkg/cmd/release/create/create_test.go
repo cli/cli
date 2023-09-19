@@ -321,6 +321,30 @@ func Test_NewCmdCreate(t *testing.T) {
 				VerifyTag:     true,
 			},
 		},
+		{
+			name:  "with --notes-from-tag",
+			args:  "v1.2.3 --notes-from-tag",
+			isTTY: false,
+			want: CreateOptions{
+				TagName:      "v1.2.3",
+				BodyProvided: true,
+				Concurrency:  5,
+				Assets:       []*shared.AssetForUpload(nil),
+				NotesFromTag: true,
+			},
+		},
+		{
+			name:    "with --notes-from-tag and --generate-notes",
+			args:    "v1.2.3 --notes-from-tag --generate-notes",
+			isTTY:   false,
+			wantErr: "using `--notes-from-tag` with `--generate-notes` or `--notes-start-tag` is not supported",
+		},
+		{
+			name:    "with --notes-from-tag and --notes-start-tag",
+			args:    "v1.2.3 --notes-from-tag --notes-start-tag v1.2.3",
+			isTTY:   false,
+			wantErr: "using `--notes-from-tag` with `--generate-notes` or `--notes-start-tag` is not supported",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -375,6 +399,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.NotesStartTag, opts.NotesStartTag)
 			assert.Equal(t, tt.want.IsLatest, opts.IsLatest)
 			assert.Equal(t, tt.want.VerifyTag, opts.VerifyTag)
+			assert.Equal(t, tt.want.NotesFromTag, opts.NotesFromTag)
 
 			require.Equal(t, len(tt.want.Assets), len(opts.Assets))
 			for i := range tt.want.Assets {
@@ -391,6 +416,7 @@ func Test_createRun(t *testing.T) {
 		isTTY      bool
 		opts       CreateOptions
 		httpStubs  func(t *testing.T, reg *httpmock.Registry)
+		runStubs   func(rs *run.CommandStubber)
 		wantErr    string
 		wantStdout string
 		wantStderr string
@@ -404,6 +430,9 @@ func Test_createRun(t *testing.T) {
 				Body:         "* Fixed bugs",
 				BodyProvided: true,
 				Target:       "",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
@@ -434,6 +463,9 @@ func Test_createRun(t *testing.T) {
 				Target:             "",
 				DiscussionCategory: "General",
 			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
+			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
@@ -463,6 +495,9 @@ func Test_createRun(t *testing.T) {
 				BodyProvided: true,
 				Target:       "main",
 			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
+			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
@@ -490,6 +525,9 @@ func Test_createRun(t *testing.T) {
 				BodyProvided: true,
 				Draft:        true,
 				Target:       "",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
@@ -519,6 +557,9 @@ func Test_createRun(t *testing.T) {
 				BodyProvided:  true,
 				GenerateNotes: false,
 			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
+			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
@@ -546,6 +587,9 @@ func Test_createRun(t *testing.T) {
 				Target:        "",
 				BodyProvided:  true,
 				GenerateNotes: true,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
@@ -575,6 +619,9 @@ func Test_createRun(t *testing.T) {
 				BodyProvided:  true,
 				GenerateNotes: true,
 				NotesStartTag: "v1.1.0",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
@@ -615,6 +662,9 @@ func Test_createRun(t *testing.T) {
 				BodyProvided:  true,
 				GenerateNotes: true,
 				NotesStartTag: "v1.1.0",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
@@ -663,6 +713,9 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 				Concurrency: 1,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
@@ -721,6 +774,9 @@ func Test_createRun(t *testing.T) {
 				},
 				Concurrency: 1,
 			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
+			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(200, ``))
 			},
@@ -747,6 +803,9 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 				Concurrency: 1,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
@@ -781,6 +840,9 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 				Concurrency: 1,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
@@ -817,6 +879,9 @@ func Test_createRun(t *testing.T) {
 				},
 				Concurrency: 1,
 			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
+			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(200, ``))
 			},
@@ -844,6 +909,9 @@ func Test_createRun(t *testing.T) {
 				},
 				DiscussionCategory: "general",
 				Concurrency:        1,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
@@ -884,6 +952,94 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final\n",
 			wantStderr: ``,
 		},
+		{
+			name:  "with generate notes from tag",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName:      "v1.2.3",
+				BodyProvided: true,
+				Concurrency:  5,
+				Assets:       []*shared.AssetForUpload(nil),
+				NotesFromTag: true,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "some tag message")
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+					httpmock.RESTPayload(201, `{
+						"url": "https://api.github.com/releases/123",
+						"upload_url": "https://api.github.com/assets/upload",
+						"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+					}`, func(payload map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"tag_name":   "v1.2.3",
+							"draft":      false,
+							"prerelease": false,
+							"body":       "some tag message",
+						}, payload)
+					}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: "",
+		},
+		{
+			name:  "with generate notes from tag and notes provided",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName:      "v1.2.3",
+				Body:         "some notes here",
+				BodyProvided: true,
+				Concurrency:  5,
+				Assets:       []*shared.AssetForUpload(nil),
+				NotesFromTag: true,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "some tag message")
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+					httpmock.RESTPayload(201, `{
+						"url": "https://api.github.com/releases/123",
+						"upload_url": "https://api.github.com/assets/upload",
+						"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+					}`, func(payload map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"tag_name":   "v1.2.3",
+							"draft":      false,
+							"prerelease": false,
+							"body":       "some notes here\nsome tag message",
+						}, payload)
+					}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: "",
+		},
+		{
+			name:  "with generate notes from tag and tag does not exist",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName:      "v1.2.3",
+				BodyProvided: true,
+				Concurrency:  5,
+				Assets:       []*shared.AssetForUpload(nil),
+				NotesFromTag: true,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
+			},
+			wantErr: "cannot generate release notes from tag v1.2.3 as it does not exist locally",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -907,6 +1063,12 @@ func Test_createRun(t *testing.T) {
 			}
 
 			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+
+			rs, teardown := run.Stub()
+			defer teardown(t)
+			if tt.runStubs != nil {
+				tt.runStubs(rs)
+			}
 
 			err := createRun(&tt.opts)
 			if tt.wantErr != "" {
@@ -1451,34 +1613,34 @@ func Test_createRun_interactive(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		ios, _, stdout, stderr := iostreams.Test()
-		ios.SetStdoutTTY(true)
-		ios.SetStdinTTY(true)
-		ios.SetStderrTTY(true)
-		tt.opts.IO = ios
-
-		reg := &httpmock.Registry{}
-		defer reg.Verify(t)
-		tt.httpStubs(reg)
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-
-		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("OWNER/REPO")
-		}
-
-		tt.opts.Config = func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		}
-
-		tt.opts.Edit = func(_, _, val string, _ io.Reader, _, _ io.Writer) (string, error) {
-			return val, nil
-		}
-
-		tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
-
 		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
+			tt.opts.IO = ios
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			tt.httpStubs(reg)
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+
+			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.FromFullName("OWNER/REPO")
+			}
+
+			tt.opts.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+
+			tt.opts.Edit = func(_, _, val string, _ io.Reader, _, _ io.Writer) (string, error) {
+				return val, nil
+			}
+
+			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+
 			pm := prompter.NewMockPrompter(t)
 			if tt.prompterStubs != nil {
 				tt.prompterStubs(t, pm)

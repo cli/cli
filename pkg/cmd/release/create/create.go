@@ -59,6 +59,7 @@ type CreateOptions struct {
 	GenerateNotes      bool
 	NotesStartTag      string
 	VerifyTag          bool
+	NotesFromTag       bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -92,6 +93,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a release from an annotated git tag, first create one locally with
 			git, push the tag to GitHub, then run this command.
+			Use %[1]s--notes-from-tag%[1]s to automatically generate the release notes
+ 			from the annotated git tag.
 
 			When using automatically generated release notes, a release title will also be automatically
 			generated unless a title was explicitly passed. Additional release notes can be prepended to
@@ -146,9 +149,17 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("tag required when not running interactively")
 			}
 
+			if opts.NotesFromTag && (opts.GenerateNotes || opts.NotesStartTag != "") {
+				return cmdutil.FlagErrorf("using `--notes-from-tag` with `--generate-notes` or `--notes-start-tag` is not supported")
+			}
+
+			if opts.NotesFromTag && opts.RepoOverride != "" {
+				return cmdutil.FlagErrorf("using `--notes-from-tag` with `--repo` is not supported")
+			}
+
 			opts.Concurrency = 5
 
-			opts.BodyProvided = cmd.Flags().Changed("notes") || opts.GenerateNotes
+			opts.BodyProvided = cmd.Flags().Changed("notes") || opts.GenerateNotes || opts.NotesFromTag
 			if notesFile != "" {
 				b, err := cmdutil.ReadFile(notesFile, opts.IO.In)
 				if err != nil {
@@ -176,6 +187,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
 	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
 	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
+	cmd.Flags().BoolVarP(&opts.NotesFromTag, "notes-from-tag", "", false, "Automatically generate notes from annotated tag")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
 
@@ -241,6 +253,12 @@ func createRun(opts *CreateOptions) error {
 	var tagDescription string
 	if opts.RepoOverride == "" {
 		tagDescription, _ = gitTagInfo(opts.GitClient, opts.TagName)
+
+		if opts.NotesFromTag && tagDescription == "" {
+			return fmt.Errorf("cannot generate release notes from tag %s as it does not exist locally",
+				opts.TagName)
+		}
+
 		// If there is a local tag with the same name as specified
 		// the user may not want to create a new tag on the remote
 		// as the local one might be annotated or signed.
@@ -425,6 +443,13 @@ func createRun(opts *CreateOptions) error {
 			}
 		} else {
 			params["generate_release_notes"] = true
+		}
+	}
+	if opts.NotesFromTag {
+		if opts.Body == "" {
+			params["body"] = tagDescription
+		} else {
+			params["body"] = fmt.Sprintf("%s\n%s", opts.Body, tagDescription)
 		}
 	}
 

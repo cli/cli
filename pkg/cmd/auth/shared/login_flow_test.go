@@ -18,11 +18,11 @@ import (
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) Login(host, username, token, gitProtocol string, encrypt bool) error {
+func (c tinyConfig) Login(host, username, token, gitProtocol string, encrypt bool) (bool, error) {
 	c[fmt.Sprintf("%s:%s", host, "user")] = username
 	c[fmt.Sprintf("%s:%s", host, "oauth_token")] = token
 	c[fmt.Sprintf("%s:%s", host, "git_protocol")] = gitProtocol
-	return nil
+	return false, nil
 }
 
 func TestLogin_ssh(t *testing.T) {
