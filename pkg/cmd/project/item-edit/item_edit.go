@@ -28,6 +28,7 @@ type editItemOpts struct {
 	date                 string
 	singleSelectOptionID string
 	iterationID          string
+	clear                bool
 	// format
 	format string
 }
@@ -48,6 +49,12 @@ type UpdateProjectV2FieldValue struct {
 	Update struct {
 		Item queries.ProjectItem `graphql:"projectV2Item"`
 	} `graphql:"updateProjectV2ItemFieldValue(input:$input)"`
+}
+
+type ClearProjectV2FieldValue struct {
+	Clear struct {
+		Item queries.ProjectItem `graphql:"projectV2Item"`
+	} `graphql:"clearProjectV2ItemFieldValue(input:$input)"`
 }
 
 func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) *cobra.Command {
@@ -108,6 +115,7 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	editItemCmd.Flags().StringVar(&opts.date, "date", "", "Date value for the field (YYYY-MM-DD)")
 	editItemCmd.Flags().StringVar(&opts.singleSelectOptionID, "single-select-option-id", "", "ID of the single select option value to set on the field")
 	editItemCmd.Flags().StringVar(&opts.iterationID, "iteration-id", "", "ID of the iteration value to set on the field")
+	editItemCmd.Flags().BoolVar(&opts.clear, "clear", false, "Remove field value")
 
 	_ = editItemCmd.MarkFlagRequired("id")
 
@@ -115,6 +123,34 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 }
 
 func runEditItem(config editItemConfig) error {
+	// when clear flag is used, remove value set to the corresponding field ID
+	if config.opts.clear {
+		if config.opts.fieldID == "" && config.opts.projectID == "" {
+			return cmdutil.FlagErrorf("field-id and project-id must be provided for use with the clear flag")
+		}
+		if config.opts.fieldID == "" {
+			return cmdutil.FlagErrorf("field-id must be provided for use with the clear flag")
+		}
+		if config.opts.projectID == "" {
+			// TODO: offer to fetch interactively
+			return cmdutil.FlagErrorf("project-id must be provided for use with the clear flag")
+		}
+		if config.opts.text != "" || config.opts.number != 0 || config.opts.date != "" || config.opts.singleSelectOptionID != "" || config.opts.iterationID != "" {
+			return cmdutil.FlagErrorf("cannot use this flag in conjunction with clear")
+		}
+		query, variables := buildClearItem(config)
+		err := config.client.Mutate("ClearItemFieldValue", query, variables)
+		if err != nil {
+			return err
+		}
+
+		if config.opts.format == "json" {
+			return printItemJSON(config, &query.Clear.Item)
+		}
+
+		return printItemResults(config, &query.Clear.Item)
+	}
+
 	// update draft issue
 	if config.opts.title != "" || config.opts.body != "" {
 		if !strings.HasPrefix(config.opts.itemID, "DI_") {
@@ -213,6 +249,16 @@ func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2Fie
 			ItemID:    githubv4.ID(config.opts.itemID),
 			FieldID:   githubv4.ID(config.opts.fieldID),
 			Value:     value,
+		},
+	}
+}
+
+func buildClearItem(config editItemConfig) (*ClearProjectV2FieldValue, map[string]interface{}) {
+	return &ClearProjectV2FieldValue{}, map[string]interface{}{
+		"input": githubv4.ClearProjectV2ItemFieldValueInput{
+			ProjectID: githubv4.ID(config.opts.projectID),
+			ItemID:    githubv4.ID(config.opts.itemID),
+			FieldID:   githubv4.ID(config.opts.fieldID),
 		},
 	}
 }
