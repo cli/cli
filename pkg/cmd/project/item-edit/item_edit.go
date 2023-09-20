@@ -173,6 +173,9 @@ func runEditItem(config editItemConfig) error {
 
 	// update item values
 	if config.opts.text != "" || config.opts.number != 0 || config.opts.date != "" || config.opts.singleSelectOptionID != "" || config.opts.iterationID != "" {
+		if config.opts.fieldID == "" && config.opts.projectID == "" {
+			return cmdutil.FlagErrorf("field-id and project-id must be provided")
+		}
 		if config.opts.fieldID == "" {
 			return cmdutil.FlagErrorf("field-id must be provided")
 		}
