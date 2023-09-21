@@ -3,6 +3,7 @@ package delete
 import (
 	"bytes"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -170,6 +171,20 @@ func TestDeleteRun(t *testing.T) {
 			},
 			wantErr:    true,
 			wantErrMsg: "X Failed to delete cache: HTTP 500 (https://api.github.com/repos/OWNER/REPO/actions/caches/123)",
+		},
+		{
+			name: "keys must be percent-encoded before being used as query params",
+			opts: DeleteOptions{Identifier: "a weird＿cache+key"},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("DELETE", "repos/OWNER/REPO/actions/caches", url.Values{
+						"key": []string{"a weird＿cache+key"},
+					}),
+					httpmock.StatusStringResponse(204, ""),
+				)
+			},
+			tty:        true,
+			wantStdout: "✓ Deleted 1 cache from OWNER/REPO\n",
 		},
 	}
 
