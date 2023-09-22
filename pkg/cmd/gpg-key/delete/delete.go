@@ -91,7 +91,7 @@ func deleteRun(opts *DeleteOptions) error {
 
 	err = deleteGPGKey(httpClient, host, id)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if opts.IO.IsStdoutTTY() {
