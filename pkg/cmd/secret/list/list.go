@@ -23,11 +23,20 @@ type ListOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Now        func() time.Time
+	Exporter   cmdutil.Exporter
 
 	OrgName     string
 	EnvName     string
 	UserSecrets bool
 	Application string
+}
+
+var secretFields = []string{
+	"selected_repos_url",
+	"name",
+	"visibility",
+	"updated_at",
+	"num_selected_repos",
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -70,7 +79,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "List secrets for an environment")
 	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "List a secret for your user")
 	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Codespaces, shared.Dependabot}, "List secrets for a specific application")
-
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, secretFields)
 	return cmd
 }
 
@@ -145,6 +154,10 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, secrets)
+	}
+
 	table := tableprinter.New(opts.IO)
 	if secretEntity == shared.Organization || secretEntity == shared.User {
 		table.HeaderRow("Name", "Updated", "Visibility")
@@ -173,11 +186,11 @@ func listRun(opts *ListOptions) error {
 }
 
 type Secret struct {
-	Name             string
-	UpdatedAt        time.Time `json:"updated_at"`
-	Visibility       shared.Visibility
-	SelectedReposURL string `json:"selected_repositories_url"`
-	NumSelectedRepos int
+	Name             string            `json:"name"`
+	UpdatedAt        time.Time         `json:"updated_at"`
+	Visibility       shared.Visibility `json:"visibility"`
+	SelectedReposURL string            `json:"selected_repositories_url"`
+	NumSelectedRepos int               `json:"num_selected_repos"`
 }
 
 func fmtVisibility(s Secret) string {
