@@ -173,7 +173,7 @@ func watchRun(opts *WatchOptions) error {
 	opts.IO.StopAlternateScreenBuffer()
 
 	if err != nil {
-		return nil
+		return err
 	}
 
 	// Write the last temporary buffer one last time
