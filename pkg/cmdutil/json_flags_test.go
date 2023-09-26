@@ -116,6 +116,102 @@ func TestAddJSONFlags(t *testing.T) {
 	}
 }
 
+func TestAddFormatFlags(t *testing.T) {
+	fields := []string{"id", "number"}
+	tests := []struct {
+		name        string
+		args        []string
+		wantsExport *exportFormat
+		wantsError  string
+	}{
+		{
+			name:        "no format flag",
+			args:        []string{},
+			wantsExport: nil,
+		},
+		{
+			name:        "empty format flag",
+			args:        []string{"--format"},
+			wantsExport: nil,
+			wantsError:  "flag needs an argument: --format",
+		},
+		{
+			name:        "invalid format field",
+			args:        []string{"--format", "idontexist"},
+			wantsExport: nil,
+			wantsError:  "invalid argument \"idontexist\" for \"--format\" flag: valid values are {json}",
+		},
+		{
+			name:        "cannot combine --format with --web",
+			args:        []string{"--format", "json", "--web"},
+			wantsExport: nil,
+			wantsError:  "cannot use `--web` with `--format`",
+		},
+		{
+			name:        "cannot use --jq without --format",
+			args:        []string{"--jq", ".number"},
+			wantsExport: nil,
+			wantsError:  "cannot use `--jq` without specifying `--format json`",
+		},
+		{
+			name:        "cannot use --template without --format",
+			args:        []string{"--template", "{{.number}}"},
+			wantsExport: nil,
+			wantsError:  "cannot use `--template` without specifying `--format json`",
+		},
+		{
+			name: "with json format",
+			args: []string{"--format", "json"},
+			wantsExport: &exportFormat{
+				fields:   fields,
+				filter:   "",
+				template: "",
+			},
+		},
+		{
+			name: "with jq filter",
+			args: []string{"--format", "json", "-q.number"},
+			wantsExport: &exportFormat{
+				fields:   fields,
+				filter:   ".number",
+				template: "",
+			},
+		},
+		{
+			name: "with Go template",
+			args: []string{"--format", "json", "-t", "{{.number}}"},
+			wantsExport: &exportFormat{
+				fields:   fields,
+				filter:   "",
+				template: "{{.number}}",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{Run: func(*cobra.Command, []string) {}}
+			cmd.Flags().Bool("web", false, "")
+			var exporter Exporter
+			AddFormatFlags(cmd, &exporter, fields)
+			cmd.SetArgs(tt.args)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			_, err := cmd.ExecuteC()
+			if tt.wantsError == "" {
+				require.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantsError)
+				return
+			}
+			if tt.wantsExport == nil {
+				assert.Nil(t, exporter)
+			} else {
+				assert.Equal(t, tt.wantsExport, exporter)
+			}
+		})
+	}
+}
+
 func Test_exportFormat_Write(t *testing.T) {
 	type args struct {
 		data interface{}

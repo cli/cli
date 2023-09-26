@@ -15,11 +15,12 @@ import (
 
 func TestNewCmdlist(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       listOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         listOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name: "owner",
@@ -49,9 +50,9 @@ func TestNewCmdlist(t *testing.T) {
 			name: "json",
 			cli:  "--format json",
 			wants: listOpts{
-				format: "json",
-				limit:  30,
+				limit: 30,
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -86,7 +87,7 @@ func TestNewCmdlist(t *testing.T) {
 			assert.Equal(t, tt.wants.closed, gotOpts.closed)
 			assert.Equal(t, tt.wants.web, gotOpts.web)
 			assert.Equal(t, tt.wants.limit, gotOpts.limit)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }
@@ -245,6 +246,86 @@ func TestRunList(t *testing.T) {
 	assert.Equal(
 		t,
 		"1\tProject 1\topen\tid-1\n",
+		stdout.String())
+}
+
+func TestRunList_tty(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"nodes": []interface{}{
+							map[string]interface{}{
+								"title":            "Project 1",
+								"shortDescription": "Short description 1",
+								"url":              "url1",
+								"closed":           false,
+								"ID":               "id-1",
+								"number":           1,
+							},
+							map[string]interface{}{
+								"title":            "Project 2",
+								"shortDescription": "",
+								"url":              "url2",
+								"closed":           true,
+								"ID":               "id-2",
+								"number":           2,
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	config := listConfig{
+		opts: listOpts{
+			owner: "monalisa",
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Doc(`
+			NUMBER  TITLE      STATE  ID
+			1       Project 1  open   id-1
+		`),
 		stdout.String())
 }
 

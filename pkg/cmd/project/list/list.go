@@ -19,7 +19,6 @@ type listOpts struct {
 	web      bool
 	owner    string
 	closed   bool
-	format   string
 	exporter cmdutil.Exporter
 }
 
@@ -70,9 +69,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner")
 	listCmd.Flags().BoolVarP(&opts.closed, "closed", "", false, "Include closed projects")
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser")
-	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(listCmd, &opts.exporter, format.ProjectFields)
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of projects to fetch")
-	format.AddJSONFlags(listCmd, &opts.format, &opts.exporter, format.ProjectFields)
 
 	return listCmd
 }
@@ -158,16 +156,18 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 
 	tp := tableprinter.New(config.io, tableprinter.WithHeader("Number", "Title", "State", "ID"))
 
+	cs := config.io.ColorScheme()
 	for _, p := range projects {
-		tp.AddField(strconv.Itoa(int(p.Number)), tableprinter.WithTruncate(nil))
+		tp.AddField(
+			strconv.Itoa(int(p.Number)),
+			tableprinter.WithTruncate(nil),
+			tableprinter.WithColor(cs.ColorFromString(format.ColorForProjectState(p))),
+		)
 		tp.AddField(p.Title)
-		var state string
-		if p.Closed {
-			state = "closed"
-		} else {
-			state = "open"
-		}
-		tp.AddField(state)
+		tp.AddField(
+			format.ProjectState(p),
+			tableprinter.WithColor(cs.ColorFromString(format.ColorForProjectState(p))),
+		)
 		tp.AddField(p.ID, tableprinter.WithTruncate(nil))
 		tp.EndRow()
 	}

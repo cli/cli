@@ -110,6 +110,70 @@ func checkJSONFlags(cmd *cobra.Command) (*exportFormat, error) {
 	return nil, nil
 }
 
+func AddFormatFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
+	var format string
+	StringEnumFlag(cmd, &format, "format", "", "", []string{"json"}, "Output format")
+	f := cmd.Flags()
+	f.StringP("jq", "q", "", "Filter JSON output using a jq `expression`")
+	f.StringP("template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
+
+	oldPreRun := cmd.PreRunE
+	cmd.PreRunE = func(c *cobra.Command, args []string) error {
+		if oldPreRun != nil {
+			if err := oldPreRun(c, args); err != nil {
+				return err
+			}
+		}
+
+		if export, err := checkFormatFlags(c, fields); err == nil {
+			if export == nil {
+				*exportTarget = nil
+			} else {
+				*exportTarget = export
+			}
+		} else {
+			return err
+		}
+		return nil
+	}
+
+	cmd.SetFlagErrorFunc(func(c *cobra.Command, e error) error {
+		if c == cmd && e.Error() == "flag needs an argument: --json" {
+			sort.Strings(fields)
+			return JSONFlagError{fmt.Errorf("Specify one or more comma-separated fields for `--json`:\n  %s", strings.Join(fields, "\n  "))}
+		}
+		if cmd.HasParent() {
+			return cmd.Parent().FlagErrorFunc()(c, e)
+		}
+		return e
+	})
+}
+
+func checkFormatFlags(cmd *cobra.Command, fields []string) (*exportFormat, error) {
+	f := cmd.Flags()
+	formatFlag := f.Lookup("format")
+	formatValue := formatFlag.Value.String()
+	jqFlag := f.Lookup("jq")
+	tplFlag := f.Lookup("template")
+	webFlag := f.Lookup("web")
+
+	if formatFlag.Changed {
+		if webFlag != nil && webFlag.Changed {
+			return nil, errors.New("cannot use `--web` with `--format`")
+		}
+		return &exportFormat{
+			fields:   fields,
+			filter:   jqFlag.Value.String(),
+			template: tplFlag.Value.String(),
+		}, nil
+	} else if jqFlag.Changed && formatValue != "json" {
+		return nil, errors.New("cannot use `--jq` without specifying `--format json`")
+	} else if tplFlag.Changed && formatValue != "json" {
+		return nil, errors.New("cannot use `--template` without specifying `--format json`")
+	}
+	return nil, nil
+}
+
 type Exporter interface {
 	Fields() []string
 	Write(io *iostreams.IOStreams, data interface{}) error

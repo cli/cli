@@ -5,46 +5,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
-	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
-
-func AddJSONFlags(cmd *cobra.Command, format *string, exportTarget *cmdutil.Exporter, fields []string) {
-	oldPreRun := cmd.PreRunE
-	cmd.PreRunE = func(cmd *cobra.Command, args []string) error {
-		if oldPreRun != nil {
-			if err := oldPreRun(cmd, args); err != nil {
-				return err
-			}
-		}
-
-		jsonFlag := cmd.Flags().Lookup("json")
-		if err := cmdutil.MutuallyExclusive(
-			"specify only one of `--format` or `--json`",
-			format != nil,
-			jsonFlag.Changed,
-		); err != nil {
-			return err
-		}
-
-		// Check legacy "format" and use consistent "json" flag instead
-		if *format == "json" {
-			jv := jsonFlag.Value.(pflag.SliceValue)
-			if err := jv.Replace(fields); err != nil {
-				return err
-			}
-			jsonFlag.Changed = true
-		}
-
-		return nil
-	}
-
-	_ = cmd.Flags().MarkDeprecated("format", "use `--json` instead")
-
-	// TODO: Implement filtering on specified fields; likely requires rewrite to use string queries instead of graphql tags.
-	cmdutil.AddJSONFlags(cmd, exportTarget, fields)
-}
 
 // JSONProject serializes a Project to JSON.
 func JSONProject(project queries.Project) ([]byte, error) {
