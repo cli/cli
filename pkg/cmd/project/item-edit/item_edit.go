@@ -70,6 +70,9 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 		Example: heredoc.Doc(`
 			# edit an item's text field value
 			gh project item-edit --id <item-ID> --field-id <field-ID> --project-id <project-ID> --text "new text"
+
+			# clear an item's field value
+			gh project item-edit --id <item-ID> --field-id <field-ID> --project-id <project-ID> --clear
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cmdutil.MutuallyExclusive(
