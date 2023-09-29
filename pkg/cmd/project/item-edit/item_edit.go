@@ -83,6 +83,14 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"cannot use `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` in conjunction with `--clear`",
+				opts.text != "" || opts.number != 0 || opts.date != "" || opts.singleSelectOptionID != "" || opts.iterationID != "",
+				opts.clear,
+			); err != nil {
+				return err
+			}
+
 			client, err := client.New(f)
 			if err != nil {
 				return err
@@ -134,9 +142,6 @@ func runEditItem(config editItemConfig) error {
 		if config.opts.projectID == "" {
 			// TODO: offer to fetch interactively
 			return cmdutil.FlagErrorf("project-id must be provided for use with the clear flag")
-		}
-		if config.opts.text != "" || config.opts.number != 0 || config.opts.date != "" || config.opts.singleSelectOptionID != "" || config.opts.iterationID != "" {
-			return cmdutil.FlagErrorf("cannot use this flag in conjunction with clear")
 		}
 		query, variables := buildClearItem(config)
 		err := config.client.Mutate("ClearItemFieldValue", query, variables)
