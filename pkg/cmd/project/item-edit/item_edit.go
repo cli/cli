@@ -138,82 +138,23 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 func runEditItem(config editItemConfig) error {
 	// when clear flag is used, remove value set to the corresponding field ID
 	if config.opts.clear {
-		if config.opts.fieldID == "" && config.opts.projectID == "" {
-			return cmdutil.FlagErrorf("field-id and project-id must be provided for use with the clear flag")
-		}
-		if config.opts.fieldID == "" {
-			return cmdutil.FlagErrorf("field-id must be provided for use with the clear flag")
-		}
-		if config.opts.projectID == "" {
-			// TODO: offer to fetch interactively
-			return cmdutil.FlagErrorf("project-id must be provided for use with the clear flag")
-		}
-		query, variables := buildClearItem(config)
-		err := config.client.Mutate("ClearItemFieldValue", query, variables)
-		if err != nil {
+		if err := clearItemFieldValue(config); err != nil {
 			return err
 		}
-
-		if config.opts.format == "json" {
-			return printItemJSON(config, &query.Clear.Item)
-		}
-
-		return printItemResults(config, &query.Clear.Item)
 	}
 
 	// update draft issue
 	if config.opts.title != "" || config.opts.body != "" {
-		if !strings.HasPrefix(config.opts.itemID, "DI_") {
-			return cmdutil.FlagErrorf("ID must be the ID of the draft issue content which is prefixed with `DI_`")
-		}
-
-		query, variables := buildEditDraftIssue(config)
-
-		err := config.client.Mutate("EditDraftIssueItem", query, variables)
-		if err != nil {
+		if err := updateDraftIssue(config); err != nil {
 			return err
 		}
-
-		if config.opts.format == "json" {
-			return printDraftIssueJSON(config, query.UpdateProjectV2DraftIssue.DraftIssue)
-		}
-
-		return printDraftIssueResults(config, query.UpdateProjectV2DraftIssue.DraftIssue)
 	}
 
 	// update item values
 	if config.opts.text != "" || config.opts.number != 0 || config.opts.date != "" || config.opts.singleSelectOptionID != "" || config.opts.iterationID != "" {
-		if config.opts.fieldID == "" && config.opts.projectID == "" {
-			return cmdutil.FlagErrorf("field-id and project-id must be provided")
-		}
-		if config.opts.fieldID == "" {
-			return cmdutil.FlagErrorf("field-id must be provided")
-		}
-		if config.opts.projectID == "" {
-			// TODO: offer to fetch interactively
-			return cmdutil.FlagErrorf("project-id must be provided")
-		}
-
-		var parsedDate time.Time
-		if config.opts.date != "" {
-			date, err := time.Parse("2006-01-02", config.opts.date)
-			if err != nil {
-				return err
-			}
-			parsedDate = date
-		}
-
-		query, variables := buildUpdateItem(config, parsedDate)
-		err := config.client.Mutate("UpdateItemValues", query, variables)
-		if err != nil {
+		if err := updateItemValues(config); err != nil {
 			return err
 		}
-
-		if config.opts.format == "json" {
-			return printItemJSON(config, &query.Update.Item)
-		}
-
-		return printItemResults(config, &query.Update.Item)
 	}
 
 	if _, err := fmt.Fprintln(config.io.ErrOut, "error: no changes to make"); err != nil {
@@ -309,4 +250,81 @@ func printItemJSON(config editItemConfig, item *queries.ProjectItem) error {
 	_, err = config.io.Out.Write(b)
 	return err
 
+}
+
+func clearItemFieldValue(config editItemConfig) error {
+	if err := fieldIdAndProjectIdPresence(config); err != nil {
+		return err
+	}
+	query, variables := buildClearItem(config)
+	err := config.client.Mutate("ClearItemFieldValue", query, variables)
+	if err != nil {
+		return err
+	}
+
+	if config.opts.format == "json" {
+		return printItemJSON(config, &query.Clear.Item)
+	}
+
+	return printItemResults(config, &query.Clear.Item)
+}
+
+func updateDraftIssue(config editItemConfig) error {
+	if !strings.HasPrefix(config.opts.itemID, "DI_") {
+		return cmdutil.FlagErrorf("ID must be the ID of the draft issue content which is prefixed with `DI_`")
+	}
+
+	query, variables := buildEditDraftIssue(config)
+
+	err := config.client.Mutate("EditDraftIssueItem", query, variables)
+	if err != nil {
+		return err
+	}
+
+	if config.opts.format == "json" {
+		return printDraftIssueJSON(config, query.UpdateProjectV2DraftIssue.DraftIssue)
+	}
+
+	return printDraftIssueResults(config, query.UpdateProjectV2DraftIssue.DraftIssue)
+}
+
+func updateItemValues(config editItemConfig) error {
+	if err := fieldIdAndProjectIdPresence(config); err != nil {
+		return err
+	}
+
+	var parsedDate time.Time
+	if config.opts.date != "" {
+		date, err := time.Parse("2006-01-02", config.opts.date)
+		if err != nil {
+			return err
+		}
+		parsedDate = date
+	}
+
+	query, variables := buildUpdateItem(config, parsedDate)
+	err := config.client.Mutate("UpdateItemValues", query, variables)
+	if err != nil {
+		return err
+	}
+
+	if config.opts.format == "json" {
+		return printItemJSON(config, &query.Update.Item)
+	}
+
+	return printItemResults(config, &query.Update.Item)
+}
+
+func fieldIdAndProjectIdPresence(config editItemConfig) error {
+	if config.opts.fieldID == "" && config.opts.projectID == "" {
+		return cmdutil.FlagErrorf("field-id and project-id must be provided")
+	}
+	if config.opts.fieldID == "" {
+		return cmdutil.FlagErrorf("field-id must be provided")
+	}
+	if config.opts.projectID == "" {
+		// TODO: offer to fetch interactively
+		return cmdutil.FlagErrorf("project-id must be provided")
+	}
+	return nil
 }
