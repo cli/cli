@@ -66,6 +66,8 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 			Edit either a draft issue or a project item. Both usages require the ID of the item to edit.
 			
 			For non-draft issues, the ID of the project is also required, and only a single field value can be updated per invocation.
+
+			Remove project item field value using "--clear" flag.
 		`),
 		Example: heredoc.Doc(`
 			# edit an item's text field value
