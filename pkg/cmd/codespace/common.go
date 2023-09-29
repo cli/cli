@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -104,6 +105,7 @@ type apiClient interface {
 	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
 	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
 	GetCodespaceBillableOwner(ctx context.Context, nwo string) (*api.User, error)
+	HTTPClient() (*http.Client, error)
 }
 
 var errNoCodespaces = errors.New("you have no codespaces")
