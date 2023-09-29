@@ -25,8 +25,8 @@ var deployKeyFields = []string{
 	"id",
 	"key",
 	"title",
-	"created_at",
-	"read_only",
+	"createdAt",
+	"readOnly",
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {

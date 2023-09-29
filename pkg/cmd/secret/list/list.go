@@ -32,11 +32,11 @@ type ListOptions struct {
 }
 
 var secretFields = []string{
-	"selected_repos_url",
+	"selectedReposURL",
 	"name",
 	"visibility",
-	"updated_at",
-	"num_selected_repos",
+	"updatedAt",
+	"numSelectedRepos",
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
