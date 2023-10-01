@@ -72,7 +72,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// require that the user is authenticated before running most commands
 			if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
-				if cmd.Parent().Use == "codespace" {
+				parent := cmd.Parent()
+				if parent != nil && parent.Use == "codespace" {
 					fmt.Fprintln(io.ErrOut, "To get started with GitHub CLI, please run:  gh auth login -s codespace")
 				} else {
 					fmt.Fprint(io.ErrOut, authHelp())
