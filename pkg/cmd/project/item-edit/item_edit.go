@@ -138,23 +138,17 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 func runEditItem(config editItemConfig) error {
 	// when clear flag is used, remove value set to the corresponding field ID
 	if config.opts.clear {
-		if err := clearItemFieldValue(config); err != nil {
-			return err
-		}
+		return clearItemFieldValue(config)
 	}
 
 	// update draft issue
 	if config.opts.title != "" || config.opts.body != "" {
-		if err := updateDraftIssue(config); err != nil {
-			return err
-		}
+		return updateDraftIssue(config)
 	}
 
 	// update item values
 	if config.opts.text != "" || config.opts.number != 0 || config.opts.date != "" || config.opts.singleSelectOptionID != "" || config.opts.iterationID != "" {
-		if err := updateItemValues(config); err != nil {
-			return err
-		}
+		return updateItemValues(config)
 	}
 
 	if _, err := fmt.Fprintln(config.io.ErrOut, "error: no changes to make"); err != nil {
