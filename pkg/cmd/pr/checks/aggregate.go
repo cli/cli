@@ -25,6 +25,7 @@ type checkCounts struct {
 	Passed   int
 	Pending  int
 	Skipping int
+	Canceled int
 }
 
 func aggregateChecks(checkContexts []api.CheckContext, requiredChecks bool) (checks []check, counts checkCounts) {
@@ -70,9 +71,12 @@ func aggregateChecks(checkContexts []api.CheckContext, requiredChecks bool) (che
 		case "SKIPPED", "NEUTRAL":
 			item.Bucket = "skipping"
 			counts.Skipping++
-		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
+		case "ERROR", "FAILURE", "TIMED_OUT", "ACTION_REQUIRED":
 			item.Bucket = "fail"
 			counts.Failed++
+		case "CANCELLED":
+			item.Bucket = "cancel"
+			counts.Canceled++
 		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
 			item.Bucket = "pending"
 			counts.Pending++
