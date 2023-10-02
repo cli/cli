@@ -13,9 +13,9 @@ import (
 )
 
 type deployKey struct {
-	ID        int
-	Key       string
-	Title     string
+	ID        int       `json:"id"`
+	Key       string    `json:"key"`
+	Title     string    `json:"title"`
 	CreatedAt time.Time `json:"created_at"`
 	ReadOnly  bool      `json:"read_only"`
 }
