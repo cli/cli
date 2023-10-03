@@ -181,7 +181,6 @@ func RESTPayload(responseStatus int, responseBody string, cb func(payload map[st
 		return httpResponse(responseStatus, req, bytes.NewBufferString(responseBody)), nil
 	}
 }
-
 func GraphQLMutation(body string, cb func(map[string]interface{})) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		var bodyData struct {
