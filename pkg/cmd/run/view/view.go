@@ -221,7 +221,7 @@ func runView(opts *ViewOptions) error {
 
 	if shouldFetchJobs(opts) {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, run)
+		jobs, err = shared.GetJobs(client, repo, run, attempt)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
@@ -259,7 +259,7 @@ func runView(opts *ViewOptions) error {
 
 	if selectedJob == nil && len(jobs) == 0 {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, run)
+		jobs, err = shared.GetJobs(client, repo, run, attempt)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get jobs: %w", err)
