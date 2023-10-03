@@ -9,7 +9,9 @@ on:
       tag_name:
         required: true
         type: string
-
+      environment:
+        default: production
+        type: environment
 jobs:
   bump:
     runs-on: ubuntu-latest
