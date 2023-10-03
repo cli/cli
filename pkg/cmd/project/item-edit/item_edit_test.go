@@ -95,6 +95,16 @@ func TestNewCmdeditItem(t *testing.T) {
 			},
 		},
 		{
+			name: "clear",
+			cli:  "--id 123 --field-id FIELD_ID --project-id PROJECT_ID --clear",
+			wants: editItemOpts{
+				itemID:    "123",
+				fieldID:   "FIELD_ID",
+				projectID: "PROJECT_ID",
+				clear:     true,
+			},
+		},
+		{
 			name: "json",
 			cli:  "--format json --id 123",
 			wants: editItemOpts{
@@ -142,6 +152,7 @@ func TestNewCmdeditItem(t *testing.T) {
 			assert.Equal(t, tt.wants.date, gotOpts.date)
 			assert.Equal(t, tt.wants.singleSelectOptionID, gotOpts.singleSelectOptionID)
 			assert.Equal(t, tt.wants.iterationID, gotOpts.iterationID)
+			assert.Equal(t, tt.wants.clear, gotOpts.clear)
 		})
 	}
 }
@@ -471,4 +482,52 @@ func TestRunItemEdit_InvalidID(t *testing.T) {
 
 	err := runEditItem(config)
 	assert.Error(t, err, "ID must be the ID of the draft issue content which is prefixed with `DI_`")
+}
+
+func TestRunItemEdit_Clear(t *testing.T) {
+	defer gock.Off()
+	// gock.Observe(gock.DumpRequest)
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation ClearItemFieldValue.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id"}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"clearProjectV2ItemFieldValue": map[string]interface{}{
+					"projectV2Item": map[string]interface{}{
+						"ID": "item_id",
+						"content": map[string]interface{}{
+							"__typename": "Issue",
+							"body":       "body",
+							"title":      "title",
+							"number":     1,
+							"repository": map[string]interface{}{
+								"nameWithOwner": "my-repo",
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			itemID:    "item_id",
+			projectID: "project_id",
+			fieldID:   "field_id",
+			clear:     true,
+		},
+		client: client,
+	}
+
+	err := runEditItem(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "Edited item \"title\"\n", stdout.String())
 }
