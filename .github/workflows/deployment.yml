@@ -206,6 +206,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: [linux, macos, windows]
+    environment: ${{ inputs.environment }}
     if: inputs.release
     steps:
       - name: Checkout cli/cli
