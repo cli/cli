@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -275,7 +277,7 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 	}
 
 	p = filepath.ToSlash(parts[0])
-	if !path.IsAbs(p) {
+	if !path.IsAbs(p) && reflect.TypeOf(opts.GitClient) != reflect.TypeOf(&remoteGitClient{}) && os.Getenv("GH_REPO") == "" {
 		p = path.Join(opts.PathFromRepoRoot(), p)
 		if p == "." || strings.HasPrefix(p, "..") {
 			p = ""
