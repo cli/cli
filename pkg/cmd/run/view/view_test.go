@@ -256,7 +256,7 @@ func TestViewRun(t *testing.T) {
 												"name": "REPO"}}
 				]}}}}`))
 				reg.Register(
-					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/attempts/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{
 						Jobs: []shared.Job{
 							shared.SuccessfulJob,
@@ -369,7 +369,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
 				reg.Register(
-					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/attempts/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{}))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
@@ -442,7 +442,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
 				reg.Register(
-					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/attempts/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{
 						Jobs: []shared.Job{
 							shared.SuccessfulJob,
@@ -616,7 +616,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/attempts/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
 				reg.Register(
-					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/attempts/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{
 						Jobs: []shared.Job{
 							shared.SuccessfulJob,
@@ -846,7 +846,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/attempts/3"),
 					httpmock.JSONResponse(shared.FailedRun))
 				reg.Register(
-					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/attempts/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{
 						Jobs: []shared.Job{
 							shared.SuccessfulJob,

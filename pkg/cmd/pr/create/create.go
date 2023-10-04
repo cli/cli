@@ -105,8 +105,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			to push the branch and offer an option to fork the base repository. Use %[1]s--head%[1]s to
 			explicitly skip any forking or pushing behavior.
 
-			A prompt will also ask for the title and the body of the pull request. Use %[1]s--title%[1]s
-			and %[1]s--body%[1]s to skip this, or use %[1]s--fill%[1]s to autofill these values from git commits.
+			A prompt will also ask for the title and the body of the pull request. Use %[1]s--title%[1]s and
+			%[1]s--body%[1]s to skip this, or use %[1]s--fill%[1]s to autofill these values from git commits.
+			It's important to notice that if the %[1]s--title%[1]s and/or %[1]s--body%[1]s are also provided
+			alongside %[1]s--fill%[1]s, the values specified by %[1]s--title%[1]s and/or %[1]s--body%[1]s will
+			take precedence and overwrite any autofilled content.
 
 			Link an issue to the pull request by referencing the issue in the body of the pull
 			request. If the body text mentions %[1]sFixes #123%[1]s or %[1]sCloses #123%[1]s, the referenced issue
@@ -193,8 +196,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
-	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
-	fl.BoolVar(&opts.FillFirst, "fill-first", false, "Do not prompt for title/body and just use first commit info")
+	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Use commit info for title and body")
+	fl.BoolVar(&opts.FillFirst, "fill-first", false, "Use first commit info for title and body")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
 	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
