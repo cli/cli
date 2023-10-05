@@ -49,11 +49,12 @@ type CreateOptions struct {
 	WebMode     bool
 	RecoverFile string
 
-	IsDraft    bool
-	Title      string
-	Body       string
-	BaseBranch string
-	HeadBranch string
+	IsDraft        bool
+	Title          string
+	Body           string
+	BaseBranch     string
+	HeadBranch     string
+	PushToBaseRepo bool
 
 	Reviewers []string
 	Assignees []string
@@ -103,7 +104,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			When the current branch isn't fully pushed to a git remote, a prompt will ask where
 			to push the branch and offer an option to fork the base repository. Use %[1]s--head%[1]s to
-			explicitly skip any forking or pushing behavior.
+			explicitly skip any forking or pushing behavior, or %[1]s--push-to-base-repo%[1]s to push to the
+			base repository, assuming the user has write access to that repository.
 
 			A prompt will also ask for the title and the body of the pull request. Use %[1]s--title%[1]s and
 			%[1]s--body%[1]s to skip this, or use %[1]s--fill%[1]s to autofill these values from git commits.
@@ -206,6 +208,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
+	fl.BoolVar(&opts.PushToBaseRepo, "push-to-base-repo", false, "Push the head branch to the base repository")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -571,6 +574,24 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 					headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), pushedTo.BranchName)
 				}
 			}
+		}
+	}
+
+	// check if the user requested for the base repository to be treated as the head repository
+	if headRepo == nil && isPushEnabled && opts.PushToBaseRepo {
+		pushableRepos, err := repoContext.HeadRepos()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, r := range pushableRepos {
+			if ghrepo.IsSame(baseRepo, r) {
+				headRepo = r
+			}
+		}
+
+		if headRepo == nil {
+			return nil, fmt.Errorf("the user might lack write access to the base repository")
 		}
 	}
 

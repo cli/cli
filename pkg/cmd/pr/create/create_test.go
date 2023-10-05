@@ -347,6 +347,41 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 		{
+			name: "push branch to base repository without prompt",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.PushToBaseRepo = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`, func(input map[string]interface{}) {
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "my title", input["title"].(string))
+						assert.Equal(t, "my body", input["body"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "feature", input["headRefName"].(string))
+						assert.Equal(t, false, input["draft"].(bool))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
 			name: "project v2",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
@@ -1021,10 +1056,10 @@ func Test_createRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
-						{ 
+						{
 						"data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
-							} } } 
+							} } }
 						}
 						`,
 						func(input map[string]interface{}) {
