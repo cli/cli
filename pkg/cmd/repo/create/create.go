@@ -418,9 +418,9 @@ func createFromScratch(opts *CreateOptions) error {
 
 // create new repo on remote host from template repo
 func createFromTemplate(opts *CreateOptions) error {
-	// this method is only for interactive mode
+	// this function is only for interactive mode
 	if !opts.Interactive {
-		return nil
+		return errors.New(`"createFromTemplate" function needs to be called in interactive mode`)
 	}
 
 	httpClient, err := opts.HttpClient()
