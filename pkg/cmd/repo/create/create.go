@@ -428,7 +428,6 @@ func createFromTemplate(opts *CreateOptions) error {
 		return err
 	}
 
-	var repoToCreate ghrepo.Interface
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -448,7 +447,7 @@ func createFromTemplate(opts *CreateOptions) error {
 		}
 		opts.Name = fmt.Sprintf("%s/%s", username, opts.Name)
 	}
-	repoToCreate, err = ghrepo.FromFullName(opts.Name)
+	repoToCreate, err := ghrepo.FromFullName(opts.Name)
 	if err != nil {
 		return fmt.Errorf("argument error: %w", err)
 	}
