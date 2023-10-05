@@ -18,11 +18,11 @@ import (
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) Login(host, username, token, gitProtocol string, encrypt bool) error {
+func (c tinyConfig) Login(host, username, token, gitProtocol string, encrypt bool) (bool, error) {
 	c[fmt.Sprintf("%s:%s", host, "user")] = username
 	c[fmt.Sprintf("%s:%s", host, "oauth_token")] = token
 	c[fmt.Sprintf("%s:%s", host, "git_protocol")] = gitProtocol
-	return nil
+	return false, nil
 }
 
 func TestLogin_ssh(t *testing.T) {
@@ -117,8 +117,7 @@ func TestLogin_ssh(t *testing.T) {
 
 func Test_scopesSentence(t *testing.T) {
 	type args struct {
-		scopes       []string
-		isEnterprise bool
+		scopes []string
 	}
 	tests := []struct {
 		name string
@@ -128,39 +127,28 @@ func Test_scopesSentence(t *testing.T) {
 		{
 			name: "basic scopes",
 			args: args{
-				scopes:       []string{"repo", "read:org"},
-				isEnterprise: false,
+				scopes: []string{"repo", "read:org"},
 			},
 			want: "'repo', 'read:org'",
 		},
 		{
 			name: "empty",
 			args: args{
-				scopes:       []string(nil),
-				isEnterprise: false,
+				scopes: []string(nil),
 			},
 			want: "",
 		},
 		{
-			name: "workflow scope for dotcom",
+			name: "workflow scope",
 			args: args{
-				scopes:       []string{"repo", "workflow"},
-				isEnterprise: false,
+				scopes: []string{"repo", "workflow"},
 			},
 			want: "'repo', 'workflow'",
-		},
-		{
-			name: "workflow scope for GHE",
-			args: args{
-				scopes:       []string{"repo", "workflow"},
-				isEnterprise: true,
-			},
-			want: "'repo', 'workflow' (GHE 3.0+)",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := scopesSentence(tt.args.scopes, tt.args.isEnterprise); got != tt.want {
+			if got := scopesSentence(tt.args.scopes); got != tt.want {
 				t.Errorf("scopesSentence() = %q, want %q", got, tt.want)
 			}
 		})

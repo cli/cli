@@ -108,7 +108,7 @@ func statusRun(opts *StatusOptions) error {
 		scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
 		if err != nil {
 			addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
-			addMsg("- The %s token in %s is no longer valid.", cs.Bold(hostname), tokenSource)
+			addMsg("- The %s token in %s is invalid.", cs.Bold(hostname), tokenSource)
 			if tokenIsWriteable {
 				addMsg("- To re-authenticate, run: %s %s",
 					cs.Bold("gh auth login -h"), cs.Bold(hostname))

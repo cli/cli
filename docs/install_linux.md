@@ -197,10 +197,10 @@ kiss b github-cli && kiss i github-cli
 
 ### Nix/NixOS
 
-Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?show=gitAndTools.gh&query=gh&from=0&size=30&sort=relevance&channel=20.03#disabled):
+Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?query=gh&sort=relevance&show=gh):
 
 ```bash
-nix-env -iA nixos.gitAndTools.gh
+nix-env -iA nixos.gh
 ```
 
 ### openSUSE Tumbleweed

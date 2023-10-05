@@ -173,7 +173,7 @@ func watchRun(opts *WatchOptions) error {
 	opts.IO.StopAlternateScreenBuffer()
 
 	if err != nil {
-		return nil
+		return err
 	}
 
 	// Write the last temporary buffer one last time
@@ -207,7 +207,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	jobs, err := shared.GetJobs(client, repo, run)
+	jobs, err := shared.GetJobs(client, repo, run, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}

@@ -113,9 +113,15 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	repoI, err := opts.BaseRepo()
-	if err != nil {
-		return err
+	var repoI ghrepo.Interface
+
+	// only one of the repo or org context is necessary
+	if opts.Organization == "" {
+		var repoErr error
+		repoI, repoErr = opts.BaseRepo()
+		if repoErr != nil {
+			return repoErr
+		}
 	}
 
 	hostname, _ := ghAuth.DefaultHost()
@@ -192,6 +198,10 @@ func viewRun(opts *ViewOptions) error {
 		fmt.Fprintf(w, "%s\n", cs.Green("Active"))
 	default:
 		fmt.Fprintf(w, "%s\n", rs.Enforcement)
+	}
+
+	if rs.CurrentUserCanBypass != "" {
+		fmt.Fprintf(w, "You can bypass: %s\n", strings.ReplaceAll(rs.CurrentUserCanBypass, "_", " "))
 	}
 
 	fmt.Fprintf(w, "\n%s\n", cs.Bold("Bypass List"))

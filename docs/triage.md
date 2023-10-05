@@ -6,7 +6,7 @@ triage role. The initial expectation is that the person in the role for the week
 
 ## Expectations for incoming issues
 
-All incoming issues need either an `enhancement`, `bug`, or `docs` label.
+Review and label [open issues missing either the `enhancement`, `bug`, or `docs` label](https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+-label%3Abug%2Cenhancement%2Cdocs+).
 
 To be considered triaged, `enhancement` issues require at least one of the following additional labels:
 

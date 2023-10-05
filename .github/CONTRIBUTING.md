@@ -16,6 +16,7 @@ Please do:
 Please avoid:
 
 * Opening pull requests for issues marked `needs-design`, `needs-investigation`, or `blocked`.
+* Opening pull requests that haven't been approved for work in an issue
 * Adding installation instructions specifically for your OS/package manager.
 * Opening pull requests for any issue marked `core`. These issues require additional context from
   the core CLI team at GitHub and any external pull requests will not be accepted.
@@ -23,7 +24,7 @@ Please avoid:
 ## Building the project
 
 Prerequisites:
-- Go 1.16+
+- Go 1.21+
 
 Build with:
 * Unix-like systems: `make`

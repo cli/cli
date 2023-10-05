@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -129,7 +128,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	}
 
 	if opts.useWeb && userInputs.Repository == "" {
-		return a.browser.Browse("https://github.com/codespaces/new")
+		return a.browser.Browse(fmt.Sprintf("%s/codespaces/new", a.apiClient.ServerURL()))
 	}
 
 	promptForRepoAndBranch := userInputs.Repository == "" && !opts.useWeb
@@ -293,7 +292,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	}
 
 	if opts.useWeb {
-		return a.browser.Browse(fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", createParams.RepositoryID, createParams.Branch, createParams.Machine, createParams.Location))
+		return a.browser.Browse(fmt.Sprintf("%s/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", a.apiClient.ServerURL(), createParams.RepositoryID, createParams.Branch, createParams.Machine, createParams.Location))
 	}
 
 	var codespace *api.Codespace
@@ -336,13 +335,12 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	var (
 		isInteractive = a.io.CanPrompt()
 		cs            = a.io.ColorScheme()
-		displayURL    = text.DisplayURL(allowPermissionsURL)
 	)
 
 	fmt.Fprintf(a.io.ErrOut, "You must authorize or deny additional permissions requested by this codespace before continuing.\n")
 
 	if !isInteractive {
-		fmt.Fprintf(a.io.ErrOut, "%s in your browser to review and authorize additional permissions: %s\n", cs.Bold("Open this URL"), displayURL)
+		fmt.Fprintf(a.io.ErrOut, "%s in your browser to review and authorize additional permissions: %s\n", cs.Bold("Open this URL"), allowPermissionsURL)
 		fmt.Fprintf(a.io.ErrOut, "Alternatively, you can run %q with the %q option to continue without authorizing additional permissions.\n", a.io.ColorScheme().Bold("create"), cs.Bold("--default-permissions"))
 		return nil, cmdutil.SilentError
 	}

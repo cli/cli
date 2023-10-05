@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -255,7 +256,7 @@ func TestViewRun(t *testing.T) {
 												"name": "REPO"}}
 				]}}}}`))
 				reg.Register(
-					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/attempts/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{
 						Jobs: []shared.Job{
 							shared.SuccessfulJob,
@@ -368,7 +369,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
 				reg.Register(
-					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/attempts/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{}))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
@@ -441,7 +442,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.GraphQL(`query PullRequestForRun`),
 					httpmock.StringResponse(``))
 				reg.Register(
-					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/attempts/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{
 						Jobs: []shared.Job{
 							shared.SuccessfulJob,
@@ -615,7 +616,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/attempts/3"),
 					httpmock.JSONResponse(shared.SuccessfulRun))
 				reg.Register(
-					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/attempts/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{
 						Jobs: []shared.Job{
 							shared.SuccessfulJob,
@@ -845,7 +846,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/attempts/3"),
 					httpmock.JSONResponse(shared.FailedRun))
 				reg.Register(
-					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/attempts/3/jobs"),
 					httpmock.JSONResponse(shared.JobsPayload{
 						Jobs: []shared.Job{
 							shared.SuccessfulJob,
@@ -1241,6 +1242,42 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
 			wantOut: "\nX trunk CI · 123\nTriggered via push about 59 minutes ago\n\nX This run likely failed because of a workflow file issue.\n\nFor more information, see: https://github.com/runs/123\n",
+		},
+		{
+			name: "Fetches all of a run's jobs with --json flag",
+			opts: &ViewOptions{
+				RunID: "3",
+				Exporter: shared.MakeTestExporter(
+					[]string{"jobs"},
+					func(io *iostreams.IOStreams, data interface{}) error {
+						run, ok := data.(*shared.Run)
+						if !ok {
+							return fmt.Errorf("expected data type *shared.Run")
+						}
+						fmt.Fprintf(io.Out, "fetched %d jobs\n", len(run.Jobs))
+						return nil
+					},
+				),
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.QueryMatcher("GET", "runs/3/jobs", url.Values{"per_page": []string{"100"}}),
+					httpmock.WithHeader(
+						httpmock.StringResponse(`{"jobs":[{},{},{}]}`),
+						"Link",
+						`<https://api.github.com/runs/3/jobs?page=2>; rel="next", <https://api.github.com/runs/3/jobs?page=2>; rel="last"`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.StringResponse(`{"jobs":[{},{}]}`))
+			},
+			wantOut: "fetched 5 jobs\n",
 		},
 	}
 

@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -110,6 +112,7 @@ func Test_deleteRun(t *testing.T) {
 		isTTY         bool
 		opts          DeleteOptions
 		prompterStubs func(*prompter.PrompterMock)
+		runStubs      func(*run.CommandStubber)
 		wantErr       string
 		wantStdout    string
 		wantStderr    string
@@ -164,6 +167,9 @@ func Test_deleteRun(t *testing.T) {
 				SkipConfirm: true,
 				CleanupTag:  true,
 			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag -d v1.2.3`, 0, "")
+			},
 			wantStdout: ``,
 			wantStderr: heredoc.Doc(`
 				✓ Deleted release and tag v1.2.3
@@ -176,6 +182,9 @@ func Test_deleteRun(t *testing.T) {
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
 				CleanupTag:  true,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag -d v1.2.3`, 0, "")
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -203,6 +212,12 @@ func Test_deleteRun(t *testing.T) {
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/23456"), httpmock.StatusStringResponse(204, ""))
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags/v1.2.3"), httpmock.StatusStringResponse(204, ""))
 
+			rs, teardown := run.Stub()
+			defer teardown(t)
+			if tt.runStubs != nil {
+				tt.runStubs(rs)
+			}
+
 			tt.opts.IO = ios
 			tt.opts.Prompter = pm
 			tt.opts.HttpClient = func() (*http.Client, error) {
@@ -211,6 +226,7 @@ func Test_deleteRun(t *testing.T) {
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
+			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
 
 			err := deleteRun(&tt.opts)
 			if tt.wantErr != "" {

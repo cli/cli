@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -88,6 +89,7 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
 type apiClient interface {
+	ServerURL() string
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
@@ -103,6 +105,7 @@ type apiClient interface {
 	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
 	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
 	GetCodespaceBillableOwner(ctx context.Context, nwo string) (*api.User, error)
+	HTTPClient() (*http.Client, error)
 }
 
 var errNoCodespaces = errors.New("you have no codespaces")

@@ -1,6 +1,6 @@
 name: Deployment
 
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
@@ -17,7 +17,7 @@ on:
         default: production
         type: environment
       go_version:
-        default: "1.19"
+        default: "1.21"
         type: string
       platforms:
         default: "linux,macos,windows"
@@ -34,13 +34,13 @@ jobs:
     if: contains(inputs.platforms, 'linux')
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ inputs.go_version }}
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           version: "~1.17.1"
           install-only: true
@@ -61,14 +61,14 @@ jobs:
             dist/*.tar.gz
             dist/*.rpm
             dist/*.deb
-  
+
   macos:
     runs-on: macos-latest
     environment: ${{ inputs.environment }}
     if: contains(inputs.platforms, 'macos')
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -92,7 +92,7 @@ jobs:
           security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
           rm "$RUNNER_TEMP/cert.p12"
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           version: "~1.17.1"
           install-only: true
@@ -118,14 +118,14 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.zip
-  
+
   windows:
     runs-on: windows-latest
     environment: ${{ inputs.environment }}
     if: contains(inputs.platforms, 'windows')
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -140,7 +140,7 @@ jobs:
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           version: "~1.17.1"
           install-only: true
@@ -209,11 +209,11 @@ jobs:
     if: inputs.release
     steps:
       - name: Checkout cli/cli
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Merge built artifacts
         uses: actions/download-artifact@v3
       - name: Checkout documentation site
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: github/cli.github.com
           path: site
@@ -336,11 +336,12 @@ jobs:
             git diff --name-status @{upstream}..
           fi
       - name: Bump homebrew-core formula
-        uses: mislav/bump-homebrew-formula-action@v2
+        uses: mislav/bump-homebrew-formula-action@v3
         if: inputs.environment == 'production' && !contains(inputs.tag_name, '-')
         with:
           formula-name: gh
+          formula-path: Formula/g/gh.rb
           tag-name: ${{ inputs.tag_name }}
-          push-to: cli/homebrew-core
+          push-to: williammartin/homebrew-core
         env:
           COMMITTER_TOKEN: ${{ secrets.HOMEBREW_PR_PAT }}

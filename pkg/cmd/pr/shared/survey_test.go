@@ -5,8 +5,8 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,45 +43,32 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		},
 	}
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, restoreAsk := prompt.InitAskStubber()
-	defer restoreAsk()
-
-	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "metadata",
-			Value: []string{"Labels", "Projects", "Assignees", "Reviewers", "Milestone"},
-		},
+	pm := prompter.NewMockPrompter(t)
+	pm.RegisterMultiSelect("What would you like to add?",
+		[]string{}, []string{"Reviewers", "Assignees", "Labels", "Projects", "Milestone"}, func(_ string, _, _ []string) ([]int, error) {
+			return []int{0, 1, 2, 3, 4}, nil
+		})
+	pm.RegisterMultiSelect("Reviewers", []string{}, []string{"hubot", "monalisa"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{1}, nil
 	})
-	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "reviewers",
-			Value: []string{"monalisa"},
-		},
-		{
-			Name:  "assignees",
-			Value: []string{"hubot"},
-		},
-		{
-			Name:  "labels",
-			Value: []string{"good first issue"},
-		},
-		{
-			Name:  "projects",
-			Value: []string{"The road to 1.0"},
-		},
-		{
-			Name:  "milestone",
-			Value: "(none)",
-		},
+	pm.RegisterMultiSelect("Assignees", []string{}, []string{"hubot", "monalisa"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{0}, nil
+	})
+	pm.RegisterMultiSelect("Labels", []string{}, []string{"help wanted", "good first issue"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{1}, nil
+	})
+	pm.RegisterMultiSelect("Projects", []string{}, []string{"Huge Refactoring", "The road to 1.0"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{1}, nil
+	})
+	pm.RegisterSelect("Milestone", []string{"(none)", "1.2 patch release"}, func(_, _ string, _ []string) (int, error) {
+		return 0, nil
 	})
 
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
+		Type:      PRMetadata,
 	}
-	err := MetadataSurvey(ios, repo, fetcher, state)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -112,33 +99,21 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 		},
 	}
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, restoreAsk := prompt.InitAskStubber()
-	defer restoreAsk()
-
-	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "metadata",
-			Value: []string{"Labels", "Projects"},
-		},
+	pm := prompter.NewMockPrompter(t)
+	pm.RegisterMultiSelect("What would you like to add?", []string{}, []string{"Assignees", "Labels", "Projects", "Milestone"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{1, 2}, nil
 	})
-	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "labels",
-			Value: []string{"good first issue"},
-		},
-		{
-			Name:  "projects",
-			Value: []string{"The road to 1.0"},
-		},
+	pm.RegisterMultiSelect("Labels", []string{}, []string{"help wanted", "good first issue"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{1}, nil
+	})
+	pm.RegisterMultiSelect("Projects", []string{}, []string{"Huge Refactoring", "The road to 1.0"}, func(_ string, _, _ []string) ([]int, error) {
+		return []int{1}, nil
 	})
 
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
 	}
-	err := MetadataSurvey(ios, repo, fetcher, state)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())

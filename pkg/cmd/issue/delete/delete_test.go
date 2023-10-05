@@ -2,6 +2,7 @@ package delete
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"regexp"
@@ -9,16 +10,16 @@ import (
 
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
 
-func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
+func runCommand(rt http.RoundTripper, pm *prompter.MockPrompter, isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
@@ -26,6 +27,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 
 	factory := &cmdutil.Factory{
 		IOStreams: ios,
+		Prompter:  pm,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -76,11 +78,10 @@ func TestIssueDelete(t *testing.T) {
 			}),
 	)
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("You're going to delete issue #13. This action cannot be reversed. To confirm, type the issue number:").AnswerWith("13")
+	pm := prompter.NewMockPrompter(t)
+	pm.RegisterConfirmDeletion("13", func(_ string) error { return nil })
 
-	output, err := runCommand(httpRegistry, true, "13")
+	output, err := runCommand(httpRegistry, pm, true, "13")
 	if err != nil {
 		t.Fatalf("error running command `issue delete`: %v", err)
 	}
@@ -112,7 +113,7 @@ func TestIssueDelete_confirm(t *testing.T) {
 			}),
 	)
 
-	output, err := runCommand(httpRegistry, true, "13 --confirm")
+	output, err := runCommand(httpRegistry, nil, true, "13 --confirm")
 	if err != nil {
 		t.Fatalf("error running command `issue delete`: %v", err)
 	}
@@ -137,19 +138,17 @@ func TestIssueDelete_cancel(t *testing.T) {
 			} } }`),
 	)
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("You're going to delete issue #13. This action cannot be reversed. To confirm, type the issue number:").AnswerWith("14")
+	pm := prompter.NewMockPrompter(t)
+	pm.RegisterConfirmDeletion("13", func(_ string) error {
+		return errors.New("You entered 14")
+	})
 
-	output, err := runCommand(httpRegistry, true, "13")
-	if err != nil {
-		t.Fatalf("error running command `issue delete`: %v", err)
+	_, err := runCommand(httpRegistry, pm, true, "13")
+	if err == nil {
+		t.Fatalf("expected error")
 	}
-
-	r := regexp.MustCompile(`Issue #13 was not deleted`)
-
-	if !r.MatchString(output.String()) {
-		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.String())
+	if err.Error() != "You entered 14" {
+		t.Fatalf("got unexpected error '%s'", err)
 	}
 }
 
@@ -166,7 +165,7 @@ func TestIssueDelete_doesNotExist(t *testing.T) {
 			`),
 	)
 
-	_, err := runCommand(httpRegistry, true, "13")
+	_, err := runCommand(httpRegistry, nil, true, "13")
 	if err == nil || err.Error() != "GraphQL: Could not resolve to an Issue with the number of 13." {
 		t.Errorf("error running command `issue delete`: %v", err)
 	}
@@ -199,7 +198,7 @@ func TestIssueDelete_issuesDisabled(t *testing.T) {
 		}`),
 	)
 
-	_, err := runCommand(httpRegistry, true, "13")
+	_, err := runCommand(httpRegistry, nil, true, "13")
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Fatalf("got error: %v", err)
 	}

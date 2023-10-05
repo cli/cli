@@ -22,7 +22,7 @@ import (
 const defaultSSHKeyTitle = "GitHub CLI"
 
 type iconfig interface {
-	Login(string, string, string, string, bool) error
+	Login(string, string, string, string, bool) (bool, error)
 }
 
 type LoginOptions struct {
@@ -162,7 +162,7 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
 			Tip: you can generate a Personal Access Token here https://%s/settings/tokens
 			The minimum required scopes are %s.
-		`, hostname, scopesSentence(minimumScopes, ghinstance.IsEnterprise(hostname))))
+		`, hostname, scopesSentence(minimumScopes)))
 
 		var err error
 		authToken, err = opts.Prompter.AuthToken()
@@ -188,8 +188,12 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	if err := cfg.Login(hostname, username, authToken, gitProtocol, opts.SecureStorage); err != nil {
+	insecureStorageUsed, err := cfg.Login(hostname, username, authToken, gitProtocol, opts.SecureStorage)
+	if err != nil {
 		return err
+	}
+	if insecureStorageUsed {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication credentials saved in plain text\n", cs.Yellow("!"))
 	}
 
 	if credentialFlow.ShouldSetup() {
@@ -216,14 +220,10 @@ func Login(opts *LoginOptions) error {
 	return nil
 }
 
-func scopesSentence(scopes []string, isEnterprise bool) string {
+func scopesSentence(scopes []string) string {
 	quoted := make([]string, len(scopes))
 	for i, s := range scopes {
 		quoted[i] = fmt.Sprintf("'%s'", s)
-		if s == "workflow" && isEnterprise {
-			// remove when GHE 2.x reaches EOL
-			quoted[i] += " (GHE 3.0+)"
-		}
 	}
 	return strings.Join(quoted, ", ")
 }

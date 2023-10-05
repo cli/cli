@@ -2,14 +2,10 @@ package root
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
-	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
@@ -76,7 +72,12 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// require that the user is authenticated before running most commands
 			if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
-				fmt.Fprint(io.ErrOut, authHelp())
+				parent := cmd.Parent()
+				if parent != nil && parent.Use == "codespace" {
+					fmt.Fprintln(io.ErrOut, "To get started with GitHub CLI, please run:  gh auth login -s codespace")
+				} else {
+					fmt.Fprint(io.ErrOut, authHelp())
+				}
 				return &AuthError{}
 			}
 			return nil
@@ -134,7 +135,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(variableCmd.NewCmdVariable(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
-	cmd.AddCommand(newCodespaceCmd(f))
+	cmd.AddCommand(codespaceCmd.NewCmdCodespace(f))
 	cmd.AddCommand(projectCmd.NewCmdProject(f))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
@@ -152,13 +153,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
 	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
 	cmd.AddCommand(cacheCmd.NewCmdCache(&repoResolvingCmdFactory))
-
-	// the `api` command should not inherit any extra HTTP headers
-	bareHTTPCmdFactory := *f
-	bareHTTPCmdFactory.HttpClient = bareHTTPClient(f, version)
-	bareHTTPCmdFactory.BaseRepo = factory.SmartBaseRepoFunc(&bareHTTPCmdFactory)
-
-	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, nil))
+	cmd.AddCommand(apiCmd.NewCmdApi(&repoResolvingCmdFactory, nil))
 
 	// Help topics
 	var referenceCmd *cobra.Command
@@ -223,69 +218,4 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	referenceCmd.Long = stringifyReference(cmd)
 	referenceCmd.SetHelpFunc(longPager(f.IOStreams))
 	return cmd, nil
-}
-
-func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, error) {
-	return func() (*http.Client, error) {
-		cfg, err := f.Config()
-		if err != nil {
-			return nil, err
-		}
-		opts := api.HTTPClientOptions{
-			AppVersion:        version,
-			Config:            cfg.Authentication(),
-			Log:               f.IOStreams.ErrOut,
-			LogColorize:       f.IOStreams.ColorEnabled(),
-			SkipAcceptHeaders: true,
-		}
-		return api.NewHTTPClient(opts)
-	}
-}
-
-func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
-	serverURL := os.Getenv("GITHUB_SERVER_URL")
-	apiURL := os.Getenv("GITHUB_API_URL")
-	vscsURL := os.Getenv("INTERNAL_VSCS_TARGET_URL")
-	app := codespaceCmd.NewApp(
-		f.IOStreams,
-		f,
-		codespacesAPI.New(
-			serverURL,
-			apiURL,
-			vscsURL,
-			&lazyLoadedHTTPClient{factory: f},
-		),
-		f.Browser,
-		f.Remotes,
-	)
-	cmd := codespaceCmd.NewRootCmd(app)
-	cmd.Use = "codespace"
-	cmd.Aliases = []string{"cs"}
-	cmd.GroupID = "core"
-	return cmd
-}
-
-type lazyLoadedHTTPClient struct {
-	factory *cmdutil.Factory
-
-	httpClientMu sync.RWMutex // guards httpClient
-	httpClient   *http.Client
-}
-
-func (l *lazyLoadedHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	l.httpClientMu.RLock()
-	httpClient := l.httpClient
-	l.httpClientMu.RUnlock()
-
-	if httpClient == nil {
-		var err error
-		l.httpClientMu.Lock()
-		l.httpClient, err = l.factory.HttpClient()
-		l.httpClientMu.Unlock()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return l.httpClient.Do(req)
 }
