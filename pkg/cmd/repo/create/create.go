@@ -269,9 +269,8 @@ func createRun(opts *CreateOptions) error {
 
 	if opts.Source == "" {
 		return createFromScratch(opts)
-	} else {
-		return createFromLocal(opts)
 	}
+	return createFromLocal(opts)
 }
 
 // create new repo on remote host
