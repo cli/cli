@@ -12,10 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/codespaces/connection"
+	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
-	"github.com/cli/cli/v2/pkg/liveshare"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -46,21 +47,21 @@ type Invoker interface {
 }
 
 type invoker struct {
-	conn            *grpc.ClientConn
-	session         liveshare.LiveshareSession
-	listener        net.Listener
-	jupyterClient   jupyter.JupyterServerHostClient
-	codespaceClient codespace.CodespaceHostClient
-	sshClient       ssh.SshServerHostClient
-	cancelPF        context.CancelFunc
+	conn                *grpc.ClientConn
+	codespaceConnection *connection.CodespaceConnection
+	listener            net.Listener
+	jupyterClient       jupyter.JupyterServerHostClient
+	codespaceClient     codespace.CodespaceHostClient
+	sshClient           ssh.SshServerHostClient
+	cancelPF            context.CancelFunc
 }
 
 // Connects to the internal RPC server and returns a new invoker for it
-func CreateInvoker(ctx context.Context, session liveshare.LiveshareSession) (Invoker, error) {
+func CreateInvoker(ctx context.Context, codespaceConnection *connection.CodespaceConnection) (Invoker, error) {
 	ctx, cancel := context.WithTimeout(ctx, ConnectionTimeout)
 	defer cancel()
 
-	invoker, err := connect(ctx, session)
+	invoker, err := connect(ctx, codespaceConnection)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to internal server: %w", err)
 	}
@@ -69,7 +70,7 @@ func CreateInvoker(ctx context.Context, session liveshare.LiveshareSession) (Inv
 }
 
 // Finds a free port to listen on and creates a new RPC invoker that connects to that port
-func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, error) {
+func connect(ctx context.Context, codespaceConnection *connection.CodespaceConnection) (Invoker, error) {
 	listener, err := listenTCP()
 	if err != nil {
 		return nil, err
@@ -77,8 +78,8 @@ func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, 
 	localAddress := listener.Addr().String()
 
 	invoker := &invoker{
-		session:  session,
-		listener: listener,
+		codespaceConnection: codespaceConnection,
+		listener:            listener,
 	}
 
 	// Create a cancelable context to be able to cancel background tasks
@@ -100,8 +101,17 @@ func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, 
 
 	// Tunnel the remote gRPC server port to the local port
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, codespacesInternalSessionName, codespacesInternalPort, true)
-		ch <- fwd.ForwardToListener(pfctx, listener)
+		fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+		if err != nil {
+			ch <- fmt.Errorf("failed to create port forwarder: %w", err)
+		}
+
+		opts := portforwarder.ForwardPortOpts{
+			Port:     codespacesInternalPort,
+			Connect:  true,
+			Internal: true,
+		}
+		ch <- fwd.ForwardPortToListener(pfctx, opts, listener)
 	}()
 
 	var conn *grpc.ClientConn
@@ -262,7 +272,7 @@ func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			reason := i.session.GetKeepAliveReason()
+			reason := i.codespaceConnection.GetKeepAliveReason()
 			_ = i.notifyCodespaceOfClientActivity(ctx, reason)
 		}
 	}

@@ -345,7 +345,12 @@ func (a *App) ForwardPorts(ctx context.Context, selector *CodespaceSelector, por
 			if err != nil {
 				return fmt.Errorf("failed to create port forwarder: %w", err)
 			}
-			return fwd.ForwardAndConnectToPort(ctx, uint16(pair.remote), listen, false, false)
+
+			opts := portforwarder.ForwardPortOpts{
+				Port:    pair.remote,
+				Connect: true,
+			}
+			return fwd.ForwardPortToListener(ctx, opts, listen)
 		})
 	}
 	return group.Wait() // first error

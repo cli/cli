@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/spf13/cobra"
@@ -49,13 +50,12 @@ func (a *App) Rebuild(ctx context.Context, selector *CodespaceSelector, full boo
 		return nil
 	}
 
-	session, err := startLiveShareSession(ctx, codespace, a, false, "")
+	codespaceConnection, err := codespaces.GetCodespaceConnection(ctx, a, a.apiClient, codespace)
 	if err != nil {
-		return fmt.Errorf("starting Live Share session: %w", err)
+		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
-	defer safeClose(session, &err)
 
-	invoker, err := rpc.CreateInvoker(ctx, session)
+	invoker, err := rpc.CreateInvoker(ctx, codespaceConnection)
 	if err != nil {
 		return err
 	}

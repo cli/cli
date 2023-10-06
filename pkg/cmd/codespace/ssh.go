@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -18,10 +19,10 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
 	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/cli/cli/v2/pkg/ssh"
 	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
@@ -144,6 +145,33 @@ func newSSHCmd(app *App) *cobra.Command {
 	return sshCmd
 }
 
+type ReadWriteHalfCloser interface {
+	io.ReadWriteCloser
+	CloseWrite() error
+}
+
+type combinedReadWriteHalfCloser struct {
+	io.ReadCloser
+	io.WriteCloser
+}
+
+func NewReadWriteHalfCloser(reader io.ReadCloser, writer io.WriteCloser) ReadWriteHalfCloser {
+	return &combinedReadWriteHalfCloser{reader, writer}
+}
+
+func (crwc *combinedReadWriteHalfCloser) Close() error {
+	werr := crwc.WriteCloser.Close()
+	rerr := crwc.ReadCloser.Close()
+	if werr != nil {
+		return werr
+	}
+	return rerr
+}
+
+func (crwc *combinedReadWriteHalfCloser) CloseWrite() error {
+	return crwc.WriteCloser.Close()
+}
+
 // SSH opens an ssh session or runs an ssh command in a codespace.
 func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
@@ -175,11 +203,10 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return err
 	}
 
-	session, err := startLiveShareSession(ctx, codespace, a, opts.debug, opts.debugFile)
+	codespaceConnection, err := codespaces.GetCodespaceConnection(ctx, a, a.apiClient, codespace)
 	if err != nil {
-		return err
+		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
-	defer safeClose(session, &err)
 
 	var (
 		invoker             rpc.Invoker
@@ -187,7 +214,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		sshUser             string
 	)
 	err = a.RunWithProgress("Fetching SSH Details", func() (err error) {
-		invoker, err = rpc.CreateInvoker(ctx, session)
+		invoker, err = rpc.CreateInvoker(ctx, codespaceConnection)
 		if err != nil {
 			return
 		}
@@ -202,10 +229,20 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
 
+	fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+	if err != nil {
+		return fmt.Errorf("failed to create port forwarder: %w", err)
+	}
+
 	if opts.stdio {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
-		stdio := liveshare.NewReadWriteHalfCloser(os.Stdin, os.Stdout)
-		err := fwd.Forward(ctx, stdio) // always non-nil
+		stdio := NewReadWriteHalfCloser(os.Stdin, os.Stdout)
+		opts := portforwarder.ForwardPortOpts{
+			Port:      remoteSSHServerPort,
+			Connect:   true,
+			Internal:  true,
+			KeepAlive: true,
+		}
+		err = fwd.ForwardPort(ctx, opts, nil, stdio)
 		return fmt.Errorf("tunnel closed: %w", err)
 	}
 
@@ -227,8 +264,13 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
-		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
+		opts := portforwarder.ForwardPortOpts{
+			Port:      remoteSSHServerPort,
+			Connect:   true,
+			Internal:  true,
+			KeepAlive: true,
+		}
+		tunnelClosed <- fwd.ForwardPortToListener(ctx, opts, listen)
 	}()
 
 	shellClosed := make(chan error, 1)
@@ -526,13 +568,11 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			result := sshResult{}
 			defer wg.Done()
 
-			session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, cs)
+			codespaceConnection, err := codespaces.GetCodespaceConnection(ctx, a, a.apiClient, cs)
 			if err != nil {
 				result.err = fmt.Errorf("error connecting to codespace: %w", err)
 			} else {
-				defer safeClose(session, &err)
-
-				invoker, err := rpc.CreateInvoker(ctx, session)
+				invoker, err := rpc.CreateInvoker(ctx, codespaceConnection)
 				if err != nil {
 					result.err = fmt.Errorf("error connecting to codespace: %w", err)
 				} else {

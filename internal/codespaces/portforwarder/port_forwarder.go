@@ -3,6 +3,7 @@ package portforwarder
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 
@@ -22,6 +23,19 @@ const (
 	PublicPortVisibility  = "public"
 )
 
+const (
+	trafficTypeInput  = "input"
+	trafficTypeOutput = "output"
+)
+
+type ForwardPortOpts struct {
+	Port       int
+	Connect    bool
+	Internal   bool
+	KeepAlive  bool
+	Visibility string
+}
+
 type PortForwarder struct {
 	connection connection.CodespaceConnection
 }
@@ -34,20 +48,20 @@ func NewPortForwarder(ctx context.Context, codespaceConnection *connection.Codes
 }
 
 // ForwardAndConnectToPort forwards a port and connects to it via a local TCP port.
-func (fwd *PortForwarder) ForwardAndConnectToPort(ctx context.Context, remotePort uint16, listen *net.TCPListener, keepAlive bool, internal bool) error {
-	return fwd.ForwardPort(ctx, remotePort, listen, keepAlive, true, internal, "")
+func (fwd *PortForwarder) ForwardPortToListener(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener) error {
+	return fwd.ForwardPort(ctx, opts, listener, nil)
 }
 
-// ForwardPort forwards a port and optionally connects to it via a local TCP port.
-func (fwd *PortForwarder) ForwardPort(ctx context.Context, remotePort uint16, listen *net.TCPListener, keepAlive bool, connect bool, internal bool, visibility string) error {
-	tunnelPort := tunnels.NewTunnelPort(remotePort, "", "", tunnels.TunnelProtocolHttp)
+// ForwardPort forwards a port and optionally connects to it via a local TCP port or a given ReadWriteCloser.
+func (fwd *PortForwarder) ForwardPort(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener, conn io.ReadWriteCloser) error {
+	tunnelPort := tunnels.NewTunnelPort(uint16(opts.Port), "", "", tunnels.TunnelProtocolHttps)
 
 	// If no visibility is provided, Dev Tunnels will use the default (private)
-	if visibility != "" {
+	if opts.Visibility != "" {
 		// Check if the requested visibility is allowed
 		allowed := false
 		for _, allowedVisibility := range fwd.connection.AllowedPortPrivacySettings {
-			if allowedVisibility == visibility {
+			if allowedVisibility == opts.Visibility {
 				allowed = true
 				break
 			}
@@ -55,10 +69,10 @@ func (fwd *PortForwarder) ForwardPort(ctx context.Context, remotePort uint16, li
 
 		// If the requested visibility is not allowed, return an error
 		if !allowed {
-			return fmt.Errorf("visibility %s is not allowed", visibility)
+			return fmt.Errorf("visibility %s is not allowed", opts.Visibility)
 		}
 
-		accessControlEntries := visibilityToAccessControlEntries(visibility)
+		accessControlEntries := visibilityToAccessControlEntries(opts.Visibility)
 		if len(accessControlEntries) > 0 {
 			tunnelPort.AccessControl = &tunnels.TunnelAccessControl{
 				Entries: accessControlEntries,
@@ -67,7 +81,7 @@ func (fwd *PortForwarder) ForwardPort(ctx context.Context, remotePort uint16, li
 	}
 
 	// Tag the port as internal or user forwarded so we know if it needs to be shown in the UI
-	if internal {
+	if opts.Internal {
 		tunnelPort.Tags = []string{InternalPortTag}
 	} else {
 		tunnelPort.Tags = []string{UserForwardedPortTag}
@@ -88,6 +102,9 @@ func (fwd *PortForwarder) ForwardPort(ctx context.Context, remotePort uint16, li
 			return
 		}
 
+		// Close the tunnel client when we're done
+		defer fwd.connection.TunnelClient.Close()
+
 		// Inform the host that we've forwarded the port locally
 		err = fwd.connection.TunnelClient.RefreshPorts(ctx)
 		if err != nil {
@@ -96,20 +113,20 @@ func (fwd *PortForwarder) ForwardPort(ctx context.Context, remotePort uint16, li
 		}
 
 		// If we don't want to connect to the port, exit early
-		if !connect {
+		if !opts.Connect {
 			done <- nil
 			return
 		}
 
 		// Ensure the port is forwarded before connecting
-		err = fwd.connection.TunnelClient.WaitForForwardedPort(ctx, remotePort)
+		err = fwd.connection.TunnelClient.WaitForForwardedPort(ctx, uint16(opts.Port))
 		if err != nil {
 			done <- fmt.Errorf("wait for forwarded port failed: %v", err)
 			return
 		}
 
-		// Connect to the forwarded port via a local TCP port
-		err = fwd.connection.TunnelClient.ConnectToForwardedPort(ctx, listen, remotePort)
+		// Connect to the forwarded port
+		err = fwd.connectToForwardedPort(ctx, opts, listener, conn)
 		if err != nil {
 			done <- fmt.Errorf("connect to forwarded port failed: %v", err)
 			return
@@ -125,6 +142,55 @@ func (fwd *PortForwarder) ForwardPort(ctx context.Context, remotePort uint16, li
 		return nil
 	case <-ctx.Done():
 		return nil
+	}
+}
+
+// connectToForwardedPort connects to the forwarded port via a local TCP port or a given ReadWriteCloser.
+// Optionally, it detects traffic over the connection and sends activity signals to the server to keep the codespace from shutting down.
+func (fwd *PortForwarder) connectToForwardedPort(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener, conn io.ReadWriteCloser) (err error) {
+	errc := make(chan error, 1)
+	sendError := func(err error) {
+		// Use non-blocking send, to avoid goroutines getting
+		// stuck in case of concurrent or sequential errors.
+		select {
+		case errc <- err:
+		default:
+		}
+	}
+	go func() {
+		for {
+			// Make a copy of the connection so we can accept new connections before this one closes
+			connCopy := conn
+
+			// If a listener is provided, accept a connection from it
+			if listener != nil {
+				connCopy, err = listener.AcceptTCP()
+				if err != nil {
+					sendError(err)
+					return
+				}
+			}
+
+			// Create a traffic monitor to keep the session alive
+			if opts.KeepAlive {
+				connCopy = newTrafficMonitor(connCopy, fwd.connection)
+			}
+
+			// Connect to the forwarded port in a goroutine so we can accept new connections
+			go func() {
+				if err := fwd.connection.TunnelClient.ConnectToForwardedPort(ctx, connCopy, uint16(opts.Port)); err != nil {
+					sendError(err)
+				}
+			}()
+		}
+	}()
+
+	// Wait for an error or for the context to be cancelled
+	select {
+	case err := <-errc:
+		return err
+	case <-ctx.Done():
+		return ctx.Err() // canceled
 	}
 }
 
@@ -165,6 +231,9 @@ func (fwd *PortForwarder) UpdatePortVisibility(ctx context.Context, remotePort i
 			return
 		}
 
+		// Close the tunnel client when we're done
+		defer fwd.connection.TunnelClient.Close()
+
 		// Inform the host that we've deleted the port
 		err = fwd.connection.TunnelClient.RefreshPorts(ctx)
 		if err != nil {
@@ -183,7 +252,7 @@ func (fwd *PortForwarder) UpdatePortVisibility(ctx context.Context, remotePort i
 		}
 
 		// Re-forward the port with the updated visibility
-		err = fwd.ForwardPort(ctx, uint16(remotePort), nil, false, false, false, visibility)
+		err = fwd.ForwardPort(ctx, ForwardPortOpts{Port: remotePort, Visibility: visibility}, nil, nil)
 		if err != nil {
 			return fmt.Errorf("error forwarding port: %w", err)
 		}
@@ -250,4 +319,34 @@ func IsInternalPort(port *tunnels.TunnelPort) bool {
 	}
 
 	return false
+}
+
+// trafficMonitor implements io.Reader. It keeps the session alive by notifying
+// it of the traffic type during Read operations.
+type trafficMonitor struct {
+	rwc        io.ReadWriteCloser
+	connection connection.CodespaceConnection
+}
+
+// newTrafficMonitor returns a trafficMonitor for the specified codespace connection.
+// It wraps the provided io.ReaderWriteCloser with its own Read/Write/Close methods.
+func newTrafficMonitor(rwc io.ReadWriteCloser, connection connection.CodespaceConnection) *trafficMonitor {
+	return &trafficMonitor{rwc, connection}
+}
+
+// Read wraps the underlying ReadWriteCloser's Read method and keeps the session alive with the "input" traffic type.
+func (t *trafficMonitor) Read(p []byte) (n int, err error) {
+	t.connection.KeepAlive(trafficTypeInput)
+	return t.rwc.Read(p)
+}
+
+// Write wraps the underlying ReadWriteCloser's Write method and keeps the session alive with the "output" traffic type.
+func (t *trafficMonitor) Write(p []byte) (n int, err error) {
+	t.connection.KeepAlive(trafficTypeOutput)
+	return t.rwc.Write(p)
+}
+
+// Close closes the underlying ReadWriteCloser.
+func (t *trafficMonitor) Close() error {
+	return t.rwc.Close()
 }
