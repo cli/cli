@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -761,44 +760,4 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 		return cmdutil.FlagErrorf("at least one argument must have a 'remote:' prefix")
 	}
 	return a.SSH(ctx, nil, opts.sshOptions)
-}
-
-// fileLogger is a wrapper around an log.Logger configured to write
-// to a file. It exports two additional methods to get the log file name
-// and close the file handle when the operation is finished.
-type fileLogger struct {
-	*log.Logger
-
-	f *os.File
-}
-
-// newFileLogger creates a new fileLogger. It returns an error if the file
-// cannot be created. The file is created on the specified path, if the path
-// is empty it is created in the temporary directory.
-func newFileLogger(file string) (fl *fileLogger, err error) {
-	var f *os.File
-	if file == "" {
-		f, err = os.CreateTemp("", "")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create tmp file: %w", err)
-		}
-	} else {
-		f, err = os.Create(file)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &fileLogger{
-		Logger: log.New(f, "", log.LstdFlags),
-		f:      f,
-	}, nil
-}
-
-func (fl *fileLogger) Name() string {
-	return fl.f.Name()
-}
-
-func (fl *fileLogger) Close() error {
-	return fl.f.Close()
 }

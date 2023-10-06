@@ -177,10 +177,6 @@ func noArgsConstraint(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func noopLogger() *log.Logger {
-	return log.New(io.Discard, "", 0)
-}
-
 type codespace struct {
 	*api.Codespace
 }

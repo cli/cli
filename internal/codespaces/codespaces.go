@@ -38,11 +38,6 @@ type progressIndicator interface {
 	StopProgressIndicator()
 }
 
-type logger interface {
-	Println(v ...interface{})
-	Printf(f string, v ...interface{})
-}
-
 type TimeoutError struct {
 	message string
 }
