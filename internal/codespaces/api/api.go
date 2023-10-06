@@ -247,11 +247,6 @@ const (
 )
 
 type CodespaceConnection struct {
-	SessionID        string           `json:"sessionId"`
-	SessionToken     string           `json:"sessionToken"`
-	RelayEndpoint    string           `json:"relayEndpoint"`
-	RelaySAS         string           `json:"relaySas"`
-	HostPublicKeys   []string         `json:"hostPublicKeys"`
 	TunnelProperties TunnelProperties `json:"tunnelProperties"`
 }
 
