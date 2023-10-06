@@ -48,6 +48,7 @@ require (
 )
 
 require (
+	github.com/TheCount/go-structfilter v0.1.0 // indirect
 	github.com/alecthomas/chroma v0.10.0 // indirect
 	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/aymanbagabas/go-osc52 v1.0.3 // indirect

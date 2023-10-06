@@ -1,6 +1,7 @@
 package queries
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/briandowns/spinner"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/queryfilter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/shurcooL/githubv4"
@@ -76,6 +78,11 @@ const (
 
 // doQuery wraps API calls with a visual spinner
 func (c *Client) doQuery(name string, query interface{}, variables map[string]interface{}) error {
+	filteredQuery, err := queryfilter.FilterTemplate(query)
+	if err != nil {
+		return fmt.Errorf("failed to filter template: %v", err)
+	}
+
 	var sp *spinner.Spinner
 	if c.spinner {
 		// https://github.com/briandowns/spinner#available-character-sets
@@ -83,17 +90,49 @@ func (c *Client) doQuery(name string, query interface{}, variables map[string]in
 		sp = spinner.New(dotStyle, 120*time.Millisecond, spinner.WithColor("fgCyan"))
 		sp.Start()
 	}
-	err := c.apiClient.Query(name, query, variables)
+
+	err = c.apiClient.Query(name, filteredQuery, variables)
 	if sp != nil {
 		sp.Stop()
 	}
-	return handleError(err)
+	if err != nil {
+		return handleError(err)
+	}
+
+	m, err := json.Marshal(filteredQuery)
+	if err != nil {
+		return fmt.Errorf("failed to marshal response: %v", err)
+	}
+
+	if err := json.Unmarshal(m, query); err != nil {
+		return fmt.Errorf("failed to unmarshal response: %v", err)
+	}
+
+	return nil
 }
 
 // TODO: un-export this since it couples the caller heavily to api.GraphQLClient
 func (c *Client) Mutate(operationName string, query interface{}, variables map[string]interface{}) error {
-	err := c.apiClient.Mutate(operationName, query, variables)
-	return handleError(err)
+	filteredQuery, err := queryfilter.FilterTemplate(query)
+	if err != nil {
+		return fmt.Errorf("failed to filter template: %v", err)
+	}
+
+	err = c.apiClient.Mutate(operationName, filteredQuery, variables)
+	if err != nil {
+		return handleError(err)
+	}
+
+	m, err := json.Marshal(filteredQuery)
+	if err != nil {
+		return fmt.Errorf("failed to marshal response: %v", err)
+	}
+
+	if err := json.Unmarshal(m, query); err != nil {
+		return fmt.Errorf("failed to unmarshal response: %v", err)
+	}
+
+	return nil
 }
 
 // PageInfo is a PageInfo GraphQL object https://docs.github.com/en/graphql/reference/objects#pageinfo.
