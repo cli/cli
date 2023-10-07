@@ -786,16 +786,16 @@ func localInit(gitClient *git.Client, remoteURL, path string) error {
 }
 
 func interactiveRepoTemplate(client *http.Client, hostname, owner string, prompter iprompter) (*api.Repository, error) {
-	repoTemplates, err := listRepositoryTemplates(client, hostname, owner)
+	templateRepos, err := listTemplateRepositories(client, hostname, owner)
 	if err != nil {
 		return nil, err
 	}
-	if len(repoTemplates.Repositories) == 0 {
+	if len(templateRepos) == 0 {
 		return nil, fmt.Errorf("%s has no template repositories", owner)
 	}
 
 	var templates []string
-	for _, repo := range repoTemplates.Repositories {
+	for _, repo := range templateRepos {
 		templates = append(templates, repo.Name)
 	}
 
@@ -803,7 +803,7 @@ func interactiveRepoTemplate(client *http.Client, hostname, owner string, prompt
 	if err != nil {
 		return nil, err
 	}
-	return &repoTemplates.Repositories[selected], nil
+	return &templateRepos[selected], nil
 }
 
 func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompter) (string, error) {

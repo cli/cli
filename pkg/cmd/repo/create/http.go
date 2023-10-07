@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/pkg/cmd/repo/list"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -264,7 +263,7 @@ func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug str
 	return &response, err
 }
 
-func listRepositoryTemplates(client *http.Client, hostname, owner string) (*list.RepositoryList, error) {
+func listTemplateRepositories(client *http.Client, hostname, owner string) ([]api.Repository, error) {
 	ownerConnection := "repositoryOwner(login: $owner)"
 
 	variables := map[string]interface{}{
@@ -305,7 +304,7 @@ func listRepositoryTemplates(client *http.Client, hostname, owner string) (*list
 	}`, strings.Join(inputs, ","), ownerConnection)
 
 	apiClient := api.NewClientFromHTTP(client)
-	listResult := list.RepositoryList{}
+	var templateRepositories []api.Repository
 	for {
 		var res result
 		err := apiClient.GraphQL(hostname, query, variables, &res)
@@ -314,12 +313,10 @@ func listRepositoryTemplates(client *http.Client, hostname, owner string) (*list
 		}
 
 		owner := res.RepositoryOwner
-		listResult.TotalCount = owner.Repositories.TotalCount
-		listResult.Owner = owner.Login
 
 		for _, repo := range owner.Repositories.Nodes {
 			if repo.IsTemplate {
-				listResult.Repositories = append(listResult.Repositories, repo)
+				templateRepositories = append(templateRepositories, repo)
 			}
 		}
 
@@ -329,7 +326,7 @@ func listRepositoryTemplates(client *http.Client, hostname, owner string) (*list
 		variables["endCursor"] = githubv4.String(owner.Repositories.PageInfo.EndCursor)
 	}
 
-	return &listResult, nil
+	return templateRepositories, nil
 }
 
 // listGitIgnoreTemplates uses API v3 here because gitignore template isn't supported by GraphQL yet.
