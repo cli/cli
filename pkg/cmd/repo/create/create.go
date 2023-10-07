@@ -490,15 +490,10 @@ func createFromTemplate(opts *CreateOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-	isTTY := opts.IO.IsStdoutTTY()
-	if isTTY {
-		fmt.Fprintf(opts.IO.Out,
-			"%s Created repository %s on GitHub\n",
-			cs.SuccessIconWithColor(cs.Green),
-			ghrepo.FullName(repo))
-	} else {
-		fmt.Fprintln(opts.IO.Out, repo.URL)
-	}
+	fmt.Fprintf(opts.IO.Out,
+		"%s Created repository %s on GitHub\n",
+		cs.SuccessIconWithColor(cs.Green),
+		ghrepo.FullName(repo))
 
 	opts.Clone, err = opts.Prompter.Confirm("Clone the new repository locally?", true)
 	if err != nil {
