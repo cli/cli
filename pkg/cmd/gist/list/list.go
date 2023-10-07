@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -95,8 +95,8 @@ func listRun(opts *ListOptions) error {
 
 	cs := opts.IO.ColorScheme()
 
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(opts.IO)
+	tp := tableprinter.New(opts.IO)
+	tp.HeaderRow("ID", "DESCRIPTION", "FILES", "", "UPDATED")
 
 	for _, gist := range gists {
 		fileCount := len(gist.Files)
@@ -118,16 +118,11 @@ func listRun(opts *ListOptions) error {
 			}
 		}
 
-		gistTime := gist.UpdatedAt.Format(time.RFC3339)
-		if tp.IsTTY() {
-			gistTime = text.FuzzyAgo(time.Now(), gist.UpdatedAt)
-		}
-
-		tp.AddField(gist.ID, nil, nil)
-		tp.AddField(text.RemoveExcessiveWhitespace(description), nil, cs.Bold)
-		tp.AddField(text.Pluralize(fileCount, "file"), nil, nil)
-		tp.AddField(visibility, nil, visColor)
-		tp.AddField(gistTime, nil, cs.Gray)
+		tp.AddField(gist.ID)
+		tp.AddField(text.RemoveExcessiveWhitespace(description), tableprinter.WithColor(cs.Bold))
+		tp.AddField(text.Pluralize(fileCount, "file"))
+		tp.AddField(visibility, tableprinter.WithColor(visColor))
+		tp.AddTimeField(time.Now(), gist.UpdatedAt, cs.Gray)
 		tp.EndRow()
 	}
 

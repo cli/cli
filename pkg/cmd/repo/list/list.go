@@ -12,10 +12,10 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 )
 
 type ListOptions struct {
@@ -176,9 +176,10 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(opts.IO)
+	tp := tableprinter.New(opts.IO)
+	tp.HeaderRow("NAME", "DESCRIPTION", "INFO", "UPDATED")
 
+	totalMatchCount := len(listResult.Repositories)
 	for _, repo := range listResult.Repositories {
 		info := repoInfo(repo)
 		infoColor := cs.Gray
@@ -192,13 +193,13 @@ func listRun(opts *ListOptions) error {
 			t = &repo.CreatedAt
 		}
 
-		tp.AddField(repo.NameWithOwner, nil, cs.Bold)
-		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description), nil, nil)
-		tp.AddField(info, nil, infoColor)
+		tp.AddField(repo.NameWithOwner, tableprinter.WithColor(cs.Bold))
+		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description))
+		tp.AddField(info, tableprinter.WithColor(infoColor))
 		if tp.IsTTY() {
-			tp.AddField(text.FuzzyAgoAbbr(opts.Now(), *t), nil, cs.Gray)
+			tp.AddField(text.FuzzyAgoAbbr(opts.Now(), *t), tableprinter.WithColor(cs.Gray))
 		} else {
-			tp.AddField(t.Format(time.RFC3339), nil, nil)
+			tp.AddField(t.Format(time.RFC3339))
 		}
 		tp.EndRow()
 	}
@@ -208,11 +209,15 @@ func listRun(opts *ListOptions) error {
 	}
 	if opts.IO.IsStdoutTTY() {
 		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || len(filter.Topic) > 0
-		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
+		title := listHeader(listResult.Owner, totalMatchCount, listResult.TotalCount, hasFilters)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
-	return tp.Render()
+	if totalMatchCount > 0 {
+		return tp.Render()
+	}
+
+	return nil
 }
 
 func listHeader(owner string, matchCount, totalMatchCount int, hasFilters bool) string {

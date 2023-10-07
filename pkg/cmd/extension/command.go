@@ -18,7 +18,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/search"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -268,8 +267,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return cmdutil.NewNoResultsError("no installed extensions found")
 				}
 				cs := io.ColorScheme()
-				//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-				t := utils.NewTablePrinter(io)
+				t := tableprinter.New(io)
+				t.HeaderRow("NAME", "REPO", "VERSION")
 				for _, c := range cmds {
 					// TODO consider a Repo() on Extension interface
 					var repo string
@@ -279,13 +278,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						}
 					}
 
-					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
-					t.AddField(repo, nil, nil)
+					t.AddField(fmt.Sprintf("gh %s", c.Name()))
+					t.AddField(repo)
 					version := displayExtensionVersion(c, c.CurrentVersion())
 					if c.IsPinned() {
-						t.AddField(version, nil, cs.Cyan)
+						t.AddField(version, nil, tableprinter.WithColor(cs.Cyan))
 					} else {
-						t.AddField(version, nil, nil)
+						t.AddField(version)
 					}
 
 					t.EndRow()

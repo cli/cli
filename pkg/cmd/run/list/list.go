@@ -7,12 +7,12 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -138,41 +138,29 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, runs)
 	}
 
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(opts.IO)
+	tp := tableprinter.New(opts.IO)
+	tp.HeaderRow("STATUS", "TITLE", "WORKFLOW", "BRANCH", "EVENT", "ID", "ELAPSED", "AGE")
 
 	cs := opts.IO.ColorScheme()
-
-	if tp.IsTTY() {
-		tp.AddField("STATUS", nil, nil)
-		tp.AddField("TITLE", nil, nil)
-		tp.AddField("WORKFLOW", nil, nil)
-		tp.AddField("BRANCH", nil, nil)
-		tp.AddField("EVENT", nil, nil)
-		tp.AddField("ID", nil, nil)
-		tp.AddField("ELAPSED", nil, nil)
-		tp.AddField("AGE", nil, nil)
-		tp.EndRow()
-	}
 
 	for _, run := range runs {
 		if tp.IsTTY() {
 			symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
-			tp.AddField(symbol, nil, symbolColor)
+			tp.AddField(symbol, tableprinter.WithColor(symbolColor))
 		} else {
-			tp.AddField(string(run.Status), nil, nil)
-			tp.AddField(string(run.Conclusion), nil, nil)
+			tp.AddField(string(run.Status))
+			tp.AddField(string(run.Conclusion))
 		}
 
-		tp.AddField(run.Title(), nil, cs.Bold)
+		tp.AddField(run.Title(), tableprinter.WithColor(cs.Bold))
 
-		tp.AddField(run.WorkflowName(), nil, nil)
-		tp.AddField(run.HeadBranch, nil, cs.Bold)
-		tp.AddField(string(run.Event), nil, nil)
-		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
+		tp.AddField(run.WorkflowName())
+		tp.AddField(run.HeadBranch, tableprinter.WithColor(cs.Bold))
+		tp.AddField(string(run.Event))
+		tp.AddField(fmt.Sprintf("%d", run.ID), tableprinter.WithColor(cs.Cyan))
 
-		tp.AddField(run.Duration(opts.now).String(), nil, nil)
-		tp.AddField(text.FuzzyAgoAbbr(time.Now(), run.StartedTime()), nil, nil)
+		tp.AddField(run.Duration(opts.now).String())
+		tp.AddField(text.FuzzyAgoAbbr(time.Now(), run.StartedTime()))
 		tp.EndRow()
 	}
 

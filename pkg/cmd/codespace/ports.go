@@ -108,14 +108,7 @@ func (a *App) ListPorts(ctx context.Context, selector *CodespaceSelector, export
 
 	cs := a.io.ColorScheme()
 	tp := tableprinter.New(a.io)
-
-	if a.io.IsStdoutTTY() {
-		tp.AddField("LABEL")
-		tp.AddField("PORT")
-		tp.AddField("VISIBILITY")
-		tp.AddField("BROWSE URL")
-		tp.EndRow()
-	}
+	tp.HeaderRow("LABEL", "PORT", "VISIBILITY", "BROWSE URL")
 
 	for _, port := range portInfos {
 		// Convert the ACE to a friendly visibility string (private, org, public)

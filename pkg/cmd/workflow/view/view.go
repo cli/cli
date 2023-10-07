@@ -11,13 +11,13 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	runShared "github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -213,8 +213,7 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(opts.IO)
+	tp := tableprinter.New(opts.IO)
 
 	// Header
 	filename := workflow.Base()
@@ -228,26 +227,39 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 		fmt.Fprintln(out, "Recent runs")
 	}
 
+	headers := make([]string, 0, 8)
+	if opts.Raw {
+		headers = append(headers, "STATUS", "CONCLUSION")
+	} else {
+		headers = append(headers, "")
+	}
+	headers = append(headers, "TITLE", "WORKFLOW", "BRANCH", "EVENT")
+	if opts.Raw {
+		headers = append(headers, "ELAPSED")
+	}
+	headers = append(headers, "ID")
+	tp.HeaderRow(headers...)
+
 	for _, run := range wr.WorkflowRuns {
 		if opts.Raw {
-			tp.AddField(string(run.Status), nil, nil)
-			tp.AddField(string(run.Conclusion), nil, nil)
+			tp.AddField(string(run.Status))
+			tp.AddField(string(run.Conclusion))
 		} else {
 			symbol, symbolColor := runShared.Symbol(cs, run.Status, run.Conclusion)
-			tp.AddField(symbol, nil, symbolColor)
+			tp.AddField(symbol, tableprinter.WithColor(symbolColor))
 		}
 
-		tp.AddField(run.Title(), nil, cs.Bold)
+		tp.AddField(run.Title(), tableprinter.WithColor(cs.Bold))
 
-		tp.AddField(run.WorkflowName(), nil, nil)
-		tp.AddField(run.HeadBranch, nil, cs.Bold)
-		tp.AddField(string(run.Event), nil, nil)
+		tp.AddField(run.WorkflowName())
+		tp.AddField(run.HeadBranch, tableprinter.WithColor(cs.Bold))
+		tp.AddField(string(run.Event))
 
 		if opts.Raw {
-			tp.AddField(run.Duration(opts.now).String(), nil, nil)
+			tp.AddField(run.Duration(opts.now).String())
 		}
 
-		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
+		tp.AddField(fmt.Sprintf("%d", run.ID), tableprinter.WithColor(cs.Cyan))
 
 		tp.EndRow()
 	}

@@ -112,6 +112,12 @@ func printTable(io *iostreams.IOStreams, checks []check) error {
 		return (b0 == "fail") || (b0 == "pending" && b1 == "success")
 	})
 
+	if io.IsStdoutTTY() {
+		tp.HeaderRow("", "NAME", "DESCRIPTION", "ELAPSED", "URL")
+	} else {
+		tp.HeaderRow("NAME", "STATUS", "ELAPSED", "URL", "DESCRIPTION")
+	}
+
 	for _, o := range checks {
 		addRow(tp, io, o)
 	}
