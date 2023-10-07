@@ -452,26 +452,25 @@ func createFromTemplate(opts *CreateOptions) error {
 		return fmt.Errorf("argument error: %w", err)
 	}
 
-	input := repoCreateInput{
-		Name:               repoToCreate.RepoName(),
-		Visibility:         opts.Visibility,
-		OwnerLogin:         repoToCreate.RepoOwner(),
-		TeamSlug:           opts.Team,
-		Description:        opts.Description,
-		HomepageURL:        opts.Homepage,
-		HasIssuesEnabled:   !opts.DisableIssues,
-		HasWikiEnabled:     !opts.DisableWiki,
-		GitIgnoreTemplate:  opts.GitIgnoreTemplate,
-		LicenseTemplate:    opts.LicenseTemplate,
-		IncludeAllBranches: opts.IncludeAllBranches,
-		InitReadme:         opts.AddReadme,
-	}
-
 	templateRepo, err := interactiveRepoTemplate(httpClient, host, repoToCreate.RepoOwner(), opts.Prompter)
 	if err != nil {
 		return err
 	}
-	input.TemplateRepositoryID = templateRepo.ID
+	input := repoCreateInput{
+		Name:                 repoToCreate.RepoName(),
+		Visibility:           opts.Visibility,
+		OwnerLogin:           repoToCreate.RepoOwner(),
+		TeamSlug:             opts.Team,
+		Description:          opts.Description,
+		HomepageURL:          opts.Homepage,
+		HasIssuesEnabled:     !opts.DisableIssues,
+		HasWikiEnabled:       !opts.DisableWiki,
+		GitIgnoreTemplate:    opts.GitIgnoreTemplate,
+		LicenseTemplate:      opts.LicenseTemplate,
+		IncludeAllBranches:   opts.IncludeAllBranches,
+		InitReadme:           opts.AddReadme,
+		TemplateRepositoryID: templateRepo.ID,
+	}
 	templateRepoMainBranch := templateRepo.DefaultBranchRef.Name
 
 	targetRepo := shared.NormalizeRepoName(opts.Name)
