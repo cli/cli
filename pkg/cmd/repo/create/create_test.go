@@ -588,6 +588,54 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
 		},
 		{
+			name: "interactive create from template repo but there are no template repos",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
+					switch message {
+					default:
+						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
+					}
+				}
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					switch message {
+					case "Repository name":
+						return "REPO", nil
+					case "Description":
+						return "my new repo", nil
+					default:
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Create a new repository on GitHub from a template repository")
+					case "Visibility":
+						return prompter.IndexFor(options, "Private")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER","organizations":{"nodes": []}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER","organizations":{"nodes": []}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryList\b`),
+					httpmock.StringResponse(`{"data":{"repositoryOwner":{"login":"OWNER","repositories":{"nodes":[]},"totalCount":0,"pageInfo":{"hasNextPage":false,"endCursor":""}}}}`))
+			},
+			execStubs:  func(cs *run.CommandStubber) {},
+			wantStdout: "",
+			wantErr:    true,
+			errMsg:     "OWNER has no template repositories",
+		},
+		{
 			name: "noninteractive create from scratch",
 			opts: &CreateOptions{
 				Interactive: false,
