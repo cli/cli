@@ -385,6 +385,7 @@ func TestRepoList_tty(t *testing.T) {
 
 		Showing 3 of 3 repositories in @octocat
 
+		NAME                 DESCRIPTION          INFO          UPDATED
 		octocat/hello-world  My first repository  public        8h
 		octocat/cli          GitHub CLI           public, fork  8h
 		octocat/testing                           private       7d

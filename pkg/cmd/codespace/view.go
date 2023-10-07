@@ -73,7 +73,7 @@ func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions) error {
 		return opts.exporter.Write(a.io, selectedCodespace)
 	}
 
-	tp := tableprinter.New(a.io)
+	tp := tableprinter.New(a.io, tableprinter.NoHeader)
 	c := codespace{selectedCodespace}
 	formattedName := formatNameForVSCSTarget(c.Name, c.VSCSTarget)
 

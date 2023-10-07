@@ -104,9 +104,10 @@ func TestIssueList_tty(t *testing.T) {
 
 		Showing 3 of 3 open issues in OWNER/REPO
 
-		#1  number won   label  about 1 day ago
-		#2  number too   label  about 1 month ago
-		#4  number fore  label  about 2 years ago
+		    TITLE        LABELS  UPDATED
+		#1  number won   label   about 1 day ago
+		#2  number too   label   about 1 month ago
+		#4  number fore  label   about 2 years ago
 	`), output.String())
 	assert.Equal(t, ``, output.Stderr())
 }

@@ -84,6 +84,7 @@ func TestPRList(t *testing.T) {
 
 		Showing 3 of 3 open pull requests in OWNER/REPO
 
+		     TITLE                  BRANCH         CREATED AT
 		#32  New feature            feature        about 3 hours ago
 		#29  Fixed bad bug          hubot:bug-fix  about 1 month ago
 		#28  Improve documentation  docs           about 2 years ago
