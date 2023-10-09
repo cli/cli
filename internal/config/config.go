@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -224,6 +225,15 @@ func (c *AuthConfig) Hosts() []string {
 	return ghAuth.KnownHosts()
 }
 
+func (c *AuthConfig) UsersForHost(hostname string) ([]string, error) {
+	users, err := c.cfg.Keys([]string{hosts, hostname, "users"})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the users from the hosts config for %s: %v", hostname, err)
+	}
+
+	return users, nil
+}
+
 // SetHosts will override any hosts resolution and return the given
 // hosts for all calls to Hosts. Use for testing purposes only.
 func (c *AuthConfig) SetHosts(hosts []string) {
@@ -245,6 +255,41 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 	c.defaultHostOverride = func() (string, string) {
 		return host, source
 	}
+}
+
+// This migration is super vulnerable to ending up in a broken state.
+func (c *AuthConfig) MigrateKeyring() error {
+	var multiError error
+	for _, hostname := range c.Hosts() {
+		token, err := keyring.Get(keyringServiceName(hostname), "")
+		var notFoundErr keyring.NotFoundError
+		if errors.As(err, &notFoundErr) {
+			continue
+		}
+		if err != nil {
+			multiError = errors.Join(multiError, err)
+			continue
+		}
+
+		activeUser, err := c.User(hostname)
+		if err != nil {
+			multiError = errors.Join(multiError, fmt.Errorf("failed to get the active user from the hosts config for %s: %v", hostname, err))
+			continue
+		}
+
+		if err := keyring.Set(keyringServiceName(hostname), activeUser, token); err != nil {
+			multiError = errors.Join(multiError, fmt.Errorf("failed to set the keyring for host %q and user %q: %v", hostname, activeUser, err))
+			continue
+		}
+
+		if err := keyring.Delete(keyringServiceName(hostname), ""); err != nil {
+			multiError = errors.Join(multiError, fmt.Errorf("failed to delete the keyring for host %q: %v", hostname, err))
+			continue
+		}
+
+		// Delete the old keyring entry but for now it's handy to leave alone since we don't need a "revert"
+	}
+	return multiError
 }
 
 // Login will set user, git protocol, and auth token for the given hostname.
@@ -277,27 +322,33 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }
 
+func (c *AuthConfig) Switch(hostname, username string) error {
+	c.cfg.Set([]string{hosts, hostname, "active_user"}, username)
+	return ghConfig.Write(c.cfg)
+}
+
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
+// It returns a string of the newly active user, or an empty string if there is none.
 // TODO: This needs to take a username, or if not, then it needs to remove the currently
 // active user
-func (c *AuthConfig) Logout(hostname string) error {
+func (c *AuthConfig) Logout(hostname string) (string, error) {
 	if hostname == "" {
-		return nil
+		return "", nil
 	}
 
 	// Get all the logged in users for this host, that way we can set one to active if there is one,
 	// otherwise delete the entire host.
 	users, err := c.cfg.Keys([]string{hosts, hostname, "users"})
 	if err != nil {
-		return fmt.Errorf("failed to get the active user from the hosts config for %s: %v", hostname, err)
+		return "", fmt.Errorf("failed to get the active user from the hosts config for %s: %v", hostname, err)
 	}
 
 	// Get the active user in order to delete the entry for that user, or to get their username
 	// so that we can delete their entry for the keyring. Probably this should use the .User() method TODO
 	activeUser, err := c.User(hostname)
 	if err != nil {
-		return fmt.Errorf("failed to get the active user from the hosts config for %s: %v", hostname, err)
+		return "", fmt.Errorf("failed to get the active user from the hosts config for %s: %v", hostname, err)
 	}
 
 	// Remove the keyring entry for this user
@@ -308,7 +359,7 @@ func (c *AuthConfig) Logout(hostname string) error {
 	users = remove(users, activeUser)
 	if len(users) == 0 {
 		_ = c.cfg.Remove([]string{hosts, hostname})
-		return ghConfig.Write(c.cfg)
+		return "", ghConfig.Write(c.cfg)
 	}
 
 	// If we have multiple entries then we should delete that one user from config,
@@ -316,7 +367,7 @@ func (c *AuthConfig) Logout(hostname string) error {
 	_ = c.cfg.Remove([]string{hosts, hostname, "users", activeUser})
 	c.cfg.Set([]string{hosts, hostname, "active_user"}, users[0])
 
-	return ghConfig.Write(c.cfg)
+	return users[0], ghConfig.Write(c.cfg)
 }
 
 func keyringServiceName(hostname string) string {

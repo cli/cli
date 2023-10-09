@@ -56,18 +56,23 @@ func mainRun() exitCode {
 
 	ctx := context.Background()
 
-	if os.Getenv("MIGRATE") != "" {
-		config, err := cmdFactory.Config()
-		if err != nil && hasDebug {
-			fmt.Fprintf(stderr, "warning: loading config failed: %v", err)
-			return exitError
-		}
+	config, err := cmdFactory.Config()
+	if err != nil && hasDebug {
+		fmt.Fprintf(stderr, "warning: loading config failed: %v", err)
+		return exitError
+	}
 
-		_, err = config.Migrate()
-		if err != nil {
-			fmt.Fprintf(stderr, "warning: config migration failed: %v", err)
-			return exitError
-		}
+	_, err = config.Migrate()
+	if err != nil {
+		fmt.Fprintf(stderr, "warning: config migration failed: %v", err)
+		return exitError
+	}
+
+	authCfg := config.Authentication()
+	err = authCfg.MigrateKeyring()
+	if err != nil {
+		fmt.Fprintf(stderr, "warning: auth keyring migration failed: %v", err)
+		return exitError
 	}
 
 	if os.Getenv("REVERT") != "" {
