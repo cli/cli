@@ -44,13 +44,18 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 
+	fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+	if err != nil {
+		return fmt.Errorf("failed to create port forwarder: %w", err)
+	}
+
 	var (
 		invoker    rpc.Invoker
 		serverPort int
 		serverUrl  string
 	)
 	err = a.RunWithProgress("Starting JupyterLab on codespace", func() (err error) {
-		invoker, err = rpc.CreateInvoker(ctx, codespaceConnection)
+		invoker, err = rpc.CreateInvoker(ctx, fwd)
 		if err != nil {
 			return
 		}
@@ -75,11 +80,6 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
-		if err != nil {
-			tunnelClosed <- fmt.Errorf("failed to create port forwarder: %w", err)
-		}
-
 		opts := portforwarder.ForwardPortOpts{
 			Port:    serverPort,
 			Connect: true,

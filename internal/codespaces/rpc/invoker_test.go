@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
+	rpctest "github.com/cli/cli/v2/internal/codespaces/rpc/test"
 	"google.golang.org/grpc"
 )
 
@@ -71,8 +72,8 @@ func createTestInvoker(t *testing.T, server *mockServer) (Invoker, func(), error
 		listener.Close()
 	}
 
-	// TODO: Fix these tests to work with Dev Tunnels
-	invoker, err := CreateInvoker(context.Background(), nil)
+	// Create a new invoker with a mock port forwarder
+	invoker, err := CreateInvoker(context.Background(), rpctest.PortForwarder{})
 	if err != nil {
 		close()
 		return nil, nil, fmt.Errorf("error connecting to internal server: %w", err)

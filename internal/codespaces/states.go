@@ -43,6 +43,11 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 
+	fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+	if err != nil {
+		return fmt.Errorf("failed to create port forwarder: %w", err)
+	}
+
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, localPort, err := ListenTCP(0, false)
 	if err != nil {
@@ -50,7 +55,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	}
 
 	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	invoker, err := rpc.CreateInvoker(ctx, codespaceConnection)
+	invoker, err := rpc.CreateInvoker(ctx, fwd)
 	if err != nil {
 		return err
 	}
@@ -65,11 +70,6 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	progress.StartProgressIndicatorWithLabel("Fetching status")
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
-		fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
-		if err != nil {
-			tunnelClosed <- fmt.Errorf("failed to create port forwarder: %w", err)
-		}
-
 		opts := portforwarder.ForwardPortOpts{
 			Port:     remoteSSHServerPort,
 			Connect:  true,

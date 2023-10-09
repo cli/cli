@@ -207,13 +207,18 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 
+	fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+	if err != nil {
+		return fmt.Errorf("failed to create port forwarder: %w", err)
+	}
+
 	var (
 		invoker             rpc.Invoker
 		remoteSSHServerPort int
 		sshUser             string
 	)
 	err = a.RunWithProgress("Fetching SSH Details", func() (err error) {
-		invoker, err = rpc.CreateInvoker(ctx, codespaceConnection)
+		invoker, err = rpc.CreateInvoker(ctx, fwd)
 		if err != nil {
 			return
 		}
@@ -226,11 +231,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
-	}
-
-	fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
-	if err != nil {
-		return fmt.Errorf("failed to create port forwarder: %w", err)
 	}
 
 	if opts.stdio {
@@ -570,22 +570,33 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			codespaceConnection, err := codespaces.GetCodespaceConnection(ctx, a, a.apiClient, cs)
 			if err != nil {
 				result.err = fmt.Errorf("error connecting to codespace: %w", err)
-			} else {
-				invoker, err := rpc.CreateInvoker(ctx, codespaceConnection)
-				if err != nil {
-					result.err = fmt.Errorf("error connecting to codespace: %w", err)
-				} else {
-					defer safeClose(invoker, &err)
-
-					_, result.user, err = invoker.StartSSHServer(ctx)
-					if err != nil {
-						result.err = fmt.Errorf("error getting ssh server details: %w", err)
-					} else {
-						result.codespace = cs
-					}
-				}
+				sshUsers <- result
+				return
 			}
 
+			fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+			if err != nil {
+				result.err = fmt.Errorf("failed to create port forwarder: %w", err)
+				sshUsers <- result
+				return
+			}
+
+			invoker, err := rpc.CreateInvoker(ctx, fwd)
+			if err != nil {
+				result.err = fmt.Errorf("error connecting to codespace: %w", err)
+				sshUsers <- result
+				return
+			}
+			defer safeClose(invoker, &err)
+
+			_, result.user, err = invoker.StartSSHServer(ctx)
+			if err != nil {
+				result.err = fmt.Errorf("error getting ssh server details: %w", err)
+				sshUsers <- result
+				return
+			}
+
+			result.codespace = cs
 			sshUsers <- result
 		}()
 	}

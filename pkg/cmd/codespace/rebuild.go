@@ -6,6 +6,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
 	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/spf13/cobra"
 )
@@ -55,7 +56,12 @@ func (a *App) Rebuild(ctx context.Context, selector *CodespaceSelector, full boo
 		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 
-	invoker, err := rpc.CreateInvoker(ctx, codespaceConnection)
+	fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+	if err != nil {
+		return fmt.Errorf("failed to create port forwarder: %w", err)
+	}
+
+	invoker, err := rpc.CreateInvoker(ctx, fwd)
 	if err != nil {
 		return err
 	}

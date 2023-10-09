@@ -23,7 +23,6 @@ type CodespaceConnection struct {
 	Options                    *tunnels.TunnelRequestOptions
 	Tunnel                     *tunnels.Tunnel
 	AllowedPortPrivacySettings []string
-	keepAliveReason            chan string
 }
 
 // NewCodespaceConnection initializes a connection to a codespace.
@@ -72,7 +71,6 @@ func NewCodespaceConnection(ctx context.Context, codespace *api.Codespace, httpC
 		Options:                    options,
 		Tunnel:                     tunnel,
 		AllowedPortPrivacySettings: allowedPortPrivacySettings,
-		keepAliveReason:            make(chan string, 1),
 	}, nil
 }
 
@@ -115,20 +113,4 @@ func getTunnelClient(ctx context.Context, tunnelManager *tunnels.Manager, tunnel
 	}
 
 	return tunnelClient, nil
-}
-
-// KeepAlive accepts a reason that is retained if there is no active reason
-// to send to the server.
-func (c *CodespaceConnection) KeepAlive(reason string) {
-	select {
-	case c.keepAliveReason <- reason:
-	default:
-		// there is already an active keep alive reason
-		// so we can ignore this one
-	}
-}
-
-// GetKeepAliveReason fetches the keep alive reason from the channel and returns it.
-func (c *CodespaceConnection) GetKeepAliveReason() string {
-	return <-c.keepAliveReason
 }

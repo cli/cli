@@ -47,6 +47,11 @@ func (a *App) Logs(ctx context.Context, selector *CodespaceSelector, follow bool
 		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 
+	fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+	if err != nil {
+		return fmt.Errorf("failed to create port forwarder: %w", err)
+	}
+
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, localPort, err := codespaces.ListenTCP(0, false)
 	if err != nil {
@@ -56,7 +61,7 @@ func (a *App) Logs(ctx context.Context, selector *CodespaceSelector, follow bool
 
 	remoteSSHServerPort, sshUser := 0, ""
 	err = a.RunWithProgress("Fetching SSH Details", func() (err error) {
-		invoker, err := rpc.CreateInvoker(ctx, codespaceConnection)
+		invoker, err := rpc.CreateInvoker(ctx, fwd)
 		if err != nil {
 			return
 		}
@@ -84,11 +89,6 @@ func (a *App) Logs(ctx context.Context, selector *CodespaceSelector, follow bool
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
-		if err != nil {
-			tunnelClosed <- fmt.Errorf("failed to create port forwarder: %w", err)
-		}
-
 		opts := portforwarder.ForwardPortOpts{
 			Port:     remoteSSHServerPort,
 			Connect:  true,

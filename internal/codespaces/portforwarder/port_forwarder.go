@@ -36,24 +36,35 @@ type ForwardPortOpts struct {
 	Visibility string
 }
 
-type PortForwarder struct {
-	connection connection.CodespaceConnection
+type CodespacesPortForwarder struct {
+	connection      connection.CodespaceConnection
+	keepAliveReason chan string
+}
+
+type PortForwarder interface {
+	ForwardPortToListener(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener) error
+	ForwardPort(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener, conn io.ReadWriteCloser) error
+	ListPorts(ctx context.Context) ([]*tunnels.TunnelPort, error)
+	UpdatePortVisibility(ctx context.Context, remotePort int, visibility string) error
+	KeepAlive(reason string)
+	GetKeepAliveReason() string
 }
 
 // NewPortForwarder returns a new PortForwarder for the specified codespace.
-func NewPortForwarder(ctx context.Context, codespaceConnection *connection.CodespaceConnection) (fwd *PortForwarder, err error) {
-	return &PortForwarder{
-		connection: *codespaceConnection,
+func NewPortForwarder(ctx context.Context, codespaceConnection *connection.CodespaceConnection) (fwd PortForwarder, err error) {
+	return &CodespacesPortForwarder{
+		connection:      *codespaceConnection,
+		keepAliveReason: make(chan string, 1),
 	}, nil
 }
 
 // ForwardPortToListener forwards the specified port to the given TCP listener.
-func (fwd *PortForwarder) ForwardPortToListener(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener) error {
+func (fwd *CodespacesPortForwarder) ForwardPortToListener(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener) error {
 	return fwd.ForwardPort(ctx, opts, listener, nil)
 }
 
 // ForwardPort forwards the specified port to the given TCP listener or ReadWriteCloser.
-func (fwd *PortForwarder) ForwardPort(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener, conn io.ReadWriteCloser) error {
+func (fwd *CodespacesPortForwarder) ForwardPort(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener, conn io.ReadWriteCloser) error {
 	// Ensure that the port number is valid before casting it to a uint16
 	var portNumber uint16
 	if opts.Port >= 0 && opts.Port <= 65535 {
@@ -155,7 +166,7 @@ func (fwd *PortForwarder) ForwardPort(ctx context.Context, opts ForwardPortOpts,
 
 // connectToForwardedPort connects to the forwarded port via a local TCP port or a given ReadWriteCloser.
 // Optionally, it detects traffic over the connection and sends activity signals to the server to keep the codespace from shutting down.
-func (fwd *PortForwarder) connectToForwardedPort(ctx context.Context, portNumber uint16, keepAlive bool, listener *net.TCPListener, conn io.ReadWriteCloser) (err error) {
+func (fwd *CodespacesPortForwarder) connectToForwardedPort(ctx context.Context, portNumber uint16, keepAlive bool, listener *net.TCPListener, conn io.ReadWriteCloser) (err error) {
 	errc := make(chan error, 1)
 	sendError := func(err error) {
 		// Use non-blocking send, to avoid goroutines getting
@@ -181,7 +192,7 @@ func (fwd *PortForwarder) connectToForwardedPort(ctx context.Context, portNumber
 
 			// Create a traffic monitor to keep the session alive
 			if keepAlive {
-				connCopy = newTrafficMonitor(connCopy, fwd.connection)
+				connCopy = newTrafficMonitor(connCopy, fwd)
 			}
 
 			// Connect to the forwarded port in a goroutine so we can accept new connections
@@ -203,7 +214,7 @@ func (fwd *PortForwarder) connectToForwardedPort(ctx context.Context, portNumber
 }
 
 // ListPorts fetches the list of ports that are currently forwarded.
-func (fwd *PortForwarder) ListPorts(ctx context.Context) (ports []*tunnels.TunnelPort, err error) {
+func (fwd *CodespacesPortForwarder) ListPorts(ctx context.Context) (ports []*tunnels.TunnelPort, err error) {
 	ports, err = fwd.connection.TunnelManager.ListTunnelPorts(ctx, fwd.connection.Tunnel, fwd.connection.Options)
 	if err != nil {
 		return nil, fmt.Errorf("error listing ports: %w", err)
@@ -213,7 +224,7 @@ func (fwd *PortForwarder) ListPorts(ctx context.Context) (ports []*tunnels.Tunne
 }
 
 // UpdatePortVisibility changes the visibility (private, org, public) of the specified port.
-func (fwd *PortForwarder) UpdatePortVisibility(ctx context.Context, remotePort int, visibility string) error {
+func (fwd *CodespacesPortForwarder) UpdatePortVisibility(ctx context.Context, remotePort int, visibility string) error {
 	tunnelPort, err := fwd.connection.TunnelManager.GetTunnelPort(ctx, fwd.connection.Tunnel, remotePort, fwd.connection.Options)
 	if err != nil {
 		return fmt.Errorf("error getting tunnel port: %w", err)
@@ -269,6 +280,22 @@ func (fwd *PortForwarder) UpdatePortVisibility(ctx context.Context, remotePort i
 	case <-ctx.Done():
 		return nil
 	}
+}
+
+// KeepAlive accepts a reason that is retained if there is no active reason
+// to send to the server.
+func (fwd *CodespacesPortForwarder) KeepAlive(reason string) {
+	select {
+	case fwd.keepAliveReason <- reason:
+	default:
+		// there is already an active keep alive reason
+		// so we can ignore this one
+	}
+}
+
+// GetKeepAliveReason fetches the keep alive reason from the channel and returns it.
+func (fwd *CodespacesPortForwarder) GetKeepAliveReason() string {
+	return <-fwd.keepAliveReason
 }
 
 // AccessControlEntriesToVisibility converts the access control entries used by Dev Tunnels to a friendly visibility value.
@@ -332,25 +359,25 @@ func IsInternalPort(port *tunnels.TunnelPort) bool {
 // trafficMonitor implements io.Reader. It keeps the session alive by notifying
 // it of the traffic type during Read operations.
 type trafficMonitor struct {
-	rwc        io.ReadWriteCloser
-	connection connection.CodespaceConnection
+	rwc io.ReadWriteCloser
+	fwd PortForwarder
 }
 
 // newTrafficMonitor returns a trafficMonitor for the specified codespace connection.
 // It wraps the provided io.ReaderWriteCloser with its own Read/Write/Close methods.
-func newTrafficMonitor(rwc io.ReadWriteCloser, connection connection.CodespaceConnection) *trafficMonitor {
-	return &trafficMonitor{rwc, connection}
+func newTrafficMonitor(rwc io.ReadWriteCloser, fwd PortForwarder) *trafficMonitor {
+	return &trafficMonitor{rwc, fwd}
 }
 
 // Read wraps the underlying ReadWriteCloser's Read method and keeps the session alive with the "input" traffic type.
 func (t *trafficMonitor) Read(p []byte) (n int, err error) {
-	t.connection.KeepAlive(trafficTypeInput)
+	t.fwd.KeepAlive(trafficTypeInput)
 	return t.rwc.Read(p)
 }
 
 // Write wraps the underlying ReadWriteCloser's Write method and keeps the session alive with the "output" traffic type.
 func (t *trafficMonitor) Write(p []byte) (n int, err error) {
-	t.connection.KeepAlive(trafficTypeOutput)
+	t.fwd.KeepAlive(trafficTypeOutput)
 	return t.rwc.Write(p)
 }
 
