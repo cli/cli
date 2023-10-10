@@ -109,11 +109,21 @@ type Project struct {
 	ShortDescription string
 	Public           bool
 	Closed           bool
-	Template         bool
-	Title            string
-	ID               string
-	Readme           string
-	Items            struct {
+	// The Template field is commented out due to https://github.com/cli/cli/issues/8103.
+	// We released gh v2.34.0 without realizing the Template field does not exist
+	// on GHES 3.8 and older. This broke all project commands for users targeting GHES 3.8
+	// and older. In order to fix this we will no longer query the Template field until
+	// GHES 3.8 gets deprecated on 2024-03-07. This solution was simplier and quicker
+	// than adding a feature detection measure to every place this query is used.
+	// It does have the negative consequence that we have had to hardcode a false value for
+	// the Template field when outputing projects to JSON using the --format flag supported
+	// by a number of project commands. See `pkg/cmd/project/shared/format/json.go` for
+	// implementation.
+	// Template         bool
+	Title  string
+	ID     string
+	Readme string
+	Items  struct {
 		PageInfo   PageInfo
 		TotalCount int
 		Nodes      []ProjectItem

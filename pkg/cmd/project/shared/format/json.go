@@ -15,10 +15,13 @@ func JSONProject(project queries.Project) ([]byte, error) {
 		ShortDescription: project.ShortDescription,
 		Public:           project.Public,
 		Closed:           project.Closed,
-		Template:         project.Template,
-		Title:            project.Title,
-		ID:               project.ID,
-		Readme:           project.Readme,
+		// The Template field is hardcoded to be false due to https://github.com/cli/cli/issues/8103.
+		// The Template field does not exist on GHES 3.8 and older, once GHES 3.8 gets
+		// deprecated on 2024-03-07 we can start populating this field with actual data.
+		Template: false,
+		Title:    project.Title,
+		ID:       project.ID,
+		Readme:   project.Readme,
 		Items: struct {
 			TotalCount int `json:"totalCount"`
 		}{
@@ -50,10 +53,13 @@ func JSONProjects(projects []queries.Project, totalCount int) ([]byte, error) {
 			ShortDescription: p.ShortDescription,
 			Public:           p.Public,
 			Closed:           p.Closed,
-			Template:         p.Template,
-			Title:            p.Title,
-			ID:               p.ID,
-			Readme:           p.Readme,
+			// The Template field is hardcoded to be false due to https://github.com/cli/cli/issues/8103.
+			// The Template field does not exist on GHES 3.8 and older, once GHES 3.8 gets
+			// deprecated on 2024-03-07 we can start populating this field with actual data.
+			Template: false,
+			Title:    p.Title,
+			ID:       p.ID,
+			Readme:   p.Readme,
 			Items: struct {
 				TotalCount int `json:"totalCount"`
 			}{
