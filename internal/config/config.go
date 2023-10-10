@@ -194,7 +194,13 @@ func (c *AuthConfig) TokenFromKeyring(hostname string) (string, error) {
 		return "", fmt.Errorf("failed to get the active user from the hosts config for %s: %v", hostname, err)
 	}
 
-	return keyring.Get(keyringServiceName(hostname), activeUser)
+	return c.TokenFromKeyringForUser(hostname, activeUser)
+}
+
+// TokenFromKeyring will retrieve the auth token for the given hostname,
+// and username
+func (c *AuthConfig) TokenFromKeyringForUser(hostname string, username string) (string, error) {
+	return keyring.Get(keyringServiceName(hostname), username)
 }
 
 // User will retrieve the username for the logged in user at the given hostname.
@@ -286,9 +292,37 @@ func (c *AuthConfig) MigrateKeyring() error {
 			multiError = errors.Join(multiError, fmt.Errorf("failed to delete the keyring for host %q: %v", hostname, err))
 			continue
 		}
-
-		// Delete the old keyring entry but for now it's handy to leave alone since we don't need a "revert"
 	}
+	return multiError
+}
+
+func (c *AuthConfig) RevertKeyring(hostsUsersTokens map[string]map[string]string) error {
+	var multiError error
+
+	// First delete all keyring entries
+	for host, users := range hostsUsersTokens {
+		for user := range users {
+			if err := keyring.Delete(keyringServiceName(host), user); err != nil {
+				multiError = errors.Join(multiError, fmt.Errorf("failed to delete the keyring for host %q user %q: %v", host, user, err))
+			}
+		}
+	}
+
+	// Then let's go over the host file to get the active user from the reversion and set the keyring up
+	for _, hostname := range c.Hosts() {
+		user, err := c.cfg.Get([]string{hosts, hostname, "user"})
+		if err != nil {
+			multiError = errors.Join(multiError, fmt.Errorf("failed to get the user from the hosts config for %s: %v", hostname, err))
+			continue
+		}
+
+		userToken := hostsUsersTokens[hostname][user]
+		if err := keyring.Set(keyringServiceName(hostname), "", userToken); err != nil {
+			multiError = errors.Join(multiError, fmt.Errorf("failed to set the keyring for host %q: %v", hostname, err))
+			continue
+		}
+	}
+
 	return multiError
 }
 
