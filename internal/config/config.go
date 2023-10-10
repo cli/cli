@@ -8,7 +8,9 @@ import (
 
 	"github.com/cli/cli/v2/internal/keyring"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	"github.com/cli/go-gh/v2/pkg/config"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
+	"github.com/cli/go-gh/v2/pkg/config/migration"
 )
 
 const (
@@ -29,12 +31,7 @@ type Config interface {
 	Aliases() *AliasConfig
 	Authentication() *AuthConfig
 
-	String() string
-
-	// Migrate takes any migration steps necessary, returning true if there were any
-	// otherwise false. In the case of error, it will additionally return an error.
-	Migrate() (bool, error)
-	Revert() (bool, error)
+	Migrate() error
 }
 
 func NewConfig() (Config, error) {
@@ -50,16 +47,9 @@ type cfg struct {
 	cfg *ghConfig.Config
 }
 
-func (c *cfg) String() string {
-	return c.cfg.String()
-}
-
-func (c *cfg) Migrate() (bool, error) {
-	return c.cfg.Migrate()
-}
-
-func (c *cfg) Revert() (bool, error) {
-	return c.cfg.Revert()
+func (c *cfg) Migrate() error {
+	var m migration.MultiAccount
+	return config.Migrate(c.cfg, m)
 }
 
 func (c *cfg) Get(hostname, key string) (string, error) {
@@ -288,43 +278,44 @@ func (c *AuthConfig) MigrateKeyring() error {
 			continue
 		}
 
-		if err := keyring.Delete(keyringServiceName(hostname), ""); err != nil {
-			multiError = errors.Join(multiError, fmt.Errorf("failed to delete the keyring for host %q: %v", hostname, err))
-			continue
-		}
+		// Intentionally do not delete the old keyring to allow migration back by just copying the old hosts.yml
+		// if err := keyring.Delete(keyringServiceName(hostname), ""); err != nil {
+		// 	multiError = errors.Join(multiError, fmt.Errorf("failed to delete the keyring for host %q: %v", hostname, err))
+		// 	continue
+		// }
 	}
 	return multiError
 }
 
-func (c *AuthConfig) RevertKeyring(hostsUsersTokens map[string]map[string]string) error {
-	var multiError error
+// func (c *AuthConfig) RevertKeyring(hostsUsersTokens map[string]map[string]string) error {
+// 	var multiError error
 
-	// First delete all keyring entries
-	for host, users := range hostsUsersTokens {
-		for user := range users {
-			if err := keyring.Delete(keyringServiceName(host), user); err != nil {
-				multiError = errors.Join(multiError, fmt.Errorf("failed to delete the keyring for host %q user %q: %v", host, user, err))
-			}
-		}
-	}
+// 	// First delete all keyring entries
+// 	for host, users := range hostsUsersTokens {
+// 		for user := range users {
+// 			if err := keyring.Delete(keyringServiceName(host), user); err != nil {
+// 				multiError = errors.Join(multiError, fmt.Errorf("failed to delete the keyring for host %q user %q: %v", host, user, err))
+// 			}
+// 		}
+// 	}
 
-	// Then let's go over the host file to get the active user from the reversion and set the keyring up
-	for _, hostname := range c.Hosts() {
-		user, err := c.cfg.Get([]string{hosts, hostname, "user"})
-		if err != nil {
-			multiError = errors.Join(multiError, fmt.Errorf("failed to get the user from the hosts config for %s: %v", hostname, err))
-			continue
-		}
+// 	// Then let's go over the host file to get the active user from the reversion and set the keyring up
+// 	for _, hostname := range c.Hosts() {
+// 		user, err := c.cfg.Get([]string{hosts, hostname, "user"})
+// 		if err != nil {
+// 			multiError = errors.Join(multiError, fmt.Errorf("failed to get the user from the hosts config for %s: %v", hostname, err))
+// 			continue
+// 		}
 
-		userToken := hostsUsersTokens[hostname][user]
-		if err := keyring.Set(keyringServiceName(hostname), "", userToken); err != nil {
-			multiError = errors.Join(multiError, fmt.Errorf("failed to set the keyring for host %q: %v", hostname, err))
-			continue
-		}
-	}
+// 		userToken := hostsUsersTokens[hostname][user]
+// 		if err := keyring.Set(keyringServiceName(hostname), "", userToken); err != nil {
+// 			multiError = errors.Join(multiError, fmt.Errorf("failed to set the keyring for host %q: %v", hostname, err))
+// 			continue
+// 		}
+// 	}
 
-	return multiError
-}
+// 	return multiError
+// }
 
 // Login will set user, git protocol, and auth token for the given hostname.
 // If the encrypt option is specified it will first try to store the auth token

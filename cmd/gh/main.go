@@ -62,7 +62,7 @@ func mainRun() exitCode {
 		return exitError
 	}
 
-	_, err = config.Migrate()
+	err = config.Migrate()
 	if err != nil {
 		fmt.Fprintf(stderr, "warning: config migration failed: %v", err)
 		return exitError
@@ -75,50 +75,50 @@ func mainRun() exitCode {
 		return exitError
 	}
 
-	if os.Getenv("REVERT") != "" {
-		// lol gross
-		hosts := authCfg.Hosts()
-		hostsUsersTokens := make(map[string]map[string]string, len(hosts))
+	// if os.Getenv("REVERT") != "" {
+	// 	// lol gross
+	// 	hosts := authCfg.Hosts()
+	// 	hostsUsersTokens := make(map[string]map[string]string, len(hosts))
 
-		for _, host := range hosts {
-			users, err := authCfg.UsersForHost(host)
-			if err != nil {
-				fmt.Fprintf(stderr, "failed to get user list for host %q: %s\n", host, err)
-				return exitError
-			}
+	// 	for _, host := range hosts {
+	// 		users, err := authCfg.UsersForHost(host)
+	// 		if err != nil {
+	// 			fmt.Fprintf(stderr, "failed to get user list for host %q: %s\n", host, err)
+	// 			return exitError
+	// 		}
 
-			for _, user := range users {
-				token, err := authCfg.TokenFromKeyringForUser(host, user)
-				if err != nil {
-					fmt.Fprintf(stderr, "failed to get token for host %q user %q: %s\n", host, user, err)
-					return exitError
-				}
+	// 		for _, user := range users {
+	// 			token, err := authCfg.TokenFromKeyringForUser(host, user)
+	// 			if err != nil {
+	// 				fmt.Fprintf(stderr, "failed to get token for host %q user %q: %s\n", host, user, err)
+	// 				return exitError
+	// 			}
 
-				if hostsUsersTokens[host] == nil {
-					hostsUsersTokens[host] = make(map[string]string)
-				}
-				hostsUsersTokens[host][user] = token
-			}
-		}
+	// 			if hostsUsersTokens[host] == nil {
+	// 				hostsUsersTokens[host] = make(map[string]string)
+	// 			}
+	// 			hostsUsersTokens[host][user] = token
+	// 		}
+	// 	}
 
-		config, err := cmdFactory.Config()
-		if err != nil && hasDebug {
-			fmt.Fprintf(stderr, "warning: loading config failed: %v", err)
-			return exitError
-		}
+	// 	config, err := cmdFactory.Config()
+	// 	if err != nil && hasDebug {
+	// 		fmt.Fprintf(stderr, "warning: loading config failed: %v", err)
+	// 		return exitError
+	// 	}
 
-		_, err = config.Revert()
-		if err != nil {
-			fmt.Fprintf(stderr, "warning: config migration failed: %v", err)
-			return exitError
-		}
+	// 	_, err = config.Revert()
+	// 	if err != nil {
+	// 		fmt.Fprintf(stderr, "warning: config migration failed: %v", err)
+	// 		return exitError
+	// 	}
 
-		err = authCfg.RevertKeyring(hostsUsersTokens)
-		if err != nil {
-			fmt.Fprintf(stderr, "warning: auth keyring revert failed: %v", err)
-			return exitError
-		}
-	}
+	// 	err = authCfg.RevertKeyring(hostsUsersTokens)
+	// 	if err != nil {
+	// 		fmt.Fprintf(stderr, "warning: auth keyring revert failed: %v", err)
+	// 		return exitError
+	// 	}
+	// }
 
 	updateCtx, updateCancel := context.WithCancel(ctx)
 	defer updateCancel()

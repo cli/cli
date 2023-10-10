@@ -29,17 +29,11 @@ var _ Config = &ConfigMock{}
 //			GetOrDefaultFunc: func(s1 string, s2 string) (string, error) {
 //				panic("mock out the GetOrDefault method")
 //			},
-//			MigrateFunc: func() (bool, error) {
+//			MigrateFunc: func() error {
 //				panic("mock out the Migrate method")
-//			},
-//			RevertFunc: func() (bool, error) {
-//				panic("mock out the Revert method")
 //			},
 //			SetFunc: func(s1 string, s2 string, s3 string)  {
 //				panic("mock out the Set method")
-//			},
-//			StringFunc: func() string {
-//				panic("mock out the String method")
 //			},
 //			WriteFunc: func() error {
 //				panic("mock out the Write method")
@@ -64,16 +58,10 @@ type ConfigMock struct {
 	GetOrDefaultFunc func(s1 string, s2 string) (string, error)
 
 	// MigrateFunc mocks the Migrate method.
-	MigrateFunc func() (bool, error)
-
-	// RevertFunc mocks the Revert method.
-	RevertFunc func() (bool, error)
+	MigrateFunc func() error
 
 	// SetFunc mocks the Set method.
 	SetFunc func(s1 string, s2 string, s3 string)
-
-	// StringFunc mocks the String method.
-	StringFunc func() string
 
 	// WriteFunc mocks the Write method.
 	WriteFunc func() error
@@ -103,9 +91,6 @@ type ConfigMock struct {
 		// Migrate holds details about calls to the Migrate method.
 		Migrate []struct {
 		}
-		// Revert holds details about calls to the Revert method.
-		Revert []struct {
-		}
 		// Set holds details about calls to the Set method.
 		Set []struct {
 			// S1 is the s1 argument value.
@@ -114,9 +99,6 @@ type ConfigMock struct {
 			S2 string
 			// S3 is the s3 argument value.
 			S3 string
-		}
-		// String holds details about calls to the String method.
-		String []struct {
 		}
 		// Write holds details about calls to the Write method.
 		Write []struct {
@@ -127,9 +109,7 @@ type ConfigMock struct {
 	lockGet            sync.RWMutex
 	lockGetOrDefault   sync.RWMutex
 	lockMigrate        sync.RWMutex
-	lockRevert         sync.RWMutex
 	lockSet            sync.RWMutex
-	lockString         sync.RWMutex
 	lockWrite          sync.RWMutex
 }
 
@@ -260,7 +240,7 @@ func (mock *ConfigMock) GetOrDefaultCalls() []struct {
 }
 
 // Migrate calls MigrateFunc.
-func (mock *ConfigMock) Migrate() (bool, error) {
+func (mock *ConfigMock) Migrate() error {
 	if mock.MigrateFunc == nil {
 		panic("ConfigMock.MigrateFunc: method is nil but Config.Migrate was just called")
 	}
@@ -283,33 +263,6 @@ func (mock *ConfigMock) MigrateCalls() []struct {
 	mock.lockMigrate.RLock()
 	calls = mock.calls.Migrate
 	mock.lockMigrate.RUnlock()
-	return calls
-}
-
-// Revert calls RevertFunc.
-func (mock *ConfigMock) Revert() (bool, error) {
-	if mock.RevertFunc == nil {
-		panic("ConfigMock.RevertFunc: method is nil but Config.Revert was just called")
-	}
-	callInfo := struct {
-	}{}
-	mock.lockRevert.Lock()
-	mock.calls.Revert = append(mock.calls.Revert, callInfo)
-	mock.lockRevert.Unlock()
-	return mock.RevertFunc()
-}
-
-// RevertCalls gets all the calls that were made to Revert.
-// Check the length with:
-//
-//	len(mockedConfig.RevertCalls())
-func (mock *ConfigMock) RevertCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockRevert.RLock()
-	calls = mock.calls.Revert
-	mock.lockRevert.RUnlock()
 	return calls
 }
 
@@ -350,33 +303,6 @@ func (mock *ConfigMock) SetCalls() []struct {
 	mock.lockSet.RLock()
 	calls = mock.calls.Set
 	mock.lockSet.RUnlock()
-	return calls
-}
-
-// String calls StringFunc.
-func (mock *ConfigMock) String() string {
-	if mock.StringFunc == nil {
-		panic("ConfigMock.StringFunc: method is nil but Config.String was just called")
-	}
-	callInfo := struct {
-	}{}
-	mock.lockString.Lock()
-	mock.calls.String = append(mock.calls.String, callInfo)
-	mock.lockString.Unlock()
-	return mock.StringFunc()
-}
-
-// StringCalls gets all the calls that were made to String.
-// Check the length with:
-//
-//	len(mockedConfig.StringCalls())
-func (mock *ConfigMock) StringCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockString.RLock()
-	calls = mock.calls.String
-	mock.lockString.RUnlock()
 	return calls
 }
 
