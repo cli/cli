@@ -78,9 +78,8 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
-	table := tableprinter.New(opts.IO)
+	table := tableprinter.New(opts.IO, tableprinter.WithHeaders("Title", "Type", "Tag name", "Published"))
 	iofmt := opts.IO.ColorScheme()
-	table.HeaderRow("Title", "Type", "Tag name", "Published")
 	for _, rel := range releases {
 		title := text.RemoveExcessiveWhitespace(rel.Name)
 		if title == "" {

@@ -115,8 +115,7 @@ func listRun(opts *ListOptions) error {
 		opts.Now = time.Now()
 	}
 
-	tp := tableprinter.New(opts.IO)
-	tp.HeaderRow("ID", "KEY", "SIZE", "CREATED", "ACCESSED")
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders("ID", "KEY", "SIZE", "CREATED", "ACCESSED"))
 	for _, cache := range result.ActionsCaches {
 		tp.AddField(opts.IO.ColorScheme().Cyan(fmt.Sprintf("%d", cache.Id)))
 		tp.AddField(cache.Key)

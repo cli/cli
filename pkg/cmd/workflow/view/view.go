@@ -213,7 +213,6 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
-	tp := tableprinter.New(opts.IO)
 
 	// Header
 	filename := workflow.Base()
@@ -227,41 +226,39 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 		fmt.Fprintln(out, "Recent runs")
 	}
 
-	headers := make([]string, 0, 8)
+	var tp *tableprinter.TablePrinter
 	if opts.Raw {
-		headers = append(headers, "STATUS", "CONCLUSION")
-	} else {
-		headers = append(headers, "")
-	}
-	headers = append(headers, "TITLE", "WORKFLOW", "BRANCH", "EVENT")
-	if opts.Raw {
-		headers = append(headers, "ELAPSED")
-	}
-	headers = append(headers, "ID")
-	tp.HeaderRow(headers...)
+		headers := []string{"STATUS", "CONCLUSION", "TITLE", "WORKFLOW", "BRANCH", "EVENT", "ELAPSED", "ID"}
+		tp = tableprinter.New(opts.IO, tableprinter.WithHeaders(headers...))
 
-	for _, run := range wr.WorkflowRuns {
-		if opts.Raw {
+		for _, run := range wr.WorkflowRuns {
 			tp.AddField(string(run.Status))
 			tp.AddField(string(run.Conclusion))
-		} else {
+			tp.AddField(run.Title(), tableprinter.WithColor(cs.Bold))
+			tp.AddField(run.WorkflowName())
+			tp.AddField(run.HeadBranch, tableprinter.WithColor(cs.Bold))
+			tp.AddField(string(run.Event))
+			tp.AddField(run.Duration(opts.now).String())
+			tp.AddField(fmt.Sprintf("%d", run.ID), tableprinter.WithColor(cs.Cyan))
+
+			tp.EndRow()
+		}
+	} else {
+		headers := []string{"", "TITLE", "WORKFLOW", "BRANCH", "EVENT", "ID"}
+		tp = tableprinter.New(opts.IO, tableprinter.WithHeaders(headers...))
+
+		for _, run := range wr.WorkflowRuns {
+
 			symbol, symbolColor := runShared.Symbol(cs, run.Status, run.Conclusion)
 			tp.AddField(symbol, tableprinter.WithColor(symbolColor))
+			tp.AddField(run.Title(), tableprinter.WithColor(cs.Bold))
+			tp.AddField(run.WorkflowName())
+			tp.AddField(run.HeadBranch, tableprinter.WithColor(cs.Bold))
+			tp.AddField(string(run.Event))
+			tp.AddField(fmt.Sprintf("%d", run.ID), tableprinter.WithColor(cs.Cyan))
+
+			tp.EndRow()
 		}
-
-		tp.AddField(run.Title(), tableprinter.WithColor(cs.Bold))
-
-		tp.AddField(run.WorkflowName())
-		tp.AddField(run.HeadBranch, tableprinter.WithColor(cs.Bold))
-		tp.AddField(string(run.Event))
-
-		if opts.Raw {
-			tp.AddField(run.Duration(opts.now).String())
-		}
-
-		tp.AddField(fmt.Sprintf("%d", run.ID), tableprinter.WithColor(cs.Cyan))
-
-		tp.EndRow()
 	}
 
 	err = tp.Render()

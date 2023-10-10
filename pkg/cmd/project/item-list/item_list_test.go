@@ -8,7 +8,6 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -178,7 +177,6 @@ func TestRunList_User(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
 			owner:  "monalisa",
@@ -285,7 +283,6 @@ func TestRunList_Org(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
 			owner:  "github",
@@ -382,7 +379,6 @@ func TestRunList_Me(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
 			owner:  "@me",

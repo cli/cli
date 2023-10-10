@@ -155,8 +155,7 @@ func displayResults(io *iostreams.IOStreams, now time.Time, results search.Commi
 		now = time.Now()
 	}
 	cs := io.ColorScheme()
-	tp := tableprinter.New(io)
-	tp.HeaderRow("Repo", "SHA", "Message", "Author", "Created")
+	tp := tableprinter.New(io, tableprinter.WithHeaders("Repo", "SHA", "Message", "Author", "Created"))
 	for _, commit := range results.Items {
 		tp.AddField(commit.Repo.FullName)
 		tp.AddField(commit.Sha)

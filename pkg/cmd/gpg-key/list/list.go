@@ -71,11 +71,9 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no GPG keys present in the GitHub account")
 	}
 
-	t := tableprinter.New(opts.IO)
+	t := tableprinter.New(opts.IO, tableprinter.WithHeaders("EMAIL", "KEY ID", "PUBLIC KEY", "ADDED", "EXPIRES"))
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
-
-	t.HeaderRow("EMAIL", "KEY ID", "PUBLIC KEY", "ADDED", "EXPIRES")
 
 	for _, gpgKey := range gpgKeys {
 		t.AddField(gpgKey.Emails.String())
@@ -83,13 +81,13 @@ func listRun(opts *ListOptions) error {
 		t.AddField(gpgKey.PublicKey, tableprinter.WithTruncate(truncateMiddle))
 
 		createdAt := gpgKey.CreatedAt.Format(time.RFC3339)
-		if t.IsTTY() {
+		if opts.IO.IsStdoutTTY() {
 			createdAt = text.FuzzyAgoAbbr(now, gpgKey.CreatedAt)
 		}
 		t.AddField(createdAt, tableprinter.WithColor(cs.Gray))
 
 		expiresAt := gpgKey.ExpiresAt.Format(time.RFC3339)
-		if t.IsTTY() {
+		if opts.IO.IsStdoutTTY() {
 			if gpgKey.ExpiresAt.IsZero() {
 				expiresAt = "Never"
 			} else {

@@ -14,24 +14,9 @@ type TablePrinter struct {
 	tableprinter.TablePrinter
 	isTTY bool
 	cs    *iostreams.ColorScheme
-
-	// Assert that we tried to add a header.
-	addedHeader bool
 }
 
-func (t *TablePrinter) IsTTY() bool {
-	return t.isTTY
-}
-
-func (t *TablePrinter) HeaderRow(columns ...string) {
-	if t.addedHeader {
-		return
-	}
-	t.addedHeader = true
-
-	if !t.isTTY {
-		return
-	}
+func (t *TablePrinter) headerRow(columns ...string) {
 	for _, col := range columns {
 		// TODO: Consider truncating longer headers e.g., NUMBER, or removing unnecessary headers e.g., DESCRIPTION with no descriptions.
 		t.AddField(strings.ToUpper(col), WithColor(t.cs.Bold))
@@ -54,39 +39,40 @@ var (
 	WithColor    = tableprinter.WithColor
 )
 
-type option func(*TablePrinter)
+type headerProviderOptFn func() []string
 
-func New(ios *iostreams.IOStreams, options ...option) *TablePrinter {
+func WithHeaders(headers ...string) headerProviderOptFn {
+	return func() []string {
+		return headers
+	}
+}
+
+var NoHeaders = func() []string {
+	return nil
+}
+
+func New(ios *iostreams.IOStreams, headerFn headerProviderOptFn) *TablePrinter {
 	maxWidth := 80
 	isTTY := ios.IsStdoutTTY()
 	if isTTY {
 		maxWidth = ios.TerminalWidth()
 	}
 
-	return NewWithOptions(ios.Out, isTTY, maxWidth, ios.ColorScheme(), options...)
+	return NewWithOptions(ios.Out, isTTY, maxWidth, ios.ColorScheme(), headerFn)
 }
 
-func NewWithOptions(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorScheme, options ...option) *TablePrinter {
+func NewWithOptions(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorScheme, headerFn headerProviderOptFn) *TablePrinter {
 	tp := &TablePrinter{
 		TablePrinter: tableprinter.New(w, isTTY, maxWidth),
 		isTTY:        isTTY,
 		cs:           cs,
 	}
 
-	for _, opt := range options {
-		opt(tp)
+	if isTTY && headerFn != nil {
+		if headers := headerFn(); len(headers) > 0 {
+			tp.headerRow(headers...)
+		}
 	}
+
 	return tp
-}
-
-// NoHeader disable printing or checking for a table header.
-func NoHeader(tp *TablePrinter) {
-	tp.addedHeader = true
-}
-
-func (t *TablePrinter) Render() error {
-	if !t.addedHeader {
-		panic("must call HeaderRow")
-	}
-	return t.TablePrinter.Render()
 }

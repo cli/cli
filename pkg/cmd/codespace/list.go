@@ -116,8 +116,6 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 		return a.browser.Browse(fmt.Sprintf("%s/codespaces?repository_id=%d", a.apiClient.ServerURL(), codespaces[0].Repository.ID))
 	}
 
-	tp := tableprinter.New(a.io)
-
 	headers := []string{
 		"NAME",
 		"DISPLAY NAME",
@@ -134,7 +132,7 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 	if hasNonProdVSCSTarget {
 		headers = append(headers, "VSCS TARGET")
 	}
-	tp.HeaderRow(headers...)
+	tp := tableprinter.New(a.io, tableprinter.WithHeaders(headers...))
 
 	cs := a.io.ColorScheme()
 	for _, apiCodespace := range codespaces {
@@ -171,7 +169,7 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 			tp.AddField(c.State, tableprinter.WithColor(stateColor))
 		}
 
-		if tp.IsTTY() {
+		if a.io.IsStdoutTTY() {
 			ct, err := time.Parse(time.RFC3339, c.CreatedAt)
 			if err != nil {
 				return fmt.Errorf("error parsing date %q: %w", c.CreatedAt, err)

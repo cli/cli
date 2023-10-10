@@ -214,8 +214,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return false
 					}
 
-					tp := tableprinter.New(io)
-					tp.HeaderRow("", "REPO", "DESCRIPTION")
+					tp := tableprinter.New(io, tableprinter.WithHeaders("", "REPO", "DESCRIPTION"))
 
 					for _, repo := range result.Items {
 						if !strings.HasPrefix(repo.Name, "gh-") {
@@ -267,8 +266,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return cmdutil.NewNoResultsError("no installed extensions found")
 				}
 				cs := io.ColorScheme()
-				t := tableprinter.New(io)
-				t.HeaderRow("NAME", "REPO", "VERSION")
+				t := tableprinter.New(io, tableprinter.WithHeaders("NAME", "REPO", "VERSION"))
 				for _, c := range cmds {
 					// TODO consider a Repo() on Extension interface
 					var repo string

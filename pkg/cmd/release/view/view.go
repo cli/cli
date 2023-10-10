@@ -154,7 +154,7 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 
 	if len(release.Assets) > 0 {
 		fmt.Fprintf(w, "%s\n", iofmt.Bold("Assets"))
-		table := tableprinter.New(io, tableprinter.NoHeader)
+		table := tableprinter.New(io, tableprinter.NoHeaders)
 		for _, a := range release.Assets {
 			table.AddField(a.Name)
 			table.AddField(humanFileSize(a.Size))

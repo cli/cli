@@ -77,11 +77,9 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, deployKeys)
 	}
 
-	t := tableprinter.New(opts.IO)
+	t := tableprinter.New(opts.IO, tableprinter.WithHeaders("ID", "TITLE", "TYPE", "KEY", "CREATED AT"))
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
-
-	t.HeaderRow("ID", "TITLE", "TYPE", "KEY", "CREATED AT")
 
 	for _, deployKey := range deployKeys {
 		sshID := strconv.Itoa(deployKey.ID)
@@ -97,7 +95,7 @@ func listRun(opts *ListOptions) error {
 
 		// TODO: Modify AddTimeField, add AddAbbrTimeField, or something else.
 		createdAt := deployKey.CreatedAt.Format(time.RFC3339)
-		if t.IsTTY() {
+		if opts.IO.IsStdoutTTY() {
 			createdAt = text.FuzzyAgoAbbr(now, deployKey.CreatedAt)
 		}
 		t.AddField(createdAt, tableprinter.WithColor(cs.Gray))

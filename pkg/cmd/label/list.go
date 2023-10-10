@@ -134,8 +134,7 @@ func listRun(opts *listOptions) error {
 
 func printLabels(io *iostreams.IOStreams, labels []label) error {
 	cs := io.ColorScheme()
-	table := tableprinter.New(io)
-	table.HeaderRow("NAME", "DESCRIPTION", "COLOR")
+	table := tableprinter.New(io, tableprinter.WithHeaders("NAME", "DESCRIPTION", "COLOR"))
 
 	for _, label := range labels {
 		table.AddField(label.Name, tableprinter.WithColor(cs.ColorFromRGB(label.Color)))

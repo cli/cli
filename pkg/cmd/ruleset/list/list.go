@@ -49,7 +49,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 			Use the --parents flag to control whether rulesets configured at higher levels that also apply to the provided
 			repository or organization should be returned. The default is true.
-			
+
 			Your access token must have the admin:org scope to use the --org flag, which can be granted by running "gh auth refresh -s admin:org".
 		`),
 		Example: heredoc.Doc(`
@@ -161,8 +161,7 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.Out, "\nShowing %d of %d rulesets in %s\n\n", len(result.Rulesets), result.TotalCount, inMsg)
 	}
 
-	tp := tableprinter.New(opts.IO)
-	tp.HeaderRow("ID", "NAME", "SOURCE", "STATUS", "RULES")
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders("ID", "NAME", "SOURCE", "STATUS", "RULES"))
 
 	for _, rs := range result.Rulesets {
 		tp.AddField(strconv.Itoa(rs.DatabaseId), tableprinter.WithColor(cs.Cyan))

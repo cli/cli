@@ -97,12 +97,15 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 	}
 	isTTY := io.IsStdoutTTY()
 	cs := io.ColorScheme()
-	tp := tableprinter.New(io)
+
+	var headers []string
 	if et == Both {
-		tp.HeaderRow("Kind", "Repo", "ID", "Title", "Labels", "Updated")
+		headers = []string{"Kind", "Repo", "ID", "Title", "Labels", "Updated"}
 	} else {
-		tp.HeaderRow("Repo", "ID", "Title", "Labels", "Updated")
+		headers = []string{"Repo", "ID", "Title", "Labels", "Updated"}
 	}
+	tp := tableprinter.New(io, tableprinter.WithHeaders(headers...))
+
 	for _, issue := range results.Items {
 		if et == Both {
 			kind := "issue"
