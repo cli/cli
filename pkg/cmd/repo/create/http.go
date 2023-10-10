@@ -292,6 +292,7 @@ func listTemplateRepositories(client *http.Client, hostname, owner string) ([]ap
 			repositories(first: $perPage, after: $endCursor, ownerAffiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC }) {
 				nodes{
 					id
+					name
 					isTemplate
 					defaultBranchRef {
 						name
