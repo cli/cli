@@ -289,6 +289,9 @@ func (fwd *CodespacesPortForwarder) UpdatePortVisibility(ctx context.Context, re
 			return fmt.Errorf("error forwarding port: %w", err)
 		}
 
+		// Close the SSH connection when we're done
+		fwd.CloseSSHConnection()
+
 		return nil
 	case <-ctx.Done():
 		return nil
