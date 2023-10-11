@@ -131,14 +131,11 @@ func (c *Client) UpdateRemoteURL(ctx context.Context, name, url string) error {
 	return nil
 }
 
-func (c *Client) SetRemoteResolution(ctx context.Context, name, resolution string, mods ...CommandModifier) error {
+func (c *Client) SetRemoteResolution(ctx context.Context, name, resolution string) error {
 	args := []string{"config", "--add", fmt.Sprintf("remote.%s.gh-resolved", name), resolution}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
-	}
-	for _, mod := range mods {
-		mod(cmd)
 	}
 	_, err = cmd.Output()
 	if err != nil {
@@ -449,14 +446,11 @@ func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (c *Client) UnsetRemoteResolution(ctx context.Context, name string, mods ...CommandModifier) error {
+func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
 	args := []string{"config", "--unset", fmt.Sprintf("remote.%s.gh-resolved", name)}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
-	}
-	for _, mod := range mods {
-		mod(cmd)
 	}
 	_, err = cmd.Output()
 	if err != nil {

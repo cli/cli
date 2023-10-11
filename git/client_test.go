@@ -238,7 +238,6 @@ func TestClientUpdateRemoteURL(t *testing.T) {
 func TestClientSetRemoteResolution(t *testing.T) {
 	tests := []struct {
 		name          string
-		mods          []CommandModifier
 		cmdExitStatus int
 		cmdStdout     string
 		cmdStderr     string
@@ -248,11 +247,6 @@ func TestClientSetRemoteResolution(t *testing.T) {
 		{
 			name:        "set remote resolution",
 			wantCmdArgs: `path/to/git config --add remote.origin.gh-resolved base`,
-		},
-		{
-			name:        "accepts command modifiers",
-			mods:        []CommandModifier{WithRepoDir("/path/to/repo")},
-			wantCmdArgs: `path/to/git -C /path/to/repo config --add remote.origin.gh-resolved base`,
 		},
 		{
 			name:          "git error",
@@ -269,7 +263,7 @@ func TestClientSetRemoteResolution(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
-			err := client.SetRemoteResolution(context.Background(), "origin", "base", tt.mods...)
+			err := client.SetRemoteResolution(context.Background(), "origin", "base")
 			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
 			if tt.wantErrorMsg == "" {
 				assert.NoError(t, err)
