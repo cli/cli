@@ -72,7 +72,6 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	go func() {
 		opts := portforwarder.ForwardPortOpts{
 			Port:     remoteSSHServerPort,
-			Connect:  true,
 			Internal: true,
 		}
 		tunnelClosed <- fwd.ForwardPortToListener(ctx, opts, listen)

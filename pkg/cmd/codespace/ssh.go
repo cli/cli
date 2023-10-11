@@ -144,18 +144,9 @@ func newSSHCmd(app *App) *cobra.Command {
 	return sshCmd
 }
 
-type ReadWriteHalfCloser interface {
-	io.ReadWriteCloser
-	CloseWrite() error
-}
-
 type combinedReadWriteHalfCloser struct {
 	io.ReadCloser
 	io.WriteCloser
-}
-
-func NewReadWriteHalfCloser(reader io.ReadCloser, writer io.WriteCloser) ReadWriteHalfCloser {
-	return &combinedReadWriteHalfCloser{reader, writer}
 }
 
 func (crwc *combinedReadWriteHalfCloser) Close() error {
@@ -234,14 +225,28 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 
 	if opts.stdio {
-		stdio := NewReadWriteHalfCloser(os.Stdin, os.Stdout)
+		stdio := &combinedReadWriteHalfCloser{os.Stdin, os.Stdout}
 		opts := portforwarder.ForwardPortOpts{
 			Port:      remoteSSHServerPort,
-			Connect:   true,
 			Internal:  true,
 			KeepAlive: true,
 		}
-		err = fwd.ForwardPort(ctx, opts, nil, stdio)
+
+		// Forward the port
+		err = fwd.ForwardPort(ctx, opts)
+		if err != nil {
+			return fmt.Errorf("failed to forward port: %w", err)
+		}
+
+		// Close the forwarder when we're done
+		defer fwd.Close()
+
+		// Connect to the forwarded port
+		err = fwd.ConnectToForwardedPort(ctx, stdio, opts)
+		if err != nil {
+			return fmt.Errorf("failed to connect to forwarded port: %w", err)
+		}
+
 		return fmt.Errorf("tunnel closed: %w", err)
 	}
 
@@ -265,7 +270,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	go func() {
 		opts := portforwarder.ForwardPortOpts{
 			Port:      remoteSSHServerPort,
-			Connect:   true,
 			Internal:  true,
 			KeepAlive: true,
 		}

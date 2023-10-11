@@ -91,7 +91,6 @@ func (a *App) Logs(ctx context.Context, selector *CodespaceSelector, follow bool
 	go func() {
 		opts := portforwarder.ForwardPortOpts{
 			Port:     remoteSSHServerPort,
-			Connect:  true,
 			Internal: true,
 		}
 		tunnelClosed <- fwd.ForwardPortToListener(ctx, opts, listen)

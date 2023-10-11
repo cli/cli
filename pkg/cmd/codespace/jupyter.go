@@ -81,8 +81,7 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 	tunnelClosed := make(chan error, 1)
 	go func() {
 		opts := portforwarder.ForwardPortOpts{
-			Port:    serverPort,
-			Connect: true,
+			Port: serverPort,
 		}
 		tunnelClosed <- fwd.ForwardPortToListener(ctx, opts, listen)
 	}()

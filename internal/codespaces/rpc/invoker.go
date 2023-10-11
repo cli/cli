@@ -103,7 +103,6 @@ func connect(ctx context.Context, fwd portforwarder.PortForwarder) (Invoker, err
 		// Start forwarding the port locally
 		opts := portforwarder.ForwardPortOpts{
 			Port:     codespacesInternalPort,
-			Connect:  true,
 			Internal: true,
 		}
 		ch <- fwd.ForwardPortToListener(pfctx, opts, listener)

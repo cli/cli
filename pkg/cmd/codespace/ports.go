@@ -347,8 +347,7 @@ func (a *App) ForwardPorts(ctx context.Context, selector *CodespaceSelector, por
 			}
 
 			opts := portforwarder.ForwardPortOpts{
-				Port:    pair.remote,
-				Connect: true,
+				Port: pair.remote,
 			}
 			return fwd.ForwardPortToListener(ctx, opts, listen)
 		})
