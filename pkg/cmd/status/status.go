@@ -286,7 +286,28 @@ func (s *StatusGetter) LoadNotifications() error {
 					if !ok {
 						return nil
 					}
-					if actual, err := s.ActualMention(n.Subject.LatestCommentURL); actual != "" && err == nil {
+					actual, err := s.ActualMention(n.Subject.LatestCommentURL)
+
+					if err != nil {
+						var httpErr api.HTTPError
+						httpStatusCode := -1
+
+						if errors.As(err, &httpErr) {
+							httpStatusCode = httpErr.StatusCode
+						}
+
+						switch httpStatusCode {
+						case 403:
+							s.addAuthError(httpErr.Message, factory.SSOURL())
+						case 404:
+							return nil
+						default:
+							abortFetching()
+							return fmt.Errorf("could not fetch comment: %w", err)
+						}
+					}
+
+					if actual != "" {
 						// I'm so sorry
 						split := strings.Split(n.Subject.URL, "/")
 						fetched <- StatusItem{
@@ -294,14 +315,6 @@ func (s *StatusGetter) LoadNotifications() error {
 							Identifier: fmt.Sprintf("%s#%s", n.Repository.FullName, split[len(split)-1]),
 							preview:    actual,
 							index:      n.index,
-						}
-					} else if err != nil {
-						var httpErr api.HTTPError
-						if errors.As(err, &httpErr) && httpErr.StatusCode == 403 {
-							s.addAuthError(httpErr.Message, factory.SSOURL())
-						} else {
-							abortFetching()
-							return fmt.Errorf("could not fetch comment: %w", err)
 						}
 					}
 				}

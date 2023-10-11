@@ -37,6 +37,9 @@ var SilentError = errors.New("SilentError")
 // CancelError signals user-initiated cancellation
 var CancelError = errors.New("CancelError")
 
+// PendingError signals nothing failed but something is pending
+var PendingError = errors.New("PendingError")
+
 func IsUserCancellation(err error) bool {
 	return errors.Is(err, CancelError) || errors.Is(err, terminal.InterruptErr)
 }

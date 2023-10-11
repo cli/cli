@@ -15,6 +15,7 @@ func JSONProject(project queries.Project) ([]byte, error) {
 		ShortDescription: project.ShortDescription,
 		Public:           project.Public,
 		Closed:           project.Closed,
+		Template:         project.Template,
 		Title:            project.Title,
 		ID:               project.ID,
 		Readme:           project.Readme,
@@ -49,6 +50,7 @@ func JSONProjects(projects []queries.Project, totalCount int) ([]byte, error) {
 			ShortDescription: p.ShortDescription,
 			Public:           p.Public,
 			Closed:           p.Closed,
+			Template:         p.Template,
 			Title:            p.Title,
 			ID:               p.ID,
 			Readme:           p.Readme,
@@ -87,6 +89,7 @@ type projectJSON struct {
 	ShortDescription string `json:"shortDescription"`
 	Public           bool   `json:"public"`
 	Closed           bool   `json:"closed"`
+	Template         bool   `json:"template"`
 	Title            string `json:"title"`
 	ID               string `json:"id"`
 	Readme           string `json:"readme"`

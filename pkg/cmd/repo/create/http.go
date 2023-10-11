@@ -64,6 +64,12 @@ type cloneTemplateRepositoryInput struct {
 	IncludeAllBranches bool   `json:"includeAllBranches"`
 }
 
+type updateRepositoryInput struct {
+	RepositoryID     string `json:"repositoryId"`
+	HasWikiEnabled   bool   `json:"hasWikiEnabled"`
+	HasIssuesEnabled bool   `json:"hasIssuesEnabled"`
+}
+
 // repoCreate creates a new GitHub repository
 func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*api.Repository, error) {
 	isOrg := false
@@ -131,6 +137,28 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		`, variables, &response)
 		if err != nil {
 			return nil, err
+		}
+
+		if !input.HasWikiEnabled || !input.HasIssuesEnabled {
+			updateVariables := map[string]interface{}{
+				"input": updateRepositoryInput{
+					RepositoryID:     response.CloneTemplateRepository.Repository.ID,
+					HasWikiEnabled:   input.HasWikiEnabled,
+					HasIssuesEnabled: input.HasIssuesEnabled,
+				},
+			}
+
+			if err := apiClient.GraphQL(hostname, `
+				mutation UpdateRepository($input: UpdateRepositoryInput!) {
+					updateRepository(input: $input) {
+						repository {
+							id
+						}
+					}
+				}
+			`, updateVariables, nil); err != nil {
+				return nil, err
+			}
 		}
 
 		return api.InitRepoHostname(&response.CloneTemplateRepository.Repository, hostname), nil

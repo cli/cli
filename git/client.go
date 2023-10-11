@@ -325,6 +325,19 @@ func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg Branc
 	return
 }
 
+func (c *Client) DeleteLocalTag(ctx context.Context, tag string) error {
+	args := []string{"tag", "-d", tag}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Client) DeleteLocalBranch(ctx context.Context, branch string) error {
 	args := []string{"branch", "-D", branch}
 	cmd, err := c.Command(ctx, args...)

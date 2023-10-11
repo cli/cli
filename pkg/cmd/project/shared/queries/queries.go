@@ -109,6 +109,7 @@ type Project struct {
 	ShortDescription string
 	Public           bool
 	Closed           bool
+	Template         bool
 	Title            string
 	ID               string
 	Readme           string

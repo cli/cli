@@ -18,6 +18,15 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	HTTPClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Exporter   cmdutil.Exporter
+}
+
+var deployKeyFields = []string{
+	"id",
+	"key",
+	"title",
+	"createdAt",
+	"readOnly",
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -40,7 +49,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			return listRun(opts)
 		},
 	}
-
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, deployKeyFields)
 	return cmd
 }
 
@@ -62,6 +71,10 @@ func listRun(opts *ListOptions) error {
 
 	if len(deployKeys) == 0 {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("no deploy keys found in %s", ghrepo.FullName(repo)))
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, deployKeys)
 	}
 
 	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter

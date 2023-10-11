@@ -48,7 +48,8 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			if err != nil {
 				return err
 			}
-			return authCfg.Login(hostname, username, token, "", secureStorage)
+			_, loginErr := authCfg.Login(hostname, username, token, "", secureStorage)
+			return loginErr
 		},
 		HttpClient: &http.Client{},
 		GitClient:  f.GitClient,
