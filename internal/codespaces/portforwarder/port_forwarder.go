@@ -48,7 +48,7 @@ type PortForwarder interface {
 	UpdatePortVisibility(ctx context.Context, remotePort int, visibility string) error
 	KeepAlive(reason string)
 	GetKeepAliveReason() string
-	CloseSSHConnection() error
+	CloseSSHConnection()
 }
 
 // NewPortForwarder returns a new PortForwarder for the specified codespace.
@@ -315,8 +315,8 @@ func (fwd *CodespacesPortForwarder) GetKeepAliveReason() string {
 }
 
 // Close closes the port forwarder's tunnel client connection.
-func (fwd *CodespacesPortForwarder) CloseSSHConnection() error {
-	return fwd.connection.TunnelClient.Close()
+func (fwd *CodespacesPortForwarder) CloseSSHConnection() {
+	_ = fwd.connection.TunnelClient.Close()
 }
 
 // AccessControlEntriesToVisibility converts the access control entries used by Dev Tunnels to a friendly visibility value.
