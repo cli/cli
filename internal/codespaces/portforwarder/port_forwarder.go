@@ -103,7 +103,7 @@ func (fwd *CodespacesPortForwarder) ForwardPortToListener(ctx context.Context, o
 	}
 }
 
-// ForwardPort forwards the specified port to the given TCP listener or ReadWriteCloser.
+// ForwardPort informs the host that we would like to forward the given port.
 func (fwd *CodespacesPortForwarder) ForwardPort(ctx context.Context, opts ForwardPortOpts) error {
 	// Convert the port number to a uint16
 	port, err := convertIntToUint16(opts.Port)
