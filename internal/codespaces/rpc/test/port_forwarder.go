@@ -12,6 +12,21 @@ import (
 
 type PortForwarder struct{}
 
+// Close implements portforwarder.PortForwarder.
+func (PortForwarder) Close() error {
+	panic("unimplemented")
+}
+
+// ConnectToForwardedPort implements portforwarder.PortForwarder.
+func (PortForwarder) ConnectToForwardedPort(ctx context.Context, conn io.ReadWriteCloser, opts portforwarder.ForwardPortOpts) error {
+	panic("unimplemented")
+}
+
+// ForwardPort implements portforwarder.PortForwarder.
+func (PortForwarder) ForwardPort(ctx context.Context, opts portforwarder.ForwardPortOpts) error {
+	panic("unimplemented")
+}
+
 // GetKeepAliveReason implements portforwarder.PortForwarder.
 func (PortForwarder) GetKeepAliveReason() string {
 	panic("unimplemented")
@@ -19,11 +34,6 @@ func (PortForwarder) GetKeepAliveReason() string {
 
 // KeepAlive implements portforwarder.PortForwarder.
 func (PortForwarder) KeepAlive(reason string) {
-	panic("unimplemented")
-}
-
-// ForwardPort implements portforwarder.PortForwarder.
-func (PortForwarder) ForwardPort(ctx context.Context, opts portforwarder.ForwardPortOpts, listener *net.TCPListener, conn io.ReadWriteCloser) error {
 	panic("unimplemented")
 }
 
