@@ -71,8 +71,15 @@ func (fwd *CodespacesPortForwarder) ForwardPortToListener(ctx context.Context, o
 
 	done := make(chan error)
 	go func() {
+		// Convert the port number to a uint16
+		port, err := convertIntToUint16(opts.Port)
+		if err != nil {
+			done <- fmt.Errorf("error converting port: %w", err)
+			return
+		}
+
 		// Ensure the port is forwarded before connecting
-		err = fwd.connection.TunnelClient.WaitForForwardedPort(ctx, uint16(opts.Port))
+		err = fwd.connection.TunnelClient.WaitForForwardedPort(ctx, port)
 		if err != nil {
 			done <- fmt.Errorf("wait for forwarded port failed: %v", err)
 			return
