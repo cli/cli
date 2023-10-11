@@ -13,7 +13,7 @@ import (
 type PortForwarder struct{}
 
 // Close implements portforwarder.PortForwarder.
-func (PortForwarder) Close() error {
+func (PortForwarder) CloseSSHConnection() error {
 	panic("unimplemented")
 }
 

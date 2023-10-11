@@ -238,8 +238,8 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 			return fmt.Errorf("failed to forward port: %w", err)
 		}
 
-		// Close the forwarder when we're done
-		defer fwd.Close()
+		// Close the SSH connection when we're done
+		defer fwd.CloseSSHConnection()
 
 		// Connect to the forwarded port
 		err = fwd.ConnectToForwardedPort(ctx, stdio, opts)

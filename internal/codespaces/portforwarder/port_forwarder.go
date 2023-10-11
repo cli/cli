@@ -48,7 +48,7 @@ type PortForwarder interface {
 	UpdatePortVisibility(ctx context.Context, remotePort int, visibility string) error
 	KeepAlive(reason string)
 	GetKeepAliveReason() string
-	Close() error
+	CloseSSHConnection() error
 }
 
 // NewPortForwarder returns a new PortForwarder for the specified codespace.
@@ -66,8 +66,8 @@ func (fwd *CodespacesPortForwarder) ForwardPortToListener(ctx context.Context, o
 		return fmt.Errorf("error forwarding port: %w", err)
 	}
 
-	// Close the forwarder when we're done
-	defer fwd.Close()
+	// Close the SSH connection when we're done
+	defer fwd.CloseSSHConnection()
 
 	done := make(chan error)
 	go func() {
@@ -159,7 +159,7 @@ func (fwd *CodespacesPortForwarder) ForwardPort(ctx context.Context, opts Forwar
 	// Inform the host that we've forwarded the port locally
 	err = fwd.connection.TunnelClient.RefreshPorts(ctx)
 	if err != nil {
-		fwd.Close()
+		fwd.CloseSSHConnection()
 		return fmt.Errorf("refresh ports failed: %v", err)
 	}
 
@@ -312,7 +312,7 @@ func (fwd *CodespacesPortForwarder) GetKeepAliveReason() string {
 }
 
 // Close closes the port forwarder's tunnel client connection.
-func (fwd *CodespacesPortForwarder) Close() error {
+func (fwd *CodespacesPortForwarder) CloseSSHConnection() error {
 	return fwd.connection.TunnelClient.Close()
 }
 
