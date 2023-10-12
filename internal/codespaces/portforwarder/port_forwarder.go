@@ -263,8 +263,8 @@ func (fwd *CodespacesPortForwarder) UpdatePortVisibility(ctx context.Context, re
 			return
 		}
 
-		// Close the tunnel client when we're done
-		defer fwd.connection.TunnelClient.Close()
+		// Close the SSH connection when we're done
+		fwd.CloseSSHConnection()
 
 		// Inform the host that we've deleted the port
 		err = fwd.connection.TunnelClient.RefreshPorts(ctx)
