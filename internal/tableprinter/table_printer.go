@@ -64,7 +64,7 @@ func NewWithWriter(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorSch
 	if isTTY && len(headers.columns) > 0 {
 		for _, header := range headers.columns {
 			// TODO: Consider truncating longer headers e.g., NUMBER, or removing unnecessary headers e.g., DESCRIPTION with no descriptions.
-			tp.AddField(strings.ToUpper(header), WithColor(cs.Bold))
+			tp.AddField(strings.ToUpper(header), WithColor(cs.GrayBold))
 		}
 		tp.EndRow()
 	}

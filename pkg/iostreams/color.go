@@ -19,6 +19,7 @@ var (
 	bold      = ansi.ColorFunc("default+b")
 	cyanBold  = ansi.ColorFunc("cyan+b")
 	greenBold = ansi.ColorFunc("green+b")
+	grayBold  = ansi.ColorFunc("black+b")
 
 	gray256 = func(t string) string {
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
@@ -102,6 +103,17 @@ func (c *ColorScheme) Gray(t string) string {
 
 func (c *ColorScheme) Grayf(t string, args ...interface{}) string {
 	return c.Gray(fmt.Sprintf(t, args...))
+}
+
+func (c *ColorScheme) GrayBold(t string) string {
+	if !c.enabled {
+		return t
+	}
+	return grayBold(t)
+}
+
+func (c *ColorScheme) GrayBoldf(t string, args ...interface{}) string {
+	return c.GrayBold(fmt.Sprintf(t, args...))
 }
 
 func (c *ColorScheme) Magenta(t string) string {
