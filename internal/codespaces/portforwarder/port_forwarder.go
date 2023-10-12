@@ -264,12 +264,19 @@ func (fwd *CodespacesPortForwarder) UpdatePortVisibility(ctx context.Context, re
 		}
 
 		// Close the SSH connection when we're done
-		fwd.CloseSSHConnection()
+		defer fwd.CloseSSHConnection()
 
 		// Inform the host that we've deleted the port
 		err = fwd.connection.TunnelClient.RefreshPorts(ctx)
 		if err != nil {
 			done <- fmt.Errorf("refresh ports failed: %v", err)
+			return
+		}
+
+		// Re-forward the port with the updated visibility
+		err = fwd.ForwardPort(ctx, ForwardPortOpts{Port: remotePort, Visibility: visibility})
+		if err != nil {
+			done <- fmt.Errorf("error forwarding port: %w", err)
 			return
 		}
 
@@ -280,17 +287,11 @@ func (fwd *CodespacesPortForwarder) UpdatePortVisibility(ctx context.Context, re
 	select {
 	case err := <-done:
 		if err != nil {
+			// If we fail to re-forward the port, we need to forward again with the original visibility so the port is still accessible
+			_ = fwd.ForwardPort(ctx, ForwardPortOpts{Port: remotePort, Visibility: AccessControlEntriesToVisibility(tunnelPort.AccessControl.Entries)})
+
 			return fmt.Errorf("error connecting to tunnel: %w", err)
 		}
-
-		// Re-forward the port with the updated visibility
-		err = fwd.ForwardPort(ctx, ForwardPortOpts{Port: remotePort, Visibility: visibility})
-		if err != nil {
-			return fmt.Errorf("error forwarding port: %w", err)
-		}
-
-		// Close the SSH connection when we're done
-		fwd.CloseSSHConnection()
 
 		return nil
 	case <-ctx.Done():
