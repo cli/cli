@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/shurcooL/githubv4"
 )
 
 // repoCreateInput is input parameters for the repoCreate method
@@ -262,6 +263,73 @@ func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug str
 	var response teamResponse
 	err := client.REST(hostname, "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
 	return &response, err
+}
+
+func listTemplateRepositories(client *http.Client, hostname, owner string) ([]api.Repository, error) {
+	ownerConnection := "repositoryOwner(login: $owner)"
+
+	variables := map[string]interface{}{
+		"perPage": githubv4.Int(100),
+		"owner":   githubv4.String(owner),
+	}
+	inputs := []string{"$perPage:Int!", "$endCursor:String", "$owner:String!"}
+
+	type result struct {
+		RepositoryOwner struct {
+			Login        string
+			Repositories struct {
+				Nodes      []api.Repository
+				TotalCount int
+				PageInfo   struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			}
+		}
+	}
+
+	query := fmt.Sprintf(`query RepositoryList(%s) {
+		%s {
+			login
+			repositories(first: $perPage, after: $endCursor, ownerAffiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC }) {
+				nodes{
+					id
+					name
+					isTemplate
+					defaultBranchRef {
+						name
+					}
+				}
+				totalCount
+				pageInfo{hasNextPage,endCursor}
+			}
+		}
+	}`, strings.Join(inputs, ","), ownerConnection)
+
+	apiClient := api.NewClientFromHTTP(client)
+	var templateRepositories []api.Repository
+	for {
+		var res result
+		err := apiClient.GraphQL(hostname, query, variables, &res)
+		if err != nil {
+			return nil, err
+		}
+
+		owner := res.RepositoryOwner
+
+		for _, repo := range owner.Repositories.Nodes {
+			if repo.IsTemplate {
+				templateRepositories = append(templateRepositories, repo)
+			}
+		}
+
+		if !owner.Repositories.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(owner.Repositories.PageInfo.EndCursor)
+	}
+
+	return templateRepositories, nil
 }
 
 // listGitIgnoreTemplates uses API v3 here because gitignore template isn't supported by GraphQL yet.

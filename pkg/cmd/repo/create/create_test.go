@@ -511,6 +511,131 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
 		},
 		{
+			name: "interactive create from a template repository",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
+					switch message {
+					case `This will create "OWNER/REPO" as a private repository on GitHub. Continue?`:
+						return defaultValue, nil
+					case "Clone the new repository locally?":
+						return defaultValue, nil
+					default:
+						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
+					}
+				}
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					switch message {
+					case "Repository name":
+						return "REPO", nil
+					case "Description":
+						return "my new repo", nil
+					default:
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "Repository owner":
+						return prompter.IndexFor(options, "OWNER")
+					case "Choose a template repository":
+						return prompter.IndexFor(options, "REPO")
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Create a new repository on GitHub from a template repository")
+					case "Visibility":
+						return prompter.IndexFor(options, "Private")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER","organizations":{"nodes": []}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER","organizations":{"nodes": []}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryList\b`),
+					httpmock.FileResponse("./fixtures/repoTempList.json"))
+				reg.Register(
+					httpmock.REST("GET", "users/OWNER"),
+					httpmock.StringResponse(`{"login":"OWNER","type":"User"}`))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"id":"OWNER"}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation CloneTemplateRepository\b`),
+					httpmock.StringResponse(`
+						{
+							"data": {
+								"cloneTemplateRepository": {
+									"repository": {
+										"id": "REPOID",
+										"name": "REPO",
+										"owner": {"login":"OWNER"},
+										"url": "https://github.com/OWNER/REPO"
+									}
+								}
+							}
+						}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git clone --branch main https://github.com/OWNER/REPO`, 0, "")
+			},
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
+		},
+		{
+			name: "interactive create from template repo but there are no template repos",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
+					switch message {
+					default:
+						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
+					}
+				}
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					switch message {
+					case "Repository name":
+						return "REPO", nil
+					case "Description":
+						return "my new repo", nil
+					default:
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Create a new repository on GitHub from a template repository")
+					case "Visibility":
+						return prompter.IndexFor(options, "Private")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER","organizations":{"nodes": []}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER","organizations":{"nodes": []}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryList\b`),
+					httpmock.StringResponse(`{"data":{"repositoryOwner":{"login":"OWNER","repositories":{"nodes":[]},"totalCount":0,"pageInfo":{"hasNextPage":false,"endCursor":""}}}}`))
+			},
+			execStubs:  func(cs *run.CommandStubber) {},
+			wantStdout: "",
+			wantErr:    true,
+			errMsg:     "OWNER has no template repositories",
+		},
+		{
 			name: "noninteractive create from scratch",
 			opts: &CreateOptions{
 				Interactive: false,
