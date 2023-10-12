@@ -111,7 +111,7 @@ func (fwd *CodespacesPortForwarder) ForwardPort(ctx context.Context, opts Forwar
 		return fmt.Errorf("error converting port: %w", err)
 	}
 
-	tunnelPort := tunnels.NewTunnelPort(port, "", "", tunnels.TunnelProtocolHttps)
+	tunnelPort := tunnels.NewTunnelPort(port, "", "", tunnels.TunnelProtocolHttp)
 
 	// If no visibility is provided, Dev Tunnels will use the default (private)
 	if opts.Visibility != "" {
