@@ -77,11 +77,9 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, deployKeys)
 	}
 
-	t := tableprinter.New(opts.IO)
+	t := tableprinter.New(opts.IO, tableprinter.WithHeaders("ID", "TITLE", "TYPE", "KEY", "CREATED AT"))
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
-
-	t.HeaderRow("ID", "TITLE", "TYPE", "KEY", "CREATED AT")
 
 	for _, deployKey := range deployKeys {
 		sshID := strconv.Itoa(deployKey.ID)

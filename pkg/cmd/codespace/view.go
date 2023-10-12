@@ -73,7 +73,8 @@ func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions) error {
 		return opts.exporter.Write(a.io, selectedCodespace)
 	}
 
-	tp := tableprinter.New(a.io, tableprinter.NoHeader)
+	//nolint:staticcheck // SA1019: Showing NAME|VALUE headers adds nothing to table.
+	tp := tableprinter.New(a.io, tableprinter.NoHeaders)
 	c := codespace{selectedCodespace}
 	formattedName := formatNameForVSCSTarget(c.Name, c.VSCSTarget)
 

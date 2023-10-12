@@ -79,11 +79,9 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no SSH keys present in the GitHub account")
 	}
 
-	t := tableprinter.New(opts.IO)
+	t := tableprinter.New(opts.IO, tableprinter.WithHeaders("TITLE", "ID", "KEY", "TYPE", "ADDED"))
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
-
-	t.HeaderRow("TITLE", "ID", "KEY", "TYPE", "ADDED")
 
 	for _, sshKey := range sshKeys {
 		id := strconv.Itoa(sshKey.ID)

@@ -154,7 +154,7 @@ func TestRunList(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
+		tp: tableprinter.New(ios, tableprinter.NoHeaders),
 		opts: listOpts{
 			owner: "monalisa",
 		},
@@ -225,7 +225,7 @@ func TestRunList_Me(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
+		tp: tableprinter.New(ios, tableprinter.NoHeaders),
 		opts: listOpts{
 			owner: "@me",
 		},
@@ -296,7 +296,7 @@ func TestRunListViewer(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp:     tableprinter.New(ios),
+		tp:     tableprinter.New(ios, tableprinter.NoHeaders),
 		opts:   listOpts{},
 		client: client,
 		io:     ios,
@@ -374,7 +374,7 @@ func TestRunListOrg(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
+		tp: tableprinter.New(ios, tableprinter.NoHeaders),
 		opts: listOpts{
 			owner: "github",
 		},
@@ -428,7 +428,7 @@ func TestRunListEmpty(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	config := listConfig{
-		tp:     tableprinter.New(ios),
+		tp:     tableprinter.New(ios, tableprinter.NoHeaders),
 		opts:   listOpts{},
 		client: client,
 		io:     ios,
@@ -504,7 +504,7 @@ func TestRunListWithClosed(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
+		tp: tableprinter.New(ios, tableprinter.NoHeaders),
 		opts: listOpts{
 			owner:  "monalisa",
 			closed: true,

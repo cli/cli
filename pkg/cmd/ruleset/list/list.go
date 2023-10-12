@@ -161,8 +161,7 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.Out, "\nShowing %d of %d rulesets in %s\n\n", len(result.Rulesets), result.TotalCount, inMsg)
 	}
 
-	tp := tableprinter.New(opts.IO)
-	tp.HeaderRow("ID", "NAME", "SOURCE", "STATUS", "RULES")
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders("ID", "NAME", "SOURCE", "STATUS", "RULES"))
 
 	for _, rs := range result.Rulesets {
 		tp.AddField(strconv.Itoa(rs.DatabaseId), tableprinter.WithColor(cs.Cyan))

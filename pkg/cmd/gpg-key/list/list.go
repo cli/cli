@@ -71,11 +71,9 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no GPG keys present in the GitHub account")
 	}
 
-	t := tableprinter.New(opts.IO)
+	t := tableprinter.New(opts.IO, tableprinter.WithHeaders("EMAIL", "KEY ID", "PUBLIC KEY", "ADDED", "EXPIRES"))
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
-
-	t.HeaderRow("EMAIL", "KEY ID", "PUBLIC KEY", "ADDED", "EXPIRES")
 
 	for _, gpgKey := range gpgKeys {
 		t.AddField(gpgKey.Emails.String())

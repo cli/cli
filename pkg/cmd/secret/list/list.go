@@ -158,12 +158,14 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, secrets)
 	}
 
-	table := tableprinter.New(opts.IO)
+	var headers []string
 	if secretEntity == shared.Organization || secretEntity == shared.User {
-		table.HeaderRow("Name", "Updated", "Visibility")
+		headers = []string{"Name", "Updated", "Visibility"}
 	} else {
-		table.HeaderRow("Name", "Updated")
+		headers = []string{"Name", "Updated"}
 	}
+
+	table := tableprinter.New(opts.IO, tableprinter.WithHeaders(headers...))
 	for _, secret := range secrets {
 		table.AddField(secret.Name)
 		table.AddTimeField(opts.Now(), secret.UpdatedAt, nil)

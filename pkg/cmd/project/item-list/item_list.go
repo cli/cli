@@ -52,7 +52,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 				opts.number = int32(num)
 			}
 
-			t := tableprinter.New(f.IOStreams)
+			t := tableprinter.New(f.IOStreams, tableprinter.WithHeaders("Type", "Title", "Number", "Repository", "ID"))
 			config := listConfig{
 				io:     f.IOStreams,
 				tp:     t,
@@ -107,8 +107,6 @@ func printResults(config listConfig, items []queries.ProjectItem, login string) 
 	if len(items) == 0 {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for owner %s has no items", config.opts.number, login))
 	}
-
-	config.tp.HeaderRow("Type", "Title", "Number", "Repository", "ID")
 
 	for _, i := range items {
 		config.tp.AddField(i.Type())

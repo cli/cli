@@ -52,7 +52,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 			URLOpener := func(url string) error {
 				return f.Browser.Browse(url)
 			}
-			t := tableprinter.New(f.IOStreams)
+			t := tableprinter.New(f.IOStreams, tableprinter.WithHeaders("Number", "Title", "State", "ID"))
 			config := listConfig{
 				tp:        t,
 				client:    client,
@@ -156,8 +156,6 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 	if len(projects) == 0 {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("No projects found for %s", owner))
 	}
-
-	config.tp.HeaderRow("Number", "Title", "State", "ID")
 
 	for _, p := range projects {
 		config.tp.AddField(strconv.Itoa(int(p.Number)), tableprinter.WithTruncate(nil))

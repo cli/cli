@@ -680,7 +680,8 @@ func statusRun(opts *StatusOptions) error {
 		if len(items) == 0 {
 			fmt.Fprintln(tableOut, "Nothing here ^_^")
 		} else {
-			tp := tableprinter.NewWithOptions(tableOut, opts.IO.IsStdoutTTY(), width, cs, tableprinter.NoHeader)
+			//nolint:staticcheck // SA1019: Headers distract from numerous nested tables.
+			tp := tableprinter.NewWithWriter(tableOut, opts.IO.IsStdoutTTY(), width, cs, tableprinter.NoHeaders)
 			for i, si := range items {
 				if i == rowLimit {
 					break

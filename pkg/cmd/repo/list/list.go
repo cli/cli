@@ -176,8 +176,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-	tp := tableprinter.New(opts.IO)
-	tp.HeaderRow("NAME", "DESCRIPTION", "INFO", "UPDATED")
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders("NAME", "DESCRIPTION", "INFO", "UPDATED"))
 
 	totalMatchCount := len(listResult.Repositories)
 	for _, repo := range listResult.Repositories {

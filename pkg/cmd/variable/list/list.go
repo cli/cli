@@ -124,12 +124,14 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
-	table := tableprinter.New(opts.IO)
+	var headers []string
 	if variableEntity == shared.Organization {
-		table.HeaderRow("Name", "Value", "Updated", "Visibility")
+		headers = []string{"Name", "Value", "Updated", "Visibility"}
 	} else {
-		table.HeaderRow("Name", "Value", "Updated")
+		headers = []string{"Name", "Value", "Updated"}
 	}
+
+	table := tableprinter.New(opts.IO, tableprinter.WithHeaders(headers...))
 	for _, variable := range variables {
 		table.AddField(variable.Name)
 		table.AddField(variable.Value)

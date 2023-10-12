@@ -15,9 +15,9 @@ import (
 
 func PrintIssues(io *iostreams.IOStreams, now time.Time, prefix string, totalCount int, issues []api.Issue) {
 	cs := io.ColorScheme()
-	table := tableprinter.New(io)
+	isTTY := io.IsStdoutTTY()
 	headers := []string{""} // NUMBER, but often wider than issue numbers.
-	if !table.IsTTY() {
+	if !isTTY {
 		headers = append(headers, "STATE")
 	}
 	headers = append(headers,
@@ -25,19 +25,19 @@ func PrintIssues(io *iostreams.IOStreams, now time.Time, prefix string, totalCou
 		"LABELS",
 		"UPDATED",
 	)
-	table.HeaderRow(headers...)
+	table := tableprinter.New(io, tableprinter.WithHeaders(headers...))
 	for _, issue := range issues {
 		issueNum := strconv.Itoa(issue.Number)
-		if table.IsTTY() {
+		if isTTY {
 			issueNum = "#" + issueNum
 		}
 		issueNum = prefix + issueNum
 		table.AddField(issueNum, tableprinter.WithColor(cs.ColorFromString(prShared.ColorForIssueState(issue))))
-		if !table.IsTTY() {
+		if !isTTY {
 			table.AddField(issue.State)
 		}
 		table.AddField(text.RemoveExcessiveWhitespace(issue.Title))
-		table.AddField(issueLabelList(&issue, cs, table.IsTTY()))
+		table.AddField(issueLabelList(&issue, cs, isTTY))
 		table.AddTimeField(now, issue.UpdatedAt, cs.Gray)
 		table.EndRow()
 	}

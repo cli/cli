@@ -178,7 +178,7 @@ func TestRunList_User(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
+		tp: tableprinter.New(ios, tableprinter.NoHeaders),
 		opts: listOpts{
 			number: 1,
 			owner:  "monalisa",
@@ -285,7 +285,7 @@ func TestRunList_Org(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
+		tp: tableprinter.New(ios, tableprinter.NoHeaders),
 		opts: listOpts{
 			number: 1,
 			owner:  "github",
@@ -382,7 +382,7 @@ func TestRunList_Me(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
+		tp: tableprinter.New(ios, tableprinter.NoHeaders),
 		opts: listOpts{
 			number: 1,
 			owner:  "@me",

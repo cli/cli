@@ -213,7 +213,6 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
-	tp := tableprinter.New(opts.IO)
 
 	// Header
 	filename := workflow.Base()
@@ -238,8 +237,8 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 		headers = append(headers, "ELAPSED")
 	}
 	headers = append(headers, "ID")
-	tp.HeaderRow(headers...)
 
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders(headers...))
 	for _, run := range wr.WorkflowRuns {
 		if opts.Raw {
 			tp.AddField(string(run.Status))

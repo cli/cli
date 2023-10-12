@@ -138,8 +138,7 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, runs)
 	}
 
-	tp := tableprinter.New(opts.IO)
-	tp.HeaderRow("STATUS", "TITLE", "WORKFLOW", "BRANCH", "EVENT", "ID", "ELAPSED", "AGE")
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders("STATUS", "TITLE", "WORKFLOW", "BRANCH", "EVENT", "ID", "ELAPSED", "AGE"))
 
 	cs := opts.IO.ColorScheme()
 

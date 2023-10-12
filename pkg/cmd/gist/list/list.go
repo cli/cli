@@ -94,9 +94,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-
-	tp := tableprinter.New(opts.IO)
-	tp.HeaderRow("ID", "DESCRIPTION", "FILES", "", "UPDATED")
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders("ID", "DESCRIPTION", "FILES", "", "UPDATED"))
 
 	for _, gist := range gists {
 		fileCount := len(gist.Files)

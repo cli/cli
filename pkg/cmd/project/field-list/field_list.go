@@ -52,7 +52,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 				opts.number = int32(num)
 			}
 
-			t := tableprinter.New(f.IOStreams)
+			t := tableprinter.New(f.IOStreams, tableprinter.WithHeaders("Name", "Data type", "ID"))
 			config := listConfig{
 				io:     f.IOStreams,
 				tp:     t,
@@ -108,8 +108,6 @@ func printResults(config listConfig, fields []queries.ProjectField, login string
 	if len(fields) == 0 {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for owner %s has no fields", config.opts.number, login))
 	}
-
-	config.tp.HeaderRow("Name", "Data type", "ID")
 
 	for _, f := range fields {
 		config.tp.AddField(f.Name())

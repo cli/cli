@@ -199,32 +199,32 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-	table := tableprinter.New(opts.IO)
+	isTTY := opts.IO.IsStdoutTTY()
 
 	headers := []string{
 		"",
 		"TITLE",
 		"BRANCH",
 	}
-	if !table.IsTTY() {
+	if !isTTY {
 		headers = append(headers, "STATE")
 	}
 	headers = append(headers, "CREATED AT")
-	table.HeaderRow(headers...)
 
+	table := tableprinter.New(opts.IO, tableprinter.WithHeaders(headers...))
 	for _, pr := range listResult.PullRequests {
 		prNum := strconv.Itoa(pr.Number)
-		if table.IsTTY() {
+		if isTTY {
 			prNum = "#" + prNum
 		}
 
 		table.AddField(prNum, tableprinter.WithColor(cs.ColorFromString(shared.ColorForPRState(pr))))
 		table.AddField(text.RemoveExcessiveWhitespace(pr.Title))
 		table.AddField(pr.HeadLabel(), tableprinter.WithColor(cs.Cyan))
-		if !table.IsTTY() {
+		if !isTTY {
 			table.AddField(prStateWithDraft(&pr))
 		}
-		if table.IsTTY() {
+		if isTTY {
 			table.AddField(text.FuzzyAgo(opts.Now(), pr.CreatedAt), tableprinter.WithColor(cs.Gray))
 		} else {
 			table.AddField(pr.CreatedAt.String())
