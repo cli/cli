@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -18,10 +18,10 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
 	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/cli/cli/v2/pkg/ssh"
 	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
@@ -144,6 +144,24 @@ func newSSHCmd(app *App) *cobra.Command {
 	return sshCmd
 }
 
+type combinedReadWriteHalfCloser struct {
+	io.ReadCloser
+	io.WriteCloser
+}
+
+func (crwc *combinedReadWriteHalfCloser) Close() error {
+	werr := crwc.WriteCloser.Close()
+	rerr := crwc.ReadCloser.Close()
+	if werr != nil {
+		return werr
+	}
+	return rerr
+}
+
+func (crwc *combinedReadWriteHalfCloser) CloseWrite() error {
+	return crwc.WriteCloser.Close()
+}
+
 // SSH opens an ssh session or runs an ssh command in a codespace.
 func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
@@ -175,11 +193,15 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return err
 	}
 
-	session, err := startLiveShareSession(ctx, codespace, a, opts.debug, opts.debugFile)
+	codespaceConnection, err := codespaces.GetCodespaceConnection(ctx, a, a.apiClient, codespace)
 	if err != nil {
-		return err
+		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
-	defer safeClose(session, &err)
+
+	fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+	if err != nil {
+		return fmt.Errorf("failed to create port forwarder: %w", err)
+	}
 
 	var (
 		invoker             rpc.Invoker
@@ -187,7 +209,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		sshUser             string
 	)
 	err = a.RunWithProgress("Fetching SSH Details", func() (err error) {
-		invoker, err = rpc.CreateInvoker(ctx, session)
+		invoker, err = rpc.CreateInvoker(ctx, fwd)
 		if err != nil {
 			return
 		}
@@ -203,9 +225,28 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 
 	if opts.stdio {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
-		stdio := liveshare.NewReadWriteHalfCloser(os.Stdin, os.Stdout)
-		err := fwd.Forward(ctx, stdio) // always non-nil
+		stdio := &combinedReadWriteHalfCloser{os.Stdin, os.Stdout}
+		opts := portforwarder.ForwardPortOpts{
+			Port:      remoteSSHServerPort,
+			Internal:  true,
+			KeepAlive: true,
+		}
+
+		// Forward the port
+		err = fwd.ForwardPort(ctx, opts)
+		if err != nil {
+			return fmt.Errorf("failed to forward port: %w", err)
+		}
+
+		// Close the SSH connection when we're done
+		defer fwd.CloseSSHConnection()
+
+		// Connect to the forwarded port
+		err = fwd.ConnectToForwardedPort(ctx, stdio, opts)
+		if err != nil {
+			return fmt.Errorf("failed to connect to forwarded port: %w", err)
+		}
+
 		return fmt.Errorf("tunnel closed: %w", err)
 	}
 
@@ -227,8 +268,12 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
-		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
+		opts := portforwarder.ForwardPortOpts{
+			Port:      remoteSSHServerPort,
+			Internal:  true,
+			KeepAlive: true,
+		}
+		tunnelClosed <- fwd.ForwardPortToListener(ctx, opts, listen)
 	}()
 
 	shellClosed := make(chan error, 1)
@@ -526,27 +571,36 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			result := sshResult{}
 			defer wg.Done()
 
-			session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, cs)
+			codespaceConnection, err := codespaces.GetCodespaceConnection(ctx, a, a.apiClient, cs)
 			if err != nil {
 				result.err = fmt.Errorf("error connecting to codespace: %w", err)
-			} else {
-				defer safeClose(session, &err)
-
-				invoker, err := rpc.CreateInvoker(ctx, session)
-				if err != nil {
-					result.err = fmt.Errorf("error connecting to codespace: %w", err)
-				} else {
-					defer safeClose(invoker, &err)
-
-					_, result.user, err = invoker.StartSSHServer(ctx)
-					if err != nil {
-						result.err = fmt.Errorf("error getting ssh server details: %w", err)
-					} else {
-						result.codespace = cs
-					}
-				}
+				sshUsers <- result
+				return
 			}
 
+			fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+			if err != nil {
+				result.err = fmt.Errorf("failed to create port forwarder: %w", err)
+				sshUsers <- result
+				return
+			}
+
+			invoker, err := rpc.CreateInvoker(ctx, fwd)
+			if err != nil {
+				result.err = fmt.Errorf("error connecting to codespace: %w", err)
+				sshUsers <- result
+				return
+			}
+			defer safeClose(invoker, &err)
+
+			_, result.user, err = invoker.StartSSHServer(ctx)
+			if err != nil {
+				result.err = fmt.Errorf("error getting ssh server details: %w", err)
+				sshUsers <- result
+				return
+			}
+
+			result.codespace = cs
 			sshUsers <- result
 		}()
 	}
@@ -721,44 +775,4 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 		return cmdutil.FlagErrorf("at least one argument must have a 'remote:' prefix")
 	}
 	return a.SSH(ctx, nil, opts.sshOptions)
-}
-
-// fileLogger is a wrapper around an log.Logger configured to write
-// to a file. It exports two additional methods to get the log file name
-// and close the file handle when the operation is finished.
-type fileLogger struct {
-	*log.Logger
-
-	f *os.File
-}
-
-// newFileLogger creates a new fileLogger. It returns an error if the file
-// cannot be created. The file is created on the specified path, if the path
-// is empty it is created in the temporary directory.
-func newFileLogger(file string) (fl *fileLogger, err error) {
-	var f *os.File
-	if file == "" {
-		f, err = os.CreateTemp("", "")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create tmp file: %w", err)
-		}
-	} else {
-		f, err = os.Create(file)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &fileLogger{
-		Logger: log.New(f, "", log.LstdFlags),
-		f:      f,
-	}, nil
-}
-
-func (fl *fileLogger) Name() string {
-	return fl.f.Name()
-}
-
-func (fl *fileLogger) Close() error {
-	return fl.f.Close()
 }

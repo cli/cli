@@ -17,10 +17,8 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	clicontext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -63,28 +61,6 @@ func (a *App) StopProgressIndicator() {
 
 func (a *App) RunWithProgress(label string, run func() error) error {
 	return a.io.RunWithProgress(label, run)
-}
-
-// Connects to a codespace using Live Share and returns that session
-func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (session *liveshare.Session, err error) {
-	liveshareLogger := noopLogger()
-	if debug {
-		debugLogger, err := newFileLogger(debugFile)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't create file logger: %w", err)
-		}
-		defer safeClose(debugLogger, &err)
-
-		liveshareLogger = debugLogger.Logger
-		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
-	}
-
-	session, err = codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Live Share: %w", err)
-	}
-
-	return session, nil
 }
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
@@ -199,10 +175,6 @@ func noArgsConstraint(cmd *cobra.Command, args []string) error {
 		return ErrTooManyArgs
 	}
 	return nil
-}
-
-func noopLogger() *log.Logger {
-	return log.New(io.Discard, "", 0)
 }
 
 type codespace struct {

@@ -72,7 +72,8 @@ func createTestInvoker(t *testing.T, server *mockServer) (Invoker, func(), error
 		listener.Close()
 	}
 
-	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
+	// Create a new invoker with a mock port forwarder
+	invoker, err := CreateInvoker(context.Background(), rpctest.PortForwarder{})
 	if err != nil {
 		close()
 		return nil, nil, fmt.Errorf("error connecting to internal server: %w", err)
