@@ -162,6 +162,27 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			}
 		}
 
+		if !input.HasIssuesEnabled {
+			updateVariables := map[string]interface{}{
+				"input": updateRepositoryInput{
+					RepositoryID:     response.CloneTemplateRepository.Repository.ID,
+					HasIssuesEnabled: input.HasIssuesEnabled,
+				},
+			}
+
+			if err := apiClient.GraphQL(hostname, `
+				mutation UpdateRepository($input: UpdateRepositoryInput!) {
+					updateRepository(input: $input) {
+						repository {
+							id
+						}
+					}
+				}
+			`, updateVariables, nil); err != nil {
+				return nil, err
+			}
+		}
+
 		return api.InitRepoHostname(&response.CloneTemplateRepository.Repository, hostname), nil
 	}
 
