@@ -85,6 +85,10 @@ func TestIssue_ExportData(t *testing.T) {
 						"project": {
 							"id": "PVT_id",
 							"title": "Some Project"
+						},
+						"status": {
+							"name": "Todo",
+							"optionId": "abc123"
 						}
 					}
 				] } }
@@ -93,6 +97,10 @@ func TestIssue_ExportData(t *testing.T) {
 				{
 					"projectItems": [
 						{
+							"status": {
+								"optionId": "abc123",
+								"name": "Todo"
+							},
 							"title": "Some Project"
 						}
 					]
