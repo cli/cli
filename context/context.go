@@ -107,7 +107,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		"please run `gh repo set-default` to select a default remote repository.")
 }
 
-func (r *ResolvedRemotes) HeadRepos() ([]*api.Repository, error) {
+func (r *ResolvedRemotes) HeadRepos() ([]Remote, error) {
 	if r.network == nil {
 		err := resolveNetwork(r, defaultRemotesForLookup)
 		if err != nil {
@@ -115,10 +115,14 @@ func (r *ResolvedRemotes) HeadRepos() ([]*api.Repository, error) {
 		}
 	}
 
-	var results []*api.Repository
-	for _, repo := range r.network.Repositories {
+	var results []Remote
+	for i, repo := range r.network.Repositories {
 		if repo != nil && repo.ViewerCanPush() {
-			results = append(results, repo)
+			var remote = Remote{
+				Remote: r.remotes[i].Remote,
+				Repo:   repo,
+			}
+			results = append(results, remote)
 		}
 	}
 	return results, nil
