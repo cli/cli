@@ -164,8 +164,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if cmd.Flags().Changed("enable-wiki") {
 				opts.DisableWiki = !enableWiki
 			}
-			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "") {
-				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, or `--team`")
+			if opts.Template != "" && opts.Team != "" {
+				return cmdutil.FlagErrorf("the `--template` option is not supported with `--team`")
 			}
 
 			if opts.Template == "" && opts.IncludeAllBranches {

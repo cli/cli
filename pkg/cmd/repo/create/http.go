@@ -69,6 +69,7 @@ type updateRepositoryInput struct {
 	RepositoryID     string `json:"repositoryId"`
 	HasWikiEnabled   bool   `json:"hasWikiEnabled"`
 	HasIssuesEnabled bool   `json:"hasIssuesEnabled"`
+	HomepageURL      string `json:"homepageUrl,omitempty"`
 }
 
 // repoCreate creates a new GitHub repository
@@ -145,10 +146,11 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 				RepositoryID:     response.CloneTemplateRepository.Repository.ID,
 				HasWikiEnabled:   input.HasWikiEnabled,
 				HasIssuesEnabled: input.HasIssuesEnabled,
+				HomepageURL:      input.HomepageURL,
 			},
 		}
 
-		if !input.HasWikiEnabled || !input.HasIssuesEnabled {
+		if !input.HasWikiEnabled || !input.HasIssuesEnabled || input.HomepageURL != "" {
 			if err := apiClient.GraphQL(hostname, `
 				mutation UpdateRepository($input: UpdateRepositoryInput!) {
 					updateRepository(input: $input) {
