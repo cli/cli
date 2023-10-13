@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -38,13 +37,14 @@ type BrowseOptions struct {
 
 	SelectorArg string
 
-	Branch        string
-	Commit        string
-	ProjectsFlag  bool
-	ReleasesFlag  bool
-	SettingsFlag  bool
-	WikiFlag      bool
-	NoBrowserFlag bool
+	Branch          string
+	Commit          string
+	ProjectsFlag    bool
+	ReleasesFlag    bool
+	SettingsFlag    bool
+	WikiFlag        bool
+	NoBrowserFlag   bool
+	HasRepoOverride bool
 }
 
 func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
@@ -55,7 +55,8 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 		PathFromRepoRoot: func() string {
 			return f.GitClient.PathFromRoot(context.Background())
 		},
-		GitClient: &localGitClient{client: f.GitClient},
+		GitClient:       &localGitClient{client: f.GitClient},
+		HasRepoOverride: false,
 	}
 
 	cmd := &cobra.Command{
@@ -133,6 +134,10 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 
 			if cmd.Flags().Changed("repo") {
 				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
+			}
+
+			if cmd.Flags().Changed("repo") || os.Getenv("GH_REPO") != "" {
+				opts.HasRepoOverride = true
 			}
 
 			if runF != nil {
@@ -277,7 +282,7 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 	}
 
 	p = filepath.ToSlash(parts[0])
-	if !path.IsAbs(p) && reflect.TypeOf(opts.GitClient) != reflect.TypeOf(&remoteGitClient{}) && os.Getenv("GH_REPO") == "" {
+	if !path.IsAbs(p) && !opts.HasRepoOverride {
 		p = path.Join(opts.PathFromRepoRoot(), p)
 		if p == "." || strings.HasPrefix(p, "..") {
 			p = ""
