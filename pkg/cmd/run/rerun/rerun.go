@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -25,6 +26,7 @@ type RerunOptions struct {
 
 	RunID      string
 	OnlyFailed bool
+	ContainsAnnotation string
 	JobID      string
 	Debug      bool
 
@@ -71,6 +73,10 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 				return cmdutil.FlagErrorf("specify only one of `<run-id>` or `--job`")
 			}
 
+			if opts.RunID == "" && opts.ContainsAnnotation != "" {
+				return cmdutil.FlagErrorf("specify `<run-id>` for the given <annotation>")
+			} 
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -79,6 +85,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().BoolVar(&opts.OnlyFailed, "failed", false, "Rerun only failed jobs, including dependencies")
+	cmd.Flags().StringVarP(&opts.ContainsAnnotation, "annotation", "a", "", "Rerun only jobs containing the given annotated message")
 	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "Rerun a specific job from a run, including dependencies")
 	cmd.Flags().BoolVarP(&opts.Debug, "debug", "d", false, "Rerun with debug logging")
 
@@ -150,6 +157,29 @@ func runRerun(opts *RerunOptions) error {
 				cs.Cyanf("%d", selectedJob.RunID),
 				debugMsg)
 		}
+	} else if opts.ContainsAnnotation != "" { 
+		opts.IO.StartProgressIndicator()
+		run, err := shared.GetRun(client, repo, runID, 0)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return fmt.Errorf("failed to get run: %w", err)
+		}
+		err = rerunAnnotatedJobs(client, repo, run, opts.ContainsAnnotation, opts.Debug)
+		if err != nil {
+			return err
+		}
+		if opts.IO.IsStdoutTTY() {
+			onlyFailedMsg := ""
+			if opts.OnlyFailed {
+				onlyFailedMsg = "(failed jobs) "
+			}
+			fmt.Fprintf(opts.IO.Out, "%s Requested rerun %sof run %s containing annotation: (%s)%s\n",
+				cs.SuccessIcon(),
+				onlyFailedMsg,
+				cs.Cyanf("%d", run.ID),
+				opts.ContainsAnnotation,
+				debugMsg)
+		}
 	} else {
 		opts.IO.StartProgressIndicator()
 		run, err := shared.GetRun(client, repo, runID, 0)
@@ -177,6 +207,40 @@ func runRerun(opts *RerunOptions) error {
 
 	return nil
 }
+
+func rerunAnnotatedJobs(client *api.Client, repo ghrepo.Interface, run *shared.Run, containsAnnotation string, debug bool) error {
+	var jobs []shared.Job
+	var err error
+	var attempt uint64 = 1
+	jobs, err = shared.GetJobs(client, repo, run, attempt)
+	if err != nil {
+		return fmt.Errorf("failed to get jobs: %w", err)	
+	}
+	var annotationErr error
+	var as []shared.Annotation
+	for _, job := range jobs {
+		if job.Conclusion != shared.Failure {
+			continue
+		}
+		as, annotationErr = shared.GetAnnotations(client, repo, job)
+		if annotationErr != nil {
+			return fmt.Errorf("failed to get annotations: %w", annotationErr)
+		}
+		for _, annotation := range as {
+			fmt.Print(annotation.Message)
+			fmt.Printf("\n")
+			if strings.Contains(strings.ToLower(annotation.Message), strings.ToLower(containsAnnotation)) {
+				err = rerunJob(client, repo, &job, debug)
+				if err != nil {
+					return fmt.Errorf("failed to rerun the job: %w", err)
+				}
+			}
+		}
+	}
+	return nil
+}
+	
+
 
 func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFailed, debug bool) error {
 	runVerb := "rerun"
