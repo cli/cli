@@ -141,16 +141,16 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			return nil, err
 		}
 
-		updateVariables := map[string]interface{}{
-			"input": updateRepositoryInput{
-				RepositoryID:     response.CloneTemplateRepository.Repository.ID,
-				HasWikiEnabled:   input.HasWikiEnabled,
-				HasIssuesEnabled: input.HasIssuesEnabled,
-				HomepageURL:      input.HomepageURL,
-			},
-		}
-
 		if !input.HasWikiEnabled || !input.HasIssuesEnabled || input.HomepageURL != "" {
+			updateVariables := map[string]interface{}{
+				"input": updateRepositoryInput{
+					RepositoryID:     response.CloneTemplateRepository.Repository.ID,
+					HasWikiEnabled:   input.HasWikiEnabled,
+					HasIssuesEnabled: input.HasIssuesEnabled,
+					HomepageURL:      input.HomepageURL,
+				},
+			}
+
 			if err := apiClient.GraphQL(hostname, `
 				mutation UpdateRepository($input: UpdateRepositoryInput!) {
 					updateRepository(input: $input) {
