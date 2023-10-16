@@ -55,8 +55,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 		PathFromRepoRoot: func() string {
 			return f.GitClient.PathFromRoot(context.Background())
 		},
-		GitClient:       &localGitClient{client: f.GitClient},
-		HasRepoOverride: false,
+		GitClient: &localGitClient{client: f.GitClient},
 	}
 
 	cmd := &cobra.Command{
@@ -132,11 +131,8 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("%q is an invalid argument when using `--branch` or `--commit`", opts.SelectorArg)
 			}
 
-			if cmd.Flags().Changed("repo") {
-				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
-			}
-
 			if cmd.Flags().Changed("repo") || os.Getenv("GH_REPO") != "" {
+				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
 				opts.HasRepoOverride = true
 			}
 
