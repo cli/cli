@@ -639,6 +639,46 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 	return response.Machines, nil
 }
 
+// GetCodespacesPermissionsCheck returns a bool indicating whether the user has accepted permissions for the given repo and devcontainer path.
+func (a *API) GetCodespacesPermissionsCheck(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) (bool, error) {
+	reqURL := fmt.Sprintf("%s/repositories/%d/codespaces/permissions_check", a.githubAPI, repoID)
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("error creating request: %w", err)
+	}
+
+	q := req.URL.Query()
+	q.Add("location", location)
+	q.Add("ref", branch)
+	q.Add("devcontainer_path", devcontainerPath)
+	req.URL.RawQuery = q.Encode()
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/repositories/*/codespaces/permissions_check")
+	if err != nil {
+		return false, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, api.HandleHTTPError(resp)
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var response struct {
+		Accepted bool `json:"accepted"`
+	}
+	if err := json.Unmarshal(b, &response); err != nil {
+		return false, fmt.Errorf("error unmarshalling response: %w", err)
+	}
+
+	return response.Accepted, nil
+}
+
 // RepoSearchParameters are the optional parameters for searching for repositories.
 type RepoSearchParameters struct {
 	// The maximum number of repos to return. At most 100 repos are returned even if this value is greater than 100.
