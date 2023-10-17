@@ -4,6 +4,7 @@ package context
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/cli/cli/v2/api"
@@ -107,7 +108,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		"please run `gh repo set-default` to select a default remote repository.")
 }
 
-func (r *ResolvedRemotes) HeadRepos() ([]Remote, error) {
+func (r *ResolvedRemotes) HeadRepos() ([]*api.Repository, error) {
 	if r.network == nil {
 		err := resolveNetwork(r, defaultRemotesForLookup)
 		if err != nil {
@@ -115,14 +116,12 @@ func (r *ResolvedRemotes) HeadRepos() ([]Remote, error) {
 		}
 	}
 
-	var results []Remote
-	for i, repo := range r.network.Repositories {
-		if repo != nil && repo.ViewerCanPush() {
-			var remote = Remote{
-				Remote: r.remotes[i].Remote,
-				Repo:   repo,
-			}
-			results = append(results, remote)
+	var results []*api.Repository
+	var ids []string // Check if repo duplicates
+	for _, repo := range r.network.Repositories {
+		if repo != nil && repo.ViewerCanPush() && !slices.Contains(ids, repo.ID) {
+			results = append(results, repo)
+			ids = append(ids, repo.ID)
 		}
 	}
 	return results, nil

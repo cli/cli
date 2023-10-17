@@ -576,6 +576,17 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 
 	// otherwise, ask the user for the head repository using info obtained from the API
 	if headRepo == nil && isPushEnabled && opts.IO.CanPrompt() {
+		pushableRepos, err := repoContext.HeadRepos()
+		if err != nil {
+			return nil, err
+		}
+
+		if len(pushableRepos) == 0 {
+			pushableRepos, err = api.RepoFindForks(client, baseRepo, 3)
+			if err != nil {
+				return nil, err
+			}
+		}
 
 		currentLogin, err := api.CurrentLoginName(client, baseRepo.RepoHost())
 		if err != nil {
@@ -584,30 +595,10 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 
 		hasOwnFork := false
 		var pushOptions []string
-
-		pushableRepos, err := repoContext.HeadRepos()
-		if err != nil {
-			return nil, err
-		}
-
-		if len(pushableRepos) == 0 {
-			forkedPushableRepo, err := api.RepoFindForks(client, baseRepo, 3)
-			if err != nil {
-				return nil, err
-			}
-
-			if len(forkedPushableRepo) != 0 {
+		for _, r := range pushableRepos {
+			pushOptions = append(pushOptions, ghrepo.FullName(r))
+			if r.RepoOwner() == currentLogin {
 				hasOwnFork = true
-				for _, r := range forkedPushableRepo {
-					pushOptions = append(pushOptions, ghrepo.FullName(r))
-				}
-			}
-		} else {
-			for _, r := range pushableRepos {
-				pushOptions = append(pushOptions, fmt.Sprintf("%s (%s)", ghrepo.FullName(r), r.Remote.Name))
-				if r.RepoOwner() == currentLogin {
-					hasOwnFork = true
-				}
 			}
 		}
 
