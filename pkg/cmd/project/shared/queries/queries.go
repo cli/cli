@@ -115,8 +115,8 @@ type Project struct {
 	// and older. In order to fix this we will no longer query the Template field until
 	// GHES 3.8 gets deprecated on 2024-03-07. This solution was simplier and quicker
 	// than adding a feature detection measure to every place this query is used.
-	// It does have the negative consequence that we have had to hardcode a false value for
-	// the Template field when outputing projects to JSON using the --format flag supported
+	// It does have the negative consequence that we have had to remove the
+	// Template field when outputing projects to JSON using the --format flag supported
 	// by a number of project commands. See `pkg/cmd/project/shared/format/json.go` for
 	// implementation.
 	// Template         bool
