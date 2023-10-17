@@ -213,6 +213,38 @@ func TestPullRequest_ExportData(t *testing.T) {
 				}
 			`),
 		},
+		{
+			name:   "project items",
+			fields: []string{"projectItems"},
+			inputJSON: heredoc.Doc(`
+				{ "projectItems": { "nodes": [
+					{
+						"id": "PVTPR_id",
+						"project": {
+							"id": "PVT_id",
+							"title": "Some Project"
+						},
+						"status": {
+							"name": "Todo",
+							"optionId": "abc123"
+						}
+					}
+				] } }
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"projectItems": [
+						{
+							"status": {
+								"optionId": "abc123",
+								"name": "Todo"
+							},
+							"title": "Some Project"
+						}
+					]
+				}
+			`),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
