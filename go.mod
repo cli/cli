@@ -87,5 +87,3 @@ require (
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
-
-replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
