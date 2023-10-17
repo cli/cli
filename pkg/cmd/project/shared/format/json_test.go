@@ -25,7 +25,7 @@ func TestJSONProject_User(t *testing.T) {
 	b, err := JSONProject(project)
 	assert.NoError(t, err)
 
-	assert.Equal(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"template":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"User","login":"monalisa"}}`, string(b))
+	assert.Equal(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"User","login":"monalisa"}}`, string(b))
 }
 
 func TestJSONProject_Org(t *testing.T) {
@@ -36,7 +36,6 @@ func TestJSONProject_Org(t *testing.T) {
 		ShortDescription: "short description",
 		Public:           true,
 		Readme:           "readme",
-		Template:         true,
 	}
 
 	project.Items.TotalCount = 1
@@ -46,7 +45,7 @@ func TestJSONProject_Org(t *testing.T) {
 	b, err := JSONProject(project)
 	assert.NoError(t, err)
 
-	assert.Equal(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"template":true,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"Organization","login":"github"}}`, string(b))
+	assert.Equal(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"Organization","login":"github"}}`, string(b))
 }
 
 func TestJSONProjects(t *testing.T) {
@@ -71,7 +70,6 @@ func TestJSONProjects(t *testing.T) {
 		ShortDescription: "short description",
 		Public:           true,
 		Readme:           "readme",
-		Template:         true,
 	}
 
 	orgProject.Items.TotalCount = 1
@@ -83,7 +81,7 @@ func TestJSONProjects(t *testing.T) {
 
 	assert.Equal(
 		t,
-		`{"projects":[{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"template":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"User","login":"monalisa"}},{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"template":true,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"Organization","login":"github"}}],"totalCount":2}`,
+		`{"projects":[{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"User","login":"monalisa"}},{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"Organization","login":"github"}}],"totalCount":2}`,
 		string(b))
 }
 
