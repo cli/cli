@@ -4,6 +4,7 @@ package context
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/cli/cli/v2/api"
@@ -116,9 +117,11 @@ func (r *ResolvedRemotes) HeadRepos() ([]*api.Repository, error) {
 	}
 
 	var results []*api.Repository
+	var ids []string // Check if repo duplicates
 	for _, repo := range r.network.Repositories {
-		if repo != nil && repo.ViewerCanPush() {
+		if repo != nil && repo.ViewerCanPush() && !slices.Contains(ids, repo.ID) {
 			results = append(results, repo)
+			ids = append(ids, repo.ID)
 		}
 	}
 	return results, nil
