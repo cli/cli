@@ -105,6 +105,54 @@ func TestTokenFromKeyringNonExistent(t *testing.T) {
 	require.ErrorIs(t, err, keyring.ErrNotFound)
 }
 
+func TestHasEnvTokenWithoutAnyEnvToken(t *testing.T) {
+	// Given an empty hosts configuration
+	authCfg := newTestAuthConfig()
+	ghConfig.Read = func() (*ghConfig.Config, error) {
+		return authCfg.cfg, nil
+	}
+
+	// When we check if it has an env token
+	hasEnvToken := authCfg.HasEnvToken()
+
+	// Then it returns false
+	require.False(t, hasEnvToken, "expected not to have env token")
+}
+
+func TestHasEnvTokenWithEnvToken(t *testing.T) {
+	// Given an empty hosts configuration but a token set in the env var
+	authCfg := newTestAuthConfig()
+	ghConfig.Read = func() (*ghConfig.Config, error) {
+		return authCfg.cfg, nil
+	}
+	t.Setenv("GH_ENTERPRISE_TOKEN", "test-token")
+
+	// When we check if it has an env token
+	hasEnvToken := authCfg.HasEnvToken()
+
+	// Then it returns true
+	require.True(t, hasEnvToken, "expected to have env token")
+}
+
+func TestHasEnvTokenWithNoEnvTokenButAConfigVar(t *testing.T) {
+	t.Skip("this test is explicitly breaking some implementation assumptions")
+
+	// Given a token in the config
+	authCfg := newTestAuthConfig()
+	ghConfig.Read = func() (*ghConfig.Config, error) {
+		return authCfg.cfg, nil
+	}
+	// Using example.com here will cause the token to be returned from the config
+	_, err := authCfg.Login("example.com", "test-user", "test-token", "", false)
+	require.NoError(t, err)
+
+	// When we check if it has an env token
+	hasEnvToken := authCfg.HasEnvToken()
+
+	// Then it SHOULD return false
+	require.False(t, hasEnvToken, "expected not to have env token")
+}
+
 func TestNoUserInAuthConfig(t *testing.T) {
 	// Given a host configuration without a user
 	authCfg := newTestAuthConfig()
