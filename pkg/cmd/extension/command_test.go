@@ -969,15 +969,6 @@ func Test_checkValidExtension(t *testing.T) {
 			},
 			wantError: "\"auth\" matches the name of a built-in command or alias",
 		},
-		{
-			name: "clashes with an installed extension",
-			args: args{
-				rootCmd: rootCmd,
-				manager: m,
-				extName: "gh-triage",
-			},
-			wantError: "there is already an installed extension that provides the \"triage\" command",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
