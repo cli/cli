@@ -202,7 +202,7 @@ func listRun(opts *ListOptions) error {
 	isTTY := opts.IO.IsStdoutTTY()
 
 	headers := []string{
-		"",
+		"ID",
 		"TITLE",
 		"BRANCH",
 	}
@@ -211,7 +211,7 @@ func listRun(opts *ListOptions) error {
 	}
 	headers = append(headers, "CREATED AT")
 
-	table := tableprinter.New(opts.IO, tableprinter.WithHeaders(headers...))
+	table := tableprinter.New(opts.IO, tableprinter.WithHeader(headers...))
 	for _, pr := range listResult.PullRequests {
 		prNum := strconv.Itoa(pr.Number)
 		if isTTY {
@@ -219,7 +219,7 @@ func listRun(opts *ListOptions) error {
 		}
 
 		table.AddField(prNum, tableprinter.WithColor(cs.ColorFromString(shared.ColorForPRState(pr))))
-		table.AddField(text.RemoveExcessiveWhitespace(pr.Title))
+		table.AddField(text.RemoveExcessiveWhitespace(pr.Title), tableprinter.WithTruncate(tableprinter.TruncateNonURL))
 		table.AddField(pr.HeadLabel(), tableprinter.WithColor(cs.Cyan))
 		if !isTTY {
 			table.AddField(prStateWithDraft(&pr))

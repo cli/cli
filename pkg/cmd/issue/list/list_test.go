@@ -104,7 +104,7 @@ func TestIssueList_tty(t *testing.T) {
 
 		Showing 3 of 3 open issues in OWNER/REPO
 
-		    TITLE        LABELS  UPDATED
+		ID  TITLE        LABELS  UPDATED
 		#1  number won   label   about 1 day ago
 		#2  number too   label   about 1 month ago
 		#4  number fore  label   about 2 years ago

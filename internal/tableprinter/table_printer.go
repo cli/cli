@@ -90,16 +90,25 @@ func NewWithWriter(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorSch
 	return tp
 }
 
-// WithHeaders defines the column names for a table.
+// WithHeader defines the column names for a table.
 // Panics if columns is nil or empty.
-func WithHeaders(columns ...string) headerOption {
+func WithHeader(columns ...string) headerOption {
 	if len(columns) == 0 {
-		panic("must define headers")
+		panic("must define header columns")
 	}
 	return headerOption{columns}
 }
 
 // NoHeader disable printing or checking for a table header.
 //
-// Deprecated: use WithHeaders unless required otherwise.
-var NoHeaders = headerOption{}
+// Deprecated: use WithHeader unless required otherwise.
+var NoHeader = headerOption{}
+
+// TruncateNonURL truncates any text that does not begin with "https://" or "http://".
+// This is provided for backward compatibility with the old table printer for existing tables.
+func TruncateNonURL(maxWidth int, s string) string {
+	if strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://") {
+		return s
+	}
+	return text.Truncate(maxWidth, s)
+}

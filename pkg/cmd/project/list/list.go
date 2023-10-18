@@ -52,7 +52,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 			URLOpener := func(url string) error {
 				return f.Browser.Browse(url)
 			}
-			t := tableprinter.New(f.IOStreams, tableprinter.WithHeaders("Number", "Title", "State", "ID"))
+			t := tableprinter.New(f.IOStreams, tableprinter.WithHeader("Number", "Title", "State", "ID"))
 			config := listConfig{
 				tp:        t,
 				client:    client,

@@ -74,7 +74,7 @@ func (a *App) ViewCodespace(ctx context.Context, opts *viewOptions) error {
 	}
 
 	//nolint:staticcheck // SA1019: Showing NAME|VALUE headers adds nothing to table.
-	tp := tableprinter.New(a.io, tableprinter.NoHeaders)
+	tp := tableprinter.New(a.io, tableprinter.NoHeader)
 	c := codespace{selectedCodespace}
 	formattedName := formatNameForVSCSTarget(c.Name, c.VSCSTarget)
 

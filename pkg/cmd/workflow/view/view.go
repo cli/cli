@@ -238,7 +238,7 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 	}
 	headers = append(headers, "ID")
 
-	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders(headers...))
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeader(headers...))
 	for _, run := range wr.WorkflowRuns {
 		if opts.Raw {
 			tp.AddField(string(run.Status))

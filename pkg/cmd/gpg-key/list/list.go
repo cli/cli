@@ -71,7 +71,7 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no GPG keys present in the GitHub account")
 	}
 
-	t := tableprinter.New(opts.IO, tableprinter.WithHeaders("EMAIL", "KEY ID", "PUBLIC KEY", "ADDED", "EXPIRES"))
+	t := tableprinter.New(opts.IO, tableprinter.WithHeader("EMAIL", "KEY ID", "PUBLIC KEY", "ADDED", "EXPIRES"))
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
 

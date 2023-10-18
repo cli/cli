@@ -176,7 +176,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders("NAME", "DESCRIPTION", "INFO", "UPDATED"))
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("NAME", "DESCRIPTION", "INFO", "UPDATED"))
 
 	totalMatchCount := len(listResult.Repositories)
 	for _, repo := range listResult.Repositories {
@@ -193,7 +193,7 @@ func listRun(opts *ListOptions) error {
 		}
 
 		tp.AddField(repo.NameWithOwner, tableprinter.WithColor(cs.Bold))
-		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description))
+		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description), tableprinter.WithTruncate(tableprinter.TruncateNonURL))
 		tp.AddField(info, tableprinter.WithColor(infoColor))
 		if tp.IsTTY() {
 			tp.AddField(text.FuzzyAgoAbbr(opts.Now(), *t), tableprinter.WithColor(cs.Gray))

@@ -94,7 +94,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders("ID", "DESCRIPTION", "FILES", "", "UPDATED"))
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("ID", "DESCRIPTION", "FILES", "", "UPDATED"))
 
 	for _, gist := range gists {
 		fileCount := len(gist.Files)
@@ -117,7 +117,11 @@ func listRun(opts *ListOptions) error {
 		}
 
 		tp.AddField(gist.ID)
-		tp.AddField(text.RemoveExcessiveWhitespace(description), tableprinter.WithColor(cs.Bold))
+		tp.AddField(
+			text.RemoveExcessiveWhitespace(description),
+			tableprinter.WithColor(cs.Bold),
+			tableprinter.WithTruncate(tableprinter.TruncateNonURL),
+		)
 		tp.AddField(text.Pluralize(fileCount, "file"))
 		tp.AddField(visibility, tableprinter.WithColor(visColor))
 		tp.AddTimeField(time.Now(), gist.UpdatedAt, cs.Gray)

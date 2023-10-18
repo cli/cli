@@ -52,7 +52,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 				opts.number = int32(num)
 			}
 
-			t := tableprinter.New(f.IOStreams, tableprinter.WithHeaders("Type", "Title", "Number", "Repository", "ID"))
+			t := tableprinter.New(f.IOStreams, tableprinter.WithHeader("Type", "Title", "Number", "Repository", "ID"))
 			config := listConfig{
 				io:     f.IOStreams,
 				tp:     t,

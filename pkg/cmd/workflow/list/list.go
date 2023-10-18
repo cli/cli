@@ -111,7 +111,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-	tp := tableprinter.New(opts.IO, tableprinter.WithHeaders("Name", "State", "ID"))
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("Name", "State", "ID"))
 
 	for _, workflow := range filteredWorkflows {
 		tp.AddField(workflow.Name)

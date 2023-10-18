@@ -99,7 +99,7 @@ func printTable(io *iostreams.IOStreams, checks []check) error {
 		headers = []string{"NAME", "STATUS", "ELAPSED", "URL", "DESCRIPTION"}
 	}
 
-	tp := tableprinter.New(io, tableprinter.WithHeaders(headers...))
+	tp := tableprinter.New(io, tableprinter.WithHeader(headers...))
 
 	sort.Slice(checks, func(i, j int) bool {
 		b0 := checks[i].Bucket

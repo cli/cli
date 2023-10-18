@@ -10,4 +10,4 @@ issues:
   - path: _test\.go
     linters:
     - staticcheck
-    text: "SA1019: tableprinter.NoHeaders is deprecated: use WithHeaders unless required otherwise."
+    text: "SA1019: tableprinter.NoHeader is deprecated: use WithHeader unless required otherwise."

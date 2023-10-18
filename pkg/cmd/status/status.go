@@ -681,17 +681,16 @@ func statusRun(opts *StatusOptions) error {
 			fmt.Fprintln(tableOut, "Nothing here ^_^")
 		} else {
 			//nolint:staticcheck // SA1019: Headers distract from numerous nested tables.
-			tp := tableprinter.NewWithWriter(tableOut, opts.IO.IsStdoutTTY(), width, cs, tableprinter.NoHeaders)
+			tp := tableprinter.NewWithWriter(tableOut, opts.IO.IsStdoutTTY(), width, cs, tableprinter.NoHeader)
 			for i, si := range items {
 				if i == rowLimit {
 					break
 				}
-				// TODO: Duplicate behavior of old util.TablePrinter: never truncate first column or URLs.
 				tp.AddField(si.Identifier, tableprinter.WithColor(idStyle), tableprinter.WithTruncate(nil))
 				if si.Reason != "" {
-					tp.AddField(si.Reason)
+					tp.AddField(si.Reason, tableprinter.WithTruncate(tableprinter.TruncateNonURL))
 				}
-				tp.AddField(si.Preview())
+				tp.AddField(si.Preview(), tableprinter.WithTruncate(tableprinter.TruncateNonURL))
 				tp.EndRow()
 			}
 

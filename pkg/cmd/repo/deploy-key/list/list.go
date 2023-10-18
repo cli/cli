@@ -77,7 +77,7 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, deployKeys)
 	}
 
-	t := tableprinter.New(opts.IO, tableprinter.WithHeaders("ID", "TITLE", "TYPE", "KEY", "CREATED AT"))
+	t := tableprinter.New(opts.IO, tableprinter.WithHeader("ID", "TITLE", "TYPE", "KEY", "CREATED AT"))
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
 

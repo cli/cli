@@ -165,7 +165,7 @@ func listRun(opts *ListOptions) error {
 		headers = []string{"Name", "Updated"}
 	}
 
-	table := tableprinter.New(opts.IO, tableprinter.WithHeaders(headers...))
+	table := tableprinter.New(opts.IO, tableprinter.WithHeader(headers...))
 	for _, secret := range secrets {
 		table.AddField(secret.Name)
 		table.AddTimeField(opts.Now(), secret.UpdatedAt, nil)

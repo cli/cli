@@ -131,7 +131,7 @@ func listRun(opts *ListOptions) error {
 		headers = []string{"Name", "Value", "Updated"}
 	}
 
-	table := tableprinter.New(opts.IO, tableprinter.WithHeaders(headers...))
+	table := tableprinter.New(opts.IO, tableprinter.WithHeader(headers...))
 	for _, variable := range variables {
 		table.AddField(variable.Name)
 		table.AddField(variable.Value)

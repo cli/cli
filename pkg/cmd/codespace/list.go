@@ -132,7 +132,7 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 	if hasNonProdVSCSTarget {
 		headers = append(headers, "VSCS TARGET")
 	}
-	tp := tableprinter.New(a.io, tableprinter.WithHeaders(headers...))
+	tp := tableprinter.New(a.io, tableprinter.WithHeader(headers...))
 
 	cs := a.io.ColorScheme()
 	for _, apiCodespace := range codespaces {

@@ -104,7 +104,7 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 	}
 
 	cs := io.ColorScheme()
-	tp := tableprinter.New(io, tableprinter.WithHeaders(headers...))
+	tp := tableprinter.New(io, tableprinter.WithHeader(headers...))
 	for _, issue := range results.Items {
 		if et == Both {
 			kind := "issue"
