@@ -58,7 +58,7 @@ func (c *cfg) GetOrDefault(hostname, key string) (string, error) {
 		return val, err
 	}
 
-	if val, ok := def(key); ok {
+	if val, ok := defaultFor(key); ok {
 		return val, nil
 	}
 
@@ -85,31 +85,13 @@ func (c *cfg) Authentication() *AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
 }
 
-func def(key string) (string, bool) {
+func defaultFor(key string) (string, bool) {
 	for _, co := range configOptions {
 		if co.Key == key {
 			return co.DefaultValue, true
 		}
 	}
 	return "", false
-}
-
-func defaultFor(key string) string {
-	for _, co := range configOptions {
-		if co.Key == key {
-			return co.DefaultValue
-		}
-	}
-	return ""
-}
-
-func defaultExists(key string) bool {
-	for _, co := range configOptions {
-		if co.Key == key {
-			return true
-		}
-	}
-	return false
 }
 
 // AuthConfig is used for interacting with some persistent configuration for gh,
@@ -185,7 +167,12 @@ func (c *AuthConfig) GitProtocol(hostname string) (string, error) {
 	if err == nil {
 		return val, err
 	}
-	return defaultFor(key), nil
+
+	if val, ok := defaultFor(key); ok {
+		return val, nil
+	}
+
+	return "", nil
 }
 
 func (c *AuthConfig) Hosts() []string {
