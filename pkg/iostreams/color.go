@@ -19,11 +19,12 @@ var (
 	bold      = ansi.ColorFunc("default+b")
 	cyanBold  = ansi.ColorFunc("cyan+b")
 	greenBold = ansi.ColorFunc("green+b")
-	grayBold  = ansi.ColorFunc("black+b")
 
 	gray256 = func(t string) string {
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
 	}
+
+	tableHeader = ansi.ColorFunc("white+du")
 )
 
 func NewColorScheme(enabled, is256enabled bool, trueColor bool) *ColorScheme {
@@ -38,6 +39,10 @@ type ColorScheme struct {
 	enabled      bool
 	is256enabled bool
 	hasTrueColor bool
+}
+
+func (c *ColorScheme) Enabled() bool {
+	return c.enabled
 }
 
 func (c *ColorScheme) Bold(t string) string {
@@ -105,17 +110,6 @@ func (c *ColorScheme) Grayf(t string, args ...interface{}) string {
 	return c.Gray(fmt.Sprintf(t, args...))
 }
 
-func (c *ColorScheme) GrayBold(t string) string {
-	if !c.enabled {
-		return t
-	}
-	return grayBold(t)
-}
-
-func (c *ColorScheme) GrayBoldf(t string, args ...interface{}) string {
-	return c.GrayBold(fmt.Sprintf(t, args...))
-}
-
 func (c *ColorScheme) Magenta(t string) string {
 	if !c.enabled {
 		return t
@@ -174,6 +168,13 @@ func (c *ColorScheme) FailureIcon() string {
 
 func (c *ColorScheme) FailureIconWithColor(colo func(string) string) string {
 	return colo("X")
+}
+
+func (c *ColorScheme) TableHeader(t string) string {
+	if !c.enabled {
+		return t
+	}
+	return tableHeader(t)
 }
 
 func (c *ColorScheme) ColorFromString(s string) func(string) string {

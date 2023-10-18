@@ -62,11 +62,29 @@ func NewWithWriter(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorSch
 	}
 
 	if isTTY && len(headers.columns) > 0 {
-		for _, header := range headers.columns {
+		// Make sure all headers are uppercase.
+		for i := range headers.columns {
 			// TODO: Consider truncating longer headers e.g., NUMBER, or removing unnecessary headers e.g., DESCRIPTION with no descriptions.
-			tp.AddField(strings.ToUpper(header), WithColor(cs.GrayBold))
+			headers.columns[i] = strings.ToUpper(headers.columns[i])
 		}
-		tp.EndRow()
+
+		// Make sure all header columns are padded - even the last one - to apply the proper TableHeader style.
+		// Checking cs.Enabled() avoids having to do that for nearly all CLI tests.
+		var paddingFunc func(int, string) string
+		if cs.Enabled() {
+			paddingFunc = func(width int, text string) string {
+				if l := len(text); l < width {
+					return text + strings.Repeat(" ", width-l)
+				}
+				return text
+			}
+		}
+
+		tp.AddHeader(
+			headers.columns,
+			tableprinter.WithPadding(paddingFunc),
+			tableprinter.WithColor(cs.TableHeader),
+		)
 	}
 
 	return tp
