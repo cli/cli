@@ -178,6 +178,7 @@ func (c *AuthConfig) User(hostname string) (string, error) {
 
 // GitProtocol will retrieve the git protocol for the logged in user at the given hostname.
 // If none is set it will return the default value.
+// TODO: although this returns an error, it actually has no path to error.
 func (c *AuthConfig) GitProtocol(hostname string) (string, error) {
 	key := "git_protocol"
 	val, err := c.cfg.Get([]string{hosts, hostname, key})
