@@ -53,22 +53,13 @@ func (c *cfg) Get(hostname, key string) (string, error) {
 }
 
 func (c *cfg) GetOrDefault(hostname, key string) (string, error) {
-	var val string
-	var err error
-	if hostname != "" {
-		val, err = c.cfg.Get([]string{hosts, hostname, key})
-		if err == nil {
-			return val, err
-		}
-	}
-
-	val, err = c.cfg.Get([]string{key})
+	val, err := c.Get(hostname, key)
 	if err == nil {
 		return val, err
 	}
 
-	if defaultExists(key) {
-		return defaultFor(key), nil
+	if val, ok := def(key); ok {
+		return val, nil
 	}
 
 	return val, err
@@ -92,6 +83,15 @@ func (c *cfg) Aliases() *AliasConfig {
 
 func (c *cfg) Authentication() *AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
+}
+
+func def(key string) (string, bool) {
+	for _, co := range configOptions {
+		if co.Key == key {
+			return co.DefaultValue, true
+		}
+	}
+	return "", false
 }
 
 func defaultFor(key string) string {

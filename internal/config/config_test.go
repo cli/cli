@@ -1,21 +1,22 @@
-package config_test
+package config
 
 import (
 	"testing"
 
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/stretchr/testify/require"
 
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
-func TestGetNonExistentKey(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
+func newTestConfig() *cfg {
+	return &cfg{
+		cfg: ghConfig.ReadFromString(""),
+	}
+}
 
+func TestGetNonExistentKey(t *testing.T) {
 	// Given we have no top level configuration
-	cfg, err := config.NewConfig()
-	require.NoError(t, err)
+	cfg := newTestConfig()
 
 	// When we get a key that has no value
 	val, err := cfg.Get("", "non-existent-key")
@@ -27,12 +28,8 @@ func TestGetNonExistentKey(t *testing.T) {
 }
 
 func TestGetNonExistentHostSpecificKey(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given have no top level configuration
-	cfg, err := config.NewConfig()
-	require.NoError(t, err)
+	cfg := newTestConfig()
 
 	// When we get a key for a host that has no value
 	val, err := cfg.Get("non-existent-host", "non-existent-key")
@@ -44,12 +41,8 @@ func TestGetNonExistentHostSpecificKey(t *testing.T) {
 }
 
 func TestGetExistingTopLevelKey(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given have a top level config entry
-	cfg, err := config.NewConfig()
-	require.NoError(t, err)
+	cfg := newTestConfig()
 	cfg.Set("", "top-level-key", "top-level-value")
 
 	// When we get that key
@@ -61,12 +54,8 @@ func TestGetExistingTopLevelKey(t *testing.T) {
 }
 
 func TestGetExistingHostSpecificKey(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given have a host specific config entry
-	cfg, err := config.NewConfig()
-	require.NoError(t, err)
+	cfg := newTestConfig()
 	cfg.Set("github.com", "host-specific-key", "host-specific-value")
 
 	// When we get that key
@@ -78,12 +67,8 @@ func TestGetExistingHostSpecificKey(t *testing.T) {
 }
 
 func TestGetHostnameSpecificKeyFallsBackToTopLevel(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given have a top level config entry
-	cfg, err := config.NewConfig()
-	require.NoError(t, err)
+	cfg := newTestConfig()
 	cfg.Set("", "key", "value")
 
 	// When we get that key on a specific host
@@ -92,4 +77,59 @@ func TestGetHostnameSpecificKeyFallsBackToTopLevel(t *testing.T) {
 	// Then it returns successfully, falling back to the top level config
 	require.NoError(t, err)
 	require.Equal(t, "value", val)
+}
+
+func TestGetOrDefaultApplicationDefaults(t *testing.T) {
+	tests := []struct {
+		key             string
+		expectedDefault string
+	}{
+		{"git_protocol", "https"},
+		{"editor", ""},
+		{"prompt", "enabled"},
+		{"pager", ""},
+		{"http_unix_socket", ""},
+		{"browser", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			// Given we have no top level configuration
+			cfg := newTestConfig()
+
+			// When we get a key that has no value, but has a default
+			val, err := cfg.GetOrDefault("", tt.key)
+
+			// Then it returns the default value
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedDefault, val)
+		})
+	}
+}
+
+func TestGetOrDefaultExistingKey(t *testing.T) {
+	// Given have a top level config entry
+	cfg := newTestConfig()
+	cfg.Set("", "git_protocol", "ssh")
+
+	// When we get that key
+	val, err := cfg.GetOrDefault("", "git_protocol")
+
+	// Then it returns successfully with the correct value, and doesn't fall back
+	// to the default
+	require.NoError(t, err)
+	require.Equal(t, "ssh", val)
+}
+
+func TestGetOrDefaultNotFoundAndNoDefault(t *testing.T) {
+	// Given have no configuration
+	cfg := newTestConfig()
+
+	// When we get a non-existent-key that has no default
+	val, err := cfg.GetOrDefault("", "non-existent-key")
+
+	// Then it returns an error and the value is empty
+	var keyNotFoundError *ghConfig.KeyNotFoundError
+	require.ErrorAs(t, err, &keyNotFoundError)
+	require.Empty(t, val)
 }
