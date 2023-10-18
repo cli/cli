@@ -234,6 +234,8 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 		c.cfg.Set([]string{hosts, hostname, oauthToken}, token)
 		insecureStorageUsed = true
 	}
+	// TODO: I can't find anywhere that calls this function without a username, so that would seem like
+	// something we might want to error on?
 	if username != "" {
 		c.cfg.Set([]string{hosts, hostname, "user"}, username)
 	}
@@ -246,6 +248,8 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
 func (c *AuthConfig) Logout(hostname string) error {
+	// TODO: I can't find anywhere that expects to call this function without a hostname
+	// and that would seem like a programmer error?
 	if hostname == "" {
 		return nil
 	}
