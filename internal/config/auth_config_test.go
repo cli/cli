@@ -29,6 +29,70 @@ func TestTokenFromKeyring(t *testing.T) {
 	require.Equal(t, "test-token", token)
 }
 
+func TestTokenStoredInConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("GH_CONFIG_DIR", tempDir)
+
+	// When the user has logged in insecurely
+	authCfg := newTestAuthConfig()
+	ghConfig.Read = func() (*ghConfig.Config, error) {
+		return authCfg.cfg, nil
+	}
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
+	require.NoError(t, err)
+
+	// When we get the token
+	token, source := authCfg.Token("github.com")
+
+	// Then the token is successfully fetched
+	// and the source is set to oauth_token but this isn't great
+	// but I can't find the issue # that references this.
+	require.Equal(t, "test-token", token)
+	require.Equal(t, "oauth_token", source)
+}
+
+func TestTokenStoredInEnv(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("GH_CONFIG_DIR", tempDir)
+
+	// When the user is authenticated via env var
+	authCfg := newTestAuthConfig()
+	ghConfig.Read = func() (*ghConfig.Config, error) {
+		return authCfg.cfg, nil
+	}
+	t.Setenv("GH_TOKEN", "test-token")
+
+	// When we get the token
+	token, source := authCfg.Token("github.com")
+
+	// Then the token is successfully fetched
+	// and the source is set to the name of the env var
+	require.Equal(t, "test-token", token)
+	require.Equal(t, "GH_TOKEN", source)
+}
+
+func TestTokenStoredInKeyring(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("GH_CONFIG_DIR", tempDir)
+
+	// When the user has logged in securely
+	keyring.MockInit()
+	authCfg := newTestAuthConfig()
+	ghConfig.Read = func() (*ghConfig.Config, error) {
+		return authCfg.cfg, nil
+	}
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
+	require.NoError(t, err)
+
+	// When we get the token
+	token, source := authCfg.Token("github.com")
+
+	// Then the token is successfully fetched
+	// and the source is set to keyring
+	require.Equal(t, "test-token", token)
+	require.Equal(t, "keyring", source)
+}
+
 func TestTokenFromKeyringNonExistent(t *testing.T) {
 	// Given a keyring that doesn't contain any tokens
 	keyring.MockInit()
