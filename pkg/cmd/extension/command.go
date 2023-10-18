@@ -22,6 +22,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var alreadyInstalledError = errors.New("the extension is already installed")
+
 func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
@@ -339,6 +341,14 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 							return upgradeFunc(ext.Name(), forceFlag, false)
 						}
 
+						if errors.Is(err, alreadyInstalledError) {
+							if io.IsStdoutTTY() {
+								cs := io.ColorScheme()
+								fmt.Fprintf(io.ErrOut, "%s Extension %s is already installed\n", cs.WarningIcon(), ext.Name())
+								return nil
+							}
+						}
+
 						return err
 					}
 
@@ -649,7 +659,7 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 
 	for _, ext := range m.List() {
 		if ext.Name() == commandName {
-			return ext, fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
+			return ext, alreadyInstalledError
 		}
 	}
 
