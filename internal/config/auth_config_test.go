@@ -10,9 +10,19 @@ import (
 )
 
 func newTestAuthConfig() *AuthConfig {
-	return &AuthConfig{
+	authCfg := AuthConfig{
 		cfg: ghConfig.ReadFromString(""),
 	}
+	// The real implementation of config.Read uses a sync.Once
+	// to read config files and initialise package level variables
+	// that are used from then on.
+	//
+	// This means that tests can't be isolated from each other, so
+	// we swap out the function here to return a new config each time.
+	ghConfig.Read = func() (*ghConfig.Config, error) {
+		return authCfg.cfg, nil
+	}
+	return &authCfg
 }
 
 func TestTokenFromKeyring(t *testing.T) {
@@ -35,9 +45,6 @@ func TestTokenStoredInConfig(t *testing.T) {
 
 	// When the user has logged in insecurely
 	authCfg := newTestAuthConfig()
-	ghConfig.Read = func() (*ghConfig.Config, error) {
-		return authCfg.cfg, nil
-	}
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
 	require.NoError(t, err)
 
@@ -57,9 +64,6 @@ func TestTokenStoredInEnv(t *testing.T) {
 
 	// When the user is authenticated via env var
 	authCfg := newTestAuthConfig()
-	ghConfig.Read = func() (*ghConfig.Config, error) {
-		return authCfg.cfg, nil
-	}
 	t.Setenv("GH_TOKEN", "test-token")
 
 	// When we get the token
@@ -78,9 +82,6 @@ func TestTokenStoredInKeyring(t *testing.T) {
 	// When the user has logged in securely
 	keyring.MockInit()
 	authCfg := newTestAuthConfig()
-	ghConfig.Read = func() (*ghConfig.Config, error) {
-		return authCfg.cfg, nil
-	}
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
 	require.NoError(t, err)
 
@@ -108,9 +109,6 @@ func TestTokenFromKeyringNonExistent(t *testing.T) {
 func TestHasEnvTokenWithoutAnyEnvToken(t *testing.T) {
 	// Given an empty hosts configuration
 	authCfg := newTestAuthConfig()
-	ghConfig.Read = func() (*ghConfig.Config, error) {
-		return authCfg.cfg, nil
-	}
 
 	// When we check if it has an env token
 	hasEnvToken := authCfg.HasEnvToken()
@@ -122,9 +120,6 @@ func TestHasEnvTokenWithoutAnyEnvToken(t *testing.T) {
 func TestHasEnvTokenWithEnvToken(t *testing.T) {
 	// Given an empty hosts configuration but a token set in the env var
 	authCfg := newTestAuthConfig()
-	ghConfig.Read = func() (*ghConfig.Config, error) {
-		return authCfg.cfg, nil
-	}
 	t.Setenv("GH_ENTERPRISE_TOKEN", "test-token")
 
 	// When we check if it has an env token
@@ -139,9 +134,6 @@ func TestHasEnvTokenWithNoEnvTokenButAConfigVar(t *testing.T) {
 
 	// Given a token in the config
 	authCfg := newTestAuthConfig()
-	ghConfig.Read = func() (*ghConfig.Config, error) {
-		return authCfg.cfg, nil
-	}
 	// Using example.com here will cause the token to be returned from the config
 	_, err := authCfg.Login("example.com", "test-user", "test-token", "", false)
 	require.NoError(t, err)
@@ -165,7 +157,7 @@ func TestUserNotLoggedIn(t *testing.T) {
 	require.ErrorAs(t, err, &keyNotFoundError)
 }
 
-func TestNoGitProtocolInAuthConfig(t *testing.T) {
+func TestGitProtocolNotLoggedInDefaults(t *testing.T) {
 	// Given a host configuration without a git protocol
 	authCfg := newTestAuthConfig()
 
@@ -306,9 +298,6 @@ func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
 	// Given a usable keyring and an empty config
 	keyring.MockInit()
 	authCfg := newTestAuthConfig()
-	ghConfig.Read = func() (*ghConfig.Config, error) {
-		return authCfg.cfg, nil
-	}
 
 	// When we login
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", true)
