@@ -153,8 +153,8 @@ func TestHasEnvTokenWithNoEnvTokenButAConfigVar(t *testing.T) {
 	require.False(t, hasEnvToken, "expected not to have env token")
 }
 
-func TestNoUserInAuthConfig(t *testing.T) {
-	// Given a host configuration without a user
+func TestUserNotLoggedIn(t *testing.T) {
+	// Given we have not logged in
 	authCfg := newTestAuthConfig()
 
 	// When we get the user
@@ -163,19 +163,6 @@ func TestNoUserInAuthConfig(t *testing.T) {
 	// Then it returns failure, bubbling the KeyNotFoundError
 	var keyNotFoundError *ghConfig.KeyNotFoundError
 	require.ErrorAs(t, err, &keyNotFoundError)
-}
-
-func TestUserInAuthConfig(t *testing.T) {
-	// Given an a host configuration with a user
-	authCfg := newTestAuthConfig()
-	authCfg.cfg.Set([]string{hosts, "github.com", "user"}, "test-user")
-
-	// When we get the user
-	user, err := authCfg.User("github.com")
-
-	// Then it returns success with the correct user
-	require.NoError(t, err)
-	require.Equal(t, "test-user", user)
 }
 
 func TestNoGitProtocolInAuthConfig(t *testing.T) {
@@ -274,22 +261,42 @@ func TestLoginInsecureStorage(t *testing.T) {
 	requireKeyWithValue(t, authCfg.cfg, []string{hosts, "github.com", oauthToken}, "test-token")
 }
 
-func TestLoginSetsUserAndGitProtocolInConfig(t *testing.T) {
+func TestLoginSetsUserForProvidedHost(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("GH_CONFIG_DIR", tempDir)
 
-	// Given a usable keyring
+	// Given a usable keyring and an empty config
 	keyring.MockInit()
 	authCfg := newTestAuthConfig()
 
-	// When we login with secure storage
+	// When we login
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", true)
 
-	// Then it returns success, and stores the user and git protocol in the config
+	// Then it returns success and the user is set
 	require.NoError(t, err)
 
-	requireKeyWithValue(t, authCfg.cfg, []string{hosts, "github.com", "user"}, "test-user")
-	requireKeyWithValue(t, authCfg.cfg, []string{hosts, "github.com", "git_protocol"}, "ssh")
+	user, err := authCfg.User("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "test-user", user)
+}
+
+func TestLoginSetsGitProtocolForProdivdedHost(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("GH_CONFIG_DIR", tempDir)
+
+	// Given a usable keyring and an empty config
+	keyring.MockInit()
+	authCfg := newTestAuthConfig()
+
+	// When we login
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", true)
+
+	// Then it returns success and the git protocol is set
+	require.NoError(t, err)
+
+	gitProtocol, err := authCfg.GitProtocol("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "ssh", gitProtocol)
 }
 
 func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
