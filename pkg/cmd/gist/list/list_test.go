@@ -180,11 +180,11 @@ func Test_listRun(t *testing.T) {
 				)
 			},
 			wantOut: heredoc.Doc(`
-				ID          DESCRIPTION                      FILES             UPDATED
-				1234567890  cool.txt                         1 file    public  about 6 hours ago
-				4567890123                                   1 file    public  about 6 hours ago
-				2345678901  tea leaves thwart those who ...  2 files   secret  about 6 hours ago
-				3456789012  short desc                       11 files  secret  about 6 hours ago
+				ID          DESCRIPTION                  FILES     VISIBILITY  UPDATED
+				1234567890  cool.txt                     1 file    public      about 6 hours ago
+				4567890123                               1 file    public      about 6 hours ago
+				2345678901  tea leaves thwart those ...  2 files   secret      about 6 hours ago
+				3456789012  short desc                   11 files  secret      about 6 hours ago
 			`),
 		},
 		{
@@ -215,9 +215,9 @@ func Test_listRun(t *testing.T) {
 				)
 			},
 			wantOut: heredoc.Doc(`
-				ID          DESCRIPTION  FILES           UPDATED
-				1234567890  cool.txt     1 file  public  about 6 hours ago
-				4567890123               1 file  public  about 6 hours ago
+				ID          DESCRIPTION  FILES   VISIBILITY  UPDATED
+				1234567890  cool.txt     1 file  public      about 6 hours ago
+				4567890123               1 file  public      about 6 hours ago
 			`),
 		},
 		{
@@ -263,9 +263,9 @@ func Test_listRun(t *testing.T) {
 				)
 			},
 			wantOut: heredoc.Doc(`
-				ID          DESCRIPTION                      FILES             UPDATED
-				2345678901  tea leaves thwart those who ...  2 files   secret  about 6 hours ago
-				3456789012  short desc                       11 files  secret  about 6 hours ago
+				ID          DESCRIPTION                  FILES     VISIBILITY  UPDATED
+				2345678901  tea leaves thwart those ...  2 files   secret      about 6 hours ago
+				3456789012  short desc                   11 files  secret      about 6 hours ago
 			`),
 		},
 		{
@@ -289,8 +289,8 @@ func Test_listRun(t *testing.T) {
 				)
 			},
 			wantOut: heredoc.Doc(`
-				ID          DESCRIPTION  FILES           UPDATED
-				1234567890  cool.txt     1 file  public  about 6 hours ago
+				ID          DESCRIPTION  FILES   VISIBILITY  UPDATED
+				1234567890  cool.txt     1 file  public      about 6 hours ago
 			`),
 		},
 		{

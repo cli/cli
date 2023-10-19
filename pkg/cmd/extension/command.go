@@ -281,7 +281,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					t.AddField(repo)
 					version := displayExtensionVersion(c, c.CurrentVersion())
 					if c.IsPinned() {
-						t.AddField(version, nil, tableprinter.WithColor(cs.Cyan))
+						t.AddField(version, tableprinter.WithColor(cs.Cyan))
 					} else {
 						t.AddField(version)
 					}

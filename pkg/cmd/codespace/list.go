@@ -176,7 +176,7 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 			}
 			tp.AddField(text.FuzzyAgoAbbr(time.Now(), ct), tableprinter.WithColor(cs.Gray))
 		} else {
-			tp.AddField(c.CreatedAt, nil, nil)
+			tp.AddField(c.CreatedAt)
 		}
 
 		if hasNonProdVSCSTarget {
