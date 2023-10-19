@@ -8,7 +8,6 @@ import (
 
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/tableprinter"
-	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -79,13 +78,7 @@ func listRun(opts *ListOptions) error {
 		t.AddField(gpgKey.Emails.String())
 		t.AddField(gpgKey.KeyID)
 		t.AddField(gpgKey.PublicKey, tableprinter.WithTruncate(truncateMiddle))
-
-		createdAt := gpgKey.CreatedAt.Format(time.RFC3339)
-		if t.IsTTY() {
-			createdAt = text.FuzzyAgoAbbr(now, gpgKey.CreatedAt)
-		}
-		t.AddField(createdAt, tableprinter.WithColor(cs.Gray))
-
+		t.AddTimeField(now, gpgKey.CreatedAt, cs.Gray)
 		expiresAt := gpgKey.ExpiresAt.Format(time.RFC3339)
 		if t.IsTTY() {
 			if gpgKey.ExpiresAt.IsZero() {
@@ -95,7 +88,6 @@ func listRun(opts *ListOptions) error {
 			}
 		}
 		t.AddField(expiresAt, tableprinter.WithColor(cs.Gray))
-
 		t.EndRow()
 	}
 
