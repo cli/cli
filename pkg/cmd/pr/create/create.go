@@ -761,7 +761,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			return err
 		}
 
-		cloneProtocol, _ := cfg.GetOrDefault(headRepo.RepoHost(), "git_protocol")
+		cloneProtocol := cfg.Authentication().GitProtocol(headRepo.RepoHost())
 		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
 		gitClient := ctx.GitClient
 		origin, _ := remotes.FindByName("origin")

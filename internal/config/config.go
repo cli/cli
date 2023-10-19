@@ -53,22 +53,13 @@ func (c *cfg) Get(hostname, key string) (string, error) {
 }
 
 func (c *cfg) GetOrDefault(hostname, key string) (string, error) {
-	var val string
-	var err error
-	if hostname != "" {
-		val, err = c.cfg.Get([]string{hosts, hostname, key})
-		if err == nil {
-			return val, err
-		}
-	}
-
-	val, err = c.cfg.Get([]string{key})
+	val, err := c.Get(hostname, key)
 	if err == nil {
 		return val, err
 	}
 
-	if defaultExists(key) {
-		return defaultFor(key), nil
+	if val, ok := defaultFor(key); ok {
+		return val, nil
 	}
 
 	return val, err
@@ -94,22 +85,13 @@ func (c *cfg) Authentication() *AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
 }
 
-func defaultFor(key string) string {
+func defaultFor(key string) (string, bool) {
 	for _, co := range configOptions {
 		if co.Key == key {
-			return co.DefaultValue
+			return co.DefaultValue, true
 		}
 	}
-	return ""
-}
-
-func defaultExists(key string) bool {
-	for _, co := range configOptions {
-		if co.Key == key {
-			return true
-		}
-	}
-	return false
+	return "", false
 }
 
 // AuthConfig is used for interacting with some persistent configuration for gh,
@@ -153,6 +135,10 @@ func (c *AuthConfig) HasEnvToken() bool {
 			return true
 		}
 	}
+	// TODO: This is _extremely_ knowledgable about the implementation of TokenFromEnvOrConfig
+	// It has to use a hostname that is not going to be found in the hosts so that it
+	// can guarantee that tokens will only be returned from a set env var.
+	// Discussed here, but maybe worth revisiting: https://github.com/cli/cli/pull/7169#discussion_r1136979033
 	token, _ := ghAuth.TokenFromEnvOrConfig(hostname)
 	return token != ""
 }
@@ -178,13 +164,20 @@ func (c *AuthConfig) User(hostname string) (string, error) {
 
 // GitProtocol will retrieve the git protocol for the logged in user at the given hostname.
 // If none is set it will return the default value.
-func (c *AuthConfig) GitProtocol(hostname string) (string, error) {
+func (c *AuthConfig) GitProtocol(hostname string) string {
 	key := "git_protocol"
-	val, err := c.cfg.Get([]string{hosts, hostname, key})
-	if err == nil {
-		return val, err
+	if val, err := c.cfg.Get([]string{hosts, hostname, key}); err == nil {
+		return val
 	}
-	return defaultFor(key), nil
+
+	if val, ok := defaultFor(key); ok {
+		return val
+	}
+
+	// This should not happen, as we know there is a default value for this key.
+	// Perhaps it says something about our current default abstraction being not quite right?
+	// The defaults are also currently used to provide information about the config options.
+	return ""
 }
 
 func (c *AuthConfig) Hosts() []string {
@@ -233,9 +226,9 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 		c.cfg.Set([]string{hosts, hostname, oauthToken}, token)
 		insecureStorageUsed = true
 	}
-	if username != "" {
-		c.cfg.Set([]string{hosts, hostname, "user"}, username)
-	}
+
+	c.cfg.Set([]string{hosts, hostname, "user"}, username)
+
 	if gitProtocol != "" {
 		c.cfg.Set([]string{hosts, hostname, "git_protocol"}, gitProtocol)
 	}
@@ -245,9 +238,6 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
 func (c *AuthConfig) Logout(hostname string) error {
-	if hostname == "" {
-		return nil
-	}
 	_ = c.cfg.Remove([]string{hosts, hostname})
 	_ = keyring.Delete(keyringServiceName(hostname), "")
 	return ghConfig.Write(c.cfg)
