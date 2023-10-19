@@ -286,12 +286,11 @@ func TestLoginSetsUserForProvidedHost(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("GH_CONFIG_DIR", tempDir)
 
-	// Given a usable keyring and an empty config
-	keyring.MockInit()
+	// Given we are not logged in
 	authCfg := newTestAuthConfig()
 
 	// When we login
-	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", true)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
 
 	// Then it returns success and the user is set
 	require.NoError(t, err)
@@ -301,16 +300,15 @@ func TestLoginSetsUserForProvidedHost(t *testing.T) {
 	require.Equal(t, "test-user", user)
 }
 
-func TestLoginSetsGitProtocolForProdivdedHost(t *testing.T) {
+func TestLoginSetsGitProtocolForProvidedHost(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("GH_CONFIG_DIR", tempDir)
 
-	// Given a usable keyring and an empty config
-	keyring.MockInit()
+	// Given we are not logged in
 	authCfg := newTestAuthConfig()
 
 	// When we login
-	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", true)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
 
 	// Then it returns success and the git protocol is set
 	require.NoError(t, err)
@@ -324,12 +322,11 @@ func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("GH_CONFIG_DIR", tempDir)
 
-	// Given a usable keyring and an empty config
-	keyring.MockInit()
+	// Given we are not logged in
 	authCfg := newTestAuthConfig()
 
 	// When we login
-	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", true)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
 
 	// Then it returns success and a host is added
 	require.NoError(t, err)
