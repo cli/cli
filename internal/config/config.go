@@ -164,19 +164,19 @@ func (c *AuthConfig) User(hostname string) (string, error) {
 
 // GitProtocol will retrieve the git protocol for the logged in user at the given hostname.
 // If none is set it will return the default value.
-// TODO: although this returns an error, it actually has no path to error.
-func (c *AuthConfig) GitProtocol(hostname string) (string, error) {
+func (c *AuthConfig) GitProtocol(hostname string) string {
 	key := "git_protocol"
-	val, err := c.cfg.Get([]string{hosts, hostname, key})
-	if err == nil {
-		return val, err
+	if val, err := c.cfg.Get([]string{hosts, hostname, key}); err == nil {
+		return val
 	}
 
 	if val, ok := defaultFor(key); ok {
-		return val, nil
+		return val
 	}
 
-	return "", nil
+	// This should not happen, as we know there is a default value for this key.
+	// Perhaps it says something about our current default abstraction being not quite right?
+	return ""
 }
 
 func (c *AuthConfig) Hosts() []string {

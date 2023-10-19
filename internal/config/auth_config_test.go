@@ -107,7 +107,7 @@ func TestTokenFromKeyringNonExistent(t *testing.T) {
 }
 
 func TestHasEnvTokenWithoutAnyEnvToken(t *testing.T) {
-	// Given an empty hosts configuration
+	// Given we have no env set
 	authCfg := newTestAuthConfig(t)
 
 	// When we check if it has an env token
@@ -118,7 +118,8 @@ func TestHasEnvTokenWithoutAnyEnvToken(t *testing.T) {
 }
 
 func TestHasEnvTokenWithEnvToken(t *testing.T) {
-	// Given an empty hosts configuration but a token set in the env var
+	// Given we have an env token set
+	// Note that any valid env var for tokens will do, not just GH_ENTERPRISE_TOKEN
 	authCfg := newTestAuthConfig(t)
 	t.Setenv("GH_ENTERPRISE_TOKEN", "test-token")
 
@@ -158,15 +159,26 @@ func TestUserNotLoggedIn(t *testing.T) {
 }
 
 func TestGitProtocolNotLoggedInDefaults(t *testing.T) {
-	// Given a host configuration without a git protocol
+	// Given we have not logged in
 	authCfg := newTestAuthConfig(t)
 
 	// When we get the git protocol
-	gitProtocol, err := authCfg.GitProtocol("github.com")
+	gitProtocol := authCfg.GitProtocol("github.com")
 
-	// Then it returns success, using the default
-	require.NoError(t, err)
+	// Then it returns the default
 	require.Equal(t, "https", gitProtocol)
+}
+
+func TestHostsIncludesEnvVar(t *testing.T) {
+	// Given the GH_HOST env var is set
+	authCfg := newTestAuthConfig(t)
+	t.Setenv("GH_HOST", "ghe.io")
+
+	// When we get the hosts
+	hosts := authCfg.Hosts()
+
+	// Then the host in the env var is included
+	require.Contains(t, hosts, "ghe.io")
 }
 
 func TestDefaultHostFromEnvVar(t *testing.T) {
@@ -284,31 +296,28 @@ func TestLoginSetsUserForProvidedHost(t *testing.T) {
 }
 
 func TestLoginSetsGitProtocolForProvidedHost(t *testing.T) {
-	// Given we are not logged in
+	// Given we are loggedin
 	authCfg := newTestAuthConfig(t)
-
-	// When we login
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
-
-	// Then it returns success and the git protocol is set
 	require.NoError(t, err)
 
-	gitProtocol, err := authCfg.GitProtocol("github.com")
-	require.NoError(t, err)
+	// When we get the git protocol
+	gitProtocol := authCfg.GitProtocol("github.com")
+
+	// Then it returns the git protocol we provided on login
 	require.Equal(t, "ssh", gitProtocol)
 }
 
 func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
-	// Given we are not logged in
+	// Given we are logged in
 	authCfg := newTestAuthConfig(t)
-
-	// When we login
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
-
-	// Then it returns success and a host is added
 	require.NoError(t, err)
 
+	// When we get the hosts
 	hosts := authCfg.Hosts()
+
+	// Then it includes our logged in host
 	require.Contains(t, hosts, "github.com")
 }
 
