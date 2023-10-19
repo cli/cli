@@ -58,8 +58,8 @@ func TestTokenStoredInConfig(t *testing.T) {
 	token, source := authCfg.Token("github.com")
 
 	// Then the token is successfully fetched
-	// and the source is set to oauth_token but this isn't great
-	// but I can't find the issue # that references this.
+	// and the source is set to oauth_token but this isn't great:
+	// https://github.com/cli/go-gh/issues/94
 	require.Equal(t, "test-token", token)
 	require.Equal(t, "oauth_token", source)
 }
