@@ -139,10 +139,6 @@ func (c *AuthConfig) HasEnvToken() bool {
 	// It has to use a hostname that is not going to be found in the hosts so that it
 	// can guarantee that tokens will only be returned from a set env var.
 	// Discussed here, but maybe worth revisiting: https://github.com/cli/cli/pull/7169#discussion_r1136979033
-	//
-	// By providing example.com. it's also _only_ looking for GH_ENTERPRISE_TOKEN or GITHUB_ENTERPRISE_TOKEN
-	// or the GITHUB_TOKEN if we happen to be in a codespace?? This doesn't seem to reflect the actual
-	// name of the function at all.
 	token, _ := ghAuth.TokenFromEnvOrConfig(hostname)
 	return token != ""
 }
