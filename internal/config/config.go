@@ -243,11 +243,6 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
 func (c *AuthConfig) Logout(hostname string) error {
-	// TODO: I can't find anywhere that expects to call this function without a hostname
-	// and that would seem like a programmer error?
-	if hostname == "" {
-		return nil
-	}
 	_ = c.cfg.Remove([]string{hosts, hostname})
 	_ = keyring.Delete(keyringServiceName(hostname), "")
 	return ghConfig.Write(c.cfg)
