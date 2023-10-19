@@ -323,6 +323,10 @@ func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 // Note that I'm not sure this test enforces particularly desirable behaviour
 // since it leads users to believe a token has been removed when really
 // that might have failed for some reason.
+//
+// The original intention here is that if the logout fails, the user can't
+// really do anything to recover. On the other hand, a user might
+// want to rectify this manually, for example if there were on a shared machine.
 func TestLogoutIgnoresErrorsFromConfigAndKeyring(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("GH_CONFIG_DIR", tempDir)
