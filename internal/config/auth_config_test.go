@@ -169,17 +169,46 @@ func TestGitProtocolNotLoggedInDefaults(t *testing.T) {
 	require.Equal(t, "https", gitProtocol)
 }
 
-func TestGitProtocolInAuthConfig(t *testing.T) {
-	// Given an a host configuration with a git protocol
+func TestDefaultHostFromEnvVar(t *testing.T) {
+	// Given the GH_HOST env var is set
 	authCfg := newTestAuthConfig()
-	authCfg.cfg.Set([]string{hosts, "github.com", "git_protocol"}, "ssh")
+	t.Setenv("GH_HOST", "ghe.io")
 
-	// When we get the git protocol
-	gitProtocol, err := authCfg.GitProtocol("github.com")
+	// When we get the DefaultHost
+	defaultHost, source := authCfg.DefaultHost()
 
-	// Then it returns success with the correct git protocol
+	// Then the returned host and source are using the env var
+	require.Equal(t, "ghe.io", defaultHost)
+	require.Equal(t, "GH_HOST", source)
+}
+
+func TestDefaultHostNotLoggedIn(t *testing.T) {
+	// Given we are not logged in
+	authCfg := newTestAuthConfig()
+
+	// When we get the DefaultHost
+	defaultHost, source := authCfg.DefaultHost()
+
+	// Then the returned host is always github.com
+	require.Equal(t, "github.com", defaultHost)
+	require.Equal(t, "default", source)
+}
+
+func TestDefaultHostLoggedInToOnlyOneHost(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("GH_CONFIG_DIR", tempDir)
+
+	// Given we are logged into one host (not github.com to differentiate from the fallback)
+	authCfg := newTestAuthConfig()
+	_, err := authCfg.Login("ghe.io", "test-user", "test-token", "", false)
 	require.NoError(t, err)
-	require.Equal(t, "ssh", gitProtocol)
+
+	// When we get the DefaultHost
+	defaultHost, source := authCfg.DefaultHost()
+
+	// Then the returned host is that logged in host and the source is the hosts config
+	require.Equal(t, "ghe.io", defaultHost)
+	require.Equal(t, "hosts", source)
 }
 
 func TestLoginSecureStorageUsesKeyring(t *testing.T) {
