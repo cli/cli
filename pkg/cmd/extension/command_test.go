@@ -239,7 +239,7 @@ func TestNewCmdExtension(t *testing.T) {
 			args: []string{"install", "owner/gh-existing-ext"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.ListFunc = func() []extensions.Extension {
-					e := &Extension{path: "owner2/gh-existing-ext"}
+					e := &Extension{path: "owner2/gh-existing-ext", owner: "owner2"}
 					return []extensions.Extension{e}
 				}
 				return func(t *testing.T) {
@@ -249,6 +249,21 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "there is already an installed extension that provides the \"existing-ext\" command",
+		},
+		{
+			name: "install an already installed extension",
+			args: []string{"install", "owner/gh-existing-ext"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					e := &Extension{path: "owner/gh-existing-ext", owner: "owner"}
+					return []extensions.Extension{e}
+				}
+				return func(t *testing.T) {
+					calls := em.ListCalls()
+					assert.Equal(t, 1, len(calls))
+				}
+			},
+			wantStderr: "! Extension owner/gh-existing-ext is already installed\n",
 		},
 		{
 			name: "install local extension",
@@ -817,7 +832,7 @@ func TestNewCmdExtension(t *testing.T) {
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.ListFunc = func() []extensions.Extension {
 					return []extensions.Extension{
-						&Extension{path: "owner/gh-hello"},
+						&Extension{path: "owner/gh-hello", owner: "owner"},
 					}
 				}
 				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
@@ -924,19 +939,22 @@ func Test_checkValidExtension(t *testing.T) {
 		ListFunc: func() []extensions.Extension {
 			return []extensions.Extension{
 				&extensions.ExtensionMock{
-					NameFunc: func() string { return "screensaver" },
+					OwnerFunc: func() string { return "monalisa" },
+					NameFunc:  func() string { return "screensaver" },
 				},
 				&extensions.ExtensionMock{
-					NameFunc: func() string { return "triage" },
+					OwnerFunc: func() string { return "monalisa" },
+					NameFunc:  func() string { return "triage" },
 				},
 			}
 		},
 	}
 
 	type args struct {
-		rootCmd *cobra.Command
-		manager extensions.ExtensionManager
-		extName string
+		rootCmd  *cobra.Command
+		manager  extensions.ExtensionManager
+		extName  string
+		extOwner string
 	}
 	tests := []struct {
 		name      string
@@ -946,42 +964,56 @@ func Test_checkValidExtension(t *testing.T) {
 		{
 			name: "valid extension",
 			args: args{
-				rootCmd: rootCmd,
-				manager: m,
-				extName: "gh-hello",
+				rootCmd:  rootCmd,
+				manager:  m,
+				extOwner: "monalisa",
+				extName:  "gh-hello",
 			},
 		},
 		{
 			name: "invalid extension name",
 			args: args{
-				rootCmd: rootCmd,
-				manager: m,
-				extName: "gherkins",
+				rootCmd:  rootCmd,
+				manager:  m,
+				extOwner: "monalisa",
+				extName:  "gherkins",
 			},
 			wantError: "extension repository name must start with `gh-`",
 		},
 		{
 			name: "clashes with built-in command",
 			args: args{
-				rootCmd: rootCmd,
-				manager: m,
-				extName: "gh-auth",
+				rootCmd:  rootCmd,
+				manager:  m,
+				extOwner: "monalisa",
+				extName:  "gh-auth",
 			},
 			wantError: "\"auth\" matches the name of a built-in command or alias",
 		},
 		{
 			name: "clashes with an installed extension",
 			args: args{
-				rootCmd: rootCmd,
-				manager: m,
-				extName: "gh-triage",
+				rootCmd:  rootCmd,
+				manager:  m,
+				extOwner: "cli",
+				extName:  "gh-triage",
 			},
 			wantError: "there is already an installed extension that provides the \"triage\" command",
+		},
+		{
+			name: "clashes with same extension",
+			args: args{
+				rootCmd:  rootCmd,
+				manager:  m,
+				extOwner: "monalisa",
+				extName:  "gh-triage",
+			},
+			wantError: "alreadyInstalledError",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := checkValidExtension(tt.args.rootCmd, tt.args.manager, tt.args.extName)
+			_, err := checkValidExtension(tt.args.rootCmd, tt.args.manager, tt.args.extName, tt.args.extOwner)
 			if tt.wantError == "" {
 				assert.NoError(t, err)
 			} else {

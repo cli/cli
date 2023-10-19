@@ -22,6 +22,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var alreadyInstalledError = errors.New("alreadyInstalledError")
+
 func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
@@ -333,16 +335,22 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return err
 					}
 
-					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
+					cs := io.ColorScheme()
+
+					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName(), repo.RepoOwner()); err != nil {
 						// If an existing extension was found and --force was specified, attempt to upgrade.
 						if forceFlag && ext != nil {
 							return upgradeFunc(ext.Name(), forceFlag, false)
 						}
 
+						if errors.Is(err, alreadyInstalledError) {
+							fmt.Fprintf(io.ErrOut, "%s Extension %s is already installed\n", cs.WarningIcon(), ghrepo.FullName(repo))
+							return nil
+						}
+
 						return err
 					}
 
-					cs := io.ColorScheme()
 					if err := m.Install(repo, pinFlag); err != nil {
 						if errors.Is(err, releaseNotFoundErr) {
 							return fmt.Errorf("%s Could not find a release of %s for %s",
@@ -637,7 +645,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	return &extCmd
 }
 
-func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName string) (extensions.Extension, error) {
+func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName, extOwner string) (extensions.Extension, error) {
 	if !strings.HasPrefix(extName, "gh-") {
 		return nil, errors.New("extension repository name must start with `gh-`")
 	}
@@ -649,6 +657,9 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 
 	for _, ext := range m.List() {
 		if ext.Name() == commandName {
+			if ext.Owner() == extOwner {
+				return ext, alreadyInstalledError
+			}
 			return ext, fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
 		}
 	}
