@@ -9,10 +9,11 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-func newTestAuthConfig() *AuthConfig {
+func newTestAuthConfig(t *testing.T) *AuthConfig {
 	authCfg := AuthConfig{
 		cfg: ghConfig.ReadFromString(""),
 	}
+
 	// The real implementation of config.Read uses a sync.Once
 	// to read config files and initialise package level variables
 	// that are used from then on.
@@ -22,6 +23,14 @@ func newTestAuthConfig() *AuthConfig {
 	ghConfig.Read = func() (*ghConfig.Config, error) {
 		return authCfg.cfg, nil
 	}
+
+	// The config.Write method isn't defined in the same way as Read to allow
+	// the function to be swapped out and it does try to write to disk.
+	//
+	// We should consider whether it makes sense to change that but in the meantime
+	// we can use GH_CONFIG_DIR env var to ensure the tests remain isolated.
+	t.Setenv("GH_CONFIG_DIR", t.TempDir())
+
 	return &authCfg
 }
 
@@ -31,7 +40,7 @@ func TestTokenFromKeyring(t *testing.T) {
 	require.NoError(t, keyring.Set(keyringServiceName("github.com"), "", "test-token"))
 
 	// When we get the token from the auth config
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	token, err := authCfg.TokenFromKeyring("github.com")
 
 	// Then it returns successfully with the correct token
@@ -40,11 +49,8 @@ func TestTokenFromKeyring(t *testing.T) {
 }
 
 func TestTokenStoredInConfig(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// When the user has logged in insecurely
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
 	require.NoError(t, err)
 
@@ -59,11 +65,8 @@ func TestTokenStoredInConfig(t *testing.T) {
 }
 
 func TestTokenStoredInEnv(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// When the user is authenticated via env var
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	t.Setenv("GH_TOKEN", "test-token")
 
 	// When we get the token
@@ -76,12 +79,9 @@ func TestTokenStoredInEnv(t *testing.T) {
 }
 
 func TestTokenStoredInKeyring(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// When the user has logged in securely
 	keyring.MockInit()
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
 	require.NoError(t, err)
 
@@ -99,7 +99,7 @@ func TestTokenFromKeyringNonExistent(t *testing.T) {
 	keyring.MockInit()
 
 	// When we try to get a token from the auth config
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.TokenFromKeyring("github.com")
 
 	// Then it returns failure bubbling the ErrNotFound
@@ -108,7 +108,7 @@ func TestTokenFromKeyringNonExistent(t *testing.T) {
 
 func TestHasEnvTokenWithoutAnyEnvToken(t *testing.T) {
 	// Given an empty hosts configuration
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 
 	// When we check if it has an env token
 	hasEnvToken := authCfg.HasEnvToken()
@@ -119,7 +119,7 @@ func TestHasEnvTokenWithoutAnyEnvToken(t *testing.T) {
 
 func TestHasEnvTokenWithEnvToken(t *testing.T) {
 	// Given an empty hosts configuration but a token set in the env var
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	t.Setenv("GH_ENTERPRISE_TOKEN", "test-token")
 
 	// When we check if it has an env token
@@ -133,7 +133,7 @@ func TestHasEnvTokenWithNoEnvTokenButAConfigVar(t *testing.T) {
 	t.Skip("this test is explicitly breaking some implementation assumptions")
 
 	// Given a token in the config
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	// Using example.com here will cause the token to be returned from the config
 	_, err := authCfg.Login("example.com", "test-user", "test-token", "", false)
 	require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestHasEnvTokenWithNoEnvTokenButAConfigVar(t *testing.T) {
 
 func TestUserNotLoggedIn(t *testing.T) {
 	// Given we have not logged in
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 
 	// When we get the user
 	_, err := authCfg.User("github.com")
@@ -159,7 +159,7 @@ func TestUserNotLoggedIn(t *testing.T) {
 
 func TestGitProtocolNotLoggedInDefaults(t *testing.T) {
 	// Given a host configuration without a git protocol
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 
 	// When we get the git protocol
 	gitProtocol, err := authCfg.GitProtocol("github.com")
@@ -171,7 +171,7 @@ func TestGitProtocolNotLoggedInDefaults(t *testing.T) {
 
 func TestDefaultHostFromEnvVar(t *testing.T) {
 	// Given the GH_HOST env var is set
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	t.Setenv("GH_HOST", "ghe.io")
 
 	// When we get the DefaultHost
@@ -184,7 +184,7 @@ func TestDefaultHostFromEnvVar(t *testing.T) {
 
 func TestDefaultHostNotLoggedIn(t *testing.T) {
 	// Given we are not logged in
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 
 	// When we get the DefaultHost
 	defaultHost, source := authCfg.DefaultHost()
@@ -195,11 +195,8 @@ func TestDefaultHostNotLoggedIn(t *testing.T) {
 }
 
 func TestDefaultHostLoggedInToOnlyOneHost(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given we are logged into one host (not github.com to differentiate from the fallback)
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("ghe.io", "test-user", "test-token", "", false)
 	require.NoError(t, err)
 
@@ -212,12 +209,9 @@ func TestDefaultHostLoggedInToOnlyOneHost(t *testing.T) {
 }
 
 func TestLoginSecureStorageUsesKeyring(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given a usable keyring
 	keyring.MockInit()
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 
 	// When we login with secure storage
 	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
@@ -232,12 +226,9 @@ func TestLoginSecureStorageUsesKeyring(t *testing.T) {
 }
 
 func TestLoginSecureStorageRemovesOldInsecureConfigToken(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given a usable keyring and an oauth token in the config
 	keyring.MockInit()
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	authCfg.cfg.Set([]string{hosts, "github.com", oauthToken}, "old-token")
 
 	// When we login with secure storage
@@ -249,12 +240,9 @@ func TestLoginSecureStorageRemovesOldInsecureConfigToken(t *testing.T) {
 }
 
 func TestLoginSecureStorageWithErrorFallsbackAndReports(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given a keyring that errors
 	keyring.MockInitWithError(errors.New("test-explosion"))
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 
 	// When we login with secure storage
 	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
@@ -267,10 +255,8 @@ func TestLoginSecureStorageWithErrorFallsbackAndReports(t *testing.T) {
 }
 
 func TestLoginInsecureStorage(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
-	authCfg := newTestAuthConfig()
+	// Given we are not logged in
+	authCfg := newTestAuthConfig(t)
 
 	// When we login with insecure storage
 	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
@@ -283,11 +269,8 @@ func TestLoginInsecureStorage(t *testing.T) {
 }
 
 func TestLoginSetsUserForProvidedHost(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given we are not logged in
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 
 	// When we login
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
@@ -301,11 +284,8 @@ func TestLoginSetsUserForProvidedHost(t *testing.T) {
 }
 
 func TestLoginSetsGitProtocolForProvidedHost(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given we are not logged in
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 
 	// When we login
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
@@ -319,11 +299,8 @@ func TestLoginSetsGitProtocolForProvidedHost(t *testing.T) {
 }
 
 func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given we are not logged in
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 
 	// When we login
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
@@ -336,12 +313,9 @@ func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
 }
 
 func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given we are logged into a host
 	keyring.MockInit()
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", true)
 	require.NoError(t, err)
 
@@ -364,13 +338,10 @@ func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 // really do anything to recover. On the other hand, a user might
 // want to rectify this manually, for example if there were on a shared machine.
 func TestLogoutIgnoresErrorsFromConfigAndKeyring(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("GH_CONFIG_DIR", tempDir)
-
 	// Given we have keyring that errors, and a config that
 	// doesn't even have a hosts key (which would cause Remove to fail)
 	keyring.MockInitWithError(errors.New("test-explosion"))
-	authCfg := newTestAuthConfig()
+	authCfg := newTestAuthConfig(t)
 
 	// When we logout
 	err := authCfg.Logout("github.com")
