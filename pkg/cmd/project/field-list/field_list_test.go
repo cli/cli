@@ -163,6 +163,7 @@ func TestRunList_User(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
 		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			number: 1,
@@ -256,6 +257,7 @@ func TestRunList_Org(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
 		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			number: 1,
@@ -339,6 +341,7 @@ func TestRunList_Me(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
 		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			number: 1,
@@ -406,6 +409,7 @@ func TestRunList_Empty(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	config := listConfig{
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
 		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			number: 1,

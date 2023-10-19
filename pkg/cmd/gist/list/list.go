@@ -120,7 +120,6 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(
 			text.RemoveExcessiveWhitespace(description),
 			tableprinter.WithColor(cs.Bold),
-			tableprinter.WithTruncate(tableprinter.TruncateNonURL),
 		)
 		tp.AddField(text.Pluralize(fileCount, "file"))
 		tp.AddField(visibility, tableprinter.WithColor(visColor))

@@ -64,26 +64,21 @@ func NewWithWriter(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorSch
 	if isTTY && len(headers.columns) > 0 {
 		// Make sure all headers are uppercase.
 		for i := range headers.columns {
-			// TODO: Consider truncating longer headers e.g., NUMBER, or removing unnecessary headers e.g., DESCRIPTION with no descriptions.
 			headers.columns[i] = strings.ToUpper(headers.columns[i])
 		}
 
-		// Make sure all header columns are padded - even the last one - to apply the proper TableHeader style.
-		// Checking cs.Enabled() avoids having to do that for nearly all CLI tests.
+		// Make sure all header columns are padded - even the last one. Previously, the last header column
+		// was not padded. In tests cs.Enabled() is false which allows us to avoid having to fix up
+		// numerous tests that verify header padding.
 		var paddingFunc func(int, string) string
 		if cs.Enabled() {
-			paddingFunc = func(width int, text string) string {
-				if l := len(text); l < width {
-					return text + strings.Repeat(" ", width-l)
-				}
-				return text
-			}
+			paddingFunc = text.PadRight
 		}
 
 		tp.AddHeader(
 			headers.columns,
 			tableprinter.WithPadding(paddingFunc),
-			tableprinter.WithColor(cs.TableHeader),
+			tableprinter.WithColor(cs.GrayUnderline),
 		)
 	}
 
@@ -103,12 +98,3 @@ func WithHeader(columns ...string) headerOption {
 //
 // Deprecated: use WithHeader unless required otherwise.
 var NoHeader = headerOption{}
-
-// TruncateNonURL truncates any text that does not begin with "https://" or "http://".
-// This is provided for backward compatibility with the old table printer for existing tables.
-func TruncateNonURL(maxWidth int, s string) string {
-	if strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://") {
-		return s
-	}
-	return text.Truncate(maxWidth, s)
-}

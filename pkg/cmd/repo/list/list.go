@@ -193,7 +193,7 @@ func listRun(opts *ListOptions) error {
 		}
 
 		tp.AddField(repo.NameWithOwner, tableprinter.WithColor(cs.Bold))
-		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description), tableprinter.WithTruncate(tableprinter.TruncateNonURL))
+		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description))
 		tp.AddField(info, tableprinter.WithColor(infoColor))
 		if tp.IsTTY() {
 			tp.AddField(text.FuzzyAgoAbbr(opts.Now(), *t), tableprinter.WithColor(cs.Gray))

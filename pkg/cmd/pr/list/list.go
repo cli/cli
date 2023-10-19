@@ -219,7 +219,7 @@ func listRun(opts *ListOptions) error {
 		}
 
 		table.AddField(prNum, tableprinter.WithColor(cs.ColorFromString(shared.ColorForPRState(pr))))
-		table.AddField(text.RemoveExcessiveWhitespace(pr.Title), tableprinter.WithTruncate(tableprinter.TruncateNonURL))
+		table.AddField(text.RemoveExcessiveWhitespace(pr.Title))
 		table.AddField(pr.HeadLabel(), tableprinter.WithColor(cs.Cyan))
 		if !isTTY {
 			table.AddField(prStateWithDraft(&pr))

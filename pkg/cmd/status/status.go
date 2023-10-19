@@ -688,9 +688,9 @@ func statusRun(opts *StatusOptions) error {
 				}
 				tp.AddField(si.Identifier, tableprinter.WithColor(idStyle), tableprinter.WithTruncate(nil))
 				if si.Reason != "" {
-					tp.AddField(si.Reason, tableprinter.WithTruncate(tableprinter.TruncateNonURL))
+					tp.AddField(si.Reason)
 				}
-				tp.AddField(si.Preview(), tableprinter.WithTruncate(tableprinter.TruncateNonURL))
+				tp.AddField(si.Preview())
 				tp.EndRow()
 			}
 

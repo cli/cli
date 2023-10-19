@@ -9,22 +9,21 @@ import (
 )
 
 var (
-	magenta   = ansi.ColorFunc("magenta")
-	cyan      = ansi.ColorFunc("cyan")
-	red       = ansi.ColorFunc("red")
-	yellow    = ansi.ColorFunc("yellow")
-	blue      = ansi.ColorFunc("blue")
-	green     = ansi.ColorFunc("green")
-	gray      = ansi.ColorFunc("black+h")
-	bold      = ansi.ColorFunc("default+b")
-	cyanBold  = ansi.ColorFunc("cyan+b")
-	greenBold = ansi.ColorFunc("green+b")
+	magenta       = ansi.ColorFunc("magenta")
+	cyan          = ansi.ColorFunc("cyan")
+	red           = ansi.ColorFunc("red")
+	yellow        = ansi.ColorFunc("yellow")
+	blue          = ansi.ColorFunc("blue")
+	green         = ansi.ColorFunc("green")
+	gray          = ansi.ColorFunc("black+h")
+	grayUnderline = ansi.ColorFunc("white+du")
+	bold          = ansi.ColorFunc("default+b")
+	cyanBold      = ansi.ColorFunc("cyan+b")
+	greenBold     = ansi.ColorFunc("green+b")
 
 	gray256 = func(t string) string {
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
 	}
-
-	tableHeader = ansi.ColorFunc("white+du")
 )
 
 func NewColorScheme(enabled, is256enabled bool, trueColor bool) *ColorScheme {
@@ -110,6 +109,13 @@ func (c *ColorScheme) Grayf(t string, args ...interface{}) string {
 	return c.Gray(fmt.Sprintf(t, args...))
 }
 
+func (c *ColorScheme) GrayUnderline(t string) string {
+	if !c.enabled {
+		return t
+	}
+	return grayUnderline(t)
+}
+
 func (c *ColorScheme) Magenta(t string) string {
 	if !c.enabled {
 		return t
@@ -168,13 +174,6 @@ func (c *ColorScheme) FailureIcon() string {
 
 func (c *ColorScheme) FailureIconWithColor(colo func(string) string) string {
 	return colo("X")
-}
-
-func (c *ColorScheme) TableHeader(t string) string {
-	if !c.enabled {
-		return t
-	}
-	return tableHeader(t)
 }
 
 func (c *ColorScheme) ColorFromString(s string) func(string) string {

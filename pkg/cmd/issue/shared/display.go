@@ -36,7 +36,7 @@ func PrintIssues(io *iostreams.IOStreams, now time.Time, prefix string, totalCou
 		if !isTTY {
 			table.AddField(issue.State)
 		}
-		table.AddField(text.RemoveExcessiveWhitespace(issue.Title), tableprinter.WithTruncate(tableprinter.TruncateNonURL))
+		table.AddField(text.RemoveExcessiveWhitespace(issue.Title))
 		table.AddField(issueLabelList(&issue, cs, isTTY))
 		table.AddTimeField(now, issue.UpdatedAt, cs.Gray)
 		table.EndRow()

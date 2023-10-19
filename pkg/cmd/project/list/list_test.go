@@ -154,6 +154,7 @@ func TestRunList(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
 		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			owner: "monalisa",
@@ -225,6 +226,7 @@ func TestRunList_Me(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
 		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			owner: "@me",
@@ -296,6 +298,7 @@ func TestRunListViewer(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
 		tp:     tableprinter.New(ios, tableprinter.NoHeader),
 		opts:   listOpts{},
 		client: client,
@@ -374,6 +377,7 @@ func TestRunListOrg(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
 		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			owner: "github",
@@ -428,6 +432,7 @@ func TestRunListEmpty(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	config := listConfig{
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
 		tp:     tableprinter.New(ios, tableprinter.NoHeader),
 		opts:   listOpts{},
 		client: client,
@@ -504,6 +509,7 @@ func TestRunListWithClosed(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
 		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			owner:  "monalisa",

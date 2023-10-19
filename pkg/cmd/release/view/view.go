@@ -157,8 +157,8 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 		//nolint:staticcheck // SA1019: Showing NAME|SIZE headers adds nothing to table.
 		table := tableprinter.New(io, tableprinter.NoHeader)
 		for _, a := range release.Assets {
-			table.AddField(a.Name, tableprinter.WithTruncate(tableprinter.TruncateNonURL))
-			table.AddField(humanFileSize(a.Size), tableprinter.WithTruncate(tableprinter.TruncateNonURL))
+			table.AddField(a.Name)
+			table.AddField(humanFileSize(a.Size))
 			table.EndRow()
 		}
 		err := table.Render()
