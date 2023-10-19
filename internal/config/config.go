@@ -176,6 +176,7 @@ func (c *AuthConfig) GitProtocol(hostname string) string {
 
 	// This should not happen, as we know there is a default value for this key.
 	// Perhaps it says something about our current default abstraction being not quite right?
+	// The defaults are also currently used to provide information about the config options.
 	return ""
 }
 
