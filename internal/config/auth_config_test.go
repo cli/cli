@@ -299,6 +299,27 @@ func TestLoginSetsGitProtocolForProdivdedHost(t *testing.T) {
 	require.Equal(t, "ssh", gitProtocol)
 }
 
+func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("GH_CONFIG_DIR", tempDir)
+
+	// Given a usable keyring and an empty config
+	keyring.MockInit()
+	authCfg := newTestAuthConfig()
+	ghConfig.Read = func() (*ghConfig.Config, error) {
+		return authCfg.cfg, nil
+	}
+
+	// When we login
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", true)
+
+	// Then it returns success and a host is added
+	require.NoError(t, err)
+
+	hosts := authCfg.Hosts()
+	require.Contains(t, hosts, "github.com")
+}
+
 func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("GH_CONFIG_DIR", tempDir)
