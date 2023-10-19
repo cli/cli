@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"gopkg.in/yaml.v3"
 )
@@ -36,6 +37,7 @@ type Extension struct {
 	isPinned       *bool
 	currentVersion string
 	latestVersion  string
+	owner          string
 }
 
 func (e *Extension) Name() string {
@@ -174,6 +176,38 @@ func (e *Extension) IsPinned() bool {
 	e.mu.Unlock()
 
 	return *e.isPinned
+}
+
+func (e *Extension) Owner() string {
+	e.mu.RLock()
+	if e.owner != "" {
+		defer e.mu.RUnlock()
+		return e.owner
+	}
+	e.mu.RUnlock()
+
+	var owner string
+	switch e.kind {
+	case LocalKind:
+	case BinaryKind:
+		if manifest, err := e.loadManifest(); err == nil {
+			owner = manifest.Owner
+		}
+	case GitKind:
+		if remoteURL, err := e.gitClient.Config("remote.origin.url"); err == nil {
+			if url, err := git.ParseURL(strings.TrimSpace(string(remoteURL))); err == nil {
+				if repo, err := ghrepo.FromURL(url); err == nil {
+					owner = repo.RepoOwner()
+				}
+			}
+		}
+	}
+
+	e.mu.Lock()
+	e.owner = owner
+	e.mu.Unlock()
+
+	return e.owner
 }
 
 func (e *Extension) UpdateAvailable() bool {
