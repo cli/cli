@@ -229,11 +229,9 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 		c.cfg.Set([]string{hosts, hostname, oauthToken}, token)
 		insecureStorageUsed = true
 	}
-	// TODO: I can't find anywhere that calls this function without a username, so that would seem like
-	// something we might want to error on?
-	if username != "" {
-		c.cfg.Set([]string{hosts, hostname, "user"}, username)
-	}
+
+	c.cfg.Set([]string{hosts, hostname, "user"}, username)
+
 	if gitProtocol != "" {
 		c.cfg.Set([]string{hosts, hostname, "git_protocol"}, gitProtocol)
 	}
