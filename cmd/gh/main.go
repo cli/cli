@@ -56,6 +56,14 @@ func mainRun() exitCode {
 
 	ctx := context.Background()
 
+	// cfg, err := cmdFactory.Config()
+	// if err != nil {
+	// 	fmt.Fprintf(stderr, "failed to load configuration to attempt migration: %s\n", err)
+	// }
+	// if err := cfg.MigrateMultiAccount(); err != nil {
+	// 	fmt.Fprintf(stderr, "failed to migrate configuration: %s\n", err)
+	// }
+
 	updateCtx, updateCancel := context.WithCancel(ctx)
 	defer updateCancel()
 	updateMessageChan := make(chan *update.ReleaseInfo)

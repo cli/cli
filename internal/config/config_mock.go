@@ -38,6 +38,9 @@ var _ Config = &ConfigMock{}
 //			HTTPUnixSocketFunc: func(s string) string {
 //				panic("mock out the HTTPUnixSocket method")
 //			},
+//			MigrateMultiAccountFunc: func() error {
+//				panic("mock out the MigrateMultiAccount method")
+//			},
 //			PagerFunc: func(s string) string {
 //				panic("mock out the Pager method")
 //			},
@@ -77,6 +80,9 @@ type ConfigMock struct {
 
 	// HTTPUnixSocketFunc mocks the HTTPUnixSocket method.
 	HTTPUnixSocketFunc func(s string) string
+
+	// MigrateMultiAccountFunc mocks the MigrateMultiAccount method.
+	MigrateMultiAccountFunc func() error
 
 	// PagerFunc mocks the Pager method.
 	PagerFunc func(s string) string
@@ -125,6 +131,9 @@ type ConfigMock struct {
 			// S is the s argument value.
 			S string
 		}
+		// MigrateMultiAccount holds details about calls to the MigrateMultiAccount method.
+		MigrateMultiAccount []struct {
+		}
 		// Pager holds details about calls to the Pager method.
 		Pager []struct {
 			// S is the s argument value.
@@ -148,17 +157,18 @@ type ConfigMock struct {
 		Write []struct {
 		}
 	}
-	lockAliases        sync.RWMutex
-	lockAuthentication sync.RWMutex
-	lockBrowser        sync.RWMutex
-	lockEditor         sync.RWMutex
-	lockGetOrDefault   sync.RWMutex
-	lockGitProtocol    sync.RWMutex
-	lockHTTPUnixSocket sync.RWMutex
-	lockPager          sync.RWMutex
-	lockPrompt         sync.RWMutex
-	lockSet            sync.RWMutex
-	lockWrite          sync.RWMutex
+	lockAliases             sync.RWMutex
+	lockAuthentication      sync.RWMutex
+	lockBrowser             sync.RWMutex
+	lockEditor              sync.RWMutex
+	lockGetOrDefault        sync.RWMutex
+	lockGitProtocol         sync.RWMutex
+	lockHTTPUnixSocket      sync.RWMutex
+	lockMigrateMultiAccount sync.RWMutex
+	lockPager               sync.RWMutex
+	lockPrompt              sync.RWMutex
+	lockSet                 sync.RWMutex
+	lockWrite               sync.RWMutex
 }
 
 // Aliases calls AliasesFunc.
@@ -376,6 +386,33 @@ func (mock *ConfigMock) HTTPUnixSocketCalls() []struct {
 	mock.lockHTTPUnixSocket.RLock()
 	calls = mock.calls.HTTPUnixSocket
 	mock.lockHTTPUnixSocket.RUnlock()
+	return calls
+}
+
+// MigrateMultiAccount calls MigrateMultiAccountFunc.
+func (mock *ConfigMock) MigrateMultiAccount() error {
+	if mock.MigrateMultiAccountFunc == nil {
+		panic("ConfigMock.MigrateMultiAccountFunc: method is nil but Config.MigrateMultiAccount was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockMigrateMultiAccount.Lock()
+	mock.calls.MigrateMultiAccount = append(mock.calls.MigrateMultiAccount, callInfo)
+	mock.lockMigrateMultiAccount.Unlock()
+	return mock.MigrateMultiAccountFunc()
+}
+
+// MigrateMultiAccountCalls gets all the calls that were made to MigrateMultiAccount.
+// Check the length with:
+//
+//	len(mockedConfig.MigrateMultiAccountCalls())
+func (mock *ConfigMock) MigrateMultiAccountCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockMigrateMultiAccount.RLock()
+	calls = mock.calls.MigrateMultiAccount
+	mock.lockMigrateMultiAccount.RUnlock()
 	return calls
 }
 
