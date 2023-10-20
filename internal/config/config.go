@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/keyring"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
@@ -19,6 +20,9 @@ const (
 	oauthTokenKey     = "oauth_token"
 	pagerKey          = "pager"
 	promptKey         = "prompt"
+	userKey           = "user"
+	usersKey          = "users"
+	versionKey        = "version"
 )
 
 // This interface describes interacting with some persistent configuration for gh.
@@ -37,6 +41,8 @@ type Config interface {
 	HTTPUnixSocket(string) string
 	Pager(string) string
 	Prompt(string) string
+
+	MigrateMultiAccount() error
 }
 
 func NewConfig() (Config, error) {
@@ -126,6 +132,11 @@ func (c *cfg) Prompt(hostname string) string {
 	return val
 }
 
+func (c *cfg) MigrateMultiAccount() error {
+	var m migration.MultiAccount
+	return Migrate(c.cfg, m)
+}
+
 func defaultFor(key string) (string, bool) {
 	for _, co := range ConfigOptions() {
 		if co.Key == key {
@@ -200,7 +211,7 @@ func (c *AuthConfig) TokenFromKeyring(hostname string) (string, error) {
 
 // User will retrieve the username for the logged in user at the given hostname.
 func (c *AuthConfig) User(hostname string) (string, error) {
-	return c.cfg.Get([]string{hostsKey, hostname, "user"})
+	return c.cfg.Get([]string{hostsKey, hostname, userKey})
 }
 
 func (c *AuthConfig) Hosts() []string {
@@ -240,21 +251,33 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	var setErr error
 	if secureStorage {
 		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
-			// Clean up the previous oauth_token from the config file.
+			// Clean up the previous oauth_tokens from the config file.
 			_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
+			_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username, oauthTokenKey})
 		}
 	}
 	insecureStorageUsed := false
 	if !secureStorage || setErr != nil {
+		// Set the current active oauth token
 		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
+		// And set the oauth token under the user to support later auth switch
+		// and logout switch without another migration.
+		c.cfg.Set([]string{hostsKey, hostname, usersKey, username, oauthTokenKey}, token)
 		insecureStorageUsed = true
 	}
 
-	c.cfg.Set([]string{hostsKey, hostname, "user"}, username)
+	c.cfg.Set([]string{hostsKey, hostname, userKey}, username)
 
 	if gitProtocol != "" {
-		c.cfg.Set([]string{hostsKey, hostname, gitProtocolKey}, gitProtocol)
+		c.cfg.Set([]string{hostsKey, hostname, usersKey, username, gitProtocolKey}, gitProtocol)
 	}
+
+	// Create the username key with an empty value so it will be
+	// written even when there are no keys set under it.
+	if _, getErr := c.cfg.Get([]string{hostsKey, hostname, usersKey, username}); getErr != nil {
+		c.cfg.Set([]string{hostsKey, hostname, usersKey, username}, "")
+	}
+
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }
 
@@ -303,7 +326,12 @@ func fallbackConfig() *ghConfig.Config {
 	return ghConfig.ReadFromString(defaultConfigStr)
 }
 
+// The schema version in here should match the PostVersion of whatever the
+// last migration we decided to run is. Therefore, if we run a new migration,
+// this should be bumped.
 const defaultConfigStr = `
+# The current version of the config schema
+version: 1
 # What protocol to use when performing git operations. Supported values: ssh, https
 git_protocol: https
 # What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.

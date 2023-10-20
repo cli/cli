@@ -274,8 +274,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc123\n    user: x-access-token\n",
+			wantHosts: "github.com:\n    oauth_token: abc123\n    users:\n        monalisa:\n            oauth_token: abc123\n    user: monalisa\n",
 		},
 		{
 			name: "insecure with token and https git-protocol",
@@ -287,8 +290,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc123\n    user: x-access-token\n    git_protocol: https\n",
+			wantHosts: "github.com:\n    oauth_token: abc123\n    users:\n        monalisa:\n            oauth_token: abc123\n            git_protocol: https\n    user: monalisa\n",
 		},
 		{
 			name: "with token and non-default host",
@@ -299,8 +305,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "albert.wesker:\n    oauth_token: abc123\n    user: x-access-token\n",
+			wantHosts: "albert.wesker:\n    oauth_token: abc123\n    users:\n        monalisa:\n            oauth_token: abc123\n    user: monalisa\n",
 		},
 		{
 			name: "missing repo scope",
@@ -333,8 +342,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,admin:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc456\n    user: x-access-token\n",
+			wantHosts: "github.com:\n    oauth_token: abc456\n    users:\n        monalisa:\n            oauth_token: abc456\n    user: monalisa\n",
 		},
 		{
 			name: "github.com token from environment",
@@ -351,9 +363,9 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			wantErr: "SilentError",
 			wantStderr: heredoc.Doc(`
-				The value of the GH_TOKEN environment variable is being used for authentication.
-				To have GitHub CLI store credentials instead, first clear the value from the environment.
-			`),
+                The value of the GH_TOKEN environment variable is being used for authentication.
+                To have GitHub CLI store credentials instead, first clear the value from the environment.
+            `),
 		},
 		{
 			name: "GHE token from environment",
@@ -370,9 +382,9 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			wantErr: "SilentError",
 			wantStderr: heredoc.Doc(`
-				The value of the GH_ENTERPRISE_TOKEN environment variable is being used for authentication.
-				To have GitHub CLI store credentials instead, first clear the value from the environment.
-			`),
+                The value of the GH_ENTERPRISE_TOKEN environment variable is being used for authentication.
+                To have GitHub CLI store credentials instead, first clear the value from the environment.
+            `),
 		},
 		{
 			name: "with token and secure storage",
@@ -382,8 +394,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts:       "github.com:\n    user: x-access-token\n",
+			wantHosts:       "github.com:\n    user: monalisa\n    users:\n        monalisa:\n",
 			wantSecureToken: "abc123",
 		},
 	}
@@ -485,11 +500,14 @@ func Test_loginRun_Survey(t *testing.T) {
 				InsecureStorage: true,
 			},
 			wantHosts: heredoc.Doc(`
-				rebecca.chambers:
-				    oauth_token: def456
-				    user: jillv
-				    git_protocol: https
-			`),
+                rebecca.chambers:
+                    oauth_token: def456
+                    users:
+                        jillv:
+                            oauth_token: def456
+                            git_protocol: https
+                    user: jillv
+            `),
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
@@ -516,11 +534,14 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name: "choose enterprise",
 			wantHosts: heredoc.Doc(`
-				brad.vickers:
-				    oauth_token: def456
-				    user: jillv
-				    git_protocol: https
-			`),
+                brad.vickers:
+                    oauth_token: def456
+                    users:
+                        jillv:
+                            oauth_token: def456
+                            git_protocol: https
+                    user: jillv
+            `),
 			opts: &LoginOptions{
 				Interactive:     true,
 				InsecureStorage: true,
@@ -556,11 +577,14 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name: "choose github.com",
 			wantHosts: heredoc.Doc(`
-				github.com:
-				    oauth_token: def456
-				    user: jillv
-				    git_protocol: https
-			`),
+                github.com:
+                    oauth_token: def456
+                    users:
+                        jillv:
+                            oauth_token: def456
+                            git_protocol: https
+                    user: jillv
+            `),
 			opts: &LoginOptions{
 				Interactive:     true,
 				InsecureStorage: true,
@@ -587,11 +611,14 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name: "sets git_protocol",
 			wantHosts: heredoc.Doc(`
-				github.com:
-				    oauth_token: def456
-				    user: jillv
-				    git_protocol: ssh
-			`),
+                github.com:
+                    oauth_token: def456
+                    users:
+                        jillv:
+                            oauth_token: def456
+                            git_protocol: ssh
+                    user: jillv
+            `),
 			opts: &LoginOptions{
 				Interactive:     true,
 				InsecureStorage: true,
@@ -633,10 +660,12 @@ func Test_loginRun_Survey(t *testing.T) {
 				rs.Register(`git config credential\.helper`, 1, "")
 			},
 			wantHosts: heredoc.Doc(`
-				github.com:
-				    user: jillv
-				    git_protocol: https
-			`),
+                github.com:
+                    user: jillv
+                    users:
+                        jillv:
+                            git_protocol: https
+            `),
 			wantErrOut:      regexp.MustCompile("Logged in as jillv"),
 			wantSecureToken: "def456",
 		},
