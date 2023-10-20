@@ -383,7 +383,7 @@ func requireNoKey(t *testing.T, cfg *ghConfig.Config, keys []string) {
 func TestUserWorksRightAfterMigration(t *testing.T) {
 	// Given we have logged in before migration
 	authCfg := newTestAuthConfig(t)
-	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
+	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
 
 	// When we migrate
@@ -396,11 +396,10 @@ func TestUserWorksRightAfterMigration(t *testing.T) {
 	require.Equal(t, "test-user", user)
 }
 
-// Fix: Update GitProtocol function to get the user and pass it to the cfg.Get
 func TestGitProtocolWorksRightAfterMigration(t *testing.T) {
 	// Given we have logged in before migration with a non-default git protocol
 	authCfg := newTestAuthConfig(t)
-	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
+	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
 
 	// When we migrate
@@ -415,7 +414,7 @@ func TestGitProtocolWorksRightAfterMigration(t *testing.T) {
 func TestHostsWorksRightAfterMigration(t *testing.T) {
 	// Given we have logged in before migration
 	authCfg := newTestAuthConfig(t)
-	_, err := authCfg.Login("ghe.io", "test-user", "test-token", "ssh", false)
+	_, err := preMigrationLogin(authCfg, "ghe.io", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
 
 	// When we migrate
@@ -430,7 +429,7 @@ func TestHostsWorksRightAfterMigration(t *testing.T) {
 func TestDefaultHostWorksRightAfterMigration(t *testing.T) {
 	// Given we have logged in before migration to an enterprise host
 	authCfg := newTestAuthConfig(t)
-	_, err := authCfg.Login("ghe.io", "test-user", "test-token", "ssh", false)
+	_, err := preMigrationLogin(authCfg, "ghe.io", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
 
 	// When we migrate
@@ -446,7 +445,7 @@ func TestDefaultHostWorksRightAfterMigration(t *testing.T) {
 func TestTokenWorksRightAfterMigration(t *testing.T) {
 	// Given we have logged in before migration
 	authCfg := newTestAuthConfig(t)
-	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
+	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
 
 	// When we migrate
@@ -462,7 +461,7 @@ func TestTokenWorksRightAfterMigration(t *testing.T) {
 func TestLogoutRigthAfterMigrationRemovesHost(t *testing.T) {
 	// Given we have logged in before migration
 	authCfg := newTestAuthConfig(t)
-	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
+	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
 
 	// When we migrate and logout
@@ -475,7 +474,6 @@ func TestLogoutRigthAfterMigrationRemovesHost(t *testing.T) {
 	requireNoKey(t, authCfg.cfg, []string{hosts, "github.com"})
 }
 
-// FIX: Update login function to write token under the user key
 func TestLoginInsecurePostMigrationUsesConfigForToken(t *testing.T) {
 	// Given we have not logged in
 	authCfg := newTestAuthConfig(t)
@@ -533,7 +531,7 @@ func TestLoginPostMigrationSetsUser(t *testing.T) {
 func TestLoginSecurePostMigrationRemovesTokenFromConfig(t *testing.T) {
 	// Given we have logged in insecurely
 	authCfg := newTestAuthConfig(t)
-	_, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
+	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "", false)
 	require.NoError(t, err)
 
 	// When we migrate and login again with secure storage
@@ -548,4 +546,29 @@ func TestLoginSecurePostMigrationRemovesTokenFromConfig(t *testing.T) {
 	fmt.Println(authCfg.cfg)
 	requireNoKey(t, authCfg.cfg, []string{hosts, "github.com", oauthToken})
 	requireNoKey(t, authCfg.cfg, []string{hosts, "github.com", "users", "test-user", oauthToken})
+}
+
+// Copied and pasted directly from the trunk branch before doing any work on
+// login, plus the addition of AuthConfig as the first arg since it is a method
+// receiver in the real implementation.
+func preMigrationLogin(c *AuthConfig, hostname, username, token, gitProtocol string, secureStorage bool) (bool, error) {
+	var setErr error
+	if secureStorage {
+		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
+			// Clean up the previous oauth_token from the config file.
+			_ = c.cfg.Remove([]string{hosts, hostname, oauthToken})
+		}
+	}
+	insecureStorageUsed := false
+	if !secureStorage || setErr != nil {
+		c.cfg.Set([]string{hosts, hostname, oauthToken}, token)
+		insecureStorageUsed = true
+	}
+
+	c.cfg.Set([]string{hosts, hostname, "user"}, username)
+
+	if gitProtocol != "" {
+		c.cfg.Set([]string{hosts, hostname, "git_protocol"}, gitProtocol)
+	}
+	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }

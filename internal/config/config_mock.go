@@ -29,6 +29,9 @@ var _ Config = &ConfigMock{}
 //			GetOrDefaultFunc: func(s1 string, s2 string) (string, error) {
 //				panic("mock out the GetOrDefault method")
 //			},
+//			MigrateMultiAccountFunc: func() error {
+//				panic("mock out the MigrateMultiAccount method")
+//			},
 //			SetFunc: func(s1 string, s2 string, s3 string)  {
 //				panic("mock out the Set method")
 //			},
@@ -53,6 +56,9 @@ type ConfigMock struct {
 
 	// GetOrDefaultFunc mocks the GetOrDefault method.
 	GetOrDefaultFunc func(s1 string, s2 string) (string, error)
+
+	// MigrateMultiAccountFunc mocks the MigrateMultiAccount method.
+	MigrateMultiAccountFunc func() error
 
 	// SetFunc mocks the Set method.
 	SetFunc func(s1 string, s2 string, s3 string)
@@ -82,6 +88,9 @@ type ConfigMock struct {
 			// S2 is the s2 argument value.
 			S2 string
 		}
+		// MigrateMultiAccount holds details about calls to the MigrateMultiAccount method.
+		MigrateMultiAccount []struct {
+		}
 		// Set holds details about calls to the Set method.
 		Set []struct {
 			// S1 is the s1 argument value.
@@ -95,12 +104,13 @@ type ConfigMock struct {
 		Write []struct {
 		}
 	}
-	lockAliases        sync.RWMutex
-	lockAuthentication sync.RWMutex
-	lockGet            sync.RWMutex
-	lockGetOrDefault   sync.RWMutex
-	lockSet            sync.RWMutex
-	lockWrite          sync.RWMutex
+	lockAliases             sync.RWMutex
+	lockAuthentication      sync.RWMutex
+	lockGet                 sync.RWMutex
+	lockGetOrDefault        sync.RWMutex
+	lockMigrateMultiAccount sync.RWMutex
+	lockSet                 sync.RWMutex
+	lockWrite               sync.RWMutex
 }
 
 // Aliases calls AliasesFunc.
@@ -226,6 +236,33 @@ func (mock *ConfigMock) GetOrDefaultCalls() []struct {
 	mock.lockGetOrDefault.RLock()
 	calls = mock.calls.GetOrDefault
 	mock.lockGetOrDefault.RUnlock()
+	return calls
+}
+
+// MigrateMultiAccount calls MigrateMultiAccountFunc.
+func (mock *ConfigMock) MigrateMultiAccount() error {
+	if mock.MigrateMultiAccountFunc == nil {
+		panic("ConfigMock.MigrateMultiAccountFunc: method is nil but Config.MigrateMultiAccount was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockMigrateMultiAccount.Lock()
+	mock.calls.MigrateMultiAccount = append(mock.calls.MigrateMultiAccount, callInfo)
+	mock.lockMigrateMultiAccount.Unlock()
+	return mock.MigrateMultiAccountFunc()
+}
+
+// MigrateMultiAccountCalls gets all the calls that were made to MigrateMultiAccount.
+// Check the length with:
+//
+//	len(mockedConfig.MigrateMultiAccountCalls())
+func (mock *ConfigMock) MigrateMultiAccountCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockMigrateMultiAccount.RLock()
+	calls = mock.calls.MigrateMultiAccount
+	mock.lockMigrateMultiAccount.RUnlock()
 	return calls
 }
 

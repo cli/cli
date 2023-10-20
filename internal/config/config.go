@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/v2/internal/keyring"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
+	"github.com/cli/go-gh/v2/pkg/config/migration"
 )
 
 const (
@@ -26,6 +27,8 @@ type Config interface {
 
 	Aliases() *AliasConfig
 	Authentication() *AuthConfig
+
+	MigrateMultiAccount() error
 }
 
 func NewConfig() (Config, error) {
@@ -83,6 +86,11 @@ func (c *cfg) Aliases() *AliasConfig {
 
 func (c *cfg) Authentication() *AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
+}
+
+func (c *cfg) MigrateMultiAccount() error {
+	var m migration.MultiAccount
+	return ghConfig.Migrate(c.cfg, m)
 }
 
 func defaultFor(key string) (string, bool) {
@@ -159,7 +167,7 @@ func (c *AuthConfig) TokenFromKeyring(hostname string) (string, error) {
 
 // User will retrieve the username for the logged in user at the given hostname.
 func (c *AuthConfig) User(hostname string) (string, error) {
-	return c.cfg.Get([]string{hosts, hostname, "active_user"})
+	return c.cfg.Get([]string{hosts, hostname, "user"})
 }
 
 // GitProtocol will retrieve the git protocol for the logged in user at the given hostname.
@@ -235,7 +243,7 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 		insecureStorageUsed = true
 	}
 
-	c.cfg.Set([]string{hosts, hostname, "active_user"}, username)
+	c.cfg.Set([]string{hosts, hostname, "user"}, username)
 
 	if gitProtocol != "" {
 		c.cfg.Set([]string{hosts, hostname, "users", username, "git_protocol"}, gitProtocol)
