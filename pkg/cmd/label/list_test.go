@@ -215,7 +215,14 @@ func TestListRun(t *testing.T) {
 					),
 				)
 			},
-			wantStdout: "\nShowing 2 of 2 labels in OWNER/REPO\n\nbug   This is a bug label   #d73a4a\ndocs  This is a docs label  #ffa8da\n",
+			wantStdout: heredoc.Doc(`
+
+				Showing 2 of 2 labels in OWNER/REPO
+				
+				NAME  DESCRIPTION           COLOR
+				bug   This is a bug label   #d73a4a
+				docs  This is a docs label  #ffa8da
+			`),
 		},
 		{
 			name: "lists labels notty",
@@ -343,6 +350,7 @@ func TestListRun(t *testing.T) {
 
 			Showing 2 of 2 labels in OWNER/REPO
 
+			NAME  DESCRIPTION           COLOR
 			bug   This is a bug label   #d73a4a
 			docs  This is a docs label  #ffa8da
 			`),

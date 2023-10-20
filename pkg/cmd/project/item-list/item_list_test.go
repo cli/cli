@@ -178,7 +178,8 @@ func TestRunList_User(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
+		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			number: 1,
 			owner:  "monalisa",
@@ -285,7 +286,8 @@ func TestRunList_Org(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
+		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			number: 1,
 			owner:  "github",
@@ -382,7 +384,8 @@ func TestRunList_Me(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
+		//nolint:staticcheck // SA1019: tableprinter.NoHeaders temporarily allowed in project tests.
+		tp: tableprinter.New(ios, tableprinter.NoHeader),
 		opts: listOpts{
 			number: 1,
 			owner:  "@me",

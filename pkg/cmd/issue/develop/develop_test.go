@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -245,7 +246,14 @@ func TestDevelopRun(t *testing.T) {
 						assert.Equal(t, "REPO", inputs["name"])
 					}))
 			},
-			expectedOut: "\nShowing linked branches for OWNER/REPO#42\n\nfoo  https://github.com/OWNER/REPO/tree/foo\nbar  https://github.com/OWNER/OTHER-REPO/tree/bar\n",
+			expectedOut: heredoc.Doc(`
+
+				Showing linked branches for OWNER/REPO#42
+				
+				BRANCH  URL
+				foo     https://github.com/OWNER/REPO/tree/foo
+				bar     https://github.com/OWNER/OTHER-REPO/tree/bar
+			`),
 		},
 		{
 			name: "list branches for an issue providing an issue url",
