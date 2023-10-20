@@ -159,18 +159,21 @@ func (c *AuthConfig) TokenFromKeyring(hostname string) (string, error) {
 
 // User will retrieve the username for the logged in user at the given hostname.
 func (c *AuthConfig) User(hostname string) (string, error) {
-	return c.cfg.Get([]string{hosts, hostname, "user"})
+	return c.cfg.Get([]string{hosts, hostname, "active_user"})
 }
 
 // GitProtocol will retrieve the git protocol for the logged in user at the given hostname.
 // If none is set it will return the default value.
 func (c *AuthConfig) GitProtocol(hostname string) string {
-	key := "git_protocol"
-	if val, err := c.cfg.Get([]string{hosts, hostname, key}); err == nil {
+	// Ignore the error here because if the user doesn't exist
+	// we fall back to default
+	user, _ := c.User(hostname)
+	key := []string{hosts, hostname, "users", user, "git_protocol"}
+	if val, err := c.cfg.Get(key); err == nil {
 		return val
 	}
 
-	if val, ok := defaultFor(key); ok {
+	if val, ok := defaultFor("git_protocol"); ok {
 		return val
 	}
 
@@ -217,20 +220,25 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	var setErr error
 	if secureStorage {
 		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
-			// Clean up the previous oauth_token from the config file.
+			// Clean up the previous oauth_tokens from the config file.
 			_ = c.cfg.Remove([]string{hosts, hostname, oauthToken})
+			_ = c.cfg.Remove([]string{hosts, hostname, "users", username, oauthToken})
 		}
 	}
 	insecureStorageUsed := false
 	if !secureStorage || setErr != nil {
+		// Set the current active oauth token
 		c.cfg.Set([]string{hosts, hostname, oauthToken}, token)
+		// And set the oauth token under the user to support later auth switch
+		// and logout switch without another migration.
+		c.cfg.Set([]string{hosts, hostname, "users", username, oauthToken}, token)
 		insecureStorageUsed = true
 	}
 
-	c.cfg.Set([]string{hosts, hostname, "user"}, username)
+	c.cfg.Set([]string{hosts, hostname, "active_user"}, username)
 
 	if gitProtocol != "" {
-		c.cfg.Set([]string{hosts, hostname, "git_protocol"}, gitProtocol)
+		c.cfg.Set([]string{hosts, hostname, "users", username, "git_protocol"}, gitProtocol)
 	}
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }

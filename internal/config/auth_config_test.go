@@ -380,10 +380,7 @@ func requireNoKey(t *testing.T, cfg *ghConfig.Config, keys []string) {
 
 // Post migration tests
 
-// FIX: Update User function to look for active_user
 func TestUserWorksRightAfterMigration(t *testing.T) {
-	t.Skip("intentionally skipping until implementation is done")
-
 	// Given we have logged in before migration
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
@@ -401,8 +398,6 @@ func TestUserWorksRightAfterMigration(t *testing.T) {
 
 // Fix: Update GitProtocol function to get the user and pass it to the cfg.Get
 func TestGitProtocolWorksRightAfterMigration(t *testing.T) {
-	t.Skip("intentionally skipping until implementation is done")
-
 	// Given we have logged in before migration with a non-default git protocol
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
@@ -482,8 +477,6 @@ func TestLogoutRigthAfterMigrationRemovesHost(t *testing.T) {
 
 // FIX: Update login function to write token under the user key
 func TestLoginInsecurePostMigrationUsesConfigForToken(t *testing.T) {
-	t.Skip("intentionally skipping until implementation is done")
-
 	// Given we have not logged in
 	authCfg := newTestAuthConfig(t)
 
@@ -502,8 +495,6 @@ func TestLoginInsecurePostMigrationUsesConfigForToken(t *testing.T) {
 	requireKeyWithValue(t, authCfg.cfg, []string{hosts, "github.com", "users", "test-user", oauthToken}, "test-token")
 }
 
-// Note that this will break after we fix the other GitProtocol test
-// FIX: Update login function to write git_protocol under the user key
 func TestLoginPostMigrationSetsGitProtocol(t *testing.T) {
 	// Given we have logged in after migration
 	authCfg := newTestAuthConfig(t)
@@ -521,8 +512,6 @@ func TestLoginPostMigrationSetsGitProtocol(t *testing.T) {
 	require.Equal(t, "ssh", gitProtocol)
 }
 
-// Note that this will break after we fix the other User test
-// FIX: Update login function to write the username under the active_user key
 func TestLoginPostMigrationSetsUser(t *testing.T) {
 	// Given we have logged in after migration
 	authCfg := newTestAuthConfig(t)
@@ -541,10 +530,7 @@ func TestLoginPostMigrationSetsUser(t *testing.T) {
 	require.Equal(t, "test-user", user)
 }
 
-// FIX: Ensure we also remove the token from under the users entry
 func TestLoginSecurePostMigrationRemovesTokenFromConfig(t *testing.T) {
-	t.Skip("intentionally skipping until implementation is done")
-
 	// Given we have logged in insecurely
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
