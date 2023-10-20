@@ -78,7 +78,7 @@ func NewWithWriter(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorSch
 		tp.AddHeader(
 			headers.columns,
 			tableprinter.WithPadding(paddingFunc),
-			tableprinter.WithColor(cs.GrayUnderline),
+			tableprinter.WithColor(cs.LightGrayUnderline),
 		)
 	}
 
