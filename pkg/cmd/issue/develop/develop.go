@@ -202,7 +202,7 @@ func printLinkedBranches(io *iostreams.IOStreams, branches []api.LinkedBranch) {
 	table := tableprinter.New(io, tableprinter.WithHeader("BRANCH", "URL"))
 	for _, branch := range branches {
 		table.AddField(branch.BranchName, tableprinter.WithColor(cs.ColorFromString("cyan")))
-		table.AddField(branch.URL)
+		table.AddURLField(branch.URL)
 		table.EndRow()
 	}
 	_ = table.Render()

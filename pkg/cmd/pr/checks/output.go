@@ -46,7 +46,7 @@ func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 		tp.AddField(name)
 		tp.AddField(o.Description)
 		tp.AddField(elapsed)
-		tp.AddField(o.Link)
+		tp.AddURLField(o.Link)
 	} else {
 		tp.AddField(o.Name)
 		if o.Bucket == "cancel" {
@@ -59,7 +59,7 @@ func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 		} else {
 			tp.AddField(elapsed)
 		}
-		tp.AddField(o.Link)
+		tp.AddURLField(o.Link)
 		tp.AddField(o.Description)
 	}
 

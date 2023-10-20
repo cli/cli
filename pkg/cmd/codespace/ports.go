@@ -116,7 +116,7 @@ func (a *App) ListPorts(ctx context.Context, selector *CodespaceSelector, export
 		tp.AddField(port.Label())
 		tp.AddField(cs.Yellow(fmt.Sprintf("%d", port.Port.PortNumber)))
 		tp.AddField(visibility)
-		tp.AddField(port.BrowseURL())
+		tp.AddURLField(port.BrowseURL())
 		tp.EndRow()
 	}
 	return tp.Render()

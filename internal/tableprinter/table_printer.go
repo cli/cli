@@ -33,6 +33,11 @@ func (tp *TablePrinter) AddTimeField(now, t time.Time, c func(string) string) {
 	tp.AddField(tf, WithColor(c))
 }
 
+// AddURLField displays the URL preventing it from being truncated.
+func (tp *TablePrinter) AddURLField(url string) {
+	tp.AddField(url, WithTruncate(nil))
+}
+
 var (
 	WithColor    = tableprinter.WithColor
 	WithPadding  = tableprinter.WithPadding
