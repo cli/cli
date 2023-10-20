@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/config/migration"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 	"github.com/stretchr/testify/require"
 	"github.com/zalando/go-keyring"
@@ -61,7 +62,7 @@ func TestTokenStoredInConfig(t *testing.T) {
 	// and the source is set to oauth_token but this isn't great:
 	// https://github.com/cli/go-gh/issues/94
 	require.Equal(t, "test-token", token)
-	require.Equal(t, "oauth_token", source)
+	require.Equal(t, oauthTokenKey, source)
 }
 
 func TestTokenStoredInEnv(t *testing.T) {
@@ -285,13 +286,13 @@ func TestLoginSetsUserForProvidedHost(t *testing.T) {
 }
 
 func TestLoginSetsGitProtocolForProvidedHost(t *testing.T) {
-	// Given we are loggedin
+	// Given we are logged in
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
 
 	// When we get the git protocol
-	protocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", gitProtocolKey})
+	protocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", gitProtocolKey})
 	require.NoError(t, err)
 
 	// Then it returns the git protocol we provided on login
@@ -309,6 +310,23 @@ func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
 
 	// Then it includes our logged in host
 	require.Contains(t, hosts, "github.com")
+}
+
+// This test mimics the behaviour of logging in with a token and not providing
+// a git protocol.
+func TestLoginAddsUserToConfigWithoutGitProtocolOrSecureStorage(t *testing.T) {
+	// Given we are not logged in
+	authCfg := newTestAuthConfig(t)
+
+	// When we log in without git protocol or secure storage
+	keyring.MockInit()
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
+	require.NoError(t, err)
+
+	// Then the username is added under the users config
+	users, err := authCfg.cfg.Keys([]string{hostsKey, "github.com", usersKey})
+	require.NoError(t, err)
+	require.Contains(t, users, "test-user")
 }
 
 func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
@@ -364,4 +382,200 @@ func requireNoKey(t *testing.T, cfg *ghConfig.Config, keys []string) {
 	_, err := cfg.Get(keys)
 	var keyNotFoundError *ghConfig.KeyNotFoundError
 	require.ErrorAs(t, err, &keyNotFoundError)
+}
+
+// Post migration tests
+
+func TestUserWorksRightAfterMigration(t *testing.T) {
+	// Given we have logged in before migration
+	authCfg := newTestAuthConfig(t)
+	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "ssh", false)
+	require.NoError(t, err)
+
+	// When we migrate
+	var m migration.MultiAccount
+	require.NoError(t, Migrate(authCfg.cfg, m))
+
+	// Then we can still get the user correctly
+	user, err := authCfg.User("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "test-user", user)
+}
+
+func TestGitProtocolWorksRightAfterMigration(t *testing.T) {
+	// Given we have logged in before migration with a non-default git protocol
+	authCfg := newTestAuthConfig(t)
+	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "ssh", false)
+	require.NoError(t, err)
+
+	// When we migrate
+	var m migration.MultiAccount
+	require.NoError(t, Migrate(authCfg.cfg, m))
+
+	// Then we can still get the git protocol correctly
+	gitProtocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", gitProtocolKey})
+	require.NoError(t, err)
+	require.Equal(t, "ssh", gitProtocol)
+}
+
+func TestHostsWorksRightAfterMigration(t *testing.T) {
+	// Given we have logged in before migration
+	authCfg := newTestAuthConfig(t)
+	_, err := preMigrationLogin(authCfg, "ghe.io", "test-user", "test-token", "ssh", false)
+	require.NoError(t, err)
+
+	// When we migrate
+	var m migration.MultiAccount
+	require.NoError(t, Migrate(authCfg.cfg, m))
+
+	// Then we can still get the hosts correctly
+	hosts := authCfg.Hosts()
+	require.Contains(t, hosts, "ghe.io")
+}
+
+func TestDefaultHostWorksRightAfterMigration(t *testing.T) {
+	// Given we have logged in before migration to an enterprise host
+	authCfg := newTestAuthConfig(t)
+	_, err := preMigrationLogin(authCfg, "ghe.io", "test-user", "test-token", "ssh", false)
+	require.NoError(t, err)
+
+	// When we migrate
+	var m migration.MultiAccount
+	require.NoError(t, Migrate(authCfg.cfg, m))
+
+	// Then the default host is still the enterprise host
+	defaultHost, source := authCfg.DefaultHost()
+	require.Equal(t, "ghe.io", defaultHost)
+	require.Equal(t, hostsKey, source)
+}
+
+func TestTokenWorksRightAfterMigration(t *testing.T) {
+	// Given we have logged in before migration
+	authCfg := newTestAuthConfig(t)
+	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "ssh", false)
+	require.NoError(t, err)
+
+	// When we migrate
+	var m migration.MultiAccount
+	require.NoError(t, Migrate(authCfg.cfg, m))
+
+	// Then we can still get the token correctly
+	token, source := authCfg.Token("github.com")
+	require.Equal(t, "test-token", token)
+	require.Equal(t, oauthTokenKey, source)
+}
+
+func TestLogoutRigthAfterMigrationRemovesHost(t *testing.T) {
+	// Given we have logged in before migration
+	authCfg := newTestAuthConfig(t)
+	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "ssh", false)
+	require.NoError(t, err)
+
+	// When we migrate and logout
+	var m migration.MultiAccount
+	require.NoError(t, Migrate(authCfg.cfg, m))
+
+	require.NoError(t, authCfg.Logout("github.com"))
+
+	// Then the host is removed from the config
+	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com"})
+}
+
+func TestLoginInsecurePostMigrationUsesConfigForToken(t *testing.T) {
+	// Given we have not logged in
+	authCfg := newTestAuthConfig(t)
+
+	// When we migrate and login with insecure storage
+	var m migration.MultiAccount
+	require.NoError(t, Migrate(authCfg.cfg, m))
+
+	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
+
+	// Then it returns success, notes that insecure storage was used, and stores the token in the config
+	// both under the host and under the user
+	require.NoError(t, err)
+
+	require.True(t, insecureStorageUsed, "expected to use insecure storage")
+	requireKeyWithValue(t, authCfg.cfg, []string{hostsKey, "github.com", oauthTokenKey}, "test-token")
+	requireKeyWithValue(t, authCfg.cfg, []string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey}, "test-token")
+}
+
+func TestLoginPostMigrationSetsGitProtocol(t *testing.T) {
+	// Given we have logged in after migration
+	authCfg := newTestAuthConfig(t)
+
+	var m migration.MultiAccount
+	require.NoError(t, Migrate(authCfg.cfg, m))
+
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
+	require.NoError(t, err)
+
+	// When we get the git protocol
+	gitProtocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", gitProtocolKey})
+	require.NoError(t, err)
+
+	// Then it returns the git protocol we provided on login
+	require.Equal(t, "ssh", gitProtocol)
+}
+
+func TestLoginPostMigrationSetsUser(t *testing.T) {
+	// Given we have logged in after migration
+	authCfg := newTestAuthConfig(t)
+
+	var m migration.MultiAccount
+	require.NoError(t, Migrate(authCfg.cfg, m))
+
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
+	require.NoError(t, err)
+
+	// When we get the user
+	user, err := authCfg.User("github.com")
+
+	// Then it returns success and the user we provided on login
+	require.NoError(t, err)
+	require.Equal(t, "test-user", user)
+}
+
+func TestLoginSecurePostMigrationRemovesTokenFromConfig(t *testing.T) {
+	// Given we have logged in insecurely
+	authCfg := newTestAuthConfig(t)
+	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "", false)
+	require.NoError(t, err)
+
+	// When we migrate and login again with secure storage
+	var m migration.MultiAccount
+	require.NoError(t, Migrate(authCfg.cfg, m))
+
+	keyring.MockInit()
+	_, err = authCfg.Login("github.com", "test-user", "test-token", "", true)
+
+	// Then it returns success, having removed the old insecure oauth token entry
+	require.NoError(t, err)
+	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com", oauthTokenKey})
+	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey})
+}
+
+// Copied and pasted directly from the trunk branch before doing any work on
+// login, plus the addition of AuthConfig as the first arg since it is a method
+// receiver in the real implementation.
+func preMigrationLogin(c *AuthConfig, hostname, username, token, gitProtocol string, secureStorage bool) (bool, error) {
+	var setErr error
+	if secureStorage {
+		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
+			// Clean up the previous oauth_token from the config file.
+			_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
+		}
+	}
+	insecureStorageUsed := false
+	if !secureStorage || setErr != nil {
+		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
+		insecureStorageUsed = true
+	}
+
+	c.cfg.Set([]string{hostsKey, hostname, userKey}, username)
+
+	if gitProtocol != "" {
+		c.cfg.Set([]string{hostsKey, hostname, gitProtocolKey}, gitProtocol)
+	}
+	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }
