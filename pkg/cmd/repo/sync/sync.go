@@ -234,9 +234,14 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 			return err
 		}
 		if branchRemote != remote {
-			return mismatchRemotesError
+			hasCommonAncestor, err := git.HasCommonAncestor(branch, "FETCH_HEAD")
+			if err != nil {
+				return err
+			}
+			if !hasCommonAncestor {
+				return mismatchRemotesError
+			}
 		}
-
 		fastForward, err := git.IsAncestor(branch, "FETCH_HEAD")
 		if err != nil {
 			return err
