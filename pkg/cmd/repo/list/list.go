@@ -195,11 +195,7 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(repo.NameWithOwner, tableprinter.WithColor(cs.Bold))
 		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description))
 		tp.AddField(info, tableprinter.WithColor(infoColor))
-		if tp.IsTTY() {
-			tp.AddField(text.FuzzyAgoAbbr(opts.Now(), *t), tableprinter.WithColor(cs.Gray))
-		} else {
-			tp.AddField(t.Format(time.RFC3339))
-		}
+		tp.AddTimeField(opts.Now(), *t, cs.Gray)
 		tp.EndRow()
 	}
 

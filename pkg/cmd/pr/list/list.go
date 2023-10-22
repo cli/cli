@@ -224,11 +224,7 @@ func listRun(opts *ListOptions) error {
 		if !isTTY {
 			table.AddField(prStateWithDraft(&pr))
 		}
-		if isTTY {
-			table.AddField(text.FuzzyAgo(opts.Now(), pr.CreatedAt), tableprinter.WithColor(cs.Gray))
-		} else {
-			table.AddField(pr.CreatedAt.String())
-		}
+		table.AddTimeField(opts.Now(), pr.CreatedAt, cs.Gray)
 		table.EndRow()
 	}
 	err = table.Render()

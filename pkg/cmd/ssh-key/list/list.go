@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/tableprinter"
-	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -85,22 +84,19 @@ func listRun(opts *ListOptions) error {
 
 	for _, sshKey := range sshKeys {
 		id := strconv.Itoa(sshKey.ID)
-		createdAt := sshKey.CreatedAt.Format(time.RFC3339)
-
 		if t.IsTTY() {
 			t.AddField(sshKey.Title)
 			t.AddField(id)
 			t.AddField(sshKey.Key, tableprinter.WithTruncate(truncateMiddle))
 			t.AddField(sshKey.Type)
-			t.AddField(text.FuzzyAgoAbbr(now, sshKey.CreatedAt), tableprinter.WithColor(cs.Gray))
+			t.AddTimeField(now, sshKey.CreatedAt, cs.Gray)
 		} else {
 			t.AddField(sshKey.Title)
 			t.AddField(sshKey.Key)
-			t.AddField(createdAt)
+			t.AddTimeField(now, sshKey.CreatedAt, cs.Gray)
 			t.AddField(id)
 			t.AddField(sshKey.Type)
 		}
-
 		t.EndRow()
 	}
 

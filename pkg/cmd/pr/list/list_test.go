@@ -105,9 +105,9 @@ func TestPRList_nontty(t *testing.T) {
 
 	assert.Equal(t, "", output.Stderr())
 
-	assert.Equal(t, `32	New feature	feature	DRAFT	2022-08-24 20:01:12 +0000 UTC
-29	Fixed bad bug	hubot:bug-fix	OPEN	2022-07-20 19:01:12 +0000 UTC
-28	Improve documentation	docs	MERGED	2020-01-26 19:01:12 +0000 UTC
+	assert.Equal(t, `32	New feature	feature	DRAFT	2022-08-24T20:01:12Z
+29	Fixed bad bug	hubot:bug-fix	OPEN	2022-07-20T19:01:12Z
+28	Improve documentation	docs	MERGED	2020-01-26T19:01:12Z
 `, output.String())
 }
 

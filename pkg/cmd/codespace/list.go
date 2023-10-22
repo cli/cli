@@ -8,7 +8,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/internal/tableprinter"
-	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -169,15 +168,11 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 			tp.AddField(c.State, tableprinter.WithColor(stateColor))
 		}
 
-		if tp.IsTTY() {
-			ct, err := time.Parse(time.RFC3339, c.CreatedAt)
-			if err != nil {
-				return fmt.Errorf("error parsing date %q: %w", c.CreatedAt, err)
-			}
-			tp.AddField(text.FuzzyAgoAbbr(time.Now(), ct), tableprinter.WithColor(cs.Gray))
-		} else {
-			tp.AddField(c.CreatedAt)
+		ct, err := time.Parse(time.RFC3339, c.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error parsing date %q: %w", c.CreatedAt, err)
 		}
+		tp.AddTimeField(time.Now(), ct, cs.Gray)
 
 		if hasNonProdVSCSTarget {
 			tp.AddField(c.VSCSTarget)

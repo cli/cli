@@ -8,7 +8,6 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
-	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -85,20 +84,13 @@ func listRun(opts *ListOptions) error {
 		sshID := strconv.Itoa(deployKey.ID)
 		t.AddField(sshID)
 		t.AddField(deployKey.Title)
-
 		sshType := "read-only"
 		if !deployKey.ReadOnly {
 			sshType = "read-write"
 		}
 		t.AddField(sshType)
 		t.AddField(deployKey.Key, tableprinter.WithTruncate(truncateMiddle))
-
-		// TODO: Modify AddTimeField, add AddAbbrTimeField, or something else.
-		createdAt := deployKey.CreatedAt.Format(time.RFC3339)
-		if t.IsTTY() {
-			createdAt = text.FuzzyAgoAbbr(now, deployKey.CreatedAt)
-		}
-		t.AddField(createdAt, tableprinter.WithColor(cs.Gray))
+		t.AddTimeField(now, deployKey.CreatedAt, cs.Gray)
 		t.EndRow()
 	}
 
