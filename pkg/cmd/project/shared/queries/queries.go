@@ -1001,7 +1001,7 @@ type Owner struct {
 // NewOwner creates a project Owner
 // If canPrompt is false, login is required as we cannot prompt for it.
 // If login is not empty, it is used to lookup the project owner.
-// If login is empty empty, interative mode is used to select an owner.
+// If login is empty, interative mode is used to select an owner.
 // from the current viewer and their organizations
 func (c *Client) NewOwner(canPrompt bool, login string) (*Owner, error) {
 	if login != "" {
@@ -1018,7 +1018,7 @@ func (c *Client) NewOwner(canPrompt bool, login string) (*Owner, error) {
 	}
 
 	if !canPrompt {
-		return nil, fmt.Errorf("login is required when not running interactively")
+		return nil, fmt.Errorf("owner is required when not running interactively")
 	}
 
 	logins, err := c.userOrgLogins()
