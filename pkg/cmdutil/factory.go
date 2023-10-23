@@ -82,7 +82,7 @@ func executable(fallbackName string) string {
 		if p == exe {
 			return p
 		} else if f.Mode()&os.ModeSymlink != 0 {
-			if t, err := os.Readlink(p); err == nil && t == exe {
+			if t, err := filepath.EvalSymlinks(p); err == nil && t == exe {
 				return p
 			}
 		}
