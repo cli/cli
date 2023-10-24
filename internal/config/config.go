@@ -4,10 +4,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/keyring"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
-	"github.com/cli/go-gh/v2/pkg/config/migration"
 )
 
 const (
@@ -90,7 +90,7 @@ func (c *cfg) Authentication() *AuthConfig {
 
 func (c *cfg) MigrateMultiAccount() error {
 	var m migration.MultiAccount
-	return ghConfig.Migrate(c.cfg, m)
+	return Migrate(c.cfg, m)
 }
 
 func defaultFor(key string) (string, bool) {
