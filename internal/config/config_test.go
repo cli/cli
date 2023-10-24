@@ -14,6 +14,23 @@ func newTestConfig() *cfg {
 	}
 }
 
+func TestNewConfigProvidesFallback(t *testing.T) {
+	var spiedCfg *ghConfig.Config
+	ghConfig.Read = func(fallback *ghConfig.Config) (*ghConfig.Config, error) {
+		spiedCfg = fallback
+		return fallback, nil
+	}
+	_, err := NewConfig()
+	require.NoError(t, err)
+	requireKeyWithValue(t, spiedCfg, []string{"git_protocol"}, "https")
+	requireKeyWithValue(t, spiedCfg, []string{"editor"}, "")
+	requireKeyWithValue(t, spiedCfg, []string{"prompt"}, "enabled")
+	requireKeyWithValue(t, spiedCfg, []string{"pager"}, "")
+	requireKeyWithValue(t, spiedCfg, []string{"aliases", "co"}, "pr checkout")
+	requireKeyWithValue(t, spiedCfg, []string{"http_unix_socket"}, "")
+	requireKeyWithValue(t, spiedCfg, []string{"browser"}, "")
+}
+
 func TestGetNonExistentKey(t *testing.T) {
 	// Given we have no top level configuration
 	cfg := newTestConfig()
@@ -136,32 +153,12 @@ func TestGetOrDefaultNotFoundAndNoDefault(t *testing.T) {
 
 func TestFallbackConfig(t *testing.T) {
 	cfg := fallbackConfig()
-
-	protocol, err := cfg.Get([]string{"git_protocol"})
-	require.NoError(t, err)
-	require.Equal(t, "https", protocol)
-
-	editor, err := cfg.Get([]string{"editor"})
-	require.NoError(t, err)
-	require.Equal(t, "", editor)
-
-	prompt, err := cfg.Get([]string{"prompt"})
-	require.NoError(t, err)
-	require.Equal(t, "enabled", prompt)
-
-	pager, err := cfg.Get([]string{"pager"})
-	require.NoError(t, err)
-	require.Equal(t, "", pager)
-
-	socket, err := cfg.Get([]string{"http_unix_socket"})
-	require.NoError(t, err)
-	require.Equal(t, "", socket)
-
-	browser, err := cfg.Get([]string{"browser"})
-	require.NoError(t, err)
-	require.Equal(t, "", browser)
-
-	unknown, err := cfg.Get([]string{"unknown"})
-	require.EqualError(t, err, `could not find key "unknown"`)
-	require.Equal(t, "", unknown)
+	requireKeyWithValue(t, cfg, []string{"git_protocol"}, "https")
+	requireKeyWithValue(t, cfg, []string{"editor"}, "")
+	requireKeyWithValue(t, cfg, []string{"prompt"}, "enabled")
+	requireKeyWithValue(t, cfg, []string{"pager"}, "")
+	requireKeyWithValue(t, cfg, []string{"aliases", "co"}, "pr checkout")
+	requireKeyWithValue(t, cfg, []string{"http_unix_socket"}, "")
+	requireKeyWithValue(t, cfg, []string{"browser"}, "")
+	requireNoKey(t, cfg, []string{"unknown"})
 }
