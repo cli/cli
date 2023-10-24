@@ -139,7 +139,7 @@ func statusRun(opts *StatusOptions) error {
 			}
 
 			addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
-			proto := authCfg.GitProtocol(hostname)
+			proto := cfg.GitProtocol(hostname)
 			if proto != "" {
 				addMsg("%s Git operations for %s configured to use %s protocol.",
 					cs.SuccessIcon(), hostname, cs.Bold(proto))

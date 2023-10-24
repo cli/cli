@@ -10,22 +10,33 @@ import (
 )
 
 const (
-	aliases    = "aliases"
-	hosts      = "hosts"
-	oauthToken = "oauth_token"
+	aliases        = "aliases"
+	browser        = "browser"
+	editor         = "editor"
+	gitProtocol    = "git_protocol"
+	hosts          = "hosts"
+	httpUnixSocket = "http_unix_socket"
+	oauthToken     = "oauth_token"
+	pager          = "pager"
+	prompt         = "prompt"
 )
 
 // This interface describes interacting with some persistent configuration for gh.
 //
 //go:generate moq -rm -out config_mock.go . Config
 type Config interface {
-	Get(string, string) (string, error)
 	GetOrDefault(string, string) (string, error)
 	Set(string, string, string)
 	Write() error
 
 	Aliases() *AliasConfig
 	Authentication() *AuthConfig
+	Browser(string) string
+	Editor(string) string
+	GitProtocol(string) string
+	HTTPUnixSocket(string) string
+	Pager(string) string
+	Prompt(string) string
 }
 
 func NewConfig() (Config, error) {
@@ -83,6 +94,36 @@ func (c *cfg) Aliases() *AliasConfig {
 
 func (c *cfg) Authentication() *AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
+}
+
+func (c *cfg) Browser(hostname string) string {
+	val, _ := c.GetOrDefault(hostname, browser)
+	return val
+}
+
+func (c *cfg) Editor(hostname string) string {
+	val, _ := c.GetOrDefault(hostname, editor)
+	return val
+}
+
+func (c *cfg) GitProtocol(hostname string) string {
+	val, _ := c.GetOrDefault(hostname, gitProtocol)
+	return val
+}
+
+func (c *cfg) HTTPUnixSocket(hostname string) string {
+	val, _ := c.GetOrDefault(hostname, httpUnixSocket)
+	return val
+}
+
+func (c *cfg) Pager(hostname string) string {
+	val, _ := c.GetOrDefault(hostname, pager)
+	return val
+}
+
+func (c *cfg) Prompt(hostname string) string {
+	val, _ := c.GetOrDefault(hostname, prompt)
+	return val
 }
 
 func defaultFor(key string) (string, bool) {
@@ -162,24 +203,6 @@ func (c *AuthConfig) User(hostname string) (string, error) {
 	return c.cfg.Get([]string{hosts, hostname, "user"})
 }
 
-// GitProtocol will retrieve the git protocol for the logged in user at the given hostname.
-// If none is set it will return the default value.
-func (c *AuthConfig) GitProtocol(hostname string) string {
-	key := "git_protocol"
-	if val, err := c.cfg.Get([]string{hosts, hostname, key}); err == nil {
-		return val
-	}
-
-	if val, ok := defaultFor(key); ok {
-		return val
-	}
-
-	// This should not happen, as we know there is a default value for this key.
-	// Perhaps it says something about our current default abstraction being not quite right?
-	// The defaults are also currently used to provide information about the config options.
-	return ""
-}
-
 func (c *AuthConfig) Hosts() []string {
 	if c.hostsOverride != nil {
 		return c.hostsOverride()
@@ -213,7 +236,7 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 // Login will set user, git protocol, and auth token for the given hostname.
 // If the encrypt option is specified it will first try to store the auth token
 // in encrypted storage and will fall back to the plain text config file.
-func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secureStorage bool) (bool, error) {
+func (c *AuthConfig) Login(hostname, username, token, protocol string, secureStorage bool) (bool, error) {
 	var setErr error
 	if secureStorage {
 		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
@@ -229,8 +252,8 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 
 	c.cfg.Set([]string{hosts, hostname, "user"}, username)
 
-	if gitProtocol != "" {
-		c.cfg.Set([]string{hosts, hostname, "git_protocol"}, gitProtocol)
+	if protocol != "" {
+		c.cfg.Set([]string{hosts, hostname, gitProtocol}, protocol)
 	}
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }
@@ -308,34 +331,34 @@ type ConfigOption struct {
 func ConfigOptions() []ConfigOption {
 	return []ConfigOption{
 		{
-			Key:           "git_protocol",
+			Key:           gitProtocol,
 			Description:   "the protocol to use for git clone and push operations",
 			DefaultValue:  "https",
 			AllowedValues: []string{"https", "ssh"},
 		},
 		{
-			Key:          "editor",
+			Key:          editor,
 			Description:  "the text editor program to use for authoring text",
 			DefaultValue: "",
 		},
 		{
-			Key:           "prompt",
+			Key:           prompt,
 			Description:   "toggle interactive prompting in the terminal",
 			DefaultValue:  "enabled",
 			AllowedValues: []string{"enabled", "disabled"},
 		},
 		{
-			Key:          "pager",
+			Key:          pager,
 			Description:  "the terminal pager program to send standard output to",
 			DefaultValue: "",
 		},
 		{
-			Key:          "http_unix_socket",
+			Key:          httpUnixSocket,
 			Description:  "the path to a Unix socket through which to make an HTTP connection",
 			DefaultValue: "",
 		},
 		{
-			Key:          "browser",
+			Key:          browser,
 			Description:  "the web browser to use for opening URLs",
 			DefaultValue: "",
 		},

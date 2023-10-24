@@ -158,17 +158,6 @@ func TestUserNotLoggedIn(t *testing.T) {
 	require.ErrorAs(t, err, &keyNotFoundError)
 }
 
-func TestGitProtocolNotLoggedInDefaults(t *testing.T) {
-	// Given we have not logged in
-	authCfg := newTestAuthConfig(t)
-
-	// When we get the git protocol
-	gitProtocol := authCfg.GitProtocol("github.com")
-
-	// Then it returns the default
-	require.Equal(t, "https", gitProtocol)
-}
-
 func TestHostsIncludesEnvVar(t *testing.T) {
 	// Given the GH_HOST env var is set
 	authCfg := newTestAuthConfig(t)
@@ -217,7 +206,7 @@ func TestDefaultHostLoggedInToOnlyOneHost(t *testing.T) {
 
 	// Then the returned host is that logged in host and the source is the hosts config
 	require.Equal(t, "ghe.io", defaultHost)
-	require.Equal(t, "hosts", source)
+	require.Equal(t, hosts, source)
 }
 
 func TestLoginSecureStorageUsesKeyring(t *testing.T) {
@@ -302,10 +291,11 @@ func TestLoginSetsGitProtocolForProvidedHost(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the git protocol
-	gitProtocol := authCfg.GitProtocol("github.com")
+	protocol, err := authCfg.cfg.Get([]string{hosts, "github.com", gitProtocol})
+	require.NoError(t, err)
 
 	// Then it returns the git protocol we provided on login
-	require.Equal(t, "ssh", gitProtocol)
+	require.Equal(t, "ssh", protocol)
 }
 
 func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
