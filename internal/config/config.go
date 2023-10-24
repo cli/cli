@@ -296,7 +296,12 @@ func fallbackConfig() *ghConfig.Config {
 	return ghConfig.ReadFromString(defaultConfigStr)
 }
 
+// The schema version in here should match the PostVersion of whatever the
+// last migration we decided to run is. Therefore, if we run a new migration,
+// this should be bumped.
 const defaultConfigStr = `
+# The current version of the config schema
+version: 1
 # What protocol to use when performing git operations. Supported values: ssh, https
 git_protocol: https
 # What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.

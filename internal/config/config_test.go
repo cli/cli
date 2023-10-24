@@ -22,6 +22,7 @@ func TestNewConfigProvidesFallback(t *testing.T) {
 	}
 	_, err := NewConfig()
 	require.NoError(t, err)
+	requireKeyWithValue(t, spiedCfg, []string{"version"}, "1")
 	requireKeyWithValue(t, spiedCfg, []string{"git_protocol"}, "https")
 	requireKeyWithValue(t, spiedCfg, []string{"editor"}, "")
 	requireKeyWithValue(t, spiedCfg, []string{"prompt"}, "enabled")
