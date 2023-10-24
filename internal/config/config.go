@@ -29,7 +29,7 @@ type Config interface {
 }
 
 func NewConfig() (Config, error) {
-	c, err := ghConfig.Read()
+	c, err := ghConfig.Read(fallbackConfig())
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (c *cfg) Authentication() *AuthConfig {
 }
 
 func defaultFor(key string) (string, bool) {
-	for _, co := range configOptions {
+	for _, co := range ConfigOptions() {
 		if co.Key == key {
 			return co.DefaultValue, true
 		}
@@ -276,6 +276,28 @@ func (a *AliasConfig) All() map[string]string {
 	return out
 }
 
+func fallbackConfig() *ghConfig.Config {
+	return ghConfig.ReadFromString(defaultConfigStr)
+}
+
+const defaultConfigStr = `
+# What protocol to use when performing git operations. Supported values: ssh, https
+git_protocol: https
+# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.
+editor:
+# When to interactively prompt. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
+prompt: enabled
+# A pager program to send command output to, e.g. "less". Set the value to "cat" to disable the pager.
+pager:
+# Aliases allow you to create nicknames for gh commands
+aliases:
+  co: pr checkout
+# The path to a unix socket through which send HTTP connections. If blank, HTTP traffic will be handled by net/http.DefaultTransport.
+http_unix_socket:
+# What web browser gh should use when opening URLs. If blank, will refer to environment.
+browser:
+`
+
 type ConfigOption struct {
 	Key           string
 	Description   string
@@ -283,43 +305,41 @@ type ConfigOption struct {
 	AllowedValues []string
 }
 
-var configOptions = []ConfigOption{
-	{
-		Key:           "git_protocol",
-		Description:   "the protocol to use for git clone and push operations",
-		DefaultValue:  "https",
-		AllowedValues: []string{"https", "ssh"},
-	},
-	{
-		Key:          "editor",
-		Description:  "the text editor program to use for authoring text",
-		DefaultValue: "",
-	},
-	{
-		Key:           "prompt",
-		Description:   "toggle interactive prompting in the terminal",
-		DefaultValue:  "enabled",
-		AllowedValues: []string{"enabled", "disabled"},
-	},
-	{
-		Key:          "pager",
-		Description:  "the terminal pager program to send standard output to",
-		DefaultValue: "",
-	},
-	{
-		Key:          "http_unix_socket",
-		Description:  "the path to a Unix socket through which to make an HTTP connection",
-		DefaultValue: "",
-	},
-	{
-		Key:          "browser",
-		Description:  "the web browser to use for opening URLs",
-		DefaultValue: "",
-	},
-}
-
 func ConfigOptions() []ConfigOption {
-	return configOptions
+	return []ConfigOption{
+		{
+			Key:           "git_protocol",
+			Description:   "the protocol to use for git clone and push operations",
+			DefaultValue:  "https",
+			AllowedValues: []string{"https", "ssh"},
+		},
+		{
+			Key:          "editor",
+			Description:  "the text editor program to use for authoring text",
+			DefaultValue: "",
+		},
+		{
+			Key:           "prompt",
+			Description:   "toggle interactive prompting in the terminal",
+			DefaultValue:  "enabled",
+			AllowedValues: []string{"enabled", "disabled"},
+		},
+		{
+			Key:          "pager",
+			Description:  "the terminal pager program to send standard output to",
+			DefaultValue: "",
+		},
+		{
+			Key:          "http_unix_socket",
+			Description:  "the path to a Unix socket through which to make an HTTP connection",
+			DefaultValue: "",
+		},
+		{
+			Key:          "browser",
+			Description:  "the web browser to use for opening URLs",
+			DefaultValue: "",
+		},
+	}
 }
 
 func HomeDirPath(subdir string) (string, error) {

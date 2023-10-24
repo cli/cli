@@ -20,7 +20,7 @@ func newTestAuthConfig(t *testing.T) *AuthConfig {
 	//
 	// This means that tests can't be isolated from each other, so
 	// we swap out the function here to return a new config each time.
-	ghConfig.Read = func() (*ghConfig.Config, error) {
+	ghConfig.Read = func(_ *ghConfig.Config) (*ghConfig.Config, error) {
 		return authCfg.cfg, nil
 	}
 
@@ -29,7 +29,7 @@ func newTestAuthConfig(t *testing.T) *AuthConfig {
 	//
 	// We should consider whether it makes sense to change that but in the meantime
 	// we can use GH_CONFIG_DIR env var to ensure the tests remain isolated.
-	t.Setenv("GH_CONFIG_DIR", t.TempDir())
+	StubWriteConfig(t)
 
 	return &authCfg
 }
