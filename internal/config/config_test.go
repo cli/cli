@@ -133,3 +133,35 @@ func TestGetOrDefaultNotFoundAndNoDefault(t *testing.T) {
 	require.ErrorAs(t, err, &keyNotFoundError)
 	require.Empty(t, val)
 }
+
+func TestFallbackConfig(t *testing.T) {
+	cfg := fallbackConfig()
+
+	protocol, err := cfg.Get([]string{"git_protocol"})
+	require.NoError(t, err)
+	require.Equal(t, "https", protocol)
+
+	editor, err := cfg.Get([]string{"editor"})
+	require.NoError(t, err)
+	require.Equal(t, "", editor)
+
+	prompt, err := cfg.Get([]string{"prompt"})
+	require.NoError(t, err)
+	require.Equal(t, "enabled", prompt)
+
+	pager, err := cfg.Get([]string{"pager"})
+	require.NoError(t, err)
+	require.Equal(t, "", pager)
+
+	socket, err := cfg.Get([]string{"http_unix_socket"})
+	require.NoError(t, err)
+	require.Equal(t, "", socket)
+
+	browser, err := cfg.Get([]string{"browser"})
+	require.NoError(t, err)
+	require.Equal(t, "", browser)
+
+	unknown, err := cfg.Get([]string{"unknown"})
+	require.EqualError(t, err, `could not find key "unknown"`)
+	require.Equal(t, "", unknown)
+}
