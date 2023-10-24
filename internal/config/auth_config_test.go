@@ -323,6 +323,23 @@ func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
 	require.Contains(t, hosts, "github.com")
 }
 
+// This test mimics the behaviour of logging in with a token and not providing
+// a git protocol.
+func TestLoginAddsUserToConfigWithoutGitProtocolOrSecureStorage(t *testing.T) {
+	// Given we are not logged in
+	authCfg := newTestAuthConfig(t)
+
+	// When we log in without git protocol or secure storage
+	keyring.MockInit()
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
+	require.NoError(t, err)
+
+	// Then the username is added under the users config
+	users, err := authCfg.cfg.Keys([]string{"hosts", "github.com", "users"})
+	require.NoError(t, err)
+	require.Contains(t, users, "test-user")
+}
+
 func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 	// Given we are logged into a host
 	keyring.MockInit()
