@@ -36,37 +36,37 @@ func NewFromString(cfgStr string) *ConfigMock {
 				return "github.com", "default"
 			},
 			hostsOverride: func() []string {
-				keys, _ := c.Keys([]string{hosts})
+				keys, _ := c.Keys([]string{hostsKey})
 				return keys
 			},
 			tokenOverride: func(hostname string) (string, string) {
-				token, _ := c.Get([]string{hosts, hostname, oauthToken})
-				return token, oauthToken
+				token, _ := c.Get([]string{hostsKey, hostname, oauthTokenKey})
+				return token, oauthTokenKey
 			},
 		}
 	}
 	mock.BrowserFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, browser)
+		val, _ := cfg.GetOrDefault(hostname, browserKey)
 		return val
 	}
 	mock.EditorFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, editor)
+		val, _ := cfg.GetOrDefault(hostname, editorKey)
 		return val
 	}
 	mock.GitProtocolFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, gitProtocol)
+		val, _ := cfg.GetOrDefault(hostname, gitProtocolKey)
 		return val
 	}
 	mock.HTTPUnixSocketFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, httpUnixSocket)
+		val, _ := cfg.GetOrDefault(hostname, httpUnixSocketKey)
 		return val
 	}
 	mock.PagerFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, pager)
+		val, _ := cfg.GetOrDefault(hostname, pagerKey)
 		return val
 	}
 	mock.PromptFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, prompt)
+		val, _ := cfg.GetOrDefault(hostname, promptKey)
 		return val
 	}
 	return mock

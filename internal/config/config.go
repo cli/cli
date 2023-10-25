@@ -10,15 +10,15 @@ import (
 )
 
 const (
-	aliases        = "aliases"
-	browser        = "browser"
-	editor         = "editor"
-	gitProtocol    = "git_protocol"
-	hosts          = "hosts"
-	httpUnixSocket = "http_unix_socket"
-	oauthToken     = "oauth_token"
-	pager          = "pager"
-	prompt         = "prompt"
+	aliasesKey        = "aliases"
+	browserKey        = "browser"
+	editorKey         = "editor"
+	gitProtocolKey    = "git_protocol"
+	hostsKey          = "hosts"
+	httpUnixSocketKey = "http_unix_socket"
+	oauthTokenKey     = "oauth_token"
+	pagerKey          = "pager"
+	promptKey         = "prompt"
 )
 
 // This interface describes interacting with some persistent configuration for gh.
@@ -54,7 +54,7 @@ type cfg struct {
 
 func (c *cfg) Get(hostname, key string) (string, error) {
 	if hostname != "" {
-		val, err := c.cfg.Get([]string{hosts, hostname, key})
+		val, err := c.cfg.Get([]string{hostsKey, hostname, key})
 		if err == nil {
 			return val, err
 		}
@@ -81,7 +81,7 @@ func (c *cfg) Set(hostname, key, value string) {
 		c.cfg.Set([]string{key}, value)
 		return
 	}
-	c.cfg.Set([]string{hosts, hostname, key}, value)
+	c.cfg.Set([]string{hostsKey, hostname, key}, value)
 }
 
 func (c *cfg) Write() error {
@@ -97,32 +97,32 @@ func (c *cfg) Authentication() *AuthConfig {
 }
 
 func (c *cfg) Browser(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, browser)
+	val, _ := c.GetOrDefault(hostname, browserKey)
 	return val
 }
 
 func (c *cfg) Editor(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, editor)
+	val, _ := c.GetOrDefault(hostname, editorKey)
 	return val
 }
 
 func (c *cfg) GitProtocol(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, gitProtocol)
+	val, _ := c.GetOrDefault(hostname, gitProtocolKey)
 	return val
 }
 
 func (c *cfg) HTTPUnixSocket(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, httpUnixSocket)
+	val, _ := c.GetOrDefault(hostname, httpUnixSocketKey)
 	return val
 }
 
 func (c *cfg) Pager(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, pager)
+	val, _ := c.GetOrDefault(hostname, pagerKey)
 	return val
 }
 
 func (c *cfg) Prompt(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, prompt)
+	val, _ := c.GetOrDefault(hostname, promptKey)
 	return val
 }
 
@@ -200,7 +200,7 @@ func (c *AuthConfig) TokenFromKeyring(hostname string) (string, error) {
 
 // User will retrieve the username for the logged in user at the given hostname.
 func (c *AuthConfig) User(hostname string) (string, error) {
-	return c.cfg.Get([]string{hosts, hostname, "user"})
+	return c.cfg.Get([]string{hostsKey, hostname, "user"})
 }
 
 func (c *AuthConfig) Hosts() []string {
@@ -236,24 +236,24 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 // Login will set user, git protocol, and auth token for the given hostname.
 // If the encrypt option is specified it will first try to store the auth token
 // in encrypted storage and will fall back to the plain text config file.
-func (c *AuthConfig) Login(hostname, username, token, protocol string, secureStorage bool) (bool, error) {
+func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secureStorage bool) (bool, error) {
 	var setErr error
 	if secureStorage {
 		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
 			// Clean up the previous oauth_token from the config file.
-			_ = c.cfg.Remove([]string{hosts, hostname, oauthToken})
+			_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
 		}
 	}
 	insecureStorageUsed := false
 	if !secureStorage || setErr != nil {
-		c.cfg.Set([]string{hosts, hostname, oauthToken}, token)
+		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
 		insecureStorageUsed = true
 	}
 
-	c.cfg.Set([]string{hosts, hostname, "user"}, username)
+	c.cfg.Set([]string{hostsKey, hostname, "user"}, username)
 
-	if protocol != "" {
-		c.cfg.Set([]string{hosts, hostname, gitProtocol}, protocol)
+	if gitProtocol != "" {
+		c.cfg.Set([]string{hostsKey, hostname, gitProtocolKey}, gitProtocol)
 	}
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }
@@ -261,7 +261,7 @@ func (c *AuthConfig) Login(hostname, username, token, protocol string, secureSto
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
 func (c *AuthConfig) Logout(hostname string) error {
-	_ = c.cfg.Remove([]string{hosts, hostname})
+	_ = c.cfg.Remove([]string{hostsKey, hostname})
 	_ = keyring.Delete(keyringServiceName(hostname), "")
 	return ghConfig.Write(c.cfg)
 }
@@ -275,25 +275,25 @@ type AliasConfig struct {
 }
 
 func (a *AliasConfig) Get(alias string) (string, error) {
-	return a.cfg.Get([]string{aliases, alias})
+	return a.cfg.Get([]string{aliasesKey, alias})
 }
 
 func (a *AliasConfig) Add(alias, expansion string) {
-	a.cfg.Set([]string{aliases, alias}, expansion)
+	a.cfg.Set([]string{aliasesKey, alias}, expansion)
 }
 
 func (a *AliasConfig) Delete(alias string) error {
-	return a.cfg.Remove([]string{aliases, alias})
+	return a.cfg.Remove([]string{aliasesKey, alias})
 }
 
 func (a *AliasConfig) All() map[string]string {
 	out := map[string]string{}
-	keys, err := a.cfg.Keys([]string{aliases})
+	keys, err := a.cfg.Keys([]string{aliasesKey})
 	if err != nil {
 		return out
 	}
 	for _, key := range keys {
-		val, _ := a.cfg.Get([]string{aliases, key})
+		val, _ := a.cfg.Get([]string{aliasesKey, key})
 		out[key] = val
 	}
 	return out
@@ -331,34 +331,34 @@ type ConfigOption struct {
 func ConfigOptions() []ConfigOption {
 	return []ConfigOption{
 		{
-			Key:           gitProtocol,
+			Key:           gitProtocolKey,
 			Description:   "the protocol to use for git clone and push operations",
 			DefaultValue:  "https",
 			AllowedValues: []string{"https", "ssh"},
 		},
 		{
-			Key:          editor,
+			Key:          editorKey,
 			Description:  "the text editor program to use for authoring text",
 			DefaultValue: "",
 		},
 		{
-			Key:           prompt,
+			Key:           promptKey,
 			Description:   "toggle interactive prompting in the terminal",
 			DefaultValue:  "enabled",
 			AllowedValues: []string{"enabled", "disabled"},
 		},
 		{
-			Key:          pager,
+			Key:          pagerKey,
 			Description:  "the terminal pager program to send standard output to",
 			DefaultValue: "",
 		},
 		{
-			Key:          httpUnixSocket,
+			Key:          httpUnixSocketKey,
 			Description:  "the path to a Unix socket through which to make an HTTP connection",
 			DefaultValue: "",
 		},
 		{
-			Key:          browser,
+			Key:          browserKey,
 			Description:  "the web browser to use for opening URLs",
 			DefaultValue: "",
 		},
