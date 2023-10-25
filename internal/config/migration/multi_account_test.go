@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config/migration"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/go-gh/v2/pkg/config"
 	"github.com/stretchr/testify/require"
+	"github.com/zalando/go-keyring"
 )
 
 func TestMigration(t *testing.T) {
@@ -83,6 +85,94 @@ hosts:
 
 	var m migration.MultiAccount
 	require.NoError(t, m.Do(cfg))
+}
+
+func TestMigrationReturnsSuccessfullyWhenAnonymousUserExists(t *testing.T) {
+	// Simulates config that gets generated when a user logs
+	// in with a token and git protocol is not specified and
+	// secure storage is used.
+	keyring.MockInit()
+	require.NoError(t, keyring.Set("gh:github.com", "", "test-token"))
+
+	cfg := config.ReadFromString(`
+hosts:
+  github.com:
+    user: x-access-token
+`)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query CurrentUser\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`),
+	)
+
+	m := migration.MultiAccount{Transport: reg}
+	require.NoError(t, m.Do(cfg))
+
+	require.Equal(t, "token test-token", reg.Requests[0].Header.Get("Authorization"))
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "user"}, "monalisa")
+	// monalisa key gets created with no value
+	users, err := cfg.Keys([]string{"hosts", "github.com", "users"})
+	require.NoError(t, err)
+	require.Equal(t, []string{"monalisa"}, users)
+}
+
+func TestMigrationReturnsSuccessfullyWhenAnonymousUserExistsAndGitProtocol(t *testing.T) {
+	// Simulates config that gets generated when a user logs
+	// in with a token and git protocol is specified and
+	// secure storage is used.
+	keyring.MockInit()
+	require.NoError(t, keyring.Set("gh:github.com", "", "test-token"))
+
+	cfg := config.ReadFromString(`
+hosts:
+  github.com:
+    user: x-access-token
+    git_protocol: ssh
+`)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query CurrentUser\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`),
+	)
+
+	m := migration.MultiAccount{Transport: reg}
+	require.NoError(t, m.Do(cfg))
+
+	require.Equal(t, "token test-token", reg.Requests[0].Header.Get("Authorization"))
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "user"}, "monalisa")
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "users", "monalisa", "git_protocol"}, "ssh")
+}
+
+func TestMigrationReturnsSuccessfullyWhenAnonymousUserExistsAndInsecureStorage(t *testing.T) {
+	// Simulates config that gets generated when a user logs
+	// in with a token and git protocol is specified and
+	// secure storage is not used.
+	cfg := config.ReadFromString(`
+hosts:
+  github.com:
+    user: x-access-token
+    oauth_token: test-token
+    git_protocol: ssh
+`)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query CurrentUser\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`),
+	)
+
+	m := migration.MultiAccount{Transport: reg}
+	require.NoError(t, m.Do(cfg))
+
+	require.Equal(t, "token test-token", reg.Requests[0].Header.Get("Authorization"))
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "user"}, "monalisa")
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "users", "monalisa", "oauth_token"}, "test-token")
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "users", "monalisa", "git_protocol"}, "ssh")
 }
 
 func requireKeyWithValue(t *testing.T, cfg *config.Config, keys []string, value string) {

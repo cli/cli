@@ -3,7 +3,10 @@ package migration
 import (
 	"errors"
 	"fmt"
+	"net/http"
 
+	"github.com/cli/cli/v2/internal/keyring"
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/cli/go-gh/v2/pkg/config"
 )
 
@@ -56,7 +59,10 @@ var hostsKey = []string{"hosts"}
 // breaking existing users of go-gh which looks at a specific location
 // in the config for oauth tokens that are stored insecurely.
 
-type MultiAccount struct{}
+type MultiAccount struct {
+	// Allow injecting a transport layer in tests.
+	Transport http.RoundTripper
+}
 
 func (m MultiAccount) PreVersion() string {
 	return ""
@@ -99,7 +105,31 @@ func (m MultiAccount) Do(c *config.Config) error {
 			return CowardlyRefusalError{fmt.Sprintf("couldn't get user name for %q", hostname)}
 		}
 
+		// When anonymous user exists get the user login.
+		if username == "x-access-token" {
+			var token string
+			token, err := c.Get(append(hostsKey, hostname, "oauth_token"))
+			if err != nil || token == "" {
+				token, err = keyring.Get(keyringServiceName(hostname), "")
+			}
+			if err != nil || token == "" {
+				return CowardlyRefusalError{fmt.Sprintf("couldn't find oauth token for %q", hostname)}
+			}
+			username, err = getUsername(m.Transport, hostname, token)
+			if err != nil {
+				return CowardlyRefusalError{fmt.Sprintf("couldn't retrieve logged in user for %q", hostname)}
+			}
+			c.Set(append(hostsKey, hostname, "user"), username)
+		}
+
+		c.Set(append(hostsKey, hostname, "users", username), "")
+
 		for _, configEntryKey := range configEntryKeys {
+			// Do not re-write the user key.
+			if configEntryKey == "user" {
+				continue
+			}
+
 			// We would expect that these keys map directly to values
 			// e.g. [williammartin, https, vim, gho_xyz...] but it's possible that a manually
 			// edited config file might nest further but we don't support that.
@@ -123,4 +153,27 @@ func (m MultiAccount) Do(c *config.Config) error {
 	}
 
 	return nil
+}
+
+func getUsername(transport http.RoundTripper, hostname, token string) (string, error) {
+	opts := ghAPI.ClientOptions{
+		Host:      hostname,
+		AuthToken: token,
+		Transport: transport,
+	}
+	client, err := ghAPI.NewGraphQLClient(opts)
+	if err != nil {
+		return "", err
+	}
+	var query struct {
+		Viewer struct {
+			Login string
+		}
+	}
+	err = client.Query("CurrentUser", &query, nil)
+	return query.Viewer.Login, err
+}
+
+func keyringServiceName(hostname string) string {
+	return "gh:" + hostname
 }
