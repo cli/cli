@@ -275,7 +275,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc123\n    users:\n        x-access-token:\n            oauth_token: abc123\n            git_protocol: https\n    user: x-access-token\n",
+			wantHosts: "github.com:\n    oauth_token: abc123\n    users:\n        x-access-token:\n            oauth_token: abc123\n    user: x-access-token\n",
 		},
 		{
 			name: "insecure with token and https git-protocol",
@@ -300,7 +300,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
 			},
-			wantHosts: "albert.wesker:\n    oauth_token: abc123\n    users:\n        x-access-token:\n            oauth_token: abc123\n            git_protocol: https\n    user: x-access-token\n",
+			wantHosts: "albert.wesker:\n    oauth_token: abc123\n    users:\n        x-access-token:\n            oauth_token: abc123\n    user: x-access-token\n",
 		},
 		{
 			name: "missing repo scope",
@@ -334,7 +334,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,admin:org"))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc456\n    users:\n        x-access-token:\n            oauth_token: abc456\n            git_protocol: https\n    user: x-access-token\n",
+			wantHosts: "github.com:\n    oauth_token: abc456\n    users:\n        x-access-token:\n            oauth_token: abc456\n    user: x-access-token\n",
 		},
 		{
 			name: "github.com token from environment",
@@ -383,7 +383,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			},
-			wantHosts:       "github.com:\n    user: x-access-token\n    users:\n        x-access-token:\n            git_protocol: https\n",
+			wantHosts:       "github.com:\n    user: x-access-token\n    users:\n        x-access-token:\n",
 			wantSecureToken: "abc123",
 		},
 	}

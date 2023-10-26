@@ -245,10 +245,15 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 
 	c.cfg.Set([]string{hosts, hostname, "user"}, username)
 
-	if gitProtocol == "" {
-		gitProtocol = c.GitProtocol(hostname)
+	if gitProtocol != "" {
+		c.cfg.Set([]string{hosts, hostname, "users", username, "git_protocol"}, gitProtocol)
 	}
-	c.cfg.Set([]string{hosts, hostname, "users", username, "git_protocol"}, gitProtocol)
+
+	// Create the username key with an empty value so it will be
+	// written even when there are no keys set under it.
+	if _, getErr := c.cfg.Get([]string{hosts, hostname, "users", username}); getErr != nil {
+		c.cfg.Set([]string{hosts, hostname, "users", username}, "")
+	}
 
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }

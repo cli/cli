@@ -122,6 +122,8 @@ func (m MultiAccount) Do(c *config.Config) error {
 			c.Set(append(hostsKey, hostname, "user"), username)
 		}
 
+		// Create the username key with an empty value so it will be
+		// written even if there are no keys set under it.
 		c.Set(append(hostsKey, hostname, "users", username), "")
 
 		for _, configEntryKey := range configEntryKeys {
