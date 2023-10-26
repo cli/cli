@@ -274,8 +274,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc123\n    users:\n        x-access-token:\n            oauth_token: abc123\n    user: x-access-token\n",
+			wantHosts: "github.com:\n    oauth_token: abc123\n    users:\n        monalisa:\n            oauth_token: abc123\n    user: monalisa\n",
 		},
 		{
 			name: "insecure with token and https git-protocol",
@@ -287,8 +290,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc123\n    users:\n        x-access-token:\n            oauth_token: abc123\n            git_protocol: https\n    user: x-access-token\n",
+			wantHosts: "github.com:\n    oauth_token: abc123\n    users:\n        monalisa:\n            oauth_token: abc123\n            git_protocol: https\n    user: monalisa\n",
 		},
 		{
 			name: "with token and non-default host",
@@ -299,8 +305,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "albert.wesker:\n    oauth_token: abc123\n    users:\n        x-access-token:\n            oauth_token: abc123\n    user: x-access-token\n",
+			wantHosts: "albert.wesker:\n    oauth_token: abc123\n    users:\n        monalisa:\n            oauth_token: abc123\n    user: monalisa\n",
 		},
 		{
 			name: "missing repo scope",
@@ -333,8 +342,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,admin:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc456\n    users:\n        x-access-token:\n            oauth_token: abc456\n    user: x-access-token\n",
+			wantHosts: "github.com:\n    oauth_token: abc456\n    users:\n        monalisa:\n            oauth_token: abc456\n    user: monalisa\n",
 		},
 		{
 			name: "github.com token from environment",
@@ -382,8 +394,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts:       "github.com:\n    user: x-access-token\n    users:\n        x-access-token:\n",
+			wantHosts:       "github.com:\n    user: monalisa\n    users:\n        monalisa:\n",
 			wantSecureToken: "abc123",
 		},
 	}

@@ -177,9 +177,9 @@ func Login(opts *LoginOptions) error {
 
 	if username == "" {
 		var err error
-		username, err = getCurrentLogin(httpClient, hostname, authToken)
+		username, err = GetCurrentLogin(httpClient, hostname, authToken)
 		if err != nil {
-			return fmt.Errorf("error using api: %w", err)
+			return fmt.Errorf("error retrieving current user: %w", err)
 		}
 	}
 
@@ -238,7 +238,7 @@ func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title strin
 	return add.SSHKeyUpload(httpClient, hostname, f, title)
 }
 
-func getCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {
+func GetCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {
 	query := `query UserCurrent{viewer{login}}`
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query})
 	if err != nil {
