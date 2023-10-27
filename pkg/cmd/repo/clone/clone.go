@@ -129,7 +129,7 @@ func cloneRun(opts *CloneOptions) error {
 			return err
 		}
 
-		protocol = cfg.Authentication().GitProtocol(repo.RepoHost())
+		protocol = cfg.GitProtocol(repo.RepoHost())
 	}
 
 	wantsWiki := strings.HasSuffix(repo.RepoName(), ".wiki")
@@ -163,7 +163,7 @@ func cloneRun(opts *CloneOptions) error {
 
 	// If the repo is a fork, add the parent as an upstream remote and set the parent as the default repo.
 	if canonicalRepo.Parent != nil {
-		protocol := cfg.Authentication().GitProtocol(canonicalRepo.Parent.RepoHost())
+		protocol := cfg.GitProtocol(canonicalRepo.Parent.RepoHost())
 		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
 		upstreamName := opts.UpstreamName

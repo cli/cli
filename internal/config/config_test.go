@@ -22,13 +22,13 @@ func TestNewConfigProvidesFallback(t *testing.T) {
 	}
 	_, err := NewConfig()
 	require.NoError(t, err)
-	requireKeyWithValue(t, spiedCfg, []string{"git_protocol"}, "https")
-	requireKeyWithValue(t, spiedCfg, []string{"editor"}, "")
-	requireKeyWithValue(t, spiedCfg, []string{"prompt"}, "enabled")
-	requireKeyWithValue(t, spiedCfg, []string{"pager"}, "")
-	requireKeyWithValue(t, spiedCfg, []string{"aliases", "co"}, "pr checkout")
-	requireKeyWithValue(t, spiedCfg, []string{"http_unix_socket"}, "")
-	requireKeyWithValue(t, spiedCfg, []string{"browser"}, "")
+	requireKeyWithValue(t, spiedCfg, []string{gitProtocolKey}, "https")
+	requireKeyWithValue(t, spiedCfg, []string{editorKey}, "")
+	requireKeyWithValue(t, spiedCfg, []string{promptKey}, "enabled")
+	requireKeyWithValue(t, spiedCfg, []string{pagerKey}, "")
+	requireKeyWithValue(t, spiedCfg, []string{aliasesKey, "co"}, "pr checkout")
+	requireKeyWithValue(t, spiedCfg, []string{httpUnixSocketKey}, "")
+	requireKeyWithValue(t, spiedCfg, []string{browserKey}, "")
 }
 
 func TestGetNonExistentKey(t *testing.T) {
@@ -101,12 +101,12 @@ func TestGetOrDefaultApplicationDefaults(t *testing.T) {
 		key             string
 		expectedDefault string
 	}{
-		{"git_protocol", "https"},
-		{"editor", ""},
-		{"prompt", "enabled"},
-		{"pager", ""},
-		{"http_unix_socket", ""},
-		{"browser", ""},
+		{gitProtocolKey, "https"},
+		{editorKey, ""},
+		{promptKey, "enabled"},
+		{pagerKey, ""},
+		{httpUnixSocketKey, ""},
+		{browserKey, ""},
 	}
 
 	for _, tt := range tests {
@@ -127,10 +127,10 @@ func TestGetOrDefaultApplicationDefaults(t *testing.T) {
 func TestGetOrDefaultExistingKey(t *testing.T) {
 	// Given have a top level config entry
 	cfg := newTestConfig()
-	cfg.Set("", "git_protocol", "ssh")
+	cfg.Set("", gitProtocolKey, "ssh")
 
 	// When we get that key
-	val, err := cfg.GetOrDefault("", "git_protocol")
+	val, err := cfg.GetOrDefault("", gitProtocolKey)
 
 	// Then it returns successfully with the correct value, and doesn't fall back
 	// to the default
@@ -153,12 +153,12 @@ func TestGetOrDefaultNotFoundAndNoDefault(t *testing.T) {
 
 func TestFallbackConfig(t *testing.T) {
 	cfg := fallbackConfig()
-	requireKeyWithValue(t, cfg, []string{"git_protocol"}, "https")
-	requireKeyWithValue(t, cfg, []string{"editor"}, "")
-	requireKeyWithValue(t, cfg, []string{"prompt"}, "enabled")
-	requireKeyWithValue(t, cfg, []string{"pager"}, "")
-	requireKeyWithValue(t, cfg, []string{"aliases", "co"}, "pr checkout")
-	requireKeyWithValue(t, cfg, []string{"http_unix_socket"}, "")
-	requireKeyWithValue(t, cfg, []string{"browser"}, "")
+	requireKeyWithValue(t, cfg, []string{gitProtocolKey}, "https")
+	requireKeyWithValue(t, cfg, []string{editorKey}, "")
+	requireKeyWithValue(t, cfg, []string{promptKey}, "enabled")
+	requireKeyWithValue(t, cfg, []string{pagerKey}, "")
+	requireKeyWithValue(t, cfg, []string{aliasesKey, "co"}, "pr checkout")
+	requireKeyWithValue(t, cfg, []string{httpUnixSocketKey}, "")
+	requireKeyWithValue(t, cfg, []string{browserKey}, "")
 	requireNoKey(t, cfg, []string{"unknown"})
 }

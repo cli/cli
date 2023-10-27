@@ -158,17 +158,6 @@ func TestUserNotLoggedIn(t *testing.T) {
 	require.ErrorAs(t, err, &keyNotFoundError)
 }
 
-func TestGitProtocolNotLoggedInDefaults(t *testing.T) {
-	// Given we have not logged in
-	authCfg := newTestAuthConfig(t)
-
-	// When we get the git protocol
-	gitProtocol := authCfg.GitProtocol("github.com")
-
-	// Then it returns the default
-	require.Equal(t, "https", gitProtocol)
-}
-
 func TestHostsIncludesEnvVar(t *testing.T) {
 	// Given the GH_HOST env var is set
 	authCfg := newTestAuthConfig(t)
@@ -217,7 +206,7 @@ func TestDefaultHostLoggedInToOnlyOneHost(t *testing.T) {
 
 	// Then the returned host is that logged in host and the source is the hosts config
 	require.Equal(t, "ghe.io", defaultHost)
-	require.Equal(t, "hosts", source)
+	require.Equal(t, hostsKey, source)
 }
 
 func TestLoginSecureStorageUsesKeyring(t *testing.T) {
@@ -241,14 +230,14 @@ func TestLoginSecureStorageRemovesOldInsecureConfigToken(t *testing.T) {
 	// Given a usable keyring and an oauth token in the config
 	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
-	authCfg.cfg.Set([]string{hosts, "github.com", oauthToken}, "old-token")
+	authCfg.cfg.Set([]string{hostsKey, "github.com", oauthTokenKey}, "old-token")
 
 	// When we login with secure storage
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
 
 	// Then it returns success, having also removed the old token from the config
 	require.NoError(t, err)
-	requireNoKey(t, authCfg.cfg, []string{hosts, "github.com", oauthToken})
+	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com", oauthTokenKey})
 }
 
 func TestLoginSecureStorageWithErrorFallsbackAndReports(t *testing.T) {
@@ -263,7 +252,7 @@ func TestLoginSecureStorageWithErrorFallsbackAndReports(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, insecureStorageUsed, "expected to use insecure storage")
-	requireKeyWithValue(t, authCfg.cfg, []string{hosts, "github.com", oauthToken}, "test-token")
+	requireKeyWithValue(t, authCfg.cfg, []string{hostsKey, "github.com", oauthTokenKey}, "test-token")
 }
 
 func TestLoginInsecureStorage(t *testing.T) {
@@ -277,7 +266,7 @@ func TestLoginInsecureStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, insecureStorageUsed, "expected to use insecure storage")
-	requireKeyWithValue(t, authCfg.cfg, []string{hosts, "github.com", oauthToken}, "test-token")
+	requireKeyWithValue(t, authCfg.cfg, []string{hostsKey, "github.com", oauthTokenKey}, "test-token")
 }
 
 func TestLoginSetsUserForProvidedHost(t *testing.T) {
@@ -302,10 +291,11 @@ func TestLoginSetsGitProtocolForProvidedHost(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the git protocol
-	gitProtocol := authCfg.GitProtocol("github.com")
+	protocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", gitProtocolKey})
+	require.NoError(t, err)
 
 	// Then it returns the git protocol we provided on login
-	require.Equal(t, "ssh", gitProtocol)
+	require.Equal(t, "ssh", protocol)
 }
 
 func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
@@ -334,7 +324,7 @@ func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 	// Then we return success, and the host and token are removed from the config and keyring
 	require.NoError(t, err)
 
-	requireNoKey(t, authCfg.cfg, []string{hosts, "github.com"})
+	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com"})
 	_, err = keyring.Get(keyringServiceName("github.com"), "")
 	require.ErrorIs(t, err, keyring.ErrNotFound)
 }

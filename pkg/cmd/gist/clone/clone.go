@@ -80,7 +80,7 @@ func cloneRun(opts *CloneOptions) error {
 			return err
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		protocol := cfg.Authentication().GitProtocol(hostname)
+		protocol := cfg.GitProtocol(hostname)
 		gistURL = formatRemoteURL(hostname, gistURL, protocol)
 	}
 
