@@ -312,7 +312,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			return fmt.Errorf("error creating codespace: %w", err)
 		}
 
-		codespace, err = a.handleAdditionalPermissions(ctx, createParams, aerr.AllowPermissionsURL, userInputs.Location)
+		codespace, err = a.handleAdditionalPermissions(ctx, createParams, aerr.AllowPermissionsURL)
 		if err != nil {
 			// this error could be a cmdutil.SilentError (in the case that the user opened the browser) so we don't want to wrap it
 			return err
@@ -336,7 +336,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	return nil
 }
 
-func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api.CreateCodespaceParams, allowPermissionsURL string, location string) (*api.Codespace, error) {
+func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api.CreateCodespaceParams, allowPermissionsURL string) (*api.Codespace, error) {
 	var (
 		isInteractive = a.io.CanPrompt()
 		cs            = a.io.ColorScheme()
@@ -380,41 +380,41 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 		if err := a.browser.Browse(allowPermissionsURL); err != nil {
 			return nil, fmt.Errorf("error opening browser: %w", err)
 		}
-	}
 
-	// Poll until the user has accepted the permissions or timeout
-	err := a.RunWithProgress("Waiting for permissions to be accepted in the browser", func() (err error) {
-		ctx, cancel := context.WithTimeout(ctx, permissionsPollingTimeout)
-		defer cancel()
+		// Poll until the user has accepted the permissions or timeout
+		err := a.RunWithProgress("Waiting for permissions to be accepted in the browser", func() (err error) {
+			ctx, cancel := context.WithTimeout(ctx, permissionsPollingTimeout)
+			defer cancel()
 
-		done := make(chan error, 1)
-		go func() {
-			for {
-				accepted, err := a.apiClient.GetCodespacesPermissionsCheck(ctx, createParams.RepositoryID, createParams.Branch, location, createParams.DevContainerPath)
-				if err != nil {
-					done <- err
-					return
+			done := make(chan error, 1)
+			go func() {
+				for {
+					accepted, err := a.apiClient.GetCodespacesPermissionsCheck(ctx, createParams.RepositoryID, createParams.Branch, createParams.DevContainerPath)
+					if err != nil {
+						done <- err
+						return
+					}
+
+					if accepted {
+						done <- nil
+						return
+					}
+
+					// Wait before polling again
+					time.Sleep(permissionsPollingInterval)
 				}
+			}()
 
-				if accepted {
-					done <- nil
-					return
-				}
-
-				// Wait before polling again
-				time.Sleep(permissionsPollingInterval)
+			select {
+			case err := <-done:
+				return err
+			case <-ctx.Done():
+				return fmt.Errorf("timed out waiting for permissions to be accepted in the browser")
 			}
-		}()
-
-		select {
-		case err := <-done:
-			return err
-		case <-ctx.Done():
-			return fmt.Errorf("timed out waiting for permissions to be accepted in the browser")
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error polling for permissions: %w", err)
 		}
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error polling for permissions: %w", err)
 	}
 
 	// if the user chose to create the codespace without the permissions,
@@ -422,7 +422,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	createParams.PermissionsOptOut = true
 
 	var codespace *api.Codespace
-	err = a.RunWithProgress("Creating codespace", func() (err error) {
+	err := a.RunWithProgress("Creating codespace", func() (err error) {
 		codespace, err = a.apiClient.CreateCodespace(ctx, createParams)
 		return
 	})
