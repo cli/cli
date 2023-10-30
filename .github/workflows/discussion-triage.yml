@@ -1,0 +1,28 @@
+name: Discussion Triage
+on:
+  issues:
+    types:
+      - labeled
+jobs:
+  add-comment:
+    if: github.event.label.name == 'discuss'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create a discussion in github/cli
+        run: |
+            export TITLE="Triage: $(gh issue view ${ISSUE_NUMBER} --json title --template {{.title}}) (#${ISSUE_NUMBER})"
+            gh api graphql -f query='
+              mutation($title: String!, $body: String!) {
+                createDiscussion(
+                    input: {repositoryId: "R_kgDODAqwpw", categoryId: "DIC_kwDODAqwp84CajJa", title: $title, body: $body}
+                ) {
+                    discussion {
+                      id
+                    }
+                  }
+              }' -f title="${TITLE}" -f body="@${LABELLER} added the discuss label to #${ISSUE_NUMBER}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_CLI_DISCUSSION_TRIAGE_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          LABELLER: ${{ github.event.sender.login }}
+
