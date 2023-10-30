@@ -362,6 +362,13 @@ on:
         options:
         - monalisa
         - cschleiden
+      favourite-animal:
+        type: choice
+        description: What's your favourite animal
+        required: true
+        options:
+        - dog
+        - cat
 jobs:
   greet:
   runs-on: ubuntu-latest
@@ -378,7 +385,6 @@ on:
       name:
         type: choice
         description: Who to greet
-        default: monalisa
         options:
 jobs:
   greet:
@@ -679,7 +685,7 @@ jobs:
 			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=workflow.yml\n",
 		},
 		{
-			name: "prompt-choice-ip",
+			name: "prompt, workflow choice input",
 			tty:  true,
 			opts: &RunOptions{
 				Prompt: true,
@@ -710,20 +716,25 @@ jobs:
 				pm.RegisterSelect("Select a workflow", []string{"choice inputs (workflow.yml)"}, func(_, _ string, opts []string) (int, error) {
 					return 0, nil
 				})
+				pm.RegisterSelect("favourite-animal (required)", []string{"dog", "cat"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
 				pm.RegisterSelect("name", []string{"monalisa", "cschleiden"}, func(_, _ string, opts []string) (int, error) {
 					return 0, nil
 				})
+
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
-					"name": "monalisa",
+					"name":             "monalisa",
+					"favourite-animal": "dog",
 				},
 				"ref": "trunk",
 			},
 			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=workflow.yml\n",
 		},
 		{
-			name: "prompt-choice-missing-ip",
+			name: "prompt, workflow choice missing input",
 			tty:  true,
 			opts: &RunOptions{
 				Prompt: true,
