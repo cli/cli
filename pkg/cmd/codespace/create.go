@@ -382,37 +382,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 		}
 
 		// Poll until the user has accepted the permissions or timeout
-		err := a.RunWithProgress("Waiting for permissions to be accepted in the browser", func() (err error) {
-			ctx, cancel := context.WithTimeout(ctx, permissionsPollingTimeout)
-			defer cancel()
-
-			done := make(chan error, 1)
-			go func() {
-				for {
-					accepted, err := a.apiClient.GetCodespacesPermissionsCheck(ctx, createParams.RepositoryID, createParams.Branch, createParams.DevContainerPath)
-					if err != nil {
-						done <- err
-						return
-					}
-
-					if accepted {
-						done <- nil
-						return
-					}
-
-					// Wait before polling again
-					time.Sleep(permissionsPollingInterval)
-				}
-			}()
-
-			select {
-			case err := <-done:
-				return err
-			case <-ctx.Done():
-				return fmt.Errorf("timed out waiting for permissions to be accepted in the browser")
-			}
-		})
-		if err != nil {
+		if err := a.pollForPermissions(ctx, createParams); err != nil {
 			return nil, fmt.Errorf("error polling for permissions: %w", err)
 		}
 	}
@@ -432,6 +402,39 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	}
 
 	return codespace, nil
+}
+
+func (a *App) pollForPermissions(ctx context.Context, createParams *api.CreateCodespaceParams) error {
+	return a.RunWithProgress("Waiting for permissions to be accepted in the browser", func() (err error) {
+		ctx, cancel := context.WithTimeout(ctx, permissionsPollingTimeout)
+		defer cancel()
+
+		done := make(chan error, 1)
+		go func() {
+			for {
+				accepted, err := a.apiClient.GetCodespacesPermissionsCheck(ctx, createParams.RepositoryID, createParams.Branch, createParams.DevContainerPath)
+				if err != nil {
+					done <- err
+					return
+				}
+
+				if accepted {
+					done <- nil
+					return
+				}
+
+				// Wait before polling again
+				time.Sleep(permissionsPollingInterval)
+			}
+		}()
+
+		select {
+		case err := <-done:
+			return err
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for permissions to be accepted in the browser")
+		}
+	})
 }
 
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
