@@ -69,6 +69,7 @@ type updateRepositoryInput struct {
 	RepositoryID     string `json:"repositoryId"`
 	HasWikiEnabled   bool   `json:"hasWikiEnabled"`
 	HasIssuesEnabled bool   `json:"hasIssuesEnabled"`
+	HomepageURL      string `json:"homepageUrl,omitempty"`
 }
 
 // repoCreate creates a new GitHub repository
@@ -140,12 +141,13 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			return nil, err
 		}
 
-		if !input.HasWikiEnabled || !input.HasIssuesEnabled {
+		if !input.HasWikiEnabled || !input.HasIssuesEnabled || input.HomepageURL != "" {
 			updateVariables := map[string]interface{}{
 				"input": updateRepositoryInput{
 					RepositoryID:     response.CloneTemplateRepository.Repository.ID,
 					HasWikiEnabled:   input.HasWikiEnabled,
 					HasIssuesEnabled: input.HasIssuesEnabled,
+					HomepageURL:      input.HomepageURL,
 				},
 			}
 

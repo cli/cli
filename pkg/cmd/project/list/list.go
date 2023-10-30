@@ -23,7 +23,6 @@ type listOpts struct {
 }
 
 type listConfig struct {
-	tp        *tableprinter.TablePrinter
 	client    *queries.Client
 	opts      listOpts
 	URLOpener func(string) error
@@ -52,9 +51,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 			URLOpener := func(url string) error {
 				return f.Browser.Browse(url)
 			}
-			t := tableprinter.New(f.IOStreams)
+
 			config := listConfig{
-				tp:        t,
 				client:    client,
 				opts:      opts,
 				URLOpener: URLOpener,
@@ -68,7 +66,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 			return runList(config)
 		},
 	}
-
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner")
 	listCmd.Flags().BoolVarP(&opts.closed, "closed", "", false, "Include closed projects")
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser")
@@ -157,23 +154,23 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 		return cmdutil.NewNoResultsError(fmt.Sprintf("No projects found for %s", owner))
 	}
 
-	config.tp.HeaderRow("Number", "Title", "State", "ID")
+	tp := tableprinter.New(config.io, tableprinter.WithHeader("Number", "Title", "State", "ID"))
 
 	for _, p := range projects {
-		config.tp.AddField(strconv.Itoa(int(p.Number)), tableprinter.WithTruncate(nil))
-		config.tp.AddField(p.Title)
+		tp.AddField(strconv.Itoa(int(p.Number)), tableprinter.WithTruncate(nil))
+		tp.AddField(p.Title)
 		var state string
 		if p.Closed {
 			state = "closed"
 		} else {
 			state = "open"
 		}
-		config.tp.AddField(state)
-		config.tp.AddField(p.ID, tableprinter.WithTruncate(nil))
-		config.tp.EndRow()
+		tp.AddField(state)
+		tp.AddField(p.ID, tableprinter.WithTruncate(nil))
+		tp.EndRow()
 	}
 
-	return config.tp.Render()
+	return tp.Render()
 }
 
 func printJSON(config listConfig, projects []queries.Project, totalCount int) error {

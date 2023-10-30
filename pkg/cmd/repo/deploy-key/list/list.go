@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -77,28 +76,21 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, deployKeys)
 	}
 
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	t := utils.NewTablePrinter(opts.IO)
+	t := tableprinter.New(opts.IO, tableprinter.WithHeader("ID", "TITLE", "TYPE", "KEY", "CREATED AT"))
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
 
 	for _, deployKey := range deployKeys {
 		sshID := strconv.Itoa(deployKey.ID)
-		t.AddField(sshID, nil, nil)
-		t.AddField(deployKey.Title, nil, nil)
-
+		t.AddField(sshID)
+		t.AddField(deployKey.Title)
 		sshType := "read-only"
 		if !deployKey.ReadOnly {
 			sshType = "read-write"
 		}
-		t.AddField(sshType, nil, nil)
-		t.AddField(deployKey.Key, truncateMiddle, nil)
-
-		createdAt := deployKey.CreatedAt.Format(time.RFC3339)
-		if t.IsTTY() {
-			createdAt = text.FuzzyAgoAbbr(now, deployKey.CreatedAt)
-		}
-		t.AddField(createdAt, nil, cs.Gray)
+		t.AddField(sshType)
+		t.AddField(deployKey.Key, tableprinter.WithTruncate(truncateMiddle))
+		t.AddTimeField(now, deployKey.CreatedAt, cs.Gray)
 		t.EndRow()
 	}
 

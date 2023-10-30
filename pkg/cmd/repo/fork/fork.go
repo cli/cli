@@ -243,7 +243,7 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol, _ := cfg.Get(repoToFork.RepoHost(), "git_protocol")
+	protocol := cfg.GitProtocol(repoToFork.RepoHost())
 
 	gitClient := opts.GitClient
 	ctx := context.Background()

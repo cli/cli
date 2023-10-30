@@ -18,7 +18,7 @@ func Test_run(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error reading `gh-issue-create.1`: %v", err)
 	}
-	if !strings.Contains(string(manPage), `\fB\fCgh issue create`) {
+	if !strings.Contains(string(manPage), `\fBgh issue create`) {
 		t.Fatal("man page corrupted")
 	}
 

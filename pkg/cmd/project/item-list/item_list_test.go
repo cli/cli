@@ -3,12 +3,12 @@ package itemlist
 import (
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -86,6 +86,115 @@ func TestNewCmdList(t *testing.T) {
 			assert.Equal(t, tt.wants.limit, gotOpts.limit)
 		})
 	}
+}
+
+func TestRunList_User_tty(t *testing.T) {
+	defer gock.Off()
+	// gock.Observe(gock.DumpRequest)
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// list project items
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserProjectWithItems.*",
+			"variables": map[string]interface{}{
+				"firstItems":  queries.LimitDefault,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+				"login":       "monalisa",
+				"number":      1,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"items": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"id": "issue ID",
+									"content": map[string]interface{}{
+										"__typename": "Issue",
+										"title":      "an issue",
+										"number":     1,
+										"repository": map[string]string{
+											"nameWithOwner": "cli/go-gh",
+										},
+									},
+								},
+								{
+									"id": "pull request ID",
+									"content": map[string]interface{}{
+										"__typename": "PullRequest",
+										"title":      "a pull request",
+										"number":     2,
+										"repository": map[string]string{
+											"nameWithOwner": "cli/go-gh",
+										},
+									},
+								},
+								{
+									"id": "draft issue ID",
+									"content": map[string]interface{}{
+										"title":      "draft issue",
+										"__typename": "DraftIssue",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	config := listConfig{
+		opts: listOpts{
+			number: 1,
+			owner:  "monalisa",
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Doc(`
+		TYPE         TITLE           NUMBER  REPOSITORY  ID
+		Issue        an issue        1       cli/go-gh   issue ID
+		PullRequest  a pull request  2       cli/go-gh   pull request ID
+		DraftIssue   draft issue                         draft issue ID
+  `), stdout.String())
 }
 
 func TestRunList_User(t *testing.T) {
@@ -178,7 +287,6 @@ func TestRunList_User(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
 			owner:  "monalisa",
@@ -285,7 +393,6 @@ func TestRunList_Org(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
 			owner:  "github",
@@ -382,7 +489,6 @@ func TestRunList_Me(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
 			owner:  "@me",

@@ -48,8 +48,9 @@ func TestListRun(t *testing.T) {
 				)
 			},
 			wantStdout: heredoc.Doc(`
-				1234  Mac            read-only   ssh-rsa AAAABbBB123  1d
-				5678  hubot@Windows  read-write  ssh-rsa EEEEEEEK247  1d
+				ID    TITLE          TYPE        KEY                  CREATED AT
+				1234  Mac            read-only   ssh-rsa AAAABbBB123  about 1 day ago
+				5678  hubot@Windows  read-write  ssh-rsa EEEEEEEK247  about 1 day ago
 			`),
 			wantStderr: "",
 		},

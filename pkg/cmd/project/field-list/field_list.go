@@ -23,7 +23,6 @@ type listOpts struct {
 
 type listConfig struct {
 	io     *iostreams.IOStreams
-	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   listOpts
 }
@@ -52,10 +51,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 				opts.number = int32(num)
 			}
 
-			t := tableprinter.New(f.IOStreams)
 			config := listConfig{
 				io:     f.IOStreams,
-				tp:     t,
 				client: client,
 				opts:   opts,
 			}
@@ -109,16 +106,16 @@ func printResults(config listConfig, fields []queries.ProjectField, login string
 		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for owner %s has no fields", config.opts.number, login))
 	}
 
-	config.tp.HeaderRow("Name", "Data type", "ID")
+	tp := tableprinter.New(config.io, tableprinter.WithHeader("Name", "Data type", "ID"))
 
 	for _, f := range fields {
-		config.tp.AddField(f.Name())
-		config.tp.AddField(f.Type())
-		config.tp.AddField(f.ID(), tableprinter.WithTruncate(nil))
-		config.tp.EndRow()
+		tp.AddField(f.Name())
+		tp.AddField(f.Type())
+		tp.AddField(f.ID(), tableprinter.WithTruncate(nil))
+		tp.EndRow()
 	}
 
-	return config.tp.Render()
+	return tp.Render()
 }
 
 func printJSON(config listConfig, project *queries.Project) error {

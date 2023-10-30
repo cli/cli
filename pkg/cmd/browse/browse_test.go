@@ -512,6 +512,20 @@ func Test_runBrowse(t *testing.T) {
 			wantsErr:      false,
 		},
 		{
+			name: "does not use relative path when has repo override",
+			opts: BrowseOptions{
+				SelectorArg:     "README.md",
+				HasRepoOverride: true,
+				PathFromRepoRoot: func() string {
+					return "pkg/cmd/browse/"
+				},
+			},
+			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
+			defaultBranch: "trunk",
+			expectedURL:   "https://github.com/bchadwic/gh-graph/tree/trunk/README.md",
+			wantsErr:      false,
+		},
+		{
 			name: "use special characters in selector arg",
 			opts: BrowseOptions{
 				SelectorArg: "?=hello world/ *:23-44",

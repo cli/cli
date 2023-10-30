@@ -10,33 +10,13 @@ import (
 )
 
 func NewBlankConfig() *ConfigMock {
-	defaultStr := `
-# What protocol to use when performing git operations. Supported values: ssh, https
-git_protocol: https
-# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.
-editor:
-# When to interactively prompt. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
-prompt: enabled
-# A pager program to send command output to, e.g. "less". Set the value to "cat" to disable the pager.
-pager:
-# Aliases allow you to create nicknames for gh commands
-aliases:
-  co: pr checkout
-# The path to a unix socket through which send HTTP connections. If blank, HTTP traffic will be handled by net/http.DefaultTransport.
-http_unix_socket:
-# What web browser gh should use when opening URLs. If blank, will refer to environment.
-browser:
-`
-	return NewFromString(defaultStr)
+	return NewFromString(defaultConfigStr)
 }
 
 func NewFromString(cfgStr string) *ConfigMock {
 	c := ghConfig.ReadFromString(cfgStr)
 	cfg := cfg{c}
 	mock := &ConfigMock{}
-	mock.GetFunc = func(host, key string) (string, error) {
-		return cfg.Get(host, key)
-	}
 	mock.GetOrDefaultFunc = func(host, key string) (string, error) {
 		return cfg.GetOrDefault(host, key)
 	}
@@ -56,14 +36,38 @@ func NewFromString(cfgStr string) *ConfigMock {
 				return "github.com", "default"
 			},
 			hostsOverride: func() []string {
-				keys, _ := c.Keys([]string{"hosts"})
+				keys, _ := c.Keys([]string{hostsKey})
 				return keys
 			},
 			tokenOverride: func(hostname string) (string, string) {
-				token, _ := c.Get([]string{hosts, hostname, oauthToken})
-				return token, "oauth_token"
+				token, _ := c.Get([]string{hostsKey, hostname, oauthTokenKey})
+				return token, oauthTokenKey
 			},
 		}
+	}
+	mock.BrowserFunc = func(hostname string) string {
+		val, _ := cfg.GetOrDefault(hostname, browserKey)
+		return val
+	}
+	mock.EditorFunc = func(hostname string) string {
+		val, _ := cfg.GetOrDefault(hostname, editorKey)
+		return val
+	}
+	mock.GitProtocolFunc = func(hostname string) string {
+		val, _ := cfg.GetOrDefault(hostname, gitProtocolKey)
+		return val
+	}
+	mock.HTTPUnixSocketFunc = func(hostname string) string {
+		val, _ := cfg.GetOrDefault(hostname, httpUnixSocketKey)
+		return val
+	}
+	mock.PagerFunc = func(hostname string) string {
+		val, _ := cfg.GetOrDefault(hostname, pagerKey)
+		return val
+	}
+	mock.PromptFunc = func(hostname string) string {
+		val, _ := cfg.GetOrDefault(hostname, promptKey)
+		return val
 	}
 	return mock
 }

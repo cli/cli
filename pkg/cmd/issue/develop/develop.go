@@ -199,7 +199,7 @@ func developRunList(opts *DevelopOptions, apiClient *api.Client, issueRepo ghrep
 
 func printLinkedBranches(io *iostreams.IOStreams, branches []api.LinkedBranch) {
 	cs := io.ColorScheme()
-	table := tableprinter.New(io)
+	table := tableprinter.New(io, tableprinter.WithHeader("BRANCH", "URL"))
 	for _, branch := range branches {
 		table.AddField(branch.BranchName, tableprinter.WithColor(cs.ColorFromString("cyan")))
 		table.AddField(branch.URL)

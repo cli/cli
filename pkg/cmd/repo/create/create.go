@@ -164,8 +164,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if cmd.Flags().Changed("enable-wiki") {
 				opts.DisableWiki = !enableWiki
 			}
-			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "") {
-				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, or `--team`")
+			if opts.Template != "" && opts.Team != "" {
+				return cmdutil.FlagErrorf("the `--template` option is not supported with `--team`")
 			}
 
 			if opts.Template == "" && opts.IncludeAllBranches {
@@ -395,11 +395,7 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
-		if err != nil {
-			return err
-		}
-
+		protocol := cfg.GitProtocol(repo.RepoHost())
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 		if !opts.AddReadme && opts.LicenseTemplate == "" && opts.GitIgnoreTemplate == "" && opts.Template == "" {
@@ -496,11 +492,7 @@ func createFromTemplate(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
-		if err != nil {
-			return err
-		}
-
+		protocol := cfg.GitProtocol(repo.RepoHost())
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 		if err := cloneWithRetry(opts, remoteURL, templateRepoMainBranch); err != nil {
@@ -622,11 +614,7 @@ func createFromLocal(opts *CreateOptions) error {
 		fmt.Fprintln(stdout, repo.URL)
 	}
 
-	protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
-	if err != nil {
-		return err
-	}
-
+	protocol := cfg.GitProtocol(repo.RepoHost())
 	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 	if opts.Interactive {

@@ -385,9 +385,10 @@ func TestRepoList_tty(t *testing.T) {
 
 		Showing 3 of 3 repositories in @octocat
 
-		octocat/hello-world  My first repository  public        8h
-		octocat/cli          GitHub CLI           public, fork  8h
-		octocat/testing                           private       7d
+		NAME                 DESCRIPTION          INFO          UPDATED
+		octocat/hello-world  My first repository  public        about 8 hours ago
+		octocat/cli          GitHub CLI           public, fork  about 8 hours ago
+		octocat/testing                           private       about 7 days ago
 	`), stdout.String())
 }
 
