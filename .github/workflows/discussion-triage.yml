@@ -1,4 +1,5 @@
 name: Discussion Triage
+run-name: ${{ github.event.issue.title }}
 on:
   issues:
     types:
@@ -10,19 +11,22 @@ jobs:
     steps:
       - name: Create a discussion in github/cli
         run: |
-            export TITLE="Triage: $(gh issue view ${ISSUE_NUMBER} --json title --template {{.title}}) (#${ISSUE_NUMBER})"
+            export DISCUSSION_TITLE="Triage: ${ISSUE_TITLE} (#${ISSUE_NUMBER})"
             gh api graphql -f query='
-              mutation($title: String!, $body: String!) {
+              mutation($repositoryId: String!, $categoryId: String!, $title: String!, $body: String!) {
                 createDiscussion(
-                    input: {repositoryId: "R_kgDODAqwpw", categoryId: "DIC_kwDODAqwp84CajJa", title: $title, body: $body}
+                    input: {repositoryId: $repositoryId, categoryId: $categoryId, title: $title, body: $body}
                 ) {
                     discussion {
                       id
                     }
                   }
-              }' -f title="${TITLE}" -f body="@${LABELLER} added the discuss label to #${ISSUE_NUMBER}"
+              }' -f title="${DISCUSSION_TITLE}" -f body="@${LABELLER} added the discuss label to #${ISSUE_NUMBER}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_CLI_DISCUSSION_TRIAGE_TOKEN }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           LABELLER: ${{ github.event.sender.login }}
+          GITHUB_CLI_REPOSITORY_ID: "R_kgDODAqwpw"
+          TRIAGE_CATEGORY_ID: "DIC_kwDODAqwp84CajJa"
 
