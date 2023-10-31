@@ -5,7 +5,7 @@ on:
     types:
       - labeled
 jobs:
-  add-comment:
+  create-discussion:
     if: github.event.label.name == 'discuss'
     runs-on: ubuntu-latest
     steps:
@@ -23,7 +23,7 @@ jobs:
                   }
               }' -f title="${DISCUSSION_TITLE}" -f body="@${LABELLER} added the discuss label to #${ISSUE_NUMBER}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_CLI_DISCUSSION_TRIAGE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CLI_DISCUSSION_TRIAGE_TOKEN }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           LABELLER: ${{ github.event.sender.login }}
