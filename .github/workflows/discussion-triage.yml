@@ -13,7 +13,7 @@ jobs:
         run: |
             export DISCUSSION_TITLE="Triage: ${ISSUE_TITLE} (#${ISSUE_NUMBER})"
             gh api graphql -f query='
-              mutation($repositoryId: String!, $categoryId: String!, $title: String!, $body: String!) {
+              mutation($repositoryId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
                 createDiscussion(
                     input: {repositoryId: $repositoryId, categoryId: $categoryId, title: $title, body: $body}
                 ) {
