@@ -217,7 +217,18 @@ func collectInputs(p iprompter, yamlContent []byte) (map[string]string, error) {
 
 	for _, input := range inputs {
 		var answer string
-		if input.Required {
+
+		if input.Type == "choice" {
+			name := input.Name
+			if input.Required {
+				name += " (required)"
+			}
+			selected, err := p.Select(name, input.Default, input.Options)
+			if err != nil {
+				return nil, err
+			}
+			answer = input.Options[selected]
+		} else if input.Required {
 			for answer == "" {
 				answer, err = p.Input(input.Name+" (required)", input.Default)
 				if err != nil {
@@ -234,7 +245,6 @@ func collectInputs(p iprompter, yamlContent []byte) (map[string]string, error) {
 
 		providedInputs[input.Name] = answer
 	}
-
 	return providedInputs, nil
 }
 
@@ -331,6 +341,8 @@ type WorkflowInput struct {
 	Required    bool
 	Default     string
 	Description string
+	Type        string
+	Options     []string
 }
 
 func findInputs(yamlContent []byte) ([]WorkflowInput, error) {
@@ -412,11 +424,16 @@ func findInputs(yamlContent []byte) ([]WorkflowInput, error) {
 	}
 
 	for name, input := range m {
+		if input.Type == "choice" && len(input.Options) == 0 {
+			return nil, fmt.Errorf("workflow input %q is of type choice, but has no options", name)
+		}
 		out = append(out, WorkflowInput{
 			Name:        name,
 			Default:     input.Default,
 			Description: input.Description,
 			Required:    input.Required,
+			Options:     input.Options,
+			Type:        input.Type,
 		})
 	}
 
