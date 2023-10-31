@@ -83,7 +83,7 @@ func NewCodespaceConnection(ctx context.Context, codespace *api.Codespace, httpC
 
 // Connect connects the client to the tunnel.
 func (c *CodespaceConnection) Connect(ctx context.Context) error {
-	// Lock the mutex to prevent connection races
+	// Lock the mutex to prevent race conditions with the underlying SSH connection
 	c.TunnelClient.mu.Lock()
 	defer c.TunnelClient.mu.Unlock()
 
@@ -105,7 +105,7 @@ func (c *CodespaceConnection) Connect(ctx context.Context) error {
 
 // Close closes the underlying tunnel client SSH connection.
 func (c *CodespaceConnection) Close() error {
-	// Lock the mutex to prevent connection races
+	// Lock the mutex to prevent race conditions with the underlying SSH connection
 	c.TunnelClient.mu.Lock()
 	defer c.TunnelClient.mu.Unlock()
 
