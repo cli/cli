@@ -20,7 +20,7 @@ const (
 type TunnelClient struct {
 	*tunnels.Client
 	connected bool
-	connectMu sync.Mutex
+	mu        sync.Mutex
 }
 
 type CodespaceConnection struct {
@@ -84,8 +84,8 @@ func NewCodespaceConnection(ctx context.Context, codespace *api.Codespace, httpC
 // Connect connects the client to the tunnel.
 func (c *CodespaceConnection) Connect(ctx context.Context) error {
 	// Lock the mutex to prevent connection races
-	c.TunnelClient.connectMu.Lock()
-	defer c.TunnelClient.connectMu.Unlock()
+	c.TunnelClient.mu.Lock()
+	defer c.TunnelClient.mu.Unlock()
 
 	// If already connected, return
 	if c.TunnelClient.connected {
@@ -105,6 +105,10 @@ func (c *CodespaceConnection) Connect(ctx context.Context) error {
 
 // Close closes the underlying tunnel client SSH connection.
 func (c *CodespaceConnection) Close() error {
+	// Lock the mutex to prevent connection races
+	c.TunnelClient.mu.Lock()
+	defer c.TunnelClient.mu.Unlock()
+
 	// Don't close if we're not connected
 	if c.TunnelClient != nil && c.TunnelClient.connected {
 		if err := c.TunnelClient.Close(); err != nil {
