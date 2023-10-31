@@ -21,7 +21,7 @@ jobs:
                       id
                     }
                   }
-              }' -f repositoryId="${GITHUB_CLI_REPOSITORY_ID}" -f categoryId="${TRIAGE_CATEGORY_ID}" -f title="${DISCUSSION_TITLE}" -f body="@${LABELLER} added the discuss label to #${ISSUE_NUMBER}"
+              }' -f repositoryId="${GITHUB_CLI_REPOSITORY_ID}" -f categoryId="${TRIAGE_CATEGORY_ID}" -f title="${DISCUSSION_TITLE}" -f body="@${LABELLER} added the discuss label to https://github.com/cli/cli/issues/${ISSUE_NUMBER}"
         env:
           GITHUB_TOKEN: ${{ secrets.CLI_DISCUSSION_TRIAGE_TOKEN }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
