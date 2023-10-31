@@ -11,12 +11,12 @@ import (
 )
 
 type CowardlyRefusalError struct {
-	Reason string
+	err error
 }
 
 func (e CowardlyRefusalError) Error() string {
 	// Consider whether we should add a call to action here like "open an issue with the contents of your redacted hosts.yml"
-	return fmt.Sprintf("cowardly refusing to continue with multi account migration: %s", e.Reason)
+	return fmt.Sprintf("cowardly refusing to continue with multi account migration: %s", e.err.Error())
 }
 
 var hostsKey = []string{"hosts"}
@@ -82,7 +82,7 @@ func (m MultiAccount) Do(c *config.Config) error {
 		return nil
 	}
 	if err != nil {
-		return CowardlyRefusalError{"couldn't get hosts configuration"}
+		return CowardlyRefusalError{errors.New("couldn't get hosts configuration")}
 	}
 
 	// If there are no hosts then it doesn't matter whether we migrate or not,
@@ -93,71 +93,47 @@ func (m MultiAccount) Do(c *config.Config) error {
 
 	// Otherwise let's get to the business of migrating!
 	for _, hostname := range hostnames {
-		configEntryKeys, err := c.Keys(append(hostsKey, hostname))
-		// e.g. [user, git_protocol, editor, ouath_token]
+		token, inKeyring, err := getToken(c, hostname)
 		if err != nil {
-			return CowardlyRefusalError{fmt.Sprintf("couldn't get host configuration despite %q existing", hostname)}
+			return CowardlyRefusalError{fmt.Errorf("couldn't find oauth token for %q: %w", hostname, err)}
 		}
 
-		// Get the user so that we can nest under it in future
-		username, err := c.Get(append(hostsKey, hostname, "user"))
+		username, err := getUsername(c, hostname, token, m.Transport)
 		if err != nil {
-			return CowardlyRefusalError{fmt.Sprintf("couldn't get user name for %q", hostname)}
+			return CowardlyRefusalError{fmt.Errorf("couldn't get user name for %q: %w", hostname, err)}
 		}
 
-		// When anonymous user exists get the user login.
-		if username == "x-access-token" {
-			var token string
-			token, err := c.Get(append(hostsKey, hostname, "oauth_token"))
-			if err != nil || token == "" {
-				token, err = keyring.Get(keyringServiceName(hostname), "")
-			}
-			if err != nil || token == "" {
-				return CowardlyRefusalError{fmt.Sprintf("couldn't find oauth token for %q", hostname)}
-			}
-			username, err = getUsername(m.Transport, hostname, token)
-			if err != nil {
-				return CowardlyRefusalError{fmt.Sprintf("couldn't retrieve logged in user for %q", hostname)}
-			}
-			c.Set(append(hostsKey, hostname, "user"), username)
+		if err := migrateToken(hostname, username, token, inKeyring); err != nil {
+			return CowardlyRefusalError{fmt.Errorf("couldn't not migrate oauth token for %q: %w", hostname, err)}
 		}
 
-		// Create the username key with an empty value so it will be
-		// written even if there are no keys set under it.
-		c.Set(append(hostsKey, hostname, "users", username), "")
-
-		for _, configEntryKey := range configEntryKeys {
-			// Do not re-write the user key.
-			if configEntryKey == "user" {
-				continue
-			}
-
-			// We would expect that these keys map directly to values
-			// e.g. [williammartin, https, vim, gho_xyz...] but it's possible that a manually
-			// edited config file might nest further but we don't support that.
-			//
-			// We could consider throwing away the nested values, but I suppose
-			// I'd rather make the user take a destructive action even if we have a backup.
-			// If they have configuration here, it's probably for a reason.
-			keys, err := c.Keys(append(hostsKey, hostname, configEntryKey))
-			if err == nil && len(keys) > 0 {
-				return CowardlyRefusalError{"hosts file has entries that are surprisingly deeply nested"}
-			}
-
-			configEntryValue, err := c.Get(append(hostsKey, hostname, configEntryKey))
-			if err != nil {
-				return CowardlyRefusalError{fmt.Sprintf("couldn't get configuration entry value despite %q / %q existing", hostname, configEntryKey)}
-			}
-
-			// Set these entries in their new location under the user
-			c.Set(append(hostsKey, hostname, "users", username, configEntryKey), configEntryValue)
+		if err := migrateConfig(c, hostname, username); err != nil {
+			return CowardlyRefusalError{fmt.Errorf("couldn't not migrate config for %q: %w", hostname, err)}
 		}
 	}
 
 	return nil
 }
 
-func getUsername(transport http.RoundTripper, hostname, token string) (string, error) {
+func getToken(c *config.Config, hostname string) (string, bool, error) {
+	if token, _ := c.Get(append(hostsKey, hostname, "oauth_token")); token != "" {
+		return token, false, nil
+	}
+	token, err := keyring.Get(keyringServiceName(hostname), "")
+	if err != nil {
+		return "", false, err
+	}
+	if token == "" {
+		return "", false, errors.New("token not found in config or keyring")
+	}
+	return token, true, nil
+}
+
+func getUsername(c *config.Config, hostname, token string, transport http.RoundTripper) (string, error) {
+	username, _ := c.Get(append(hostsKey, hostname, "user"))
+	if username != "" && username != "x-access-token" {
+		return username, nil
+	}
 	opts := ghAPI.ClientOptions{
 		Host:      hostname,
 		AuthToken: token,
@@ -174,6 +150,59 @@ func getUsername(transport http.RoundTripper, hostname, token string) (string, e
 	}
 	err = client.Query("CurrentUser", &query, nil)
 	return query.Viewer.Login, err
+}
+
+func migrateToken(hostname, username, token string, inKeyring bool) error {
+	// If token is not currently stored in the keyring do not migrate it,
+	// as it is being stored in the config and is being handled when
+	// when migrating the config.
+	if !inKeyring {
+		return nil
+	}
+	return keyring.Set(keyringServiceName(hostname), username, token)
+}
+
+func migrateConfig(c *config.Config, hostname, username string) error {
+	// Set the user key incase it was previously an anonymous user.
+	c.Set(append(hostsKey, hostname, "user"), username)
+	// Create the username key with an empty value so it will be
+	// written even if there are no keys set under it.
+	c.Set(append(hostsKey, hostname, "users", username), "")
+
+	// e.g. [user, git_protocol, editor, ouath_token]
+	configEntryKeys, err := c.Keys(append(hostsKey, hostname))
+	if err != nil {
+		return fmt.Errorf("couldn't get host configuration despite %q existing", hostname)
+	}
+
+	for _, configEntryKey := range configEntryKeys {
+		// Do not re-write process the user and users keys.
+		if configEntryKey == "user" || configEntryKey == "users" {
+			continue
+		}
+
+		// We would expect that these keys map directly to values
+		// e.g. [williammartin, https, vim, gho_xyz...] but it's possible that a manually
+		// edited config file might nest further but we don't support that.
+		//
+		// We could consider throwing away the nested values, but I suppose
+		// I'd rather make the user take a destructive action even if we have a backup.
+		// If they have configuration here, it's probably for a reason.
+		keys, err := c.Keys(append(hostsKey, hostname, configEntryKey))
+		if err == nil && len(keys) > 0 {
+			return errors.New("hosts file has entries that are surprisingly deeply nested")
+		}
+
+		configEntryValue, err := c.Get(append(hostsKey, hostname, configEntryKey))
+		if err != nil {
+			return fmt.Errorf("couldn't get configuration entry value despite %q / %q existing", hostname, configEntryKey)
+		}
+
+		// Set these entries in their new location under the user
+		c.Set(append(hostsKey, hostname, "users", username, configEntryKey), configEntryValue)
+	}
+
+	return nil
 }
 
 func keyringServiceName(hostname string) string {
