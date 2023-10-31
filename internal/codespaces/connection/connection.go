@@ -85,6 +85,7 @@ func NewCodespaceConnection(ctx context.Context, codespace *api.Codespace, httpC
 func (c *CodespaceConnection) Connect(ctx context.Context) error {
 	// Lock the mutex to prevent connection races
 	c.TunnelClient.connectMu.Lock()
+	defer c.TunnelClient.connectMu.Unlock()
 
 	// If already connected, return
 	if c.TunnelClient.connected {
@@ -98,9 +99,6 @@ func (c *CodespaceConnection) Connect(ctx context.Context) error {
 
 	// Set the connected flag so we know we're connected
 	c.TunnelClient.connected = true
-
-	// Unlock the mutex
-	c.TunnelClient.connectMu.Unlock()
 
 	return nil
 }
