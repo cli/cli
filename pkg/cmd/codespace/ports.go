@@ -66,6 +66,7 @@ func (a *App) ListPorts(ctx context.Context, selector *CodespaceSelector, export
 	if err != nil {
 		return fmt.Errorf("failed to create port forwarder: %w", err)
 	}
+	defer safeClose(fwd, &err)
 
 	var ports []*tunnels.TunnelPort
 	err = a.RunWithProgress("Fetching ports", func() (err error) {
@@ -246,6 +247,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, selector *CodespaceSelec
 	if err != nil {
 		return fmt.Errorf("failed to create port forwarder: %w", err)
 	}
+	defer safeClose(fwd, &err)
 
 	// TODO: check if port visibility can be updated in parallel instead of sequentially
 	for _, port := range ports {
@@ -337,6 +339,7 @@ func (a *App) ForwardPorts(ctx context.Context, selector *CodespaceSelector, por
 			if err != nil {
 				return fmt.Errorf("failed to create port forwarder: %w", err)
 			}
+			defer safeClose(fwd, &err)
 
 			opts := portforwarder.ForwardPortOpts{
 				Port: pair.remote,

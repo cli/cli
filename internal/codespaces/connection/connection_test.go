@@ -41,6 +41,12 @@ func TestNewCodespaceConnection(t *testing.T) {
 		t.Fatalf("NewCodespaceConnection returned an error: %v", err)
 	}
 
+	// Verify closing before connected doesn't throw
+	err = conn.Close()
+	if err != nil {
+		t.Fatalf("Close returned an error: %v", err)
+	}
+
 	// Check that the connection was created successfully
 	if conn == nil {
 		t.Fatal("NewCodespaceConnection returned nil")
