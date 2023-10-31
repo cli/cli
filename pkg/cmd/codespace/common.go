@@ -77,7 +77,7 @@ type apiClient interface {
 	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	GetCodespacesMachines(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) ([]*api.Machine, error)
-	GetCodespacesPermissionsCheck(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) (bool, error)
+	GetCodespacesPermissionsCheck(ctx context.Context, repoID int, branch string, devcontainerPath string) (bool, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
 	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
 	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
