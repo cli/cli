@@ -66,3 +66,11 @@ func Delete(service, user string) error {
 		return &TimeoutError{"timeout while trying to delete secret from keyring"}
 	}
 }
+
+func MockInit() {
+	keyring.MockInit()
+}
+
+func MockInitWithError(err error) {
+	keyring.MockInitWithError(err)
+}
