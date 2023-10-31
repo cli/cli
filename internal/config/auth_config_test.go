@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config/migration"
+	"github.com/cli/cli/v2/internal/keyring"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 	"github.com/stretchr/testify/require"
-	"github.com/zalando/go-keyring"
 )
 
 func newTestAuthConfig(t *testing.T) *AuthConfig {
@@ -104,7 +104,7 @@ func TestTokenFromKeyringNonExistent(t *testing.T) {
 	_, err := authCfg.TokenFromKeyring("github.com")
 
 	// Then it returns failure bubbling the ErrNotFound
-	require.ErrorIs(t, err, keyring.ErrNotFound)
+	require.ErrorContains(t, err, "secret not found in keyring")
 }
 
 func TestHasEnvTokenWithoutAnyEnvToken(t *testing.T) {
@@ -344,7 +344,7 @@ func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 
 	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com"})
 	_, err = keyring.Get(keyringServiceName("github.com"), "")
-	require.ErrorIs(t, err, keyring.ErrNotFound)
+	require.ErrorContains(t, err, "secret not found in keyring")
 }
 
 // Note that I'm not sure this test enforces particularly desirable behaviour
