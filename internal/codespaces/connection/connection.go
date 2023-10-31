@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/microsoft/dev-tunnels/go/tunnels"
@@ -19,6 +20,7 @@ const (
 type TunnelClient struct {
 	*tunnels.Client
 	connected bool
+	connectMu sync.Mutex
 }
 
 type CodespaceConnection struct {
@@ -81,6 +83,9 @@ func NewCodespaceConnection(ctx context.Context, codespace *api.Codespace, httpC
 
 // Connect connects the client to the tunnel.
 func (c *CodespaceConnection) Connect(ctx context.Context) error {
+	// Lock the mutex to prevent connection races
+	c.TunnelClient.connectMu.Lock()
+
 	// If already connected, return
 	if c.TunnelClient.connected {
 		return nil
@@ -93,6 +98,9 @@ func (c *CodespaceConnection) Connect(ctx context.Context) error {
 
 	// Set the connected flag so we know we're connected
 	c.TunnelClient.connected = true
+
+	// Unlock the mutex
+	c.TunnelClient.connectMu.Unlock()
 
 	return nil
 }
