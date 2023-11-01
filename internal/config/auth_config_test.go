@@ -340,17 +340,23 @@ func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 	// Given we are logged into a host
 	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
-	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", true)
+	host := "github.com"
+	user := "test-user"
+	token := "test-token"
+
+	_, err := authCfg.Login(host, user, token, "ssh", true)
 	require.NoError(t, err)
 
 	// When we logout
-	err = authCfg.Logout("github.com")
+	err = authCfg.Logout(host, user)
 
 	// Then we return success, and the host and token are removed from the config and keyring
 	require.NoError(t, err)
 
-	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com"})
-	_, err = keyring.Get(keyringServiceName("github.com"), "")
+	requireNoKey(t, authCfg.cfg, []string{hostsKey, host})
+	_, err = keyring.Get(keyringServiceName(host), "")
+	require.ErrorContains(t, err, "secret not found in keyring")
+	_, err = keyring.Get(keyringServiceName(host), user)
 	require.ErrorContains(t, err, "secret not found in keyring")
 }
 
@@ -368,7 +374,7 @@ func TestLogoutIgnoresErrorsFromConfigAndKeyring(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	// When we logout
-	err := authCfg.Logout("github.com")
+	err := authCfg.Logout("github.com", "test-user")
 
 	// Then it returns success anyway, suppressing the errors
 	require.NoError(t, err)
@@ -475,14 +481,18 @@ func TestTokenWorksRightAfterMigration(t *testing.T) {
 func TestLogoutRigthAfterMigrationRemovesHost(t *testing.T) {
 	// Given we have logged in before migration
 	authCfg := newTestAuthConfig(t)
-	_, err := preMigrationLogin(authCfg, "github.com", "test-user", "test-token", "ssh", false)
+	host := "github.com"
+	user := "test-user"
+	token := "test-token"
+
+	_, err := preMigrationLogin(authCfg, host, user, token, "ssh", false)
 	require.NoError(t, err)
 
 	// When we migrate and logout
 	var m migration.MultiAccount
 	require.NoError(t, Migrate(authCfg.cfg, m))
 
-	require.NoError(t, authCfg.Logout("github.com"))
+	require.NoError(t, authCfg.Logout(host, user))
 
 	// Then the host is removed from the config
 	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com"})

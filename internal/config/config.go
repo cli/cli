@@ -286,9 +286,10 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
-func (c *AuthConfig) Logout(hostname string) error {
+func (c *AuthConfig) Logout(hostname, username string) error {
 	_ = c.cfg.Remove([]string{hostsKey, hostname})
 	_ = keyring.Delete(keyringServiceName(hostname), "")
+	_ = keyring.Delete(keyringServiceName(hostname), username)
 	return ghConfig.Write(c.cfg)
 }
 
