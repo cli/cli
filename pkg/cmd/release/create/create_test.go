@@ -755,6 +755,69 @@ func Test_createRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
+			name:  "publish after uploading files, but do not mark as latest",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:      "v1.2.3",
+				Name:         "",
+				Body:         "",
+				BodyProvided: true,
+				Draft:        false,
+				IsLatest:     boolPtr(false),
+				Target:       "",
+				Assets: []*shared.AssetForUpload{
+					{
+						Name: "ball.tgz",
+						Open: func() (io.ReadCloser, error) {
+							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
+						},
+					},
+				},
+				Concurrency: 1,
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "")
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":    "v1.2.3",
+						"draft":       true,
+						"prerelease":  false,
+						"make_latest": "false",
+					}, params)
+				}))
+				reg.Register(httpmock.REST("POST", "assets/upload"), func(req *http.Request) (*http.Response, error) {
+					q := req.URL.Query()
+					assert.Equal(t, "ball.tgz", q.Get("name"))
+					assert.Equal(t, "", q.Get("label"))
+					return &http.Response{
+						StatusCode: 201,
+						Request:    req,
+						Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
+						Header: map[string][]string{
+							"Content-Type": {"application/json"},
+						},
+					}, nil
+				})
+				reg.Register(httpmock.REST("PATCH", "releases/123"), httpmock.RESTPayload(201, `{
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"draft":       false,
+						"make_latest": "false",
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final\n",
+			wantStderr: ``,
+		},
+		{
 			name:  "upload files but release already exists",
 			isTTY: true,
 			opts: CreateOptions{
