@@ -13,7 +13,7 @@ require (
 	github.com/cli/oauth v1.0.1
 	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.3
-	github.com/creack/pty v1.1.18
+	github.com/creack/pty v1.1.20
 	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/gdamore/tcell/v2 v2.5.4
 	github.com/google/go-cmp v0.5.9
