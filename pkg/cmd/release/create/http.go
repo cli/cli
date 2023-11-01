@@ -196,7 +196,7 @@ func publishRelease(httpClient *http.Client, releaseURL string, discussionCatego
 	}
 
 	if isLatest != nil {
-		params["make_latest"] = *isLatest
+		params["make_latest"] = fmt.Sprintf("%v", *isLatest)
 	}
 
 	bodyBytes, err := json.Marshal(params)
