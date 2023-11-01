@@ -23,7 +23,8 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 			items := make([]map[string]interface{}, 0, len(issue.ProjectItems.Nodes))
 			for _, n := range issue.ProjectItems.Nodes {
 				items = append(items, map[string]interface{}{
-					"title": n.Project.Title,
+					"status": n.Status,
+					"title":  n.Project.Title,
 				})
 			}
 			data[f] = items
@@ -108,7 +109,8 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 			items := make([]map[string]interface{}, 0, len(pr.ProjectItems.Nodes))
 			for _, n := range pr.ProjectItems.Nodes {
 				items = append(items, map[string]interface{}{
-					"title": n.Project.Title,
+					"status": n.Status,
+					"title":  n.Project.Title,
 				})
 			}
 			data[f] = items
