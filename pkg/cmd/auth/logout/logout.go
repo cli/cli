@@ -125,7 +125,7 @@ func logoutRun(opts *LogoutOptions) error {
 		usernameStr = fmt.Sprintf(" account '%s'", username)
 	}
 
-	if err := authCfg.Logout(hostname); err != nil {
+	if err := authCfg.Logout(hostname, username); err != nil {
 		return fmt.Errorf("failed to write config, authentication configuration not updated: %w", err)
 	}
 
