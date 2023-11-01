@@ -30,6 +30,13 @@ func Migrate(c *ghConfig.Config, m Migration) error {
 	// It is expected initially that there is no version key because we don't
 	// have one to begin with, so an error is expected.
 	version, _ := c.Get([]string{versionKey})
+
+	// If migration has already occured then do not attempt to migrate again.
+	if m.PostVersion() == version {
+		return nil
+	}
+
+	// If migration is incompatible with current version then return an error.
 	if m.PreVersion() != version {
 		return fmt.Errorf("failed to migrate as %q pre migration version did not match config version %q", m.PreVersion(), version)
 	}

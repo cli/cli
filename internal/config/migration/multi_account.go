@@ -103,12 +103,12 @@ func (m MultiAccount) Do(c *config.Config) error {
 			return CowardlyRefusalError{fmt.Errorf("couldn't get user name for %q: %w", hostname, err)}
 		}
 
-		if err := migrateToken(hostname, username, token, inKeyring); err != nil {
-			return CowardlyRefusalError{fmt.Errorf("couldn't not migrate oauth token for %q: %w", hostname, err)}
-		}
-
 		if err := migrateConfig(c, hostname, username); err != nil {
 			return CowardlyRefusalError{fmt.Errorf("couldn't not migrate config for %q: %w", hostname, err)}
+		}
+
+		if err := migrateToken(hostname, username, token, inKeyring); err != nil {
+			return CowardlyRefusalError{fmt.Errorf("couldn't not migrate oauth token for %q: %w", hostname, err)}
 		}
 	}
 
