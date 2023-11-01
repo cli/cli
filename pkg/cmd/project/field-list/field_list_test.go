@@ -3,7 +3,7 @@ package fieldlist
 import (
 	"testing"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -87,6 +87,101 @@ func TestNewCmdList(t *testing.T) {
 	}
 }
 
+func TestRunList_User_tty(t *testing.T) {
+	defer gock.Off()
+	// gock.Observe(gock.DumpRequest)
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// list project fields
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitDefault,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"fields": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2Field",
+									"name":       "FieldTitle",
+									"id":         "field ID",
+								},
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"name":       "Status",
+									"id":         "status ID",
+								},
+								{
+									"__typename": "ProjectV2IterationField",
+									"name":       "Iterations",
+									"id":         "iteration ID",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	config := listConfig{
+		opts: listOpts{
+			number: 1,
+			owner:  "monalisa",
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Doc(`
+		NAME        DATA TYPE                   ID
+		FieldTitle  ProjectV2Field              field ID
+		Status      ProjectV2SingleSelectField  status ID
+		Iterations  ProjectV2IterationField     iteration ID
+  `), stdout.String())
+}
+
 func TestRunList_User(t *testing.T) {
 	defer gock.Off()
 	// gock.Observe(gock.DumpRequest)
@@ -163,7 +258,6 @@ func TestRunList_User(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
 			owner:  "monalisa",
@@ -256,7 +350,6 @@ func TestRunList_Org(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
 			owner:  "github",
@@ -339,7 +432,6 @@ func TestRunList_Me(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
 			owner:  "@me",
@@ -406,7 +498,6 @@ func TestRunList_Empty(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number: 1,
 			owner:  "@me",

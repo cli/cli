@@ -77,3 +77,7 @@ func DisplayURL(urlStr string) string {
 func RemoveDiacritics(value string) string {
 	return text.RemoveDiacritics(value)
 }
+
+func PadRight(maxWidth int, s string) string {
+	return text.PadRight(maxWidth, s)
+}

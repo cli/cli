@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -91,6 +91,85 @@ func TestNewCmdlist(t *testing.T) {
 	}
 }
 
+func TestRunListTTY(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"nodes": []interface{}{
+							map[string]interface{}{
+								"title":            "Project 1",
+								"shortDescription": "Short description 1",
+								"url":              "url1",
+								"closed":           false,
+								"ID":               "id-1",
+								"number":           1,
+							},
+							map[string]interface{}{
+								"title":            "Project 2",
+								"shortDescription": "",
+								"url":              "url2",
+								"closed":           true,
+								"ID":               "id-2",
+								"number":           2,
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	config := listConfig{
+		opts: listOpts{
+			owner: "monalisa",
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Doc(`
+		NUMBER  TITLE      STATE  ID
+		1       Project 1  open   id-1
+  `), stdout.String())
+}
+
 func TestRunList(t *testing.T) {
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
@@ -154,7 +233,6 @@ func TestRunList(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			owner: "monalisa",
 		},
@@ -225,7 +303,6 @@ func TestRunList_Me(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			owner: "@me",
 		},
@@ -296,7 +373,6 @@ func TestRunListViewer(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp:     tableprinter.New(ios),
 		opts:   listOpts{},
 		client: client,
 		io:     ios,
@@ -374,7 +450,6 @@ func TestRunListOrg(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			owner: "github",
 		},
@@ -428,7 +503,6 @@ func TestRunListEmpty(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	config := listConfig{
-		tp:     tableprinter.New(ios),
 		opts:   listOpts{},
 		client: client,
 		io:     ios,
@@ -504,7 +578,6 @@ func TestRunListWithClosed(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(ios),
 		opts: listOpts{
 			owner:  "monalisa",
 			closed: true,

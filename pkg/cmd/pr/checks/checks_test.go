@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
@@ -167,7 +168,15 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someFailing.json"),
 				)
 			},
-			wantOut: "Some checks were not successful\n0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests     1m26s  sweet link\n✓  cool tests    1m26s  sweet link\n*  slow tests    1m26s  sweet link\n",
+			wantOut: heredoc.Doc(`
+				Some checks were not successful
+				0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks
+				
+				   NAME        DESCRIPTION  ELAPSED  URL
+				X  sad tests                1m26s    sweet link
+				✓  cool tests               1m26s    sweet link
+				*  slow tests               1m26s    sweet link
+			`),
 			wantErr: "SilentError",
 		},
 		{
@@ -179,7 +188,15 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someCancelled.json"),
 				)
 			},
-			wantOut: "Some checks were cancelled\n1 cancelled, 0 failing, 2 successful, 0 skipped, and 0 pending checks\n\n✓  cool tests       1m26s  sweet link\n-  sad tests        1m26s  sweet link\n✓  awesome tests    1m26s  sweet link\n",
+			wantOut: heredoc.Doc(`
+				Some checks were cancelled
+				1 cancelled, 0 failing, 2 successful, 0 skipped, and 0 pending checks
+				
+				   NAME           DESCRIPTION  ELAPSED  URL
+				✓  cool tests                  1m26s    sweet link
+				-  sad tests                   1m26s    sweet link
+				✓  awesome tests               1m26s    sweet link
+			`),
 			wantErr: "",
 		},
 		{
@@ -191,7 +208,16 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/somePending.json"),
 				)
 			},
-			wantOut: "Some checks are still pending\n1 cancelled, 0 failing, 2 successful, 0 skipped, and 1 pending checks\n\n✓  cool tests    1m26s  sweet link\n✓  rad tests     1m26s  sweet link\n*  slow tests    1m26s  sweet link\n-  sad tests     1m26s  sweet link\n",
+			wantOut: heredoc.Doc(`
+				Some checks are still pending
+				1 cancelled, 0 failing, 2 successful, 0 skipped, and 1 pending checks
+				
+				   NAME        DESCRIPTION  ELAPSED  URL
+				✓  cool tests               1m26s    sweet link
+				✓  rad tests                1m26s    sweet link
+				*  slow tests               1m26s    sweet link
+				-  sad tests                1m26s    sweet link
+			`),
 			wantErr: "PendingError",
 		},
 		{
@@ -203,7 +229,15 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/allPassing.json"),
 				)
 			},
-			wantOut: "All checks were successful\n0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests    1m26s  sweet link\n✓  cool tests       1m26s  sweet link\n✓  rad tests        1m26s  sweet link\n",
+			wantOut: heredoc.Doc(`
+				All checks were successful
+				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
+				
+				   NAME           DESCRIPTION  ELAPSED  URL
+				✓  awesome tests               1m26s    sweet link
+				✓  cool tests                  1m26s    sweet link
+				✓  rad tests                   1m26s    sweet link
+			`),
 			wantErr: "",
 		},
 		{
@@ -216,7 +250,22 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/allPassing.json"),
 				)
 			},
-			wantOut: "\x1b[?1049hAll checks were successful\n0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests    1m26s  sweet link\n✓  cool tests       1m26s  sweet link\n✓  rad tests        1m26s  sweet link\n\x1b[?1049lAll checks were successful\n0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests    1m26s  sweet link\n✓  cool tests       1m26s  sweet link\n✓  rad tests        1m26s  sweet link\n",
+			wantOut: heredoc.Docf(`
+				%[1]s[?1049hAll checks were successful
+				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
+				
+				   NAME           DESCRIPTION  ELAPSED  URL
+				✓  awesome tests               1m26s    sweet link
+				✓  cool tests                  1m26s    sweet link
+				✓  rad tests                   1m26s    sweet link
+				%[1]s[?1049lAll checks were successful
+				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
+
+				   NAME           DESCRIPTION  ELAPSED  URL
+				✓  awesome tests               1m26s    sweet link
+				✓  cool tests                  1m26s    sweet link
+				✓  rad tests                   1m26s    sweet link
+			`, "\x1b"),
 			wantErr: "",
 		},
 		{
@@ -230,7 +279,24 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someFailing.json"),
 				)
 			},
-			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing checks status every 0 seconds. Press Ctrl+C to quit.\n\nSome checks were not successful\n0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests     1m26s  sweet link\n✓  cool tests    1m26s  sweet link\n*  slow tests    1m26s  sweet link\n\x1b[?1049lSome checks were not successful\n0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests     1m26s  sweet link\n✓  cool tests    1m26s  sweet link\n*  slow tests    1m26s  sweet link\n",
+			wantOut: heredoc.Docf(`
+				%[1]s[?1049h%[1]s[0;0H%[1]s[JRefreshing checks status every 0 seconds. Press Ctrl+C to quit.
+				
+				Some checks were not successful
+				0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks
+				
+				   NAME        DESCRIPTION  ELAPSED  URL
+				X  sad tests                1m26s    sweet link
+				✓  cool tests               1m26s    sweet link
+				*  slow tests               1m26s    sweet link
+				%[1]s[?1049lSome checks were not successful
+				0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks
+				
+				   NAME        DESCRIPTION  ELAPSED  URL
+				X  sad tests                1m26s    sweet link
+				✓  cool tests               1m26s    sweet link
+				*  slow tests               1m26s    sweet link
+			`, "\x1b"),
 			wantErr: "SilentError",
 		},
 		{
@@ -242,7 +308,15 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withStatuses.json"),
 				)
 			},
-			wantOut: "Some checks were not successful\n0 cancelled, 1 failing, 2 successful, 0 skipped, and 0 pending checks\n\nX  a status             sweet link\n✓  cool tests    1m26s  sweet link\n✓  rad tests     1m26s  sweet link\n",
+			wantOut: heredoc.Doc(`
+				Some checks were not successful
+				0 cancelled, 1 failing, 2 successful, 0 skipped, and 0 pending checks
+				
+				   NAME        DESCRIPTION  ELAPSED  URL
+				X  a status                          sweet link
+				✓  cool tests               1m26s    sweet link
+				✓  rad tests                1m26s    sweet link
+			`),
 			wantErr: "SilentError",
 		},
 		{
@@ -320,7 +394,15 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someSkipping.json"),
 				)
 			},
-			wantOut: "All checks were successful\n0 cancelled, 0 failing, 1 successful, 2 skipped, and 0 pending checks\n\n✓  cool tests    1m26s  sweet link\n-  rad tests     1m26s  sweet link\n-  skip tests    1m26s  sweet link\n",
+			wantOut: heredoc.Doc(`
+				All checks were successful
+				0 cancelled, 0 failing, 1 successful, 2 skipped, and 0 pending checks
+				
+				   NAME        DESCRIPTION  ELAPSED  URL
+				✓  cool tests               1m26s    sweet link
+				-  rad tests                1m26s    sweet link
+				-  skip tests               1m26s    sweet link
+			`),
 			wantErr: "",
 		},
 		{
@@ -344,7 +426,13 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/onlyRequired.json"),
 				)
 			},
-			wantOut: "All checks were successful\n0 cancelled, 0 failing, 1 successful, 0 skipped, and 0 pending checks\n\n✓  cool tests    1m26s  sweet link\n",
+			wantOut: heredoc.Doc(`
+				All checks were successful
+				0 cancelled, 0 failing, 1 successful, 0 skipped, and 0 pending checks
+				
+				   NAME        DESCRIPTION  ELAPSED  URL
+				✓  cool tests               1m26s    sweet link
+			`),
 			wantErr: "",
 		},
 		{
@@ -393,7 +481,15 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withDescriptions.json"),
 				)
 			},
-			wantOut: "All checks were successful\n0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  awesome description  1m26s  sweet link\n✓  cool tests     cool description     1m26s  sweet link\n✓  rad tests      rad description      1m26s  sweet link\n",
+			wantOut: heredoc.Doc(`
+				All checks were successful
+				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
+				
+				   NAME           DESCRIPTION          ELAPSED  URL
+				✓  awesome tests  awesome description  1m26s    sweet link
+				✓  cool tests     cool description     1m26s    sweet link
+				✓  rad tests      rad description      1m26s    sweet link
+			`),
 			wantErr: "",
 		},
 		{
@@ -416,7 +512,14 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withEvents.json"),
 				)
 			},
-			wantOut: "All checks were successful\n0 cancelled, 0 failing, 2 successful, 0 skipped, and 0 pending checks\n\n✓  tests/cool tests (pull_request)  cool description  1m26s  sweet link\n✓  tests/cool tests (push)          cool description  1m26s  sweet link\n",
+			wantOut: heredoc.Doc(`
+				All checks were successful
+				0 cancelled, 0 failing, 2 successful, 0 skipped, and 0 pending checks
+				
+				   NAME                             DESCRIPTION       ELAPSED  URL
+				✓  tests/cool tests (pull_request)  cool description  1m26s    sweet link
+				✓  tests/cool tests (push)          cool description  1m26s    sweet link
+			`),
 			wantErr: "",
 		},
 		{
@@ -429,7 +532,13 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withoutEvents.json"),
 				)
 			},
-			wantOut: "All checks were successful\n0 cancelled, 0 failing, 1 successful, 0 skipped, and 0 pending checks\n\n✓  tests/cool tests  cool description  1m26s  sweet link\n",
+			wantOut: heredoc.Doc(`
+				All checks were successful
+				0 cancelled, 0 failing, 1 successful, 0 skipped, and 0 pending checks
+				
+				   NAME              DESCRIPTION       ELAPSED  URL
+				✓  tests/cool tests  cool description  1m26s    sweet link
+			`),
 			wantErr: "",
 		},
 		{

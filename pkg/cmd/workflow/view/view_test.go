@@ -176,10 +176,11 @@ func TestViewRun(t *testing.T) {
 
 		Total runs 10
 		Recent runs
-		X  cool commit  a workflow  trunk  push  1
-		*  cool commit  a workflow  trunk  push  2
-		✓  cool commit  a workflow  trunk  push  3
-		X  cool commit  a workflow  trunk  push  4
+		   TITLE        WORKFLOW    BRANCH  EVENT  ID
+		X  cool commit  a workflow  trunk   push   1
+		*  cool commit  a workflow  trunk   push   2
+		✓  cool commit  a workflow  trunk   push   3
+		X  cool commit  a workflow  trunk   push   4
 
 		To see more runs for this workflow, try: gh run list --workflow flow.yml
 		To see the YAML for this workflow, try: gh workflow view flow.yml --yaml

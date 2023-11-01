@@ -18,9 +18,10 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/search"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
+
+var alreadyInstalledError = errors.New("alreadyInstalledError")
 
 func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
@@ -215,9 +216,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return false
 					}
 
-					tp := tableprinter.New(io)
-					tp.HeaderRow("", "REPO", "DESCRIPTION")
-
+					tp := tableprinter.New(io, tableprinter.WithHeader("", "REPO", "DESCRIPTION"))
 					for _, repo := range result.Items {
 						if !strings.HasPrefix(repo.Name, "gh-") {
 							continue
@@ -268,8 +267,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return cmdutil.NewNoResultsError("no installed extensions found")
 				}
 				cs := io.ColorScheme()
-				//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-				t := utils.NewTablePrinter(io)
+				t := tableprinter.New(io, tableprinter.WithHeader("NAME", "REPO", "VERSION"))
 				for _, c := range cmds {
 					// TODO consider a Repo() on Extension interface
 					var repo string
@@ -279,13 +277,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						}
 					}
 
-					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
-					t.AddField(repo, nil, nil)
+					t.AddField(fmt.Sprintf("gh %s", c.Name()))
+					t.AddField(repo)
 					version := displayExtensionVersion(c, c.CurrentVersion())
 					if c.IsPinned() {
-						t.AddField(version, nil, cs.Cyan)
+						t.AddField(version, tableprinter.WithColor(cs.Cyan))
 					} else {
-						t.AddField(version, nil, nil)
+						t.AddField(version)
 					}
 
 					t.EndRow()
@@ -333,16 +331,22 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return err
 					}
 
-					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
+					cs := io.ColorScheme()
+
+					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName(), repo.RepoOwner()); err != nil {
 						// If an existing extension was found and --force was specified, attempt to upgrade.
 						if forceFlag && ext != nil {
 							return upgradeFunc(ext.Name(), forceFlag, false)
 						}
 
+						if errors.Is(err, alreadyInstalledError) {
+							fmt.Fprintf(io.ErrOut, "%s Extension %s is already installed\n", cs.WarningIcon(), ghrepo.FullName(repo))
+							return nil
+						}
+
 						return err
 					}
 
-					cs := io.ColorScheme()
 					if err := m.Install(repo, pinFlag); err != nil {
 						if errors.Is(err, releaseNotFoundErr) {
 							return fmt.Errorf("%s Could not find a release of %s for %s",
@@ -637,7 +641,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	return &extCmd
 }
 
-func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName string) (extensions.Extension, error) {
+func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName, extOwner string) (extensions.Extension, error) {
 	if !strings.HasPrefix(extName, "gh-") {
 		return nil, errors.New("extension repository name must start with `gh-`")
 	}
@@ -649,6 +653,9 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 
 	for _, ext := range m.List() {
 		if ext.Name() == commandName {
+			if ext.Owner() == extOwner {
+				return ext, alreadyInstalledError
+			}
 			return ext, fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
 		}
 	}

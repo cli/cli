@@ -9,16 +9,17 @@ import (
 )
 
 var (
-	magenta   = ansi.ColorFunc("magenta")
-	cyan      = ansi.ColorFunc("cyan")
-	red       = ansi.ColorFunc("red")
-	yellow    = ansi.ColorFunc("yellow")
-	blue      = ansi.ColorFunc("blue")
-	green     = ansi.ColorFunc("green")
-	gray      = ansi.ColorFunc("black+h")
-	bold      = ansi.ColorFunc("default+b")
-	cyanBold  = ansi.ColorFunc("cyan+b")
-	greenBold = ansi.ColorFunc("green+b")
+	magenta            = ansi.ColorFunc("magenta")
+	cyan               = ansi.ColorFunc("cyan")
+	red                = ansi.ColorFunc("red")
+	yellow             = ansi.ColorFunc("yellow")
+	blue               = ansi.ColorFunc("blue")
+	green              = ansi.ColorFunc("green")
+	gray               = ansi.ColorFunc("black+h")
+	lightGrayUnderline = ansi.ColorFunc("white+du")
+	bold               = ansi.ColorFunc("default+b")
+	cyanBold           = ansi.ColorFunc("cyan+b")
+	greenBold          = ansi.ColorFunc("green+b")
 
 	gray256 = func(t string) string {
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
@@ -37,6 +38,10 @@ type ColorScheme struct {
 	enabled      bool
 	is256enabled bool
 	hasTrueColor bool
+}
+
+func (c *ColorScheme) Enabled() bool {
+	return c.enabled
 }
 
 func (c *ColorScheme) Bold(t string) string {
@@ -102,6 +107,13 @@ func (c *ColorScheme) Gray(t string) string {
 
 func (c *ColorScheme) Grayf(t string, args ...interface{}) string {
 	return c.Gray(fmt.Sprintf(t, args...))
+}
+
+func (c *ColorScheme) LightGrayUnderline(t string) string {
+	if !c.enabled {
+		return t
+	}
+	return lightGrayUnderline(t)
 }
 
 func (c *ColorScheme) Magenta(t string) string {

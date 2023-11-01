@@ -23,7 +23,6 @@ type listOpts struct {
 
 type listConfig struct {
 	io     *iostreams.IOStreams
-	tp     *tableprinter.TablePrinter
 	client *queries.Client
 	opts   listOpts
 }
@@ -52,10 +51,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 				opts.number = int32(num)
 			}
 
-			t := tableprinter.New(f.IOStreams)
 			config := listConfig{
 				io:     f.IOStreams,
-				tp:     t,
 				client: client,
 				opts:   opts,
 			}
@@ -108,22 +105,22 @@ func printResults(config listConfig, items []queries.ProjectItem, login string) 
 		return cmdutil.NewNoResultsError(fmt.Sprintf("Project %d for owner %s has no items", config.opts.number, login))
 	}
 
-	config.tp.HeaderRow("Type", "Title", "Number", "Repository", "ID")
+	tp := tableprinter.New(config.io, tableprinter.WithHeader("Type", "Title", "Number", "Repository", "ID"))
 
 	for _, i := range items {
-		config.tp.AddField(i.Type())
-		config.tp.AddField(i.Title())
+		tp.AddField(i.Type())
+		tp.AddField(i.Title())
 		if i.Number() == 0 {
-			config.tp.AddField("")
+			tp.AddField("")
 		} else {
-			config.tp.AddField(strconv.Itoa(i.Number()))
+			tp.AddField(strconv.Itoa(i.Number()))
 		}
-		config.tp.AddField(i.Repo())
-		config.tp.AddField(i.ID(), tableprinter.WithTruncate(nil))
-		config.tp.EndRow()
+		tp.AddField(i.Repo())
+		tp.AddField(i.ID(), tableprinter.WithTruncate(nil))
+		tp.EndRow()
 	}
 
-	return config.tp.Render()
+	return tp.Render()
 }
 
 func printJSON(config listConfig, project *queries.Project) error {

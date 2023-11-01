@@ -361,7 +361,7 @@ func TestNewProject_nonTTY(t *testing.T) {
 func TestNewOwner_nonTTY(t *testing.T) {
 	client := NewTestClient()
 	_, err := client.NewOwner(false, "")
-	assert.EqualError(t, err, "login is required when not running interactively")
+	assert.EqualError(t, err, "owner is required when not running interactively")
 
 }
 
