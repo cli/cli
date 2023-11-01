@@ -810,7 +810,7 @@ func Test_createRun(t *testing.T) {
 				}`, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"draft":       false,
-						"make_latest": false,
+						"make_latest": "false",
 					}, params)
 				}))
 			},
