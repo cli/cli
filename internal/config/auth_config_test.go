@@ -214,17 +214,24 @@ func TestLoginSecureStorageUsesKeyring(t *testing.T) {
 	// Given a usable keyring
 	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
+	host := "github.com"
+	user := "test-user"
+	token := "test-token"
 
 	// When we login with secure storage
-	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
+	insecureStorageUsed, err := authCfg.Login(host, user, token, "", true)
 
 	// Then it returns success, notes that insecure storage was not used, and stores the token in the keyring
 	require.NoError(t, err)
 	require.False(t, insecureStorageUsed, "expected to use secure storage")
 
-	token, err := keyring.Get(keyringServiceName("github.com"), "")
+	gotToken, err := keyring.Get(keyringServiceName(host), "")
 	require.NoError(t, err)
-	require.Equal(t, "test-token", token)
+	require.Equal(t, token, gotToken)
+
+	gotToken, err = keyring.Get(keyringServiceName(host), user)
+	require.NoError(t, err)
+	require.Equal(t, token, gotToken)
 }
 
 func TestLoginSecureStorageRemovesOldInsecureConfigToken(t *testing.T) {

@@ -251,6 +251,9 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	var setErr error
 	if secureStorage {
 		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
+			setErr = keyring.Set(keyringServiceName(hostname), username, token)
+		}
+		if setErr == nil {
 			// Clean up the previous oauth_tokens from the config file.
 			_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
 			_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username, oauthTokenKey})
