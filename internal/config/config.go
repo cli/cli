@@ -107,7 +107,12 @@ func (c *cfg) Set(hostname, key, value string) {
 		c.cfg.Set([]string{key}, value)
 		return
 	}
+
 	c.cfg.Set([]string{hostsKey, hostname, key}, value)
+
+	if user, _ := c.cfg.Get([]string{hostsKey, hostname, userKey}); user != "" {
+		c.cfg.Set([]string{hostsKey, hostname, usersKey, user, key}, value)
+	}
 }
 
 func (c *cfg) Write() error {
