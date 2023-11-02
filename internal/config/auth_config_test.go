@@ -298,12 +298,19 @@ func TestLoginSetsGitProtocolForProvidedHost(t *testing.T) {
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
 
-	// When we get the git protocol
-	protocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", gitProtocolKey})
+	// When we get the host git protocol
+	hostProtocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", gitProtocolKey})
 	require.NoError(t, err)
 
 	// Then it returns the git protocol we provided on login
-	require.Equal(t, "ssh", protocol)
+	require.Equal(t, "ssh", hostProtocol)
+
+	// When we get the users git protocol
+	userProtocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", gitProtocolKey})
+	require.NoError(t, err)
+
+	// Then it returns the git protocol we provided on login
+	require.Equal(t, "ssh", userProtocol)
 }
 
 func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
@@ -535,12 +542,19 @@ func TestLoginPostMigrationSetsGitProtocol(t *testing.T) {
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
 
-	// When we get the git protocol
-	gitProtocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", gitProtocolKey})
+	// When we get the host git protocol
+	hostProtocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", gitProtocolKey})
 	require.NoError(t, err)
 
 	// Then it returns the git protocol we provided on login
-	require.Equal(t, "ssh", gitProtocol)
+	require.Equal(t, "ssh", hostProtocol)
+
+	// When we get the user git protocol
+	userProtocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", gitProtocolKey})
+	require.NoError(t, err)
+
+	// Then it returns the git protocol we provided on login
+	require.Equal(t, "ssh", userProtocol)
 }
 
 func TestLoginPostMigrationSetsUser(t *testing.T) {
