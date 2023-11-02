@@ -17,7 +17,8 @@ func TestMigrationAppliedSuccessfully(t *testing.T) {
 
 	// Given we have a migrator that writes some keys to the top level config
 	// and hosts key
-	cfg := ghConfig.ReadFromString(testFullConfig())
+	c := ghConfig.ReadFromString(testFullConfig())
+
 	topLevelKey := []string{"toplevelkey"}
 	newHostKey := []string{hostsKey, "newhost"}
 
@@ -28,11 +29,12 @@ func TestMigrationAppliedSuccessfully(t *testing.T) {
 	})
 
 	// When we run the migration
-	require.NoError(t, Migrate(cfg, migration))
+	conf := cfg{c}
+	require.NoError(t, conf.Migrate(migration))
 
 	// Then our original config is updated with the migration applied
-	requireKeyWithValue(t, cfg, topLevelKey, "toplevelvalue")
-	requireKeyWithValue(t, cfg, newHostKey, "newhostvalue")
+	requireKeyWithValue(t, c, topLevelKey, "toplevelvalue")
+	requireKeyWithValue(t, c, newHostKey, "newhostvalue")
 
 	// And our config / hosts changes are persisted to their relevant files
 	// Note that this is real janky. We have writers that represent the
@@ -54,8 +56,8 @@ func TestMigrationAppliedBumpsVersion(t *testing.T) {
 
 	// Given we have a migration with a pre version that matches
 	// the version in the config
-	cfg := ghConfig.ReadFromString(testFullConfig())
-	cfg.Set([]string{versionKey}, "expected-pre-version")
+	c := ghConfig.ReadFromString(testFullConfig())
+	c.Set([]string{versionKey}, "expected-pre-version")
 	topLevelKey := []string{"toplevelkey"}
 
 	migration := &MigrationMock{
@@ -72,11 +74,12 @@ func TestMigrationAppliedBumpsVersion(t *testing.T) {
 	}
 
 	// When we migrate
-	require.NoError(t, Migrate(cfg, migration))
+	conf := cfg{c}
+	require.NoError(t, conf.Migrate(migration))
 
 	// Then our original config is updated with the migration applied
-	requireKeyWithValue(t, cfg, topLevelKey, "toplevelvalue")
-	requireKeyWithValue(t, cfg, []string{versionKey}, "expected-post-version")
+	requireKeyWithValue(t, c, topLevelKey, "toplevelvalue")
+	requireKeyWithValue(t, c, []string{versionKey}, "expected-post-version")
 
 	// And our config / hosts changes are persisted to their relevant files
 	var configBuf bytes.Buffer
@@ -87,13 +90,40 @@ func TestMigrationAppliedBumpsVersion(t *testing.T) {
 	requireKeyWithValue(t, persistedCfg, []string{versionKey}, "expected-post-version")
 }
 
+func TestMigrationIsNoopWhenAlreadyApplied(t *testing.T) {
+	// Given we have a migration with a post version that matches
+	// the version in the config
+	c := ghConfig.ReadFromString(testFullConfig())
+	c.Set([]string{versionKey}, "expected-post-version")
+
+	migration := &MigrationMock{
+		DoFunc: func(config *ghConfig.Config) error {
+			return errors.New("is not called")
+		},
+		PreVersionFunc: func() string {
+			return "is not called"
+		},
+		PostVersionFunc: func() string {
+			return "expected-post-version"
+		},
+	}
+
+	// When we run Migrate
+	conf := cfg{c}
+	err := conf.Migrate(migration)
+
+	// Then there is nothing done and the config is not modified
+	require.NoError(t, err)
+	requireKeyWithValue(t, c, []string{versionKey}, "expected-post-version")
+}
+
 func TestMigrationErrorsWhenPreVersionMismatch(t *testing.T) {
 	StubWriteConfig(t)
 
 	// Given we have a migration with a pre version that does not match
 	// the version in the config
-	cfg := ghConfig.ReadFromString(testFullConfig())
-	cfg.Set([]string{versionKey}, "not-expected-pre-version")
+	c := ghConfig.ReadFromString(testFullConfig())
+	c.Set([]string{versionKey}, "not-expected-pre-version")
 	topLevelKey := []string{"toplevelkey"}
 
 	migration := &MigrationMock{
@@ -110,12 +140,13 @@ func TestMigrationErrorsWhenPreVersionMismatch(t *testing.T) {
 	}
 
 	// When we run Migrate
-	err := Migrate(cfg, migration)
+	conf := cfg{c}
+	err := conf.Migrate(migration)
 
 	// Then there is an error the migration is not applied and the version is not modified
 	require.ErrorContains(t, err, `failed to migrate as "expected-pre-version" pre migration version did not match config version "not-expected-pre-version"`)
-	requireNoKey(t, cfg, topLevelKey)
-	requireKeyWithValue(t, cfg, []string{versionKey}, "not-expected-pre-version")
+	requireNoKey(t, c, topLevelKey)
+	requireKeyWithValue(t, c, []string{versionKey}, "not-expected-pre-version")
 }
 
 func TestMigrationErrorWritesNoFiles(t *testing.T) {
@@ -123,13 +154,14 @@ func TestMigrationErrorWritesNoFiles(t *testing.T) {
 	t.Setenv("GH_CONFIG_DIR", tempDir)
 
 	// Given we have a migrator that errors
-	cfg := ghConfig.ReadFromString(testFullConfig())
+	c := ghConfig.ReadFromString(testFullConfig())
 	migration := mockMigration(func(config *ghConfig.Config) error {
 		return errors.New("failed to migrate in test")
 	})
 
 	// When we run the migration
-	err := Migrate(cfg, migration)
+	conf := cfg{c}
+	err := conf.Migrate(migration)
 
 	// Then the error is wrapped and bubbled
 	require.EqualError(t, err, "failed to migrate config: failed to migrate in test")
@@ -166,18 +198,19 @@ func TestMigrationWriteErrors(t *testing.T) {
 			// Given we error when writing the files (because we chmod the files as trickery)
 			makeFileUnwriteable(t, filepath.Join(tempDir, tt.unwriteableFile))
 
-			cfg := ghConfig.ReadFromString(testFullConfig())
+			c := ghConfig.ReadFromString(testFullConfig())
 			topLevelKey := []string{"toplevelkey"}
 			hostsKey := []string{hostsKey, "newhost"}
 
-			migration := mockMigration(func(c *ghConfig.Config) error {
-				c.Set(topLevelKey, "toplevelvalue")
-				c.Set(hostsKey, "newhostvalue")
+			migration := mockMigration(func(someCfg *ghConfig.Config) error {
+				someCfg.Set(topLevelKey, "toplevelvalue")
+				someCfg.Set(hostsKey, "newhostvalue")
 				return nil
 			})
 
 			// When we run the migration
-			err := Migrate(cfg, migration)
+			conf := cfg{c}
+			err := conf.Migrate(migration)
 
 			// Then the error is wrapped and bubbled
 			require.ErrorContains(t, err, tt.wantErrContains)

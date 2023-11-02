@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmd/root"
@@ -57,7 +58,8 @@ func mainRun() exitCode {
 	ctx := context.Background()
 
 	if cfg, err := cmdFactory.Config(); err == nil {
-		if err := cfg.MigrateMultiAccount(); err != nil {
+		var m migration.MultiAccount
+		if err := cfg.Migrate(m); err != nil {
 			fmt.Fprintf(stderr, "failed to migrate configuration: %s\n", err)
 			return exitError
 		}
