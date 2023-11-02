@@ -322,6 +322,10 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	c.cfg.Set([]string{hostsKey, hostname, userKey}, username)
 
 	if gitProtocol != "" {
+		// Set the git protocol
+		c.cfg.Set([]string{hostsKey, hostname, gitProtocolKey}, gitProtocol)
+		// And set the git protocol under the user to support later auth switch
+		// and logout switch without another migration.
 		c.cfg.Set([]string{hostsKey, hostname, usersKey, username, gitProtocolKey}, gitProtocol)
 	}
 
