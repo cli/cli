@@ -319,13 +319,13 @@ func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
 	require.Contains(t, hosts, "github.com")
 }
 
-// This test mimics the behaviour of logging in with a token and not providing
-// a git protocol.
-func TestLoginAddsUserToConfigWithoutGitProtocolOrSecureStorage(t *testing.T) {
+// This test mimics the behaviour of logging in with a token, not providing
+// a git protocol, and using secure storage.
+func TestLoginAddsUserToConfigWithoutGitProtocolAndWithSecureStorage(t *testing.T) {
 	// Given we are not logged in
 	authCfg := newTestAuthConfig(t)
 
-	// When we log in without git protocol or secure storage
+	// When we log in without git protocol and with secure storage
 	keyring.MockInit()
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
 	require.NoError(t, err)
@@ -407,7 +407,8 @@ func TestUserWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccount
-	require.NoError(t, Migrate(authCfg.cfg, m))
+	c := cfg{authCfg.cfg}
+	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the user correctly
 	user, err := authCfg.User("github.com")
@@ -423,7 +424,8 @@ func TestGitProtocolWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccount
-	require.NoError(t, Migrate(authCfg.cfg, m))
+	c := cfg{authCfg.cfg}
+	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the git protocol correctly
 	gitProtocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", gitProtocolKey})
@@ -439,7 +441,8 @@ func TestHostsWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccount
-	require.NoError(t, Migrate(authCfg.cfg, m))
+	c := cfg{authCfg.cfg}
+	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the hosts correctly
 	hosts := authCfg.Hosts()
@@ -454,7 +457,8 @@ func TestDefaultHostWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccount
-	require.NoError(t, Migrate(authCfg.cfg, m))
+	c := cfg{authCfg.cfg}
+	require.NoError(t, c.Migrate(m))
 
 	// Then the default host is still the enterprise host
 	defaultHost, source := authCfg.DefaultHost()
@@ -470,7 +474,8 @@ func TestTokenWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccount
-	require.NoError(t, Migrate(authCfg.cfg, m))
+	c := cfg{authCfg.cfg}
+	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the token correctly
 	token, source := authCfg.Token("github.com")
@@ -490,7 +495,8 @@ func TestLogoutRigthAfterMigrationRemovesHost(t *testing.T) {
 
 	// When we migrate and logout
 	var m migration.MultiAccount
-	require.NoError(t, Migrate(authCfg.cfg, m))
+	c := cfg{authCfg.cfg}
+	require.NoError(t, c.Migrate(m))
 
 	require.NoError(t, authCfg.Logout(host, user))
 
@@ -504,7 +510,8 @@ func TestLoginInsecurePostMigrationUsesConfigForToken(t *testing.T) {
 
 	// When we migrate and login with insecure storage
 	var m migration.MultiAccount
-	require.NoError(t, Migrate(authCfg.cfg, m))
+	c := cfg{authCfg.cfg}
+	require.NoError(t, c.Migrate(m))
 
 	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
 
@@ -522,7 +529,8 @@ func TestLoginPostMigrationSetsGitProtocol(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	var m migration.MultiAccount
-	require.NoError(t, Migrate(authCfg.cfg, m))
+	c := cfg{authCfg.cfg}
+	require.NoError(t, c.Migrate(m))
 
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
@@ -540,7 +548,8 @@ func TestLoginPostMigrationSetsUser(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	var m migration.MultiAccount
-	require.NoError(t, Migrate(authCfg.cfg, m))
+	c := cfg{authCfg.cfg}
+	require.NoError(t, c.Migrate(m))
 
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
 	require.NoError(t, err)
@@ -561,7 +570,8 @@ func TestLoginSecurePostMigrationRemovesTokenFromConfig(t *testing.T) {
 
 	// When we migrate and login again with secure storage
 	var m migration.MultiAccount
-	require.NoError(t, Migrate(authCfg.cfg, m))
+	c := cfg{authCfg.cfg}
+	require.NoError(t, c.Migrate(m))
 
 	keyring.MockInit()
 	_, err = authCfg.Login("github.com", "test-user", "test-token", "", true)
