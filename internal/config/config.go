@@ -1,10 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/keyring"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
@@ -32,6 +32,7 @@ type Config interface {
 	GetOrDefault(string, string) (string, error)
 	Set(string, string, string)
 	Write() error
+	Migrate(Migration) error
 
 	Aliases() *AliasConfig
 	Authentication() *AuthConfig
@@ -41,8 +42,27 @@ type Config interface {
 	HTTPUnixSocket(string) string
 	Pager(string) string
 	Prompt(string) string
+	Version() string
+}
 
-	MigrateMultiAccount() error
+// Migration is the interace that config migrations must implement.
+//
+// Migrations will receive a copy of the config, and should modify that copy
+// as necessary. After migration has completed, the modified config contents
+// will be used.
+//
+// The calling code is expected to verify that the current version of the config
+// matches the PreVersion of the migration before calling Do, and will set the
+// config version to the PostVersion after the migration has completed successfully.
+//
+//go:generate moq -rm -out migration_mock.go . Migration
+type Migration interface {
+	// PreVersion is the required config version for this to be applied
+	PreVersion() string
+	// PostVersion is the config version that must be applied after migration
+	PostVersion() string
+	// Do is expected to apply any necessary changes to the config in place
+	Do(*ghConfig.Config) error
 }
 
 func NewConfig() (Config, error) {
@@ -132,9 +152,36 @@ func (c *cfg) Prompt(hostname string) string {
 	return val
 }
 
-func (c *cfg) MigrateMultiAccount() error {
-	var m migration.MultiAccount
-	return Migrate(c.cfg, m)
+func (c *cfg) Version() string {
+	val, _ := c.GetOrDefault("", versionKey)
+	return val
+}
+
+func (c *cfg) Migrate(m Migration) error {
+	version := c.Version()
+
+	// If migration has already occured then do not attempt to migrate again.
+	if m.PostVersion() == version {
+		return nil
+	}
+
+	// If migration is incompatible with current version then return an error.
+	if m.PreVersion() != version {
+		return fmt.Errorf("failed to migrate as %q pre migration version did not match config version %q", m.PreVersion(), version)
+	}
+
+	if err := m.Do(c.cfg); err != nil {
+		return fmt.Errorf("failed to migrate config: %s", err)
+	}
+
+	c.Set("", versionKey, m.PostVersion())
+
+	// Then write out our migrated config.
+	if err := c.Write(); err != nil {
+		return fmt.Errorf("failed to write config after migration: %s", err)
+	}
+
+	return nil
 }
 
 func defaultFor(key string) (string, bool) {
@@ -250,7 +297,10 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secureStorage bool) (bool, error) {
 	var setErr error
 	if secureStorage {
+		// Set the current active oauth token
 		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
+			// And set the oauth token under the user to support later auth switch
+			// and logout switch without another migration.
 			setErr = keyring.Set(keyringServiceName(hostname), username, token)
 		}
 		if setErr == nil {

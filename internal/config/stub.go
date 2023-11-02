@@ -26,6 +26,9 @@ func NewFromString(cfgStr string) *ConfigMock {
 	mock.WriteFunc = func() error {
 		return cfg.Write()
 	}
+	mock.MigrateFunc = func(m Migration) error {
+		return cfg.Migrate(m)
+	}
 	mock.AliasesFunc = func() *AliasConfig {
 		return &AliasConfig{cfg: c}
 	}
@@ -67,6 +70,10 @@ func NewFromString(cfgStr string) *ConfigMock {
 	}
 	mock.PromptFunc = func(hostname string) string {
 		val, _ := cfg.GetOrDefault(hostname, promptKey)
+		return val
+	}
+	mock.VersionFunc = func() string {
+		val, _ := cfg.GetOrDefault("", versionKey)
 		return val
 	}
 	return mock

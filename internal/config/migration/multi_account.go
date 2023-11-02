@@ -65,6 +65,8 @@ type MultiAccount struct {
 }
 
 func (m MultiAccount) PreVersion() string {
+	// It is expected that there is no version key since this migration
+	// introduces it.
 	return ""
 }
 
@@ -149,7 +151,10 @@ func getUsername(c *config.Config, hostname, token string, transport http.RoundT
 		}
 	}
 	err = client.Query("CurrentUser", &query, nil)
-	return query.Viewer.Login, err
+	if err != nil {
+		return "", err
+	}
+	return query.Viewer.Login, nil
 }
 
 func migrateToken(hostname, username, token string, inKeyring bool) error {

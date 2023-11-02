@@ -38,8 +38,8 @@ var _ Config = &ConfigMock{}
 //			HTTPUnixSocketFunc: func(s string) string {
 //				panic("mock out the HTTPUnixSocket method")
 //			},
-//			MigrateMultiAccountFunc: func() error {
-//				panic("mock out the MigrateMultiAccount method")
+//			MigrateFunc: func(migration Migration) error {
+//				panic("mock out the Migrate method")
 //			},
 //			PagerFunc: func(s string) string {
 //				panic("mock out the Pager method")
@@ -49,6 +49,9 @@ var _ Config = &ConfigMock{}
 //			},
 //			SetFunc: func(s1 string, s2 string, s3 string)  {
 //				panic("mock out the Set method")
+//			},
+//			VersionFunc: func() string {
+//				panic("mock out the Version method")
 //			},
 //			WriteFunc: func() error {
 //				panic("mock out the Write method")
@@ -81,8 +84,8 @@ type ConfigMock struct {
 	// HTTPUnixSocketFunc mocks the HTTPUnixSocket method.
 	HTTPUnixSocketFunc func(s string) string
 
-	// MigrateMultiAccountFunc mocks the MigrateMultiAccount method.
-	MigrateMultiAccountFunc func() error
+	// MigrateFunc mocks the Migrate method.
+	MigrateFunc func(migration Migration) error
 
 	// PagerFunc mocks the Pager method.
 	PagerFunc func(s string) string
@@ -92,6 +95,9 @@ type ConfigMock struct {
 
 	// SetFunc mocks the Set method.
 	SetFunc func(s1 string, s2 string, s3 string)
+
+	// VersionFunc mocks the Version method.
+	VersionFunc func() string
 
 	// WriteFunc mocks the Write method.
 	WriteFunc func() error
@@ -131,8 +137,10 @@ type ConfigMock struct {
 			// S is the s argument value.
 			S string
 		}
-		// MigrateMultiAccount holds details about calls to the MigrateMultiAccount method.
-		MigrateMultiAccount []struct {
+		// Migrate holds details about calls to the Migrate method.
+		Migrate []struct {
+			// Migration is the migration argument value.
+			Migration Migration
 		}
 		// Pager holds details about calls to the Pager method.
 		Pager []struct {
@@ -153,22 +161,26 @@ type ConfigMock struct {
 			// S3 is the s3 argument value.
 			S3 string
 		}
+		// Version holds details about calls to the Version method.
+		Version []struct {
+		}
 		// Write holds details about calls to the Write method.
 		Write []struct {
 		}
 	}
-	lockAliases             sync.RWMutex
-	lockAuthentication      sync.RWMutex
-	lockBrowser             sync.RWMutex
-	lockEditor              sync.RWMutex
-	lockGetOrDefault        sync.RWMutex
-	lockGitProtocol         sync.RWMutex
-	lockHTTPUnixSocket      sync.RWMutex
-	lockMigrateMultiAccount sync.RWMutex
-	lockPager               sync.RWMutex
-	lockPrompt              sync.RWMutex
-	lockSet                 sync.RWMutex
-	lockWrite               sync.RWMutex
+	lockAliases        sync.RWMutex
+	lockAuthentication sync.RWMutex
+	lockBrowser        sync.RWMutex
+	lockEditor         sync.RWMutex
+	lockGetOrDefault   sync.RWMutex
+	lockGitProtocol    sync.RWMutex
+	lockHTTPUnixSocket sync.RWMutex
+	lockMigrate        sync.RWMutex
+	lockPager          sync.RWMutex
+	lockPrompt         sync.RWMutex
+	lockSet            sync.RWMutex
+	lockVersion        sync.RWMutex
+	lockWrite          sync.RWMutex
 }
 
 // Aliases calls AliasesFunc.
@@ -389,30 +401,35 @@ func (mock *ConfigMock) HTTPUnixSocketCalls() []struct {
 	return calls
 }
 
-// MigrateMultiAccount calls MigrateMultiAccountFunc.
-func (mock *ConfigMock) MigrateMultiAccount() error {
-	if mock.MigrateMultiAccountFunc == nil {
-		panic("ConfigMock.MigrateMultiAccountFunc: method is nil but Config.MigrateMultiAccount was just called")
+// Migrate calls MigrateFunc.
+func (mock *ConfigMock) Migrate(migration Migration) error {
+	if mock.MigrateFunc == nil {
+		panic("ConfigMock.MigrateFunc: method is nil but Config.Migrate was just called")
 	}
 	callInfo := struct {
-	}{}
-	mock.lockMigrateMultiAccount.Lock()
-	mock.calls.MigrateMultiAccount = append(mock.calls.MigrateMultiAccount, callInfo)
-	mock.lockMigrateMultiAccount.Unlock()
-	return mock.MigrateMultiAccountFunc()
+		Migration Migration
+	}{
+		Migration: migration,
+	}
+	mock.lockMigrate.Lock()
+	mock.calls.Migrate = append(mock.calls.Migrate, callInfo)
+	mock.lockMigrate.Unlock()
+	return mock.MigrateFunc(migration)
 }
 
-// MigrateMultiAccountCalls gets all the calls that were made to MigrateMultiAccount.
+// MigrateCalls gets all the calls that were made to Migrate.
 // Check the length with:
 //
-//	len(mockedConfig.MigrateMultiAccountCalls())
-func (mock *ConfigMock) MigrateMultiAccountCalls() []struct {
+//	len(mockedConfig.MigrateCalls())
+func (mock *ConfigMock) MigrateCalls() []struct {
+	Migration Migration
 } {
 	var calls []struct {
+		Migration Migration
 	}
-	mock.lockMigrateMultiAccount.RLock()
-	calls = mock.calls.MigrateMultiAccount
-	mock.lockMigrateMultiAccount.RUnlock()
+	mock.lockMigrate.RLock()
+	calls = mock.calls.Migrate
+	mock.lockMigrate.RUnlock()
 	return calls
 }
 
@@ -517,6 +534,33 @@ func (mock *ConfigMock) SetCalls() []struct {
 	mock.lockSet.RLock()
 	calls = mock.calls.Set
 	mock.lockSet.RUnlock()
+	return calls
+}
+
+// Version calls VersionFunc.
+func (mock *ConfigMock) Version() string {
+	if mock.VersionFunc == nil {
+		panic("ConfigMock.VersionFunc: method is nil but Config.Version was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockVersion.Lock()
+	mock.calls.Version = append(mock.calls.Version, callInfo)
+	mock.lockVersion.Unlock()
+	return mock.VersionFunc()
+}
+
+// VersionCalls gets all the calls that were made to Version.
+// Check the length with:
+//
+//	len(mockedConfig.VersionCalls())
+func (mock *ConfigMock) VersionCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockVersion.RLock()
+	calls = mock.calls.Version
+	mock.lockVersion.RUnlock()
 	return calls
 }
 
