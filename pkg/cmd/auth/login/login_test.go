@@ -294,7 +294,7 @@ func Test_loginRun_nontty(t *testing.T) {
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc123\n    users:\n        monalisa:\n            oauth_token: abc123\n            git_protocol: https\n    user: monalisa\n",
+			wantHosts: "github.com:\n    oauth_token: abc123\n    users:\n        monalisa:\n            oauth_token: abc123\n            git_protocol: https\n    user: monalisa\n    git_protocol: https\n",
 		},
 		{
 			name: "with token and non-default host",
@@ -507,6 +507,7 @@ func Test_loginRun_Survey(t *testing.T) {
                             oauth_token: def456
                             git_protocol: https
                     user: jillv
+                    git_protocol: https
             `),
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
@@ -541,6 +542,7 @@ func Test_loginRun_Survey(t *testing.T) {
                             oauth_token: def456
                             git_protocol: https
                     user: jillv
+                    git_protocol: https
             `),
 			opts: &LoginOptions{
 				Interactive:     true,
@@ -584,6 +586,7 @@ func Test_loginRun_Survey(t *testing.T) {
                             oauth_token: def456
                             git_protocol: https
                     user: jillv
+                    git_protocol: https
             `),
 			opts: &LoginOptions{
 				Interactive:     true,
@@ -618,6 +621,7 @@ func Test_loginRun_Survey(t *testing.T) {
                             oauth_token: def456
                             git_protocol: ssh
                     user: jillv
+                    git_protocol: ssh
             `),
 			opts: &LoginOptions{
 				Interactive:     true,
@@ -662,6 +666,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			wantHosts: heredoc.Doc(`
                 github.com:
                     user: jillv
+                    git_protocol: https
                     users:
                         jillv:
                             git_protocol: https
