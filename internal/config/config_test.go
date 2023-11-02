@@ -163,3 +163,44 @@ func TestFallbackConfig(t *testing.T) {
 	requireKeyWithValue(t, cfg, []string{browserKey}, "")
 	requireNoKey(t, cfg, []string{"unknown"})
 }
+
+func TestSetTopLevelKey(t *testing.T) {
+	c := newTestConfig()
+	host := ""
+	key := "top-level-key"
+	val := "top-level-value"
+	c.Set(host, key, val)
+	requireKeyWithValue(t, c.cfg, []string{key}, val)
+}
+
+func TestSetHostSpecificKey(t *testing.T) {
+	c := newTestConfig()
+	host := "github.com"
+	key := "host-level-key"
+	val := "host-level-value"
+	c.Set(host, key, val)
+	requireKeyWithValue(t, c.cfg, []string{hostsKey, host, key}, val)
+}
+
+func TestSetUserSpecificKey(t *testing.T) {
+	c := newTestConfig()
+	host := "github.com"
+	user := "test-user"
+	c.cfg.Set([]string{hostsKey, host, userKey}, user)
+
+	key := "host-level-key"
+	val := "host-level-value"
+	c.Set(host, key, val)
+	requireKeyWithValue(t, c.cfg, []string{hostsKey, host, key}, val)
+	requireKeyWithValue(t, c.cfg, []string{hostsKey, host, usersKey, user, key}, val)
+}
+
+func TestSetUserSpecificKeyNoUserPresent(t *testing.T) {
+	c := newTestConfig()
+	host := "github.com"
+	key := "host-level-key"
+	val := "host-level-value"
+	c.Set(host, key, val)
+	requireKeyWithValue(t, c.cfg, []string{hostsKey, host, key}, val)
+	requireNoKey(t, c.cfg, []string{hostsKey, host, usersKey})
+}
