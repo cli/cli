@@ -48,6 +48,7 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 	if err != nil {
 		return fmt.Errorf("failed to create port forwarder: %w", err)
 	}
+	defer safeClose(fwd, &err)
 
 	var (
 		invoker    rpc.Invoker

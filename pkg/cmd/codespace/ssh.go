@@ -202,6 +202,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	if err != nil {
 		return fmt.Errorf("failed to create port forwarder: %w", err)
 	}
+	defer safeClose(fwd, &err)
 
 	var (
 		invoker             rpc.Invoker
@@ -237,9 +238,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		if err != nil {
 			return fmt.Errorf("failed to forward port: %w", err)
 		}
-
-		// Close the SSH connection when we're done
-		defer fwd.CloseSSHConnection()
 
 		// Connect to the forwarded port
 		err = fwd.ConnectToForwardedPort(ctx, stdio, opts)
@@ -584,6 +582,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 				sshUsers <- result
 				return
 			}
+			defer safeClose(fwd, &err)
 
 			invoker, err := rpc.CreateInvoker(ctx, fwd)
 			if err != nil {

@@ -48,7 +48,7 @@ type PortForwarder interface {
 	UpdatePortVisibility(ctx context.Context, remotePort int, visibility string) error
 	KeepAlive(reason string)
 	GetKeepAliveReason() string
-	CloseSSHConnection()
+	Close() error
 }
 
 // NewPortForwarder returns a new PortForwarder for the specified codespace.
@@ -65,9 +65,6 @@ func (fwd *CodespacesPortForwarder) ForwardPortToListener(ctx context.Context, o
 	if err != nil {
 		return fmt.Errorf("error forwarding port: %w", err)
 	}
-
-	// Close the SSH connection when we're done
-	defer fwd.CloseSSHConnection()
 
 	done := make(chan error)
 	go func() {
@@ -151,7 +148,7 @@ func (fwd *CodespacesPortForwarder) ForwardPort(ctx context.Context, opts Forwar
 	}
 
 	// Connect to the tunnel
-	err = fwd.connection.TunnelClient.Connect(ctx, "")
+	err = fwd.connection.Connect(ctx)
 	if err != nil {
 		return fmt.Errorf("connect failed: %v", err)
 	}
@@ -159,7 +156,6 @@ func (fwd *CodespacesPortForwarder) ForwardPort(ctx context.Context, opts Forwar
 	// Inform the host that we've forwarded the port locally
 	err = fwd.connection.TunnelClient.RefreshPorts(ctx)
 	if err != nil {
-		fwd.CloseSSHConnection()
 		return fmt.Errorf("refresh ports failed: %v", err)
 	}
 
@@ -257,14 +253,11 @@ func (fwd *CodespacesPortForwarder) UpdatePortVisibility(ctx context.Context, re
 	done := make(chan error)
 	go func() {
 		// Connect to the tunnel
-		err = fwd.connection.TunnelClient.Connect(ctx, "")
+		err = fwd.connection.Connect(ctx)
 		if err != nil {
 			done <- fmt.Errorf("connect failed: %v", err)
 			return
 		}
-
-		// Close the SSH connection when we're done
-		defer fwd.CloseSSHConnection()
 
 		// Inform the host that we've deleted the port
 		err = fwd.connection.TunnelClient.RefreshPorts(ctx)
@@ -316,8 +309,8 @@ func (fwd *CodespacesPortForwarder) GetKeepAliveReason() string {
 }
 
 // Close closes the port forwarder's tunnel client connection.
-func (fwd *CodespacesPortForwarder) CloseSSHConnection() {
-	_ = fwd.connection.TunnelClient.Close()
+func (fwd *CodespacesPortForwarder) Close() error {
+	return fwd.connection.Close()
 }
 
 // AccessControlEntriesToVisibility converts the access control entries used by Dev Tunnels to a friendly visibility value.
