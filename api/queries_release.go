@@ -4,29 +4,50 @@ import (
 	"time"
 )
 
+var ReleaseFields = []string{
+	"url",
+	"tarballUrl",
+	"zipballUrl",
+	"id",
+	"tagName",
+	"name",
+	"description",
+	"isDraft",
+	"isLatest",
+	"isPrerelease",
+	"createdAt",
+	"publishedAt",
+	"author",
+	"releaseAssets",
+}
+
 type Release struct {
 	DatabaseID   int64
 	ID           string
 	TagName      string
 	Name         string
-	Body         string
+	Description  string
 	IsDraft      bool
 	IsPrerelease bool
 	CreatedAt    time.Time
 	PublishedAt  *time.Time
 	URL          string
 	ResourcePath string
-	Assets       []ReleaseAsset
 	Author       Author
 
+	ReleaseAssets struct {
+		TotalCount int
+		Nodes      []ReleaseAsset
+	} `graphql:"releaseAssets(first: 100)"`
+
 	Tag struct {
-		ID                 string
-		Name               string
-		Message            string
-		OID                string
-		CommitResourcePath string
-		CommitUrl          string
-		Tagger             Author
+		ID   string
+		Name string
+
+		Target struct {
+			OID string
+			// commitResourcePath string
+		}
 	}
 
 	TagCommit struct {
