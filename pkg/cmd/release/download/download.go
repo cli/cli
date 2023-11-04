@@ -50,7 +50,8 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			Download assets from a GitHub release.
 
 			Without an explicit tag name argument, assets are downloaded from the
-			latest release in the project. In this case, '--pattern' is required.
+			latest release in the project. In this case, "--pattern" or "--archive"
+                        is required, but not both.
 		`),
 		Example: heredoc.Doc(`
 			# download all assets from a specific release
