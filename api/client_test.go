@@ -234,10 +234,9 @@ func TestHTTPHeaders(t *testing.T) {
 
 	ios, _, _, stderr := iostreams.Test()
 	httpClient, err := NewHTTPClient(HTTPClientOptions{
-		AppVersion:        "v1.2.3",
-		Config:            tinyConfig{ts.URL[7:] + ":oauth_token": "MYTOKEN"},
-		Log:               ios.ErrOut,
-		SkipAcceptHeaders: false,
+		AppVersion: "v1.2.3",
+		Config:     tinyConfig{ts.URL[7:] + ":oauth_token": "MYTOKEN"},
+		Log:        ios.ErrOut,
 	})
 	assert.NoError(t, err)
 	client := NewClientFromHTTP(httpClient)
