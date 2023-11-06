@@ -74,6 +74,9 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 	if bodyIsJSON && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	}
+	if req.Header.Get("Accept") == "" {
+		req.Header.Set("Accept", "*/*")
+	}
 
 	return client.Do(req)
 }

@@ -1455,3 +1455,58 @@ func Test_parseErrorResponse(t *testing.T) {
 		})
 	}
 }
+
+func Test_apiRun_acceptHeader(t *testing.T) {
+	tests := []struct {
+		name             string
+		options          ApiOptions
+		wantAcceptHeader string
+	}{
+		{
+			name:             "sets default accept header",
+			options:          ApiOptions{},
+			wantAcceptHeader: "*/*",
+		},
+		{
+			name: "does not override user accept header",
+			options: ApiOptions{
+				RequestHeaders: []string{"Accept: testing"},
+			},
+			wantAcceptHeader: "testing",
+		},
+		{
+			name: "does not override preview names",
+			options: ApiOptions{
+				Previews: []string{"nebula"},
+			},
+			wantAcceptHeader: "application/vnd.github.nebula-preview+json",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			tt.options.IO = ios
+
+			tt.options.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+
+			var gotReq *http.Request
+			tt.options.HttpClient = func() (*http.Client, error) {
+				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+					gotReq = req
+					resp := &http.Response{
+						StatusCode: 200,
+						Request:    req,
+						Body:       io.NopCloser(bytes.NewBufferString("")),
+					}
+					return resp, nil
+				}
+				return &http.Client{Transport: tr}, nil
+			}
+
+			assert.NoError(t, apiRun(&tt.options))
+			assert.Equal(t, tt.wantAcceptHeader, gotReq.Header.Get("Accept"))
+		})
+	}
+}

@@ -17,14 +17,13 @@ type tokenGetter interface {
 }
 
 type HTTPClientOptions struct {
-	AppVersion        string
-	CacheTTL          time.Duration
-	Config            tokenGetter
-	EnableCache       bool
-	Log               io.Writer
-	LogColorize       bool
-	LogVerboseHTTP    bool
-	SkipAcceptHeaders bool
+	AppVersion     string
+	CacheTTL       time.Duration
+	Config         tokenGetter
+	EnableCache    bool
+	Log            io.Writer
+	LogColorize    bool
+	LogVerboseHTTP bool
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
@@ -49,9 +48,6 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 
 	headers := map[string]string{
 		userAgent: fmt.Sprintf("GitHub CLI %s", opts.AppVersion),
-	}
-	if opts.SkipAcceptHeaders {
-		headers[accept] = ""
 	}
 	clientOpts.Headers = headers
 
