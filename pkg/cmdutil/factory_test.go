@@ -12,6 +12,10 @@ func Test_executable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	testExe, err = filepath.EvalSymlinks(testExe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testExeName := filepath.Base(testExe)
 
@@ -23,6 +27,10 @@ func Test_executable(t *testing.T) {
 	bin1Exe := filepath.Join(bin1, testExeName)
 	bin2 := filepath.Join(dir, "bin2")
 	bin2Exe := filepath.Join(bin2, testExeName)
+	testExeRel, err := filepath.Rel(bin2Exe, testExe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	bin3 := filepath.Join(dir, "bin3")
 	bin3Exe := filepath.Join(bin3, testExeName)
 
@@ -40,7 +48,7 @@ func Test_executable(t *testing.T) {
 	} else {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(testExe, bin2Exe); err != nil {
+	if err := os.Symlink(testExeRel, bin2Exe); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(bin3Exe, bin1Exe); err != nil {

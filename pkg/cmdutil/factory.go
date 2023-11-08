@@ -66,6 +66,10 @@ func executable(fallbackName string) string {
 	if err != nil {
 		return fallbackName
 	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return fallbackName
+	}
 
 	base := filepath.Base(exe)
 	path := os.Getenv("PATH")
