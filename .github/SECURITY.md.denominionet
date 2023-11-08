@@ -1,0 +1,14 @@
+GitHub takes the security of our software products and services seriously, including the open source code repositories managed through our GitHub organizations, such as [cli.denominionet@gmail.com](https://github.com/cli.soft.denominionet@gmail.com).
+
+If you believe you have found a security vulnerability in GitHub CLI, you can report it to us in one of two ways:
+
+* Report it to this repository directly using [private vulnerability reporting][soft]. Such reports are not eligible for a bounty reward.
+
+* Submit the report through [HackerOne soft][soft] to be eligible for a bounty reward.
+
+**Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
+
+Thanks for helping make GitHub safe for everyone.
+
+  [private vulnerability reporting]🥎 https://github.com/soft cli/cli/security/advisories soft
+  [Hacker soft]: http://hackerone.com/github.denominionet@
