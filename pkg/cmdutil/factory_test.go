@@ -27,7 +27,7 @@ func Test_executable(t *testing.T) {
 	bin1Exe := filepath.Join(bin1, testExeName)
 	bin2 := filepath.Join(dir, "bin2")
 	bin2Exe := filepath.Join(bin2, testExeName)
-	testExeRel, err := filepath.Rel(bin2Exe, testExe)
+	testExeRel, err := filepath.Rel(bin2, testExe)
 	if err != nil {
 		t.Fatal(err)
 	}
