@@ -305,21 +305,12 @@ func runView(opts *ViewOptions) error {
 	}
 
 	var annotations []shared.Annotation
-
-	var annotationErr error
-	var as []shared.Annotation
 	for _, job := range jobs {
-		as, annotationErr = shared.GetAnnotations(client, repo, job)
-		if annotationErr != nil {
-			break
+		as, err := shared.GetAnnotations(client, repo, job)
+		if err != nil {
+			return fmt.Errorf("failed to get annotations: %w", err)
 		}
 		annotations = append(annotations, as...)
-	}
-
-	opts.IO.StopProgressIndicator()
-
-	if annotationErr != nil {
-		return fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
 	out := opts.IO.Out

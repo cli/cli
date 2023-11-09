@@ -149,7 +149,7 @@ func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameO
 		return nil, err
 	}
 
-	protocol := cfg.Authentication().GitProtocol(repo.RepoHost())
+	protocol := cfg.GitProtocol(repo.RepoHost())
 
 	remotes, err := opts.Remotes()
 	if err != nil {

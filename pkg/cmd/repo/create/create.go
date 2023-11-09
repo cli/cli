@@ -395,7 +395,7 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol := cfg.Authentication().GitProtocol(repo.RepoHost())
+		protocol := cfg.GitProtocol(repo.RepoHost())
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 		if !opts.AddReadme && opts.LicenseTemplate == "" && opts.GitIgnoreTemplate == "" && opts.Template == "" {
@@ -492,7 +492,7 @@ func createFromTemplate(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol := cfg.Authentication().GitProtocol(repo.RepoHost())
+		protocol := cfg.GitProtocol(repo.RepoHost())
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 		if err := cloneWithRetry(opts, remoteURL, templateRepoMainBranch); err != nil {
@@ -614,7 +614,7 @@ func createFromLocal(opts *CreateOptions) error {
 		fmt.Fprintln(stdout, repo.URL)
 	}
 
-	protocol := cfg.Authentication().GitProtocol(repo.RepoHost())
+	protocol := cfg.GitProtocol(repo.RepoHost())
 	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 	if opts.Interactive {

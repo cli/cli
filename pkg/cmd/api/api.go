@@ -298,14 +298,13 @@ func apiRun(opts *ApiOptions) error {
 				log = opts.IO.Out
 			}
 			opts := api.HTTPClientOptions{
-				AppVersion:        opts.AppVersion,
-				CacheTTL:          opts.CacheTTL,
-				Config:            cfg.Authentication(),
-				EnableCache:       opts.CacheTTL > 0,
-				Log:               log,
-				LogColorize:       opts.IO.ColorEnabled(),
-				LogVerboseHTTP:    opts.Verbose,
-				SkipAcceptHeaders: true,
+				AppVersion:     opts.AppVersion,
+				CacheTTL:       opts.CacheTTL,
+				Config:         cfg.Authentication(),
+				EnableCache:    opts.CacheTTL > 0,
+				Log:            log,
+				LogColorize:    opts.IO.ColorEnabled(),
+				LogVerboseHTTP: opts.Verbose,
 			}
 			return api.NewHTTPClient(opts)
 		}

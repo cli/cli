@@ -1279,6 +1279,40 @@ func TestViewRun(t *testing.T) {
 			},
 			wantOut: "fetched 5 jobs\n",
 		},
+		{
+			name: "Returns error when failing to get annotations",
+			opts: &ViewOptions{
+				RunID:      "1234",
+				ExitStatus: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/artifacts"),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestForRun`),
+					httpmock.StringResponse(``))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/20/annotations"),
+					httpmock.StatusStringResponse(500, "internal server error"),
+				)
+			},
+			errMsg:  "failed to get annotations: HTTP 500 (https://api.github.com/repos/OWNER/REPO/check-runs/20/annotations)",
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

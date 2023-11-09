@@ -350,6 +350,50 @@ jobs:
 
 	encodedYAMLContent := base64.StdEncoding.EncodeToString(yamlContent)
 
+	yamlContentChoiceIp := []byte(`
+name: choice inputs
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        type: choice
+        description: Who to greet
+        default: monalisa
+        options:
+        - monalisa
+        - cschleiden
+      favourite-animal:
+        type: choice
+        description: What's your favourite animal
+        required: true
+        options:
+        - dog
+        - cat
+jobs:
+  greet:
+  runs-on: ubuntu-latest
+  steps:
+  - name: Send greeting
+    run: echo "${{ github.event.inputs.message }} ${{ fromJSON('["", "🥳"]')[github.event.inputs.use-emoji == 'true'] }} ${{ github.event.inputs.name }}"`)
+	encodedYAMLContentChoiceIp := base64.StdEncoding.EncodeToString(yamlContentChoiceIp)
+
+	yamlContentMissingChoiceIp := []byte(`
+name: choice missing inputs
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        type: choice
+        description: Who to greet
+        options:
+jobs:
+  greet:
+  runs-on: ubuntu-latest
+  steps:
+  - name: Send greeting
+    run: echo "${{ github.event.inputs.message }} ${{ fromJSON('["", "🥳"]')[github.event.inputs.use-emoji == 'true'] }} ${{ github.event.inputs.name }}"`)
+	encodedYAMLContentMissingChoiceIp := base64.StdEncoding.EncodeToString(yamlContentMissingChoiceIp)
+
 	stubs := func(reg *httpmock.Registry) {
 		reg.Register(
 			httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/workflow.yml"),
@@ -639,6 +683,94 @@ jobs:
 				"ref": "trunk",
 			},
 			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=workflow.yml\n",
+		},
+		{
+			name: "prompt, workflow choice input",
+			tty:  true,
+			opts: &RunOptions{
+				Prompt: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{
+						Workflows: []shared.Workflow{
+							{
+								Name:  "choice inputs",
+								ID:    12345,
+								State: shared.Active,
+								Path:  ".github/workflows/workflow.yml",
+							},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.JSONResponse(struct{ Content string }{
+						Content: encodedYAMLContentChoiceIp,
+					}))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
+					httpmock.StatusStringResponse(204, "cool"))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow", []string{"choice inputs (workflow.yml)"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+				pm.RegisterSelect("favourite-animal (required)", []string{"dog", "cat"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+				pm.RegisterSelect("name", []string{"monalisa", "cschleiden"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"name":             "monalisa",
+					"favourite-animal": "dog",
+				},
+				"ref": "trunk",
+			},
+			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=workflow.yml\n",
+		},
+		{
+			name: "prompt, workflow choice missing input",
+			tty:  true,
+			opts: &RunOptions{
+				Prompt: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{
+						Workflows: []shared.Workflow{
+							{
+								Name:  "choice missing inputs",
+								ID:    12345,
+								State: shared.Active,
+								Path:  ".github/workflows/workflow.yml",
+							},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.JSONResponse(struct{ Content string }{
+						Content: encodedYAMLContentMissingChoiceIp,
+					}))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
+					httpmock.StatusStringResponse(204, "cool"))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow", []string{"choice missing inputs (workflow.yml)"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+				pm.RegisterSelect("name", []string{}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+			},
+			wantErr: true,
+			errOut:  "workflow input \"name\" is of type choice, but has no options",
 		},
 	}
 

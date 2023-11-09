@@ -499,7 +499,7 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if draftWhileUploading {
-			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory)
+			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory, opts.IsLatest)
 			if err != nil {
 				return cleanupDraftRelease(err)
 			}

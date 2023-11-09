@@ -47,6 +47,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	if err != nil {
 		return fmt.Errorf("failed to create port forwarder: %w", err)
 	}
+	defer safeClose(fwd, &err)
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, localPort, err := ListenTCP(0, false)

@@ -178,7 +178,7 @@ func refreshRun(opts *RefreshOptions) error {
 		Prompter:   opts.Prompter,
 		GitClient:  opts.GitClient,
 	}
-	gitProtocol := authCfg.GitProtocol(hostname)
+	gitProtocol := cfg.GitProtocol(hostname)
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err

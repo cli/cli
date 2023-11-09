@@ -60,6 +60,7 @@ func (a *App) Rebuild(ctx context.Context, selector *CodespaceSelector, full boo
 	if err != nil {
 		return fmt.Errorf("failed to create port forwarder: %w", err)
 	}
+	defer safeClose(fwd, &err)
 
 	invoker, err := rpc.CreateInvoker(ctx, fwd)
 	if err != nil {
