@@ -24,16 +24,16 @@ func Test_executable(t *testing.T) {
 	// process. The first is a symlink, but to an unrelated executable, the second is a symlink to our test
 	// process and thus represents the result we want, and the third one is an unrelated executable.
 	dir := t.TempDir()
+	// On macOS, the temporary folder can also be a symbolic link
+	dir, err = filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	bin1 := filepath.Join(dir, "bin1")
 	bin1Exe := filepath.Join(bin1, testExeName)
 	bin2 := filepath.Join(dir, "bin2")
 	bin2Exe := filepath.Join(bin2, testExeName)
-	var testExeRel string
-	if runtime.GOOS == "darwin" {
-		testExeRel, err = filepath.Rel(bin2Exe, testExe)
-	} else {
-		testExeRel, err = filepath.Rel(bin2, testExe)
-	}
+	testExeRel, err := filepath.Rel(bin2, testExe)
 	if err != nil {
 		t.Fatal(err)
 	}
