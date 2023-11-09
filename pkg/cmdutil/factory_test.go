@@ -3,7 +3,6 @@ package cmdutil
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
