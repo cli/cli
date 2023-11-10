@@ -50,14 +50,14 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "diff [<number> | <url> | <branch>]",
 		Short: "View changes in a pull request",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			View changes in a pull request. 
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
 			
-			With '--web', open the pull request diff in a web browser instead.
-		`),
+			With %[1]s--web%[1]s flag, open the pull request diff in a web browser instead.
+		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)

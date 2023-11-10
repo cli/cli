@@ -33,11 +33,11 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 		Use:   "logout",
 		Args:  cobra.ExactArgs(0),
 		Short: "Log out of a GitHub host",
-		Long: heredoc.Doc(`Remove authentication for a GitHub host.
+		Long: heredoc.Docf(`Remove authentication for a GitHub host.
 
 			This command removes the authentication configuration for a host either specified
-			interactively or via --hostname.
-		`),
+			interactively or via %[1]s--hostname%[1]s.
+		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh auth logout
 			# => select what host to log out of via a prompt

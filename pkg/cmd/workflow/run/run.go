@@ -53,7 +53,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "run [<workflow-id> | <workflow-name>]",
 		Short: "Run a workflow by creating a workflow_dispatch event",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Create a workflow_dispatch event for a given workflow.
 
 			This command will trigger GitHub Actions to run a given workflow file. The given workflow file must
@@ -62,9 +62,9 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			If the workflow file supports inputs, they can be specified in a few ways:
 
 			- Interactively
-			- via -f or -F flags
+			- via %[1]s-f/--raw-field%[1]s or %[1]s-F/--field%[1]s flags
 			- As JSON, via STDIN
-    `),
+    `, "`"),
 		Example: heredoc.Doc(`
 			# Have gh prompt you for what workflow you'd like to run and interactively collect inputs
 			$ gh workflow run

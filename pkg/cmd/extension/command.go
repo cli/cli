@@ -93,12 +93,12 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			cmd := &cobra.Command{
 				Use:   "search [<query>]",
 				Short: "Search extensions to the GitHub CLI",
-				Long: heredoc.Doc(`
+				Long: heredoc.Docf(`
 					Search for gh extensions.
 
 					With no arguments, this command prints out the first 30 extensions
 					available to install sorted by number of stars. More extensions can
-					be fetched by specifying a higher limit with the --limit flag.
+					be fetched by specifying a higher limit with the %[1]s--limit%[1]s flag.
 
 					When connected to a terminal, this command prints out three columns.
 					The first has a ✓ if the extension is already installed locally. The
@@ -122,7 +122,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					see:
 
 						gh ext list
-				`),
+				`, "`"),
 				Example: heredoc.Doc(`
 					# List the first 30 extensions sorted by star count, descending
 					$ gh ext search
@@ -431,7 +431,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			cmd := &cobra.Command{
 				Use:   "browse",
 				Short: "Enter a UI for browsing, adding, and removing extensions",
-				Long: heredoc.Doc(`
+				Long: heredoc.Docf(`
 					This command will take over your terminal and run a fully interactive
 					interface for browsing, adding, and removing gh extensions. A terminal
 					width greater than 100 columns is recommended.
@@ -441,7 +441,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					Press q to quit.
 
-					Running this command with --single-column should make this command
+					Running this command with %[1]s--single-column%[1]s should make this command
 					more intelligible for users who rely on assistive technology like screen
 					readers or high zoom.
 
@@ -450,7 +450,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						gh ext search
 
 					along with gh ext install, gh ext remove, and gh repo view.
-				`),
+				`, "`"),
 				Args: cobra.NoArgs,
 				RunE: func(cmd *cobra.Command, args []string) error {
 					if !io.CanPrompt() {

@@ -35,7 +35,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "set <alias> <expansion>",
 		Short: "Create a shortcut for a gh command",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Define a word that will expand to a full gh command when invoked.
 
 			The expansion may specify additional arguments and flags. If the expansion includes
@@ -46,10 +46,10 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			Use "-" as expansion argument to read the expansion string from standard input. This
 			is useful to avoid quoting issues when defining expansions.
 
-			If the expansion starts with "!" or if "--shell" was given, the expansion is a shell
+			If the expansion starts with "!" or if %[1]s--shell%[1]s was given, the expansion is a shell
 			expression that will be evaluated through the "sh" interpreter when the alias is
 			invoked. This allows for chaining multiple commands via piping and redirection.
-		`),
+		`, "`"),
 		Example: heredoc.Doc(`
 			# note: Command Prompt on Windows requires using double quotes for arguments
 			$ gh alias set pv 'pr view'

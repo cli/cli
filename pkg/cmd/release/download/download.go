@@ -46,13 +46,13 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd := &cobra.Command{
 		Use:   "download [<tag>]",
 		Short: "Download release assets",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Download assets from a GitHub release.
 
 			Without an explicit tag name argument, assets are downloaded from the
-			latest release in the project. In this case, "--pattern" or "--archive"
-                        is required.
-		`),
+			latest release in the project. In this case, %[1]s--pattern%[1]s
+			or %[1]s--archive%[1]s is required.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# download all assets from a specific release
 			$ gh release download v1.2.3
