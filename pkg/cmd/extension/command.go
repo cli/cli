@@ -109,13 +109,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					word "installed" but otherwise the order and content of the columns
 					is the same.
 
-					This command behaves similarly to 'gh search repos' but does not
+					This command behaves similarly to %[1]sgh search repos%[1]s but does not
 					support as many search qualifiers. For a finer grained search of
 					extensions, try using:
 
 						gh search repos --topic "gh-extension"
 
-					and adding qualifiers as needed. See 'gh help search repos' to learn
+					and adding qualifiers as needed. See %[1]sgh help search repos%[1]s to learn
 					more about repository search.
 
 					For listing just the extensions that are already installed locally,
@@ -449,7 +449,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 						gh ext search
 
-					along with gh ext install, gh ext remove, and gh repo view.
+					along with %[1]sgh ext install%[1]s, %[1]sgh ext remove%[1]s, and %[1]sgh repo view%[1]s.
 				`, "`"),
 				Args: cobra.NoArgs,
 				RunE: func(cmd *cobra.Command, args []string) error {

@@ -21,7 +21,7 @@ var HelpTopics = []helpTopic{
 	{
 		name:  "mintty",
 		short: "Information about using gh with MinTTY",
-		long: heredoc.Doc(`
+		long: heredoc.Docf(`
 			MinTTY is the terminal emulator that comes by default with Git
 			for Windows. It has known issues with gh's ability to prompt a
 			user for input.
@@ -31,12 +31,12 @@ var HelpTopics = []helpTopic{
 			- Reinstall Git for Windows, checking "Enable experimental support for pseudo consoles".
 
 			- Use a different terminal emulator with Git for Windows like Windows Terminal.
-			  You can run "C:\Program Files\Git\bin\bash.exe" from any terminal emulator to continue
+			  You can run %[1]sC:\Program Files\Git\bin\bash.exe%[1]s from any terminal emulator to continue
 			  using all of the tooling in Git For Windows without MinTTY.
 
-			- Prefix invocations of gh with winpty, eg: "winpty gh auth login".
+			- Prefix invocations of gh with winpty, eg: %[1]swinpty gh auth login%[1]s.
 			  NOTE: this can lead to some UI bugs.
-		`),
+		`, "`"),
 	},
 	{
 		name:  "environment",
@@ -99,7 +99,7 @@ var HelpTopics = []helpTopic{
 
 			GH_PATH: set the path to the gh executable, useful for when gh can not properly determine
 			its own path such as in the cygwin terminal.
-		`),
+		`, "`"),
 	},
 	{
 		name:  "reference",

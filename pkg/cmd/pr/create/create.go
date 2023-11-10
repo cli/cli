@@ -119,7 +119,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
 
 			Adding a pull request to projects requires authorization with the "project" scope.
-			To authorize, run "gh auth refresh -s project".
+			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
