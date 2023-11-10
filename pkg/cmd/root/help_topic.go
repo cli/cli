@@ -41,63 +41,63 @@ var HelpTopics = []helpTopic{
 	{
 		name:  "environment",
 		short: "Environment variables that can be used with gh",
-		long: heredoc.Doc(`
-			GH_TOKEN, GITHUB_TOKEN (in order of precedence): an authentication token for github.com
+		long: heredoc.Docf(`
+			%[1]sGH_TOKEN%[1]s, %[1]sGITHUB_TOKEN%[1]s (in order of precedence): an authentication token for github.com
 			API requests. Setting this avoids being prompted to authenticate and takes precedence over
 			previously stored credentials.
 
-			GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an authentication
-			token for API requests to GitHub Enterprise. When setting this, also set GH_HOST.
+			%[1]sGH_ENTERPRISE_TOKEN%[1]s, %[1]sGITHUB_ENTERPRISE_TOKEN%[1]s (in order of precedence): an authentication
+			token for API requests to GitHub Enterprise. When setting this, also set %[1]sGH_HOST%[1]s.
 
-			GH_HOST: specify the GitHub hostname for commands that would otherwise assume the
+			%[1]sGH_HOST%[1]s: specify the GitHub hostname for commands that would otherwise assume the
 			"github.com" host when not in a context of an existing repository. When setting this, 
-			also set GH_ENTERPRISE_TOKEN.
+			also set %[1]sGH_ENTERPRISE_TOKEN%[1]s.
 
-			GH_REPO: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
+			%[1]sGH_REPO%[1]s: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
 			that otherwise operate on a local repository.
 
-			GH_EDITOR, GIT_EDITOR, VISUAL, EDITOR (in order of precedence): the editor tool to use
+			%[1]sGH_EDITOR%[1]s, %[1]sGIT_EDITOR%[1]s, %[1]sVISUAL%[1]s, %[1]sEDITOR%[1]s (in order of precedence): the editor tool to use
 			for authoring text.
 
-			GH_BROWSER, BROWSER (in order of precedence): the web browser to use for opening links.
+			%[1]sGH_BROWSER%[1]s, %[1]sBROWSER%[1]s (in order of precedence): the web browser to use for opening links.
 
-			GH_DEBUG: set to a truthy value to enable verbose output on standard error. Set to "api"
+			%[1]sGH_DEBUG%[1]s: set to a truthy value to enable verbose output on standard error. Set to "api"
 			to additionally log details of HTTP traffic.
 
-			DEBUG (deprecated): set to "1", "true", or "yes" to enable verbose output on standard
+			%[1]sDEBUG%[1]s (deprecated): set to "1", "true", or "yes" to enable verbose output on standard
 			error.
 
-			GH_PAGER, PAGER (in order of precedence): a terminal paging program to send standard output
+			%[1]sGH_PAGER%[1]s, %[1]sPAGER%[1]s (in order of precedence): a terminal paging program to send standard output
 			to, e.g. "less".
 
-			GLAMOUR_STYLE: the style to use for rendering Markdown. See
+			%[1]sGLAMOUR_STYLE%[1]s: the style to use for rendering Markdown. See
 			<https://github.com/charmbracelet/glamour#styles>
 
-			NO_COLOR: set to any value to avoid printing ANSI escape sequences for color output.
+			%[1]sNO_COLOR%[1]s: set to any value to avoid printing ANSI escape sequences for color output.
 
-			CLICOLOR: set to "0" to disable printing ANSI colors in output.
+			%[1]sCLICOLOR%[1]s: set to "0" to disable printing ANSI colors in output.
 
-			CLICOLOR_FORCE: set to a value other than "0" to keep ANSI colors in output
+			%[1]sCLICOLOR_FORCE%[1]s: set to a value other than "0" to keep ANSI colors in output
 			even when the output is piped.
 
-			GH_FORCE_TTY: set to any value to force terminal-style output even when the output is
+			%[1]sGH_FORCE_TTY%[1]s: set to any value to force terminal-style output even when the output is
 			redirected. When the value is a number, it is interpreted as the number of columns
 			available in the viewport. When the value is a percentage, it will be applied against
 			the number of columns available in the current viewport.
 
-			GH_NO_UPDATE_NOTIFIER: set to any value to disable update notifications. By default, gh
+			%[1]sGH_NO_UPDATE_NOTIFIER%[1]s: set to any value to disable update notifications. By default, gh
 			checks for new releases once every 24 hours and displays an upgrade notice on standard
 			error if a newer version was found.
 
-			GH_CONFIG_DIR: the directory where gh will store configuration files. If not specified, 
+			%[1]sGH_CONFIG_DIR%[1]s: the directory where gh will store configuration files. If not specified, 
 			the default value will be one of the following paths (in order of precedence):
 			  - "$XDG_CONFIG_HOME/gh" (if $XDG_CONFIG_HOME is set),
 			  - "$AppData/GitHub CLI" (on Windows if $AppData is set), or
 			  - "$HOME/.config/gh".
 
-			GH_PROMPT_DISABLED: set to any value to disable interactive prompting in the terminal.
+			%[1]sGH_PROMPT_DISABLED%[1]s: set to any value to disable interactive prompting in the terminal.
 
-			GH_PATH: set the path to the gh executable, useful for when gh can not properly determine
+			%[1]sGH_PATH%[1]s: set the path to the gh executable, useful for when gh can not properly determine
 			its own path such as in the cygwin terminal.
 		`, "`"),
 	},
