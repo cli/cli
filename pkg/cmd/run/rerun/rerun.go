@@ -46,7 +46,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 
 			Note that due for historical reasons, the %[1]s--job%[1]s flag may not take what you expect.
 			Specifically, when navigating to a job in the browser, the URL looks like this:
-			%[1]shttps://github.com/<org>/<repo>/actions/runs/<run-id>/jobs/<number>%[1]s.
+			%[1]shttps://github.com/<owner>/<repo>/actions/runs/<run-id>/jobs/<number>%[1]s.
 
 			However, this %[1]snumber%[1]s should not be used with the %[1]s--job%[1]s flag and will result in the
 			API returning %[1]s404 NOT FOUND%[1]s. Instead, you can get the correct job IDs using the following command:

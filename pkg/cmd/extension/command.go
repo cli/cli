@@ -102,7 +102,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					When connected to a terminal, this command prints out three columns.
 					The first has a ✓ if the extension is already installed locally. The
-					second is the full name of the extension repository in NAME/OWNER
+					second is the full name of the extension repository in "NAME/OWNER"
 					format. The third is the extension's description.
 
 					When not connected to a terminal, the ✓ character is rendered as the
@@ -300,7 +300,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Long: heredoc.Doc(`
 					Install a GitHub repository locally as a GitHub CLI extension.
 
-					The repository argument can be specified in "owner/repo" format as well as a full URL.
+					The repository argument can be specified in "OWNER/REPO" format as well as a full URL.
 					The URL format is useful when the repository is not hosted on github.com.
 
 					To install an extension in development from the current directory, use "." as the

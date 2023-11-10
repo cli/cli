@@ -47,7 +47,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			is useful to avoid quoting issues when defining expansions.
 
 			If the expansion starts with "!" or if %[1]s--shell%[1]s was given, the expansion is a shell
-			expression that will be evaluated through the "sh" interpreter when the alias is
+			expression that will be evaluated through the %[1]ssh%[1]s interpreter when the alias is
 			invoked. This allows for chaining multiple commands via piping and redirection.
 		`, "`"),
 		Example: heredoc.Doc(`

@@ -85,7 +85,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			is selected.
 
 			When targeting a branch that requires a merge queue, no merge strategy is required.
-			If required checks have not yet passed, AutoMerge will be enabled.
+			If required checks have not yet passed, auto-merge will be enabled.
 			If required checks have passed, the pull request will be added to the merge queue.
 			To bypass a merge queue and merge directly, pass the %[1]s--admin%[1]s flag.
     	`, "`"),

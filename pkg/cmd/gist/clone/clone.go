@@ -47,7 +47,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 			- by ID, e.g. 5b0e0062eb8e9654adad7bb1d81cc75f
 			- by URL, e.g. "https://gist.github.com/OWNER/5b0e0062eb8e9654adad7bb1d81cc75f"
 
-			Pass additional %[1]sgit clone%[1]s flags by listing them after '--'.
+			Pass additional %[1]sgit clone%[1]s flags by listing them after "--".
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Gist = args[0]
