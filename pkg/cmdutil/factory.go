@@ -93,8 +93,6 @@ func executable(fallbackName string) string {
 			if realP == realExe {
 				return p
 			}
-				return p
-			}
 		}
 	}
 
