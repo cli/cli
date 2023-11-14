@@ -355,7 +355,7 @@ func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we logout
-	err = authCfg.Logout(host, user)
+	_, err = authCfg.Logout(host, user)
 
 	// Then we return success, and the host and token are removed from the config and keyring
 	require.NoError(t, err)
@@ -381,7 +381,7 @@ func TestLogoutIgnoresErrorsFromConfigAndKeyring(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	// When we logout
-	err := authCfg.Logout("github.com", "test-user")
+	_, err := authCfg.Logout("github.com", "test-user")
 
 	// Then it returns success anyway, suppressing the errors
 	require.NoError(t, err)
@@ -505,7 +505,8 @@ func TestLogoutRigthAfterMigrationRemovesHost(t *testing.T) {
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
-	require.NoError(t, authCfg.Logout(host, user))
+	_, err = authCfg.Logout(host, user)
+	require.NoError(t, err)
 
 	// Then the host is removed from the config
 	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com"})

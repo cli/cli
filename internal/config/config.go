@@ -345,11 +345,106 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
-func (c *AuthConfig) Logout(hostname, username string) error {
-	_ = c.cfg.Remove([]string{hostsKey, hostname})
+// It returns a string of the newly active user, or an empty string if there is none.
+func (c *AuthConfig) Logout(hostname, username string) (string, error) {
+	// First we remove the keyring entries (if they exist)
 	_ = keyring.Delete(keyringServiceName(hostname), "")
 	_ = keyring.Delete(keyringServiceName(hostname), username)
-	return ghConfig.Write(c.cfg)
+
+	// Then we remove the token at the host level config (if there is one)
+	_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
+
+	// Then we remove the user entry
+	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
+
+	// Then we'll attempt to switch to another user
+
+	// Get all the logged in users for this host, that way we can set one to active if there is one,
+	// otherwise delete the entire host.
+	users, err := c.cfg.Keys([]string{hostsKey, hostname, usersKey})
+	if err != nil {
+		return "", fmt.Errorf("failed to get the users from the hosts config for %s: %v", hostname, err)
+	}
+
+	// If we remove the active user from the list of users and there are none left, then
+	// we should remove the entire host entry.
+	users = remove(users, username)
+	if len(users) == 0 {
+		_ = c.cfg.Remove([]string{hostsKey, hostname})
+		if err := ghConfig.Write(c.cfg); err != nil {
+			return "", fmt.Errorf("failed to write the config: %v", err)
+		}
+
+		return "", nil
+	}
+
+	// Otherwise we remove the user entry
+	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
+
+	// If there is an insecure token set, then we'll pull that up, otherwise we'll set the secure token
+	// TODO: should it do these both always? Is there any chance both can be set?
+	newActiveUser := users[0]
+	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, newActiveUser, oauthTokenKey}); err == nil {
+		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
+	} else {
+		token, err := keyring.Get(keyringServiceName(hostname), newActiveUser)
+		if err != nil {
+			return "", fmt.Errorf("failed to get the token from the keyring: %v", err)
+		}
+
+		if err := keyring.Set(keyringServiceName(hostname), "", token); err != nil {
+			return "", fmt.Errorf("failed to set the token in the keyring: %v", err)
+		}
+	}
+
+	if err := ghConfig.Write(c.cfg); err != nil {
+		return "", fmt.Errorf("failed to write the config: %v", err)
+	}
+
+	return newActiveUser, nil
+}
+
+func (c *AuthConfig) UsersForHost(hostname string) ([]string, error) {
+	users, err := c.cfg.Keys([]string{hostsKey, hostname, usersKey})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the users from the hosts config for %s: %v", hostname, err)
+	}
+
+	return users, nil
+}
+
+// Note that this only works after we stop considering host and user specific keys
+// as equivalent. Otherwise we need to pull up all keys to the host level and maybe
+// delete old ones and then it all gets complicated
+func (c *AuthConfig) Switch(hostname, username string) error {
+	// First we remove the keyring entry (if there is one)
+	_ = keyring.Delete(keyringServiceName(hostname), "")
+
+	// Then we remove the token at the host level config (if there is one)
+	_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
+
+	// Then we change the active user
+	c.cfg.Set([]string{hostsKey, hostname, userKey}, username)
+
+	// If there is an insecure token set, then we'll pull that up, otherwise we'll set the secure token
+	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, username, oauthTokenKey}); err == nil {
+		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
+	} else {
+		token, err := keyring.Get(keyringServiceName(hostname), username)
+		if err != nil {
+			return fmt.Errorf("failed to get the token from the keyring: %v", err)
+		}
+
+		if err := keyring.Set(keyringServiceName(hostname), "", token); err != nil {
+			return fmt.Errorf("failed to set the token in the keyring: %v", err)
+		}
+	}
+
+	if err := ghConfig.Write(c.cfg); err != nil {
+		return fmt.Errorf("failed to write the config: %v", err)
+	}
+
+	return nil
 }
 
 func keyringServiceName(hostname string) string {
@@ -476,4 +571,14 @@ func DataDir() string {
 
 func ConfigDir() string {
 	return ghConfig.ConfigDir()
+}
+
+func remove[T comparable](l []T, item T) []T {
+	out := make([]T, 0)
+	for _, element := range l {
+		if element != item {
+			out = append(out, element)
+		}
+	}
+	return out
 }

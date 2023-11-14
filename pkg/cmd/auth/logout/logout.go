@@ -125,7 +125,8 @@ func logoutRun(opts *LogoutOptions) error {
 		usernameStr = fmt.Sprintf(" account '%s'", username)
 	}
 
-	if err := authCfg.Logout(hostname, username); err != nil {
+	newActiveUser, err := authCfg.Logout(hostname, username)
+	if err != nil {
 		return fmt.Errorf("failed to write config, authentication configuration not updated: %w", err)
 	}
 
@@ -135,6 +136,15 @@ func logoutRun(opts *LogoutOptions) error {
 		cs := opts.IO.ColorScheme()
 		fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s%s\n",
 			cs.SuccessIcon(), cs.Bold(hostname), usernameStr)
+
+		if newActiveUser != "" {
+			fmt.Fprintf(opts.IO.ErrOut,
+				"%s Switched to %s on %s\n",
+				cs.SuccessIcon(),
+				cs.Bold(newActiveUser),
+				cs.Bold(hostname),
+			)
+		}
 	}
 
 	return nil
