@@ -184,8 +184,7 @@ func getUsername(c *config.Config, hostname, token string, transport http.RoundT
 
 func migrateToken(hostname, username string, tokenSource tokenSource) error {
 	// If token is not currently stored in the keyring do not migrate it,
-	// as it is being stored in the config and is being handled when
-	// when migrating the config.
+	// as it is being stored in the config and is being handled when migrating the config.
 	if !tokenSource.inKeyring {
 		return nil
 	}
