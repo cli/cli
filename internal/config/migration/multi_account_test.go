@@ -1,6 +1,7 @@
 package migration_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -252,6 +253,40 @@ hosts:
 	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "users", "monalisa", "git_protocol"}, "ssh")
 }
 
+func TestMigrationRemovesHostsWithInvalidTokens(t *testing.T) {
+	// Simulates config when user is logged in securely
+	// but no token entry is in the keyring.
+	keyring.MockInit()
+	cfg := config.ReadFromString(`
+hosts:
+  github.com:
+    user: user1
+    git_protocol: ssh
+`)
+
+	m := migration.MultiAccount{}
+	require.NoError(t, m.Do(cfg))
+
+	requireNoKey(t, cfg, []string{"hosts", "github.com"})
+}
+
+func TestMigrationErrorsWhenUnableToGetExpectedSecureToken(t *testing.T) {
+	// Simulates config when user is logged in securely
+	// but no token entry is in the keyring.
+	keyring.MockInitWithError(errors.New("keyring test error"))
+	cfg := config.ReadFromString(`
+hosts:
+  github.com:
+    user: user1
+    git_protocol: ssh
+`)
+
+	m := migration.MultiAccount{}
+	err := m.Do(cfg)
+
+	require.ErrorContains(t, err, `couldn't find oauth token for "github.com": keyring test error`)
+}
+
 func requireKeyWithValue(t *testing.T, cfg *config.Config, keys []string, value string) {
 	t.Helper()
 
@@ -259,4 +294,12 @@ func requireKeyWithValue(t *testing.T, cfg *config.Config, keys []string, value 
 	require.NoError(t, err)
 
 	require.Equal(t, value, actual)
+}
+
+func requireNoKey(t *testing.T, cfg *config.Config, keys []string) {
+	t.Helper()
+
+	_, err := cfg.Get(keys)
+	var keyNotFoundError *config.KeyNotFoundError
+	require.ErrorAs(t, err, &keyNotFoundError)
 }

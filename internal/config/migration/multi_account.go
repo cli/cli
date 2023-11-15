@@ -10,6 +10,8 @@ import (
 	"github.com/cli/go-gh/v2/pkg/config"
 )
 
+var noTokenError = errors.New("no token found")
+
 type CowardlyRefusalError struct {
 	err error
 }
@@ -20,6 +22,11 @@ func (e CowardlyRefusalError) Error() string {
 }
 
 var hostsKey = []string{"hosts"}
+
+type tokenSource struct {
+	token     string
+	inKeyring bool
+}
 
 // This migration exists to take a hosts section of the following structure:
 //
@@ -95,12 +102,21 @@ func (m MultiAccount) Do(c *config.Config) error {
 
 	// Otherwise let's get to the business of migrating!
 	for _, hostname := range hostnames {
-		token, inKeyring, err := getToken(c, hostname)
+		tokenSource, err := getToken(c, hostname)
+		// If no token existed for this host we'll remove the entry from the hosts file
+		// by deleting it and moving on to the next one.
+		if errors.Is(err, noTokenError) {
+			// The only error that can be returned here is the key not existing, which
+			// we know can't be true.
+			_ = c.Remove(append(hostsKey, hostname))
+			continue
+		}
+		// For any other error we'll error out
 		if err != nil {
 			return CowardlyRefusalError{fmt.Errorf("couldn't find oauth token for %q: %w", hostname, err)}
 		}
 
-		username, err := getUsername(c, hostname, token, m.Transport)
+		username, err := getUsername(c, hostname, tokenSource.token, m.Transport)
 		if err != nil {
 			return CowardlyRefusalError{fmt.Errorf("couldn't get user name for %q: %w", hostname, err)}
 		}
@@ -109,7 +125,7 @@ func (m MultiAccount) Do(c *config.Config) error {
 			return CowardlyRefusalError{fmt.Errorf("couldn't not migrate config for %q: %w", hostname, err)}
 		}
 
-		if err := migrateToken(hostname, username, token, inKeyring); err != nil {
+		if err := migrateToken(hostname, username, tokenSource); err != nil {
 			return CowardlyRefusalError{fmt.Errorf("couldn't not migrate oauth token for %q: %w", hostname, err)}
 		}
 	}
@@ -117,18 +133,27 @@ func (m MultiAccount) Do(c *config.Config) error {
 	return nil
 }
 
-func getToken(c *config.Config, hostname string) (string, bool, error) {
+func getToken(c *config.Config, hostname string) (tokenSource, error) {
 	if token, _ := c.Get(append(hostsKey, hostname, "oauth_token")); token != "" {
-		return token, false, nil
+		return tokenSource{token: token, inKeyring: false}, nil
 	}
 	token, err := keyring.Get(keyringServiceName(hostname), "")
-	if err != nil {
-		return "", false, err
+
+	// If we have an error and it's not relating to there being no token
+	// then we'll return the error cause that's really unexpected.
+	if err != nil && !errors.Is(err, keyring.ErrNotFound) {
+		return tokenSource{}, err
 	}
-	if token == "" {
-		return "", false, errors.New("token not found in config or keyring")
+
+	// Otherwise we'll return a sentinel error
+	if err != nil || token == "" {
+		return tokenSource{}, noTokenError
 	}
-	return token, true, nil
+
+	return tokenSource{
+		token:     token,
+		inKeyring: true,
+	}, nil
 }
 
 func getUsername(c *config.Config, hostname, token string, transport http.RoundTripper) (string, error) {
@@ -157,14 +182,14 @@ func getUsername(c *config.Config, hostname, token string, transport http.RoundT
 	return query.Viewer.Login, nil
 }
 
-func migrateToken(hostname, username, token string, inKeyring bool) error {
+func migrateToken(hostname, username string, tokenSource tokenSource) error {
 	// If token is not currently stored in the keyring do not migrate it,
 	// as it is being stored in the config and is being handled when
 	// when migrating the config.
-	if !inKeyring {
+	if !tokenSource.inKeyring {
 		return nil
 	}
-	return keyring.Set(keyringServiceName(hostname), username, token)
+	return keyring.Set(keyringServiceName(hostname), username, tokenSource.token)
 }
 
 func migrateConfig(c *config.Config, hostname, username string) error {
