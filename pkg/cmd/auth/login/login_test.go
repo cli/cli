@@ -18,6 +18,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func stubHomeDir(t *testing.T, dir string) {
@@ -401,6 +402,34 @@ func Test_loginRun_nontty(t *testing.T) {
 			wantHosts:       "github.com:\n    user: monalisa\n    users:\n        monalisa:\n",
 			wantSecureToken: "abc123",
 		},
+		{
+			name: "given we are already logged in, a new user is added to the config",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+				Token:    "newUserToken",
+			},
+			cfgStubs: func(c *config.ConfigMock) {
+				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
+				require.NoError(t, err)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"newUser"}}}`))
+			},
+			wantHosts: heredoc.Doc(`
+                github.com:
+                    users:
+                        monalisa:
+                            oauth_token: abc123
+                            git_protocol: https
+                        newUser:
+                    user: newUser
+                    git_protocol: https
+            `),
+			wantSecureToken: "newUserToken",
+		},
 	}
 
 	for _, tt := range tests {
@@ -466,32 +495,6 @@ func Test_loginRun_Survey(t *testing.T) {
 		wantErrOut      *regexp.Regexp
 		wantSecureToken string
 	}{
-		{
-			name: "already authenticated",
-			opts: &LoginOptions{
-				Interactive: true,
-			},
-			cfgStubs: func(c *config.ConfigMock) {
-				authCfg := c.Authentication()
-				authCfg.SetToken("ghi789", "oauth_token")
-				c.AuthenticationFunc = func() *config.AuthConfig {
-					return authCfg
-				}
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
-			},
-			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
-					if prompt == "What account do you want to log into?" {
-						return prompter.IndexFor(opts, "GitHub.com")
-					}
-					return -1, prompter.NoSuchPromptErr(prompt)
-				}
-			},
-			wantHosts:  "",
-			wantErrOut: nil,
-		},
 		{
 			name: "hostname set",
 			opts: &LoginOptions{
