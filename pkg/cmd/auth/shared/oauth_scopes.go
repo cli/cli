@@ -3,6 +3,7 @@ package shared
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 
@@ -43,6 +44,9 @@ func GetScopes(httpClient httpClient, hostname, authToken string) (string, error
 	req.Header.Set("Authorization", "token "+authToken)
 
 	res, err := httpClient.Do(req)
+	if err, ok := err.(net.Error); ok && err.Timeout() {
+		return "", err
+	}
 	if err != nil {
 		return "", err
 	}
