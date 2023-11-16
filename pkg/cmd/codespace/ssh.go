@@ -712,7 +712,7 @@ func newCpCmd(app *App) *cobra.Command {
 			provided by untrusted users; see <https://lwn.net/Articles/835962/> for discussion.
 			
 			By default, the 'cp' command will create a public/private ssh key pair to authenticate with 
-			the codespace inside the ~/.ssh directory.
+			the codespace inside the %[1]s~/.ssh directory%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh codespace cp -e README.md 'remote:/workspaces/$RepositoryName/'
