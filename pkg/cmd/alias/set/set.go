@@ -43,7 +43,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			inserted appropriately. Otherwise, extra arguments will be appended to the expanded
 			command.
 
-			Use "-" as expansion argument to read the expansion string from standard input. This
+			Use %[1]s-%[1]s as expansion argument to read the expansion string from standard input. This
 			is useful to avoid quoting issues when defining expansions.
 
 			If the expansion starts with "!" or if %[1]s--shell%[1]s was given, the expansion is a shell

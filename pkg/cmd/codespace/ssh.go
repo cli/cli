@@ -70,7 +70,7 @@ func newSSHCmd(app *App) *cobra.Command {
 			option that generates per-codespace ssh configuration in OpenSSH format.
 			Including this configuration in your %[1]s~/.ssh/config%[1]s improves the user experience
 			of tools that integrate with OpenSSH, such as Bash/Zsh completion of ssh hostnames,
-			remote path completion for %[1]sscp%[1]s/%[1]srsync%[1]s/%[1]ssshfs%[1]s, git ssh remotes, and so on.
+			remote path completion for %[1]sscp/rsync/sshfs%[1]s, git ssh remotes, and so on.
 
 			Once that is set up (see the second example below), you can ssh to codespaces as
 			if they were ordinary remote hosts (using %[1]sssh%[1]s, not %[1]sgh cs ssh%[1]s).

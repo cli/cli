@@ -44,7 +44,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 		Long: heredoc.Docf(`
 			Rerun an entire run, only failed jobs, or a specific job from a run.
 
-			Note that due for historical reasons, the %[1]s--job%[1]s flag may not take what you expect.
+			Note that due to historical reasons, the %[1]s--job%[1]s flag may not take what you expect.
 			Specifically, when navigating to a job in the browser, the URL looks like this:
 			%[1]shttps://github.com/<owner>/<repo>/actions/runs/<run-id>/jobs/<number>%[1]s.
 

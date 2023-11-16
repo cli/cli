@@ -102,7 +102,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					When connected to a terminal, this command prints out three columns.
 					The first has a ✓ if the extension is already installed locally. The
-					second is the full name of the extension repository in "NAME/OWNER"
+					second is the full name of the extension repository in "OWNER/REPO"
 					format. The third is the extension's description.
 
 					When not connected to a terminal, the ✓ character is rendered as the

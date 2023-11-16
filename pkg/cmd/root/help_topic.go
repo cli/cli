@@ -91,9 +91,9 @@ var HelpTopics = []helpTopic{
 
 			%[1]sGH_CONFIG_DIR%[1]s: the directory where gh will store configuration files. If not specified, 
 			the default value will be one of the following paths (in order of precedence):
-			  - "$XDG_CONFIG_HOME/gh" (if $XDG_CONFIG_HOME is set),
-			  - "$AppData/GitHub CLI" (on Windows if $AppData is set), or
-			  - "$HOME/.config/gh".
+			  - %[1]s$XDG_CONFIG_HOME/gh%[1]s (if %[1]s$XDG_CONFIG_HOME%[1]s is set),
+			  - %[1]s$AppData/GitHub CLI%[1]s (on Windows if %[1]s$AppData%[1]s is set), or
+			  - %[1]s$HOME/.config/gh%[1]s.
 
 			%[1]sGH_PROMPT_DISABLED%[1]s: set to any value to disable interactive prompting in the terminal.
 
@@ -138,7 +138,7 @@ var HelpTopics = []helpTopic{
 			- %[1]stablerow <fields>...%[1]s: aligns fields in output vertically as a table
 			- %[1]stablerender%[1]s: renders fields added by tablerow in place
 			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
-			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
+			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's %[1]sTime.Format%[1]s function
 			- %[1]struncate <length> <input>%[1]s: ensures input fits within length
 			- %[1]shyperlink <url> <text>%[1]s: renders a terminal hyperlink
 

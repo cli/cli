@@ -53,7 +53,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Create a new GitHub gist with given contents.
 
-			Gists can be created from one or multiple files. Alternatively, pass "-" as
+			Gists can be created from one or multiple files. Alternatively, pass %[1]s-%[1]s as
 			file name to read from standard input.
 
 			By default, gists are secret; use %[1]s--public%[1]s to make publicly listed ones.

@@ -62,8 +62,8 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			If the workflow file supports inputs, they can be specified in a few ways:
 
 			- Interactively
-			- via %[1]s-f/--raw-field%[1]s or %[1]s-F/--field%[1]s flags
-			- As JSON, via STDIN
+			- Via %[1]s-f/--raw-field%[1]s or %[1]s-F/--field%[1]s flags
+			- As JSON, via standard input
     `, "`"),
 		Example: heredoc.Doc(`
 			# Have gh prompt you for what workflow you'd like to run and interactively collect inputs
