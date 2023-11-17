@@ -479,6 +479,24 @@ func TestListRun(t *testing.T) {
 			wantErr:    true,
 			wantErrMsg: "no runs found",
 		},
+		{
+			name: "commit filter applied",
+			opts: &ListOptions{
+				Limit:   defaultLimit,
+				Commit:  "1234567890123456789012345678901234567890",
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
+						"head_sha": []string{"1234567890123456789012345678901234567890"},
+					}),
+					httpmock.JSONResponse(shared.RunsPayload{}),
+				)
+			},
+			wantErr:    true,
+			wantErrMsg: "no runs found",
+		},
 	}
 
 	for _, tt := range tests {
