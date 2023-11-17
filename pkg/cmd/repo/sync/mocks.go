@@ -33,11 +33,6 @@ func (g *mockGitClient) Fetch(a, b string) error {
 	return args.Error(0)
 }
 
-func (g *mockGitClient) HasCommonAncestor(a, b string) (bool, error) {
-	args := g.Called(a, b)
-	return args.Bool(0), args.Error(1)
-}
-
 func (g *mockGitClient) HasLocalBranch(a string) bool {
 	args := g.Called(a)
 	return args.Bool(0)

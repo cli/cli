@@ -14,7 +14,6 @@ type gitClient interface {
 	UpdateBranch(string, string) error
 	CreateBranch(string, string, string) error
 	Fetch(string, string) error
-	HasCommonAncestor(string, string) (bool, error)
 	HasLocalBranch(string) bool
 	IsAncestor(string, string) (bool, error)
 	IsDirty() (bool, error)
@@ -77,16 +76,6 @@ func (g *gitExecuter) Fetch(remote, ref string) error {
 		return err
 	}
 	return cmd.Run()
-}
-
-func (g *gitExecuter) HasCommonAncestor(commit1, commit2 string) (bool, error) {
-	args := []string{"merge-base", commit1, commit2}
-	cmd, err := g.client.Command(context.Background(), args...)
-	if err != nil {
-		return false, err
-	}
-	_, err = cmd.Output()
-	return err == nil, nil
 }
 
 func (g *gitExecuter) HasLocalBranch(branch string) bool {

@@ -125,7 +125,6 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
-				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("MergeFastForward", "FETCH_HEAD").Return(nil).Once()
@@ -142,7 +141,6 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
-				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("MergeFastForward", "FETCH_HEAD").Return(nil).Once()
@@ -160,7 +158,6 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", "upstream", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
-				mgc.On("BranchRemote", "trunk").Return("upstream", nil).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("MergeFastForward", "FETCH_HEAD").Return(nil).Once()
@@ -178,7 +175,6 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
-				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(false, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("ResetHard", "FETCH_HEAD").Return(nil).Once()
@@ -194,7 +190,6 @@ func Test_SyncRun(t *testing.T) {
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
-				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(false, nil).Once()
 			},
 			wantErr: true,
@@ -209,8 +204,6 @@ func Test_SyncRun(t *testing.T) {
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
-				mgc.On("BranchRemote", "trunk").Return("upstream", nil).Once()
-				mgc.On("HasCommonAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("IsDirty").Return(false, nil).Once()
@@ -227,11 +220,10 @@ func Test_SyncRun(t *testing.T) {
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
-				mgc.On("BranchRemote", "trunk").Return("upstream", nil).Once()
-				mgc.On("HasCommonAncestor", "trunk", "FETCH_HEAD").Return(false, nil).Once()
+				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(false, nil).Once()
 			},
 			wantErr: true,
-			errMsg:  "can't sync because trunk is not tracking OWNER/REPO",
+			errMsg:  "can't sync because there are diverging changes; use `--force` to overwrite the destination branch",
 		},
 		{
 			name: "sync local repo with parent and local changes",
@@ -242,7 +234,6 @@ func Test_SyncRun(t *testing.T) {
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
-				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
 				mgc.On("IsDirty").Return(true, nil).Once()
@@ -259,7 +250,6 @@ func Test_SyncRun(t *testing.T) {
 			gitStubs: func(mgc *mockGitClient) {
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
-				mgc.On("BranchRemote", "trunk").Return("origin", nil).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
 				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(nil).Once()
