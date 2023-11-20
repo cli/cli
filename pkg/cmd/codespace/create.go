@@ -110,7 +110,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
-	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "display name for the codespace")
+	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "display name for the codespace (48 characters or less)")
 
 	return createCmd
 }
@@ -280,6 +280,10 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		if machine == "" {
 			return errors.New("there are no available machine types for this repository")
 		}
+	}
+
+	if len(opts.displayName) > 48 { // 48 is the max length of the display name in the API
+		return fmt.Errorf("error creating codespace: display name should contains 48 characters max or less")
 	}
 
 	createParams := &api.CreateCodespaceParams{
