@@ -229,7 +229,6 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 		if err != nil {
 			return err
 		}
-
 		if !fastForward && !useForce {
 			return divergingError
 		}

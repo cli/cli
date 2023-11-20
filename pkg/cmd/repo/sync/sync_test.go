@@ -122,11 +122,11 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 			},
 			gitStubs: func(mgc *mockGitClient) {
-				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("MergeFastForward", "FETCH_HEAD").Return(nil).Once()
 			},
 			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
@@ -138,11 +138,11 @@ func Test_SyncRun(t *testing.T) {
 				Branch: "trunk",
 			},
 			gitStubs: func(mgc *mockGitClient) {
-				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("MergeFastForward", "FETCH_HEAD").Return(nil).Once()
 			},
 			wantStdout: "",
@@ -155,11 +155,11 @@ func Test_SyncRun(t *testing.T) {
 				SrcArg: "OWNER2/REPO2",
 			},
 			gitStubs: func(mgc *mockGitClient) {
-				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", "upstream", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("MergeFastForward", "FETCH_HEAD").Return(nil).Once()
 			},
 			wantStdout: "✓ Synced the \"trunk\" branch from OWNER2/REPO2 to local repository\n",
@@ -172,14 +172,32 @@ func Test_SyncRun(t *testing.T) {
 				Force:  true,
 			},
 			gitStubs: func(mgc *mockGitClient) {
-				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(false, nil).Once()
 				mgc.On("CurrentBranch").Return("trunk", nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("ResetHard", "FETCH_HEAD").Return(nil).Once()
 			},
 			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
+		},
+		{
+			name: "sync local repo with specified source repo and force specified",
+			tty:  true,
+			opts: &SyncOptions{
+				Branch: "trunk",
+				SrcArg: "OWNER2/REPO2",
+				Force:  true,
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", "upstream", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
+				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(false, nil).Once()
+				mgc.On("CurrentBranch").Return("trunk", nil).Once()
+				mgc.On("IsDirty").Return(false, nil).Once()
+				mgc.On("ResetHard", "FETCH_HEAD").Return(nil).Once()
+			},
+			wantStdout: "✓ Synced the \"trunk\" branch from OWNER2/REPO2 to local repository\n",
 		},
 		{
 			name: "sync local repo with parent and not fast forward merge",
@@ -196,29 +214,14 @@ func Test_SyncRun(t *testing.T) {
 			errMsg:  "can't sync because there are diverging changes; use `--force` to overwrite the destination branch",
 		},
 		{
-			name: "sync local repo with upstream remote",
+			name: "sync local repo with specified source repo and not fast forward merge",
 			tty:  true,
 			opts: &SyncOptions{
 				Branch: "trunk",
+				SrcArg: "OWNER2/REPO2",
 			},
 			gitStubs: func(mgc *mockGitClient) {
-				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
-				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
-				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
-				mgc.On("CurrentBranch").Return("trunk", nil).Once()
-				mgc.On("IsDirty").Return(false, nil).Once()
-				mgc.On("MergeFastForward", "FETCH_HEAD").Return(nil).Once()
-			},
-			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
-		},
-		{
-			name: "sync local repo with parent and mismatching branch remotes",
-			tty:  true,
-			opts: &SyncOptions{
-				Branch: "trunk",
-			},
-			gitStubs: func(mgc *mockGitClient) {
-				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("Fetch", "upstream", "refs/heads/trunk").Return(nil).Once()
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(false, nil).Once()
 			},
