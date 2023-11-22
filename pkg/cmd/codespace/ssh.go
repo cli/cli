@@ -701,7 +701,7 @@ func newCpCmd(app *App) *cobra.Command {
 
 			The %[1]s--recursive%[1]s flag is required if any source is a directory.
 
-			A "remote:" prefix on any file name argument indicates that it refers to
+			A %[1]sremote:%[1]s prefix on any file name argument indicates that it refers to
 			the file system of the remote (Codespace) machine. It is resolved relative
 			to the home directory of the remote user.
 

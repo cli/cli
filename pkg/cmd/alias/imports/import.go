@@ -47,7 +47,7 @@ func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Co
 			        issue list
 			        --label=enhancement
 
-			Use "-" to read aliases (in YAML format) from standard input.
+			Use %[1]s-%[1]s to read aliases (in YAML format) from standard input.
 
 			The output from %[1]sgh alias list%[1]s can be used to produce a YAML file
 			containing your aliases, which you can use to import them from one machine to

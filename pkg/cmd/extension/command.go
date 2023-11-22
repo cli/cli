@@ -38,7 +38,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		Long: heredoc.Docf(`
 			GitHub CLI extensions are repositories that provide additional gh commands.
 
-			The name of the extension repository must start with "gh-" and it must contain an
+			The name of the extension repository must start with %[1]sgh-%[1]s and it must contain an
 			executable of the same name. All arguments passed to the %[1]sgh <extname>%[1]s invocation
 			will be forwarded to the %[1]sgh-<extname>%[1]s executable of the extension.
 
@@ -102,7 +102,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					When connected to a terminal, this command prints out three columns.
 					The first has a ✓ if the extension is already installed locally. The
-					second is the full name of the extension repository in "OWNER/REPO"
+					second is the full name of the extension repository in %[1]sOWNER/REPO%[1]s
 					format. The third is the extension's description.
 
 					When not connected to a terminal, the ✓ character is rendered as the
@@ -300,10 +300,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Long: heredoc.Doc(`
 					Install a GitHub repository locally as a GitHub CLI extension.
 
-					The repository argument can be specified in "OWNER/REPO" format as well as a full URL.
+					The repository argument can be specified in %[1]sOWNER/REPO%[1]s format as well as a full URL.
 					The URL format is useful when the repository is not hosted on github.com.
 
-					To install an extension in development from the current directory, use "." as the
+					To install an extension in development from the current directory, use %[1]s.%[1]s as the
 					value of the repository argument.
 
 					See the list of available extensions at <https://github.com/topics/gh-extension>.
@@ -436,10 +436,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					interface for browsing, adding, and removing gh extensions. A terminal
 					width greater than 100 columns is recommended.
 
-					To learn how to control this interface, press ? after running to see
+					To learn how to control this interface, press %[1]s?%[1]s after running to see
 					the help text.
 
-					Press q to quit.
+					Press %[1]sq%[1]s to quit.
 
 					Running this command with %[1]s--single-column%[1]s should make this command
 					more intelligible for users who rely on assistive technology like screen
@@ -492,14 +492,14 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		&cobra.Command{
 			Use:   "exec <name> [args]",
 			Short: "Execute an installed extension",
-			Long: heredoc.Doc(`
+			Long: heredoc.Docf(`
 				Execute an extension using the short name. For example, if the extension repository is
-				"owner/gh-extension", you should pass "extension". You can use this command when
+				%[1]sowner/gh-extension%[1]s, you should pass %[1]sextension%[1]s. You can use this command when
 				the short name conflicts with a core gh command.
 
 				All arguments after the extension name will be forwarded to the executable
 				of the extension.
-			`),
+			`, "`"),
 			Example: heredoc.Doc(`
 				# execute a label extension instead of the core gh label command
 				$ gh extension exec label

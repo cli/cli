@@ -34,7 +34,7 @@ var HelpTopics = []helpTopic{
 			  You can run %[1]sC:\Program Files\Git\bin\bash.exe%[1]s from any terminal emulator to continue
 			  using all of the tooling in Git For Windows without MinTTY.
 
-			- Prefix invocations of gh with winpty, eg: %[1]swinpty gh auth login%[1]s.
+			- Prefix invocations of gh with %[1]swinpty%[1]s, eg: %[1]swinpty gh auth login%[1]s.
 			  NOTE: this can lead to some UI bugs.
 		`, "`"),
 	},
@@ -61,23 +61,23 @@ var HelpTopics = []helpTopic{
 
 			%[1]sGH_BROWSER%[1]s, %[1]sBROWSER%[1]s (in order of precedence): the web browser to use for opening links.
 
-			%[1]sGH_DEBUG%[1]s: set to a truthy value to enable verbose output on standard error. Set to "api"
+			%[1]sGH_DEBUG%[1]s: set to a truthy value to enable verbose output on standard error. Set to %[1]sapi%[1]s
 			to additionally log details of HTTP traffic.
 
-			%[1]sDEBUG%[1]s (deprecated): set to "1", "true", or "yes" to enable verbose output on standard
+			%[1]sDEBUG%[1]s (deprecated): set to %[1]s1%[1]s, %[1]strue%[1]s, or %[1]syes%[1]s to enable verbose output on standard
 			error.
 
 			%[1]sGH_PAGER%[1]s, %[1]sPAGER%[1]s (in order of precedence): a terminal paging program to send standard output
-			to, e.g. "less".
+			to, e.g. %[1]sless%[1]s.
 
 			%[1]sGLAMOUR_STYLE%[1]s: the style to use for rendering Markdown. See
 			<https://github.com/charmbracelet/glamour#styles>
 
 			%[1]sNO_COLOR%[1]s: set to any value to avoid printing ANSI escape sequences for color output.
 
-			%[1]sCLICOLOR%[1]s: set to "0" to disable printing ANSI colors in output.
+			%[1]sCLICOLOR%[1]s: set to %[1]s0%[1]s to disable printing ANSI colors in output.
 
-			%[1]sCLICOLOR_FORCE%[1]s: set to a value other than "0" to keep ANSI colors in output
+			%[1]sCLICOLOR_FORCE%[1]s: set to a value other than %[1]s0%[1]s to keep ANSI colors in output
 			even when the output is piped.
 
 			%[1]sGH_FORCE_TTY%[1]s: set to any value to force terminal-style output even when the output is

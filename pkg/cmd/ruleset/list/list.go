@@ -48,7 +48,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			configured for the provided organization.
 
 			Use the %[1]s--parents%[1]s flag to control whether rulesets configured at higher levels that also apply to the provided
-			repository or organization should be returned. The default is true.
+			repository or organization should be returned. The default is %[1]strue%[1]s.
 			
 			Your access token must have the "admin:org" scope to use the %[1]s--org%[1]s flag, which can be granted by running %[1]sgh auth refresh -s admin:org%[1]s.
 		`, "`"),

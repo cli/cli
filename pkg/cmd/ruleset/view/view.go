@@ -52,7 +52,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			
 			Use the %[1]s--parents%[1]s flag to control whether rulesets configured at higher
 			levels that also apply to the provided repository or organization should
-			be returned. The default is true.
+			be returned. The default is %[1]strue%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Interactively choose a ruleset to view from all rulesets that apply to the current repository
