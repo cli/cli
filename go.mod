@@ -9,11 +9,11 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/charmbracelet/glamour v0.6.0
 	github.com/charmbracelet/lipgloss v0.5.0
-	github.com/cli/go-gh/v2 v2.4.1-0.20231024095351-47a83eeb1778
+	github.com/cli/go-gh/v2 v2.4.1-0.20231120145612-d32c104a9a25
 	github.com/cli/oauth v1.0.1
 	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.3
-	github.com/creack/pty v1.1.20
+	github.com/creack/pty v1.1.21
 	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/gdamore/tcell/v2 v2.5.4
 	github.com/google/go-cmp v0.5.9

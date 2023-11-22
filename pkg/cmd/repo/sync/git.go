@@ -3,13 +3,11 @@ package sync
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/cli/cli/v2/git"
 )
 
 type gitClient interface {
-	BranchRemote(string) (string, error)
 	CurrentBranch() (string, error)
 	UpdateBranch(string, string) error
 	CreateBranch(string, string, string) error
@@ -23,20 +21,6 @@ type gitClient interface {
 
 type gitExecuter struct {
 	client *git.Client
-}
-
-func (g *gitExecuter) BranchRemote(branch string) (string, error) {
-	args := []string{"rev-parse", "--symbolic-full-name", "--abbrev-ref", fmt.Sprintf("%s@{u}", branch)}
-	cmd, err := g.client.Command(context.Background(), args...)
-	if err != nil {
-		return "", err
-	}
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	parts := strings.SplitN(string(out), "/", 2)
-	return parts[0], nil
 }
 
 func (g *gitExecuter) UpdateBranch(branch, ref string) error {
