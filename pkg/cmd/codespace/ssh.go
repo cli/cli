@@ -70,14 +70,14 @@ func newSSHCmd(app *App) *cobra.Command {
 			option that generates per-codespace ssh configuration in OpenSSH format.
 			Including this configuration in your %[1]s~/.ssh/config%[1]s improves the user experience
 			of tools that integrate with OpenSSH, such as Bash/Zsh completion of ssh hostnames,
-			remote path completion for %[1]sscp/rsync/sshfs%[1]s, git ssh remotes, and so on.
+			remote path completion for %[1]sscp/rsync/sshfs%[1]s, %[1]sgit%[1]s ssh remotes, and so on.
 
 			Once that is set up (see the second example below), you can ssh to codespaces as
 			if they were ordinary remote hosts (using %[1]sssh%[1]s, not %[1]sgh cs ssh%[1]s).
 
 			Note that the codespace you are connecting to must have an SSH server pre-installed.
 			If the docker image being used for the codespace does not have an SSH server,
-			install it in your Dockerfile or, for codespaces that use Debian-based images,
+			install it in your %[1]sDockerfile%[1]s or, for codespaces that use Debian-based images,
 			you can add the following to your %[1]sdevcontainer.json%[1]s:
 
 				"features": {

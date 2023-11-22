@@ -71,7 +71,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			Makes an authenticated HTTP request to the GitHub API and prints the response.
 
 			The endpoint argument should either be a path of a GitHub API v3 endpoint, or
-			"graphql" to access the GitHub API v4.
+			%[1]sgraphql%[1]s to access the GitHub API v4.
 
 			Placeholder values %[1]s{owner}%[1]s, %[1]s{repo}%[1]s, and %[1]s{branch}%[1]s in the endpoint
 			argument will get replaced with values from the repository of the current

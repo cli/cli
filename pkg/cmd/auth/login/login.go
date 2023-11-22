@@ -69,7 +69,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			This method is most suitable for "headless" use of gh such as in automation. See
 			%[1]sgh help environment%[1]s for more info.
 
-			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to "env".
+			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to %[1]senv%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# start interactive setup

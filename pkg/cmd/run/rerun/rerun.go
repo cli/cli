@@ -48,7 +48,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			Specifically, when navigating to a job in the browser, the URL looks like this:
 			%[1]shttps://github.com/<owner>/<repo>/actions/runs/<run-id>/jobs/<number>%[1]s.
 
-			However, this %[1]snumber%[1]s should not be used with the %[1]s--job%[1]s flag and will result in the
+			However, this %[1]s<number>%[1]s should not be used with the %[1]s--job%[1]s flag and will result in the
 			API returning %[1]s404 NOT FOUND%[1]s. Instead, you can get the correct job IDs using the following command:
 			%[1]sgh run view <run-id> --json jobs --jq '.jobs[] | {name, databaseId}'%[1]s.
 		`, "`"),

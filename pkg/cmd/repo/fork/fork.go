@@ -94,7 +94,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 
 			The %[1]supstream%[1]s remote will be set as the default remote repository.
 
-			Additional git clone flags can be passed after %[1]s--%[1]s.
+			Additional %[1]sgit clone%[1]s flags can be passed after %[1]s--%[1]s.
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptOk := opts.IO.CanPrompt()
