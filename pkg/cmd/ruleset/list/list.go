@@ -50,7 +50,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			Use the %[1]s--parents%[1]s flag to control whether rulesets configured at higher levels that also apply to the provided
 			repository or organization should be returned. The default is %[1]strue%[1]s.
 			
-			Your access token must have the "admin:org" scope to use the %[1]s--org%[1]s flag, which can be granted by running %[1]sgh auth refresh -s admin:org%[1]s.
+			Your access token must have the %[1]sadmin:org%[1]s scope to use the %[1]s--org%[1]s flag, which can be granted by running %[1]sgh auth refresh -s admin:org%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# List rulesets in the current repository

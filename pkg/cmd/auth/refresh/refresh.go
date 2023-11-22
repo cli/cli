@@ -68,7 +68,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 
 			The %[1]s--remove-scopes%[1]s flag accepts a comma separated list of scopes you
 			want to remove from your gh credentials. Scope removal is idempotent.
-			The minimum set of scopes ("repo", "read:org" and "gist") cannot be removed.
+			The minimum set of scopes (%[1]srepo%[1]s, %[1]sread:org%[1]s, and %[1]sgist%[1]s) cannot be removed.
 
 			The %[1]s--reset-scopes%[1]s flag resets the scopes for your gh credentials to
 			the default set of scopes for your auth flow.

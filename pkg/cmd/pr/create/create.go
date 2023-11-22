@@ -118,7 +118,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			By default, users with write access to the base repository can push new commits to the
 			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
 
-			Adding a pull request to projects requires authorization with the "project" scope.
+			Adding a pull request to projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`

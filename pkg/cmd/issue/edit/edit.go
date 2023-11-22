@@ -53,7 +53,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		Long: heredoc.Docf(`
 			Edit one or more issues within the same repository.
 
-			Editing issues' projects requires authorization with the "project" scope.
+			Editing issues' projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`

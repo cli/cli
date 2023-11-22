@@ -59,7 +59,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Create an issue on GitHub.
 
-			Adding an issue to projects requires authorization with the "project" scope.
+			Adding an issue to projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
