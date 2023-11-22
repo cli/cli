@@ -125,7 +125,7 @@ var HelpTopics = []helpTopic{
 			array, fields from an object, create a new array, and more. The %[1]sjq%[1]s utility does not need
 			to be installed on the system to use this formatting directive. When connected to a terminal,
 			the output is automatically pretty-printed. To learn about jq query syntax, see:
-			<https://stedolan.github.io/jq/manual/v1.6/>
+			<https://jqlang.github.io/jq/manual/>
 
 			The %[1]s--template%[1]s flag requires a string argument in Go template syntax, and will only print
 			those JSON values which match the query.
