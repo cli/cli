@@ -80,13 +80,13 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			any value that contains %[1]s{...}%[1]s in quotes to prevent the shell from
 			applying special meaning to curly braces.
 
-			The default HTTP request method is "GET" normally and "POST" if any parameters
+			The default HTTP request method is %[1]sGET%[1]s normally and %[1]sPOST%[1]s if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
 
 			Pass one or more %[1]s-f/--raw-field%[1]s values in %[1]skey=value%[1]s format to add static string
 			parameters to the request payload. To add non-string or placeholder-determined values, see
 			%[1]s-F/--field%[1]s below. Note that adding request parameters will automatically switch the
-			request method to "POST". To send the parameters as a "GET" query string instead, use
+			request method to %[1]sPOST%[1]s. To send the parameters as a %[1]sGET%[1]s query string instead, use
 			%[1]s--method GET%[1]s.
 
 			The %[1]s-F/--field%[1]s flag has magic type conversion based on the format of the value:
