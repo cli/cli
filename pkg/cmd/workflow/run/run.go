@@ -57,7 +57,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			Create a %[1]sworkflow_dispatch%[1]s event for a given workflow.
 
 			This command will trigger GitHub Actions to run a given workflow file. The given workflow file must
-			support a %[1]son.workflow_dispatch%[1]s trigger in order to be run in this way.
+			support an %[1]son.workflow_dispatch%[1]s trigger in order to be run in this way.
 
 			If the workflow file supports inputs, they can be specified in a few ways:
 

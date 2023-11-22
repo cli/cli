@@ -98,7 +98,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			When using automatically generated release notes, a release title will also be automatically
 			generated unless a title was explicitly passed. Additional release notes can be prepended to
-			automatically generated notes by using the notes parameter.
+			automatically generated notes by using the %[1]s--notes%[1]s flag.
 		`, "`"),
 		Example: heredoc.Doc(`
 			Interactively create a release

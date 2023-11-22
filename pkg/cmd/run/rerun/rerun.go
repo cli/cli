@@ -50,7 +50,8 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 
 			However, this %[1]s<number>%[1]s should not be used with the %[1]s--job%[1]s flag and will result in the
 			API returning %[1]s404 NOT FOUND%[1]s. Instead, you can get the correct job IDs using the following command:
-			%[1]sgh run view <run-id> --json jobs --jq '.jobs[] | {name, databaseId}'%[1]s.
+			
+				gh run view <run-id> --json jobs --jq '.jobs[] | {name, databaseId}'
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

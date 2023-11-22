@@ -48,7 +48,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			Without an argument, the pull request that belongs to the current branch
 			is displayed.
 
-			With %[1]s--web%[1]s, open the pull request in a web browser instead.
+			With %[1]s--web%[1]s flag, open the pull request in a web browser instead.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

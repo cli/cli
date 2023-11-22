@@ -43,7 +43,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			will be forwarded to the %[1]sgh-<extname>%[1]s executable of the extension.
 
 			An extension cannot override any of the core gh commands. If an extension name conflicts
-			with a core gh command you can use %[1]sgh extension exec <extname>%[1]s.
+			with a core gh command, you can use %[1]sgh extension exec <extname>%[1]s.
 
 			See the list of available extensions at <https://github.com/topics/gh-extension>.
 		`, "`"),
@@ -107,7 +107,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					When not connected to a terminal, the ✓ character is rendered as the
 					word "installed" but otherwise the order and content of the columns
-					is the same.
+					are the same.
 
 					This command behaves similarly to %[1]sgh search repos%[1]s but does not
 					support as many search qualifiers. For a finer grained search of
