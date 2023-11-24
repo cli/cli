@@ -151,9 +151,6 @@ func syncLocalRepo(opts *SyncOptions) error {
 		if errors.Is(err, divergingError) {
 			return fmt.Errorf("can't sync because there are diverging changes; use `--force` to overwrite the destination branch")
 		}
-		if errors.Is(err, mismatchRemotesError) {
-			return fmt.Errorf("can't sync because %s is not tracking %s", opts.Branch, ghrepo.FullName(srcRepo))
-		}
 		return err
 	}
 
@@ -220,7 +217,6 @@ func syncRemoteRepo(opts *SyncOptions) error {
 }
 
 var divergingError = errors.New("diverging changes")
-var mismatchRemotesError = errors.New("branch remote does not match specified source")
 
 func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOptions) error {
 	git := opts.Git
@@ -229,19 +225,10 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 
 	hasLocalBranch := git.HasLocalBranch(branch)
 	if hasLocalBranch {
-		branchRemote, err := git.BranchRemote(branch)
-		if err != nil {
-			return err
-		}
-		if branchRemote != remote {
-			return mismatchRemotesError
-		}
-
 		fastForward, err := git.IsAncestor(branch, "FETCH_HEAD")
 		if err != nil {
 			return err
 		}
-
 		if !fastForward && !useForce {
 			return divergingError
 		}
