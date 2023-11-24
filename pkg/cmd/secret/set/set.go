@@ -3,6 +3,7 @@ package set
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/hashicorp/go-multierror"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/nacl/box"
@@ -263,7 +263,7 @@ func setRun(opts *SetOptions) error {
 	for i := 0; i < len(secrets); i++ {
 		result := <-setc
 		if result.err != nil {
-			err = multierror.Append(err, result.err)
+			err = errors.Join(err, result.err)
 			continue
 		}
 		if result.encrypted != "" {

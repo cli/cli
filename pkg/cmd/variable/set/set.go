@@ -2,6 +2,7 @@ package set
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,7 +16,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/hashicorp/go-multierror"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
@@ -206,7 +206,7 @@ func setRun(opts *SetOptions) error {
 	for i := 0; i < len(variables); i++ {
 		result := <-setc
 		if result.Err != nil {
-			err = multierror.Append(err, result.Err)
+			err = errors.Join(err, result.Err)
 			continue
 		}
 		if !opts.IO.IsStdoutTTY() {
