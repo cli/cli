@@ -194,6 +194,12 @@ func TestNewCmdCreate(t *testing.T) {
 			cli:      "--fill --fill-first",
 			wantsErr: true,
 		},
+		{
+			name:     "dry-run and web",
+			tty:      false,
+			cli:      "--web --dry-run",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -299,6 +305,21 @@ func Test_createRun(t *testing.T) {
 				return func() {}
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
+		},
+		{
+			name: "dry-run",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.DryRun = true
+				return func() {}
+			},
+			expectedOut:    "Would have created a Pull Request with map[baseRefName:master body:my body draft:false headRefName:feature maintainerCanModify:false title:my title]",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 		{
 			name: "survey",

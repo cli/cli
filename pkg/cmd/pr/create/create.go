@@ -63,6 +63,8 @@ type CreateOptions struct {
 
 	MaintainerCanModify bool
 	Template            string
+
+	DryRun bool
 }
 
 type CreateContext struct {
@@ -181,6 +183,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `fill-first`) when not running interactively")
 			}
 
+			if opts.DryRun && opts.WebMode {
+				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -206,6 +212,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
+	fl.BoolVar(&opts.DryRun, "dry-run", false, "Dry run mode")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -694,6 +701,13 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	err := shared.AddMetadataToIssueParams(client, ctx.BaseRepo, params, &state)
 	if err != nil {
 		return err
+	}
+
+	if opts.DryRun {
+		if opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "Would have created a Pull Request with %v", params)
+		}
+		return nil
 	}
 
 	opts.IO.StartProgressIndicator()
