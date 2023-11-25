@@ -482,8 +482,8 @@ func TestListRun(t *testing.T) {
 		{
 			name: "commit filter applied",
 			opts: &ListOptions{
-				Limit:   defaultLimit,
-				Commit:  "1234567890123456789012345678901234567890",
+				Limit:  defaultLimit,
+				Commit: "1234567890123456789012345678901234567890",
 			},
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
