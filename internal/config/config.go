@@ -300,35 +300,24 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 // If the encrypt option is specified it will first try to store the auth token
 // in encrypted storage and will fall back to the plain text config file.
 func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secureStorage bool) (bool, error) {
+	// In this section we set up the users config
 	var setErr error
 	if secureStorage {
-		// Set the current active oauth token
-		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
-			// And set the oauth token under the user to support later auth switch
-			// and logout switch without another migration.
-			setErr = keyring.Set(keyringServiceName(hostname), username, token)
-		}
+		// Try to set the token for this user in the encrypted storage for later switching
+		setErr = keyring.Set(keyringServiceName(hostname), username, token)
 		if setErr == nil {
-			// Clean up the previous oauth_tokens from the config file.
-			_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
+			// Clean up the previous oauth_token from the config file, if there were one
 			_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username, oauthTokenKey})
 		}
 	}
 	insecureStorageUsed := false
 	if !secureStorage || setErr != nil {
-		// Set the current active oauth token
-		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
-		// And set the oauth token under the user to support later auth switch
-		// and logout switch without another migration.
+		// And set the oauth token under the user for later switching
 		c.cfg.Set([]string{hostsKey, hostname, usersKey, username, oauthTokenKey}, token)
 		insecureStorageUsed = true
 	}
 
-	c.cfg.Set([]string{hostsKey, hostname, userKey}, username)
-
 	if gitProtocol != "" {
-		// Set the git protocol
-		c.cfg.Set([]string{hostsKey, hostname, gitProtocolKey}, gitProtocol)
 		// And set the git protocol under the user to support later auth switch
 		// and logout switch without another migration.
 		c.cfg.Set([]string{hostsKey, hostname, usersKey, username, gitProtocolKey}, gitProtocol)
@@ -340,7 +329,39 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 		c.cfg.Set([]string{hostsKey, hostname, usersKey, username}, "")
 	}
 
-	return insecureStorageUsed, ghConfig.Write(c.cfg)
+	// Then we perform a switch to the new user
+	return insecureStorageUsed, c.switchUser(hostname, username)
+}
+
+func (c *AuthConfig) switchUser(hostname, user string) error {
+	// We first need to idempotently clear out any set tokens for the host
+	_ = keyring.Delete(keyringServiceName(hostname), "")
+	_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
+
+	// Then we'll move the keyring token or insecure token as necessary, only one of the
+	// following branches should be true.
+
+	// If there is a token in the secure keyring for the user, move it to the active slot
+	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
+		if err = keyring.Set(keyringServiceName(hostname), "", token); err != nil {
+			return fmt.Errorf("failed to move active token in keyring: %v", err)
+		}
+	}
+
+	// If there is a token in the insecure config for the user, move it to the active field
+	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, oauthTokenKey}); err == nil {
+		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
+	}
+
+	// Then we'll ensure the git protocol is moved as well
+	if gitProtocol, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, gitProtocolKey}); err == nil {
+		c.cfg.Set([]string{hostsKey, hostname, gitProtocolKey}, gitProtocol)
+	}
+
+	// Then we'll update the active user for the host
+	c.cfg.Set([]string{hostsKey, hostname, userKey}, user)
+
+	return ghConfig.Write(c.cfg)
 }
 
 // Logout will remove user, git protocol, and auth token for the given hostname.
