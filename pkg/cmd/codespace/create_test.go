@@ -201,7 +201,7 @@ func TestApp_Create(t *testing.T) {
 				displayName: "this-is-very-long-display-name-with-49-characters",
 			},
 			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
-			wantErr:    fmt.Errorf("error creating codespace: display name should contains 48 characters max or less"),
+			wantErr:    fmt.Errorf("error creating codespace: display name should contain a maximum of %d characters", displayNameMaxLength),
 		},
 		{
 			name: "create codespace with devcontainer path results in selecting the correct machine type",
