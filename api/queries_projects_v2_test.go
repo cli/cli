@@ -229,21 +229,13 @@ func TestProjectsV2ItemsForPullRequest(t *testing.T) {
 				Nodes: []*ProjectV2Item{
 					{
 						ID: "PVTI_lADOB-vozM4AVk16zgK6U50",
-						Project: struct {
-							ID    string `json:"id"`
-							Title string `json:"title"`
-						}{
+						Project: ProjectV2ItemProject{
 							ID:    "PVT_kwDOB-vozM4AVk16",
 							Title: "Test Project",
 						},
-						Status: Status{
-							StatusFragment: struct {
-								OptionID string `json:"optionId"`
-								Name     string `json:"name"`
-							}{
-								OptionID: "47fc9ee4",
-								Name:     "In Progress",
-							},
+						Status: ProjectV2ItemStatus{
+							OptionID: "47fc9ee4",
+							Name:     "In Progress",
 						},
 					},
 				},
