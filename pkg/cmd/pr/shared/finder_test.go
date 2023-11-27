@@ -411,7 +411,7 @@ func TestFind(t *testing.T) {
 			wantRepo: "https://github.com/OWNER/REPO",
 		},
 		{
-			name: "inclduing project items",
+			name: "including project items",
 			args: args{
 				selector: "",
 				fields:   []string{"projectItems"},
