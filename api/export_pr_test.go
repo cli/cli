@@ -75,38 +75,6 @@ func TestIssue_ExportData(t *testing.T) {
 				}
 			`),
 		},
-		{
-			name:   "project items",
-			fields: []string{"projectItems"},
-			inputJSON: heredoc.Doc(`
-				{ "projectItems": { "nodes": [
-					{
-						"id": "PVTI_id",
-						"project": {
-							"id": "PVT_id",
-							"title": "Some Project"
-						},
-						"status": {
-							"name": "Todo",
-							"optionId": "abc123"
-						}
-					}
-				] } }
-			`),
-			outputJSON: heredoc.Doc(`
-				{
-					"projectItems": [
-						{
-							"status": {
-								"optionId": "abc123",
-								"name": "Todo"
-							},
-							"title": "Some Project"
-						}
-					]
-				}
-			`),
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -213,38 +181,6 @@ func TestPullRequest_ExportData(t *testing.T) {
 				}
 			`),
 		},
-		{
-			name:   "project items",
-			fields: []string{"projectItems"},
-			inputJSON: heredoc.Doc(`
-				{ "projectItems": { "nodes": [
-					{
-						"id": "PVTPR_id",
-						"project": {
-							"id": "PVT_id",
-							"title": "Some Project"
-						},
-						"status": {
-							"name": "Todo",
-							"optionId": "abc123"
-						}
-					}
-				] } }
-			`),
-			outputJSON: heredoc.Doc(`
-				{
-					"projectItems": [
-						{
-							"status": {
-								"optionId": "abc123",
-								"name": "Todo"
-							},
-							"title": "Some Project"
-						}
-					]
-				}
-			`),
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -268,4 +204,109 @@ func TestPullRequest_ExportData(t *testing.T) {
 			assert.Equal(t, expectData, gotData)
 		})
 	}
+}
+
+// The following tests exist separately from the table driven tests
+// above because in the implementation code, the GraphQL request is
+// performed by shurcool, and it handles the JSON decoding into the
+// response struct, which is slightly different than the stdlib JSON
+// decoder used by the rest of the requests when Finding an Issue or PR.
+func TestIssueExportProjectItems(t *testing.T) {
+	issue := Issue{
+		ProjectItems: ProjectItems{
+			Nodes: []*ProjectV2Item{
+				{
+					ID: "PVTI_lADOB-vozM4AVk16zgK6U50",
+					Project: struct {
+						ID    string `json:"id"`
+						Title string `json:"title"`
+					}{
+						ID:    "PVT_kwDOB-vozM4AVk16",
+						Title: "Test Project",
+					},
+					Status: Status{
+						StatusFragment: struct {
+							OptionID string `json:"optionId"`
+							Name     string `json:"name"`
+						}{
+							OptionID: "47fc9ee4",
+							Name:     "In Progress",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expectedExportedJSON := heredoc.Doc(`
+				{
+					"projectItems": [
+						{
+							"status": {
+								"optionId": "47fc9ee4",
+								"name": "In Progress"
+							},
+							"title": "Test Project"
+						}
+					]
+				}
+			`)
+
+	exported := issue.ExportData([]string{"projectItems"})
+
+	buf := bytes.Buffer{}
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "\t")
+	require.NoError(t, enc.Encode(exported))
+	require.Equal(t, expectedExportedJSON, buf.String())
+}
+
+func TestPRExportProjectItems(t *testing.T) {
+	pr := PullRequest{
+		ProjectItems: ProjectItems{
+			Nodes: []*ProjectV2Item{
+				{
+					ID: "PVTI_lADOB-vozM4AVk16zgK6U50",
+					Project: struct {
+						ID    string `json:"id"`
+						Title string `json:"title"`
+					}{
+						ID:    "PVT_kwDOB-vozM4AVk16",
+						Title: "Test Project",
+					},
+					Status: Status{
+						StatusFragment: struct {
+							OptionID string `json:"optionId"`
+							Name     string `json:"name"`
+						}{
+							OptionID: "47fc9ee4",
+							Name:     "In Progress",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	expectedExportedJSON := heredoc.Doc(`
+				{
+					"projectItems": [
+						{
+							"status": {
+								"optionId": "47fc9ee4",
+								"name": "In Progress"
+							},
+							"title": "Test Project"
+						}
+					]
+				}
+			`)
+
+	exported := pr.ExportData([]string{"projectItems"})
+
+	buf := bytes.Buffer{}
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "\t")
+	require.NoError(t, enc.Encode(exported))
+	require.Equal(t, expectedExportedJSON, buf.String())
 }

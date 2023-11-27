@@ -236,12 +236,14 @@ func TestProjectsV2ItemsForPullRequest(t *testing.T) {
 							ID:    "PVT_kwDOB-vozM4AVk16",
 							Title: "Test Project",
 						},
-						Status: struct {
-							OptionID string `json:"optionId" graphql:"... on ProjectV2ItemFieldSingleSelectValue{optionId}"`
-							Name     string `json:"name" graphql:"... on ProjectV2ItemFieldSingleSelectValue{name}"`
-						}{
-							OptionID: "47fc9ee4",
-							Name:     "In Progress",
+						Status: Status{
+							StatusFragment: struct {
+								OptionID string `json:"optionId"`
+								Name     string `json:"name"`
+							}{
+								OptionID: "47fc9ee4",
+								Name:     "In Progress",
+							},
 						},
 					},
 				},
