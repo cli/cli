@@ -102,7 +102,7 @@ func Test_statusRun(t *testing.T) {
 			wantErr: "SilentError",
 			wantErrOut: heredoc.Doc(`
 			joel.miller
-			  X joel.miller: timeout exceeded
+			  X joel.miller: timeout trying to connect to host
 			`),
 		},
 		{

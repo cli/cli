@@ -109,7 +109,7 @@ func statusRun(opts *StatusOptions) error {
 		scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
 		if err != nil {
 			if err, ok := err.(net.Error); ok && err.Timeout() {
-				addMsg("%s %s: timeout exceeded", cs.Red("X"), hostname)
+				addMsg("%s %s: timeout trying to connect to host", cs.Red("X"), hostname)
 			} else {
 				addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
 				addMsg("- The %s token in %s is invalid.", cs.Bold(hostname), tokenSource)
