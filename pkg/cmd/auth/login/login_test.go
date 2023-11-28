@@ -403,7 +403,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			wantSecureToken: "abc123",
 		},
 		{
-			name: "given we are already logged in, a new user is added to the config",
+			name: "given we are already logged in, and log in as a new user, it is added to the config",
 			opts: &LoginOptions{
 				Hostname: "github.com",
 				Token:    "newUserToken",
@@ -676,6 +676,50 @@ func Test_loginRun_Survey(t *testing.T) {
             `),
 			wantErrOut:      regexp.MustCompile("Logged in as jillv"),
 			wantSecureToken: "def456",
+		},
+		{
+			name: "given we log in as a user that is already in the config, we get an informational message",
+			opts: &LoginOptions{
+				Hostname:        "github.com",
+				Interactive:     true,
+				InsecureStorage: true,
+			},
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+					switch prompt {
+					case "What is your preferred protocol for Git operations?":
+						return prompter.IndexFor(opts, "HTTPS")
+					case "How would you like to authenticate GitHub CLI?":
+						return prompter.IndexFor(opts, "Paste an authentication token")
+					}
+					return -1, prompter.NoSuchPromptErr(prompt)
+				}
+			},
+			cfgStubs: func(c *config.ConfigMock) {
+				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
+				require.NoError(t, err)
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git config credential\.https:/`, 1, "")
+				rs.Register(`git config credential\.helper`, 1, "")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
+			},
+			wantHosts: heredoc.Doc(`
+            github.com:
+                users:
+                    monalisa:
+                        oauth_token: def456
+                        git_protocol: https
+                git_protocol: https
+                user: monalisa
+                oauth_token: def456
+            `),
+			wantErrOut: regexp.MustCompile(`! You were already logged in to this account`),
 		},
 	}
 

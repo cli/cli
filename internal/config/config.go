@@ -373,6 +373,15 @@ func (c *AuthConfig) Logout(hostname, username string) error {
 	return ghConfig.Write(c.cfg)
 }
 
+func (c *AuthConfig) UsersForHost(hostname string) ([]string, error) {
+	users, err := c.cfg.Keys([]string{hostsKey, hostname, usersKey})
+	if err != nil {
+		return nil, fmt.Errorf("unknown host: %s", hostname)
+	}
+
+	return users, nil
+}
+
 func keyringServiceName(hostname string) string {
 	return "gh:" + hostname
 }
