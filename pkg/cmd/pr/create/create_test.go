@@ -307,21 +307,6 @@ func Test_createRun(t *testing.T) {
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
 		{
-			name: "dry-run",
-			tty:  true,
-			setup: func(opts *CreateOptions, t *testing.T) func() {
-				opts.TitleProvided = true
-				opts.BodyProvided = true
-				opts.Title = "my title"
-				opts.Body = "my body"
-				opts.HeadBranch = "feature"
-				opts.DryRun = true
-				return func() {}
-			},
-			expectedOut:    "Would have created a Pull Request with map[baseRefName:master body:my body draft:false headRefName:feature maintainerCanModify:false title:my title]",
-			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
-		},
-		{
 			name: "survey",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
@@ -1242,6 +1227,127 @@ func Test_determineTrackingBranch(t *testing.T) {
 			}
 			ref := determineTrackingBranch(gitClient, tt.remotes, "feature")
 			tt.assert(ref, t)
+		})
+	}
+}
+
+func Test_draft(t *testing.T) {
+	tests := []struct {
+		name            string
+		setup           func(*CreateOptions, *testing.T) func()
+		cmdStubs        func(*run.CommandStubber)
+		promptStubs     func(*prompter.PrompterMock)
+		httpStubs       func(*httpmock.Registry, *testing.T)
+		expectedOutputs []string
+		expectedErrOut  string
+		expectedBrowse  string
+		wantErr         string
+		tty             bool
+	}{
+		{
+			name: "dry-run",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.DryRun = true
+				return func() {}
+			},
+			expectedOutputs: []string{
+				"Would have created a Pull Request with:",
+				`title:	my title`,
+				`draft:	false`,
+				`--`,
+				`my body`,
+			},
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			branch := "feature"
+
+			reg := &httpmock.Registry{}
+			reg.StubRepoInfoResponse("OWNER", "REPO", "master")
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg, t)
+			}
+
+			pm := &prompter.PrompterMock{}
+
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
+			}
+
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+			cs.Register(`git status --porcelain`, 0, "")
+
+			if tt.cmdStubs != nil {
+				tt.cmdStubs(cs)
+			}
+
+			opts := CreateOptions{}
+			opts.Prompter = pm
+
+			ios, _, stdout, stderr := iostreams.Test()
+			// TODO do i need to bother with this
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+			browser := &browser.Stub{}
+			opts.IO = ios
+			opts.Browser = browser
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			opts.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			opts.Remotes = func() (context.Remotes, error) {
+				return context.Remotes{
+					{
+						Remote: &git.Remote{
+							Name:     "origin",
+							Resolved: "base",
+						},
+						Repo: ghrepo.New("OWNER", "REPO"),
+					},
+				}, nil
+			}
+			opts.Branch = func() (string, error) {
+				return branch, nil
+			}
+			opts.Finder = shared.NewMockFinder(branch, nil, nil)
+			opts.GitClient = &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
+			cleanSetup := func() {}
+			if tt.setup != nil {
+				cleanSetup = tt.setup(&opts, t)
+			}
+			defer cleanSetup()
+
+			err := createRun(&opts)
+			output := &test.CmdOut{
+				OutBuf:     stdout,
+				ErrBuf:     stderr,
+				BrowsedURL: browser.BrowsedURL(),
+			}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+				//nolint:staticcheck // prefer exact matchers over ExpectLines
+				test.ExpectLines(t, output.String(), tt.expectedOutputs...)
+				assert.Equal(t, tt.expectedErrOut, output.Stderr())
+				assert.Equal(t, tt.expectedBrowse, output.BrowsedURL)
+			}
 		})
 	}
 }

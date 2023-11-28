@@ -23,6 +23,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -280,7 +281,7 @@ func createRun(opts *CreateOptions) (err error) {
 	if err != nil && !errors.As(err, &notFound) {
 		return fmt.Errorf("error checking for existing pull request: %w", err)
 	}
-	if err == nil {
+	if err == nil && !opts.DryRun {
 		return fmt.Errorf("a pull request for branch %q into branch %q already exists:\n%s",
 			ctx.HeadBranchLabel, ctx.BaseBranch, existingPR.URL)
 	}
@@ -704,8 +705,68 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	}
 
 	if opts.DryRun {
-		if opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Would have created a Pull Request with %v", params)
+		out := opts.IO.Out
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprint(out, "Would have created a Pull Request with:\n")
+			fmt.Fprintf(out, "title:\t%s\n", params["title"])
+			fmt.Fprintf(out, "draft:\t%t\n", params["draft"])
+			if len(state.Labels) != 0 {
+				fmt.Fprintf(out, "labels:\t%v\n", state.Labels)
+			}
+			if len(state.Reviewers) != 0 {
+				fmt.Fprintf(out, "reviewers:\t%v\n", state.Reviewers)
+			}
+			if len(state.Assignees) != 0 {
+				fmt.Fprintf(out, "assignees:\t%v\n", state.Assignees)
+			}
+			if len(state.Milestones) != 0 {
+				fmt.Fprintf(out, "milestones:\t%v\n", state.Milestones)
+			}
+			if len(state.Projects) != 0 {
+				fmt.Fprintf(out, "projects:\t%v\n", state.Projects)
+			}
+			if len(params["body"].(string)) != 0 {
+				fmt.Fprintln(out, "--")
+				fmt.Fprintln(out, params["body"])
+			}
+		} else {
+			cs := opts.IO.ColorScheme()
+			fmt.Fprintf(out, "%s\n", cs.Bold(params["title"].(string)))
+			if len(state.Labels) != 0 {
+				fmt.Fprint(out, cs.Bold("Labels: "))
+				fmt.Fprintln(out, state.Labels)
+			}
+			if len(state.Reviewers) != 0 {
+				fmt.Fprint(out, cs.Bold("Reviewers: "))
+				fmt.Fprintln(out, state.Reviewers)
+			}
+			if len(state.Assignees) != 0 {
+				fmt.Fprint(out, cs.Bold("Assignees: "))
+				fmt.Fprintln(out, state.Assignees)
+			}
+			if len(state.Milestones) != 0 {
+				fmt.Fprint(out, cs.Bold("Milestones: "))
+				fmt.Fprintln(out, state.Milestones)
+			}
+			if len(state.Projects) != 0 {
+				fmt.Fprint(out, cs.Bold("Projects: "))
+				fmt.Fprintln(out, state.Projects)
+			}
+
+			// Body
+			var md string
+			var err error
+			if len(params["body"].(string)) == 0 {
+				md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
+			} else {
+				md, err = markdown.Render(params["body"].(string),
+					markdown.WithTheme(opts.IO.TerminalTheme()),
+					markdown.WithWrap(opts.IO.TerminalWidth()))
+				if err != nil {
+					return err
+				}
+			}
+			fmt.Fprintf(out, "\n%s\n", md)
 		}
 		return nil
 	}
