@@ -18,24 +18,21 @@ import (
 
 func Test_NewCmdLogout(t *testing.T) {
 	tests := []struct {
-		name     string
-		cli      string
-		wants    LogoutOptions
-		wantsErr bool
-		tty      bool
+		name  string
+		cli   string
+		wants LogoutOptions
+		tty   bool
 	}{
 		{
-			name:     "nontty no arguments",
-			cli:      "",
-			wantsErr: true,
+			name:  "nontty no arguments",
+			cli:   "",
+			wants: LogoutOptions{},
 		},
 		{
-			name: "tty no arguments",
-			tty:  true,
-			cli:  "",
-			wants: LogoutOptions{
-				Hostname: "",
-			},
+			name:  "tty no arguments",
+			tty:   true,
+			cli:   "",
+			wants: LogoutOptions{},
 		},
 		{
 			name: "tty with hostname",
@@ -50,6 +47,38 @@ func Test_NewCmdLogout(t *testing.T) {
 			cli:  "--hostname github.com",
 			wants: LogoutOptions{
 				Hostname: "github.com",
+			},
+		},
+		{
+			name: "tty with user",
+			tty:  true,
+			cli:  "--user monalisa",
+			wants: LogoutOptions{
+				Username: "github.com",
+			},
+		},
+		{
+			name: "nontty with user",
+			cli:  "--user monalisa",
+			wants: LogoutOptions{
+				Username: "github.com",
+			},
+		},
+		{
+			name: "tty with hostname and user",
+			tty:  true,
+			cli:  "--hostname github.com --user monalisa",
+			wants: LogoutOptions{
+				Hostname: "github.com",
+				Username: "monalisa",
+			},
+		},
+		{
+			name: "nontty with hostname and user",
+			cli:  "--hostname github.com --user monalisa",
+			wants: LogoutOptions{
+				Hostname: "github.com",
+				Username: "monalisa",
 			},
 		},
 	}
@@ -79,15 +108,10 @@ func Test_NewCmdLogout(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
-			if tt.wantsErr {
-				require.Error(t, err)
-				return
-			}
 			require.NoError(t, err)
 
 			require.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
 		})
-
 	}
 }
 
@@ -111,7 +135,7 @@ func Test_logoutRun_tty(t *testing.T) {
 		wantErr       string
 	}{
 		{
-			name: "no arguments, multiple hosts with one user each",
+			name: "logs out prompted user when multiple known hosts with one user each",
 			opts: &LogoutOptions{},
 			cfgHosts: []hostUsers{
 				{"ghe.io", []user{"monalisa-ghe"}},
@@ -126,7 +150,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'monalisa'`),
 		},
 		{
-			name: "no arguments, multiple hosts with multiple users each",
+			name: "logs out prompted user when multiple known hosts with multiple users each",
 			opts: &LogoutOptions{},
 			cfgHosts: []hostUsers{
 				{"ghe.io", []user{"monalisa-ghe", "monalisa-ghe2"}},
@@ -141,7 +165,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'monalisa'`),
 		},
 		{
-			name: "no arguments, one host, one user",
+			name: "logs out only logged in user",
 			opts: &LogoutOptions{},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{"monalisa"}},
@@ -150,7 +174,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'monalisa'`),
 		},
 		{
-			name: "no arguments, one host, multiple users",
+			name: "logs out prompted user when one known host with multiple users",
 			opts: &LogoutOptions{},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{"monalisa", "monalisa2"}},
@@ -164,14 +188,10 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'monalisa'`),
 		},
 		{
-			name:    "no arguments, no hosts",
-			opts:    &LogoutOptions{},
-			wantErr: `not logged in to any hosts`,
-		},
-		{
-			name: "hostname",
+			name: "logs out specified user when multiple known hosts with one user each",
 			opts: &LogoutOptions{
 				Hostname: "ghe.io",
+				Username: "monalisa-ghe",
 			},
 			cfgHosts: []hostUsers{
 				{"ghe.io", []user{"monalisa-ghe"}},
@@ -181,27 +201,44 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantErrOut: regexp.MustCompile(`Logged out of ghe.io account 'monalisa-ghe'`),
 		},
 		{
-			name: "hostname but not logged in to it",
-			opts: &LogoutOptions{
-				Hostname: "ghe.io",
-			},
-			cfgHosts: []hostUsers{
-				{"github.com", []user{"monalisa"}},
-			},
-			wantHosts: "github.com:\n    users:\n        monalisa:\n            oauth_token: abc123\n            git_protocol: ssh\n    oauth_token: abc123\n    git_protocol: ssh\n    user: monalisa\n",
-			wantErr:   "not logged in to ghe.io",
-		},
-		{
-			name:          "secure storage",
+			name:          "logs out specified user that is using secure storage",
 			secureStorage: true,
 			opts: &LogoutOptions{
 				Hostname: "github.com",
+				Username: "monalisa",
 			},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{"monalisa"}},
 			},
 			wantHosts:  "{}\n",
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'monalisa'`),
+		},
+		{
+			name:    "errors when no known hosts",
+			opts:    &LogoutOptions{},
+			wantErr: `not logged in to any hosts`,
+		},
+		{
+			name: "errors when specified host is not a known host",
+			opts: &LogoutOptions{
+				Hostname: "ghe.io",
+				Username: "monalisa-ghe",
+			},
+			cfgHosts: []hostUsers{
+				{"github.com", []user{"monalisa"}},
+			},
+			wantErr: "not logged in to ghe.io",
+		},
+		{
+			name: "errors when specified user is not logged in on specified host",
+			opts: &LogoutOptions{
+				Hostname: "ghe.io",
+				Username: "unknown-user",
+			},
+			cfgHosts: []hostUsers{
+				{"ghe.io", []user{"monalisa-ghe"}},
+			},
+			wantErr: "not logged in as unknown-user on ghe.io",
 		},
 	}
 
@@ -212,7 +249,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			cfg := config.NewFromString("")
 			for _, hostUsers := range tt.cfgHosts {
 				for _, user := range hostUsers.users {
-					cfg.Authentication().Login(
+					_, _ = cfg.Authentication().Login(
 						string(hostUsers.host),
 						string(user),
 						"abc123", "ssh", tt.secureStorage,
@@ -271,9 +308,10 @@ func Test_logoutRun_nontty(t *testing.T) {
 		wantErr       string
 	}{
 		{
-			name: "hostname, one host",
+			name: "logs out specified user when one known host",
 			opts: &LogoutOptions{
 				Hostname: "github.com",
+				Username: "monalisa",
 			},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{"monalisa"}},
@@ -281,9 +319,10 @@ func Test_logoutRun_nontty(t *testing.T) {
 			wantHosts: "{}\n",
 		},
 		{
-			name: "hostname, multiple hosts",
+			name: "logs out specified user when multiple known hosts",
 			opts: &LogoutOptions{
 				Hostname: "github.com",
+				Username: "monalisa",
 			},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{"monalisa"}},
@@ -292,22 +331,68 @@ func Test_logoutRun_nontty(t *testing.T) {
 			wantHosts: "ghe.io:\n    users:\n        monalisa-ghe:\n            oauth_token: abc123\n            git_protocol: ssh\n    oauth_token: abc123\n    git_protocol: ssh\n    user: monalisa-ghe\n",
 		},
 		{
-			name: "hostname, no hosts",
-			opts: &LogoutOptions{
-				Hostname: "github.com",
-			},
-			wantErr: `not logged in to any hosts`,
-		},
-		{
-			name:          "secure storage",
+			name:          "logs out specified user that is using secure storage",
 			secureStorage: true,
 			opts: &LogoutOptions{
 				Hostname: "github.com",
+				Username: "monalisa",
 			},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{"monalisa"}},
 			},
 			wantHosts: "{}\n",
+		},
+		{
+			name: "errors when no known hosts",
+			opts: &LogoutOptions{
+				Hostname: "github.com",
+				Username: "monalisa",
+			},
+			wantErr: `not logged in to any hosts`,
+		},
+		{
+			name: "errors when specified host is not a known host",
+			opts: &LogoutOptions{
+				Hostname: "ghe.io",
+				Username: "monalisa-ghe",
+			},
+			cfgHosts: []hostUsers{
+				{"github.com", []user{"monalisa"}},
+			},
+			wantErr: "not logged in to ghe.io",
+		},
+		{
+			name: "errors when specified user is not logged in on specified host",
+			opts: &LogoutOptions{
+				Hostname: "ghe.io",
+				Username: "unknown-user",
+			},
+			cfgHosts: []hostUsers{
+				{"ghe.io", []user{"monalisa-ghe"}},
+			},
+			wantErr: "not logged in as unknown-user on ghe.io",
+		},
+		{
+			name: "errors when host is specified but user is ambiguous",
+			opts: &LogoutOptions{
+				Hostname: "ghe.io",
+			},
+			cfgHosts: []hostUsers{
+				{"ghe.io", []user{"monalisa-ghe"}},
+				{"ghe.io", []user{"monalisa-ghe-2"}},
+			},
+			wantErr: "unable to determine which user account to log out of, please specify `--hostname` and `--user`",
+		},
+		{
+			name: "errors when user is specified but host is ambiguous",
+			opts: &LogoutOptions{
+				Username: "monalisa",
+			},
+			cfgHosts: []hostUsers{
+				{"github.com", []user{"monalisa"}},
+				{"ghe.io", []user{"monalisa"}},
+			},
+			wantErr: "unable to determine which user account to log out of, please specify `--hostname` and `--user`",
 		},
 	}
 
@@ -318,7 +403,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 			cfg := config.NewFromString("")
 			for _, hostUsers := range tt.cfgHosts {
 				for _, user := range hostUsers.users {
-					cfg.Authentication().Login(
+					_, _ = cfg.Authentication().Login(
 						string(hostUsers.host),
 						string(user),
 						"abc123", "ssh", tt.secureStorage,
@@ -337,6 +422,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 			err := logoutRun(tt.opts)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
+				return
 			} else {
 				require.NoError(t, err)
 			}
@@ -375,6 +461,7 @@ func TestLogoutSwitchesUserNonTTY(t *testing.T) {
 			return cfg, nil
 		},
 		Hostname: "github.com",
+		Username: "test-user-2",
 	}
 
 	require.NoError(t, logoutRun(&opts))
