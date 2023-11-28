@@ -177,6 +177,7 @@ func loginRun(opts *LoginOptions) error {
 		if err != nil {
 			return fmt.Errorf("error retrieving current user: %w", err)
 		}
+
 		// Adding a user key ensures that a nonempty host section gets written to the config file.
 		_, loginErr := authCfg.Login(hostname, username, opts.Token, opts.GitProtocol, !opts.InsecureStorage)
 		return loginErr

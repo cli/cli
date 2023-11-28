@@ -387,6 +387,33 @@ func TestLogoutIgnoresErrorsFromConfigAndKeyring(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestUsersForHostNoHost(t *testing.T) {
+	// Given we have a config with no hosts
+	authCfg := newTestAuthConfig(t)
+
+	// When we get the users for a host that doesn't exist
+	_, err := authCfg.UsersForHost("github.com")
+
+	// Then it returns an error
+	require.EqualError(t, err, "unknown host: github.com")
+}
+
+func TestUsersForHostWithUsers(t *testing.T) {
+	// Given we have a config with a host and users
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token", "ssh", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token", "ssh", false)
+	require.NoError(t, err)
+
+	// When we get the users for that host
+	users, err := authCfg.UsersForHost("github.com")
+
+	// Then it succeeds and returns the users
+	require.NoError(t, err)
+	require.Equal(t, []string{"test-user-1", "test-user-2"}, users)
+}
+
 func requireKeyWithValue(t *testing.T, cfg *ghConfig.Config, keys []string, value string) {
 	t.Helper()
 

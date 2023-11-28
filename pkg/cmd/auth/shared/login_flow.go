@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -23,6 +24,7 @@ const defaultSSHKeyTitle = "GitHub CLI"
 
 type iconfig interface {
 	Login(string, string, string, string, bool) (bool, error)
+	UsersForHost(string) ([]string, error)
 }
 
 type LoginOptions struct {
@@ -183,6 +185,15 @@ func Login(opts *LoginOptions) error {
 		}
 	}
 
+	// Get these users before adding the new one, so that we can
+	// check whether the user was already logged in later.
+	//
+	// In this case we ignore the error if the host doesn't exist
+	// because that can occur when the user is logging into a host
+	// for the first time.
+	usersForHost, _ := cfg.UsersForHost(hostname)
+	userWasAlreadyLoggedIn := slices.Contains(usersForHost, username)
+
 	if gitProtocol != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
@@ -217,6 +228,10 @@ func Login(opts *LoginOptions) error {
 	}
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", cs.SuccessIcon(), cs.Bold(username))
+	if userWasAlreadyLoggedIn {
+		fmt.Fprintf(opts.IO.ErrOut, "%s You were already logged in to this account\n", cs.WarningIcon())
+	}
+
 	return nil
 }
 
