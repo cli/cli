@@ -2,10 +2,9 @@ package logout
 
 import (
 	"fmt"
-	"net/http"
+	"slices"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -14,19 +13,17 @@ import (
 )
 
 type LogoutOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
-	Prompter   shared.Prompt
-	Hostname   string
+	IO       *iostreams.IOStreams
+	Config   func() (config.Config, error)
+	Prompter shared.Prompt
+	Hostname string
 }
 
 func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Command {
 	opts := &LogoutOptions{
-		HttpClient: f.HttpClient,
-		IO:         f.IOStreams,
-		Config:     f.Config,
-		Prompter:   f.Prompter,
+		IO:       f.IOStreams,
+		Config:   f.Config,
+		Prompter: f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -64,6 +61,8 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 
 func logoutRun(opts *LogoutOptions) error {
 	hostname := opts.Hostname
+	// TODO: opts.Username likeley needed in the future
+	username := ""
 
 	cfg, err := opts.Config()
 	if err != nil {
@@ -71,34 +70,56 @@ func logoutRun(opts *LogoutOptions) error {
 	}
 	authCfg := cfg.Authentication()
 
-	candidates := authCfg.Hosts()
-	if len(candidates) == 0 {
+	knownHosts := authCfg.Hosts()
+	if len(knownHosts) == 0 {
 		return fmt.Errorf("not logged in to any hosts")
 	}
 
-	if hostname == "" {
-		if len(candidates) == 1 {
-			hostname = candidates[0]
-		} else {
-			selected, err := opts.Prompter.Select(
-				"What account do you want to log out of?", "", candidates)
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
-			hostname = candidates[selected]
+	if hostname != "" {
+		if !slices.Contains(knownHosts, hostname) {
+			return fmt.Errorf("not logged in to %s", hostname)
 		}
-	} else {
-		var found bool
-		for _, c := range candidates {
-			if c == hostname {
-				found = true
-				break
-			}
-		}
+	}
 
-		if !found {
-			return fmt.Errorf("not logged into %s", hostname)
+	type hostUser struct {
+		host string
+		user string
+	}
+	var candidates []hostUser
+
+	for _, host := range knownHosts {
+		if hostname != "" && host != hostname {
+			continue
 		}
+		knownUsers, err := cfg.Authentication().UsersForHost(host)
+		if err != nil {
+			return err
+		}
+		for _, user := range knownUsers {
+			candidates = append(candidates, hostUser{host: host, user: user})
+		}
+	}
+
+	// We can ignore the error here because a host must always have an active user
+	preLogoutActiveUser, _ := authCfg.User(hostname)
+
+	if len(candidates) == 1 {
+		hostname = candidates[0].host
+		username = candidates[0].user
+	} else if !opts.IO.CanPrompt() {
+		username = preLogoutActiveUser
+	} else {
+		prompts := make([]string, len(candidates))
+		for i, c := range candidates {
+			prompts[i] = fmt.Sprintf("%s (%s)", c.user, c.host)
+		}
+		selected, err := opts.Prompter.Select(
+			"What account do you want to log out of?", "", prompts)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
+		hostname = candidates[selected].host
+		username = candidates[selected].user
 	}
 
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
@@ -107,34 +128,25 @@ func logoutRun(opts *LogoutOptions) error {
 		return cmdutil.SilentError
 	}
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	username, err := api.CurrentLoginName(apiClient, hostname)
-	if err != nil {
-		// suppressing; the user is trying to delete this token and it might be bad.
-		// we'll see if the username is in the config and fall back to that.
-		username, _ = authCfg.User(hostname)
-	}
-
-	usernameStr := ""
-	if username != "" {
-		usernameStr = fmt.Sprintf(" account '%s'", username)
-	}
-
 	if err := authCfg.Logout(hostname, username); err != nil {
 		return fmt.Errorf("failed to write config, authentication configuration not updated: %w", err)
 	}
+
+	postLogoutActiveUser, _ := authCfg.User(hostname)
+	hasSwitchedToNewUser := preLogoutActiveUser != postLogoutActiveUser &&
+		postLogoutActiveUser != ""
 
 	isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
 
 	if isTTY {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s%s\n",
-			cs.SuccessIcon(), cs.Bold(hostname), usernameStr)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s account '%s'\n",
+			cs.SuccessIcon(), cs.Bold(hostname), username)
+
+		if hasSwitchedToNewUser {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Switched account to '%s'\n",
+				cs.SuccessIcon(), cs.Bold(postLogoutActiveUser))
+		}
 	}
 
 	return nil
