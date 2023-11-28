@@ -367,6 +367,57 @@ func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 	require.ErrorContains(t, err, "secret not found in keyring")
 }
 
+func TestLogoutOfActiveUserSwitchesUserIfPossible(t *testing.T) {
+	// Given we have two accounts logged into a host
+	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "inactive-user", "test-token-1", "ssh", true)
+	require.NoError(t, err)
+
+	_, err = authCfg.Login("github.com", "active-user", "test-token-2", "https", true)
+	require.NoError(t, err)
+
+	// When we logout of the active user
+	err = authCfg.Logout("github.com", "active-user")
+
+	// Then we return success and the inactive user is now active
+	require.NoError(t, err)
+	activeUser, err := authCfg.User("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "inactive-user", activeUser)
+
+	token, err := authCfg.TokenFromKeyring("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "test-token-1", token)
+
+	usersForHost, err := authCfg.UsersForHost("github.com")
+	require.NoError(t, err)
+	require.NotContains(t, "active-user", usersForHost)
+}
+
+func TestLogoutOfInactiveUserDoesNotSwitchUser(t *testing.T) {
+	// Given we have two accounts logged into a host
+	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "inactive-user-1", "test-token-1.1", "ssh", true)
+	require.NoError(t, err)
+
+	_, err = authCfg.Login("github.com", "inactive-user-2", "test-token-1.2", "ssh", true)
+	require.NoError(t, err)
+
+	_, err = authCfg.Login("github.com", "active-user", "test-token-2", "https", true)
+	require.NoError(t, err)
+
+	// When we logout of an inactive user
+	err = authCfg.Logout("github.com", "inactive-user-1")
+
+	// Then we return success and the active user is still active
+	require.NoError(t, err)
+	activeUser, err := authCfg.User("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "active-user", activeUser)
+}
+
 // Note that I'm not sure this test enforces particularly desirable behaviour
 // since it leads users to believe a token has been removed when really
 // that might have failed for some reason.
@@ -517,7 +568,7 @@ func TestTokenWorksRightAfterMigration(t *testing.T) {
 	require.Equal(t, oauthTokenKey, source)
 }
 
-func TestLogoutRigthAfterMigrationRemovesHost(t *testing.T) {
+func TestLogoutRightAfterMigrationRemovesHost(t *testing.T) {
 	// Given we have logged in before migration
 	authCfg := newTestAuthConfig(t)
 	host := "github.com"

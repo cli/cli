@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/cli/cli/v2/internal/keyring"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
@@ -333,6 +334,7 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	return insecureStorageUsed, c.switchUser(hostname, username)
 }
 
+// TODO: Verify that git protocol switching works as expected
 func (c *AuthConfig) switchUser(hostname, user string) error {
 	// We first need to idempotently clear out any set tokens for the host
 	_ = keyring.Delete(keyringServiceName(hostname), "")
@@ -367,10 +369,36 @@ func (c *AuthConfig) switchUser(hostname, user string) error {
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
 func (c *AuthConfig) Logout(hostname, username string) error {
-	_ = c.cfg.Remove([]string{hostsKey, hostname})
-	_ = keyring.Delete(keyringServiceName(hostname), "")
-	_ = keyring.Delete(keyringServiceName(hostname), username)
-	return ghConfig.Write(c.cfg)
+	// This error is ignorable because if there is no host then no logout is required
+	users, _ := c.UsersForHost(hostname)
+
+	// If there is only one (or zero) users, then we remove the host
+	// and unset the keyring tokens.
+	if len(users) < 2 {
+		_ = c.cfg.Remove([]string{hostsKey, hostname})
+		_ = keyring.Delete(keyringServiceName(hostname), "")
+		_ = keyring.Delete(keyringServiceName(hostname), username)
+		return ghConfig.Write(c.cfg)
+	}
+
+	// Otherwise, we remove the user from this host
+	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
+
+	// This error is ignorable because we already know there is an active user for the host
+	activeUser, _ := c.User(hostname)
+
+	// If the user we're removing isn't active, then we just write the config
+	if activeUser != username {
+		return ghConfig.Write(c.cfg)
+	}
+
+	// Otherwise we get the first user in the slice that isn't the user we're removing
+	switchUserIdx := slices.IndexFunc(users, func(n string) bool {
+		return n != username
+	})
+
+	// And switch to them
+	return c.switchUser(hostname, users[switchUserIdx])
 }
 
 func (c *AuthConfig) UsersForHost(hostname string) ([]string, error) {
