@@ -102,14 +102,18 @@ type ProjectInfo struct {
 
 type ProjectV2Item struct {
 	ID      string `json:"id"`
-	Project struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
-	}
-	Status struct {
-		OptionID string `json:"optionId" graphql:"... on ProjectV2ItemFieldSingleSelectValue{optionId}"`
-		Name     string `json:"name" graphql:"... on ProjectV2ItemFieldSingleSelectValue{name}"`
-	} `graphql:"status:fieldValueByName(name: \"Status\")"`
+	Project ProjectV2ItemProject
+	Status  ProjectV2ItemStatus
+}
+
+type ProjectV2ItemProject struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+type ProjectV2ItemStatus struct {
+	OptionID string `json:"optionId"`
+	Name     string `json:"name"`
 }
 
 func (p ProjectCards) ProjectNames() []string {
