@@ -1,6 +1,7 @@
 package logout
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -45,10 +46,6 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 			$ gh auth logout --hostname enterprise.internal --user monalisa
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// if (opts.Hostname == "" || opts.Username == "") && !opts.IO.CanPrompt() {
-			// 	return cmdutil.FlagErrorf("--hostname and --user required when not running interactively")
-			// }
-
 			if runF != nil {
 				return runF(opts)
 			}
@@ -117,7 +114,7 @@ func logoutRun(opts *LogoutOptions) error {
 		hostname = candidates[0].host
 		username = candidates[0].user
 	} else if !opts.IO.CanPrompt() {
-		return fmt.Errorf("unable to determine which user account to log out of, please specify %[1]s--hostname%[1]s and %[1]s--user%[1]s", "`")
+		return errors.New("unable to determine which user account to log out of, please specify `--hostname` and `--user`")
 	} else {
 		prompts := make([]string, len(candidates))
 		for i, c := range candidates {
