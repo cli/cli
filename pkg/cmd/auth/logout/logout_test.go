@@ -240,6 +240,17 @@ func Test_logoutRun_tty(t *testing.T) {
 			},
 			wantErr: "not logged in as unknown-user on ghe.io",
 		},
+		{
+			name: "errors when user is specified but doesn't exist on any host",
+			opts: &LogoutOptions{
+				Username: "unknown-user",
+			},
+			cfgHosts: []hostUsers{
+				{"github.com", []user{"monalisa"}},
+				{"ghe.io", []user{"monalisa"}},
+			},
+			wantErr: "no user accounts matched that criteria",
+		},
 	}
 
 	for _, tt := range tests {
