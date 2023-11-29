@@ -38,7 +38,7 @@ func TestNewCmdSwitch(t *testing.T) {
 			name:  "user flag",
 			input: "--user monalisa",
 			expectedOpts: SwitchOptions{
-				User: "monalisa",
+				Username: "monalisa",
 			},
 		},
 		{
@@ -130,13 +130,13 @@ func TestSwitchRun(t *testing.T) {
 				activeUser:   "inactive-user",
 				activeToken:  "inactive-user-token",
 				hostsCfg:     "github.com:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user\n",
-				stderr:       "✓ Switched active account on github.com to 'inactive-user'",
+				stderr:       "✓ Switched active account for github.com to inactive-user",
 			},
 		},
 		{
 			name: "given one host, with three users, switches to the specified user",
 			opts: SwitchOptions{
-				User: "inactive-user-2",
+				Username: "inactive-user-2",
 			},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{
@@ -150,14 +150,14 @@ func TestSwitchRun(t *testing.T) {
 				activeUser:   "inactive-user-2",
 				activeToken:  "inactive-user-2-token",
 				hostsCfg:     "github.com:\n    users:\n        inactive-user-1:\n            git_protocol: ssh\n        inactive-user-2:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user-2\n",
-				stderr:       "✓ Switched active account on github.com to 'inactive-user-2'",
+				stderr:       "✓ Switched active account for github.com to inactive-user-2",
 			},
 		},
 		{
 			name: "given multiple hosts, with multiple users, switches to the specific user on the host",
 			opts: SwitchOptions{
 				Hostname: "ghe.io",
-				User:     "inactive-user",
+				Username: "inactive-user",
 			},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{
@@ -174,7 +174,7 @@ func TestSwitchRun(t *testing.T) {
 				activeUser:   "inactive-user",
 				activeToken:  "inactive-user-token",
 				hostsCfg:     "github.com:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: active-user\nghe.io:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user\n",
-				stderr:       "✓ Switched active account on ghe.io to 'inactive-user'",
+				stderr:       "✓ Switched active account for ghe.io to inactive-user",
 			},
 		},
 		{
@@ -188,7 +188,7 @@ func TestSwitchRun(t *testing.T) {
 		{
 			name: "given we can't disambiguate users across hosts",
 			opts: SwitchOptions{
-				User: "inactive-user",
+				Username: "inactive-user",
 			},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{
@@ -201,7 +201,7 @@ func TestSwitchRun(t *testing.T) {
 				}},
 			},
 			expectedFailure: failedExpectation{
-				err: errors.New("unable to determine which user account to switch to, please specify `--hostname` and `--user`"),
+				err: errors.New("unable to determine which account to switch to, please specify `--hostname` and `--user`"),
 			},
 		},
 		{
@@ -217,7 +217,7 @@ func TestSwitchRun(t *testing.T) {
 				}},
 			},
 			expectedFailure: failedExpectation{
-				err: errors.New("unable to determine which user account to switch to, please specify `--hostname` and `--user`"),
+				err: errors.New("unable to determine which account to switch to, please specify `--hostname` and `--user`"),
 			},
 		},
 		{
@@ -254,7 +254,7 @@ func TestSwitchRun(t *testing.T) {
 			name: "specified user doesn't exist on host",
 			opts: SwitchOptions{
 				Hostname: "github.com",
-				User:     "non-existent-user",
+				Username: "non-existent-user",
 			},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{
@@ -263,13 +263,13 @@ func TestSwitchRun(t *testing.T) {
 				}},
 			},
 			expectedFailure: failedExpectation{
-				err: errors.New("not logged in as non-existent-user on github.com"),
+				err: errors.New("not logged in to github.com account non-existent-user"),
 			},
 		},
 		{
 			name: "specified user doesn't exist on any host",
 			opts: SwitchOptions{
-				User: "non-existent-user",
+				Username: "non-existent-user",
 			},
 			cfgHosts: []hostUsers{
 				{"github.com", []user{
@@ -280,7 +280,7 @@ func TestSwitchRun(t *testing.T) {
 				}},
 			},
 			expectedFailure: failedExpectation{
-				err: errors.New("no user accounts matched that criteria"),
+				err: errors.New("no accounts matched that criteria"),
 			},
 		},
 		{
@@ -314,7 +314,7 @@ func TestSwitchRun(t *testing.T) {
 				activeUser:   "inactive-user",
 				activeToken:  "inactive-user-token",
 				hostsCfg:     "github.com:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: active-user\nghe.io:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user\n",
-				stderr:       "✓ Switched active account on ghe.io to 'inactive-user'",
+				stderr:       "✓ Switched active account for ghe.io to inactive-user",
 			},
 		},
 	}

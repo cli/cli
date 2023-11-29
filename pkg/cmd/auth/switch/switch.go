@@ -18,7 +18,7 @@ type SwitchOptions struct {
 	Config   func() (config.Config, error)
 	Prompter shared.Prompt
 	Hostname string
-	User     string
+	Username string
 }
 
 func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Command {
@@ -29,11 +29,22 @@ func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:     "switch",
-		Args:    cobra.ExactArgs(0),
-		Short:   "Switch to another GitHub account",
-		Long:    heredoc.Doc(""),
-		Example: heredoc.Doc(""),
+		Use:   "switch",
+		Args:  cobra.ExactArgs(0),
+		Short: "Switch active GitHub account",
+		Long: heredoc.Doc(`
+			Switch the active account for a GitHub host.
+
+			This command changes the authentication configuration that will
+			be used when running commands targeting the specified GitHub host.
+		`),
+		Example: heredoc.Doc(`
+			# Select what host and account to switch to via a prompt
+			$ gh auth switch
+
+			# Switch to a specific host and specific account
+			$ gh auth logout --hostname enterprise.internal --user monalisa
+		`),
 		RunE: func(c *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(&opts)
@@ -43,8 +54,8 @@ func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to switch account on")
-	cmd.Flags().StringVarP(&opts.User, "user", "u", "", "The user to switch to")
+	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to switch account for")
+	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to switch to")
 
 	return cmd
 }
@@ -69,7 +80,7 @@ func (c candidates) inactiveOptions() []hostUser {
 
 func switchRun(opts *SwitchOptions) error {
 	hostname := opts.Hostname
-	username := opts.User
+	username := opts.Username
 
 	cfg, err := opts.Config()
 	if err != nil {
@@ -90,7 +101,7 @@ func switchRun(opts *SwitchOptions) error {
 		if username != "" {
 			knownUsers, _ := cfg.Authentication().UsersForHost(hostname)
 			if !slices.Contains(knownUsers, username) {
-				return fmt.Errorf("not logged in as %s on %s", username, hostname)
+				return fmt.Errorf("not logged in to %s account %s", hostname, username)
 			}
 		}
 	}
@@ -119,7 +130,7 @@ func switchRun(opts *SwitchOptions) error {
 
 	inactiveCandidates := candidates.inactiveOptions()
 	if len(candidates) == 0 {
-		return errors.New("no user accounts matched that criteria")
+		return errors.New("no accounts matched that criteria")
 	} else if len(candidates) == 1 {
 		hostname = candidates[0].host
 		username = candidates[0].user
@@ -127,7 +138,7 @@ func switchRun(opts *SwitchOptions) error {
 		hostname = inactiveCandidates[0].host
 		username = inactiveCandidates[0].user
 	} else if !opts.IO.CanPrompt() {
-		return errors.New("unable to determine which user account to switch to, please specify `--hostname` and `--user`")
+		return errors.New("unable to determine which account to switch to, please specify `--hostname` and `--user`")
 	} else {
 		prompts := make([]string, len(candidates))
 		for i, c := range candidates {
@@ -152,13 +163,12 @@ func switchRun(opts *SwitchOptions) error {
 		return cmdutil.SilentError
 	}
 
-	err = authCfg.SwitchUser(hostname, username)
-	if err != nil {
+	if err := authCfg.SwitchUser(hostname, username); err != nil {
 		return err
 	}
 
 	cs := opts.IO.ColorScheme()
-	fmt.Fprintf(opts.IO.ErrOut, "%s Switched active account on %s to '%s'\n",
+	fmt.Fprintf(opts.IO.ErrOut, "%s Switched active account for %s to %s\n",
 		cs.SuccessIcon(), hostname, cs.Bold(username))
 
 	return nil

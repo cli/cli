@@ -53,14 +53,15 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "login",
 		Args:  cobra.ExactArgs(0),
-		Short: "Authenticate with a GitHub host",
+		Short: "Log in to a GitHub account",
 		Long: heredoc.Docf(`
 			Authenticate with a GitHub host.
 
 			The default authentication mode is a web-based browser flow. After completion, an
 			authentication token will be stored securely in the system credential store.
-			If a credential store is not found or there is an issue using it gh will fallback to writing the token to a plain text file.
-			See %[1]sgh auth status%[1]s for its stored location.
+			If a credential store is not found or there is an issue using it gh will fallback
+			to writing the token to a plain text file. See %[1]sgh auth status%[1]s for its
+			stored location.
 
 			Alternatively, use %[1]s--with-token%[1]s to pass in a token on standard input.
 			The minimum required scopes for the token are: "repo", "read:org".
@@ -72,13 +73,13 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to "env".
 		`, "`"),
 		Example: heredoc.Doc(`
-			# start interactive setup
+			# Start interactive setup
 			$ gh auth login
 
-			# authenticate against github.com by reading the token from a file
+			# Authenticate against github.com by reading the token from a file
 			$ gh auth login --with-token < mytoken.txt
 
-			# authenticate with a specific GitHub instance
+			# Authenticate with specific host
 			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {

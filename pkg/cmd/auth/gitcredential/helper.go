@@ -55,6 +55,7 @@ func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *
 	return cmd
 }
 
+// TODO: In multi-account we should use active user token only if the username is not passed in.
 func helperRun(opts *CredentialOptions) error {
 	if opts.Operation == "store" {
 		// We pretend to implement the "store" operation, but do nothing since we already have a cached token.

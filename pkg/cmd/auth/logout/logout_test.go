@@ -147,7 +147,7 @@ func Test_logoutRun_tty(t *testing.T) {
 					return prompter.IndexFor(opts, "monalisa (github.com)")
 				}
 			},
-			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'monalisa'`),
+			wantErrOut: regexp.MustCompile(`Logged out of github.com account monalisa`),
 		},
 		{
 			name: "logs out prompted user when multiple known hosts with multiple users each",
@@ -162,7 +162,7 @@ func Test_logoutRun_tty(t *testing.T) {
 					return prompter.IndexFor(opts, "monalisa (github.com)")
 				}
 			},
-			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'monalisa'`),
+			wantErrOut: regexp.MustCompile(`Logged out of github.com account monalisa`),
 		},
 		{
 			name: "logs out only logged in user",
@@ -171,7 +171,7 @@ func Test_logoutRun_tty(t *testing.T) {
 				{"github.com", []user{"monalisa"}},
 			},
 			wantHosts:  "{}\n",
-			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'monalisa'`),
+			wantErrOut: regexp.MustCompile(`Logged out of github.com account monalisa`),
 		},
 		{
 			name: "logs out prompted user when one known host with multiple users",
@@ -185,7 +185,7 @@ func Test_logoutRun_tty(t *testing.T) {
 				}
 			},
 			wantHosts:  "github.com:\n    users:\n        monalisa2:\n            oauth_token: abc123\n            git_protocol: ssh\n    git_protocol: ssh\n    user: monalisa2\n    oauth_token: abc123\n",
-			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'monalisa'`),
+			wantErrOut: regexp.MustCompile(`Logged out of github.com account monalisa`),
 		},
 		{
 			name: "logs out specified user when multiple known hosts with one user each",
@@ -198,7 +198,7 @@ func Test_logoutRun_tty(t *testing.T) {
 				{"github.com", []user{"monalisa"}},
 			},
 			wantHosts:  "github.com:\n    users:\n        monalisa:\n            oauth_token: abc123\n            git_protocol: ssh\n    oauth_token: abc123\n    git_protocol: ssh\n    user: monalisa\n",
-			wantErrOut: regexp.MustCompile(`Logged out of ghe.io account 'monalisa-ghe'`),
+			wantErrOut: regexp.MustCompile(`Logged out of ghe.io account monalisa-ghe`),
 		},
 		{
 			name:          "logs out specified user that is using secure storage",
@@ -211,7 +211,7 @@ func Test_logoutRun_tty(t *testing.T) {
 				{"github.com", []user{"monalisa"}},
 			},
 			wantHosts:  "{}\n",
-			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'monalisa'`),
+			wantErrOut: regexp.MustCompile(`Logged out of github.com account monalisa`),
 		},
 		{
 			name:    "errors when no known hosts",
@@ -238,7 +238,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			cfgHosts: []hostUsers{
 				{"ghe.io", []user{"monalisa-ghe"}},
 			},
-			wantErr: "not logged in as unknown-user on ghe.io",
+			wantErr: "not logged in to ghe.io account unknown-user",
 		},
 		{
 			name: "errors when user is specified but doesn't exist on any host",
@@ -249,7 +249,7 @@ func Test_logoutRun_tty(t *testing.T) {
 				{"github.com", []user{"monalisa"}},
 				{"ghe.io", []user{"monalisa"}},
 			},
-			wantErr: "no user accounts matched that criteria",
+			wantErr: "no accounts matched that criteria",
 		},
 	}
 
@@ -316,6 +316,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 		secureStorage bool
 		ghtoken       string
 		wantHosts     string
+		wantErrOut    *regexp.Regexp
 		wantErr       string
 	}{
 		{
@@ -327,7 +328,8 @@ func Test_logoutRun_nontty(t *testing.T) {
 			cfgHosts: []hostUsers{
 				{"github.com", []user{"monalisa"}},
 			},
-			wantHosts: "{}\n",
+			wantHosts:  "{}\n",
+			wantErrOut: regexp.MustCompile(`Logged out of github.com account monalisa`),
 		},
 		{
 			name: "logs out specified user when multiple known hosts",
@@ -339,7 +341,8 @@ func Test_logoutRun_nontty(t *testing.T) {
 				{"github.com", []user{"monalisa"}},
 				{"ghe.io", []user{"monalisa-ghe"}},
 			},
-			wantHosts: "ghe.io:\n    users:\n        monalisa-ghe:\n            oauth_token: abc123\n            git_protocol: ssh\n    oauth_token: abc123\n    git_protocol: ssh\n    user: monalisa-ghe\n",
+			wantHosts:  "ghe.io:\n    users:\n        monalisa-ghe:\n            oauth_token: abc123\n            git_protocol: ssh\n    oauth_token: abc123\n    git_protocol: ssh\n    user: monalisa-ghe\n",
+			wantErrOut: regexp.MustCompile(`Logged out of github.com account monalisa`),
 		},
 		{
 			name:          "logs out specified user that is using secure storage",
@@ -351,7 +354,8 @@ func Test_logoutRun_nontty(t *testing.T) {
 			cfgHosts: []hostUsers{
 				{"github.com", []user{"monalisa"}},
 			},
-			wantHosts: "{}\n",
+			wantHosts:  "{}\n",
+			wantErrOut: regexp.MustCompile(`Logged out of github.com account monalisa`),
 		},
 		{
 			name: "errors when no known hosts",
@@ -381,7 +385,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 			cfgHosts: []hostUsers{
 				{"ghe.io", []user{"monalisa-ghe"}},
 			},
-			wantErr: "not logged in as unknown-user on ghe.io",
+			wantErr: "not logged in to ghe.io account unknown-user",
 		},
 		{
 			name: "errors when host is specified but user is ambiguous",
@@ -392,7 +396,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 				{"ghe.io", []user{"monalisa-ghe"}},
 				{"ghe.io", []user{"monalisa-ghe-2"}},
 			},
-			wantErr: "unable to determine which user account to log out of, please specify `--hostname` and `--user`",
+			wantErr: "unable to determine which account to log out of, please specify `--hostname` and `--user`",
 		},
 		{
 			name: "errors when user is specified but host is ambiguous",
@@ -403,7 +407,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 				{"github.com", []user{"monalisa"}},
 				{"ghe.io", []user{"monalisa"}},
 			},
-			wantErr: "unable to determine which user account to log out of, please specify `--hostname` and `--user`",
+			wantErr: "unable to determine which account to log out of, please specify `--hostname` and `--user`",
 		},
 	}
 
@@ -438,7 +442,11 @@ func Test_logoutRun_nontty(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			require.Equal(t, "", stderr.String())
+			if tt.wantErrOut == nil {
+				require.Equal(t, "", stderr.String())
+			} else {
+				require.True(t, tt.wantErrOut.MatchString(stderr.String()), stderr.String())
+			}
 
 			mainBuf := bytes.Buffer{}
 			hostsBuf := bytes.Buffer{}
@@ -454,7 +462,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 func TestLogoutSwitchesUserNonTTY(t *testing.T) {
 	keyring.MockInit()
 
-	ios, _, _, _ := iostreams.Test()
+	ios, _, _, stderr := iostreams.Test()
 	ios.SetStdinTTY(false)
 	ios.SetStdoutTTY(false)
 
@@ -493,6 +501,8 @@ func TestLogoutSwitchesUserNonTTY(t *testing.T) {
     `)
 
 	require.Equal(t, expectedHosts, hostsBuf.String())
+
+	require.Contains(t, stderr.String(), "✓ Switched active account for github.com to test-user-1")
 }
 
 func TestLogoutSwitchesUserTTY(t *testing.T) {
@@ -542,5 +552,5 @@ func TestLogoutSwitchesUserTTY(t *testing.T) {
 
 	require.Equal(t, expectedHosts, hostsBuf.String())
 
-	require.Contains(t, stderr.String(), "✓ Switched account to 'test-user-1'")
+	require.Contains(t, stderr.String(), "✓ Switched active account for github.com to test-user-1")
 }

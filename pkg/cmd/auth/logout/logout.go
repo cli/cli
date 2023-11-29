@@ -31,18 +31,21 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "logout",
 		Args:  cobra.ExactArgs(0),
-		Short: "Log out of a GitHub user account",
+		Short: "Log out of a GitHub account",
 		Long: heredoc.Doc(`
-			Remove authentication for a GitHub user account.
+			Remove authentication for a GitHub account.
 
-			This command removes the authentication configuration for a user account
-			either specified interactively or via the --hostname and --user flags.
+			This command removes the stored authentication configuration
+			for an account. The authentication configuration is only
+			removed locally.
+
+			This command does not invalidate authentication tokens.
 		`),
 		Example: heredoc.Doc(`
-			# Select what host and user account to log out of via a prompt
+			# Select what host and account to log out of via a prompt
 			$ gh auth logout
 
-			# Log out of specified user account on specified host
+			# Log out of a specific host and specific account
 			$ gh auth logout --hostname enterprise.internal --user monalisa
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -55,7 +58,7 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to log out of")
-	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The user account to log out of")
+	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to log out of")
 
 	return cmd
 }
@@ -83,7 +86,7 @@ func logoutRun(opts *LogoutOptions) error {
 		if username != "" {
 			knownUsers, _ := cfg.Authentication().UsersForHost(hostname)
 			if !slices.Contains(knownUsers, username) {
-				return fmt.Errorf("not logged in as %s on %s", username, hostname)
+				return fmt.Errorf("not logged in to %s account %s", hostname, username)
 			}
 		}
 	}
@@ -111,12 +114,12 @@ func logoutRun(opts *LogoutOptions) error {
 	}
 
 	if len(candidates) == 0 {
-		return errors.New("no user accounts matched that criteria")
+		return errors.New("no accounts matched that criteria")
 	} else if len(candidates) == 1 {
 		hostname = candidates[0].host
 		username = candidates[0].user
 	} else if !opts.IO.CanPrompt() {
-		return errors.New("unable to determine which user account to log out of, please specify `--hostname` and `--user`")
+		return errors.New("unable to determine which account to log out of, please specify `--hostname` and `--user`")
 	} else {
 		prompts := make([]string, len(candidates))
 		for i, c := range candidates {
@@ -141,24 +144,20 @@ func logoutRun(opts *LogoutOptions) error {
 	preLogoutActiveUser, _ := authCfg.User(hostname)
 
 	if err := authCfg.Logout(hostname, username); err != nil {
-		return fmt.Errorf("failed to write config, authentication configuration not updated: %w", err)
+		return err
 	}
 
-	isTTY := opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY()
+	postLogoutActiveUser, _ := authCfg.User(hostname)
+	hasSwitchedToNewUser := preLogoutActiveUser != postLogoutActiveUser &&
+		postLogoutActiveUser != ""
 
-	if isTTY {
-		postLogoutActiveUser, _ := authCfg.User(hostname)
-		hasSwitchedToNewUser := preLogoutActiveUser != postLogoutActiveUser &&
-			postLogoutActiveUser != ""
+	cs := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s account %s\n",
+		cs.SuccessIcon(), hostname, cs.Bold(username))
 
-		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s account '%s'\n",
-			cs.SuccessIcon(), cs.Bold(hostname), username)
-
-		if hasSwitchedToNewUser {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Switched account to '%s'\n",
-				cs.SuccessIcon(), cs.Bold(postLogoutActiveUser))
-		}
+	if hasSwitchedToNewUser {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Switched active account for %s to %s\n",
+			cs.SuccessIcon(), hostname, cs.Bold(postLogoutActiveUser))
 	}
 
 	return nil
