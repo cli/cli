@@ -331,11 +331,11 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	}
 
 	// Then we perform a switch to the new user
-	return insecureStorageUsed, c.switchUser(hostname, username)
+	return insecureStorageUsed, c.SwitchUser(hostname, username)
 }
 
 // TODO: Verify that git protocol switching works as expected
-func (c *AuthConfig) switchUser(hostname, user string) error {
+func (c *AuthConfig) SwitchUser(hostname, user string) error {
 	// We first need to idempotently clear out any set tokens for the host
 	_ = keyring.Delete(keyringServiceName(hostname), "")
 	_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
@@ -398,7 +398,7 @@ func (c *AuthConfig) Logout(hostname, username string) error {
 	})
 
 	// And switch to them
-	return c.switchUser(hostname, users[switchUserIdx])
+	return c.SwitchUser(hostname, users[switchUserIdx])
 }
 
 func (c *AuthConfig) UsersForHost(hostname string) ([]string, error) {

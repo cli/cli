@@ -79,6 +79,30 @@ func NewFromString(cfgStr string) *ConfigMock {
 	return mock
 }
 
+func NewIsolatedTestConfig(t *testing.T) (Config, func(io.Writer, io.Writer)) {
+	c := ghConfig.ReadFromString("")
+	cfg := cfg{c}
+
+	// The real implementation of config.Read uses a sync.Once
+	// to read config files and initialise package level variables
+	// that are used from then on.
+	//
+	// This means that tests can't be isolated from each other, so
+	// we swap out the function here to return a new config each time.
+	ghConfig.Read = func(_ *ghConfig.Config) (*ghConfig.Config, error) {
+		return c, nil
+	}
+
+	// The config.Write method isn't defined in the same way as Read to allow
+	// the function to be swapped out and it does try to write to disk.
+	//
+	// We should consider whether it makes sense to change that but in the meantime
+	// we can use GH_CONFIG_DIR env var to ensure the tests remain isolated.
+	readConfigs := StubWriteConfig(t)
+
+	return &cfg, readConfigs
+}
+
 // StubWriteConfig stubs out the filesystem where config file are written.
 // It then returns a function that will read in the config files into io.Writers.
 // It automatically cleans up environment variables and written files.
