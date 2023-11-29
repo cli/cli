@@ -110,7 +110,9 @@ func logoutRun(opts *LogoutOptions) error {
 		}
 	}
 
-	if len(candidates) == 1 {
+	if len(candidates) == 0 {
+		return errors.New("no user accounts matched that criteria")
+	} else if len(candidates) == 1 {
 		hostname = candidates[0].host
 		username = candidates[0].user
 	} else if !opts.IO.CanPrompt() {
