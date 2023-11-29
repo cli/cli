@@ -3,7 +3,6 @@ package authswitch
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"testing"
 
@@ -83,28 +82,37 @@ func TestNewCmdSwitch(t *testing.T) {
 }
 
 func TestSwitchRun(t *testing.T) {
-	type host string
 	type user struct {
 		name  string
 		token string
 	}
 
 	type hostUsers struct {
-		host  host
+		host  string
 		users []user
 	}
 
+	type successfulExpectation struct {
+		switchedHost string
+		activeUser   string
+		activeToken  string
+		hostsCfg     string
+		stderr       string
+	}
+
+	type failedExpectation struct {
+		err    error
+		stderr string
+	}
+
 	tests := []struct {
-		name                 string
-		opts                 SwitchOptions
-		cfgHosts             []hostUsers
-		env                  map[string]string
-		expectedHostToSwitch string
-		expectedActiveUser   string
-		expectedActiveToken  string
-		expectedHosts        string
-		expectedStderr       string
-		expectedErr          error
+		name     string
+		opts     SwitchOptions
+		cfgHosts []hostUsers
+		env      map[string]string
+
+		expectedSuccess successfulExpectation
+		expectedFailure failedExpectation
 
 		prompterStubs func(*prompter.PrompterMock)
 	}{
@@ -117,11 +125,13 @@ func TestSwitchRun(t *testing.T) {
 					{"active-user", "active-user-token"},
 				}},
 			},
-			expectedHostToSwitch: "github.com",
-			expectedActiveUser:   "inactive-user",
-			expectedActiveToken:  "inactive-user-token",
-			expectedHosts:        "github.com:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user\n",
-			expectedStderr:       "✓ Switched active account on github.com to 'inactive-user'",
+			expectedSuccess: successfulExpectation{
+				switchedHost: "github.com",
+				activeUser:   "inactive-user",
+				activeToken:  "inactive-user-token",
+				hostsCfg:     "github.com:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user\n",
+				stderr:       "✓ Switched active account on github.com to 'inactive-user'",
+			},
 		},
 		{
 			name: "given one host, with three users, switches to the specified user",
@@ -135,11 +145,13 @@ func TestSwitchRun(t *testing.T) {
 					{"active-user", "active-user-token"},
 				}},
 			},
-			expectedHostToSwitch: "github.com",
-			expectedActiveUser:   "inactive-user-2",
-			expectedActiveToken:  "inactive-user-2-token",
-			expectedHosts:        "github.com:\n    users:\n        inactive-user-1:\n            git_protocol: ssh\n        inactive-user-2:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user-2\n",
-			expectedStderr:       "✓ Switched active account on github.com to 'inactive-user-2'",
+			expectedSuccess: successfulExpectation{
+				switchedHost: "github.com",
+				activeUser:   "inactive-user-2",
+				activeToken:  "inactive-user-2-token",
+				hostsCfg:     "github.com:\n    users:\n        inactive-user-1:\n            git_protocol: ssh\n        inactive-user-2:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user-2\n",
+				stderr:       "✓ Switched active account on github.com to 'inactive-user-2'",
+			},
 		},
 		{
 			name: "given multiple hosts, with multiple users, switches to the specific user on the host",
@@ -157,17 +169,21 @@ func TestSwitchRun(t *testing.T) {
 					{"active-user", "active-user-token"},
 				}},
 			},
-			expectedHostToSwitch: "ghe.io",
-			expectedActiveUser:   "inactive-user",
-			expectedActiveToken:  "inactive-user-token",
-			expectedHosts:        "github.com:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: active-user\nghe.io:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user\n",
-			expectedStderr:       "✓ Switched active account on ghe.io to 'inactive-user'",
+			expectedSuccess: successfulExpectation{
+				switchedHost: "ghe.io",
+				activeUser:   "inactive-user",
+				activeToken:  "inactive-user-token",
+				hostsCfg:     "github.com:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: active-user\nghe.io:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user\n",
+				stderr:       "✓ Switched active account on ghe.io to 'inactive-user'",
+			},
 		},
 		{
-			name:        "given we're not logged into any hosts, provide an informative error",
-			opts:        SwitchOptions{},
-			cfgHosts:    []hostUsers{},
-			expectedErr: fmt.Errorf("not logged in to any hosts"),
+			name:     "given we're not logged into any hosts, provide an informative error",
+			opts:     SwitchOptions{},
+			cfgHosts: []hostUsers{},
+			expectedFailure: failedExpectation{
+				err: errors.New("not logged in to any hosts"),
+			},
 		},
 		{
 			name: "given we can't disambiguate users across hosts",
@@ -184,7 +200,9 @@ func TestSwitchRun(t *testing.T) {
 					{"active-user", "active-user-token"},
 				}},
 			},
-			expectedErr: errors.New("unable to determine which user account to switch to, please specify `--hostname` and `--user`"),
+			expectedFailure: failedExpectation{
+				err: errors.New("unable to determine which user account to switch to, please specify `--hostname` and `--user`"),
+			},
 		},
 		{
 			name: "given we can't disambiguate user on a single host",
@@ -198,7 +216,9 @@ func TestSwitchRun(t *testing.T) {
 					{"active-user", "active-user-token"},
 				}},
 			},
-			expectedErr: errors.New("unable to determine which user account to switch to, please specify `--hostname` and `--user`"),
+			expectedFailure: failedExpectation{
+				err: errors.New("unable to determine which user account to switch to, please specify `--hostname` and `--user`"),
+			},
 		},
 		{
 			name: "given the auth token isn't writeable (e.g. a token env var is set)",
@@ -209,9 +229,11 @@ func TestSwitchRun(t *testing.T) {
 					{"active-user", "active-user-token"},
 				}},
 			},
-			env:            map[string]string{"GH_TOKEN": "unimportant-test-value"},
-			expectedErr:    cmdutil.SilentError,
-			expectedStderr: "The value of the GH_TOKEN environment variable is being used for authentication.",
+			env: map[string]string{"GH_TOKEN": "unimportant-test-value"},
+			expectedFailure: failedExpectation{
+				err:    cmdutil.SilentError,
+				stderr: "The value of the GH_TOKEN environment variable is being used for authentication.",
+			},
 		},
 		{
 			name: "specified hostname doesn't exist",
@@ -224,7 +246,9 @@ func TestSwitchRun(t *testing.T) {
 					{"active-user", "active-user-token"},
 				}},
 			},
-			expectedErr: errors.New("not logged in to ghe.io"),
+			expectedFailure: failedExpectation{
+				err: errors.New("not logged in to ghe.io"),
+			},
 		},
 		{
 			name: "specified user doesn't exist on host",
@@ -238,7 +262,9 @@ func TestSwitchRun(t *testing.T) {
 					{"active-user", "active-user-token"},
 				}},
 			},
-			expectedErr: errors.New("not logged in as non-existent-user on github.com"),
+			expectedFailure: failedExpectation{
+				err: errors.New("not logged in as non-existent-user on github.com"),
+			},
 		},
 		{
 			name: "specified user doesn't exist on any host",
@@ -253,7 +279,9 @@ func TestSwitchRun(t *testing.T) {
 					{"active-user", "active-user-token"},
 				}},
 			},
-			expectedErr: errors.New("no user accounts matched that criteria"),
+			expectedFailure: failedExpectation{
+				err: errors.New("no user accounts matched that criteria"),
+			},
 		},
 		{
 			name: "when options need to be disambiguated, the user is prompted with matrix of options including active users (if possible)",
@@ -281,11 +309,13 @@ func TestSwitchRun(t *testing.T) {
 					return prompter.IndexFor(opts, "inactive-user (ghe.io)")
 				}
 			},
-			expectedHostToSwitch: "ghe.io",
-			expectedActiveUser:   "inactive-user",
-			expectedActiveToken:  "inactive-user-token",
-			expectedHosts:        "github.com:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: active-user\nghe.io:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user\n",
-			expectedStderr:       "✓ Switched active account on ghe.io to 'inactive-user'",
+			expectedSuccess: successfulExpectation{
+				switchedHost: "ghe.io",
+				activeUser:   "inactive-user",
+				activeToken:  "inactive-user-token",
+				hostsCfg:     "github.com:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: active-user\nghe.io:\n    users:\n        inactive-user:\n            git_protocol: ssh\n        active-user:\n            git_protocol: ssh\n    git_protocol: ssh\n    user: inactive-user\n",
+				stderr:       "✓ Switched active account on ghe.io to 'inactive-user'",
+			},
 		},
 	}
 
@@ -309,7 +339,7 @@ func TestSwitchRun(t *testing.T) {
 			for _, hostUsers := range tt.cfgHosts {
 				for _, user := range hostUsers.users {
 					_, err := cfg.Authentication().Login(
-						string(hostUsers.host),
+						hostUsers.host,
 						user.name,
 						user.token, "ssh", true,
 					)
@@ -327,27 +357,27 @@ func TestSwitchRun(t *testing.T) {
 			tt.opts.IO = ios
 
 			err := switchRun(&tt.opts)
-			if tt.expectedErr != nil {
-				require.Equal(t, tt.expectedErr, err)
-				require.Contains(t, stderr.String(), tt.expectedStderr)
+			if tt.expectedFailure.err != nil {
+				require.Equal(t, tt.expectedFailure.err, err)
+				require.Contains(t, stderr.String(), tt.expectedFailure.stderr)
 				return
 			}
 
 			require.NoError(t, err)
 
-			activeUser, err := cfg.Authentication().User(tt.expectedHostToSwitch)
+			activeUser, err := cfg.Authentication().User(tt.expectedSuccess.switchedHost)
 			require.NoError(t, err)
-			require.Equal(t, tt.expectedActiveUser, activeUser)
+			require.Equal(t, tt.expectedSuccess.activeUser, activeUser)
 
-			activeToken, _ := cfg.Authentication().TokenFromKeyring(tt.expectedHostToSwitch)
-			require.Equal(t, tt.expectedActiveToken, activeToken)
+			activeToken, _ := cfg.Authentication().TokenFromKeyring(tt.expectedSuccess.switchedHost)
+			require.Equal(t, tt.expectedSuccess.activeToken, activeToken)
 
 			hostsBuf := bytes.Buffer{}
 			readConfigs(io.Discard, &hostsBuf)
 
-			require.Equal(t, tt.expectedHosts, hostsBuf.String())
+			require.Equal(t, tt.expectedSuccess.hostsCfg, hostsBuf.String())
 
-			require.Contains(t, stderr.String(), tt.expectedStderr)
+			require.Contains(t, stderr.String(), tt.expectedSuccess.stderr)
 		})
 	}
 }
