@@ -3,6 +3,7 @@ package status
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -107,13 +108,18 @@ func statusRun(opts *StatusOptions) error {
 
 		scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
 		if err != nil {
-			addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
-			addMsg("- The %s token in %s is invalid.", cs.Bold(hostname), tokenSource)
-			if tokenIsWriteable {
-				addMsg("- To re-authenticate, run: %s %s",
-					cs.Bold("gh auth login -h"), cs.Bold(hostname))
-				addMsg("- To forget about this host, run: %s %s",
-					cs.Bold("gh auth logout -h"), cs.Bold(hostname))
+			var networkError net.Error
+			if errors.As(err, &networkError) && networkError.Timeout() {
+				addMsg("%s %s: timeout trying to connect to host", cs.Red("X"), hostname)
+			} else {
+				addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
+				addMsg("- The %s token in %s is invalid.", cs.Bold(hostname), tokenSource)
+				if tokenIsWriteable {
+					addMsg("- To re-authenticate, run: %s %s",
+						cs.Bold("gh auth login -h"), cs.Bold(hostname))
+					addMsg("- To forget about this host, run: %s %s",
+						cs.Bold("gh auth logout -h"), cs.Bold(hostname))
+				}
 			}
 			failed = true
 			continue
