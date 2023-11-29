@@ -334,7 +334,8 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	return insecureStorageUsed, c.SwitchUser(hostname, username)
 }
 
-// TODO: Verify that git protocol switching works as expected
+// TODO: Write tests
+// TODO: How should git protocol be handled? Do we need to set it at the user level since it could have been changed?
 func (c *AuthConfig) SwitchUser(hostname, user string) error {
 	// We first need to idempotently clear out any set tokens for the host
 	_ = keyring.Delete(keyringServiceName(hostname), "")

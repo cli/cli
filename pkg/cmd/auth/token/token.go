@@ -3,6 +3,7 @@ package token
 import (
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -17,6 +18,7 @@ type TokenOptions struct {
 	SecureStorage bool
 }
 
+// TODO: Detmerine if this is wonky in multi-account world. Do we need a --user flag?
 func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Command {
 	opts := &TokenOptions{
 		IO:     f.IOStreams,
@@ -25,8 +27,12 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 
 	cmd := &cobra.Command{
 		Use:   "token",
-		Short: "Print the auth token gh is configured to use",
-		Args:  cobra.ExactArgs(0),
+		Short: "Print the authentication token gh is configured to use",
+		Long: heredoc.Doc(`
+			This command outputs the authentication token for the active
+			account on a given GitHub host.
+		`),
+		Args: cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(opts)

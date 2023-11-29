@@ -35,15 +35,12 @@ type RefreshOptions struct {
 	InsecureStorage bool
 }
 
+// TODO: Determine if this is super wonky in multi-account world. Do we need a --user flag?
 func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.Command {
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
 		AuthFlow: func(authCfg *config.AuthConfig, io *iostreams.IOStreams, hostname string, scopes []string, interactive, secureStorage bool) error {
-			if secureStorage {
-				cs := io.ColorScheme()
-				fmt.Fprintf(io.ErrOut, "%s Using secure storage could break installed extensions", cs.WarningIcon())
-			}
 			token, username, err := authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser)
 			if err != nil {
 				return err
