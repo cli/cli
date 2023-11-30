@@ -185,6 +185,25 @@ func TestApp_Create(t *testing.T) {
 			wantErr:    fmt.Errorf("error getting machine type: there is no such machine for the repository: %s\nAvailable machines: %v", "MEGA", []string{"GIGA", "TERA"}),
 		},
 		{
+			name: "create codespace with display name more than 48 characters results in error",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:        "monalisa/dotfiles",
+				machine:     "GIGA",
+				displayName: "this-is-very-long-display-name-with-49-characters",
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantErr:    fmt.Errorf("error creating codespace: display name should contain a maximum of %d characters", displayNameMaxLength),
+		},
+		{
 			name: "create codespace with devcontainer path results in selecting the correct machine type",
 			fields: fields{
 				apiClient: apiCreateDefaults(&apiClientMock{
