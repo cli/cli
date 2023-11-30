@@ -149,10 +149,23 @@ func manPrintFlags(buf *bytes.Buffer, flags *pflag.FlagSet) {
 		} else {
 			buf.WriteString(fmt.Sprintf("`--%s`", flag.Name))
 		}
-		if varname == "" {
+
+		defval := ""
+		hiddenDefs := map[string]bool{
+			"false": true,
+			"":      true,
+			"[]":    true,
+		}
+		if !hiddenDefs[flag.DefValue] {
+			defval = fmt.Sprintf(" (Default: %s)", flag.Value)
+		}
+
+		if varname == "" && defval != "" {
+			buf.WriteString(fmt.Sprintf(" `%s`\n", strings.TrimSpace(defval)))
+		} else if varname == "" {
 			buf.WriteString("\n")
 		} else {
-			buf.WriteString(fmt.Sprintf(" `<%s>`\n", varname))
+			buf.WriteString(fmt.Sprintf(" `<%s>%s`\n", varname, defval))
 		}
 		buf.WriteString(fmt.Sprintf(":   %s\n\n", usage))
 	})

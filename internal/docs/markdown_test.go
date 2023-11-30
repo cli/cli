@@ -103,3 +103,115 @@ func BenchmarkGenMarkdownToFile(b *testing.B) {
 		}
 	}
 }
+
+func TestPrintFlagsHTMLShowsDefaultValues(t *testing.T) {
+
+	type TestOptions struct {
+		Limit     int
+		Template  string
+		Fork      bool
+		NoArchive bool
+		Topic     []string
+	}
+	opts := TestOptions{}
+
+	// Int flag should show it
+	c := &cobra.Command{}
+	c.Flags().IntVar(&opts.Limit, "limit", 30, "Some limit")
+	flags := c.NonInheritedFlags()
+	buf := new(bytes.Buffer)
+	flags.SetOutput(buf)
+
+	if err := printFlagsHTML(buf, flags); err != nil {
+		t.Fatalf("printFlagsHTML failed: %s", err.Error())
+	}
+	output := buf.String()
+
+	checkStringContains(t, output, "(Default: 30)")
+
+	// Bool flag should hide it if default is false
+	c = &cobra.Command{}
+	c.Flags().BoolVar(&opts.Fork, "fork", false, "Show only forks")
+
+	flags = c.NonInheritedFlags()
+	buf = new(bytes.Buffer)
+	flags.SetOutput(buf)
+
+	if err := printFlagsHTML(buf, flags); err != nil {
+		t.Fatalf("printFlagsHTML failed: %s", err.Error())
+	}
+	output = buf.String()
+
+	checkStringOmits(t, output, "(Default: ")
+
+	// Bool flag should show it if default is true
+	c = &cobra.Command{}
+	c.Flags().BoolVar(&opts.NoArchive, "no-archived", true, "Hide archived")
+	flags = c.NonInheritedFlags()
+	buf = new(bytes.Buffer)
+	flags.SetOutput(buf)
+
+	if err := printFlagsHTML(buf, flags); err != nil {
+		t.Fatalf("printFlagsHTML failed: %s", err.Error())
+	}
+	output = buf.String()
+
+	checkStringContains(t, output, "(Default: true)")
+
+	// String flag should show it if default is not an empty string
+	c = &cobra.Command{}
+	c.Flags().StringVar(&opts.Template, "template", "T1", "Some template")
+	flags = c.NonInheritedFlags()
+	buf = new(bytes.Buffer)
+	flags.SetOutput(buf)
+
+	if err := printFlagsHTML(buf, flags); err != nil {
+		t.Fatalf("printFlagsHTML failed: %s", err.Error())
+	}
+	output = buf.String()
+
+	checkStringContains(t, output, "(Default: T1)")
+
+	// String flag should hide it if default is an empty string
+	c = &cobra.Command{}
+	c.Flags().StringVar(&opts.Template, "template", "", "Some template")
+
+	flags = c.NonInheritedFlags()
+	buf = new(bytes.Buffer)
+	flags.SetOutput(buf)
+
+	if err := printFlagsHTML(buf, flags); err != nil {
+		t.Fatalf("printFlagsHTML failed: %s", err.Error())
+	}
+	output = buf.String()
+
+	checkStringOmits(t, output, "(Default: ")
+
+	// String slice flag should hide it if default is an empty slice
+	c = &cobra.Command{}
+	c.Flags().StringSliceVar(&opts.Topic, "topic", nil, "Some topics")
+	flags = c.NonInheritedFlags()
+	buf = new(bytes.Buffer)
+	flags.SetOutput(buf)
+
+	if err := printFlagsHTML(buf, flags); err != nil {
+		t.Fatalf("printFlagsHTML failed: %s", err.Error())
+	}
+	output = buf.String()
+
+	checkStringOmits(t, output, "(Default: ")
+
+	// String slice flag should show it if default is not an empty slice
+	c = &cobra.Command{}
+	c.Flags().StringSliceVar(&opts.Topic, "topic", []string{"apples", "oranges"}, "Some topics")
+	flags = c.NonInheritedFlags()
+	buf = new(bytes.Buffer)
+	flags.SetOutput(buf)
+
+	if err := printFlagsHTML(buf, flags); err != nil {
+		t.Fatalf("printFlagsHTML failed: %s", err.Error())
+	}
+	output = buf.String()
+
+	checkStringContains(t, output, "(Default: [apples,oranges])")
+}

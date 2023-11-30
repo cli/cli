@@ -50,13 +50,14 @@ type flagView struct {
 	Name      string
 	Varname   string
 	Shorthand string
+	DefValue  string
 	Usage     string
 }
 
 var flagsTemplate = `
 <dl class="flags">{{ range . }}
 	<dt>{{ if .Shorthand }}<code>-{{.Shorthand}}</code>, {{ end -}}
-		<code>--{{.Name}}{{ if .Varname }} &lt;{{.Varname}}&gt;{{ end }}</code></dt>
+		<code>--{{.Name}}{{ if .Varname }} &lt;{{.Varname}}&gt;{{ end }}{{ if not (eq .DefValue "false" "" "[]") }} (Default: {{.DefValue}}){{ end }}</code></dt>
 	<dd>{{.Usage}}</dd>
 {{ end }}</dl>
 `
@@ -74,6 +75,7 @@ func printFlagsHTML(w io.Writer, fs *pflag.FlagSet) error {
 			Name:      f.Name,
 			Varname:   varname,
 			Shorthand: f.Shorthand,
+			DefValue:  f.DefValue,
 			Usage:     usage,
 		})
 	})
