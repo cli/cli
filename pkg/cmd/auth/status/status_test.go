@@ -80,7 +80,7 @@ func Test_statusRun(t *testing.T) {
 		opts       StatusOptions
 		httpStubs  func(*httpmock.Registry)
 		cfgStubs   func(config.Config)
-		wantErr    string
+		wantErr    error
 		wantOut    string
 		wantErrOut string
 	}{
@@ -115,8 +115,7 @@ func Test_statusRun(t *testing.T) {
 				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo"))
 			},
-			wantErr: "SilentError",
-			wantErrOut: heredoc.Doc(`
+			wantOut: heredoc.Doc(`
 				ghe.io
 				  X ghe.io: the token in GH_CONFIG_DIR/hosts.yml is missing required scope 'read:org'
 				  - To request missing scopes, run: gh auth refresh -h ghe.io
@@ -132,8 +131,7 @@ func Test_statusRun(t *testing.T) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
 			},
-			wantErr: "SilentError",
-			wantErrOut: heredoc.Doc(`
+			wantOut: heredoc.Doc(`
 				ghe.io
 				  X ghe.io: authentication failed
 				  - The ghe.io token in GH_CONFIG_DIR/hosts.yml is invalid.
@@ -248,7 +246,7 @@ func Test_statusRun(t *testing.T) {
 				login(t, c, "github.com", "monalisa", "abc123", "https")
 			},
 			httpStubs:  func(reg *httpmock.Registry) {},
-			wantErr:    "SilentError",
+			wantErr:    cmdutil.SilentError,
 			wantErrOut: "Hostname \"github.example.com\" not found among authenticated GitHub hosts\n",
 		},
 	}
@@ -281,8 +279,8 @@ func Test_statusRun(t *testing.T) {
 			}
 
 			err := statusRun(&tt.opts)
-			if tt.wantErr != "" {
-				require.EqualError(t, err, tt.wantErr)
+			if tt.wantErr != nil {
+				require.Equal(t, err, tt.wantErr)
 			} else {
 				require.NoError(t, err)
 			}

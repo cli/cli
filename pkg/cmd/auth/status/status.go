@@ -82,7 +82,6 @@ func statusRun(opts *StatusOptions) error {
 		return err
 	}
 
-	var failed bool
 	var isHostnameFound bool
 
 	for _, hostname := range hostnames {
@@ -91,62 +90,59 @@ func statusRun(opts *StatusOptions) error {
 		}
 		isHostnameFound = true
 
-		token, tokenSource := authCfg.Token(hostname)
-		if tokenSource == "oauth_token" {
-			// The go-gh function TokenForHost returns this value as source for tokens read from the
-			// config file, but we want the file path instead. This attempts to reconstruct it.
-			tokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
-		}
-		_, tokenIsWriteable := shared.AuthTokenWriteable(authCfg, hostname)
-
 		statusInfo[hostname] = []string{}
-		addMsg := func(x string, ys ...interface{}) {
-			statusInfo[hostname] = append(statusInfo[hostname], fmt.Sprintf(x, ys...))
-		}
 
-		scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
-		if err != nil {
-			addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
-			addMsg("- The %s token in %s is invalid.", cs.Bold(hostname), tokenSource)
-			if tokenIsWriteable {
-				addMsg("- To re-authenticate, run: %s %s",
-					cs.Bold("gh auth login -h"), cs.Bold(hostname))
-				addMsg("- To forget about this host, run: %s %s",
-					cs.Bold("gh auth logout -h"), cs.Bold(hostname))
+		users, _ := authCfg.UsersForHost(hostname)
+		for _, username := range users {
+			token, tokenSource, _ := authCfg.TokenForUser(hostname, username)
+			if tokenSource == "oauth_token" {
+				// The go-gh function TokenForHost returns this value as source for tokens read from the
+				// config file, but we want the file path instead. This attempts to reconstruct it.
+				tokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
 			}
-			failed = true
-			continue
-		}
+			_, tokenIsWriteable := shared.AuthTokenWriteable(authCfg, hostname)
 
-		if err := shared.HeaderHasMinimumScopes(scopesHeader); err != nil {
-			var missingScopes *shared.MissingScopesError
-			if errors.As(err, &missingScopes) {
-				addMsg("%s %s: the token in %s is %s", cs.Red("X"), hostname, tokenSource, err)
-				if tokenIsWriteable {
-					addMsg("- To request missing scopes, run: %s %s",
-						cs.Bold("gh auth refresh -h"),
-						cs.Bold(hostname))
-				}
+			addMsg := func(x string, ys ...interface{}) {
+				statusInfo[hostname] = append(statusInfo[hostname], fmt.Sprintf(x, ys...))
 			}
-			failed = true
-		} else {
-			username, err := authCfg.User(hostname)
+
+			scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
 			if err != nil {
-				return err
+				addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
+				addMsg("- The %s token in %s is invalid.", cs.Bold(hostname), tokenSource)
+				if tokenIsWriteable {
+					addMsg("- To re-authenticate, run: %s %s",
+						cs.Bold("gh auth login -h"), cs.Bold(hostname))
+					addMsg("- To forget about this host, run: %s %s",
+						cs.Bold("gh auth logout -h"), cs.Bold(hostname))
+				}
+				continue
 			}
 
-			addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
-			proto := cfg.GitProtocol(hostname)
-			if proto != "" {
-				addMsg("%s Git operations for %s configured to use %s protocol.",
-					cs.SuccessIcon(), hostname, cs.Bold(proto))
-			}
-			addMsg("%s Token: %s", cs.SuccessIcon(), displayToken(token, opts.ShowToken))
+			if err := shared.HeaderHasMinimumScopes(scopesHeader); err != nil {
+				var missingScopes *shared.MissingScopesError
+				if errors.As(err, &missingScopes) {
+					addMsg("%s %s: the token in %s is %s", cs.Red("X"), hostname, tokenSource, err)
+					if tokenIsWriteable {
+						addMsg("- To request missing scopes, run: %s %s",
+							cs.Bold("gh auth refresh -h"),
+							cs.Bold(hostname))
+					}
+				}
+			} else {
+				addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
+				proto := cfg.GitProtocol(hostname)
+				if proto != "" {
+					addMsg("%s Git operations for %s configured to use %s protocol.",
+						cs.SuccessIcon(), hostname, cs.Bold(proto))
+				}
+				addMsg("%s Token: %s", cs.SuccessIcon(), displayToken(token, opts.ShowToken))
 
-			if scopesHeader != "" {
-				addMsg("%s Token scopes: %s", cs.SuccessIcon(), scopesHeader)
-			} else if expectScopes(token) {
-				addMsg("%s Token scopes: none", cs.Red("X"))
+				if scopesHeader != "" {
+					addMsg("%s Token scopes: %s", cs.SuccessIcon(), scopesHeader)
+				} else if expectScopes(token) {
+					addMsg("%s Token scopes: none", cs.Red("X"))
+				}
 			}
 		}
 	}
@@ -163,27 +159,15 @@ func statusRun(opts *StatusOptions) error {
 		if !ok {
 			continue
 		}
-		if prevEntry && failed {
-			fmt.Fprint(stderr, "\n")
-		} else if prevEntry && !failed {
+
+		if prevEntry {
 			fmt.Fprint(stdout, "\n")
 		}
 		prevEntry = true
-		if failed {
-			fmt.Fprintf(stderr, "%s\n", cs.Bold(hostname))
-			for _, line := range lines {
-				fmt.Fprintf(stderr, "  %s\n", line)
-			}
-		} else {
-			fmt.Fprintf(stdout, "%s\n", cs.Bold(hostname))
-			for _, line := range lines {
-				fmt.Fprintf(stdout, "  %s\n", line)
-			}
+		fmt.Fprintf(stdout, "%s\n", cs.Bold(hostname))
+		for _, line := range lines {
+			fmt.Fprintf(stdout, "  %s\n", line)
 		}
-	}
-
-	if failed {
-		return cmdutil.SilentError
 	}
 
 	return nil
