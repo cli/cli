@@ -411,6 +411,7 @@ func (c *AuthConfig) UsersForHost(hostname string) ([]string, error) {
 	return users, nil
 }
 
+// TODO: Write tests and explore implementation and return value more
 func (c *AuthConfig) TokenForUser(hostname, user string) (string, string, error) {
 	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
 		return token, "keyring", nil

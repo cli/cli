@@ -167,7 +167,7 @@ func Test_statusRun(t *testing.T) {
 				  ✓ Logged in to ghe.io as monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
 				  ✓ Git operations for ghe.io configured to use ssh protocol.
 				  ✓ Token: gho_******
-				  X Token scopes: none
+				  ! Token scopes: none
 			`),
 		},
 		{
@@ -262,12 +262,12 @@ func Test_statusRun(t *testing.T) {
 			},
 			wantOut: heredoc.Doc(`
 				github.com
-				  ✓ Logged in to github.com as monalisa (GH_CONFIG_DIR/hosts.yml)
+				  ✓ Logged in to github.com as monalisa-2 (GH_CONFIG_DIR/hosts.yml)
 				  ✓ Git operations for github.com configured to use https protocol.
 				  ✓ Token: ******
 				  ✓ Token scopes: repo,read:org
 
-				  ✓ Logged in to github.com as monalisa-2 (GH_CONFIG_DIR/hosts.yml)
+				  ✓ Logged in to github.com as monalisa (GH_CONFIG_DIR/hosts.yml)
 				  ✓ Git operations for github.com configured to use https protocol.
 				  ✓ Token: ******
 				  ✓ Token scopes: repo,read:org,project:read
