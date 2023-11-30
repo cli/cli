@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -137,11 +136,9 @@ func statusRun(opts *StatusOptions) error {
 			}
 			failed = true
 		} else {
-			apiClient := api.NewClientFromHTTP(httpClient)
-			username, err := api.CurrentLoginName(apiClient, hostname)
+			username, err := authCfg.User(hostname)
 			if err != nil {
-				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
-				failed = true
+				return err
 			}
 
 			addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)

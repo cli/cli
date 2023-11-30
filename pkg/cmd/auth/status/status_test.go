@@ -117,15 +117,10 @@ func Test_statusRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
-				// mock for CurrentLoginName
-				// TODO: Remove in favour of asking the config for the user
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
 			wantOut: heredoc.Doc(`
 				ghe.io
-				  ✓ Logged in to ghe.io as monalisa (GH_CONFIG_DIR/hosts.yml)
+				  ✓ Logged in to ghe.io as monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
 				  ✓ Git operations for ghe.io configured to use https protocol.
 				  ✓ Token: ******
 				  ✓ Token scopes: repo,read:org
@@ -183,14 +178,6 @@ func Test_statusRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "api/v3/"),
 					httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", ""))
-				// mock for CurrentLoginName, one for each host
-				// TODO: remove for user config
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa-ghe"}}}`))
 			},
 			wantOut: heredoc.Doc(`
 				github.com
@@ -217,10 +204,6 @@ func Test_statusRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", ""),
 					httpmock.ScopesResponder(""))
-				// mock for CurrentLoginName
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
 			wantOut: heredoc.Doc(`
 				github.com
@@ -240,10 +223,6 @@ func Test_statusRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", ""),
 					httpmock.ScopesResponder(""))
-				// mock for CurrentLoginName
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
 			wantOut: heredoc.Doc(`
 				github.com
@@ -266,13 +245,6 @@ func Test_statusRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
 				// mocks for HeaderHasMinimumScopes on github.com
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
-				// mock for CurrentLoginName, one for each host
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa-ghe"}}}`))
 			},
 			wantOut: heredoc.Doc(`
 				github.com
