@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -17,6 +18,7 @@ import (
 )
 
 type validEntry struct {
+	active      bool
 	host        string
 	user        string
 	token       string
@@ -40,7 +42,7 @@ func (e validEntry) String(cs *iostreams.ColorScheme) string {
 	if e.scopes != "" {
 		sb.WriteString(fmt.Sprintf("  %s Token scopes: %s\n", cs.SuccessIcon(), e.scopes))
 	} else if expectScopes(e.token) {
-		sb.WriteString(fmt.Sprintf("  %s Token scopes: none\n", cs.Red("X")))
+		sb.WriteString(fmt.Sprintf("  %s Token scopes: none\n", cs.WarningIcon()))
 	}
 
 	return sb.String()
@@ -62,6 +64,7 @@ func (ms missingScopes) String() string {
 }
 
 type missingScopesEntry struct {
+	active           bool
 	host             string
 	tokenSource      string
 	missingScopes    missingScopes
@@ -84,6 +87,7 @@ func (e missingScopesEntry) String(cs *iostreams.ColorScheme) string {
 }
 
 type invalidTokenEntry struct {
+	active           bool
 	host             string
 	tokenSource      string
 	tokenIsWriteable bool
@@ -177,8 +181,6 @@ func statusRun(opts *StatusOptions) error {
 	}
 	authCfg := cfg.Authentication()
 
-	// TODO check tty
-
 	stderr := opts.IO.ErrOut
 	stdout := opts.IO.Out
 	cs := opts.IO.ColorScheme()
@@ -205,53 +207,39 @@ func statusRun(opts *StatusOptions) error {
 		}
 		isHostnameFound = true
 
+		var activeUser string
+		gitProtocol := cfg.GitProtocol(hostname)
+		activeUserToken, activeUserTokenSource := authCfg.Token(hostname)
+		if authTokenWriteable(activeUserTokenSource) {
+			activeUser, _ = authCfg.User(hostname)
+		}
+		entry := buildEntry(httpClient, buildEntryOptions{
+			active:      true,
+			gitProtocol: gitProtocol,
+			hostname:    hostname,
+			showToken:   opts.ShowToken,
+			token:       activeUserToken,
+			tokenSource: activeUserTokenSource,
+			username:    activeUser,
+		})
+		statuses[hostname] = append(statuses[hostname], entry)
+
 		users, _ := authCfg.UsersForHost(hostname)
 		for _, username := range users {
-			token, tokenSource, _ := authCfg.TokenForUser(hostname, username)
-			if tokenSource == "oauth_token" {
-				// The go-gh function TokenForHost returns this value as source for tokens read from the
-				// config file, but we want the file path instead. This attempts to reconstruct it.
-				tokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
-			}
-			_, tokenIsWriteable := shared.AuthTokenWriteable(authCfg, hostname)
-
-			scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
-			if err != nil {
-				var networkError net.Error
-				if errors.As(err, &networkError) && networkError.Timeout() {
-					statuses[hostname] = append(statuses[hostname], timeoutErrorEntry{
-						host: hostname,
-					})
-				} else {
-					statuses[hostname] = append(statuses[hostname], invalidTokenEntry{
-						host:             hostname,
-						tokenSource:      tokenSource,
-						tokenIsWriteable: tokenIsWriteable,
-					})
-				}
-
+			if username == activeUser {
 				continue
 			}
-
-			if err := shared.HeaderHasMinimumScopes(scopesHeader); err != nil {
-				var missingScopes *shared.MissingScopesError
-				if errors.As(err, &missingScopes) {
-					statuses[hostname] = append(statuses[hostname], missingScopesEntry{
-						host:             hostname,
-						tokenSource:      tokenSource,
-						missingScopes:    missingScopes.MissingScopes,
-						tokenIsWriteable: tokenIsWriteable,
-					})
-				}
-			} else {
-				statuses[hostname] = append(statuses[hostname], validEntry{
-					host:        hostname,
-					user:        username,
-					token:       displayToken(token, opts.ShowToken),
-					tokenSource: tokenSource,
-					gitProtocol: cfg.GitProtocol(hostname),
-					scopes:      scopesHeader})
-			}
+			token, tokenSource, _ := authCfg.TokenForUser(hostname, username)
+			entry := buildEntry(httpClient, buildEntryOptions{
+				active:      false,
+				gitProtocol: gitProtocol,
+				hostname:    hostname,
+				showToken:   opts.ShowToken,
+				token:       token,
+				tokenSource: tokenSource,
+				username:    username,
+			})
+			statuses[hostname] = append(statuses[hostname], entry)
 		}
 	}
 
@@ -294,4 +282,88 @@ func displayToken(token string, printRaw bool) string {
 
 func expectScopes(token string) bool {
 	return strings.HasPrefix(token, "ghp_") || strings.HasPrefix(token, "gho_")
+}
+
+type buildEntryOptions struct {
+	active      bool
+	gitProtocol string
+	hostname    string
+	showToken   bool
+	token       string
+	tokenSource string
+	username    string
+}
+
+func buildEntry(httpClient *http.Client, opts buildEntryOptions) Entry {
+	tokenIsWriteable := authTokenWriteable(opts.tokenSource)
+
+	if opts.tokenSource == "oauth_token" {
+		// The go-gh function TokenForHost returns this value as source for tokens read from the
+		// config file, but we want the file path instead. This attempts to reconstruct it.
+		opts.tokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
+	}
+
+	// If token is not writeable, then it came from an environment variable and
+	// we need to fetch the username as it won't be stored in the config.
+	if !tokenIsWriteable {
+		// The httpClient will automatically use the correct token here as
+		// the token from the environment variable take highest precedence.
+		apiClient := api.NewClientFromHTTP(httpClient)
+		var err error
+		opts.username, err = api.CurrentLoginName(apiClient, opts.hostname)
+		if err != nil {
+			return invalidTokenEntry{
+				active:           opts.active,
+				host:             opts.hostname,
+				tokenIsWriteable: tokenIsWriteable,
+				tokenSource:      opts.tokenSource,
+			}
+		}
+	}
+
+	// Get scopes for token.
+	scopesHeader, err := shared.GetScopes(httpClient, opts.hostname, opts.token)
+	if err != nil {
+		var networkError net.Error
+		if errors.As(err, &networkError) && networkError.Timeout() {
+			return timeoutErrorEntry{
+				host: opts.hostname,
+			}
+		}
+
+		return invalidTokenEntry{
+			active:           opts.active,
+			host:             opts.hostname,
+			tokenIsWriteable: tokenIsWriteable,
+			tokenSource:      opts.tokenSource,
+		}
+	}
+
+	// Check if token has minimum set of scopes.
+	if err := shared.HeaderHasMinimumScopes(scopesHeader); err != nil {
+		var missingScopes *shared.MissingScopesError
+		if errors.As(err, &missingScopes) {
+			return missingScopesEntry{
+				active:           opts.active,
+				host:             opts.hostname,
+				missingScopes:    missingScopes.MissingScopes,
+				tokenIsWriteable: tokenIsWriteable,
+				tokenSource:      opts.tokenSource,
+			}
+		}
+	}
+
+	return validEntry{
+		active:      opts.active,
+		gitProtocol: opts.gitProtocol,
+		host:        opts.hostname,
+		scopes:      scopesHeader,
+		token:       displayToken(opts.token, opts.showToken),
+		tokenSource: opts.tokenSource,
+		user:        opts.username,
+	}
+}
+
+func authTokenWriteable(src string) bool {
+	return !strings.HasSuffix(src, "_TOKEN")
 }
