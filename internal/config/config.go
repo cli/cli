@@ -411,6 +411,19 @@ func (c *AuthConfig) UsersForHost(hostname string) ([]string, error) {
 	return users, nil
 }
 
+func (c *AuthConfig) TokenForUser(hostname, user string) (string, string, error) {
+	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
+		return token, "keyring", nil
+	}
+
+	// If there is a token in the insecure config for the user, move it to the active field
+	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, oauthTokenKey}); err == nil {
+		return token, "oauth_token", nil
+	}
+
+	return "", "default", fmt.Errorf("no token found for: %s", user)
+}
+
 func keyringServiceName(hostname string) string {
 	return "gh:" + hostname
 }
