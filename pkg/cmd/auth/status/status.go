@@ -15,6 +15,108 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type validEntry struct {
+	host        string
+	user        string
+	token       string
+	tokenSource string
+	gitProtocol string
+	scopes      string
+}
+
+func (e validEntry) String(cs *iostreams.ColorScheme) string {
+	var sb strings.Builder
+
+	sb.WriteString(
+		fmt.Sprintf("  %s Logged in to %s as %s (%s)\n", cs.SuccessIcon(), e.host, cs.Bold(e.user), e.tokenSource),
+	)
+	if e.gitProtocol != "" {
+		sb.WriteString(fmt.Sprintf("  %s Git operations for %s configured to use %s protocol.\n",
+			cs.SuccessIcon(), e.host, cs.Bold(e.gitProtocol)))
+	}
+	sb.WriteString(fmt.Sprintf("  %s Token: %s\n", cs.SuccessIcon(), e.token))
+
+	if e.scopes != "" {
+		sb.WriteString(fmt.Sprintf("  %s Token scopes: %s\n", cs.SuccessIcon(), e.scopes))
+	} else if expectScopes(e.token) {
+		sb.WriteString(fmt.Sprintf("  %s Token scopes: none\n", cs.Red("X")))
+	}
+
+	return sb.String()
+}
+
+type missingScopes []string
+
+func (ms missingScopes) String() string {
+	var missing []string
+	for _, s := range ms {
+		missing = append(missing, fmt.Sprintf("'%s'", s))
+	}
+	scopes := strings.Join(missing, ", ")
+
+	if len(ms) == 1 {
+		return "missing required scope " + scopes
+	}
+	return "missing required scopes " + scopes
+}
+
+type missingScopesEntry struct {
+	host             string
+	tokenSource      string
+	missingScopes    missingScopes
+	tokenIsWriteable bool
+}
+
+func (e missingScopesEntry) String(cs *iostreams.ColorScheme) string {
+	var sb strings.Builder
+
+	sb.WriteString(
+		fmt.Sprintf("  %s %s: the token in %s is %s\n", cs.Red("X"), e.host, e.tokenSource, e.missingScopes),
+	)
+	if e.tokenIsWriteable {
+		sb.WriteString(fmt.Sprintf("  - To request missing scopes, run: %s %s\n",
+			cs.Bold("gh auth refresh -h"),
+			cs.Bold(e.host)))
+	}
+
+	return sb.String()
+}
+
+type invalidTokenEntry struct {
+	host             string
+	tokenSource      string
+	tokenIsWriteable bool
+}
+
+func (e invalidTokenEntry) String(cs *iostreams.ColorScheme) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("  %s %s: authentication failed\n", cs.Red("X"), e.host))
+	sb.WriteString(fmt.Sprintf("  - The %s token in %s is invalid.\n", cs.Bold(e.host), e.tokenSource))
+	if e.tokenIsWriteable {
+		sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s %s\n",
+			cs.Bold("gh auth login -h"), cs.Bold(e.host)))
+		sb.WriteString(fmt.Sprintf("  - To forget about this host, run: %s %s\n",
+			cs.Bold("gh auth logout -h"), cs.Bold(e.host)))
+	}
+
+	return sb.String()
+}
+
+type Entry interface {
+	String(cs *iostreams.ColorScheme) string
+}
+
+type Entries []Entry
+
+func (e Entries) Strings(cs *iostreams.ColorScheme) []string {
+	var out []string
+	for _, entry := range e {
+		out = append(out, entry.String(cs))
+	}
+	return out
+}
+
 type StatusOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
@@ -68,7 +170,7 @@ func statusRun(opts *StatusOptions) error {
 	stdout := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
-	statusInfo := map[string][]string{}
+	statuses := make(map[string]Entries)
 
 	hostnames := authCfg.Hosts()
 	if len(hostnames) == 0 {
@@ -90,8 +192,6 @@ func statusRun(opts *StatusOptions) error {
 		}
 		isHostnameFound = true
 
-		statusInfo[hostname] = []string{}
-
 		users, _ := authCfg.UsersForHost(hostname)
 		for _, username := range users {
 			token, tokenSource, _ := authCfg.TokenForUser(hostname, username)
@@ -102,47 +202,35 @@ func statusRun(opts *StatusOptions) error {
 			}
 			_, tokenIsWriteable := shared.AuthTokenWriteable(authCfg, hostname)
 
-			addMsg := func(x string, ys ...interface{}) {
-				statusInfo[hostname] = append(statusInfo[hostname], fmt.Sprintf(x, ys...))
-			}
-
 			scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
 			if err != nil {
-				addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
-				addMsg("- The %s token in %s is invalid.", cs.Bold(hostname), tokenSource)
-				if tokenIsWriteable {
-					addMsg("- To re-authenticate, run: %s %s",
-						cs.Bold("gh auth login -h"), cs.Bold(hostname))
-					addMsg("- To forget about this host, run: %s %s",
-						cs.Bold("gh auth logout -h"), cs.Bold(hostname))
-				}
+				statuses[hostname] = append(statuses[hostname], invalidTokenEntry{
+					host:             hostname,
+					tokenSource:      tokenSource,
+					tokenIsWriteable: tokenIsWriteable,
+				})
+
 				continue
 			}
 
 			if err := shared.HeaderHasMinimumScopes(scopesHeader); err != nil {
 				var missingScopes *shared.MissingScopesError
 				if errors.As(err, &missingScopes) {
-					addMsg("%s %s: the token in %s is %s", cs.Red("X"), hostname, tokenSource, err)
-					if tokenIsWriteable {
-						addMsg("- To request missing scopes, run: %s %s",
-							cs.Bold("gh auth refresh -h"),
-							cs.Bold(hostname))
-					}
+					statuses[hostname] = append(statuses[hostname], missingScopesEntry{
+						host:             hostname,
+						tokenSource:      tokenSource,
+						missingScopes:    missingScopes.MissingScopes,
+						tokenIsWriteable: tokenIsWriteable,
+					})
 				}
 			} else {
-				addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
-				proto := cfg.GitProtocol(hostname)
-				if proto != "" {
-					addMsg("%s Git operations for %s configured to use %s protocol.",
-						cs.SuccessIcon(), hostname, cs.Bold(proto))
-				}
-				addMsg("%s Token: %s", cs.SuccessIcon(), displayToken(token, opts.ShowToken))
-
-				if scopesHeader != "" {
-					addMsg("%s Token scopes: %s", cs.SuccessIcon(), scopesHeader)
-				} else if expectScopes(token) {
-					addMsg("%s Token scopes: none", cs.Red("X"))
-				}
+				statuses[hostname] = append(statuses[hostname], validEntry{
+					host:        hostname,
+					user:        username,
+					token:       displayToken(token, opts.ShowToken),
+					tokenSource: tokenSource,
+					gitProtocol: cfg.GitProtocol(hostname),
+					scopes:      scopesHeader})
 			}
 		}
 	}
@@ -155,7 +243,7 @@ func statusRun(opts *StatusOptions) error {
 
 	prevEntry := false
 	for _, hostname := range hostnames {
-		lines, ok := statusInfo[hostname]
+		entries, ok := statuses[hostname]
 		if !ok {
 			continue
 		}
@@ -165,9 +253,7 @@ func statusRun(opts *StatusOptions) error {
 		}
 		prevEntry = true
 		fmt.Fprintf(stdout, "%s\n", cs.Bold(hostname))
-		for _, line := range lines {
-			fmt.Fprintf(stdout, "  %s\n", line)
-		}
+		fmt.Fprintf(stdout, "%s", strings.Join(entries.Strings(cs), "\n"))
 	}
 
 	return nil
