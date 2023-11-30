@@ -269,6 +269,30 @@ func Test_statusRun(t *testing.T) {
 			wantErr:    cmdutil.SilentError,
 			wantErrOut: "Hostname \"github.example.com\" not found among authenticated GitHub hosts\n",
 		},
+		{
+			name: "multiple accounts on a host",
+			opts: StatusOptions{},
+			cfgStubs: func(c config.Config) {
+				login(t, c, "github.com", "monalisa", "abc123", "https")
+				login(t, c, "github.com", "monalisa-2", "abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org,project:read"))
+			},
+			wantOut: heredoc.Doc(`
+				github.com
+				  ✓ Logged in to github.com as monalisa (GH_CONFIG_DIR/hosts.yml)
+				  ✓ Git operations for github.com configured to use https protocol.
+				  ✓ Token: ******
+				  ✓ Token scopes: repo,read:org
+
+				  ✓ Logged in to github.com as monalisa-2 (GH_CONFIG_DIR/hosts.yml)
+				  ✓ Git operations for github.com configured to use https protocol.
+				  ✓ Token: ******
+				  ✓ Token scopes: repo,read:org,project:read
+			`),
+		},
 	}
 
 	for _, tt := range tests {
