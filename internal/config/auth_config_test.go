@@ -418,6 +418,128 @@ func TestLogoutIgnoresErrorsFromConfigAndKeyring(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestSwitchUserMakesSecureTokenActive(t *testing.T) {
+	// Given we have a user with a secure token
+	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", true)
+	require.NoError(t, err)
+
+	// When we switch to that user
+	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
+
+	// Their secure token is now active
+	token, err := authCfg.TokenFromKeyring("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "test-token-1", token)
+}
+
+func TestSwitchUserMakesInsecureTokenActive(t *testing.T) {
+	// Given we have a user with an insecure token
+	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", false)
+	require.NoError(t, err)
+
+	// When we switch to that user
+	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
+
+	// Their insecure token is now active
+	token, source := authCfg.Token("github.com")
+	require.Equal(t, "test-token-1", token)
+	require.Equal(t, oauthTokenKey, source)
+}
+
+func TestSwitchUserUpdatesTheActiveUser(t *testing.T) {
+	// Given we have two users logged into a host
+	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", false)
+	require.NoError(t, err)
+
+	// When we switch to the other user
+	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
+
+	// Then the active user is updated
+	activeUser, err := authCfg.User("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "test-user-1", activeUser)
+}
+
+// TODO: This might be removed
+func TestSwitchUserUpdatesTheHostLevelGitProtocol(t *testing.T) {
+	// Given we have two users logged into a host
+	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "https", false)
+	require.NoError(t, err)
+
+	// When we switch to the other user
+	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
+
+	// Then the host level git protocol is updated
+	requireKeyWithValue(t, authCfg.cfg, []string{hostsKey, "github.com", gitProtocolKey}, "ssh")
+}
+
+func TestSwitchUserErrorsIfNoTokenMadeActive(t *testing.T) {
+	// Given we have a user but no token can be found (because we deleted them, simulating an error case)
+	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", true)
+	require.NoError(t, err)
+
+	keyring.Delete(keyringServiceName("github.com"), "test-user-1")
+
+	// When we switch to the user
+	err = authCfg.SwitchUser("github.com", "test-user-1")
+
+	// Then it returns an error
+	require.EqualError(t, err, "no token found for 'test-user-1'")
+}
+
+func TestSwitchClearsActiveSecureTokenWhenSwitchingToInsecureUser(t *testing.T) {
+	// Given we have an active secure token
+	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", true)
+	require.NoError(t, err)
+
+	// When we switch to an insecure user
+	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
+
+	// Then the active secure token is cleared
+	_, err = authCfg.TokenFromKeyring("github.com")
+	require.Error(t, err)
+}
+
+func TestSwitchClearsActiveInsecureTokenWhenSwitchingToSecureUser(t *testing.T) {
+	// Given we have an active insecure token
+	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", false)
+	require.NoError(t, err)
+
+	// When we switch to a secure user
+	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
+
+	// Then the active insecure token is cleared
+	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com", oauthTokenKey})
+}
+
 func TestUsersForHostNoHost(t *testing.T) {
 	// Given we have a config with no hosts
 	authCfg := newTestAuthConfig(t)
