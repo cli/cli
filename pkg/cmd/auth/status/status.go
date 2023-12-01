@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -30,56 +31,26 @@ func (e validEntry) String(cs *iostreams.ColorScheme) string {
 	var sb strings.Builder
 
 	sb.WriteString(
-		fmt.Sprintf("  %s Logged in to %s as %s (%s)\n", cs.SuccessIcon(), e.host, cs.Bold(e.user), e.tokenSource),
+		fmt.Sprintf("  %s Logged in to %s account %s (%s)\n", cs.SuccessIcon(), e.host, cs.Bold(e.user), e.tokenSource),
 	)
-	if e.gitProtocol != "" {
-		sb.WriteString(fmt.Sprintf("  %s Git operations for %s configured to use %s protocol.\n",
-			cs.SuccessIcon(), e.host, cs.Bold(e.gitProtocol)))
-	}
-	sb.WriteString(fmt.Sprintf("  %s Token: %s\n", cs.SuccessIcon(), e.token))
+	activeStr := fmt.Sprintf("%v", e.active)
+	sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+	sb.WriteString(fmt.Sprintf("  - Git operations protocol: %s\n", cs.Bold(e.gitProtocol)))
+	sb.WriteString(fmt.Sprintf("  - Token: %s\n", cs.Bold(e.token)))
 
-	if e.scopes != "" {
-		sb.WriteString(fmt.Sprintf("  %s Token scopes: %s\n", cs.SuccessIcon(), e.scopes))
-	} else if expectScopes(e.token) {
-		sb.WriteString(fmt.Sprintf("  %s Token scopes: none\n", cs.WarningIcon()))
-	}
-
-	return sb.String()
-}
-
-type missingScopes []string
-
-func (ms missingScopes) String() string {
-	var missing []string
-	for _, s := range ms {
-		missing = append(missing, fmt.Sprintf("'%s'", s))
-	}
-	scopes := strings.Join(missing, ", ")
-
-	if len(ms) == 1 {
-		return "missing required scope " + scopes
-	}
-	return "missing required scopes " + scopes
-}
-
-type missingScopesEntry struct {
-	active           bool
-	host             string
-	tokenSource      string
-	missingScopes    missingScopes
-	tokenIsWriteable bool
-}
-
-func (e missingScopesEntry) String(cs *iostreams.ColorScheme) string {
-	var sb strings.Builder
-
-	sb.WriteString(
-		fmt.Sprintf("  %s %s: the token in %s is %s\n", cs.Red("X"), e.host, e.tokenSource, e.missingScopes),
-	)
-	if e.tokenIsWriteable {
-		sb.WriteString(fmt.Sprintf("  - To request missing scopes, run: %s %s\n",
-			cs.Bold("gh auth refresh -h"),
-			cs.Bold(e.host)))
+	if expectScopes(e.token) {
+		sb.WriteString(fmt.Sprintf("  - Token scopes: %s\n", cs.Bold(displayScopes(e.scopes))))
+		if err := shared.HeaderHasMinimumScopes(e.scopes); err != nil {
+			var missingScopesError *shared.MissingScopesError
+			if errors.As(err, &missingScopesError) {
+				missingScopes := strings.Join(missingScopesError.MissingScopes, ",")
+				sb.WriteString(fmt.Sprintf("  %s Missing required token scopes: %s\n",
+					cs.WarningIcon(),
+					cs.Bold(displayScopes(missingScopes))))
+				refreshInstructions := fmt.Sprintf("gh auth refresh -h %s", e.host)
+				sb.WriteString(fmt.Sprintf("  - To request missing scopes, run: %s\n", cs.Bold(refreshInstructions)))
+			}
+		}
 	}
 
 	return sb.String()
@@ -88,6 +59,7 @@ func (e missingScopesEntry) String(cs *iostreams.ColorScheme) string {
 type invalidTokenEntry struct {
 	active           bool
 	host             string
+	user             string
 	tokenSource      string
 	tokenIsWriteable bool
 }
@@ -95,13 +67,19 @@ type invalidTokenEntry struct {
 func (e invalidTokenEntry) String(cs *iostreams.ColorScheme) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("  %s %s: authentication failed\n", cs.Red("X"), e.host))
-	sb.WriteString(fmt.Sprintf("  - The %s token in %s is invalid.\n", cs.Bold(e.host), e.tokenSource))
+	if e.user != "" {
+		sb.WriteString(fmt.Sprintf("  %s Failed to log in to %s account %s (%s)\n", cs.Red("X"), e.host, cs.Bold(e.user), e.tokenSource))
+	} else {
+		sb.WriteString(fmt.Sprintf("  %s Failed to log in to %s using token (%s)\n", cs.Red("X"), e.host, e.tokenSource))
+	}
+	activeStr := fmt.Sprintf("%v", e.active)
+	sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+	sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.tokenSource))
 	if e.tokenIsWriteable {
-		sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s %s\n",
-			cs.Bold("gh auth login -h"), cs.Bold(e.host)))
-		sb.WriteString(fmt.Sprintf("  - To forget about this host, run: %s %s\n",
-			cs.Bold("gh auth logout -h"), cs.Bold(e.host)))
+		loginInstructions := fmt.Sprintf("gh auth login -h %s", e.host)
+		logoutInstructions := fmt.Sprintf("gh auth logout -h %s -u %s", e.host, e.user)
+		sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
+		sb.WriteString(fmt.Sprintf("  - To forget about this account, run: %s\n", cs.Bold(logoutInstructions)))
 	}
 
 	return sb.String()
@@ -177,7 +155,13 @@ func statusRun(opts *StatusOptions) error {
 	hostnames := authCfg.Hosts()
 	if len(hostnames) == 0 {
 		fmt.Fprintf(stderr,
-			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", cs.Bold("gh auth login"))
+			"You are not logged into any GitHub hosts. To log in, run: %s\n", cs.Bold("gh auth login"))
+		return cmdutil.SilentError
+	}
+
+	if opts.Hostname != "" && !slices.Contains(hostnames, opts.Hostname) {
+		fmt.Fprintf(stderr,
+			"You are not logged into any accounts on %s\n", opts.Hostname)
 		return cmdutil.SilentError
 	}
 
@@ -186,13 +170,10 @@ func statusRun(opts *StatusOptions) error {
 		return err
 	}
 
-	var isHostnameFound bool
-
 	for _, hostname := range hostnames {
 		if opts.Hostname != "" && opts.Hostname != hostname {
 			continue
 		}
-		isHostnameFound = true
 
 		var activeUser string
 		gitProtocol := cfg.GitProtocol(hostname)
@@ -230,12 +211,6 @@ func statusRun(opts *StatusOptions) error {
 		}
 	}
 
-	if !isHostnameFound {
-		fmt.Fprintf(stderr,
-			"Hostname %q not found among authenticated GitHub hosts\n", opts.Hostname)
-		return cmdutil.SilentError
-	}
-
 	prevEntry := false
 	for _, hostname := range hostnames {
 		entries, ok := statuses[hostname]
@@ -265,6 +240,17 @@ func displayToken(token string, printRaw bool) string {
 	}
 
 	return strings.Repeat("*", len(token))
+}
+
+func displayScopes(scopes string) string {
+	if scopes == "" {
+		return "none"
+	}
+	list := strings.Split(scopes, ",")
+	for i, s := range list {
+		list[i] = fmt.Sprintf("'%s'", strings.TrimSpace(s))
+	}
+	return strings.Join(list, ", ")
 }
 
 func expectScopes(token string) bool {
@@ -302,6 +288,7 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) Entry {
 			return invalidTokenEntry{
 				active:           opts.active,
 				host:             opts.hostname,
+				user:             opts.username,
 				tokenIsWriteable: tokenIsWriteable,
 				tokenSource:      opts.tokenSource,
 			}
@@ -314,22 +301,9 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) Entry {
 		return invalidTokenEntry{
 			active:           opts.active,
 			host:             opts.hostname,
+			user:             opts.username,
 			tokenIsWriteable: tokenIsWriteable,
 			tokenSource:      opts.tokenSource,
-		}
-	}
-
-	// Check if token has minimum set of scopes.
-	if err := shared.HeaderHasMinimumScopes(scopesHeader); err != nil {
-		var missingScopes *shared.MissingScopesError
-		if errors.As(err, &missingScopes) {
-			return missingScopesEntry{
-				active:           opts.active,
-				host:             opts.hostname,
-				missingScopes:    missingScopes.MissingScopes,
-				tokenIsWriteable: tokenIsWriteable,
-				tokenSource:      opts.tokenSource,
-			}
 		}
 	}
 
