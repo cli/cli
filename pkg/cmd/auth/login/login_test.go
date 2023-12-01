@@ -10,7 +10,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/keyring"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -428,7 +427,6 @@ func Test_loginRun_nontty(t *testing.T) {
 			ios.SetStdoutTTY(false)
 			tt.opts.IO = ios
 
-			keyring.MockInit()
 			cfg, readConfigs := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(cfg)
@@ -728,7 +726,6 @@ func Test_loginRun_Survey(t *testing.T) {
 
 			tt.opts.IO = ios
 
-			keyring.MockInit()
 			cfg, readConfigs := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(cfg)

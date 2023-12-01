@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Note that NewIsolatedTestConfig sets up a Mock keyring as well
 func newTestAuthConfig(t *testing.T) *AuthConfig {
 	cfg, _ := NewIsolatedTestConfig(t)
 	return cfg.Authentication()
@@ -17,11 +18,10 @@ func newTestAuthConfig(t *testing.T) *AuthConfig {
 
 func TestTokenFromKeyring(t *testing.T) {
 	// Given a keyring that contains a token for a host
-	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
 	require.NoError(t, keyring.Set(keyringServiceName("github.com"), "", "test-token"))
 
 	// When we get the token from the auth config
-	authCfg := newTestAuthConfig(t)
 	token, err := authCfg.TokenFromKeyring("github.com")
 
 	// Then it returns successfully with the correct token
@@ -61,7 +61,6 @@ func TestTokenStoredInEnv(t *testing.T) {
 
 func TestTokenStoredInKeyring(t *testing.T) {
 	// When the user has logged in securely
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
 	require.NoError(t, err)
@@ -77,10 +76,9 @@ func TestTokenStoredInKeyring(t *testing.T) {
 
 func TestTokenFromKeyringNonExistent(t *testing.T) {
 	// Given a keyring that doesn't contain any tokens
-	keyring.MockInit()
+	authCfg := newTestAuthConfig(t)
 
 	// When we try to get a token from the auth config
-	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.TokenFromKeyring("github.com")
 
 	// Then it returns failure bubbling the ErrNotFound
@@ -192,7 +190,6 @@ func TestDefaultHostLoggedInToOnlyOneHost(t *testing.T) {
 
 func TestLoginSecureStorageUsesKeyring(t *testing.T) {
 	// Given a usable keyring
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	host := "github.com"
 	user := "test-user"
@@ -216,7 +213,6 @@ func TestLoginSecureStorageUsesKeyring(t *testing.T) {
 
 func TestLoginSecureStorageRemovesOldInsecureConfigToken(t *testing.T) {
 	// Given a usable keyring and an oauth token in the config
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	authCfg.cfg.Set([]string{hostsKey, "github.com", oauthTokenKey}, "old-token")
 
@@ -230,8 +226,8 @@ func TestLoginSecureStorageRemovesOldInsecureConfigToken(t *testing.T) {
 
 func TestLoginSecureStorageWithErrorFallsbackAndReports(t *testing.T) {
 	// Given a keyring that errors
-	keyring.MockInitWithError(errors.New("test-explosion"))
 	authCfg := newTestAuthConfig(t)
+	keyring.MockInitWithError(errors.New("test-explosion"))
 
 	// When we login with secure storage
 	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
@@ -313,7 +309,6 @@ func TestLoginAddsUserToConfigWithoutGitProtocolAndWithSecureStorage(t *testing.
 	authCfg := newTestAuthConfig(t)
 
 	// When we log in without git protocol and with secure storage
-	keyring.MockInit()
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
 	require.NoError(t, err)
 
@@ -325,7 +320,6 @@ func TestLoginAddsUserToConfigWithoutGitProtocolAndWithSecureStorage(t *testing.
 
 func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 	// Given we are logged into a host
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	host := "github.com"
 	user := "test-user"
@@ -349,7 +343,6 @@ func TestLogoutRemovesHostAndKeyringToken(t *testing.T) {
 
 func TestLogoutOfActiveUserSwitchesUserIfPossible(t *testing.T) {
 	// Given we have two accounts logged into a host
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "inactive-user", "test-token-1", "ssh", true)
 	require.NoError(t, err)
@@ -377,7 +370,6 @@ func TestLogoutOfActiveUserSwitchesUserIfPossible(t *testing.T) {
 
 func TestLogoutOfInactiveUserDoesNotSwitchUser(t *testing.T) {
 	// Given we have two accounts logged into a host
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "inactive-user-1", "test-token-1.1", "ssh", true)
 	require.NoError(t, err)
@@ -420,7 +412,6 @@ func TestLogoutIgnoresErrorsFromConfigAndKeyring(t *testing.T) {
 
 func TestSwitchUserMakesSecureTokenActive(t *testing.T) {
 	// Given we have a user with a secure token
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
 	require.NoError(t, err)
@@ -438,7 +429,6 @@ func TestSwitchUserMakesSecureTokenActive(t *testing.T) {
 
 func TestSwitchUserMakesInsecureTokenActive(t *testing.T) {
 	// Given we have a user with an insecure token
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", false)
 	require.NoError(t, err)
@@ -456,7 +446,6 @@ func TestSwitchUserMakesInsecureTokenActive(t *testing.T) {
 
 func TestSwitchUserUpdatesTheActiveUser(t *testing.T) {
 	// Given we have two users logged into a host
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", false)
 	require.NoError(t, err)
@@ -475,7 +464,6 @@ func TestSwitchUserUpdatesTheActiveUser(t *testing.T) {
 // TODO: This might be removed
 func TestSwitchUserUpdatesTheHostLevelGitProtocol(t *testing.T) {
 	// Given we have two users logged into a host
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", false)
 	require.NoError(t, err)
@@ -491,7 +479,6 @@ func TestSwitchUserUpdatesTheHostLevelGitProtocol(t *testing.T) {
 
 func TestSwitchUserErrorsIfNoTokenMadeActive(t *testing.T) {
 	// Given we have a user but no token can be found (because we deleted them, simulating an error case)
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
 	require.NoError(t, err)
@@ -504,12 +491,12 @@ func TestSwitchUserErrorsIfNoTokenMadeActive(t *testing.T) {
 	err = authCfg.SwitchUser("github.com", "test-user-1")
 
 	// Then it returns an error
+	// But also restores the previous
 	require.EqualError(t, err, "no token found for 'test-user-1'")
 }
 
 func TestSwitchClearsActiveSecureTokenWhenSwitchingToInsecureUser(t *testing.T) {
 	// Given we have an active secure token
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", false)
 	require.NoError(t, err)
@@ -526,7 +513,6 @@ func TestSwitchClearsActiveSecureTokenWhenSwitchingToInsecureUser(t *testing.T) 
 
 func TestSwitchClearsActiveInsecureTokenWhenSwitchingToSecureUser(t *testing.T) {
 	// Given we have an active insecure token
-	keyring.MockInit()
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
 	require.NoError(t, err)
@@ -767,7 +753,6 @@ func TestLoginSecurePostMigrationRemovesTokenFromConfig(t *testing.T) {
 	c := cfg{authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
-	keyring.MockInit()
 	_, err = authCfg.Login("github.com", "test-user", "test-token", "", true)
 
 	// Then it returns success, having removed the old insecure oauth token entry

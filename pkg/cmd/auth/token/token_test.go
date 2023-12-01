@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/keyring"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
@@ -196,7 +195,6 @@ func TestTokenRunSecureStorage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			keyring.MockInit()
 			ios, _, stdout, _ := iostreams.Test()
 			tt.opts.IO = ios
 			tt.opts.SecureStorage = true
