@@ -259,8 +259,9 @@ func Test_loginRun_nontty(t *testing.T) {
 	tests := []struct {
 		name            string
 		opts            *LoginOptions
+		env             map[string]string
 		httpStubs       func(*httpmock.Registry)
-		cfgStubs        func(*config.ConfigMock)
+		cfgStubs        func(config.Config)
 		wantHosts       string
 		wantErr         string
 		wantStderr      string
@@ -355,13 +356,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Hostname: "github.com",
 				Token:    "abc456",
 			},
-			cfgStubs: func(c *config.ConfigMock) {
-				authCfg := c.Authentication()
-				authCfg.SetToken("value_from_env", "GH_TOKEN")
-				c.AuthenticationFunc = func() *config.AuthConfig {
-					return authCfg
-				}
-			},
+			env:     map[string]string{"GH_TOKEN": "value_from_env"},
 			wantErr: "SilentError",
 			wantStderr: heredoc.Doc(`
                 The value of the GH_TOKEN environment variable is being used for authentication.
@@ -374,13 +369,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Hostname: "ghe.io",
 				Token:    "abc456",
 			},
-			cfgStubs: func(c *config.ConfigMock) {
-				authCfg := c.Authentication()
-				authCfg.SetToken("value_from_env", "GH_ENTERPRISE_TOKEN")
-				c.AuthenticationFunc = func() *config.AuthConfig {
-					return authCfg
-				}
-			},
+			env:     map[string]string{"GH_ENTERPRISE_TOKEN": "value_from_env"},
 			wantErr: "SilentError",
 			wantStderr: heredoc.Doc(`
                 The value of the GH_ENTERPRISE_TOKEN environment variable is being used for authentication.
@@ -408,7 +397,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Hostname: "github.com",
 				Token:    "newUserToken",
 			},
-			cfgStubs: func(c *config.ConfigMock) {
+			cfgStubs: func(c config.Config) {
 				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
 				require.NoError(t, err)
 			},
@@ -440,8 +429,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			tt.opts.IO = ios
 
 			keyring.MockInit()
-			readConfigs := config.StubWriteConfig(t)
-			cfg := config.NewBlankConfig()
+			cfg, readConfigs := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(cfg)
 			}
@@ -456,6 +444,10 @@ func Test_loginRun_nontty(t *testing.T) {
 			}
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
+			}
+
+			for k, v := range tt.env {
+				t.Setenv(k, v)
 			}
 
 			_, restoreRun := run.Stub()
@@ -490,7 +482,7 @@ func Test_loginRun_Survey(t *testing.T) {
 		httpStubs       func(*httpmock.Registry)
 		prompterStubs   func(*prompter.PrompterMock)
 		runStubs        func(*run.CommandStubber)
-		cfgStubs        func(*config.ConfigMock)
+		cfgStubs        func(config.Config)
 		wantHosts       string
 		wantErrOut      *regexp.Regexp
 		wantSecureToken string
@@ -695,7 +687,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 			},
-			cfgStubs: func(c *config.ConfigMock) {
+			cfgStubs: func(c config.Config) {
 				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
 				require.NoError(t, err)
 			},
@@ -737,9 +729,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			tt.opts.IO = ios
 
 			keyring.MockInit()
-			readConfigs := config.StubWriteConfig(t)
-
-			cfg := config.NewBlankConfig()
+			cfg, readConfigs := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(cfg)
 			}
