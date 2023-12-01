@@ -79,7 +79,7 @@ func Test_statusRun(t *testing.T) {
 		name       string
 		opts       StatusOptions
 		httpStubs  func(*httpmock.Registry)
-		cfgStubs   func(config.Config)
+		cfgStubs   func(*testing.T, config.Config)
 		wantErr    error
 		wantOut    string
 		wantErrOut string
@@ -89,7 +89,7 @@ func Test_statusRun(t *testing.T) {
 			opts: StatusOptions{
 				Hostname: "github.com",
 			},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				login(t, c, "github.com", "monalisa", "abc123", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -108,7 +108,7 @@ func Test_statusRun(t *testing.T) {
 			opts: StatusOptions{
 				Hostname: "ghe.io",
 			},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
 				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "https")
 			},
@@ -128,7 +128,7 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "missing scope",
 			opts: StatusOptions{},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -149,7 +149,7 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "bad token",
 			opts: StatusOptions{},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -168,7 +168,7 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "all good",
 			opts: StatusOptions{},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
 				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "ssh")
 			},
@@ -201,7 +201,7 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "server-to-server token",
 			opts: StatusOptions{},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				login(t, c, "github.com", "monalisa", "ghs_abc123", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -221,7 +221,7 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "PAT V2 token",
 			opts: StatusOptions{},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				login(t, c, "github.com", "monalisa", "github_pat_abc123", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -243,7 +243,7 @@ func Test_statusRun(t *testing.T) {
 			opts: StatusOptions{
 				ShowToken: true,
 			},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
 				login(t, c, "ghe.io", "monalisa-ghe", "gho_xyz456", "https")
 			},
@@ -274,7 +274,7 @@ func Test_statusRun(t *testing.T) {
 			opts: StatusOptions{
 				Hostname: "github.example.com",
 			},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				login(t, c, "github.com", "monalisa", "abc123", "https")
 			},
 			httpStubs:  func(reg *httpmock.Registry) {},
@@ -284,7 +284,7 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "multiple accounts on a host",
 			opts: StatusOptions{},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
 				login(t, c, "github.com", "monalisa-2", "gho_abc123", "https")
 			},
@@ -319,7 +319,7 @@ func Test_statusRun(t *testing.T) {
 			tt.opts.IO = ios
 			cfg, _ := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil

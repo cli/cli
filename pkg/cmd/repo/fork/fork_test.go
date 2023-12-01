@@ -211,7 +211,7 @@ func TestRepoFork(t *testing.T) {
 		httpStubs   func(*httpmock.Registry)
 		execStubs   func(*run.CommandStubber)
 		promptStubs func(*prompter.MockPrompter)
-		cfgStubs    func(config.Config)
+		cfgStubs    func(*testing.T, config.Config)
 		remotes     []*context.Remote
 		wantOut     string
 		wantErrOut  string
@@ -254,7 +254,7 @@ func TestRepoFork(t *testing.T) {
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
 			},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(_ *testing.T, c config.Config) {
 				c.Set("", "git_protocol", "")
 			},
 			httpStubs: forkPost,
@@ -733,7 +733,7 @@ func TestRepoFork(t *testing.T) {
 
 			cfg, _ := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil

@@ -260,7 +260,7 @@ func Test_loginRun_nontty(t *testing.T) {
 		opts            *LoginOptions
 		env             map[string]string
 		httpStubs       func(*httpmock.Registry)
-		cfgStubs        func(config.Config)
+		cfgStubs        func(*testing.T, config.Config)
 		wantHosts       string
 		wantErr         string
 		wantStderr      string
@@ -396,7 +396,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Hostname: "github.com",
 				Token:    "newUserToken",
 			},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
 				require.NoError(t, err)
 			},
@@ -429,7 +429,7 @@ func Test_loginRun_nontty(t *testing.T) {
 
 			cfg, readConfigs := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
@@ -480,7 +480,7 @@ func Test_loginRun_Survey(t *testing.T) {
 		httpStubs       func(*httpmock.Registry)
 		prompterStubs   func(*prompter.PrompterMock)
 		runStubs        func(*run.CommandStubber)
-		cfgStubs        func(config.Config)
+		cfgStubs        func(*testing.T, config.Config)
 		wantHosts       string
 		wantErrOut      *regexp.Regexp
 		wantSecureToken string
@@ -685,7 +685,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 			},
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
 				require.NoError(t, err)
 			},
@@ -728,7 +728,7 @@ func Test_loginRun_Survey(t *testing.T) {
 
 			cfg, readConfigs := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil

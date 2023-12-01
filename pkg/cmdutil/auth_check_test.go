@@ -11,12 +11,11 @@ func Test_CheckAuth(t *testing.T) {
 	tests := []struct {
 		name     string
 		env      map[string]string
-		cfgStubs func(config.Config)
+		cfgStubs func(*testing.T, config.Config)
 		expected bool
 	}{
 		{
 			name:     "no known hosts, no env auth token",
-			cfgStubs: func(_ config.Config) {},
 			expected: false,
 		},
 		{
@@ -26,7 +25,7 @@ func Test_CheckAuth(t *testing.T) {
 		},
 		{
 			name: "known host",
-			cfgStubs: func(c config.Config) {
+			cfgStubs: func(t *testing.T, c config.Config) {
 				_, err := c.Authentication().Login("github.com", "test-user", "test-token", "https", false)
 				require.NoError(t, err)
 			},
@@ -43,7 +42,7 @@ func Test_CheckAuth(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg, _ := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
 
 			for k, v := range tt.env {

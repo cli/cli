@@ -86,7 +86,7 @@ func TestTokenRun(t *testing.T) {
 		name       string
 		opts       TokenOptions
 		env        map[string]string
-		cfgStubs   func(config.Config)
+		cfgStubs   func(*testing.T, config.Config)
 		wantStdout string
 		wantErr    bool
 		wantErrMsg string
@@ -94,7 +94,7 @@ func TestTokenRun(t *testing.T) {
 		{
 			name: "token",
 			opts: TokenOptions{},
-			cfgStubs: func(cfg config.Config) {
+			cfgStubs: func(t *testing.T, cfg config.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
 			wantStdout: "gho_ABCDEFG\n",
@@ -104,7 +104,7 @@ func TestTokenRun(t *testing.T) {
 			opts: TokenOptions{
 				Hostname: "github.mycompany.com",
 			},
-			cfgStubs: func(cfg config.Config) {
+			cfgStubs: func(t *testing.T, cfg config.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 				login(t, cfg, "github.mycompany.com", "test-user", "gho_1234567", "https", false)
 			},
@@ -119,7 +119,7 @@ func TestTokenRun(t *testing.T) {
 		{
 			name: "uses default host when one is not provided",
 			opts: TokenOptions{},
-			cfgStubs: func(cfg config.Config) {
+			cfgStubs: func(t *testing.T, cfg config.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 				login(t, cfg, "github.mycompany.com", "test-user", "gho_1234567", "https", false)
 			},
@@ -139,7 +139,7 @@ func TestTokenRun(t *testing.T) {
 
 			cfg, _ := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
 
 			tt.opts.Config = func() (config.Config, error) {
@@ -162,7 +162,7 @@ func TestTokenRunSecureStorage(t *testing.T) {
 	tests := []struct {
 		name       string
 		opts       TokenOptions
-		cfgStubs   func(config.Config)
+		cfgStubs   func(*testing.T, config.Config)
 		wantStdout string
 		wantErr    bool
 		wantErrMsg string
@@ -170,7 +170,7 @@ func TestTokenRunSecureStorage(t *testing.T) {
 		{
 			name: "token",
 			opts: TokenOptions{},
-			cfgStubs: func(cfg config.Config) {
+			cfgStubs: func(t *testing.T, cfg config.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", true)
 			},
 			wantStdout: "gho_ABCDEFG\n",
@@ -180,7 +180,7 @@ func TestTokenRunSecureStorage(t *testing.T) {
 			opts: TokenOptions{
 				Hostname: "mycompany.com",
 			},
-			cfgStubs: func(cfg config.Config) {
+			cfgStubs: func(t *testing.T, cfg config.Config) {
 				login(t, cfg, "mycompany.com", "test-user", "gho_1234567", "https", true)
 			},
 			wantStdout: "gho_1234567\n",
@@ -201,7 +201,7 @@ func TestTokenRunSecureStorage(t *testing.T) {
 
 			cfg, _ := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
 
 			tt.opts.Config = func() (config.Config, error) {
