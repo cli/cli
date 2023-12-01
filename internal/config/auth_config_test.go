@@ -11,28 +11,8 @@ import (
 )
 
 func newTestAuthConfig(t *testing.T) *AuthConfig {
-	authCfg := AuthConfig{
-		cfg: ghConfig.ReadFromString(""),
-	}
-
-	// The real implementation of config.Read uses a sync.Once
-	// to read config files and initialise package level variables
-	// that are used from then on.
-	//
-	// This means that tests can't be isolated from each other, so
-	// we swap out the function here to return a new config each time.
-	ghConfig.Read = func(_ *ghConfig.Config) (*ghConfig.Config, error) {
-		return authCfg.cfg, nil
-	}
-
-	// The config.Write method isn't defined in the same way as Read to allow
-	// the function to be swapped out and it does try to write to disk.
-	//
-	// We should consider whether it makes sense to change that but in the meantime
-	// we can use GH_CONFIG_DIR env var to ensure the tests remain isolated.
-	StubWriteConfig(t)
-
-	return &authCfg
+	cfg, _ := NewIsolatedTestConfig(t)
+	return cfg.Authentication()
 }
 
 func TestTokenFromKeyring(t *testing.T) {
