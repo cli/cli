@@ -44,16 +44,16 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "view [<ruleset-id>]",
 		Short: "View information about a ruleset",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			View information about a GitHub ruleset.
 
 			If no ID is provided, an interactive prompt will be used to choose
 			the ruleset to view.
 			
-			Use the --parents flag to control whether rulesets configured at higher
+			Use the %[1]s--parents%[1]s flag to control whether rulesets configured at higher
 			levels that also apply to the provided repository or organization should
-			be returned. The default is true.
-		`),
+			be returned. The default is %[1]strue%[1]s.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Interactively choose a ruleset to view from all rulesets that apply to the current repository
 			$ gh ruleset view

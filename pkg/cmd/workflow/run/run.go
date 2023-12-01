@@ -53,18 +53,18 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "run [<workflow-id> | <workflow-name>]",
 		Short: "Run a workflow by creating a workflow_dispatch event",
-		Long: heredoc.Doc(`
-			Create a workflow_dispatch event for a given workflow.
+		Long: heredoc.Docf(`
+			Create a %[1]sworkflow_dispatch%[1]s event for a given workflow.
 
 			This command will trigger GitHub Actions to run a given workflow file. The given workflow file must
-			support a workflow_dispatch 'on' trigger in order to be run in this way.
+			support an %[1]son.workflow_dispatch%[1]s trigger in order to be run in this way.
 
 			If the workflow file supports inputs, they can be specified in a few ways:
 
 			- Interactively
-			- via -f or -F flags
-			- As JSON, via STDIN
-    `),
+			- Via %[1]s-f/--raw-field%[1]s or %[1]s-F/--field%[1]s flags
+			- As JSON, via standard input
+    `, "`"),
 		Example: heredoc.Doc(`
 			# Have gh prompt you for what workflow you'd like to run and interactively collect inputs
 			$ gh workflow run
@@ -129,7 +129,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 		},
 	}
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "The branch or tag name which contains the version of the workflow file you'd like to run")
-	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a string parameter in `key=value` format, respecting @ syntax")
+	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a string parameter in `key=value` format, respecting @ syntax (see \"gh help api\").")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Read workflow inputs as JSON via STDIN")
 

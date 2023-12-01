@@ -52,9 +52,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Short: "List secrets",
 		Long: heredoc.Doc(`
 			List secrets on one of the following levels:
-			- repository (default): available to Actions runs or Dependabot in a repository
-			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs, Dependabot, or Codespaces within an organization
+			- repository (default): available to GitHub Actions runs or Dependabot in a repository
+			- environment: available to GitHub Actions runs for a deployment environment in a repository
+			- organization: available to GitHub Actions runs, Dependabot, or Codespaces within an organization
 			- user: available to Codespaces for your user
 		`),
 		Aliases: []string{"ls"},

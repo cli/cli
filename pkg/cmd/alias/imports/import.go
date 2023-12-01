@@ -34,7 +34,7 @@ func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "import [<filename> | -]",
 		Short: "Import aliases from a YAML file",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Import aliases from the contents of a YAML file.
 
 			Aliases should be defined as a map in YAML, where the keys represent aliases and
@@ -47,12 +47,12 @@ func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Co
 			        issue list
 			        --label=enhancement
 
-			Use "-" to read aliases (in YAML format) from standard input.
+			Use %[1]s-%[1]s to read aliases (in YAML format) from standard input.
 
-			The output from the gh command "alias list" can be used to produce a YAML file
+			The output from %[1]sgh alias list%[1]s can be used to produce a YAML file
 			containing your aliases, which you can use to import them from one machine to
-			another. Run "gh help alias list" to learn more.
-		`),
+			another. Run %[1]sgh help alias list%[1]s to learn more.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Import aliases from a file
 			$ gh alias import aliases.yml

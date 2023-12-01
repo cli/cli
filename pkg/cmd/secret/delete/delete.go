@@ -39,9 +39,9 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		Short: "Delete secrets",
 		Long: heredoc.Doc(`
 			Delete a secret on one of the following levels:
-			- repository (default): available to Actions runs or Dependabot in a repository
-			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs, Dependabot, or Codespaces within an organization
+			- repository (default): available to GitHub Actions runs or Dependabot in a repository
+			- environment: available to GitHub Actions runs for a deployment environment in a repository
+			- organization: available to GitHub Actions runs, Dependabot, or Codespaces within an organization
 			- user: available to Codespaces for your user
 		`),
 		Args: cobra.ExactArgs(1),

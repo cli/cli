@@ -29,7 +29,7 @@ func explainer() string {
 		 - viewing and creating pull requests
 		 - viewing and creating issues
 		 - viewing and creating releases
-		 - working with Actions
+		 - working with GitHub Actions
 		 - adding repository and environment secrets`)
 }
 

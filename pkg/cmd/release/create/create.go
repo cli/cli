@@ -94,11 +94,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			To create a release from an annotated git tag, first create one locally with
 			git, push the tag to GitHub, then run this command.
 			Use %[1]s--notes-from-tag%[1]s to automatically generate the release notes
- 			from the annotated git tag.
+			from the annotated git tag.
 
 			When using automatically generated release notes, a release title will also be automatically
 			generated unless a title was explicitly passed. Additional release notes can be prepended to
-			automatically generated notes by using the notes parameter.
+			automatically generated notes by using the %[1]s--notes%[1]s flag.
 		`, "`"),
 		Example: heredoc.Doc(`
 			Interactively create a release
