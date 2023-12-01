@@ -110,54 +110,61 @@ func Test_statusRun(t *testing.T) {
 				Hostname: "ghe.io",
 			},
 			cfgStubs: func(c config.Config) {
-				login(t, c, "github.com", "monalisa", "abc123", "https")
-				login(t, c, "ghe.io", "monalisa-ghe", "abc123", "https")
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
 			},
 			wantOut: heredoc.Doc(`
-                ghe.io
-                  ✓ Logged in to ghe.io as monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
-                  ✓ Git operations for ghe.io configured to use https protocol.
-                  ✓ Token: ******
-                  ✓ Token scopes: repo,read:org
-            `),
+				ghe.io
+				  ✓ Logged in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
+			`),
 		},
 		{
 			name: "missing scope",
 			opts: StatusOptions{},
 			cfgStubs: func(c config.Config) {
-				login(t, c, "ghe.io", "monalisa-ghe", "abc123", "https")
+				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo"))
 			},
 			wantOut: heredoc.Doc(`
-                ghe.io
-                  X ghe.io: the token in GH_CONFIG_DIR/hosts.yml is missing required scope 'read:org'
-                  - To request missing scopes, run: gh auth refresh -h ghe.io
-            `),
+				ghe.io
+				  ✓ Logged in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo'
+				  ! Missing required token scopes: 'read:org'
+				  - To request missing scopes, run: gh auth refresh -h ghe.io
+			`),
 		},
 		{
 			name: "bad token",
 			opts: StatusOptions{},
 			cfgStubs: func(c config.Config) {
-				login(t, c, "ghe.io", "monalisa-ghe", "abc123", "https")
+				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
 			},
 			wantOut: heredoc.Doc(`
-                ghe.io
-                  X ghe.io: authentication failed
-                  - The ghe.io token in GH_CONFIG_DIR/hosts.yml is invalid.
-                  - To re-authenticate, run: gh auth login -h ghe.io
-                  - To forget about this host, run: gh auth logout -h ghe.io
-            `),
+				ghe.io
+				  X Failed to log in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
+				  - To re-authenticate, run: gh auth login -h ghe.io
+				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+			`),
 		},
 		{
 			name: "all good",
@@ -177,18 +184,20 @@ func Test_statusRun(t *testing.T) {
 					httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", ""))
 			},
 			wantOut: heredoc.Doc(`
-                github.com
-                  ✓ Logged in to github.com as monalisa (GH_CONFIG_DIR/hosts.yml)
-                  ✓ Git operations for github.com configured to use https protocol.
-                  ✓ Token: gho_******
-                  ✓ Token scopes: repo, read:org
+				github.com
+				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
 
-                ghe.io
-                  ✓ Logged in to ghe.io as monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
-                  ✓ Git operations for ghe.io configured to use ssh protocol.
-                  ✓ Token: gho_******
-                  ! Token scopes: none
-            `),
+				ghe.io
+				  ✓ Logged in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: ssh
+				  - Token: gho_******
+				  - Token scopes: none
+			`),
 		},
 		{
 			name: "server-to-server token",
@@ -203,11 +212,12 @@ func Test_statusRun(t *testing.T) {
 					httpmock.ScopesResponder(""))
 			},
 			wantOut: heredoc.Doc(`
-                github.com
-                  ✓ Logged in to github.com as monalisa (GH_CONFIG_DIR/hosts.yml)
-                  ✓ Git operations for github.com configured to use https protocol.
-                  ✓ Token: ghs_******
-            `),
+				github.com
+				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: ghs_******
+			`),
 		},
 		{
 			name: "PAT V2 token",
@@ -222,11 +232,12 @@ func Test_statusRun(t *testing.T) {
 					httpmock.ScopesResponder(""))
 			},
 			wantOut: heredoc.Doc(`
-                github.com
-                  ✓ Logged in to github.com as monalisa (GH_CONFIG_DIR/hosts.yml)
-                  ✓ Git operations for github.com configured to use https protocol.
-                  ✓ Token: github_pat_******
-            `),
+				github.com
+				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: github_pat_******
+			`),
 		},
 		{
 			name: "show token",
@@ -234,8 +245,8 @@ func Test_statusRun(t *testing.T) {
 				ShowToken: true,
 			},
 			cfgStubs: func(c config.Config) {
-				login(t, c, "github.com", "monalisa", "abc123", "https")
-				login(t, c, "ghe.io", "monalisa-ghe", "xyz456", "https")
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "ghe.io", "monalisa-ghe", "gho_xyz456", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mocks for HeaderHasMinimumScopes on a non-github.com host
@@ -244,18 +255,20 @@ func Test_statusRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			},
 			wantOut: heredoc.Doc(`
-                github.com
-                  ✓ Logged in to github.com as monalisa (GH_CONFIG_DIR/hosts.yml)
-                  ✓ Git operations for github.com configured to use https protocol.
-                  ✓ Token: abc123
-                  ✓ Token scopes: repo,read:org
+				github.com
+				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_abc123
+				  - Token scopes: 'repo', 'read:org'
 
-                ghe.io
-                  ✓ Logged in to ghe.io as monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
-                  ✓ Git operations for ghe.io configured to use https protocol.
-                  ✓ Token: xyz456
-                  ✓ Token scopes: repo,read:org
-            `),
+				ghe.io
+				  ✓ Logged in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_xyz456
+				  - Token scopes: 'repo', 'read:org'
+			`),
 		},
 		{
 			name: "missing hostname",
@@ -267,31 +280,33 @@ func Test_statusRun(t *testing.T) {
 			},
 			httpStubs:  func(reg *httpmock.Registry) {},
 			wantErr:    cmdutil.SilentError,
-			wantErrOut: "Hostname \"github.example.com\" not found among authenticated GitHub hosts\n",
+			wantErrOut: "You are not logged into any accounts on github.example.com\n",
 		},
 		{
 			name: "multiple accounts on a host",
 			opts: StatusOptions{},
 			cfgStubs: func(c config.Config) {
-				login(t, c, "github.com", "monalisa", "abc123", "https")
-				login(t, c, "github.com", "monalisa-2", "abc123", "https")
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "github.com", "monalisa-2", "gho_abc123", "https")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org,project:read"))
 			},
 			wantOut: heredoc.Doc(`
-                github.com
-                  ✓ Logged in to github.com as monalisa-2 (GH_CONFIG_DIR/hosts.yml)
-                  ✓ Git operations for github.com configured to use https protocol.
-                  ✓ Token: ******
-                  ✓ Token scopes: repo,read:org
+				github.com
+				  ✓ Logged in to github.com account monalisa-2 (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
 
-                  ✓ Logged in to github.com as monalisa (GH_CONFIG_DIR/hosts.yml)
-                  ✓ Git operations for github.com configured to use https protocol.
-                  ✓ Token: ******
-                  ✓ Token scopes: repo,read:org,project:read
-            `),
+				  ✓ Logged in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: false
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org', 'project:read'
+			`),
 		},
 	}
 
