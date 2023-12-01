@@ -334,7 +334,6 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	return insecureStorageUsed, c.SwitchUser(hostname, username)
 }
 
-// TODO: Write tests
 // TODO: How should git protocol be handled? Do we need to set it at the user level since it could have been changed?
 func (c *AuthConfig) SwitchUser(hostname, user string) error {
 	// We first need to idempotently clear out any set tokens for the host
@@ -345,15 +344,22 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 	// following branches should be true.
 
 	// If there is a token in the secure keyring for the user, move it to the active slot
+	var tokenSwitched bool
 	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
 		if err = keyring.Set(keyringServiceName(hostname), "", token); err != nil {
 			return fmt.Errorf("failed to move active token in keyring: %v", err)
 		}
+		tokenSwitched = true
 	}
 
 	// If there is a token in the insecure config for the user, move it to the active field
 	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, oauthTokenKey}); err == nil {
 		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
+		tokenSwitched = true
+	}
+
+	if !tokenSwitched {
+		return fmt.Errorf("no token found for '%s'", user)
 	}
 
 	// Then we'll ensure the git protocol is moved as well
