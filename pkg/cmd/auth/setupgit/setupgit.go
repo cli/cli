@@ -100,7 +100,6 @@ func setupGitRun(opts *SetupGitOptions) error {
 	}
 
 	for _, hostname := range hostnamesToSetup {
-		//TODO: Does Setup need to take a list of all logged in users and tokens on a host?
 		if err := opts.gitConfigure.Setup(hostname, "", ""); err != nil {
 			return fmt.Errorf("failed to set up git credential helper: %w", err)
 		}
