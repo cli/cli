@@ -302,7 +302,7 @@ func (m *mergeContext) merge() error {
 				return cmdutil.FlagErrorf("--merge, --rebase, or --squash required when not running interactively")
 			}
 
-			m.infof("Merging pull request #%d (%s)\n", m.pr.Number, m.pr.Title)
+			_ = m.infof("Merging pull request #%d (%s)\n", m.pr.Number, m.pr.Title)
 
 			apiClient := api.NewClientFromHTTP(m.httpClient)
 			r, err := api.GitHubRepo(apiClient, m.baseRepo)
