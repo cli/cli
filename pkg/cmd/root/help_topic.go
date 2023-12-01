@@ -53,7 +53,7 @@ var HelpTopics = []helpTopic{
 			"github.com" host when not in a context of an existing repository. When setting this, 
 			also set %[1]sGH_ENTERPRISE_TOKEN%[1]s.
 
-			%[1]sGH_REPO%[1]s: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
+			%[1]sGH_REPO%[1]s: specify the GitHub repository in the %[1]s[HOST/]OWNER/REPO%[1]s format for commands
 			that otherwise operate on a local repository.
 
 			%[1]sGH_EDITOR%[1]s, %[1]sGIT_EDITOR%[1]s, %[1]sVISUAL%[1]s, %[1]sEDITOR%[1]s (in order of precedence): the editor tool to use

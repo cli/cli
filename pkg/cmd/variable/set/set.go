@@ -219,7 +219,7 @@ func setRun(opts *SetOptions) error {
 		if envName != "" {
 			target += " environment " + envName
 		}
-		fmt.Fprintf(opts.IO.Out, "%s %s GitHub Actions variable %s for %s\n", cs.SuccessIcon(), result.Operation, result.Key, target)
+		fmt.Fprintf(opts.IO.Out, "%s %s variable %s for %s\n", cs.SuccessIcon(), result.Operation, result.Key, target)
 	}
 
 	return err

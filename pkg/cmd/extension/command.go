@@ -45,7 +45,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			An extension cannot override any of the core gh commands. If an extension name conflicts
 			with a core gh command, you can use %[1]sgh extension exec <extname>%[1]s.
 
-			See the list of available extensions at <https://github.com/topics/gh-extension>.
+			For the list of available extensions, see <https://github.com/topics/gh-extension>.
 		`, "`"),
 		Aliases: []string{"extensions", "ext"},
 	}
@@ -297,7 +297,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			cmd := &cobra.Command{
 				Use:   "install <repository>",
 				Short: "Install a gh extension from a repository",
-				Long: heredoc.Doc(`
+				Long: heredoc.Docf(`
 					Install a GitHub repository locally as a GitHub CLI extension.
 
 					The repository argument can be specified in %[1]sOWNER/REPO%[1]s format as well as a full URL.
@@ -306,8 +306,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					To install an extension in development from the current directory, use %[1]s.%[1]s as the
 					value of the repository argument.
 
-					See the list of available extensions at <https://github.com/topics/gh-extension>.
-				`),
+					For the list of available extensions, see <https://github.com/topics/gh-extension>.
+				`, "`"),
 				Example: heredoc.Doc(`
 					$ gh extension install owner/gh-extension
 					$ gh extension install https://git.example.com/owner/gh-extension

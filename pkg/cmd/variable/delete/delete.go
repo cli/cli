@@ -126,7 +126,7 @@ func removeRun(opts *DeleteOptions) error {
 		if envName != "" {
 			fmt.Fprintf(opts.IO.Out, "%s Deleted variable %s from %s environment on %s\n", cs.SuccessIconWithColor(cs.Red), opts.VariableName, envName, target)
 		} else {
-			fmt.Fprintf(opts.IO.Out, "%s Deleted GitHub Actions variable %s from %s\n", cs.SuccessIconWithColor(cs.Red), opts.VariableName, target)
+			fmt.Fprintf(opts.IO.Out, "%s Deleted variable %s from %s\n", cs.SuccessIconWithColor(cs.Red), opts.VariableName, target)
 		}
 	}
 
