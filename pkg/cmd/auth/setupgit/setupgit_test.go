@@ -28,7 +28,7 @@ func Test_setupGitRun(t *testing.T) {
 		name               string
 		opts               *SetupGitOptions
 		setupErr           error
-		cfgStubs           func(config.Config)
+		cfgStubs           func(*testing.T, config.Config)
 		expectedHostsSetup []string
 		expectedErr        string
 		expectedErrOut     string
@@ -53,8 +53,8 @@ func Test_setupGitRun(t *testing.T) {
 			opts: &SetupGitOptions{
 				Hostname: "foo",
 			},
-			cfgStubs: func(cfg config.Config) {
-				cfg.Authentication().Login("github.com", "test-user", "gho_ABCDEFG", "https", false)
+			cfgStubs: func(t *testing.T, cfg config.Config) {
+				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
 			expectedErr:    "You are not logged into the GitHub host \"foo\"\n",
 			expectedErrOut: "",
@@ -63,8 +63,8 @@ func Test_setupGitRun(t *testing.T) {
 			name:     "error setting up git for hostname",
 			opts:     &SetupGitOptions{},
 			setupErr: fmt.Errorf("broken"),
-			cfgStubs: func(cfg config.Config) {
-				cfg.Authentication().Login("github.com", "test-user", "gho_ABCDEFG", "https", false)
+			cfgStubs: func(t *testing.T, cfg config.Config) {
+				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
 			expectedErr:    "failed to set up git credential helper: broken",
 			expectedErrOut: "",
@@ -72,9 +72,9 @@ func Test_setupGitRun(t *testing.T) {
 		{
 			name: "no hostname option given. Setup git for each hostname in config",
 			opts: &SetupGitOptions{},
-			cfgStubs: func(cfg config.Config) {
-				cfg.Authentication().Login("ghe.io", "test-user", "gho_ABCDEFG", "https", false)
-				cfg.Authentication().Login("github.com", "test-user", "gho_ABCDEFG", "https", false)
+			cfgStubs: func(t *testing.T, cfg config.Config) {
+				login(t, cfg, "ghe.io", "test-user", "gho_ABCDEFG", "https", false)
+				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
 			expectedHostsSetup: []string{"github.com", "ghe.io"},
 		},
@@ -83,8 +83,8 @@ func Test_setupGitRun(t *testing.T) {
 			opts: &SetupGitOptions{
 				Hostname: "ghe.io",
 			},
-			cfgStubs: func(cfg config.Config) {
-				cfg.Authentication().Login("ghe.io", "test-user", "gho_ABCDEFG", "https", false)
+			cfgStubs: func(t *testing.T, cfg config.Config) {
+				login(t, cfg, "ghe.io", "test-user", "gho_ABCDEFG", "https", false)
 			},
 			expectedHostsSetup: []string{"ghe.io"},
 		},
@@ -101,7 +101,7 @@ func Test_setupGitRun(t *testing.T) {
 
 			cfg, _ := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
 
 			if tt.opts.Config == nil {
