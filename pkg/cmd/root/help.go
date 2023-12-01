@@ -172,8 +172,9 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 		helpEntries = append(helpEntries, helpEntry{"ENVIRONMENT VARIABLES", command.Annotations["help:environment"]})
 	}
 	helpEntries = append(helpEntries, helpEntry{"LEARN MORE", heredoc.Docf(`
-Use %[1]sgh <command> <subcommand> --help%[1]s for more information about a command.
-Read the manual at https://cli.github.com/manual`,"`")})
+		Use %[1]sgh <command> <subcommand> --help%[1]s for more information about a command.
+		Read the manual at https://cli.github.com/manual
+	`,"`")})
 
 	out := f.IOStreams.Out
 	for _, e := range helpEntries {
