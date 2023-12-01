@@ -61,11 +61,27 @@ func UpdateProjectV2Items(client *Client, repo ghrepo.Interface, addProjectItems
 
 // ProjectsV2ItemsForIssue fetches all ProjectItems for an issue.
 func ProjectsV2ItemsForIssue(client *Client, repo ghrepo.Interface, issue *Issue) error {
+	type projectV2ItemStatus struct {
+		StatusFragment struct {
+			OptionID string `json:"optionId"`
+			Name     string `json:"name"`
+		} `graphql:"... on ProjectV2ItemFieldSingleSelectValue"`
+	}
+
+	type projectV2Item struct {
+		ID      string `json:"id"`
+		Project struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		}
+		Status projectV2ItemStatus `graphql:"status:fieldValueByName(name: \"Status\")"`
+	}
+
 	type response struct {
 		Repository struct {
 			Issue struct {
 				ProjectItems struct {
-					Nodes    []*ProjectV2Item
+					Nodes    []*projectV2Item
 					PageInfo struct {
 						HasNextPage bool
 						EndCursor   string
@@ -87,7 +103,20 @@ func ProjectsV2ItemsForIssue(client *Client, repo ghrepo.Interface, issue *Issue
 		if err != nil {
 			return err
 		}
-		items.Nodes = append(items.Nodes, query.Repository.Issue.ProjectItems.Nodes...)
+		for _, projectItemNode := range query.Repository.Issue.ProjectItems.Nodes {
+			items.Nodes = append(items.Nodes, &ProjectV2Item{
+				ID: projectItemNode.ID,
+				Project: ProjectV2ItemProject{
+					ID:    projectItemNode.Project.ID,
+					Title: projectItemNode.Project.Title,
+				},
+				Status: ProjectV2ItemStatus{
+					OptionID: projectItemNode.Status.StatusFragment.OptionID,
+					Name:     projectItemNode.Status.StatusFragment.Name,
+				},
+			})
+		}
+
 		if !query.Repository.Issue.ProjectItems.PageInfo.HasNextPage {
 			break
 		}
@@ -99,11 +128,27 @@ func ProjectsV2ItemsForIssue(client *Client, repo ghrepo.Interface, issue *Issue
 
 // ProjectsV2ItemsForPullRequest fetches all ProjectItems for a pull request.
 func ProjectsV2ItemsForPullRequest(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	type projectV2ItemStatus struct {
+		StatusFragment struct {
+			OptionID string `json:"optionId"`
+			Name     string `json:"name"`
+		} `graphql:"... on ProjectV2ItemFieldSingleSelectValue"`
+	}
+
+	type projectV2Item struct {
+		ID      string `json:"id"`
+		Project struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		}
+		Status projectV2ItemStatus `graphql:"status:fieldValueByName(name: \"Status\")"`
+	}
+
 	type response struct {
 		Repository struct {
 			PullRequest struct {
 				ProjectItems struct {
-					Nodes    []*ProjectV2Item
+					Nodes    []*projectV2Item
 					PageInfo struct {
 						HasNextPage bool
 						EndCursor   string
@@ -125,7 +170,21 @@ func ProjectsV2ItemsForPullRequest(client *Client, repo ghrepo.Interface, pr *Pu
 		if err != nil {
 			return err
 		}
-		items.Nodes = append(items.Nodes, query.Repository.PullRequest.ProjectItems.Nodes...)
+
+		for _, projectItemNode := range query.Repository.PullRequest.ProjectItems.Nodes {
+			items.Nodes = append(items.Nodes, &ProjectV2Item{
+				ID: projectItemNode.ID,
+				Project: ProjectV2ItemProject{
+					ID:    projectItemNode.Project.ID,
+					Title: projectItemNode.Project.Title,
+				},
+				Status: ProjectV2ItemStatus{
+					OptionID: projectItemNode.Status.StatusFragment.OptionID,
+					Name:     projectItemNode.Status.StatusFragment.Name,
+				},
+			})
+		}
+
 		if !query.Repository.PullRequest.ProjectItems.PageInfo.HasNextPage {
 			break
 		}

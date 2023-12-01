@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpdateProjectV2Items(t *testing.T) {
@@ -185,6 +186,61 @@ func TestProjectsV2ItemsForPullRequest(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "retrieves project items that have status columns",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestProjectItems\b`),
+					httpmock.GraphQLQuery(`{
+                        "data": {
+                          "repository": {
+                            "pullRequest": {
+                              "projectItems": {
+                                "nodes": [
+                                  {
+                                    "id": "PVTI_lADOB-vozM4AVk16zgK6U50",
+                                    "project": {
+                                      "id": "PVT_kwDOB-vozM4AVk16",
+                                      "title": "Test Project"
+                                    },
+                                    "status": {
+                                      "optionId": "47fc9ee4",
+                                      "name": "In Progress"
+                                    }
+                                  }
+                                ],
+                                "pageInfo": {
+                                  "hasNextPage": false,
+                                  "endCursor": "MQ"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }`,
+						func(query string, inputs map[string]interface{}) {
+							require.Equal(t, float64(1), inputs["number"])
+							require.Equal(t, "OWNER", inputs["owner"])
+							require.Equal(t, "REPO", inputs["name"])
+						}),
+				)
+			},
+			expectItems: ProjectItems{
+				Nodes: []*ProjectV2Item{
+					{
+						ID: "PVTI_lADOB-vozM4AVk16zgK6U50",
+						Project: ProjectV2ItemProject{
+							ID:    "PVT_kwDOB-vozM4AVk16",
+							Title: "Test Project",
+						},
+						Status: ProjectV2ItemStatus{
+							OptionID: "47fc9ee4",
+							Name:     "In Progress",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -199,11 +255,11 @@ func TestProjectsV2ItemsForPullRequest(t *testing.T) {
 			pr := &PullRequest{Number: 1}
 			err := ProjectsV2ItemsForPullRequest(client, repo, pr)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
-			assert.Equal(t, tt.expectItems, pr.ProjectItems)
+			require.Equal(t, tt.expectItems, pr.ProjectItems)
 		})
 	}
 }

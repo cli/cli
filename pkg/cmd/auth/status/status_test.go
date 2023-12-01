@@ -2,6 +2,7 @@ package status
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -84,6 +85,26 @@ func Test_statusRun(t *testing.T) {
 		wantOut    string
 		wantErrOut string
 	}{
+		{
+			name: "timeout error",
+			opts: &StatusOptions{
+				Hostname: "joel.miller",
+			},
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("joel.miller", "oauth_token", "abc123")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "api/v3/"), func(req *http.Request) (*http.Response, error) {
+					// timeout error
+					return nil, context.DeadlineExceeded
+				})
+			},
+			wantErr: "SilentError",
+			wantErrOut: heredoc.Doc(`
+			joel.miller
+			  X joel.miller: timeout trying to connect to host
+			`),
+		},
 		{
 			name: "hostname set",
 			opts: &StatusOptions{
