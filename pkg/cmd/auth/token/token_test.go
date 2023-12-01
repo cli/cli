@@ -9,7 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdToken(t *testing.T) {
@@ -53,7 +53,7 @@ func TestNewCmdToken(t *testing.T) {
 				},
 			}
 			argv, err := shlex.Split(tt.input)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var cmdOpts *TokenOptions
 			cmd := NewCmdToken(f, func(opts *TokenOptions) error {
@@ -70,14 +70,14 @@ func TestNewCmdToken(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.EqualError(t, err, tt.wantErrMsg)
+				require.Error(t, err)
+				require.EqualError(t, err, tt.wantErrMsg)
 				return
 			}
 
-			assert.NoError(t, err)
-			assert.Equal(t, tt.output.Hostname, cmdOpts.Hostname)
-			assert.Equal(t, tt.output.SecureStorage, cmdOpts.SecureStorage)
+			require.NoError(t, err)
+			require.Equal(t, tt.output.Hostname, cmdOpts.Hostname)
+			require.Equal(t, tt.output.SecureStorage, cmdOpts.SecureStorage)
 		})
 	}
 }
@@ -86,59 +86,45 @@ func TestTokenRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		opts       TokenOptions
+		env        map[string]string
+		cfgStubs   func(config.Config)
 		wantStdout string
 		wantErr    bool
 		wantErrMsg string
 	}{
 		{
 			name: "token",
-			opts: TokenOptions{
-				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					cfg.Set("github.com", "oauth_token", "gho_ABCDEFG")
-					return cfg, nil
-				},
+			opts: TokenOptions{},
+			cfgStubs: func(cfg config.Config) {
+				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
 			wantStdout: "gho_ABCDEFG\n",
 		},
 		{
 			name: "token by hostname",
 			opts: TokenOptions{
-				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					cfg.Set("github.com", "oauth_token", "gho_ABCDEFG")
-					cfg.Set("github.mycompany.com", "oauth_token", "gho_1234567")
-					return cfg, nil
-				},
 				Hostname: "github.mycompany.com",
+			},
+			cfgStubs: func(cfg config.Config) {
+				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
+				login(t, cfg, "github.mycompany.com", "test-user", "gho_1234567", "https", false)
 			},
 			wantStdout: "gho_1234567\n",
 		},
 		{
-			name: "no token",
-			opts: TokenOptions{
-				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					return cfg, nil
-				},
-			},
+			name:       "no token",
+			opts:       TokenOptions{},
 			wantErr:    true,
 			wantErrMsg: "no oauth token",
 		},
 		{
 			name: "uses default host when one is not provided",
-			opts: TokenOptions{
-				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					cfg.AuthenticationFunc = func() *config.AuthConfig {
-						authCfg := &config.AuthConfig{}
-						authCfg.SetDefaultHost("github.mycompany.com", "GH_HOST")
-						authCfg.SetToken("gho_1234567", "default")
-						return authCfg
-					}
-					return cfg, nil
-				},
+			opts: TokenOptions{},
+			cfgStubs: func(cfg config.Config) {
+				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
+				login(t, cfg, "github.mycompany.com", "test-user", "gho_1234567", "https", false)
 			},
+			env:        map[string]string{"GH_HOST": "github.mycompany.com"},
 			wantStdout: "gho_1234567\n",
 		},
 	}
@@ -147,14 +133,28 @@ func TestTokenRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, _ := iostreams.Test()
 			tt.opts.IO = ios
+
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+
+			cfg, _ := config.NewIsolatedTestConfig(t)
+			if tt.cfgStubs != nil {
+				tt.cfgStubs(cfg)
+			}
+
+			tt.opts.Config = func() (config.Config, error) {
+				return cfg, nil
+			}
+
 			err := tokenRun(&tt.opts)
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.EqualError(t, err, tt.wantErrMsg)
+				require.Error(t, err)
+				require.EqualError(t, err, tt.wantErrMsg)
 				return
 			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantStdout, stdout.String())
+			require.NoError(t, err)
+			require.Equal(t, tt.wantStdout, stdout.String())
 		})
 	}
 }
@@ -163,41 +163,32 @@ func TestTokenRunSecureStorage(t *testing.T) {
 	tests := []struct {
 		name       string
 		opts       TokenOptions
+		cfgStubs   func(config.Config)
 		wantStdout string
 		wantErr    bool
 		wantErrMsg string
 	}{
 		{
 			name: "token",
-			opts: TokenOptions{
-				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					_ = keyring.Set("gh:github.com", "", "gho_ABCDEFG")
-					return cfg, nil
-				},
+			opts: TokenOptions{},
+			cfgStubs: func(cfg config.Config) {
+				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", true)
 			},
 			wantStdout: "gho_ABCDEFG\n",
 		},
 		{
 			name: "token by hostname",
 			opts: TokenOptions{
-				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					_ = keyring.Set("gh:mycompany.com", "", "gho_1234567")
-					return cfg, nil
-				},
 				Hostname: "mycompany.com",
+			},
+			cfgStubs: func(cfg config.Config) {
+				login(t, cfg, "mycompany.com", "test-user", "gho_1234567", "https", true)
 			},
 			wantStdout: "gho_1234567\n",
 		},
 		{
-			name: "no token",
-			opts: TokenOptions{
-				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					return cfg, nil
-				},
-			},
+			name:       "no token",
+			opts:       TokenOptions{},
 			wantErr:    true,
 			wantErrMsg: "no oauth token",
 		},
@@ -209,14 +200,30 @@ func TestTokenRunSecureStorage(t *testing.T) {
 			ios, _, stdout, _ := iostreams.Test()
 			tt.opts.IO = ios
 			tt.opts.SecureStorage = true
+
+			cfg, _ := config.NewIsolatedTestConfig(t)
+			if tt.cfgStubs != nil {
+				tt.cfgStubs(cfg)
+			}
+
+			tt.opts.Config = func() (config.Config, error) {
+				return cfg, nil
+			}
+
 			err := tokenRun(&tt.opts)
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.EqualError(t, err, tt.wantErrMsg)
+				require.Error(t, err)
+				require.EqualError(t, err, tt.wantErrMsg)
 				return
 			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantStdout, stdout.String())
+			require.NoError(t, err)
+			require.Equal(t, tt.wantStdout, stdout.String())
 		})
 	}
+}
+
+func login(t *testing.T, c config.Config, hostname, username, token, gitProtocol string, secureStorage bool) {
+	t.Helper()
+	_, err := c.Authentication().Login(hostname, username, token, "https", secureStorage)
+	require.NoError(t, err)
 }
