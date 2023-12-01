@@ -1,4 +1,4 @@
-name: Triage
+name: Discussion Triage
 run-name: ${{ github.event_name == 'issues' && github.event.issue.title || github.event.pull_request.title }}
 on:
   issues:
@@ -12,9 +12,9 @@ env:
 jobs:
   issue:
     runs-on: ubuntu-latest
-    if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'triage'
+    if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'discuss'
     steps:
-      - name: Create triage issue based on source issue
+      - name: Create discuss issue based on source issue
         env:
           BODY: ${{ github.event.issue.body }}
           CREATED: ${{ github.event.issue.created_at }}
@@ -26,8 +26,8 @@ jobs:
           # Markdown quote source body by replacing newlines for newlines and markdown quoting
           BODY="${BODY//$'\n'/$'\n'> }"
 
-          # Create triage issue using dynamically constructed body within heredoc
-          cat << EOF | gh issue create --title "Triage issue \"$TITLE\"" --body-file - --repo "$TARGET_REPO" --label triage
+          # Create discuss issue using dynamically constructed body within heredoc
+          cat << EOF | gh issue create --title "Triage issue \"$TITLE\"" --body-file - --repo "$TARGET_REPO" --label discuss
           **Title:** $TITLE
           **Issue:** $LINK
           **Created:** $CREATED
@@ -40,9 +40,9 @@ jobs:
 
   pull_request:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'triage'
+    if: github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'discuss'
     steps:
-      - name: Create triage issue based on source pull request
+      - name: Create discuss issue based on source pull request
         env:
           BODY: ${{ github.event.pull_request.body }}
           CREATED: ${{ github.event.pull_request.created_at }}
@@ -54,8 +54,8 @@ jobs:
           # Markdown quote source body by replacing newlines for newlines and markdown quoting
           BODY="${BODY//$'\n'/$'\n'> }"
 
-          # Create triage issue using dynamically constructed body within heredoc
-          cat << EOF | gh issue create --title "Triage PR \"$TITLE\"" --body-file - --repo "$TARGET_REPO" --label triage
+          # Create discuss issue using dynamically constructed body within heredoc
+          cat << EOF | gh issue create --title "Triage PR \"$TITLE\"" --body-file - --repo "$TARGET_REPO" --label discuss
           **Title:** $TITLE
           **Pull request:** $LINK
           **Created:** $CREATED
