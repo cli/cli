@@ -13,7 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_NewCmdRefresh(t *testing.T) {
@@ -142,7 +142,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			ios.SetNeverPrompt(tt.neverPrompt)
 
 			argv, err := shlex.Split(tt.cli)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var gotOpts *RefreshOptions
 			cmd := NewCmdRefresh(f, func(opts *RefreshOptions) error {
@@ -159,12 +159,12 @@ func Test_NewCmdRefresh(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
-			assert.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
+			require.NoError(t, err)
+			require.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
+			require.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
 		})
 	}
 }
@@ -182,7 +182,6 @@ func Test_refreshRun(t *testing.T) {
 		opts          *RefreshOptions
 		prompterStubs func(*prompter.PrompterMock)
 		cfgHosts      []string
-		config        config.Config
 		oldScopes     string
 		wantErr       string
 		nontty        bool
@@ -416,14 +415,9 @@ func Test_refreshRun(t *testing.T) {
 				return nil
 			}
 
-			var cfg config.Config
-			if tt.config != nil {
-				cfg = tt.config
-			} else {
-				cfg = config.NewFromString("")
-				for _, hostname := range tt.cfgHosts {
-					cfg.Set(hostname, "oauth_token", "abc123")
-				}
+			cfg, _ := config.NewIsolatedTestConfig(t)
+			for _, hostname := range tt.cfgHosts {
+				cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
@@ -462,17 +456,15 @@ func Test_refreshRun(t *testing.T) {
 
 			err := refreshRun(tt.opts)
 			if tt.wantErr != "" {
-				if assert.Error(t, err) {
-					assert.Contains(t, err.Error(), tt.wantErr)
-				}
+				require.Contains(t, err.Error(), tt.wantErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
-			assert.Equal(t, tt.wantAuthArgs.hostname, aa.hostname)
-			assert.Equal(t, tt.wantAuthArgs.scopes, aa.scopes)
-			assert.Equal(t, tt.wantAuthArgs.interactive, aa.interactive)
-			assert.Equal(t, tt.wantAuthArgs.secureStorage, aa.secureStorage)
+			require.Equal(t, tt.wantAuthArgs.hostname, aa.hostname)
+			require.Equal(t, tt.wantAuthArgs.scopes, aa.scopes)
+			require.Equal(t, tt.wantAuthArgs.interactive, aa.interactive)
+			require.Equal(t, tt.wantAuthArgs.secureStorage, aa.secureStorage)
 		})
 	}
 }
