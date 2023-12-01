@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/keyring"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
@@ -79,7 +80,14 @@ func NewFromString(cfgStr string) *ConfigMock {
 	return mock
 }
 
+// NewIsolatedTestConfig sets up a Mock keyring, creates a blank config
+// overwrites the ghConfig.Read function that returns a singleton config
+// in the real implementation, sets the GH_CONFIG_DIR env var so that
+// any call to Write goes to a different location on disk, and then returns
+// the blank config and a function that reads any data written to disk.
 func NewIsolatedTestConfig(t *testing.T) (Config, func(io.Writer, io.Writer)) {
+	keyring.MockInit()
+
 	c := ghConfig.ReadFromString("")
 	cfg := cfg{c}
 
