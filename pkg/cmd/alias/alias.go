@@ -14,11 +14,11 @@ func NewCmdAlias(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "alias <command>",
 		Short: "Create command shortcuts",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Aliases can be used to make shortcuts for gh commands or to compose multiple commands.
 
-			Run "gh help alias set" to learn more.
-		`),
+			Run %[1]sgh help alias set%[1]s to learn more.
+		`, "`"),
 	}
 
 	cmdutil.DisableAuthCheck(cmd)

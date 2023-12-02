@@ -63,13 +63,13 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			See %[1]sgh auth status%[1]s for its stored location.
 
 			Alternatively, use %[1]s--with-token%[1]s to pass in a token on standard input.
-			The minimum required scopes for the token are: "repo", "read:org".
+			The minimum required scopes for the token are: %[1]srepo%[1]s, %[1]sread:org%[1]s, and %[1]sgist%[1]s.
 
 			Alternatively, gh will use the authentication token found in environment variables.
 			This method is most suitable for "headless" use of gh such as in automation. See
 			%[1]sgh help environment%[1]s for more info.
 
-			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to "env".
+			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to %[1]senv%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# start interactive setup

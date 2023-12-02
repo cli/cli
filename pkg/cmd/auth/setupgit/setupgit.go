@@ -33,7 +33,7 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 		Use:   "setup-git",
 		Short: "Setup git with GitHub CLI",
 		Long: heredoc.Docf(`
-			This command configures git to use GitHub CLI as a credential helper.
+			This command configures %[1]sgit%[1]s to use GitHub CLI as a credential helper.
 			For more information on git credential helpers please reference:
 			https://git-scm.com/docs/gitcredentials.
 

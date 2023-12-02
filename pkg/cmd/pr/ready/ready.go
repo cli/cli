@@ -31,14 +31,14 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "ready [<number> | <url> | <branch>]",
 		Short: "Mark a pull request as ready for review",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Mark a pull request as ready for review.
 
 			Without an argument, the pull request that belongs to the current branch
 			is marked as ready.
 
-			If supported by your plan, convert to draft with --undo
-		`),
+			If supported by your plan, convert to draft with %[1]s--undo%[1]s
+		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)

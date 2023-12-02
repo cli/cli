@@ -71,43 +71,43 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			Makes an authenticated HTTP request to the GitHub API and prints the response.
 
 			The endpoint argument should either be a path of a GitHub API v3 endpoint, or
-			"graphql" to access the GitHub API v4.
+			%[1]sgraphql%[1]s to access the GitHub API v4.
 
-			Placeholder values "{owner}", "{repo}", and "{branch}" in the endpoint
+			Placeholder values %[1]s{owner}%[1]s, %[1]s{repo}%[1]s, and %[1]s{branch}%[1]s in the endpoint
 			argument will get replaced with values from the repository of the current
-			directory or the repository specified in the GH_REPO environment variable.
+			directory or the repository specified in the %[1]sGH_REPO%[1]s environment variable.
 			Note that in some shells, for example PowerShell, you may need to enclose
-			any value that contains "{...}" in quotes to prevent the shell from
+			any value that contains %[1]s{...}%[1]s in quotes to prevent the shell from
 			applying special meaning to curly braces.
 
-			The default HTTP request method is "GET" normally and "POST" if any parameters
+			The default HTTP request method is %[1]sGET%[1]s normally and %[1]sPOST%[1]s if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
 
-			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string
+			Pass one or more %[1]s-f/--raw-field%[1]s values in %[1]skey=value%[1]s format to add static string
 			parameters to the request payload. To add non-string or placeholder-determined values, see
-			%[1]s--field%[1]s below. Note that adding request parameters will automatically switch the
-			request method to POST. To send the parameters as a GET query string instead, use
+			%[1]s-F/--field%[1]s below. Note that adding request parameters will automatically switch the
+			request method to %[1]sPOST%[1]s. To send the parameters as a %[1]sGET%[1]s query string instead, use
 			%[1]s--method GET%[1]s.
 
 			The %[1]s-F/--field%[1]s flag has magic type conversion based on the format of the value:
 
-			- literal values "true", "false", "null", and integer numbers get converted to
+			- literal values %[1]strue%[1]s, %[1]sfalse%[1]s, %[1]snull%[1]s, and integer numbers get converted to
 			  appropriate JSON types;
-			- placeholder values "{owner}", "{repo}", and "{branch}" get populated with values
+			- placeholder values %[1]s{owner}%[1]s, %[1]s{repo}%[1]s, and %[1]s{branch}%[1]s get populated with values
 			  from the repository of the current directory;
-			- if the value starts with "@", the rest of the value is interpreted as a
-			  filename to read the value from. Pass "-" to read from standard input.
+			- if the value starts with %[1]s@%[1]s, the rest of the value is interpreted as a
+			  filename to read the value from. Pass %[1]s-%[1]s to read from standard input.
 
-			For GraphQL requests, all fields other than "query" and "operationName" are
+			For GraphQL requests, all fields other than %[1]squery%[1]s and %[1]soperationName%[1]s are
 			interpreted as GraphQL variables.
 
-			To pass nested parameters in the request payload, use "key[subkey]=value" syntax when
+			To pass nested parameters in the request payload, use %[1]skey[subkey]=value%[1]s syntax when
 			declaring fields. To pass nested values as arrays, declare multiple fields with the
-			syntax "key[]=value1", "key[]=value2". To pass an empty array, use "key[]" without a
+			syntax %[1]skey[]=value1%[1]s, %[1]skey[]=value2%[1]s. To pass an empty array, use %[1]skey[]%[1]s without a
 			value.
 
 			To pass pre-constructed JSON or payloads in other formats, a request body may be read
-			from file specified by %[1]s--input%[1]s. Use "-" to read from standard input. When passing the
+			from file specified by %[1]s--input%[1]s. Use %[1]s-%[1]s to read from standard input. When passing the
 			request body this way, any parameters specified via field flags are added to the query
 			string of the endpoint URL.
 

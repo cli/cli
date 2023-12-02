@@ -88,13 +88,13 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 			With no argument, creates a fork of the current repository. Otherwise, forks
 			the specified repository.
 
-			By default, the new fork is set to be your "origin" remote and any existing
-			origin remote is renamed to "upstream". To alter this behavior, you can set
+			By default, the new fork is set to be your %[1]sorigin%[1]s remote and any existing
+			origin remote is renamed to %[1]supstream%[1]s. To alter this behavior, you can set
 			a name for the new fork's remote with %[1]s--remote-name%[1]s.
 
-			The "upstream" remote will be set as the default remote repository.
+			The %[1]supstream%[1]s remote will be set as the default remote repository.
 
-			Additional git clone flags can be passed after %[1]s--%[1]s.
+			Additional %[1]sgit clone%[1]s flags can be passed after %[1]s--%[1]s.
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptOk := opts.IO.CanPrompt()

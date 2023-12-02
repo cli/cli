@@ -48,11 +48,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "view {<number> | <url>}",
 		Short: "View an issue",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Display the title, body, and other information about an issue.
 
-			With '--web', open the issue in a web browser instead.
-		`),
+			With %[1]s--web%[1]s flag, open the issue in a web browser instead.
+		`, "`"),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
