@@ -47,8 +47,6 @@ type tokenSource struct {
 //	 editor: vim
 //	 users:
 //	   williammartin:
-//	     git_protocol: https
-//	     editor: vim
 //
 // github.localhost:
 //	 user: monalisa
@@ -56,8 +54,12 @@ type tokenSource struct {
 //   oauth_token: xyz
 //   users:
 //	   monalisa:
-//	     git_protocol: https
 //	     oauth_token: xyz
+//
+// For each hosts, we will create a new key `users` with the value of the host level
+// `user` key as a list entry. If there is a host level `oauth_token` we will
+// put that under the new user entry, otherwise there will be no value for the
+// new user key. No other host level configuration will be copied to the new user.
 //
 // The reason for this is that we can then add new users under a host.
 // Note that we are only copying the config under a new users key, and
@@ -198,39 +200,21 @@ func migrateConfig(c *config.Config, hostname, username string) error {
 	// written even if there are no keys set under it.
 	c.Set(append(hostsKey, hostname, "users", username), "")
 
-	// e.g. [user, git_protocol, editor, ouath_token]
-	configEntryKeys, err := c.Keys(append(hostsKey, hostname))
+	insecureToken, err := c.Get(append(hostsKey, hostname, "oauth_token"))
+	var keyNotFoundError *config.KeyNotFoundError
+	// If there is no token then we're done here
+	if errors.As(err, &keyNotFoundError) {
+		return nil
+	}
+
+	// If there's another error (current implementation doesn't have any other error but we'll be defensive)
+	// then bubble something up.
 	if err != nil {
-		return fmt.Errorf("couldn't get host configuration despite %q existing", hostname)
+		return fmt.Errorf("couldn't get oauth token for %s: %s", hostname, err)
 	}
 
-	for _, configEntryKey := range configEntryKeys {
-		// Do not re-write process the user and users keys.
-		if configEntryKey == "user" || configEntryKey == "users" {
-			continue
-		}
-
-		// We would expect that these keys map directly to values
-		// e.g. [williammartin, https, vim, gho_xyz...] but it's possible that a manually
-		// edited config file might nest further but we don't support that.
-		//
-		// We could consider throwing away the nested values, but I suppose
-		// I'd rather make the user take a destructive action even if we have a backup.
-		// If they have configuration here, it's probably for a reason.
-		keys, err := c.Keys(append(hostsKey, hostname, configEntryKey))
-		if err == nil && len(keys) > 0 {
-			return errors.New("hosts file has entries that are surprisingly deeply nested")
-		}
-
-		configEntryValue, err := c.Get(append(hostsKey, hostname, configEntryKey))
-		if err != nil {
-			return fmt.Errorf("couldn't get configuration entry value despite %q / %q existing", hostname, configEntryKey)
-		}
-
-		// Set these entries in their new location under the user
-		c.Set(append(hostsKey, hostname, "users", username, configEntryKey), configEntryValue)
-	}
-
+	// Otherwise we'll set the token under the new key
+	c.Set(append(hostsKey, hostname, "users", username, "oauth_token"), insecureToken)
 	return nil
 }
 
