@@ -192,7 +192,7 @@ func statusRun(opts *StatusOptions) error {
 		gitProtocol := cfg.GitProtocol(hostname)
 		activeUserToken, activeUserTokenSource := authCfg.Token(hostname)
 		if authTokenWriteable(activeUserTokenSource) {
-			activeUser, _ = authCfg.User(hostname)
+			activeUser, _ = authCfg.ActiveUser(hostname)
 		}
 		entry := buildEntry(httpClient, buildEntryOptions{
 			active:      true,

@@ -153,7 +153,7 @@ func TestUserNotLoggedIn(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	// When we get the user
-	_, err := authCfg.User("github.com")
+	_, err := authCfg.ActiveUser("github.com")
 
 	// Then it returns failure, bubbling the KeyNotFoundError
 	var keyNotFoundError *ghConfig.KeyNotFoundError
@@ -286,7 +286,7 @@ func TestLoginSetsUserForProvidedHost(t *testing.T) {
 	// Then it returns success and the user is set
 	require.NoError(t, err)
 
-	user, err := authCfg.User("github.com")
+	user, err := authCfg.ActiveUser("github.com")
 	require.NoError(t, err)
 	require.Equal(t, "test-user", user)
 }
@@ -371,7 +371,7 @@ func TestLogoutOfActiveUserSwitchesUserIfPossible(t *testing.T) {
 
 	// Then we return success and the inactive user is now active
 	require.NoError(t, err)
-	activeUser, err := authCfg.User("github.com")
+	activeUser, err := authCfg.ActiveUser("github.com")
 	require.NoError(t, err)
 	require.Equal(t, "inactive-user", activeUser)
 
@@ -400,7 +400,7 @@ func TestLogoutOfInactiveUserDoesNotSwitchUser(t *testing.T) {
 
 	// Then we return success and the active user is still active
 	require.NoError(t, err)
-	activeUser, err := authCfg.User("github.com")
+	activeUser, err := authCfg.ActiveUser("github.com")
 	require.NoError(t, err)
 	require.Equal(t, "active-user", activeUser)
 }
@@ -471,7 +471,7 @@ func TestSwitchUserUpdatesTheActiveUser(t *testing.T) {
 	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
 
 	// Then the active user is updated
-	activeUser, err := authCfg.User("github.com")
+	activeUser, err := authCfg.ActiveUser("github.com")
 	require.NoError(t, err)
 	require.Equal(t, "test-user-1", activeUser)
 }
@@ -509,7 +509,7 @@ func TestSwitchUserErrorsAndRestoresUserAndInsecureConfigUnderFailure(t *testing
 	require.EqualError(t, err, "no token found for test-user-1")
 
 	// And restores the previous state
-	activeUser, err := authCfg.User("github.com")
+	activeUser, err := authCfg.ActiveUser("github.com")
 	require.NoError(t, err)
 	require.Equal(t, "test-user-2", activeUser)
 
@@ -535,7 +535,7 @@ func TestSwitchUserErrorsAndRestoresUserAndKeyringUnderFailure(t *testing.T) {
 	require.EqualError(t, err, "no token found for test-user-1")
 
 	// And restores the previous state
-	activeUser, err := authCfg.User("github.com")
+	activeUser, err := authCfg.ActiveUser("github.com")
 	require.NoError(t, err)
 	require.Equal(t, "test-user-2", activeUser)
 
@@ -673,7 +673,7 @@ func TestUserWorksRightAfterMigration(t *testing.T) {
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the user correctly
-	user, err := authCfg.User("github.com")
+	user, err := authCfg.ActiveUser("github.com")
 	require.NoError(t, err)
 	require.Equal(t, "test-user", user)
 }
@@ -817,7 +817,7 @@ func TestLoginPostMigrationSetsUser(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the user
-	user, err := authCfg.User("github.com")
+	user, err := authCfg.ActiveUser("github.com")
 
 	// Then it returns success and the user we provided on login
 	require.NoError(t, err)
