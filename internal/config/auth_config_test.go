@@ -59,7 +59,7 @@ func TestTokenStoredInConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the token
-	token, source := authCfg.Token("github.com")
+	token, source := authCfg.ActiveToken("github.com")
 
 	// Then the token is successfully fetched
 	// and the source is set to oauth_token but this isn't great:
@@ -74,7 +74,7 @@ func TestTokenStoredInEnv(t *testing.T) {
 	t.Setenv("GH_TOKEN", "test-token")
 
 	// When we get the token
-	token, source := authCfg.Token("github.com")
+	token, source := authCfg.ActiveToken("github.com")
 
 	// Then the token is successfully fetched
 	// and the source is set to the name of the env var
@@ -89,7 +89,7 @@ func TestTokenStoredInKeyring(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the token
-	token, source := authCfg.Token("github.com")
+	token, source := authCfg.ActiveToken("github.com")
 
 	// Then the token is successfully fetched
 	// and the source is set to keyring
@@ -454,7 +454,7 @@ func TestSwitchUserMakesInsecureTokenActive(t *testing.T) {
 	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
 
 	// Their insecure token is now active
-	token, source := authCfg.Token("github.com")
+	token, source := authCfg.ActiveToken("github.com")
 	require.Equal(t, "test-token-1", token)
 	require.Equal(t, oauthTokenKey, source)
 }
@@ -513,7 +513,7 @@ func TestSwitchUserErrorsAndRestoresUserAndInsecureConfigUnderFailure(t *testing
 	require.NoError(t, err)
 	require.Equal(t, "test-user-2", activeUser)
 
-	token, source := authCfg.Token("github.com")
+	token, source := authCfg.ActiveToken("github.com")
 	require.Equal(t, "test-token-2", token)
 	require.Equal(t, "oauth_token", source)
 }
@@ -539,7 +539,7 @@ func TestSwitchUserErrorsAndRestoresUserAndKeyringUnderFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "test-user-2", activeUser)
 
-	token, source := authCfg.Token("github.com")
+	token, source := authCfg.ActiveToken("github.com")
 	require.Equal(t, "test-token-2", token)
 	require.Equal(t, "keyring", source)
 }
@@ -740,7 +740,7 @@ func TestTokenWorksRightAfterMigration(t *testing.T) {
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the token correctly
-	token, source := authCfg.Token("github.com")
+	token, source := authCfg.ActiveToken("github.com")
 	require.Equal(t, "test-token", token)
 	require.Equal(t, oauthTokenKey, source)
 }

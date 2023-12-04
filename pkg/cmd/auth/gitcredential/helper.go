@@ -14,7 +14,7 @@ import (
 const tokenUser = "x-access-token"
 
 type config interface {
-	Token(string) (string, string)
+	ActiveToken(string) (string, string)
 	ActiveUser(string) (string, error)
 }
 
@@ -113,10 +113,10 @@ func helperRun(opts *CredentialOptions) error {
 
 	lookupHost := wants["host"]
 	var gotUser string
-	gotToken, source := cfg.Token(lookupHost)
+	gotToken, source := cfg.ActiveToken(lookupHost)
 	if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
 		lookupHost = strings.TrimPrefix(lookupHost, "gist.")
-		gotToken, source = cfg.Token(lookupHost)
+		gotToken, source = cfg.ActiveToken(lookupHost)
 	}
 
 	if strings.HasSuffix(source, "_TOKEN") {

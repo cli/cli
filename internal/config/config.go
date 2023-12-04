@@ -210,10 +210,10 @@ type AuthConfig struct {
 	tokenOverride       func(string) (string, string)
 }
 
-// Token will retrieve the auth token for the given hostname,
+// ActiveToken will retrieve the active auth token for the given hostname,
 // searching environment variables, plain text config, and
 // lastly encrypted storage.
-func (c *AuthConfig) Token(hostname string) (string, string) {
+func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	if c.tokenOverride != nil {
 		return c.tokenOverride(hostname)
 	}
@@ -249,9 +249,9 @@ func (c *AuthConfig) HasEnvToken() bool {
 	return token != ""
 }
 
-// SetToken will override any token resolution and return the given
-// token and source for all calls to Token. Use for testing purposes only.
-func (c *AuthConfig) SetToken(token, source string) {
+// SetActiveToken will override any token resolution and return the given
+// token and source for all calls to ActiveToken. Use for testing purposes only.
+func (c *AuthConfig) SetActiveToken(token, source string) {
 	c.tokenOverride = func(_ string) (string, string) {
 		return token, source
 	}
@@ -358,7 +358,7 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 		return fmt.Errorf("failed to get active user: %s", err)
 	}
 
-	previouslyActiveToken, previousSource := c.Token(hostname)
+	previouslyActiveToken, previousSource := c.ActiveToken(hostname)
 	if previousSource != "keyring" && previousSource != "oauth_token" {
 		return fmt.Errorf("currently active token for %s is from %s", hostname, previousSource)
 	}
