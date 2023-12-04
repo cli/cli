@@ -58,7 +58,7 @@ func Login(opts *LoginOptions) error {
 			"SSH",
 		}
 		result, err := opts.Prompter.Select(
-			"What is your preferred protocol for Git operations?",
+			"What is your preferred protocol for Git operations on this host?",
 			options[0],
 			options)
 		if err != nil {

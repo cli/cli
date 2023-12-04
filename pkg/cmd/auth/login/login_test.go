@@ -503,7 +503,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
@@ -543,7 +543,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					switch prompt {
 					case "What account do you want to log into?":
 						return prompter.IndexFor(opts, "GitHub Enterprise Server")
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
@@ -586,7 +586,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					switch prompt {
 					case "What account do you want to log into?":
 						return prompter.IndexFor(opts, "GitHub.com")
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
@@ -620,7 +620,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					switch prompt {
 					case "What account do you want to log into?":
 						return prompter.IndexFor(opts, "GitHub.com")
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "SSH")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
@@ -639,7 +639,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
@@ -671,7 +671,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
