@@ -553,6 +553,47 @@ func TestUsersForHostWithUsers(t *testing.T) {
 	require.Equal(t, []string{"test-user-1", "test-user-2"}, users)
 }
 
+func TestTokenForUserSecureLogin(t *testing.T) {
+	// Given a user has logged in securely
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token", "ssh", true)
+	require.NoError(t, err)
+
+	// When we get the token
+	token, source, err := authCfg.TokenForUser("github.com", "test-user-1")
+
+	// Then it returns the token and the source as keyring
+	require.NoError(t, err)
+	require.Equal(t, "test-token", token)
+	require.Equal(t, "keyring", source)
+}
+
+func TestTokenForUserInsecureLogin(t *testing.T) {
+	// Given a user has logged in insecurely
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token", "ssh", false)
+	require.NoError(t, err)
+
+	// When we get the token
+	token, source, err := authCfg.TokenForUser("github.com", "test-user-1")
+
+	// Then it returns the token and the source as oauth_token
+	require.NoError(t, err)
+	require.Equal(t, "test-token", token)
+	require.Equal(t, "oauth_token", source)
+}
+
+func TestTokenForUserNotFoundErrors(t *testing.T) {
+	// Given a user has not logged in
+	authCfg := newTestAuthConfig(t)
+
+	// When we get the token
+	_, _, err := authCfg.TokenForUser("github.com", "test-user-1")
+
+	// Then it returns an error
+	require.EqualError(t, err, "no token found for 'test-user-1'")
+}
+
 func requireKeyWithValue(t *testing.T, cfg *ghConfig.Config, keys []string, value string) {
 	t.Helper()
 
