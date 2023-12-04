@@ -319,9 +319,11 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 	}
 
 	if gitProtocol != "" {
-		// And set the git protocol under the user to support later auth switch
-		// and logout switch without another migration.
-		c.cfg.Set([]string{hostsKey, hostname, usersKey, username, gitProtocolKey}, gitProtocol)
+		// Set the host level git protocol
+		// Although it might be expected that this is handled by switch, git protocol
+		// is currently a host level config and not a user level config, so any change
+		// will overwrite the protocol for all users on the host.
+		c.cfg.Set([]string{hostsKey, hostname, gitProtocolKey}, gitProtocol)
 	}
 
 	// Create the username key with an empty value so it will be
@@ -360,11 +362,6 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 
 	if !tokenSwitched {
 		return fmt.Errorf("no token found for '%s'", user)
-	}
-
-	// Then we'll ensure the git protocol is moved as well
-	if gitProtocol, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, gitProtocolKey}); err == nil {
-		c.cfg.Set([]string{hostsKey, hostname, gitProtocolKey}, gitProtocol)
 	}
 
 	// Then we'll update the active user for the host
