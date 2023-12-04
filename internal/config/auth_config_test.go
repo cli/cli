@@ -507,7 +507,7 @@ func TestSwitchUserErrorsAndRestoresUserAndInsecureConfigUnderFailure(t *testing
 	err = authCfg.SwitchUser("github.com", "test-user-1")
 
 	// Then it returns an error
-	require.EqualError(t, err, "no token found for 'test-user-1'")
+	require.EqualError(t, err, "no token found for test-user-1")
 
 	// And restores the previous state
 	activeUser, err := authCfg.User("github.com")
@@ -533,7 +533,7 @@ func TestSwitchUserErrorsAndRestoresUserAndKeyringUnderFailure(t *testing.T) {
 	err = authCfg.SwitchUser("github.com", "test-user-1")
 
 	// Then it returns an error
-	require.EqualError(t, err, "no token found for 'test-user-1'")
+	require.EqualError(t, err, "no token found for test-user-1")
 
 	// And restores the previous state
 	activeUser, err := authCfg.User("github.com")

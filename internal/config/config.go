@@ -369,7 +369,9 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 		// to its previous clean state just in case something else tries to make use of the config, or tries
 		// to write it again.
 		if previousSource == "keyring" {
-			err = errors.Join(err, keyring.Set(keyringServiceName(hostname), "", previouslyActiveToken))
+			if setErr := keyring.Set(keyringServiceName(hostname), "", previouslyActiveToken); setErr != nil {
+				err = errors.Join(err, setErr)
+			}
 		}
 
 		if previousSource == "oauth_token" {
@@ -442,7 +444,7 @@ func (c *AuthConfig) activateUser(hostname, user string) error {
 	}
 
 	if !tokenSwitched {
-		return fmt.Errorf("no token found for '%s'", user)
+		return fmt.Errorf("no token found for %s", user)
 	}
 
 	// Then we'll update the active user for the host
