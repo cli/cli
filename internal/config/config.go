@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -332,42 +333,40 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 		c.cfg.Set([]string{hostsKey, hostname, usersKey, username}, "")
 	}
 
-	// Then we perform a switch to the new user
-	return insecureStorageUsed, c.SwitchUser(hostname, username)
+	// Then we activate the new user
+	return insecureStorageUsed, c.activateUser(hostname, username)
 }
 
-// TODO: How should git protocol be handled? Do we need to set it at the user level since it could have been changed?
 func (c *AuthConfig) SwitchUser(hostname, user string) error {
-	// We first need to idempotently clear out any set tokens for the host
-	_ = keyring.Delete(keyringServiceName(hostname), "")
-	_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
+	previouslyActiveUser, err := c.User(hostname)
+	if err != nil {
+		return fmt.Errorf("failed to get active user: %s", err)
+	}
 
-	// Then we'll move the keyring token or insecure token as necessary, only one of the
-	// following branches should be true.
+	previouslyActiveToken, previousSource := c.Token(hostname)
+	if previousSource != "keyring" && previousSource != "oauth_token" {
+		return fmt.Errorf("currently active token for %s is from %s", hostname, previousSource)
+	}
 
-	// If there is a token in the secure keyring for the user, move it to the active slot
-	var tokenSwitched bool
-	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
-		if err = keyring.Set(keyringServiceName(hostname), "", token); err != nil {
-			return fmt.Errorf("failed to move active token in keyring: %v", err)
+	err = c.activateUser(hostname, user)
+	if err != nil {
+		// Given that activateUser can only fail before the config is written, or when writing the config
+		// we know for sure that the config has not been written. However, we still should restore it back
+		// to its previous clean state just in case something else tries to make use of the config, or tries
+		// to write it again.
+		if previousSource == "keyring" {
+			err = errors.Join(err, keyring.Set(keyringServiceName(hostname), "", previouslyActiveToken))
 		}
-		tokenSwitched = true
+
+		if previousSource == "oauth_token" {
+			c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, previouslyActiveToken)
+		}
+		c.cfg.Set([]string{hostsKey, hostname, userKey}, previouslyActiveUser)
+
+		return err
 	}
 
-	// If there is a token in the insecure config for the user, move it to the active field
-	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, oauthTokenKey}); err == nil {
-		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
-		tokenSwitched = true
-	}
-
-	if !tokenSwitched {
-		return fmt.Errorf("no token found for '%s'", user)
-	}
-
-	// Then we'll update the active user for the host
-	c.cfg.Set([]string{hostsKey, hostname, userKey}, user)
-
-	return ghConfig.Write(c.cfg)
+	return nil
 }
 
 // Logout will remove user, git protocol, and auth token for the given hostname.
@@ -401,8 +400,41 @@ func (c *AuthConfig) Logout(hostname, username string) error {
 		return n != username
 	})
 
-	// And switch to them
-	return c.SwitchUser(hostname, users[switchUserIdx])
+	// And activate them
+	return c.activateUser(hostname, users[switchUserIdx])
+}
+
+func (c *AuthConfig) activateUser(hostname, user string) error {
+	// We first need to idempotently clear out any set tokens for the host
+	_ = keyring.Delete(keyringServiceName(hostname), "")
+	_ = c.cfg.Remove([]string{hostsKey, hostname, oauthTokenKey})
+
+	// Then we'll move the keyring token or insecure token as necessary, only one of the
+	// following branches should be true.
+
+	// If there is a token in the secure keyring for the user, move it to the active slot
+	var tokenSwitched bool
+	if token, err := keyring.Get(keyringServiceName(hostname), user); err == nil {
+		if err = keyring.Set(keyringServiceName(hostname), "", token); err != nil {
+			return fmt.Errorf("failed to move active token in keyring: %v", err)
+		}
+		tokenSwitched = true
+	}
+
+	// If there is a token in the insecure config for the user, move it to the active field
+	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, oauthTokenKey}); err == nil {
+		c.cfg.Set([]string{hostsKey, hostname, oauthTokenKey}, token)
+		tokenSwitched = true
+	}
+
+	if !tokenSwitched {
+		return fmt.Errorf("no token found for '%s'", user)
+	}
+
+	// Then we'll update the active user for the host
+	c.cfg.Set([]string{hostsKey, hostname, userKey}, user)
+
+	return ghConfig.Write(c.cfg)
 }
 
 func (c *AuthConfig) UsersForHost(hostname string) ([]string, error) {

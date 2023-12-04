@@ -454,12 +454,28 @@ func TestSwitchUserUpdatesTheActiveUser(t *testing.T) {
 	require.Equal(t, "test-user-1", activeUser)
 }
 
-func TestSwitchUserErrorsIfNoTokenMadeActive(t *testing.T) {
+func TestSwitchUserErrorsImmediatelyIfTheActiveTokenComesFromEnvironment(t *testing.T) {
+	// Given we have a token in the env
+	authCfg := newTestAuthConfig(t)
+	t.Setenv("GH_TOKEN", "unimportant-test-value")
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", true)
+	require.NoError(t, err)
+
+	// When we switch to a user
+	err = authCfg.SwitchUser("github.com", "test-user-1")
+
+	// Then it errors immediately with an informative message
+	require.ErrorContains(t, err, "currently active token for github.com is from GH_TOKEN")
+}
+
+func TestSwitchUserErrorsAndRestoresUserAndInsecureConfigUnderFailure(t *testing.T) {
 	// Given we have a user but no token can be found (because we deleted them, simulating an error case)
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", true)
 	require.NoError(t, err)
-	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", true)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", false)
 	require.NoError(t, err)
 
 	require.NoError(t, keyring.Delete(keyringServiceName("github.com"), "test-user-1"))
@@ -468,8 +484,42 @@ func TestSwitchUserErrorsIfNoTokenMadeActive(t *testing.T) {
 	err = authCfg.SwitchUser("github.com", "test-user-1")
 
 	// Then it returns an error
-	// But also restores the previous
 	require.EqualError(t, err, "no token found for 'test-user-1'")
+
+	// And restores the previous state
+	activeUser, err := authCfg.User("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "test-user-2", activeUser)
+
+	token, source := authCfg.Token("github.com")
+	require.Equal(t, "test-token-2", token)
+	require.Equal(t, "oauth_token", source)
+}
+
+func TestSwitchUserErrorsAndRestoresUserAndKeyringUnderFailure(t *testing.T) {
+	// Given we have a user but no token can be found (because we deleted them, simulating an error case)
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", true)
+	require.NoError(t, err)
+
+	require.NoError(t, authCfg.cfg.Remove([]string{hostsKey, "github.com", usersKey, "test-user-1", oauthTokenKey}))
+
+	// When we switch to the user
+	err = authCfg.SwitchUser("github.com", "test-user-1")
+
+	// Then it returns an error
+	require.EqualError(t, err, "no token found for 'test-user-1'")
+
+	// And restores the previous state
+	activeUser, err := authCfg.User("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "test-user-2", activeUser)
+
+	token, source := authCfg.Token("github.com")
+	require.Equal(t, "test-token-2", token)
+	require.Equal(t, "keyring", source)
 }
 
 func TestSwitchClearsActiveSecureTokenWhenSwitchingToInsecureUser(t *testing.T) {
