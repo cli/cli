@@ -71,6 +71,10 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			%[1]sgh help environment%[1]s for more info.
 
 			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to %[1]senv%[1]s.
+
+			The git protocol to use for git operations on this host can be set with %[1]s--git-protocol%[1]s,
+			or during the interactive prompting. Although login is for a single account on a host, setting
+			the git protocol will take affect for all users on the host.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Start interactive setup
@@ -126,7 +130,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes to request")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
-	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
+	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations on this host")
 
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
