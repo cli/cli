@@ -56,7 +56,7 @@ func NewCmdConfigGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Co
 func getRun(opts *GetOptions) error {
 	// search keyring storage when fetching the `oauth_token` value
 	if opts.Hostname != "" && opts.Key == "oauth_token" {
-		token, _ := opts.Config.Authentication().Token(opts.Hostname)
+		token, _ := opts.Config.Authentication().ActiveToken(opts.Hostname)
 		if token == "" {
 			return errors.New(`could not find key "oauth_token"`)
 		}

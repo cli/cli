@@ -10,7 +10,7 @@ import (
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) Token(host string) (string, string) {
+func (c tinyConfig) ActiveToken(host string) (string, string) {
 	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], c["_source"]
 }
 

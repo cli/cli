@@ -109,7 +109,7 @@ type cfg struct {
 	token string
 }
 
-func (c cfg) Token(hostname string) (string, string) {
+func (c cfg) ActiveToken(hostname string) (string, string) {
 	return c.token, "oauth_token"
 }
 

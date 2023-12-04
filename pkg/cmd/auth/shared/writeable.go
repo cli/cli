@@ -7,6 +7,6 @@ import (
 )
 
 func AuthTokenWriteable(authCfg *config.AuthConfig, hostname string) (string, bool) {
-	token, src := authCfg.Token(hostname)
+	token, src := authCfg.ActiveToken(hostname)
 	return src, (token == "" || !strings.HasSuffix(src, "_TOKEN"))
 }
