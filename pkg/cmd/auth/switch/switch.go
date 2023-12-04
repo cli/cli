@@ -99,7 +99,7 @@ func switchRun(opts *SwitchOptions) error {
 		}
 
 		if username != "" {
-			knownUsers, _ := cfg.Authentication().UsersForHost(hostname)
+			knownUsers := cfg.Authentication().UsersForHost(hostname)
 			if !slices.Contains(knownUsers, username) {
 				return fmt.Errorf("not logged in to %s account %s", hostname, username)
 			}
@@ -116,10 +116,7 @@ func switchRun(opts *SwitchOptions) error {
 		if err != nil {
 			return err
 		}
-		knownUsers, err := cfg.Authentication().UsersForHost(host)
-		if err != nil {
-			return err
-		}
+		knownUsers := cfg.Authentication().UsersForHost(host)
 		for _, user := range knownUsers {
 			if username != "" && user != username {
 				continue

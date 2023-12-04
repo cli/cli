@@ -379,8 +379,7 @@ func TestLogoutOfActiveUserSwitchesUserIfPossible(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "test-token-1", token)
 
-	usersForHost, err := authCfg.UsersForHost("github.com")
-	require.NoError(t, err)
+	usersForHost := authCfg.UsersForHost("github.com")
 	require.NotContains(t, "active-user", usersForHost)
 }
 
@@ -581,10 +580,10 @@ func TestUsersForHostNoHost(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	// When we get the users for a host that doesn't exist
-	_, err := authCfg.UsersForHost("github.com")
+	users := authCfg.UsersForHost("github.com")
 
-	// Then it returns an error
-	require.EqualError(t, err, "unknown host: github.com")
+	// Then it returns nil
+	require.Nil(t, users)
 }
 
 func TestUsersForHostWithUsers(t *testing.T) {
@@ -596,10 +595,9 @@ func TestUsersForHostWithUsers(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we get the users for that host
-	users, err := authCfg.UsersForHost("github.com")
+	users := authCfg.UsersForHost("github.com")
 
 	// Then it succeeds and returns the users
-	require.NoError(t, err)
 	require.Equal(t, []string{"test-user-1", "test-user-2"}, users)
 }
 
