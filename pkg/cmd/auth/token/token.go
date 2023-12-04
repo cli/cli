@@ -33,7 +33,7 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 
 			Without the %[1]s--hostname%[1]s flag, the default host is chosen.
 
-			Without the %[1]s--user%[1]s flag, the currently active account for the host is chosen.
+			Without the %[1]s--user%[1]s flag, the active account for the host is chosen.
 		`, "`"),
 		Args: cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -82,12 +82,18 @@ func tokenRun(opts *TokenOptions) error {
 			val, _, _ = authCfg.TokenForUser(hostname, opts.Username)
 		}
 	}
+
 	if val == "" {
-		return fmt.Errorf("no oauth token")
+		errMsg := fmt.Sprintf("no oauth token found for %s", hostname)
+		if opts.Username != "" {
+			errMsg += fmt.Sprintf(" account %s", opts.Username)
+		}
+		return fmt.Errorf(errMsg)
 	}
 
 	if val != "" {
 		fmt.Fprintf(opts.IO.Out, "%s\n", val)
 	}
+
 	return nil
 }
