@@ -295,7 +295,7 @@ func Test_loginRun_nontty(t *testing.T) {
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    users:\n        monalisa:\n            oauth_token: abc123\n            git_protocol: https\n    oauth_token: abc123\n    git_protocol: https\n    user: monalisa\n",
+			wantHosts: "github.com:\n    users:\n        monalisa:\n            oauth_token: abc123\n    git_protocol: https\n    oauth_token: abc123\n    user: monalisa\n",
 		},
 		{
 			name: "with token and non-default host",
@@ -411,7 +411,6 @@ func Test_loginRun_nontty(t *testing.T) {
                     users:
                         monalisa:
                             oauth_token: abc123
-                            git_protocol: https
                         newUser:
                     git_protocol: https
                     user: newUser
@@ -497,9 +496,8 @@ func Test_loginRun_Survey(t *testing.T) {
                     users:
                         jillv:
                             oauth_token: def456
-                            git_protocol: https
-                    oauth_token: def456
                     git_protocol: https
+                    oauth_token: def456
                     user: jillv
             `),
 			prompterStubs: func(pm *prompter.PrompterMock) {
@@ -532,9 +530,8 @@ func Test_loginRun_Survey(t *testing.T) {
                     users:
                         jillv:
                             oauth_token: def456
-                            git_protocol: https
-                    oauth_token: def456
                     git_protocol: https
+                    oauth_token: def456
                     user: jillv
             `),
 			opts: &LoginOptions{
@@ -576,9 +573,8 @@ func Test_loginRun_Survey(t *testing.T) {
                     users:
                         jillv:
                             oauth_token: def456
-                            git_protocol: https
-                    oauth_token: def456
                     git_protocol: https
+                    oauth_token: def456
                     user: jillv
             `),
 			opts: &LoginOptions{
@@ -611,9 +607,8 @@ func Test_loginRun_Survey(t *testing.T) {
                     users:
                         jillv:
                             oauth_token: def456
-                            git_protocol: ssh
-                    oauth_token: def456
                     git_protocol: ssh
+                    oauth_token: def456
                     user: jillv
             `),
 			opts: &LoginOptions{
@@ -658,10 +653,9 @@ func Test_loginRun_Survey(t *testing.T) {
 			},
 			wantHosts: heredoc.Doc(`
                 github.com:
+                    git_protocol: https
                     users:
                         jillv:
-                            git_protocol: https
-                    git_protocol: https
                     user: jillv
             `),
 			wantErrOut:      regexp.MustCompile("Logged in as jillv"),
@@ -704,7 +698,6 @@ func Test_loginRun_Survey(t *testing.T) {
                 users:
                     monalisa:
                         oauth_token: def456
-                        git_protocol: https
                 git_protocol: https
                 user: monalisa
                 oauth_token: def456

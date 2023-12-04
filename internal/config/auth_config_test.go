@@ -280,13 +280,6 @@ func TestLoginSetsGitProtocolForProvidedHost(t *testing.T) {
 
 	// Then it returns the git protocol we provided on login
 	require.Equal(t, "ssh", hostProtocol)
-
-	// When we get the users git protocol
-	userProtocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", gitProtocolKey})
-	require.NoError(t, err)
-
-	// Then it returns the git protocol we provided on login
-	require.Equal(t, "ssh", userProtocol)
 }
 
 func TestLoginAddsHostIfNotAlreadyAdded(t *testing.T) {
@@ -459,22 +452,6 @@ func TestSwitchUserUpdatesTheActiveUser(t *testing.T) {
 	activeUser, err := authCfg.User("github.com")
 	require.NoError(t, err)
 	require.Equal(t, "test-user-1", activeUser)
-}
-
-// TODO: This might be removed
-func TestSwitchUserUpdatesTheHostLevelGitProtocol(t *testing.T) {
-	// Given we have two users logged into a host
-	authCfg := newTestAuthConfig(t)
-	_, err := authCfg.Login("github.com", "test-user-1", "test-token-1", "ssh", false)
-	require.NoError(t, err)
-	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "https", false)
-	require.NoError(t, err)
-
-	// When we switch to the other user
-	require.NoError(t, authCfg.SwitchUser("github.com", "test-user-1"))
-
-	// Then the host level git protocol is updated
-	requireKeyWithValue(t, authCfg.cfg, []string{hostsKey, "github.com", gitProtocolKey}, "ssh")
 }
 
 func TestSwitchUserErrorsIfNoTokenMadeActive(t *testing.T) {
@@ -755,13 +732,6 @@ func TestLoginPostMigrationSetsGitProtocol(t *testing.T) {
 
 	// Then it returns the git protocol we provided on login
 	require.Equal(t, "ssh", hostProtocol)
-
-	// When we get the user git protocol
-	userProtocol, err := authCfg.cfg.Get([]string{hostsKey, "github.com", usersKey, "test-user", gitProtocolKey})
-	require.NoError(t, err)
-
-	// Then it returns the git protocol we provided on login
-	require.Equal(t, "ssh", userProtocol)
 }
 
 func TestLoginPostMigrationSetsUser(t *testing.T) {
