@@ -163,11 +163,15 @@ func switchRun(opts *SwitchOptions) error {
 		return cmdutil.SilentError
 	}
 
+	cs := opts.IO.ColorScheme()
+
 	if err := authCfg.SwitchUser(hostname, username); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Failed to switch account for %s to %s\n",
+			cs.FailureIcon(), hostname, cs.Bold(username))
+
 		return err
 	}
 
-	cs := opts.IO.ColorScheme()
 	fmt.Fprintf(opts.IO.ErrOut, "%s Switched active account for %s to %s\n",
 		cs.SuccessIcon(), hostname, cs.Bold(username))
 

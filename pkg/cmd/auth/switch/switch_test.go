@@ -3,10 +3,12 @@ package authswitch
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/keyring"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -103,6 +105,8 @@ func TestSwitchRun(t *testing.T) {
 		err    error
 		stderr string
 	}
+
+	userWithMissingToken := "user-that-is-broken-by-the-test"
 
 	tests := []struct {
 		name     string
@@ -316,6 +320,22 @@ func TestSwitchRun(t *testing.T) {
 				stderr:       "✓ Switched active account for ghe.io to inactive-user",
 			},
 		},
+		{
+			name: "when switching fails due to something other than user error, an informative message is printed to explain their new state",
+			opts: SwitchOptions{
+				Username: userWithMissingToken,
+			},
+			cfgHosts: []hostUsers{
+				{"github.com", []user{
+					{userWithMissingToken, "inactive-user-token"},
+					{"active-user", "active-user-token"},
+				}},
+			},
+			expectedFailure: failedExpectation{
+				err:    fmt.Errorf("no token found for %s", userWithMissingToken),
+				stderr: fmt.Sprintf("X Failed to switch account for github.com to %s", userWithMissingToken),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -341,6 +361,10 @@ func TestSwitchRun(t *testing.T) {
 						user.token, "ssh", true,
 					)
 					require.NoError(t, err)
+
+					if user.name == userWithMissingToken {
+						require.NoError(t, keyring.Delete(fmt.Sprintf("gh:%s", hostUsers.host), userWithMissingToken))
+					}
 				}
 			}
 
