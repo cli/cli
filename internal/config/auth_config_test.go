@@ -462,7 +462,7 @@ func TestSwitchUserErrorsIfNoTokenMadeActive(t *testing.T) {
 	_, err = authCfg.Login("github.com", "test-user-2", "test-token-2", "ssh", true)
 	require.NoError(t, err)
 
-	keyring.Delete(keyringServiceName("github.com"), "test-user-1")
+	require.NoError(t, keyring.Delete(keyringServiceName("github.com"), "test-user-1"))
 
 	// When we switch to the user
 	err = authCfg.SwitchUser("github.com", "test-user-1")

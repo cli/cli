@@ -417,7 +417,8 @@ func Test_refreshRun(t *testing.T) {
 
 			cfg, _ := config.NewIsolatedTestConfig(t)
 			for _, hostname := range tt.cfgHosts {
-				cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
+				_, err := cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
+				require.NoError(t, err)
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
