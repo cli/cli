@@ -277,8 +277,9 @@ func (c *AuthConfig) TokenFromKeyringForUser(hostname, username string) (string,
 	return keyring.Get(keyringServiceName(hostname), username)
 }
 
-// User will retrieve the username for the logged in user at the given hostname.
-func (c *AuthConfig) User(hostname string) (string, error) {
+// ActiveUser will retrieve the username for the active user at the given hostname.
+// This will not be accurate if the oauth token is set from an environment variable.
+func (c *AuthConfig) ActiveUser(hostname string) (string, error) {
 	return c.cfg.Get([]string{hostsKey, hostname, userKey})
 }
 
@@ -352,7 +353,7 @@ func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secure
 }
 
 func (c *AuthConfig) SwitchUser(hostname, user string) error {
-	previouslyActiveUser, err := c.User(hostname)
+	previouslyActiveUser, err := c.ActiveUser(hostname)
 	if err != nil {
 		return fmt.Errorf("failed to get active user: %s", err)
 	}
@@ -403,7 +404,7 @@ func (c *AuthConfig) Logout(hostname, username string) error {
 	_ = c.cfg.Remove([]string{hostsKey, hostname, usersKey, username})
 
 	// This error is ignorable because we already know there is an active user for the host
-	activeUser, _ := c.User(hostname)
+	activeUser, _ := c.ActiveUser(hostname)
 
 	// If the user we're removing isn't active, then we just write the config
 	if activeUser != username {

@@ -195,7 +195,7 @@ func refreshRun(opts *RefreshOptions) error {
 	fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 
 	if credentialFlow.ShouldSetup() {
-		username, _ := authCfg.User(hostname)
+		username, _ := authCfg.ActiveUser(hostname)
 		password, _ := authCfg.Token(hostname)
 		if err := credentialFlow.Setup(hostname, username, password); err != nil {
 			return err

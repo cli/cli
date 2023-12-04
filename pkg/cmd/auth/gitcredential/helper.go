@@ -15,7 +15,7 @@ const tokenUser = "x-access-token"
 
 type config interface {
 	Token(string) (string, string)
-	User(string) (string, error)
+	ActiveUser(string) (string, error)
 }
 
 type CredentialOptions struct {
@@ -122,7 +122,7 @@ func helperRun(opts *CredentialOptions) error {
 	if strings.HasSuffix(source, "_TOKEN") {
 		gotUser = tokenUser
 	} else {
-		gotUser, _ = cfg.User(lookupHost)
+		gotUser, _ = cfg.ActiveUser(lookupHost)
 		if gotUser == "" {
 			gotUser = tokenUser
 		}

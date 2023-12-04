@@ -386,7 +386,7 @@ func TestSwitchRun(t *testing.T) {
 
 			require.NoError(t, err)
 
-			activeUser, err := cfg.Authentication().User(tt.expectedSuccess.switchedHost)
+			activeUser, err := cfg.Authentication().ActiveUser(tt.expectedSuccess.switchedHost)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedSuccess.activeUser, activeUser)
 
