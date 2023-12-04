@@ -29,6 +29,29 @@ func TestTokenFromKeyring(t *testing.T) {
 	require.Equal(t, "test-token", token)
 }
 
+func TestTokenFromKeyringForUser(t *testing.T) {
+	// Given a keyring that contains a token for a host with a specific user
+	authCfg := newTestAuthConfig(t)
+	require.NoError(t, keyring.Set(keyringServiceName("github.com"), "test-user", "test-token"))
+
+	// When we get the token from the auth config
+	token, err := authCfg.TokenFromKeyringForUser("github.com", "test-user")
+
+	// Then it returns successfully with the correct token
+	require.NoError(t, err)
+	require.Equal(t, "test-token", token)
+}
+
+func TestTokenFromKeyringForUserErrorsIfUsernameIsBlank(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+
+	// When we get the token from the keyring for an empty username
+	_, err := authCfg.TokenFromKeyringForUser("github.com", "")
+
+	// Then it returns an error
+	require.ErrorContains(t, err, "username cannot be blank")
+}
+
 func TestTokenStoredInConfig(t *testing.T) {
 	// When the user has logged in insecurely
 	authCfg := newTestAuthConfig(t)

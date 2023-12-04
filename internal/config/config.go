@@ -263,6 +263,20 @@ func (c *AuthConfig) TokenFromKeyring(hostname string) (string, error) {
 	return keyring.Get(keyringServiceName(hostname), "")
 }
 
+// TokenFromKeyringForUser will retrieve the auth token for the given hostname
+// and username, only searching in encrypted storage.
+//
+// An empty username will return an error because the potential to return
+// the currently active token under surprising cases is just too high to risk
+// compared to the utility of having the function being smart.
+func (c *AuthConfig) TokenFromKeyringForUser(hostname, username string) (string, error) {
+	if username == "" {
+		return "", errors.New("username cannot be blank")
+	}
+
+	return keyring.Get(keyringServiceName(hostname), username)
+}
+
 // User will retrieve the username for the logged in user at the given hostname.
 func (c *AuthConfig) User(hostname string) (string, error) {
 	return c.cfg.Get([]string{hostsKey, hostname, userKey})
@@ -451,7 +465,6 @@ func (c *AuthConfig) TokenForUser(hostname, user string) (string, string, error)
 		return token, "keyring", nil
 	}
 
-	// If there is a token in the insecure config for the user, move it to the active field
 	if token, err := c.cfg.Get([]string{hostsKey, hostname, usersKey, user, oauthTokenKey}); err == nil {
 		return token, "oauth_token", nil
 	}

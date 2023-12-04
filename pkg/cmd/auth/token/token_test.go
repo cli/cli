@@ -30,6 +30,16 @@ func TestNewCmdToken(t *testing.T) {
 			output: TokenOptions{Hostname: "github.mycompany.com"},
 		},
 		{
+			name:   "with user",
+			input:  "--user test-user",
+			output: TokenOptions{Username: "test-user"},
+		},
+		{
+			name:   "with shorthand user",
+			input:  "-u test-user",
+			output: TokenOptions{Username: "test-user"},
+		},
+		{
 			name:   "with shorthand hostname",
 			input:  "-h github.mycompany.com",
 			output: TokenOptions{Hostname: "github.mycompany.com"},
@@ -126,6 +136,18 @@ func TestTokenRun(t *testing.T) {
 			env:        map[string]string{"GH_HOST": "github.mycompany.com"},
 			wantStdout: "gho_1234567\n",
 		},
+		{
+			name: "token for user",
+			opts: TokenOptions{
+				Hostname: "github.com",
+				Username: "test-user",
+			},
+			cfgStubs: func(t *testing.T, cfg config.Config) {
+				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
+				login(t, cfg, "github.com", "test-user-2", "gho_1234567", "https", false)
+			},
+			wantStdout: "gho_ABCDEFG\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -190,6 +212,18 @@ func TestTokenRunSecureStorage(t *testing.T) {
 			opts:       TokenOptions{},
 			wantErr:    true,
 			wantErrMsg: "no oauth token",
+		},
+		{
+			name: "token for user",
+			opts: TokenOptions{
+				Hostname: "github.com",
+				Username: "test-user",
+			},
+			cfgStubs: func(t *testing.T, cfg config.Config) {
+				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", true)
+				login(t, cfg, "github.com", "test-user-2", "gho_1234567", "https", true)
+			},
+			wantStdout: "gho_ABCDEFG\n",
 		},
 	}
 

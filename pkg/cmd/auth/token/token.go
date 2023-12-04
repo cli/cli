@@ -15,10 +15,10 @@ type TokenOptions struct {
 	Config func() (config.Config, error)
 
 	Hostname      string
+	Username      string
 	SecureStorage bool
 }
 
-// TODO: Detmerine if this is wonky in multi-account world. Do we need a --user flag?
 func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Command {
 	opts := &TokenOptions{
 		IO:     f.IOStreams,
@@ -28,10 +28,11 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "token",
 		Short: "Print the authentication token gh is configured to use",
-		Long: heredoc.Doc(`
-			This command outputs the authentication token for the active
-			account on a given GitHub host.
-		`),
+		Long: heredoc.Docf(`
+			This command outputs the authentication token for an account on a given GitHub host.
+
+			Without the %[1]s--user%[1]s flag, the token for the currently active user is printed.
+		`, "`"),
 		Args: cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
@@ -43,6 +44,7 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance authenticated with")
+	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to log out of")
 	cmd.Flags().BoolVarP(&opts.SecureStorage, "secure-storage", "", false, "Search only secure credential store for authentication token")
 	_ = cmd.Flags().MarkHidden("secure-storage")
 
@@ -62,10 +64,21 @@ func tokenRun(opts *TokenOptions) error {
 	}
 
 	var val string
+	// If this conditional logic ends up being duplicated anywhere,
+	// we should consider making a factory function that returns the correct
+	// behavior. For now, keeping it all inline is simplest.
 	if opts.SecureStorage {
-		val, _ = authCfg.TokenFromKeyring(hostname)
+		if opts.Username == "" {
+			val, _ = authCfg.TokenFromKeyring(hostname)
+		} else {
+			val, _ = authCfg.TokenFromKeyringForUser(hostname, opts.Username)
+		}
 	} else {
-		val, _ = authCfg.Token(hostname)
+		if opts.Username == "" {
+			val, _ = authCfg.Token(hostname)
+		} else {
+			val, _, _ = authCfg.TokenForUser(hostname, opts.Username)
+		}
 	}
 	if val == "" {
 		return fmt.Errorf("no oauth token")
