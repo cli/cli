@@ -24,7 +24,7 @@ const defaultSSHKeyTitle = "GitHub CLI"
 
 type iconfig interface {
 	Login(string, string, string, string, bool) (bool, error)
-	UsersForHost(string) ([]string, error)
+	UsersForHost(string) []string
 }
 
 type LoginOptions struct {
@@ -191,7 +191,7 @@ func Login(opts *LoginOptions) error {
 	// In this case we ignore the error if the host doesn't exist
 	// because that can occur when the user is logging into a host
 	// for the first time.
-	usersForHost, _ := cfg.UsersForHost(hostname)
+	usersForHost := cfg.UsersForHost(hostname)
 	userWasAlreadyLoggedIn := slices.Contains(usersForHost, username)
 
 	if gitProtocol != "" {

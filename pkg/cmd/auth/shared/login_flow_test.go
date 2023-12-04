@@ -25,8 +25,8 @@ func (c tinyConfig) Login(host, username, token, gitProtocol string, encrypt boo
 	return false, nil
 }
 
-func (c tinyConfig) UsersForHost(hostname string) ([]string, error) {
-	return nil, nil
+func (c tinyConfig) UsersForHost(hostname string) []string {
+	return nil
 }
 
 func TestLogin_ssh(t *testing.T) {

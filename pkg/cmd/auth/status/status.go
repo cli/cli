@@ -205,7 +205,7 @@ func statusRun(opts *StatusOptions) error {
 		})
 		statuses[hostname] = append(statuses[hostname], entry)
 
-		users, _ := authCfg.UsersForHost(hostname)
+		users := authCfg.UsersForHost(hostname)
 		for _, username := range users {
 			if username == activeUser {
 				continue

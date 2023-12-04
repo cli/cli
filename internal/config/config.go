@@ -388,8 +388,7 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 // Logout will remove user, git protocol, and auth token for the given hostname.
 // It will remove the auth token from the encrypted storage if it exists there.
 func (c *AuthConfig) Logout(hostname, username string) error {
-	// This error is ignorable because if there is no host then no logout is required
-	users, _ := c.UsersForHost(hostname)
+	users := c.UsersForHost(hostname)
 
 	// If there is only one (or zero) users, then we remove the host
 	// and unset the keyring tokens.
@@ -453,13 +452,13 @@ func (c *AuthConfig) activateUser(hostname, user string) error {
 	return ghConfig.Write(c.cfg)
 }
 
-func (c *AuthConfig) UsersForHost(hostname string) ([]string, error) {
+func (c *AuthConfig) UsersForHost(hostname string) []string {
 	users, err := c.cfg.Keys([]string{hostsKey, hostname, usersKey})
 	if err != nil {
-		return nil, fmt.Errorf("unknown host: %s", hostname)
+		return nil
 	}
 
-	return users, nil
+	return users
 }
 
 func (c *AuthConfig) TokenForUser(hostname, user string) (string, string, error) {
