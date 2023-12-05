@@ -1,0 +1,127 @@
+name: HSM Testing
+run-name: ${{ inputs.tag_name }} / go ${{ inputs.go_version }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        required: true
+        type: string
+      go_version:
+        default: "1.21"
+        type: string
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ inputs.go_version }}
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          version: "~1.17.1"
+          install-only: true
+      - name: Build release binaries
+        shell: bash
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: script/release-hsm --local "$TAG_NAME" --platform windows --config .goreleaser-hsm.yml
+
+      # As official Azure HSM support for signing Windows .exe binaries is in the form of an action,
+      # we must unzip the archives created by GoReleaser, sign the binaries, and then re-zip them.
+      # This choice was due to the fact that GoReleaser produces 
+      - name: Expand goreleaser archives for signing
+        shell: bash
+        run: |
+          for ZIP_FILE in dist/gh_*_windows_*.zip; do
+            unzip -d "${ZIP_FILE%.zip}" "$ZIP_FILE"
+          done
+      - name: Sign .exe release binaries
+        uses: azure/azure-code-signing-action@6c86237186b7eed50c9e8a3a6e42131bcc5e4601
+        with:
+            azure-tenant-id: ${{ secrets.SPN_SPN_AZURE_CODE_SIGNING_DEMO_TENANT_ID }}
+            azure-client-id: ${{ secrets.SPN_SPN_AZURE_CODE_SIGNING_DEMO_CLIENT_ID }}
+            azure-client-secret: ${{ secrets.SPN_SPN_AZURE_CODE_SIGNING_DEMO }}
+            endpoint: https://wus.codesigning.azure.net/
+            code-signing-account-name: GitHubInc
+            certificate-profile-name: GitHubInc
+            files-folder: ${{ github.workspace }}/dist
+            files-folder-filter: exe
+            file-digest: SHA256
+            timestamp-rfc3161: http://timestamp.acs.microsoft.com
+            timestamp-digest: SHA256
+      - name: Zip goreleaser directories
+        shell: bash
+        run: |
+          for DIR in dist/gh_*_windows_*; do
+            zip -r "$DIR.zip" "$DIR"
+          done
+
+      - name: Set up MSBuild
+        id: setupmsbuild
+        uses: microsoft/setup-msbuild@v1.3.1
+      - name: Build MSI
+        shell: bash
+        env:
+          MSBUILD_PATH: ${{ steps.setupmsbuild.outputs.msbuildPath }}
+        run: |
+          for ZIP_FILE in dist/gh_*_windows_*.zip; do
+            MSI_NAME="$(basename "$ZIP_FILE" ".zip")"
+            MSI_VERSION="$(cut -d_ -f2 <<<"$MSI_NAME" | cut -d- -f1)"
+            case "$MSI_NAME" in
+            *_386 )
+              source_dir="$PWD/dist/windows_windows_386"
+              platform="x86"
+              ;;
+            *_amd64 )
+              source_dir="$PWD/dist/windows_windows_amd64_v1"
+              platform="x64"
+              ;;
+            *_arm64 )
+              echo "skipping building MSI for arm64 because WiX 3.11 doesn't support it: https://github.com/wixtoolset/issues/issues/6141" >&2
+              continue
+              #source_dir="$PWD/dist/windows_windows_arm64"
+              #platform="arm64"
+              ;;
+            * )
+              printf "unsupported architecture: %s\n" "$MSI_NAME" >&2
+              exit 1
+              ;;
+            esac
+            "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$source_dir" -p:OutputPath="$PWD/dist" -p:OutputName="$MSI_NAME" -p:ProductVersion="${MSI_VERSION#v}" -p:Platform="$platform"
+          done
+      - name: Sign .msi release binaries
+        uses: azure/azure-code-signing-action@6c86237186b7eed50c9e8a3a6e42131bcc5e4601
+        with:
+            azure-tenant-id: ${{ secrets.SPN_SPN_AZURE_CODE_SIGNING_DEMO_TENANT_ID }}
+            azure-client-id: ${{ secrets.SPN_SPN_AZURE_CODE_SIGNING_DEMO_CLIENT_ID }}
+            azure-client-secret: ${{ secrets.SPN_SPN_AZURE_CODE_SIGNING_DEMO }}
+            endpoint: https://wus.codesigning.azure.net/
+            code-signing-account-name: GitHubInc
+            certificate-profile-name: GitHubInc
+            files-folder: ${{ github.workspace }}/dist
+            files-folder-filter: msi
+            file-digest: SHA256
+            timestamp-rfc3161: http://timestamp.acs.microsoft.com
+            timestamp-digest: SHA256
+      - uses: actions/upload-artifact@v3
+        with:
+          name: windows
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/*.zip
+            dist/*.msi
