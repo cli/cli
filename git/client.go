@@ -228,7 +228,7 @@ func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 }
 
 func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commit, error) {
-	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
+	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s,%b", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
@@ -240,15 +240,23 @@ func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commi
 	commits := []*Commit{}
 	sha := 0
 	title := 1
+	body := 2
 	for _, line := range outputLines(out) {
-		split := strings.SplitN(line, ",", 2)
-		if len(split) != 2 {
+		split := strings.Split(line, ",")
+		if len(split) < 2 {
 			continue
 		}
-		commits = append(commits, &Commit{
+
+		c := &Commit{
 			Sha:   split[sha],
 			Title: split[title],
-		})
+		}
+
+		if len(split) > 2 {
+			c.Body = split[body]
+		}
+
+		commits = append(commits, c)
 	}
 	if len(commits) == 0 {
 		return nil, fmt.Errorf("could not find any commits between %s and %s", baseRef, headRef)
