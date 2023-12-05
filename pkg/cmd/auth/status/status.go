@@ -87,13 +87,22 @@ func (e invalidTokenEntry) String(cs *iostreams.ColorScheme) string {
 }
 
 type timeoutErrorEntry struct {
-	host string
+	active      bool
+	host        string
+	user        string
+	tokenSource string
 }
 
 func (e timeoutErrorEntry) String(cs *iostreams.ColorScheme) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("  %s %s: timeout trying to connect to host\n", cs.Red("X"), e.host))
+	if e.user != "" {
+		sb.WriteString(fmt.Sprintf("  %s Timeout trying to log in to %s account %s (%s)\n", cs.Red("X"), e.host, cs.Bold(e.user), e.tokenSource))
+	} else {
+		sb.WriteString(fmt.Sprintf("  %s Timeout trying to log in to %s using token (%s)\n", cs.Red("X"), e.host, e.tokenSource))
+	}
+	activeStr := fmt.Sprintf("%v", e.active)
+	sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
 
 	return sb.String()
 }
@@ -314,7 +323,10 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) Entry {
 		var networkError net.Error
 		if errors.As(err, &networkError) && networkError.Timeout() {
 			return timeoutErrorEntry{
-				host: opts.hostname,
+				active:      opts.active,
+				host:        opts.hostname,
+				user:        opts.username,
+				tokenSource: opts.tokenSource,
 			}
 		}
 

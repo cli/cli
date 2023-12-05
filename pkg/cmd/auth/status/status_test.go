@@ -100,9 +100,10 @@ func Test_statusRun(t *testing.T) {
 				})
 			},
 			wantOut: heredoc.Doc(`
-                github.com
-                  X github.com: timeout trying to connect to host
-            `),
+				github.com
+				  X Timeout trying to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+			`),
 		},
 		{
 			name: "hostname set",
