@@ -478,6 +478,16 @@ func TestClientCommits(t *testing.T) {
 			}},
 		},
 		{
+			name:        "get commits with body",
+			cmdStdout:   "6a6872b918c601a0e730710ad8473938a7516d30,testing testability test,This is the body",
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCommits: []*Commit{{
+				Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+				Title: "testing testability test",
+				Body:  "This is the body",
+			}},
+		},
+		{
 			name:         "no commits between SHAs",
 			wantCmdArgs:  `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
 			wantErrorMsg: "could not find any commits between SHA1 and SHA2",
