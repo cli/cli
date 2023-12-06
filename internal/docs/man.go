@@ -150,15 +150,7 @@ func manPrintFlags(buf *bytes.Buffer, flags *pflag.FlagSet) {
 			buf.WriteString(fmt.Sprintf("`--%s`", flag.Name))
 		}
 
-		defval := ""
-		hiddenDefs := map[string]bool{
-			"false": true,
-			"":      true,
-			"[]":    true,
-		}
-		if !hiddenDefs[flag.DefValue] {
-			defval = fmt.Sprintf(" (Default: %s)", flag.Value)
-		}
+		defval := getDefaultValueDisplayString(flag)
 
 		if varname == "" && defval != "" {
 			buf.WriteString(fmt.Sprintf(" `%s`\n", strings.TrimSpace(defval)))

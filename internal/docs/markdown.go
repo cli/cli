@@ -46,6 +46,30 @@ func hasNonHelpFlags(fs *pflag.FlagSet) (found bool) {
 	return
 }
 
+var hiddenFlagDefaults = map[string]bool{
+	"false":    true,
+	"":         true,
+	"[]":       true,
+	"duration": true,
+}
+
+var defaultValFormats = map[string]string{
+	"string": " (default \"%s\")",
+}
+
+func getDefaultValueDisplayString(f *pflag.Flag) string {
+
+	if hiddenFlagDefaults[f.DefValue] || hiddenFlagDefaults[f.Value.Type()] {
+		return ""
+	}
+
+	if dvf, found := defaultValFormats[f.Value.Type()]; found {
+		return fmt.Sprintf(dvf, f.Value)
+	}
+	return fmt.Sprintf(" (default: %s)", f.Value)
+
+}
+
 type flagView struct {
 	Name      string
 	Varname   string
@@ -56,8 +80,8 @@ type flagView struct {
 
 var flagsTemplate = `
 <dl class="flags">{{ range . }}
-	<dt>{{ if .Shorthand }}<code>-{{.Shorthand}}</code>, {{ end -}}
-		<code>--{{.Name}}{{ if .Varname }} &lt;{{.Varname}}&gt;{{ end }}{{ if not (eq .DefValue "false" "" "[]") }} (Default: {{.DefValue}}){{ end }}</code></dt>
+	<dt>{{ if .Shorthand }}<code>-{{.Shorthand}}</code>, {{ end }}
+		<code>--{{.Name}}{{ if .Varname }} &lt;{{.Varname}}&gt;{{ end }}{{.DefValue}} </code></dt>
 	<dd>{{.Usage}}</dd>
 {{ end }}</dl>
 `
@@ -71,11 +95,12 @@ func printFlagsHTML(w io.Writer, fs *pflag.FlagSet) error {
 			return
 		}
 		varname, usage := pflag.UnquoteUsage(f)
+
 		flags = append(flags, flagView{
 			Name:      f.Name,
 			Varname:   varname,
 			Shorthand: f.Shorthand,
-			DefValue:  f.DefValue,
+			DefValue:  getDefaultValueDisplayString(f),
 			Usage:     usage,
 		})
 	})
