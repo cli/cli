@@ -29,24 +29,18 @@ type RefreshOptions struct {
 	Scopes       []string
 	RemoveScopes []string
 	ResetScopes  bool
-	AuthFlow     func(*config.AuthConfig, *iostreams.IOStreams, string, []string, bool, bool) error
+	AuthFlow     func(*iostreams.IOStreams, string, []string, bool) (string, string, error)
 
 	Interactive     bool
 	InsecureStorage bool
 }
 
-// TODO: Determine if this is super wonky in multi-account world. Do we need a --user flag?
 func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.Command {
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(authCfg *config.AuthConfig, io *iostreams.IOStreams, hostname string, scopes []string, interactive, secureStorage bool) error {
-			token, username, err := authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser)
-			if err != nil {
-				return err
-			}
-			_, loginErr := authCfg.Login(hostname, username, token, "", secureStorage)
-			return loginErr
+		AuthFlow: func(io *iostreams.IOStreams, hostname string, scopes []string, interactive bool) (string, string, error) {
+			return authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser)
 		},
 		HttpClient: &http.Client{},
 		GitClient:  f.GitClient,
@@ -187,7 +181,15 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	if err := opts.AuthFlow(authCfg, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, !opts.InsecureStorage); err != nil {
+	username, token, err := opts.AuthFlow(opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive)
+	if err != nil {
+		return err
+	}
+	activeUser, _ := authCfg.ActiveUser(hostname)
+	if activeUser != "" && activeUser != username {
+		return fmt.Errorf("error refreshing credentials for %s received credentials for %s", activeUser, username)
+	}
+	if _, err := authCfg.Login(hostname, username, token, "", !opts.InsecureStorage); err != nil {
 		return err
 	}
 

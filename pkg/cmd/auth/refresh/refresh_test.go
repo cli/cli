@@ -176,12 +176,19 @@ type authArgs struct {
 	secureStorage bool
 }
 
+type authOut struct {
+	username string
+	token    string
+	err      error
+}
+
 func Test_refreshRun(t *testing.T) {
 	tests := []struct {
 		name          string
 		opts          *RefreshOptions
 		prompterStubs func(*prompter.PrompterMock)
 		cfgHosts      []string
+		authOut       authOut
 		oldScopes     string
 		wantErr       string
 		nontty        bool
@@ -193,7 +200,7 @@ func Test_refreshRun(t *testing.T) {
 			wantErr: `not logged in to any hosts`,
 		},
 		{
-			name: "hostname given but dne",
+			name: "hostname given but not previously authenticated with it",
 			cfgHosts: []string{
 				"github.com",
 				"aline.cedrac",
@@ -403,16 +410,30 @@ func Test_refreshRun(t *testing.T) {
 				secureStorage: true,
 			},
 		},
+		{
+			name: "errors when active user does not match user returned by auth flow",
+			cfgHosts: []string{
+				"github.com",
+			},
+			authOut: authOut{
+				username: "not-test-user",
+				token:    "xyz456",
+			},
+			opts:    &RefreshOptions{},
+			wantErr: "error refreshing credentials for test-user received credentials for not-test-user",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			tt.opts.AuthFlow = func(_ *config.AuthConfig, _ *iostreams.IOStreams, hostname string, scopes []string, interactive, secureStorage bool) error {
+			tt.opts.AuthFlow = func(_ *iostreams.IOStreams, hostname string, scopes []string, interactive bool) (string, string, error) {
 				aa.hostname = hostname
 				aa.scopes = scopes
 				aa.interactive = interactive
-				aa.secureStorage = secureStorage
-				return nil
+				if tt.authOut != (authOut{}) {
+					return tt.authOut.username, tt.authOut.token, tt.authOut.err
+				}
+				return "test-user", "xyz456", nil
 			}
 
 			cfg, _ := config.NewIsolatedTestConfig(t)
@@ -458,14 +479,20 @@ func Test_refreshRun(t *testing.T) {
 			err := refreshRun(tt.opts)
 			if tt.wantErr != "" {
 				require.Contains(t, err.Error(), tt.wantErr)
-			} else {
-				require.NoError(t, err)
+				return
 			}
+
+			require.NoError(t, err)
 
 			require.Equal(t, tt.wantAuthArgs.hostname, aa.hostname)
 			require.Equal(t, tt.wantAuthArgs.scopes, aa.scopes)
 			require.Equal(t, tt.wantAuthArgs.interactive, aa.interactive)
-			require.Equal(t, tt.wantAuthArgs.secureStorage, aa.secureStorage)
+
+			authCfg := cfg.Authentication()
+			activeUser, _ := authCfg.ActiveUser(aa.hostname)
+			activeToken, _ := authCfg.ActiveToken(aa.hostname)
+			require.Equal(t, "test-user", activeUser)
+			require.Equal(t, "xyz456", activeToken)
 		})
 	}
 }
