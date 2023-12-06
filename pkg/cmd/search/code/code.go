@@ -40,7 +40,7 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 			<https://docs.github.com/search-github/searching-on-github/searching-code>
 
 			Note that these search results are powered by what is now a legacy GitHub code search engine.
-			The results might not match what is seen on GitHub.com, and new features like regex search
+			The results might not match what is seen on github.com, and new features like regex search
 			are not yet available via the GitHub API.
 		`),
 		Example: heredoc.Doc(`

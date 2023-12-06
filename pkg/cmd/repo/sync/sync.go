@@ -46,7 +46,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 		Use:   "sync [<destination-repository>]",
 		Short: "Sync a repository",
 		Long: heredoc.Docf(`
-			Sync destination repository from source repository. Syncing uses the main branch
+			Sync destination repository from source repository. Syncing uses the default branch
 			of the source repository to update the matching branch on the destination
 			repository so they are equal. A fast forward update will be used except when the
 			%[1]s--force%[1]s flag is specified, then the two branches will
@@ -83,7 +83,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().StringVarP(&opts.SrcArg, "source", "s", "", "Source repository")
-	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Branch to sync (default: main branch)")
+	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Branch to sync (default: default branch)")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "", false, "Hard reset the branch of the destination repository to match the source repository")
 	return cmd
 }
