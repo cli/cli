@@ -47,14 +47,15 @@ func hasNonHelpFlags(fs *pflag.FlagSet) (found bool) {
 }
 
 var hiddenFlagDefaults = map[string]bool{
-	"false":    true,
-	"":         true,
-	"[]":       true,
-	"duration": true,
+	"false": true,
+	"":      true,
+	"[]":    true,
+	"0s":    true,
 }
 
 var defaultValFormats = map[string]string{
-	"string": " (default \"%s\")",
+	"string":   " (default \"%s\")",
+	"duration": " (default \"%s\")",
 }
 
 func getDefaultValueDisplayString(f *pflag.Flag) string {
