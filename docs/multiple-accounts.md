@@ -150,35 +150,7 @@ https://github.com/nix-community/home-manager. These users will hit an error whe
 `version` field to the `config.yml`. They will need to ensure that the `home-manager` configuration scripts are updated
 to add `version: 1`.
 
-___
-
-Meta: Draft text for home-manager issue:
-
-## Description
-
-In `gh` v2.40.0, we are going to be releasing initial support for [multiple accounts](https://github.com/cli/cli/issues/326)
-on a single host. As part of this process there is a migration of on-disk data and we will be adding a `version` field
-with value `1` to the `config.yml` file.
-
-I'm not too familiar with `nix` or how people use it, so I'm not sure if the following is even an expected workflow. If
-it is expected that you can update the version of `gh` in place without regenerating the `config.yml` file from
-`home-manager` scripts it is likely that users will run into an error when `gh` tries to write the `config.yml` file.
-
-Although it's our position that `gh` manages its own configuration file, we also try not to break users that choose to
-configure their systems this way. Unfortunately, in this case we value the future maintainability of having this
-`version` to support future migrations should we need them.
-
-As such, this is just an informative issue for people to find that this new field will be required to perform any operations
-with v2.40.0. Since I'm not totally sure on the workflows used in this project, here are some possible workarounds:
- 1. Temporarily allow writing to `config.yml` one time so that this `version` can be written
- 1. After seeing a failure, install updated `home-manager` scripts with `version: 1` declared in the config
- 1. Update the `home-manager` scripts with `version: 1` declared in the config and then blow everything away and start with v2.40.0 from scratch
-
-To me it feels like option `3` is the easiest, since home manager enforces config to already be defined, the only consequence
-will be requiring `gh auth login` to be run for any accounts that were removed when blowing it all away.
-
-We apologise for the inconvenience.
-___
+See https://github.com/nix-community/home-manager/issues/4744 for more details.
 
 ### Auth Refresh
 
