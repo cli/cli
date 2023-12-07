@@ -68,16 +68,6 @@ type hostUser struct {
 
 type candidates []hostUser
 
-func (c candidates) inactiveOptions() []hostUser {
-	var inactive []hostUser
-	for _, candidate := range c {
-		if !candidate.active {
-			inactive = append(inactive, candidate)
-		}
-	}
-	return inactive
-}
-
 func switchRun(opts *SwitchOptions) error {
 	hostname := opts.Hostname
 	username := opts.Username
@@ -125,15 +115,20 @@ func switchRun(opts *SwitchOptions) error {
 		}
 	}
 
-	inactiveCandidates := candidates.inactiveOptions()
 	if len(candidates) == 0 {
 		return errors.New("no accounts matched that criteria")
 	} else if len(candidates) == 1 {
 		hostname = candidates[0].host
 		username = candidates[0].user
-	} else if len(inactiveCandidates) == 1 {
-		hostname = inactiveCandidates[0].host
-		username = inactiveCandidates[0].user
+	} else if len(candidates) == 2 &&
+		candidates[0].host == candidates[1].host {
+		// If there is a single host with two users, automatically swith to the
+		// inactive user without prompting.
+		hostname = candidates[0].host
+		username = candidates[0].user
+		if candidates[0].active {
+			username = candidates[1].user
+		}
 	} else if !opts.IO.CanPrompt() {
 		return errors.New("unable to determine which account to switch to, please specify `--hostname` and `--user`")
 	} else {

@@ -321,6 +321,38 @@ func TestSwitchRun(t *testing.T) {
 			},
 		},
 		{
+			name: "options need to be disambiguated given two hosts, one with two users",
+			opts: SwitchOptions{},
+			cfgHosts: []hostUsers{
+				{"github.com", []user{
+					{"inactive-user", "inactive-user-token"},
+					{"active-user", "active-user-token"},
+				}},
+				{"ghe.io", []user{
+					{"active-user", "active-user-token"},
+				}},
+			},
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+					require.Equal(t, "What account do you want to switch to?", prompt)
+					require.Equal(t, []string{
+						"inactive-user (github.com)",
+						"active-user (github.com) - active",
+						"active-user (ghe.io) - active",
+					}, opts)
+
+					return prompter.IndexFor(opts, "inactive-user (github.com)")
+				}
+			},
+			expectedSuccess: successfulExpectation{
+				switchedHost: "github.com",
+				activeUser:   "inactive-user",
+				activeToken:  "inactive-user-token",
+				hostsCfg:     "github.com:\n    git_protocol: ssh\n    users:\n        inactive-user:\n        active-user:\n    user: inactive-user\nghe.io:\n    git_protocol: ssh\n    users:\n        active-user:\n    user: active-user\n",
+				stderr:       "✓ Switched active account for github.com to inactive-user",
+			},
+		},
+		{
 			name: "when switching fails due to something other than user error, an informative message is printed to explain their new state",
 			opts: SwitchOptions{
 				Username: userWithMissingToken,
@@ -351,6 +383,9 @@ func TestSwitchRun(t *testing.T) {
 				pm := &prompter.PrompterMock{}
 				tt.prompterStubs(pm)
 				tt.opts.Prompter = pm
+				defer func() {
+					require.Len(t, pm.SelectCalls(), 1)
+				}()
 			}
 
 			for _, hostUsers := range tt.cfgHosts {
