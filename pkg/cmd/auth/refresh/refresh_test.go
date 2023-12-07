@@ -420,7 +420,7 @@ func Test_refreshRun(t *testing.T) {
 				token:    "xyz456",
 			},
 			opts:    &RefreshOptions{},
-			wantErr: "error refreshing credentials for test-user received credentials for not-test-user",
+			wantErr: "error refreshing credentials for test-user, received credentials for not-test-user, did you use the correct account in the browser?",
 		},
 	}
 	for _, tt := range tests {
@@ -431,9 +431,9 @@ func Test_refreshRun(t *testing.T) {
 				aa.scopes = scopes
 				aa.interactive = interactive
 				if tt.authOut != (authOut{}) {
-					return tt.authOut.username, tt.authOut.token, tt.authOut.err
+					return tt.authOut.token, tt.authOut.username, tt.authOut.err
 				}
-				return "test-user", "xyz456", nil
+				return "xyz456", "test-user", nil
 			}
 
 			cfg, _ := config.NewIsolatedTestConfig(t)

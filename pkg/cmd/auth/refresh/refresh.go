@@ -181,13 +181,13 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	username, token, err := opts.AuthFlow(opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive)
+	token, username, err := opts.AuthFlow(opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive)
 	if err != nil {
 		return err
 	}
 	activeUser, _ := authCfg.ActiveUser(hostname)
 	if activeUser != "" && activeUser != username {
-		return fmt.Errorf("error refreshing credentials for %s received credentials for %s", activeUser, username)
+		return fmt.Errorf("error refreshing credentials for %s, received credentials for %s, did you use the correct account in the browser?", activeUser, username)
 	}
 	if _, err := authCfg.Login(hostname, username, token, "", !opts.InsecureStorage); err != nil {
 		return err
