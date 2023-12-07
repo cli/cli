@@ -1,15 +1,15 @@
 # Multiple Accounts with the CLI - v2.40.0
 
 Since its creation, `gh` has enforced a mapping of one account per host. Functionally, this meant that when targeting a
-single host (e.g. github.com) each `gh auth login` would replace the token being used for API requests, and for git
+single host (e.g. github.com) each `auth login` would replace the token being used for API requests, and for git
 operations when `gh` was configured as a git credential manager. Removing this limitation has been a [long requested
 feature](https://github.com/cli/cli/issues/326), with many community members offering workarounds for a variety of use cases.
 A particular shoutout to @gabe565 and his long term community support for https://github.com/gabe565/gh-profile in this space.
 
 With the release of `v2.40.0`, `gh` has begun supporting multiple accounts for some use cases on github.com and
 in GitHub Enterprise. We recognise that there are a number of missing quality of life features, and we've opted
-not to address the use case of automatic account switching based on some context (e.g. `pwd`, `git remote`, etc) though
-we hope many of those using these custom solutions will now find it easier to obtain and update tokens (via the standard
+not to address the use case of automatic account switching based on some context (e.g. `pwd`, `git remote`, etc).
+However, we hope many of those using these custom solutions will now find it easier to obtain and update tokens (via the standard
 OAuth flow rather than as a PAT), and to store them securely in the system keyring managed by `gh`.
 
 We are by no means excluding these things from ever being native to `gh` but we wanted to ship this MVP and get more
@@ -17,15 +17,17 @@ feedback so that we can iterate on it with the community.
 
 ## What is in scope for this release?
 
-The support for multiple accounts in this release is focused around `auth login` becoming additive in behaviour,
-allowing for multiple accounts to be easily switched between using the new `auth switch` command. Switching the "active"
+The support for multiple accounts in this release is focused around `auth login` becoming additive in behaviour.
+This allows for multiple accounts to be easily switched between using the new `auth switch` command. Switching the "active"
 user for a host will swap the token used by `gh` for API requests, and for git operations when `gh` was configured as a
-git credential manager. We have extended the `auth logout` command to switch the active user where possible if the
-current active user has been logged out. Finally we have extended `auth token`, `auth switch`, and `auth logout` with a
+git credential manager.
+
+We have extended the `auth logout` command to switch account where possible if the currently active user is the target
+of the `logout`. Finally we have extended `auth token`, `auth switch`, and `auth logout` with a
 `--user` flag. This new flag in combination with `--hostname` can be used to disambiguate accounts when running
 non-interactively.
 
-Here's an example usage. First, we can see that I have a single acocunt `wilmartin_microsoft` logged in, and
+Here's an example usage. First, we can see that I have a single account `wilmartin_microsoft` logged in, and
 `auth status` reports that this is the active account:
 
 ```
@@ -76,7 +78,7 @@ Fetching our username from the API shows that our active token correctly corresp
 "williammartin"
 ```
 
-Now we can easily switch users using `gh auth switch`, and hitting the API shows that the active token has been
+Now we can easily switch accounts using `gh auth switch`, and hitting the API shows that the active token has been
 changed:
 
 ```
@@ -133,8 +135,8 @@ a backup.
 
 #### Forward Compatability Exclusion
 
-There is one case using `--insecure-storage` that we don't maintain complete forward and backward compatability. This
-occurs if you `auth login --insecure-storage`, upgrade to this release (which performs the data migration), run
+There is one known case using `--insecure-storage` that we don't maintain complete forward and backward compatability.
+This occurs if you `auth login --insecure-storage`, upgrade to this release (which performs the data migration), run
 `auth login --insecure-storage` again on an older release, then at some time later use `auth switch` to make this
 account active. The symptom here would be usage of an older token (which may for example have different scopes).
 
@@ -221,16 +223,16 @@ Press Enter to open github.com in your browser...
 error refreshing credentials for williammartin, received credentials for wilmartin_microsoft, did you use the correct account in the browser?
 ```
 
-When adding or removing scopes for a user, the CLI gets the scopes for the current token and then requests a new token with the requested amended scopes. Unfortunately, when we go through the account switcher flow as a different user, we end up getting a token for the wrong user with surprising scopes. We don't believe that starting and ending a `refresh` as different users is
-a user case we wish to support and has the potential for misuse. As such, we have begun erroring in this case.
+When adding or removing scopes for a user, the CLI gets the scopes for the current token and then requests a new token with the requested amended scopes. Unfortunately, when we go through the account switcher flow as a different user, we end up getting a token for the wrong user with surprising scopes. We don't believe that starting and ending a `refresh` as different accounts is
+a use case we wish to support and has the potential for misuse. As such, we have begun erroring in this case.
 
 Note that a token has still been minted on the platform but `gh` will refuse to store it. We are investigating
-alternative approaches with the platform team to prevent this occurring earlier in the flow.
+alternative approaches with the platform team to put some better guardrails in place earlier in the flow.
 
 ### Account Switcher on GitHub Enterprise
 
 When using `auth login` with github.com, if a user has multiple accounts in the browser, they should be presented
-with an interstitial page that allows for proceeding as any of their users. However, for Device Control Flow OAuth
+with an interstitial page that allows for proceeding as any of their accounts. However, for Device Control Flow OAuth
 flows, this feature has not yet made it into GHES.
 
 For the moment, if you have multiple accounts on GHES that you wish to log in as, you will need to ensure that you
