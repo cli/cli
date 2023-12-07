@@ -426,14 +426,14 @@ func Test_refreshRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			tt.opts.AuthFlow = func(_ *iostreams.IOStreams, hostname string, scopes []string, interactive bool) (string, string, error) {
+			tt.opts.AuthFlow = func(_ *iostreams.IOStreams, hostname string, scopes []string, interactive bool) (token, username, error) {
 				aa.hostname = hostname
 				aa.scopes = scopes
 				aa.interactive = interactive
 				if tt.authOut != (authOut{}) {
-					return tt.authOut.token, tt.authOut.username, tt.authOut.err
+					return token(tt.authOut.token), username(tt.authOut.username), tt.authOut.err
 				}
-				return "xyz456", "test-user", nil
+				return token("xyz456"), username("test-user"), nil
 			}
 
 			cfg, _ := config.NewIsolatedTestConfig(t)

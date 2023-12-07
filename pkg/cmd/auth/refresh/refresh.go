@@ -16,6 +16,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type token string
+type username string
+
 type RefreshOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
@@ -29,7 +32,7 @@ type RefreshOptions struct {
 	Scopes       []string
 	RemoveScopes []string
 	ResetScopes  bool
-	AuthFlow     func(*iostreams.IOStreams, string, []string, bool) (string, string, error)
+	AuthFlow     func(*iostreams.IOStreams, string, []string, bool) (token, username, error)
 
 	Interactive     bool
 	InsecureStorage bool
@@ -39,8 +42,9 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(io *iostreams.IOStreams, hostname string, scopes []string, interactive bool) (string, string, error) {
-			return authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser)
+		AuthFlow: func(io *iostreams.IOStreams, hostname string, scopes []string, interactive bool) (token, username, error) {
+			t, u, err := authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser)
+			return token(t), username(u), err
 		},
 		HttpClient: &http.Client{},
 		GitClient:  f.GitClient,
@@ -181,15 +185,15 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	token, username, err := opts.AuthFlow(opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive)
+	authedToken, authedUser, err := opts.AuthFlow(opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive)
 	if err != nil {
 		return err
 	}
 	activeUser, _ := authCfg.ActiveUser(hostname)
-	if activeUser != "" && activeUser != username {
-		return fmt.Errorf("error refreshing credentials for %s, received credentials for %s, did you use the correct account in the browser?", activeUser, username)
+	if activeUser != "" && username(activeUser) != authedUser {
+		return fmt.Errorf("error refreshing credentials for %s, received credentials for %s, did you use the correct account in the browser?", activeUser, authedUser)
 	}
-	if _, err := authCfg.Login(hostname, username, token, "", !opts.InsecureStorage); err != nil {
+	if _, err := authCfg.Login(hostname, string(authedUser), string(authedToken), "", !opts.InsecureStorage); err != nil {
 		return err
 	}
 
