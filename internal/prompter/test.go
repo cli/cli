@@ -138,13 +138,13 @@ func IndexFor(options []string, answer string) (int, error) {
 			return ix, nil
 		}
 	}
-	return -1, NoSuchAnswerErr(answer)
+	return -1, NoSuchAnswerErr(answer, options)
 }
 
 func NoSuchPromptErr(prompt string) error {
 	return fmt.Errorf("no such prompt '%s'", prompt)
 }
 
-func NoSuchAnswerErr(answer string) error {
-	return fmt.Errorf("no such answer '%s'", answer)
+func NoSuchAnswerErr(answer string, options []string) error {
+	return fmt.Errorf("no such answer '%s' in [%s]", answer, strings.Join(options, ", "))
 }

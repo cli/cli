@@ -2,10 +2,13 @@
 package keyring
 
 import (
+	"errors"
 	"time"
 
 	"github.com/zalando/go-keyring"
 )
+
+var ErrNotFound = errors.New("secret not found in keyring")
 
 type TimeoutError struct {
 	message string
@@ -46,6 +49,9 @@ func Get(service, user string) (string, error) {
 	}()
 	select {
 	case res := <-ch:
+		if errors.Is(res.err, keyring.ErrNotFound) {
+			return "", ErrNotFound
+		}
 		return res.val, res.err
 	case <-time.After(3 * time.Second):
 		return "", &TimeoutError{"timeout while trying to get secret from keyring"}
@@ -65,4 +71,12 @@ func Delete(service, user string) error {
 	case <-time.After(3 * time.Second):
 		return &TimeoutError{"timeout while trying to delete secret from keyring"}
 	}
+}
+
+func MockInit() {
+	keyring.MockInit()
+}
+
+func MockInitWithError(err error) {
+	keyring.MockInitWithError(err)
 }
