@@ -90,7 +90,7 @@ jobs:
       - name: Build release binaries
         shell: bash
         env:
-          DLIB_PATH: ${{ runner.temp }}\acs\bin/x64/Azure.CodeSigning.Dlib.dll
+          DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
           TAG_NAME: ${{ inputs.tag_name }}
         run: script/release-hsm --local "$TAG_NAME" --platform windows --config .goreleaser-hsm.yml
