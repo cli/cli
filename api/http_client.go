@@ -13,7 +13,7 @@ import (
 )
 
 type tokenGetter interface {
-	Token(string) (string, string)
+	ActiveToken(string) (string, string)
 }
 
 type HTTPClientOptions struct {
@@ -99,7 +99,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 			// If the host has changed during a redirect do not add the authentication token header.
 			if !redirectHostnameChange {
 				hostname := ghinstance.NormalizeHostname(getHost(req))
-				if token, _ := cfg.Token(hostname); token != "" {
+				if token, _ := cfg.ActiveToken(hostname); token != "" {
 					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
 				}
 			}

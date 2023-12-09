@@ -78,7 +78,7 @@ func Test_BaseRepo(t *testing.T) {
 							hosts = append([]string{tt.override}, hosts...)
 						}
 						authCfg.SetHosts(hosts)
-						authCfg.SetToken("", "")
+						authCfg.SetActiveToken("", "")
 						authCfg.SetDefaultHost("nonsense.com", "hosts")
 						if tt.override != "" {
 							authCfg.SetDefaultHost(tt.override, "GH_HOST")
@@ -216,7 +216,7 @@ func Test_SmartBaseRepo(t *testing.T) {
 							hosts = append([]string{tt.override}, hosts...)
 						}
 						authCfg.SetHosts(hosts)
-						authCfg.SetToken("", "")
+						authCfg.SetActiveToken("", "")
 						authCfg.SetDefaultHost("nonsense.com", "hosts")
 						if tt.override != "" {
 							authCfg.SetDefaultHost(tt.override, "GH_HOST")

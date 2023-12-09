@@ -347,7 +347,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return err
 					}
 
-					if err := m.Install(repo, pinFlag); err != nil {
+					io.StartProgressIndicator()
+					err = m.Install(repo, pinFlag)
+					io.StopProgressIndicator()
+
+					if err != nil {
 						if errors.Is(err, releaseNotFoundErr) {
 							return fmt.Errorf("%s Could not find a release of %s for %s",
 								cs.FailureIcon(), args[0], cs.Cyan(pinFlag))
