@@ -27,20 +27,19 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 	}
 
 	cmd := &cobra.Command{
-		Use:   "get",
+		Use:   "get [<repository>]",
 		Args:  cobra.MaximumNArgs(1),
-		Short: "Get subscription information to the repository",
-		Long: heredoc.Doc(`
-			Get subscription information to the repository.
+		Short: "Display whether subscribed to a GitHub repository for notifications",
+		Long: heredoc.Docf(`
+			Display whether subscribed to a GitHub repository for notifications.
 
-			Without any arguments, this command prints out the subscription information
-			for the current repository.
+			With no argument, the subscription information for the current repository is displayed.
 
 			The possible subscription states are:
-			- all: you are watching the repository and notified of all notifications.
-			- ignore: you are watching the repository but not notified of any notifications.
-			- unwatched: you are not watching the repository or custom notification is set.
-		`),
+			- %[1]sall%[1]s: you are watching the repository and notified of all notifications.
+			- %[1]signore%[1]s: you are watching the repository but not notified of any notifications.
+			- %[1]sunwatched%[1]s: you are not watching the repository or custom notification is set.
+		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh subscription get
 			$ gh subscription get monalisa/hello-world
