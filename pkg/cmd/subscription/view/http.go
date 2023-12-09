@@ -13,7 +13,7 @@ type SubscriptionStatus struct {
 	IsIgnored    bool `json:"ignored"`
 }
 
-func ViewSubscription(client *http.Client, repo ghrepo.Interface) (string, error) {
+func GetSubscription(client *http.Client, repo ghrepo.Interface) (string, error) {
 	repoPath := fmt.Sprintf("repos/%s", ghrepo.FullName(repo))
 	apiClient := api.NewClientFromHTTP(client)
 

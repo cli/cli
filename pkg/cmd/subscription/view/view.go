@@ -60,30 +60,32 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 }
 
 func viewRun(opts *ViewOptions) error {
-	client, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
-	var toView ghrepo.Interface
+	var repoToView ghrepo.Interface
+	var err error
 	if opts.Repository == "" {
-		toView, err = opts.BaseRepo()
+		repoToView, err = opts.BaseRepo()
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to determine base repository: %w", err)
 		}
 	} else {
-		toView, err = ghrepo.FromFullName(opts.Repository)
+		repoToView, err = ghrepo.FromFullName(opts.Repository)
 		if err != nil {
 			return fmt.Errorf("argument error: %w", err)
 		}
 	}
-	repoName := ghrepo.FullName(toView)
 
-	subscription, err := ViewSubscription(client, toView)
+	cs := opts.IO.ColorScheme()
+
+	httpClient, err := opts.HttpClient()
 	if err != nil {
-		return fmt.Errorf("Error fetching subscription information for %s: %w", repoName, err)
+		return fmt.Errorf("unable to create client: %w", err)
 	}
-	fmt.Fprintf(opts.IO.Out, "Your subscription to %s is %s\n", repoName, subscription)
 
+	subscription, err := GetSubscription(httpClient, repoToView)
+	if err != nil {
+		return fmt.Errorf("could not fetch subscription information: %w", err)
+	}
+
+	fmt.Fprintf(opts.IO.Out, "%s Subscription is %s\n", cs.Bold(ghrepo.FullName(repoToView)), subscription)
 	return nil
 }
