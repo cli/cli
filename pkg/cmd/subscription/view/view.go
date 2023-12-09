@@ -1,4 +1,4 @@
-package get
+package view
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type GetOptions struct {
+type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	IO         *iostreams.IOStreams
@@ -19,15 +19,15 @@ type GetOptions struct {
 	Repository string
 }
 
-func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command {
-	opts := &GetOptions{
+func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
+	opts := &ViewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "get [<repository>]",
+		Use:   "view [<repository>]",
 		Args:  cobra.MaximumNArgs(1),
 		Short: "Display whether subscribed to a GitHub repository for notifications",
 		Long: heredoc.Docf(`
@@ -41,8 +41,8 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 			- %[1]sunwatched%[1]s: you are not watching the repository or custom notification is set.
 		`, "`"),
 		Example: heredoc.Doc(`
-			$ gh subscription get
-			$ gh subscription get monalisa/hello-world
+			$ gh subscription view
+			$ gh subscription view monalisa/hello-world
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
@@ -52,34 +52,34 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 			if runF != nil {
 				return runF(opts)
 			}
-			return getRun(opts)
+			return viewRun(opts)
 		},
 	}
 
 	return cmd
 }
 
-func getRun(opts *GetOptions) error {
+func viewRun(opts *ViewOptions) error {
 	client, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
 
-	var toGet ghrepo.Interface
+	var toView ghrepo.Interface
 	if opts.Repository == "" {
-		toGet, err = opts.BaseRepo()
+		toView, err = opts.BaseRepo()
 		if err != nil {
 			return err
 		}
 	} else {
-		toGet, err = ghrepo.FromFullName(opts.Repository)
+		toView, err = ghrepo.FromFullName(opts.Repository)
 		if err != nil {
 			return fmt.Errorf("argument error: %w", err)
 		}
 	}
-	repoName := ghrepo.FullName(toGet)
+	repoName := ghrepo.FullName(toView)
 
-	subscription, err := GetSubscription(client, toGet)
+	subscription, err := ViewSubscription(client, toView)
 	if err != nil {
 		return fmt.Errorf("Error fetching subscription information for %s: %w", repoName, err)
 	}

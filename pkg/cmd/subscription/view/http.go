@@ -1,4 +1,4 @@
-package get
+package view
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ type SubscriptionStatus struct {
 	IsIgnored    bool `json:"ignored"`
 }
 
-func GetSubscription(client *http.Client, repo ghrepo.Interface) (string, error) {
+func ViewSubscription(client *http.Client, repo ghrepo.Interface) (string, error) {
 	repoPath := fmt.Sprintf("repos/%s", ghrepo.FullName(repo))
 	apiClient := api.NewClientFromHTTP(client)
 
