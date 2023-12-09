@@ -53,7 +53,6 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 			if runF != nil {
 				return runF(opts)
 			}
-
 			return getRun(opts)
 		},
 	}
