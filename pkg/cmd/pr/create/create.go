@@ -733,24 +733,19 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 			cs := opts.IO.ColorScheme()
 			fmt.Fprintf(out, "%s\n", cs.Bold(params["title"].(string)))
 			if len(state.Labels) != 0 {
-				fmt.Fprint(out, cs.Bold("Labels: "))
-				fmt.Fprintln(out, state.Labels)
+				fmt.Fprintf(out, "%s: %s\n", cs.Bold("Labels"), state.Labels)
 			}
 			if len(state.Reviewers) != 0 {
-				fmt.Fprint(out, cs.Bold("Reviewers: "))
-				fmt.Fprintln(out, state.Reviewers)
+				fmt.Fprintf(out, "%s: %s\n", cs.Bold("Reviewers"), state.Reviewers)
 			}
 			if len(state.Assignees) != 0 {
-				fmt.Fprint(out, cs.Bold("Assignees: "))
-				fmt.Fprintln(out, state.Assignees)
+				fmt.Fprintf(out, "%s: %s\n", cs.Bold("Assignees"), state.Assignees)
 			}
 			if len(state.Milestones) != 0 {
-				fmt.Fprint(out, cs.Bold("Milestones: "))
-				fmt.Fprintln(out, state.Milestones)
+				fmt.Fprintf(out, "%s: %s\n", cs.Bold("Milestones"), state.Milestones)
 			}
 			if len(state.Projects) != 0 {
-				fmt.Fprint(out, cs.Bold("Projects: "))
-				fmt.Fprintln(out, state.Projects)
+				fmt.Fprintf(out, "%s: %s\n", cs.Bold("Projects"), state.Projects)
 			}
 
 			// Body
