@@ -120,7 +120,8 @@ func (m MultiAccount) Do(c *config.Config) error {
 
 		username, err := getUsername(c, hostname, tokenSource.token, m.Transport)
 		if err != nil {
-			return CowardlyRefusalError{fmt.Errorf("couldn't get user name for %q: %w", hostname, err)}
+			issueURL := "https://github.com/cli/cli/issues/8441"
+			return CowardlyRefusalError{fmt.Errorf("couldn't get user name for %q please visit %s for help: %w", hostname, issueURL, err)}
 		}
 
 		if err := migrateConfig(c, hostname, username); err != nil {
