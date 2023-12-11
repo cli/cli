@@ -94,12 +94,9 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 }
 
 func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
-	// TODO: reinstate the short-circuit once the APIs are fully available on github.com
-	// https://github.com/cli/cli/issues/5778
-	//
-	// if !ghinstance.IsEnterprise(d.host) {
-	// 	return allPullRequestFeatures, nil
-	// }
+	if !ghinstance.IsEnterprise(d.host) {
+		return allPullRequestFeatures, nil
+	}
 
 	var pullRequestFeatureDetection struct {
 		PullRequest struct {
