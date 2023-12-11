@@ -60,7 +60,7 @@ func mainRun() exitCode {
 	if cfg, err := cmdFactory.Config(); err == nil {
 		var m migration.MultiAccount
 		if err := cfg.Migrate(m); err != nil {
-			fmt.Fprintf(stderr, "failed to migrate configuration: %s\n", err)
+			fmt.Fprintln(stderr, err)
 			return exitError
 		}
 	}
