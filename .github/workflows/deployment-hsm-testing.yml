@@ -43,7 +43,7 @@ jobs:
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
         run: |
           Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Azure.CodeSigning.Client/1.0.38 -OutFile $Env:ACS_ZIP -Verbose
-          Expand-Archive $acsZip -Destination $Env:ACS_DIR acsDir -Force -Verbose
+          Expand-Archive $acsZip -Destination $Env:ACS_DIR -Force -Verbose
 
           # Generate metadata file for signtool
           @{
