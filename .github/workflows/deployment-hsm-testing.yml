@@ -87,9 +87,16 @@ jobs:
             # TimestampDigest
             # TimestampRfc3161
           } | ConvertTo-Json | Out-File -FilePath $Env:METADATA_PATH
+      # Azure Code Signing leverages the environment variables for secrets that complement the metadata.json
+      # file generated above (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
+      # 
+      # For more information, see https://learn.microsoft.com/en-us/dotnet/api/azure.identity.defaultazurecredential?view=azure-dotnet
       - name: Build release binaries
         shell: bash
         env:
+          AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI }}
+          AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_TENANT_ID }}
           DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
           TAG_NAME: ${{ inputs.tag_name }}
@@ -130,9 +137,9 @@ jobs:
       - name: Sign .msi release binaries
         uses: azure/azure-code-signing-action@6c86237186b7eed50c9e8a3a6e42131bcc5e4601
         with:
-            azure-tenant-id: ${{ secrets.SPN_SPN_AZURE_CODE_SIGNING_DEMO_TENANT_ID }}
-            azure-client-id: ${{ secrets.SPN_SPN_AZURE_CODE_SIGNING_DEMO_CLIENT_ID }}
-            azure-client-secret: ${{ secrets.SPN_SPN_AZURE_CODE_SIGNING_DEMO }}
+            azure-tenant-id: ${{ secrets.SPN_GITHUB_CLI_TENANT_ID }}
+            azure-client-id: ${{ secrets.SPN_GITHUB_CLI_CLIENT_ID }}
+            azure-client-secret: ${{ secrets.SPN_GITHUB_CLI }}
             endpoint: https://wus.codesigning.azure.net/
             code-signing-account-name: GitHubInc
             certificate-profile-name: GitHubInc
