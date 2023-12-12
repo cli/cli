@@ -95,16 +95,6 @@ hosts:
 	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "git_protocol"}, "https")
 }
 
-func TestPreVersionIsEmptyString(t *testing.T) {
-	var m migration.MultiAccount
-	require.Equal(t, "", m.PreVersion())
-}
-
-func TestPostVersion(t *testing.T) {
-	var m migration.MultiAccount
-	require.Equal(t, "1", m.PostVersion())
-}
-
 func TestMigrationReturnsSuccessfullyWhenNoHostsEntry(t *testing.T) {
 	cfg := config.ReadFromString(``)
 
@@ -222,6 +212,103 @@ hosts:
 	err := m.Do(cfg)
 
 	require.ErrorContains(t, err, `couldn't find oauth token for "github.com": keyring test error`)
+}
+
+func TestMigrationMovesModifiedOAuthTokens(t *testing.T) {
+	// Given we have a config where someone has modified
+	// only the top level oauth token, for example, because
+	// they logged in insecurely using an old version of the CLI
+	cfg := config.ReadFromString(`
+hosts:
+  github.com:
+    user: user1
+    oauth_token: xxxxxxxxxxxxxxxxxxxx
+    git_protocol: ssh
+    users:
+      user1:
+        oauth_token: yyyyyyyyyyyyyyyyyy
+`)
+
+	var m migration.MultiAccount
+	require.NoError(t, m.Do(cfg))
+
+	// Let's see that the oauth token under the users entry has been updated
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "users", "user1", "oauth_token"}, "xxxxxxxxxxxxxxxxxxxx")
+}
+
+func TestMigrationHandlesMixedVersions(t *testing.T) {
+	// Given we have a config with a mix of old and new schema,
+	// for example, someone used an older version of gh to log in
+	// and so they didn't get a new users entry.
+	cfg := config.ReadFromString(`
+hosts:
+  github.com:
+    user: user3
+    oauth_token: xxxxxxxxxxxxxxxxxxxx
+    git_protocol: ssh
+    users:
+      user1:
+      user2:
+    `)
+
+	var m migration.MultiAccount
+	require.NoError(t, m.Do(cfg))
+
+	// First we'll check that the oauth token has been moved to the new location
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "users", "user3", "oauth_token"}, "xxxxxxxxxxxxxxxxxxxx")
+
+	// Then we'll check that the old data has been left alone
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "user"}, "user3")
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "oauth_token"}, "xxxxxxxxxxxxxxxxxxxx")
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "git_protocol"}, "ssh")
+
+	requireKeyExists(t, cfg, []string{"hosts", "github.com", "users", "user1"})
+	requireKeyExists(t, cfg, []string{"hosts", "github.com", "users", "user2"})
+}
+
+func TestMigrationRunMultipleTimesIsIdempotent(t *testing.T) {
+	cfg := config.ReadFromString(`
+hosts:
+  github.com:
+    user: user1
+    oauth_token: xxxxxxxxxxxxxxxxxxxx
+    git_protocol: ssh
+  enterprise.com:
+    user: user2
+    oauth_token: yyyyyyyyyyyyyyyyyyyy
+    git_protocol: https
+`)
+
+	var m migration.MultiAccount
+	require.NoError(t, m.Do(cfg))
+
+	// First we'll check that the oauth tokens have been moved to their new locations
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "users", "user1", "oauth_token"}, "xxxxxxxxxxxxxxxxxxxx")
+	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "users", "user2", "oauth_token"}, "yyyyyyyyyyyyyyyyyyyy")
+
+	// Then we'll check that the old data has been left alone
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "user"}, "user1")
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "oauth_token"}, "xxxxxxxxxxxxxxxxxxxx")
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "git_protocol"}, "ssh")
+
+	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "user"}, "user2")
+	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "oauth_token"}, "yyyyyyyyyyyyyyyyyyyy")
+	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "git_protocol"}, "https")
+
+	// Run it again
+	require.NoError(t, m.Do(cfg))
+
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "users", "user1", "oauth_token"}, "xxxxxxxxxxxxxxxxxxxx")
+	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "users", "user2", "oauth_token"}, "yyyyyyyyyyyyyyyyyyyy")
+
+	// Then we'll check that the old data has been left alone
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "user"}, "user1")
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "oauth_token"}, "xxxxxxxxxxxxxxxxxxxx")
+	requireKeyWithValue(t, cfg, []string{"hosts", "github.com", "git_protocol"}, "ssh")
+
+	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "user"}, "user2")
+	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "oauth_token"}, "yyyyyyyyyyyyyyyyyyyy")
+	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "git_protocol"}, "https")
 }
 
 func requireKeyExists(t *testing.T, cfg *config.Config, keys []string) {

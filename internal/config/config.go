@@ -24,7 +24,6 @@ const (
 	promptKey         = "prompt"
 	userKey           = "user"
 	usersKey          = "users"
-	versionKey        = "version"
 )
 
 // This interface describes interacting with some persistent configuration for gh.
@@ -44,7 +43,6 @@ type Config interface {
 	HTTPUnixSocket(string) string
 	Pager(string) string
 	Prompt(string) string
-	Version() string
 }
 
 // Migration is the interace that config migrations must implement.
@@ -53,16 +51,10 @@ type Config interface {
 // as necessary. After migration has completed, the modified config contents
 // will be used.
 //
-// The calling code is expected to verify that the current version of the config
-// matches the PreVersion of the migration before calling Do, and will set the
-// config version to the PostVersion after the migration has completed successfully.
+// Migrations are expected to be idempotent
 //
 //go:generate moq -rm -out migration_mock.go . Migration
 type Migration interface {
-	// PreVersion is the required config version for this to be applied
-	PreVersion() string
-	// PostVersion is the config version that must be applied after migration
-	PostVersion() string
 	// Do is expected to apply any necessary changes to the config in place
 	Do(*ghConfig.Config) error
 }
@@ -159,29 +151,10 @@ func (c *cfg) Prompt(hostname string) string {
 	return val
 }
 
-func (c *cfg) Version() string {
-	val, _ := c.GetOrDefault("", versionKey)
-	return val
-}
-
 func (c *cfg) Migrate(m Migration) error {
-	version := c.Version()
-
-	// If migration has already occured then do not attempt to migrate again.
-	if m.PostVersion() == version {
-		return nil
-	}
-
-	// If migration is incompatible with current version then return an error.
-	if m.PreVersion() != version {
-		return fmt.Errorf("failed to migrate as %q pre migration version did not match config version %q", m.PreVersion(), version)
-	}
-
 	if err := m.Do(c.cfg); err != nil {
 		return fmt.Errorf("failed to migrate config: %s", err)
 	}
-
-	c.Set("", versionKey, m.PostVersion())
 
 	// Then write out our migrated config.
 	if err := c.Write(); err != nil {
@@ -511,12 +484,7 @@ func fallbackConfig() *ghConfig.Config {
 	return ghConfig.ReadFromString(defaultConfigStr)
 }
 
-// The schema version in here should match the PostVersion of whatever the
-// last migration we decided to run is. Therefore, if we run a new migration,
-// this should be bumped.
 const defaultConfigStr = `
-# The current version of the config schema
-version: 1
 # What protocol to use when performing git operations. Supported values: ssh, https
 git_protocol: https
 # What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.

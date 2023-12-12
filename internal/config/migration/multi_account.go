@@ -73,16 +73,6 @@ type MultiAccount struct {
 	Transport http.RoundTripper
 }
 
-func (m MultiAccount) PreVersion() string {
-	// It is expected that there is no version key since this migration
-	// introduces it.
-	return ""
-}
-
-func (m MultiAccount) PostVersion() string {
-	return "1"
-}
-
 func (m MultiAccount) Do(c *config.Config) error {
 	hostnames, err := c.Keys(hostsKey)
 	// [github.com, github.localhost]

@@ -73,10 +73,6 @@ func NewFromString(cfgStr string) *ConfigMock {
 		val, _ := cfg.GetOrDefault(hostname, promptKey)
 		return val
 	}
-	mock.VersionFunc = func() string {
-		val, _ := cfg.GetOrDefault("", versionKey)
-		return val
-	}
 	return mock
 }
 
