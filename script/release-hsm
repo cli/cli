@@ -86,15 +86,15 @@ build_local() {
   local config="$goreleaser_config"
   case "$platform" in
   linux )
-    sed '/#build:windows/,/^$/d; /#build:macos/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
+    sed '/#build:windows/,/^$/d; /#build:macos/,/^$/d' "$config" >.goreleaser.generated.yml
     config=".goreleaser.generated.yml"
     ;;
   macos )
-    sed '/#build:windows/,/^$/d; /#build:linux/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
+    sed '/#build:windows/,/^$/d; /#build:linux/,/^$/d' "$config" >.goreleaser.generated.yml
     config=".goreleaser.generated.yml"
     ;;
   windows )
-    sed '/#build:linux/,/^$/d; /#build:macos/,/^$/d' .goreleaser.yml >.goreleaser.generated.yml
+    sed '/#build:linux/,/^$/d; /#build:macos/,/^$/d' "$config" >.goreleaser.generated.yml
     config=".goreleaser.generated.yml"
     ;;
   esac
