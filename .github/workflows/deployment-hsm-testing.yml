@@ -45,9 +45,6 @@ jobs:
           Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Azure.CodeSigning.Client/1.0.38 -OutFile $Env:ACS_ZIP -Verbose
           Expand-Archive $acsZip -Destination $Env:ACS_DIR acsDir -Force -Verbose
 
-          # Replace ancient signtool in scripts with one that supports ACS
-          Copy-Item -Path "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\*" -Include signtool.exe,signtool.exe.manifest,Microsoft.Windows.Build.Signing.mssign32.dll.manifest,mssign32.dll,Microsoft.Windows.Build.Signing.wintrust.dll.manifest,wintrust.dll,Microsoft.Windows.Build.Appx.AppxSip.dll.manifest,AppxSip.dll,Microsoft.Windows.Build.Appx.AppxPackaging.dll.manifest,AppxPackaging.dll,Microsoft.Windows.Build.Appx.OpcServices.dll.manifest,OpcServices.dll -Destination scripts -Verbose
-
           # Generate metadata file for signtool
           @{
             CertificateProfileName = "GitHubInc"
@@ -94,9 +91,9 @@ jobs:
       - name: Build release binaries
         shell: bash
         env:
-          AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI }}
-          AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
+          AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
           DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
           TAG_NAME: ${{ inputs.tag_name }}
@@ -137,9 +134,9 @@ jobs:
       - name: Sign .msi release binaries
         uses: azure/azure-code-signing-action@6c86237186b7eed50c9e8a3a6e42131bcc5e4601
         with:
-            azure-tenant-id: ${{ secrets.SPN_GITHUB_CLI_TENANT_ID }}
-            azure-client-id: ${{ secrets.SPN_GITHUB_CLI_CLIENT_ID }}
-            azure-client-secret: ${{ secrets.SPN_GITHUB_CLI }}
+            azure-tenant-id: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
+            azure-client-id: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
+            azure-client-secret: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
             endpoint: https://wus.codesigning.azure.net/
             code-signing-account-name: GitHubInc
             certificate-profile-name: GitHubInc
