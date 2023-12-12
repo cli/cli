@@ -43,50 +43,18 @@ jobs:
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
         run: |
           Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Azure.CodeSigning.Client/1.0.38 -OutFile $Env:ACS_ZIP -Verbose
-          Expand-Archive $acsZip -Destination $Env:ACS_DIR -Force -Verbose
+          Expand-Archive $Env:ACS_ZIP -Destination $Env:ACS_DIR -Force -Verbose
 
           # Generate metadata file for signtool
           @{
             CertificateProfileName = "GitHubInc"
             CodeSigningAccountName = "GitHubInc"
             CorrelationId = $Env:CORRELATION_ID
-            Description = "GitHub CLI"
-            Endpoint =  "https://wus.codesigning.azure.net/
-
-            # Unused metadata configuration:
-            # AppendSignature
-            # DescriptionUrl
-            # EnhancedKeyUsage
-            # ExcludeAzureCliCredential
-            # ExcludeAzurePowerShellCredential
-            # ExcludeEnvironmentCredential
-            # ExcludeInteractiveBrowserCredential
-            # ExcludeManagedIdentityCredential
-            # ExcludeSharedTokenCacheCredential
-            # ExcludeVisualStudioCodeCredential
-            # ExcludeVisualStudioCredential
-            # FileDigest
-            # FilesCatalog
-            # FilesFolder
-            # FilesFolderDepth
-            # FilesFolderFilter
-            # FilesFolderRecurse
-            # GenerateDigestPath
-            # GenerateDigestXml
-            # GeneratePageHashes
-            # GeneratePkcs7
-            # IngestDigestPath
-            # Pkcs7Oid
-            # Pkcs7Options
-            # SignDigest
-            # SuppressPageHashes
-            # Timeout
-            # TimestampDigest
-            # TimestampRfc3161
+            Endpoint =  "https://wus.codesigning.azure.net/"
           } | ConvertTo-Json | Out-File -FilePath $Env:METADATA_PATH
+
       # Azure Code Signing leverages the environment variables for secrets that complement the metadata.json
       # file generated above (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
-      # 
       # For more information, see https://learn.microsoft.com/en-us/dotnet/api/azure.identity.defaultazurecredential?view=azure-dotnet
       - name: Build release binaries
         shell: bash
