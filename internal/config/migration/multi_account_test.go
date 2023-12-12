@@ -3,12 +3,15 @@ package migration_test
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/keyring"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/go-gh/v2/pkg/config"
+	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -309,6 +312,42 @@ hosts:
 	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "user"}, "user2")
 	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "oauth_token"}, "yyyyyyyyyyyyyyyyyyyy")
 	requireKeyWithValue(t, cfg, []string{"hosts", "enterprise.com", "git_protocol"}, "https")
+}
+
+func TestMigrationOnlyModifiesConfigWhenNecessary(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("GH_CONFIG_DIR", tempDir)
+
+	// Given we have a migrated config with multiple users
+	c := config.ReadFromString(`
+hosts:
+  github.com:
+    user: user1
+    oauth_token: xxxxxxxxxxxxxxxxxxxx
+    git_protocol: ssh
+    users:
+      user1:
+        oauth_token: xxxxxxxxxxxxxxxxxxxx
+      user2:
+        oauth_token: yyyyyyyyyyyyyyyyyy
+`)
+
+	// Run the migration
+	var m migration.MultiAccount
+	require.NoError(t, m.Do(c))
+
+	// Write the config
+	require.NoError(t, ghConfig.Write(c))
+
+	// Verify that the config file has not been written
+	// as the migration caused no config changes
+	_, err := os.Stat(filepath.Join(tempDir, "config.yml"))
+	require.True(t, os.IsNotExist(err))
+
+	// Verify that the hosts file has not been written
+	// as the migration caused no config changes
+	_, err = os.Stat(filepath.Join(tempDir, "hosts.yml"))
+	require.True(t, os.IsNotExist(err))
 }
 
 func requireKeyExists(t *testing.T, cfg *config.Config, keys []string) {

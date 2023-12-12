@@ -186,10 +186,17 @@ func migrateToken(hostname, username string, tokenSource tokenSource) error {
 
 func migrateConfig(c *config.Config, hostname, username string) error {
 	// Set the user key incase it was previously an anonymous user.
-	c.Set(append(hostsKey, hostname, "user"), username)
+	// Only set the user if it will been changed.
+	if user, err := c.Get(append(hostsKey, hostname, "user")); err != nil || user != username {
+		c.Set(append(hostsKey, hostname, "user"), username)
+	}
+
 	// Create the username key with an empty value so it will be
 	// written even if there are no keys set under it.
-	c.Set(append(hostsKey, hostname, "users", username), "")
+	// Only set the username key if it does not already exist.
+	if _, err := c.Get(append(hostsKey, hostname, "users", username)); err != nil {
+		c.Set(append(hostsKey, hostname, "users", username), "")
+	}
 
 	insecureToken, err := c.Get(append(hostsKey, hostname, "oauth_token"))
 	var keyNotFoundError *config.KeyNotFoundError
@@ -205,7 +212,11 @@ func migrateConfig(c *config.Config, hostname, username string) error {
 	}
 
 	// Otherwise we'll set the token under the new key
-	c.Set(append(hostsKey, hostname, "users", username, "oauth_token"), insecureToken)
+	// Only set the token if it will be changed.
+	if token, err := c.Get(append(hostsKey, hostname, "users", username, "oauth_token")); err != nil || token != insecureToken {
+		c.Set(append(hostsKey, hostname, "users", username, "oauth_token"), insecureToken)
+	}
+
 	return nil
 }
 
