@@ -1,3 +1,4 @@
+![repository-open-graph-template](https://github.com/rizwan-r-r/cli/assets/132520847/d25c485f-e83e-46c0-94ef-dc13bae0c0f2)
 # Contributor Covenant Code of Conduct
 
 ## Our Pledge
