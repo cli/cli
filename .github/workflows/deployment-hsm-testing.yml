@@ -1,4 +1,4 @@
-name: Deployment
+name: Deployment HSM Testing
 run-name: ${{ inputs.tag_name }} / go ${{ inputs.go_version }}
 
 concurrency:
@@ -42,10 +42,11 @@ jobs:
           CORRELATION_ID: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
         run: |
+          # Download Azure Code Signing client containing the DLL needed for signtool in script/sign
           Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Azure.CodeSigning.Client/1.0.38 -OutFile $Env:ACS_ZIP -Verbose
           Expand-Archive $Env:ACS_ZIP -Destination $Env:ACS_DIR -Force -Verbose
 
-          # Generate metadata file for signtool
+          # Generate metadata file for signtool, used in signing box .exe and .msi
           @{
             CertificateProfileName = "GitHubInc"
             CodeSigningAccountName = "GitHubInc"
@@ -100,19 +101,17 @@ jobs:
             "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$source_dir" -p:OutputPath="$PWD/dist" -p:OutputName="$MSI_NAME" -p:ProductVersion="${MSI_VERSION#v}" -p:Platform="$platform"
           done
       - name: Sign .msi release binaries
-        uses: azure/azure-code-signing-action@6c86237186b7eed50c9e8a3a6e42131bcc5e4601
-        with:
-            azure-tenant-id: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
-            azure-client-id: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
-            azure-client-secret: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
-            endpoint: https://wus.codesigning.azure.net/
-            code-signing-account-name: GitHubInc
-            certificate-profile-name: GitHubInc
-            files-folder: ${{ github.workspace }}/dist
-            files-folder-filter: msi
-            file-digest: SHA256
-            timestamp-rfc3161: http://timestamp.acs.microsoft.com
-            timestamp-digest: SHA256
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
+          AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
+          DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
+          METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
+        run: |
+          Get-ChildItem "$Env:GITHUB_WORKSPACE/dist" -Filter *.msi | Foreach-Object {
+            .\script\sign.ps1 $_.FullName
+          }
       - uses: actions/upload-artifact@v3
         with:
           name: windows
