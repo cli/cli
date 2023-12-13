@@ -120,8 +120,8 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(opts.IO.ColorScheme().Cyan(fmt.Sprintf("%d", cache.Id)))
 		tp.AddField(cache.Key)
 		tp.AddField(humanFileSize(cache.SizeInBytes))
-		tp.AddTimeField(time.Now(), cache.CreatedAt, opts.IO.ColorScheme().Gray)
-		tp.AddTimeField(time.Now(), cache.LastAccessedAt, opts.IO.ColorScheme().Gray)
+		tp.AddTimeField(opts.Now, cache.CreatedAt, opts.IO.ColorScheme().Gray)
+		tp.AddTimeField(opts.Now, cache.LastAccessedAt, opts.IO.ColorScheme().Gray)
 		tp.EndRow()
 	}
 
