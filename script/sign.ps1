@@ -1,11 +1,11 @@
 #!/usr/bin/env pwsh
 
-if ($null -ne $env:DLIB_PATH) {
+if ($null -eq $Env:DLIB_PATH) {
 	Write-Host "Skipping Windows code signing; DLIB_PATH not set"
 	exit
 }
 
-if ($null -ne $env:METADATA_PATH) {
+if ($null -eq $Env:METADATA_PATH) {
 	Write-Host "Skipping Windows code signing; METADATA_PATH not set"
 	exit
 }
