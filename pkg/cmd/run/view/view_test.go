@@ -1494,7 +1494,7 @@ type testRunLogCache struct{}
 func (testRunLogCache) Exists(path string) bool {
 	return false
 }
-func (testRunLogCache) Create(path string, content io.ReadCloser) error {
+func (testRunLogCache) Create(path string, content io.Reader) error {
 	return nil
 }
 func (testRunLogCache) Open(path string) (*zip.ReadCloser, error) {
