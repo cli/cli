@@ -1,6 +1,7 @@
 package view
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -39,8 +40,16 @@ func GetSubscription(client *http.Client, repo ghrepo.Interface) (string, error)
 		}
 	}
 
-	if err.(api.HTTPError).HTTPError.StatusCode == 404 {
-		return "unwatched", nil
+	var apiHttpError api.HTTPError
+	if errors.As(err, &apiHttpError) {
+		switch apiHttpError.HTTPError.StatusCode {
+		case 403:
+			return "", fmt.Errorf("access forbidden")
+		case 404:
+			return "unwatched", nil
+		default:
+			return "", err
+		}
 	}
 
 	return "", err
