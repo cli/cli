@@ -554,6 +554,13 @@ func createFromLocal(opts *CreateOptions) error {
 		return fmt.Errorf("%s is not a git repository. Run `git -C \"%s\" init` to initialize it", absPath, repoPath)
 	}
 
+	if !isToplevel(opts.GitClient) {
+		if repoPath == "." {
+			return fmt.Errorf("current directory is not the top level of a git repository. Change directories and retry")
+		}
+		return fmt.Errorf("%s is not the top level of a git repository. Change directories and retry", absPath)
+	}
+
 	committed, err := hasCommits(opts.GitClient)
 	if err != nil {
 		return err
@@ -722,22 +729,24 @@ func hasCommits(gitClient *git.Client) (bool, error) {
 	return false, nil
 }
 
-// check if path is the top level directory of a git repo
+// check if path is inside the work tree of a local git repository
 func isLocalRepo(gitClient *git.Client) (bool, error) {
-	projectDir, projectDirErr := gitClient.GitDir(context.Background())
-	if projectDirErr != nil {
+	_, toplevelDirErr := gitClient.ToplevelDir(context.Background())
+	if toplevelDirErr != nil {
 		var execError *exec.ExitError
-		if errors.As(projectDirErr, &execError) {
+		if errors.As(toplevelDirErr, &execError) {
 			if exitCode := int(execError.ExitCode()); exitCode == 128 {
 				return false, nil
 			}
-			return false, projectDirErr
+			return false, toplevelDirErr
 		}
 	}
-	if projectDir != ".git" {
-		return false, nil
-	}
 	return true, nil
+}
+
+// check if path is the top level directory of a work tree
+func isToplevel(gitClient *git.Client) bool {
+	return gitClient.PathFromRoot(context.Background()) == ""
 }
 
 // clone the checkout branch to specified path
