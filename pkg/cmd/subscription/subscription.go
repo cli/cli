@@ -2,6 +2,8 @@ package subscription
 
 import (
 	"github.com/MakeNowJust/heredoc"
+	subDeleteCmd "github.com/cli/cli/v2/pkg/cmd/subscription/delete"
+	subEditCmd "github.com/cli/cli/v2/pkg/cmd/subscription/edit"
 	subListCmd "github.com/cli/cli/v2/pkg/cmd/subscription/list"
 	subViewCmd "github.com/cli/cli/v2/pkg/cmd/subscription/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -24,6 +26,8 @@ func NewCmdSubscription(f *cmdutil.Factory) *cobra.Command {
 	cmdutil.AddGroup(cmd, "General Commands",
 		subListCmd.NewCmdList(f, nil),
 		subViewCmd.NewCmdView(f, nil),
+		subEditCmd.NewCmdEdit(f, nil),
+		subDeleteCmd.NewCmdDelete(f, nil),
 	)
 
 	return cmd
