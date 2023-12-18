@@ -36,7 +36,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "delete [<repository>]",
 		Args:  cobra.MaximumNArgs(1),
-		Short: "Delete subscription to a repository.",
+		Short: "Delete subscription to a repository",
 		Long: heredoc.Docf(`
 			Delete subscription to a repository.
 

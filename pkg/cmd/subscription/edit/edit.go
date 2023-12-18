@@ -36,7 +36,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "edit [<repository>]",
 		Args:  cobra.MaximumNArgs(1),
-		Short: "Edit subscription settings.",
+		Short: "Edit subscription settings",
 		Long: heredoc.Docf(`
 			Edit subscription settings.
 
