@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -325,6 +326,7 @@ func Test_createRun(t *testing.T) {
 				`draft:	false`,
 				`--`,
 				`my body`,
+				``,
 			},
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
@@ -1147,8 +1149,7 @@ func Test_createRun(t *testing.T) {
 					assert.Equal(t, tt.expectedOut, output.String())
 				}
 				if len(tt.expectedOutputs) > 0 {
-					//nolint:staticcheck // prefer exact matchers over ExpectLines
-					test.ExpectLines(t, output.String(), tt.expectedOutputs...)
+					assert.Equal(t, tt.expectedOutputs, strings.Split(output.String(), "\n"))
 				}
 				assert.Equal(t, tt.expectedErrOut, output.Stderr())
 				assert.Equal(t, tt.expectedBrowse, output.BrowsedURL)
