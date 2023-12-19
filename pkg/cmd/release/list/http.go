@@ -2,12 +2,24 @@ package list
 
 import (
 	"net/http"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
+
+var ReleaseFields = []string{
+	"name",
+	"tagName",
+	"isDraft",
+	"isLatest",
+	"isPrerelease",
+	"createdAt",
+	"publishedAt",
+}
 
 type Release struct {
 	Name         string
@@ -75,4 +87,21 @@ loop:
 	}
 
 	return releases, nil
+}
+
+func (r *Release) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(r).Elem()
+	fieldByName := func(v reflect.Value, field string) reflect.Value {
+		return v.FieldByNameFunc(func(s string) bool {
+			return strings.EqualFold(field, s)
+		})
+	}
+	data := map[string]interface{}{}
+
+	for _, f := range fields {
+		sf := fieldByName(v, f)
+		data[f] = sf.Interface()
+	}
+
+	return data
 }
