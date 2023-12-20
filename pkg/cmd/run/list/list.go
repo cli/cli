@@ -158,7 +158,7 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(string(run.Event))
 		tp.AddField(fmt.Sprintf("%d", run.ID), tableprinter.WithColor(cs.Cyan))
 		tp.AddField(run.Duration(opts.now).String())
-		tp.AddTimeField(time.Now(), run.StartedTime(), cs.Gray)
+		tp.AddTimeField(opts.now, run.StartedTime(), cs.Gray)
 		tp.EndRow()
 	}
 
