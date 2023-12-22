@@ -608,7 +608,7 @@ func TestClientDeleteLocalBranch(t *testing.T) {
 	}{
 		{
 			name:        "delete local branch",
-			wantCmdArgs: `path/to/git branch -D trunk`,
+			wantCmdArgs: `path/to/git branch -D trunk path/to/git branch -d -r origin/trunk`,
 		},
 		{
 			name:          "git error",

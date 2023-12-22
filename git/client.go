@@ -336,14 +336,28 @@ func (c *Client) DeleteLocalTag(ctx context.Context, tag string) error {
 }
 
 func (c *Client) DeleteLocalBranch(ctx context.Context, branch string) error {
-	args := []string{"branch", "-D", branch}
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return err
+	{
+		args := []string{"branch", "-D", branch}
+		cmd, err := c.Command(ctx, args...)
+		if err != nil {
+			return err
+		}
+		_, err = cmd.Output()
+		if err != nil {
+			return err
+		}
 	}
-	_, err = cmd.Output()
-	if err != nil {
-		return err
+	{
+		track := fmt.Sprintf("origin/%s", branch)
+		args := []string{"branch", "-d", "-r", track}
+		cmd, err := c.Command(ctx, args...)
+		if err != nil {
+			return err
+		}
+		_, err = cmd.Output()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

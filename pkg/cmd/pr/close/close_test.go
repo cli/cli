@@ -164,7 +164,9 @@ func TestPrClose_deleteBranch_sameRepo(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git rev-parse --git-dir`, 128, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git branch -d -r origin/blueberries`, 0, "")
 
 	output, err := runCommand(http, true, `96 --delete-branch`)
 	assert.NoError(t, err)
@@ -196,6 +198,7 @@ func TestPrClose_deleteBranch_crossRepo(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git branch -d -r origin/blueberries`, 0, "")
 
 	output, err := runCommand(http, true, `96 --delete-branch`)
 	assert.NoError(t, err)
@@ -231,7 +234,9 @@ func TestPrClose_deleteBranch_sameBranch(t *testing.T) {
 
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/trunk`, 0, "")
+	cs.Register(`git rev-parse --git-dir`, 128, "")
 	cs.Register(`git branch -D trunk`, 0, "")
+	cs.Register(`git branch -d -r origin/trunk`, 0, "")
 
 	output, err := runCommand(http, true, `96 --delete-branch`)
 	assert.NoError(t, err)
@@ -307,4 +312,41 @@ func TestPrClose_withComment(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "✓ Closed pull request #96 (The title of the PR)\n", output.Stderr())
+}
+
+func TestPrClose_deleteBranch_inGitRepo(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	baseRepo, pr := stubPR("OWNER/REPO:main", "OWNER/REPO:trunk")
+	pr.Title = "The title of the PR"
+	shared.RunCommandFinder("96", pr, baseRepo)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestClose\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+			}),
+	)
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/trunk"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/trunk`, 0, "")
+	cs.Register(`git rev-parse --git-dir`, 0, ".git")
+	cs.Register(`git checkout main`, 0, "")
+	cs.Register(`git branch -D trunk`, 0, "")
+	cs.Register(`git branch -d -r origin/trunk`, 0, "")
+
+	output, err := runCommand(http, true, `96 --delete-branch`)
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Closed pull request #96 (The title of the PR)
+		✓ Deleted branch trunk and switched to branch main
+	`), output.Stderr())
 }
