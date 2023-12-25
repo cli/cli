@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -24,8 +25,19 @@ type ListOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Now        func() time.Time
 
+	Exporter cmdutil.Exporter
+
 	OrgName string
 	EnvName string
+}
+
+var variableFields = []string{
+	"name",
+	"value",
+	"visibility",
+	"updatedAt",
+	"numSelectedRepos",
+	"selectedReposURL",
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -65,6 +77,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List variables for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "List variables for an environment")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, variableFields)
 
 	return cmd
 }
@@ -114,7 +127,7 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("failed to get variables: %w", err)
 	}
 
-	if len(variables) == 0 {
+	if len(variables) == 0 && opts.Exporter == nil {
 		return cmdutil.NewNoResultsError("no variables found")
 	}
 
@@ -122,6 +135,10 @@ func listRun(opts *ListOptions) error {
 		defer opts.IO.StopPager()
 	} else {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, variables)
 	}
 
 	var headers []string
@@ -235,4 +252,21 @@ func populateSelectedRepositoryInformation(client *http.Client, host string, var
 		variables[i].NumSelectedRepos = response.TotalCount
 	}
 	return nil
+}
+
+func (v *Variable) ExportData(fields []string) map[string]interface{} {
+	e := reflect.ValueOf(v).Elem()
+	fieldByName := func(val reflect.Value, field string) reflect.Value {
+		return val.FieldByNameFunc(func(s string) bool {
+			return strings.EqualFold(field, s)
+		})
+	}
+	data := map[string]interface{}{}
+
+	for _, f := range fields {
+		sf := fieldByName(e, f)
+		data[f] = sf.Interface()
+	}
+
+	return data
 }
