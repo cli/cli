@@ -42,16 +42,17 @@ func Test_NewCmdLogin(t *testing.T) {
 		wantsErr    bool
 	}{
 		{
-			name:  "nontty, with-token",
-			stdin: "abc123\n",
-			cli:   "--with-token",
+			name:        "nontty, with-token",
+			stdin:       "abc123\n",
+			cli:         "--with-token",
+			defaultHost: "github.com",
 			wants: LoginOptions{
 				Hostname: "github.com",
 				Token:    "abc123",
 			},
 		},
 		{
-			name:        "nontty, with-token, enterprise default host",
+			name:        "nontty, Enterprise host",
 			stdin:       "abc123\n",
 			cli:         "--with-token",
 			defaultHost: "git.example.com",
@@ -208,11 +209,6 @@ func Test_NewCmdLogin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Make sure there is a default host set so that
-			// the local configuration file never read from.
-			if tt.defaultHost == "" {
-				tt.defaultHost = "github.com"
-			}
 			t.Setenv("GH_HOST", tt.defaultHost)
 
 			ios, stdin, _, _ := iostreams.Test()
