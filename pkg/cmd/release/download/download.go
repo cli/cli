@@ -177,6 +177,9 @@ func downloadRun(opts *DownloadOptions) error {
 			if len(opts.FilePatterns) > 0 && !matchAny(opts.FilePatterns, a.Name) {
 				continue
 			}
+			// Note that if we need to start checking for reserved filenames on
+			// more operating systems we should move to using a build constraints
+			// pattern rather than checking the operating system at runtime.
 			if runtime.GOOS == "windows" && isWindowsReservedFilename(a.Name) {
 				return fmt.Errorf("unable to download release due to asset with reserved filename %q", a.Name)
 			}
