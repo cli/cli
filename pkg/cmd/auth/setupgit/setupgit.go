@@ -38,7 +38,7 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 			https://git-scm.com/docs/gitcredentials.
 
 			By default, GitHub CLI will be set as the credential helper for all authenticated hosts.
-			If there is no authenticated hosts the command will set github.com as default host.
+			If there are no authenticated hosts the command sets github.com as the default host.
 
 			Alternatively, use the %[1]s--hostname%[1]s flag to specify a single host to be configured.
 			If the host is not authenticated with, the command fails with an error.
