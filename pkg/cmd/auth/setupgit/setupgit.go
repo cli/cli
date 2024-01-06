@@ -77,17 +77,8 @@ func setupGitRun(opts *SetupGitOptions) error {
 
 	hostnames := authCfg.Hosts()
 
-	stderr := opts.IO.ErrOut
-	cs := opts.IO.ColorScheme()
-
 	if len(hostnames) == 0 {
-		fmt.Fprintf(
-			stderr,
-			"You are not logged into any GitHub hosts. Run %s to authenticate.\n",
-			cs.Bold("gh auth login"),
-		)
-
-		return cmdutil.SilentError
+		hostnames = append(hostnames, "github.com")
 	}
 
 	hostnamesToSetup := hostnames

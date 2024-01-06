@@ -43,10 +43,8 @@ func Test_setupGitRun(t *testing.T) {
 			expectedErr: "oops",
 		},
 		{
-			name:           "no authenticated hostnames",
-			opts:           &SetupGitOptions{},
-			expectedErr:    "SilentError",
-			expectedErrOut: "You are not logged into any GitHub hosts. Run gh auth login to authenticate.\n",
+			name: "In absense of hostname default to github.com",
+			opts: &SetupGitOptions{},
 		},
 		{
 			name: "not authenticated with the hostname given as flag",
