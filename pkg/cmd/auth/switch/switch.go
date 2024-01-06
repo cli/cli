@@ -1,4 +1,4 @@
-package logout
+package authswitch
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type LogoutOptions struct {
+type SwitchOptions struct {
 	IO       *iostreams.IOStreams
 	Config   func() (config.Config, error)
 	Prompter shared.Prompt
@@ -21,49 +21,54 @@ type LogoutOptions struct {
 	Username string
 }
 
-func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Command {
-	opts := &LogoutOptions{
+func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Command {
+	opts := SwitchOptions{
 		IO:       f.IOStreams,
 		Config:   f.Config,
 		Prompter: f.Prompter,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "logout",
+		Use:   "switch",
 		Args:  cobra.ExactArgs(0),
-		Short: "Log out of a GitHub account",
+		Short: "Switch active GitHub account",
 		Long: heredoc.Doc(`
-			Remove authentication for a GitHub account.
+			Switch the active account for a GitHub host.
 
-			This command removes the stored authentication configuration
-			for an account. The authentication configuration is only
-			removed locally.
-
-			This command does not invalidate authentication tokens.
+			This command changes the authentication configuration that will
+			be used when running commands targeting the specified GitHub host.
 		`),
 		Example: heredoc.Doc(`
-			# Select what host and account to log out of via a prompt
-			$ gh auth logout
+			# Select what host and account to switch to via a prompt
+			$ gh auth switch
 
-			# Log out of a specific host and specific account
+			# Switch to a specific host and specific account
 			$ gh auth logout --hostname enterprise.internal --user monalisa
 		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(c *cobra.Command, args []string) error {
 			if runF != nil {
-				return runF(opts)
+				return runF(&opts)
 			}
 
-			return logoutRun(opts)
+			return switchRun(&opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to log out of")
-	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to log out of")
+	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to switch account for")
+	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to switch to")
 
 	return cmd
 }
 
-func logoutRun(opts *LogoutOptions) error {
+type hostUser struct {
+	host   string
+	user   string
+	active bool
+}
+
+type candidates []hostUser
+
+func switchRun(opts *SwitchOptions) error {
 	hostname := opts.Hostname
 	username := opts.Username
 
@@ -91,22 +96,22 @@ func logoutRun(opts *LogoutOptions) error {
 		}
 	}
 
-	type hostUser struct {
-		host string
-		user string
-	}
-	var candidates []hostUser
+	var candidates candidates
 
 	for _, host := range knownHosts {
 		if hostname != "" && host != hostname {
 			continue
+		}
+		hostActiveUser, err := authCfg.ActiveUser(host)
+		if err != nil {
+			return err
 		}
 		knownUsers := cfg.Authentication().UsersForHost(host)
 		for _, user := range knownUsers {
 			if username != "" && user != username {
 				continue
 			}
-			candidates = append(candidates, hostUser{host: host, user: user})
+			candidates = append(candidates, hostUser{host: host, user: user, active: user == hostActiveUser})
 		}
 	}
 
@@ -115,15 +120,28 @@ func logoutRun(opts *LogoutOptions) error {
 	} else if len(candidates) == 1 {
 		hostname = candidates[0].host
 		username = candidates[0].user
+	} else if len(candidates) == 2 &&
+		candidates[0].host == candidates[1].host {
+		// If there is a single host with two users, automatically swith to the
+		// inactive user without prompting.
+		hostname = candidates[0].host
+		username = candidates[0].user
+		if candidates[0].active {
+			username = candidates[1].user
+		}
 	} else if !opts.IO.CanPrompt() {
-		return errors.New("unable to determine which account to log out of, please specify `--hostname` and `--user`")
+		return errors.New("unable to determine which account to switch to, please specify `--hostname` and `--user`")
 	} else {
 		prompts := make([]string, len(candidates))
 		for i, c := range candidates {
-			prompts[i] = fmt.Sprintf("%s (%s)", c.user, c.host)
+			prompt := fmt.Sprintf("%s (%s)", c.user, c.host)
+			if c.active {
+				prompt += " - active"
+			}
+			prompts[i] = prompt
 		}
 		selected, err := opts.Prompter.Select(
-			"What account do you want to log out of?", "", prompts)
+			"What account do you want to switch to?", "", prompts)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
@@ -133,29 +151,21 @@ func logoutRun(opts *LogoutOptions) error {
 
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
-		fmt.Fprint(opts.IO.ErrOut, "To erase credentials stored in GitHub CLI, first clear the value from the environment.\n")
+		fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI manage credentials instead, first clear the value from the environment.\n")
 		return cmdutil.SilentError
 	}
 
-	// We can ignore the error here because a host must always have an active user
-	preLogoutActiveUser, _ := authCfg.ActiveUser(hostname)
+	cs := opts.IO.ColorScheme()
 
-	if err := authCfg.Logout(hostname, username); err != nil {
+	if err := authCfg.SwitchUser(hostname, username); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Failed to switch account for %s to %s\n",
+			cs.FailureIcon(), hostname, cs.Bold(username))
+
 		return err
 	}
 
-	postLogoutActiveUser, _ := authCfg.ActiveUser(hostname)
-	hasSwitchedToNewUser := preLogoutActiveUser != postLogoutActiveUser &&
-		postLogoutActiveUser != ""
-
-	cs := opts.IO.ColorScheme()
-	fmt.Fprintf(opts.IO.ErrOut, "%s Logged out of %s account %s\n",
+	fmt.Fprintf(opts.IO.ErrOut, "%s Switched active account for %s to %s\n",
 		cs.SuccessIcon(), hostname, cs.Bold(username))
-
-	if hasSwitchedToNewUser {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Switched active account for %s to %s\n",
-			cs.SuccessIcon(), hostname, cs.Bold(postLogoutActiveUser))
-	}
 
 	return nil
 }

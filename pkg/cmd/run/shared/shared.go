@@ -186,9 +186,9 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 						"number":     s.Number,
 					})
 				}
-				var completedAt *time.Time
+				var completedAt time.Time
 				if !j.CompletedAt.IsZero() {
-					completedAt = &j.CompletedAt
+					completedAt = j.CompletedAt
 				}
 				jobs = append(jobs, map[string]interface{}{
 					"databaseId":  j.ID,
@@ -200,8 +200,8 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 					"completedAt": completedAt,
 					"url":         j.URL,
 				})
-				data[f] = jobs
 			}
+			data[f] = jobs
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()

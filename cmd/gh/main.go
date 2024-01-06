@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmd/root"
@@ -55,6 +56,14 @@ func mainRun() exitCode {
 	stderr := cmdFactory.IOStreams.ErrOut
 
 	ctx := context.Background()
+
+	if cfg, err := cmdFactory.Config(); err == nil {
+		var m migration.MultiAccount
+		if err := cfg.Migrate(m); err != nil {
+			fmt.Fprintln(stderr, err)
+			return exitError
+		}
+	}
 
 	updateCtx, updateCancel := context.WithCancel(ctx)
 	defer updateCancel()

@@ -3,6 +3,7 @@ package view
 import (
 	"archive/zip"
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -29,7 +30,7 @@ import (
 
 type runLogCache interface {
 	Exists(string) bool
-	Create(string, io.ReadCloser) error
+	Create(string, io.Reader) error
 	Open(string) (*zip.ReadCloser, error)
 }
 
@@ -41,7 +42,7 @@ func (rlc) Exists(path string) bool {
 	}
 	return true
 }
-func (rlc) Create(path string, content io.ReadCloser) error {
+func (rlc) Create(path string, content io.Reader) error {
 	err := os.MkdirAll(filepath.Dir(path), 0755)
 	if err != nil {
 		return fmt.Errorf("could not create cache: %w", err)
@@ -442,7 +443,19 @@ func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface
 		}
 		defer resp.Close()
 
-		err = cache.Create(filepath, resp)
+		data, err := io.ReadAll(resp)
+		if err != nil {
+			return nil, err
+		}
+		respReader := bytes.NewReader(data)
+
+		// Check if the response is a valid zip format
+		_, err = zip.NewReader(respReader, respReader.Size())
+		if err != nil {
+			return nil, err
+		}
+
+		err = cache.Create(filepath, respReader)
 		if err != nil {
 			return nil, err
 		}
