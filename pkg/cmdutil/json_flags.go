@@ -110,7 +110,7 @@ func checkJSONFlags(cmd *cobra.Command) (*exportFormat, error) {
 	return nil, nil
 }
 
-func AddFormatFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
+func AddFormatFlags(cmd *cobra.Command, exportTarget *Exporter) {
 	var format string
 	StringEnumFlag(cmd, &format, "format", "", "", []string{"json"}, "Output format")
 	f := cmd.Flags()
@@ -125,7 +125,7 @@ func AddFormatFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string)
 			}
 		}
 
-		if export, err := checkFormatFlags(c, fields); err == nil {
+		if export, err := checkFormatFlags(c); err == nil {
 			if export == nil {
 				*exportTarget = nil
 			} else {
@@ -136,20 +136,9 @@ func AddFormatFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string)
 		}
 		return nil
 	}
-
-	cmd.SetFlagErrorFunc(func(c *cobra.Command, e error) error {
-		if c == cmd && e.Error() == "flag needs an argument: --json" {
-			sort.Strings(fields)
-			return JSONFlagError{fmt.Errorf("Specify one or more comma-separated fields for `--json`:\n  %s", strings.Join(fields, "\n  "))}
-		}
-		if cmd.HasParent() {
-			return cmd.Parent().FlagErrorFunc()(c, e)
-		}
-		return e
-	})
 }
 
-func checkFormatFlags(cmd *cobra.Command, fields []string) (*exportFormat, error) {
+func checkFormatFlags(cmd *cobra.Command) (*exportFormat, error) {
 	f := cmd.Flags()
 	formatFlag := f.Lookup("format")
 	formatValue := formatFlag.Value.String()
@@ -162,7 +151,6 @@ func checkFormatFlags(cmd *cobra.Command, fields []string) (*exportFormat, error
 			return nil, errors.New("cannot use `--web` with `--format`")
 		}
 		return &exportFormat{
-			fields:   fields,
 			filter:   jqFlag.Value.String(),
 			template: tplFlag.Value.String(),
 		}, nil

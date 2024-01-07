@@ -117,7 +117,6 @@ func TestAddJSONFlags(t *testing.T) {
 }
 
 func TestAddFormatFlags(t *testing.T) {
-	fields := []string{"id", "number"}
 	tests := []struct {
 		name        string
 		args        []string
@@ -163,7 +162,6 @@ func TestAddFormatFlags(t *testing.T) {
 			name: "with json format",
 			args: []string{"--format", "json"},
 			wantsExport: &exportFormat{
-				fields:   fields,
 				filter:   "",
 				template: "",
 			},
@@ -172,7 +170,6 @@ func TestAddFormatFlags(t *testing.T) {
 			name: "with jq filter",
 			args: []string{"--format", "json", "-q.number"},
 			wantsExport: &exportFormat{
-				fields:   fields,
 				filter:   ".number",
 				template: "",
 			},
@@ -181,7 +178,6 @@ func TestAddFormatFlags(t *testing.T) {
 			name: "with Go template",
 			args: []string{"--format", "json", "-t", "{{.number}}"},
 			wantsExport: &exportFormat{
-				fields:   fields,
 				filter:   "",
 				template: "{{.number}}",
 			},
@@ -192,7 +188,7 @@ func TestAddFormatFlags(t *testing.T) {
 			cmd := &cobra.Command{Run: func(*cobra.Command, []string) {}}
 			cmd.Flags().Bool("web", false, "")
 			var exporter Exporter
-			AddFormatFlags(cmd, &exporter, fields)
+			AddFormatFlags(cmd, &exporter)
 			cmd.SetArgs(tt.args)
 			cmd.SetOut(io.Discard)
 			cmd.SetErr(io.Discard)

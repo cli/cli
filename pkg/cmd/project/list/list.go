@@ -69,7 +69,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner")
 	listCmd.Flags().BoolVarP(&opts.closed, "closed", "", false, "Include closed projects")
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser")
-	cmdutil.AddFormatFlags(listCmd, &opts.exporter, format.ProjectFields)
+	cmdutil.AddFormatFlags(listCmd, &opts.exporter)
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of projects to fetch")
 
 	return listCmd
@@ -161,7 +161,6 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 		tp.AddField(
 			strconv.Itoa(int(p.Number)),
 			tableprinter.WithTruncate(nil),
-			tableprinter.WithColor(cs.ColorFromString(format.ColorForProjectState(p))),
 		)
 		tp.AddField(p.Title)
 		tp.AddField(

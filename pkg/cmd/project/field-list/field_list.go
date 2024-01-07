@@ -15,10 +15,10 @@ import (
 )
 
 type listOpts struct {
-	limit  int
-	owner  string
-	number int32
-	format string
+	limit    int
+	owner    string
+	number   int32
+	exporter cmdutil.Exporter
 }
 
 type listConfig struct {
@@ -66,7 +66,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	}
 
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
-	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(listCmd, &opts.exporter)
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of fields to fetch")
 
 	return listCmd
@@ -94,7 +94,7 @@ func runList(config listConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printJSON(config, project)
 	}
 
@@ -119,11 +119,6 @@ func printResults(config listConfig, fields []queries.ProjectField, login string
 }
 
 func printJSON(config listConfig, project *queries.Project) error {
-	b, err := format.JSONProjectFields(project)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
+	projectsJSON := format.JSONProjectFields(project)
+	return config.opts.exporter.Write(config.io, projectsJSON)
 }

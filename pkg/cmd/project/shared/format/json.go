@@ -86,20 +86,6 @@ func JSONProjects(projects []queries.Project, totalCount int) ProjectsJSON {
 	}
 }
 
-var ProjectFields = []string{
-	"number",
-	"url",
-	"shortDescription",
-	"public",
-	"closed",
-	"title",
-	"id",
-	"readme",
-	"items",
-	"fields",
-	"owner",
-}
-
 type ProjectJSON struct {
 	Number           int32  `json:"number"`
 	URL              string `json:"url"`
@@ -132,13 +118,13 @@ type ProjectsJSON struct {
 
 // JSONProjectField serializes a ProjectField to JSON.
 func JSONProjectField(field queries.ProjectField) ([]byte, error) {
-	val := projectFieldJSON{
+	val := ProjectFieldJSON{
 		ID:   field.ID(),
 		Name: field.Name(),
 		Type: field.Type(),
 	}
 	for _, o := range field.Options() {
-		val.Options = append(val.Options, singleSelectOptionJSON{
+		val.Options = append(val.Options, SingleSelectOptionJSON{
 			Name: o.Name,
 			ID:   o.ID,
 		})
@@ -149,16 +135,16 @@ func JSONProjectField(field queries.ProjectField) ([]byte, error) {
 
 // JSONProjectFields serializes a slice of ProjectFields to JSON.
 // JSON fields are `totalCount` and `fields`.
-func JSONProjectFields(project *queries.Project) ([]byte, error) {
-	var result []projectFieldJSON
+func JSONProjectFields(project *queries.Project) ProjectFieldsJSON {
+	var result []ProjectFieldJSON
 	for _, f := range project.Fields.Nodes {
-		val := projectFieldJSON{
+		val := ProjectFieldJSON{
 			ID:   f.ID(),
 			Name: f.Name(),
 			Type: f.Type(),
 		}
 		for _, o := range f.Options() {
-			val.Options = append(val.Options, singleSelectOptionJSON{
+			val.Options = append(val.Options, SingleSelectOptionJSON{
 				Name: o.Name,
 				ID:   o.ID,
 			})
@@ -167,23 +153,25 @@ func JSONProjectFields(project *queries.Project) ([]byte, error) {
 		result = append(result, val)
 	}
 
-	return json.Marshal(struct {
-		Fields     []projectFieldJSON `json:"fields"`
-		TotalCount int                `json:"totalCount"`
-	}{
+	return ProjectFieldsJSON{
 		Fields:     result,
 		TotalCount: project.Fields.TotalCount,
-	})
+	}
 }
 
-type projectFieldJSON struct {
+type ProjectFieldJSON struct {
 	ID      string                   `json:"id"`
 	Name    string                   `json:"name"`
 	Type    string                   `json:"type"`
-	Options []singleSelectOptionJSON `json:"options,omitempty"`
+	Options []SingleSelectOptionJSON `json:"options,omitempty"`
 }
 
-type singleSelectOptionJSON struct {
+type ProjectFieldsJSON struct {
+	Fields     []ProjectFieldJSON `json:"fields"`
+	TotalCount int                `json:"totalCount"`
+}
+
+type SingleSelectOptionJSON struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }

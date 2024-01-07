@@ -164,7 +164,8 @@ func TestJSONProjectFields(t *testing.T) {
 			TotalCount: 5,
 		},
 	}
-	b, err := JSONProjectFields(p)
+	projectFieldsJSON := JSONProjectFields(p)
+	b, err := json.Marshal(projectFieldsJSON)
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"fields":[{"id":"123","name":"name","type":"ProjectV2Field"},{"id":"123","name":"name","type":"ProjectV2SingleSelectField","options":[{"id":"123","name":"name"},{"id":"456","name":"name2"}]}],"totalCount":5}`, string(b))
