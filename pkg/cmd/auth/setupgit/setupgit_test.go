@@ -43,8 +43,10 @@ func Test_setupGitRun(t *testing.T) {
 			expectedErr: "oops",
 		},
 		{
-			name: "In absense of hostname default to github.com",
-			opts: &SetupGitOptions{},
+			name: "when there is no known hosts allow any hostname passed as flag",
+			opts: &SetupGitOptions{
+				Hostname: "foo",
+			},
 		},
 		{
 			name: "not authenticated with the hostname given as flag",
