@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdMarkTemplate(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       markTemplateOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         markTemplateOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "not-a-number",
@@ -48,11 +49,9 @@ func TestNewCmdMarkTemplate(t *testing.T) {
 		},
 
 		{
-			name: "json",
-			cli:  "--format json",
-			wants: markTemplateOpts{
-				format: "json",
-			},
+			name:          "json",
+			cli:           "--format json",
+			wantsExporter: true,
 		},
 	}
 
@@ -85,7 +84,7 @@ func TestNewCmdMarkTemplate(t *testing.T) {
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
 			assert.Equal(t, tt.wants.owner, gotOpts.owner)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }

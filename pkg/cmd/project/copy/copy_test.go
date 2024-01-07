@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdCopy(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       copyOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         copyOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "not-a-number",
@@ -68,9 +69,9 @@ func TestNewCmdCopy(t *testing.T) {
 			name: "json",
 			cli:  "--format json --title t",
 			wants: copyOpts{
-				format: "json",
-				title:  "t",
+				title: "t",
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -106,7 +107,7 @@ func TestNewCmdCopy(t *testing.T) {
 			assert.Equal(t, tt.wants.targetOwner, gotOpts.targetOwner)
 			assert.Equal(t, tt.wants.title, gotOpts.title)
 			assert.Equal(t, tt.wants.includeDraftIssues, gotOpts.includeDraftIssues)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }

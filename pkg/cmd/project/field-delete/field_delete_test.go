@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdDeleteField(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       deleteFieldOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         deleteFieldOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "no id",
@@ -36,9 +37,9 @@ func TestNewCmdDeleteField(t *testing.T) {
 			name: "json",
 			cli:  "--id 123 --format json",
 			wants: deleteFieldOpts{
-				format:  "json",
 				fieldID: "123",
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -70,7 +71,7 @@ func TestNewCmdDeleteField(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.fieldID, gotOpts.fieldID)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }

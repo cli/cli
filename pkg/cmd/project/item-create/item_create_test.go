@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdCreateItem(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       createItemOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         createItemOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "missing-title",
@@ -66,9 +67,9 @@ func TestNewCmdCreateItem(t *testing.T) {
 			name: "json",
 			cli:  "--format json --title t",
 			wants: createItemOpts{
-				format: "json",
-				title:  "t",
+				title: "t",
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -102,7 +103,7 @@ func TestNewCmdCreateItem(t *testing.T) {
 			assert.Equal(t, tt.wants.number, gotOpts.number)
 			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.title, gotOpts.title)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }

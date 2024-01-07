@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdaddItem(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       addItemOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         addItemOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "missing-url",
@@ -58,9 +59,9 @@ func TestNewCmdaddItem(t *testing.T) {
 			name: "json",
 			cli:  "--format json --url github.com/cli/cli",
 			wants: addItemOpts{
-				format:  "json",
 				itemURL: "github.com/cli/cli",
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -94,7 +95,7 @@ func TestNewCmdaddItem(t *testing.T) {
 			assert.Equal(t, tt.wants.number, gotOpts.number)
 			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.itemURL, gotOpts.itemURL)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }

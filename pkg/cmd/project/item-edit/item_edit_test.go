@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdeditItem(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       editItemOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         editItemOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "missing-id",
@@ -108,9 +109,9 @@ func TestNewCmdeditItem(t *testing.T) {
 			name: "json",
 			cli:  "--format json --id 123",
 			wants: editItemOpts{
-				format: "json",
 				itemID: "123",
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -143,7 +144,7 @@ func TestNewCmdeditItem(t *testing.T) {
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
 			assert.Equal(t, tt.wants.itemID, gotOpts.itemID)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 			assert.Equal(t, tt.wants.title, gotOpts.title)
 			assert.Equal(t, tt.wants.fieldID, gotOpts.fieldID)
 			assert.Equal(t, tt.wants.projectID, gotOpts.projectID)

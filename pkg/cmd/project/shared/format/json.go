@@ -1,15 +1,14 @@
 package format
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 )
 
 // JSONProject serializes a Project to JSON.
-func JSONProject(project queries.Project) ([]byte, error) {
-	return json.Marshal(ProjectJSON{
+func JSONProject(project queries.Project) ProjectJSON {
+	return ProjectJSON{
 		Number:           project.Number,
 		URL:              project.URL,
 		ShortDescription: project.ShortDescription,
@@ -39,7 +38,7 @@ func JSONProject(project queries.Project) ([]byte, error) {
 			Type:  project.OwnerType(),
 			Login: project.OwnerLogin(),
 		},
-	})
+	}
 }
 
 // JSONProjects serializes a slice of Projects to JSON.
@@ -117,7 +116,7 @@ type ProjectsJSON struct {
 }
 
 // JSONProjectField serializes a ProjectField to JSON.
-func JSONProjectField(field queries.ProjectField) ([]byte, error) {
+func JSONProjectField(field queries.ProjectField) ProjectFieldJSON {
 	val := ProjectFieldJSON{
 		ID:   field.ID(),
 		Name: field.Name(),
@@ -130,7 +129,7 @@ func JSONProjectField(field queries.ProjectField) ([]byte, error) {
 		})
 	}
 
-	return json.Marshal(val)
+	return val
 }
 
 // JSONProjectFields serializes a slice of ProjectFields to JSON.
@@ -177,17 +176,17 @@ type SingleSelectOptionJSON struct {
 }
 
 // JSONProjectItem serializes a ProjectItem to JSON.
-func JSONProjectItem(item queries.ProjectItem) ([]byte, error) {
-	return json.Marshal(projectItemJSON{
+func JSONProjectItem(item queries.ProjectItem) ProjectItemJSON {
+	return ProjectItemJSON{
 		ID:    item.ID(),
 		Title: item.Title(),
 		Body:  item.Body(),
 		Type:  item.Type(),
 		URL:   item.URL(),
-	})
+	}
 }
 
-type projectItemJSON struct {
+type ProjectItemJSON struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
 	Body  string `json:"body"`
@@ -200,17 +199,17 @@ type projectItemJSON struct {
 // https://docs.github.com/en/graphql/reference/mutations#updateprojectv2draftissue
 // is a DraftIssue https://docs.github.com/en/graphql/reference/objects#draftissue
 // and not a ProjectV2Item https://docs.github.com/en/graphql/reference/objects#projectv2item
-func JSONProjectDraftIssue(item queries.DraftIssue) ([]byte, error) {
+func JSONProjectDraftIssue(item queries.DraftIssue) DraftIssueJSON {
 
-	return json.Marshal(draftIssueJSON{
+	return DraftIssueJSON{
 		ID:    item.ID,
 		Title: item.Title,
 		Body:  item.Body,
 		Type:  "DraftIssue",
-	})
+	}
 }
 
-type draftIssueJSON struct {
+type DraftIssueJSON struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
 	Body  string `json:"body"`
@@ -361,15 +360,17 @@ func serializeProjectWithItems(project *queries.Project) []map[string]any {
 
 // JSONProjectWithItems returns a detailed JSON representation of project items.
 // JSON fields are `totalCount` and `items`.
-func JSONProjectDetailedItems(project *queries.Project) ([]byte, error) {
+func JSONProjectDetailedItems(project *queries.Project) ProjectDetailedItems {
 	items := serializeProjectWithItems(project)
-	return json.Marshal(struct {
-		Items      []map[string]any `json:"items"`
-		TotalCount int              `json:"totalCount"`
-	}{
+	return ProjectDetailedItems{
 		Items:      items,
 		TotalCount: project.Items.TotalCount,
-	})
+	}
+}
+
+type ProjectDetailedItems struct {
+	Items      []map[string]any `json:"items"`
+	TotalCount int              `json:"totalCount"`
 }
 
 // CamelCase converts a string to camelCase, which is useful for turning Go field names to JSON keys.

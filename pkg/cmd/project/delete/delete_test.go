@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdDelete(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       deleteOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         deleteOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "not-a-number",
@@ -40,11 +41,9 @@ func TestNewCmdDelete(t *testing.T) {
 			},
 		},
 		{
-			name: "json",
-			cli:  "--format json",
-			wants: deleteOpts{
-				format: "json",
-			},
+			name:          "json",
+			cli:           "--format json",
+			wantsExporter: true,
 		},
 	}
 
@@ -77,7 +76,7 @@ func TestNewCmdDelete(t *testing.T) {
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
 			assert.Equal(t, tt.wants.owner, gotOpts.owner)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }

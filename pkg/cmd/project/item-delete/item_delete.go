@@ -18,7 +18,7 @@ type deleteItemOpts struct {
 	number    int32
 	itemID    string
 	projectID string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type deleteItemConfig struct {
@@ -73,7 +73,7 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 
 	deleteItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	deleteItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to delete")
-	cmdutil.StringEnumFlag(deleteItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(deleteItemCmd, &opts.exporter)
 
 	_ = deleteItemCmd.MarkFlagRequired("id")
 
@@ -99,7 +99,7 @@ func runDeleteItem(config deleteItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printJSON(config, query.DeleteProjectItem.DeletedItemId)
 	}
 
@@ -126,6 +126,8 @@ func printResults(config deleteItemConfig) error {
 }
 
 func printJSON(config deleteItemConfig, ID githubv4.ID) error {
-	_, err := config.io.Out.Write([]byte(fmt.Sprintf(`{"id": "%s"}`, ID)))
-	return err
+	m := map[string]interface{}{
+		"id": ID,
+	}
+	return config.opts.exporter.Write(config.io, m)
 }

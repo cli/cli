@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdCreateField(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       createFieldOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         createFieldOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "missing-name-and-data-type",
@@ -70,11 +71,11 @@ func TestNewCmdCreateField(t *testing.T) {
 			name: "json",
 			cli:  "--format json --name n --data-type TEXT ",
 			wants: createFieldOpts{
-				format:              "json",
 				name:                "n",
 				dataType:            "TEXT",
 				singleSelectOptions: []string{},
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -110,7 +111,7 @@ func TestNewCmdCreateField(t *testing.T) {
 			assert.Equal(t, tt.wants.name, gotOpts.name)
 			assert.Equal(t, tt.wants.dataType, gotOpts.dataType)
 			assert.Equal(t, tt.wants.singleSelectOptions, gotOpts.singleSelectOptions)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }

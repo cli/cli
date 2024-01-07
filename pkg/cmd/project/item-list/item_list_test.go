@@ -15,11 +15,12 @@ import (
 
 func TestNewCmdList(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       listOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         listOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "not-a-number",
@@ -47,9 +48,9 @@ func TestNewCmdList(t *testing.T) {
 			name: "json",
 			cli:  "--format json",
 			wants: listOpts{
-				format: "json",
-				limit:  30,
+				limit: 30,
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -82,7 +83,7 @@ func TestNewCmdList(t *testing.T) {
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
 			assert.Equal(t, tt.wants.owner, gotOpts.owner)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 			assert.Equal(t, tt.wants.limit, gotOpts.limit)
 		})
 	}
