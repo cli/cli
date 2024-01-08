@@ -51,6 +51,7 @@ func TestJSONProject_Org(t *testing.T) {
 	assert.JSONEq(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"Organization","login":"github"}}`, string(b))
 }
 
+// Regression test from before ExportData was implemented.
 func TestJSONProjects(t *testing.T) {
 	userProject := queries.Project{
 		ID:               "123",
@@ -79,11 +80,13 @@ func TestJSONProjects(t *testing.T) {
 	orgProject.Fields.TotalCount = 2
 	orgProject.Owner.TypeName = "Organization"
 	orgProject.Owner.Organization.Login = "github"
-	projectsJSON := JSONProjects([]queries.Project{userProject, orgProject}, 2)
-	b, err := json.Marshal(projectsJSON)
+	b, err := json.Marshal(queries.Projects{
+		Nodes:      []queries.Project{userProject, orgProject},
+		TotalCount: 2,
+	}.ExportData(nil))
 	assert.NoError(t, err)
 
-	assert.Equal(
+	assert.JSONEq(
 		t,
 		`{"projects":[{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"User","login":"monalisa"}},{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"Organization","login":"github"}}],"totalCount":2}`,
 		string(b))

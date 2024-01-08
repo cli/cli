@@ -178,6 +178,22 @@ func (p Project) OwnerLogin() string {
 	return p.Owner.Organization.Login
 }
 
+type Projects struct {
+	Nodes      []Project
+	TotalCount int
+}
+
+func (p Projects) ExportData(_ []string) map[string]interface{} {
+	v := make([]map[string]interface{}, len(p.Nodes))
+	for i := range p.Nodes {
+		v[i] = p.Nodes[i].ExportData(nil)
+	}
+	return map[string]interface{}{
+		"projects":   v,
+		"totalCount": p.TotalCount,
+	}
+}
+
 // ProjectItem is a ProjectV2Item GraphQL object https://docs.github.com/en/graphql/reference/objects#projectv2item.
 type ProjectItem struct {
 	Content     ProjectItemContent
@@ -1107,17 +1123,17 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool)
 		return nil, fmt.Errorf("project number is required when not running interactively")
 	}
 
-	projects, _, err := c.Projects(o.Login, o.Type, 0, fields)
+	projects, err := c.Projects(o.Login, o.Type, 0, fields)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(projects) == 0 {
+	if len(projects.Nodes) == 0 {
 		return nil, fmt.Errorf("no projects found for %s", o.Login)
 	}
 
-	options := make([]string, 0, len(projects))
-	for _, p := range projects {
+	options := make([]string, 0, len(projects.Nodes))
+	for _, p := range projects.Nodes {
 		title := fmt.Sprintf("%s (#%d)", p.Title, p.Number)
 		options = append(options, title)
 	}
@@ -1127,16 +1143,17 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool)
 		return nil, err
 	}
 
-	return &projects[answerIndex], nil
+	return &projects.Nodes[answerIndex], nil
 }
 
 // Projects returns all the projects for an Owner. If the OwnerType is VIEWER, no login is required.
 // If limit is 0, the default limit is used.
-func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) ([]Project, int, error) {
-	projects := make([]Project, 0)
+func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) (Projects, error) {
+	projects := Projects{
+		Nodes: make([]Project, 0),
+	}
 	cursor := (*githubv4.String)(nil)
 	hasNextPage := false
-	totalCount := 0
 
 	if limit == 0 {
 		limit = LimitDefault
@@ -1172,38 +1189,38 @@ func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) ([]
 		if t == UserOwner {
 			var query userProjects
 			if err := c.doQuery("UserProjects", &query, variables); err != nil {
-				return projects, 0, err
+				return projects, err
 			}
-			projects = append(projects, query.Owner.Projects.Nodes...)
+			projects.Nodes = append(projects.Nodes, query.Owner.Projects.Nodes...)
 			hasNextPage = query.Owner.Projects.PageInfo.HasNextPage
 			cursor = &query.Owner.Projects.PageInfo.EndCursor
-			totalCount = query.Owner.Projects.TotalCount
+			projects.TotalCount = query.Owner.Projects.TotalCount
 		} else if t == OrgOwner {
 			var query orgProjects
 			if err := c.doQuery("OrgProjects", &query, variables); err != nil {
-				return projects, 0, err
+				return projects, err
 			}
-			projects = append(projects, query.Owner.Projects.Nodes...)
+			projects.Nodes = append(projects.Nodes, query.Owner.Projects.Nodes...)
 			hasNextPage = query.Owner.Projects.PageInfo.HasNextPage
 			cursor = &query.Owner.Projects.PageInfo.EndCursor
-			totalCount = query.Owner.Projects.TotalCount
+			projects.TotalCount = query.Owner.Projects.TotalCount
 		} else if t == ViewerOwner {
 			var query viewerProjects
 			if err := c.doQuery("ViewerProjects", &query, variables); err != nil {
-				return projects, 0, err
+				return projects, err
 			}
-			projects = append(projects, query.Owner.Projects.Nodes...)
+			projects.Nodes = append(projects.Nodes, query.Owner.Projects.Nodes...)
 			hasNextPage = query.Owner.Projects.PageInfo.HasNextPage
 			cursor = &query.Owner.Projects.PageInfo.EndCursor
-			totalCount = query.Owner.Projects.TotalCount
+			projects.TotalCount = query.Owner.Projects.TotalCount
 		}
 
-		if !hasNextPage || len(projects) >= limit {
-			return projects, totalCount, nil
+		if !hasNextPage || len(projects.Nodes) >= limit {
+			return projects, nil
 		}
 
-		if len(projects)+LimitMax > limit {
-			first := limit - len(projects)
+		if len(projects.Nodes)+LimitMax > limit {
+			first := limit - len(projects.Nodes)
 			variables["first"] = githubv4.Int(first)
 		}
 		variables["after"] = cursor
