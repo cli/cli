@@ -97,7 +97,7 @@ func runDelete(config deleteConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printJSON(config, *project)
+		return printJSON(config, query.DeleteProject.Project)
 	}
 
 	return printResults(config, query.DeleteProject.Project)

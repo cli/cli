@@ -509,3 +509,103 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 		"http://a-url.com\n",
 		stdout.String())
 }
+
+func TestRunUpdate_JSON(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// get user project ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  0,
+				"afterItems":  nil,
+				"firstFields": 0,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]string{
+						"id": "an ID",
+					},
+				},
+			},
+		})
+
+	// edit project
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation UpdateProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"an ID","title":"a new title","shortDescription":"a new description","readme":"a new readme","public":true}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"updateProjectV2": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"number": 1,
+						"title":  "a title",
+						"url":    "http://a-url.com",
+						"owner": map[string]string{
+							"login": "monalisa",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := editConfig{
+		opts: editOpts{
+			number:           1,
+			owner:            "monalisa",
+			title:            "a new title",
+			shortDescription: "a new description",
+			visibility:       "PUBLIC",
+			readme:           "a new readme",
+			exporter:         cmdutil.NewJSONExporter(),
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runEdit(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"number":1,"url":"http://a-url.com","shortDescription":"","public":false,"closed":false,"title":"a title","id":"","readme":"","items":{"totalCount":0},"fields":{"totalCount":0},"owner":{"type":"","login":"monalisa"}}`,
+		stdout.String())
+}

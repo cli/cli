@@ -532,3 +532,45 @@ func TestRunItemEdit_Clear(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "Edited item \"title\"\n", stdout.String())
 }
+
+func TestRunItemEdit_JSON(t *testing.T) {
+	defer gock.Off()
+	// gock.Observe(gock.DumpRequest)
+
+	// edit item
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation EditDraftIssueItem.*","variables":{"input":{"draftIssueId":"DI_item_id","title":"a title","body":"a new body"}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"updateProjectV2DraftIssue": map[string]interface{}{
+					"draftIssue": map[string]interface{}{
+						"title": "a title",
+						"body":  "a new body",
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			title:    "a title",
+			body:     "a new body",
+			itemID:   "DI_item_id",
+			exporter: cmdutil.NewJSONExporter(),
+		},
+		client: client,
+	}
+
+	err := runEditItem(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"id":"","title":"a title","body":"a new body","type":"DraftIssue"}`,
+		stdout.String())
+}

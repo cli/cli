@@ -887,3 +887,83 @@ func TestRunListWeb_Closed(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "https://github.com/users/theviewer/projects?query=is%3Aclosed", buf.String())
 }
+
+func TestRunList_JSON(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"nodes": []interface{}{
+							map[string]interface{}{
+								"title":            "Project 1",
+								"shortDescription": "Short description 1",
+								"url":              "url1",
+								"closed":           false,
+								"ID":               "id-1",
+								"number":           1,
+							},
+							map[string]interface{}{
+								"title":            "Project 2",
+								"shortDescription": "",
+								"url":              "url2",
+								"closed":           true,
+								"ID":               "id-2",
+								"number":           2,
+							},
+						},
+						"totalCount": 2,
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := listConfig{
+		opts: listOpts{
+			owner:    "monalisa",
+			exporter: cmdutil.NewJSONExporter(),
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"projects":[{"number":1,"url":"url1","shortDescription":"Short description 1","public":false,"closed":false,"title":"Project 1","id":"id-1","readme":"","items":{"totalCount":0},"fields":{"totalCount":0},"owner":{"type":"","login":""}}],"totalCount":2}`,
+		stdout.String())
+}

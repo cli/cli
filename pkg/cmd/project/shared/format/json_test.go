@@ -359,8 +359,8 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldMilestoneValue(t *testing.
 }
 
 func TestCamelCase(t *testing.T) {
-	assert.Equal(t, "camelCase", CamelCase("camelCase"))
-	assert.Equal(t, "camelCase", CamelCase("CamelCase"))
-	assert.Equal(t, "c", CamelCase("C"))
-	assert.Equal(t, "", CamelCase(""))
+	assert.Equal(t, "camelCase", camelCase("camelCase"))
+	assert.Equal(t, "camelCase", camelCase("CamelCase"))
+	assert.Equal(t, "c", camelCase("C"))
+	assert.Equal(t, "", camelCase(""))
 }

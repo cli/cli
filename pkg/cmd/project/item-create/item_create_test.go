@@ -371,3 +371,98 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 		"Created item\n",
 		stdout.String())
 }
+
+func TestRunCreateItem_JSON(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// get project ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  0,
+				"afterItems":  nil,
+				"firstFields": 0,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "an ID",
+					},
+				},
+			},
+		})
+
+	// create item
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation CreateDraftItem.*","variables":{"input":{"projectId":"an ID","title":"a title","body":""}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"addProjectV2DraftIssue": map[string]interface{}{
+					"projectItem": map[string]interface{}{
+						"id": "item ID",
+						"content": map[string]interface{}{
+							"__typename": "Draft",
+							"title":      "a title",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := createItemConfig{
+		opts: createItemOpts{
+			title:    "a title",
+			owner:    "monalisa",
+			number:   1,
+			exporter: cmdutil.NewJSONExporter(),
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runCreateItem(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"id":"item ID","title":"","body":"","type":"Draft"}`,
+		stdout.String())
+}

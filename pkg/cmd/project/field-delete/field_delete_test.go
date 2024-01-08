@@ -114,3 +114,44 @@ func TestRunDeleteField(t *testing.T) {
 		"Deleted field\n",
 		stdout.String())
 }
+
+func TestRunDeleteField_JSON(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// delete Field
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation DeleteField.*","variables":{"input":{"fieldId":"an ID"}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"deleteProjectV2Field": map[string]interface{}{
+					"projectV2Field": map[string]interface{}{
+						"__typename": "ProjectV2Field",
+						"id":         "Field ID",
+						"name":       "a name",
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := deleteFieldConfig{
+		opts: deleteFieldOpts{
+			fieldID:  "an ID",
+			exporter: cmdutil.NewJSONExporter(),
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runDeleteField(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"id":"Field ID","name":"a name","type":"ProjectV2Field"}`,
+		stdout.String())
+}

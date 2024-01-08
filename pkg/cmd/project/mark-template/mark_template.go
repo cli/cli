@@ -121,7 +121,7 @@ func runMarkTemplate(config markTemplateConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printJSON(config, *project)
+		return printJSON(config, query.TemplateProject.Project)
 	}
 
 	return printResults(config, query.TemplateProject.Project)

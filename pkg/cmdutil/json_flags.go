@@ -173,6 +173,18 @@ type exportFormat struct {
 	template string
 }
 
+// NewJSONExporter returns an Exporter to emit JSON.
+func NewJSONExporter(opts ...JSONExporterOption) Exporter {
+	e := &exportFormat{}
+	for _, opt := range opts {
+		opt(e)
+	}
+	return e
+}
+
+// JSONExporterOption customizes a JSON Exporter for NewJSONExporter.
+type JSONExporterOption func(e *exportFormat)
+
 func (e *exportFormat) Fields() []string {
 	return e.fields
 }

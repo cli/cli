@@ -275,3 +275,74 @@ func TestRunCreate_Me(t *testing.T) {
 		"http://a-url.com\n",
 		stdout.String())
 }
+
+func TestRunCreate_JSON(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]string{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id":    "an ID",
+					"login": "monalisa",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// create project
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation CreateProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"ownerId":"an ID","title":"a title"}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"createProjectV2": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"number": 1,
+						"title":  "a title",
+						"url":    "http://a-url.com",
+						"owner": map[string]string{
+							"login": "monalisa",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := createConfig{
+		opts: createOpts{
+			title:    "a title",
+			owner:    "monalisa",
+			exporter: cmdutil.NewJSONExporter(),
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runCreate(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"number":1,"url":"http://a-url.com","shortDescription":"","public":false,"closed":false,"title":"a title","id":"","readme":"","items":{"totalCount":0},"fields":{"totalCount":0},"owner":{"type":"","login":"monalisa"}}`,
+		stdout.String())
+}

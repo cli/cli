@@ -337,7 +337,7 @@ func serializeProjectWithItems(project *queries.Project) []map[string]any {
 
 	// make a map of fields by ID
 	for _, f := range project.Fields.Nodes {
-		fields[f.ID()] = CamelCase(f.Name())
+		fields[f.ID()] = camelCase(f.Name())
 	}
 	itemsSlice := make([]map[string]any, 0)
 
@@ -373,8 +373,8 @@ type ProjectDetailedItems struct {
 	TotalCount int              `json:"totalCount"`
 }
 
-// CamelCase converts a string to camelCase, which is useful for turning Go field names to JSON keys.
-func CamelCase(s string) string {
+// camelCase converts a string to camelCase, which is useful for turning Go field names to JSON keys.
+func camelCase(s string) string {
 	if len(s) == 0 {
 		return ""
 	}

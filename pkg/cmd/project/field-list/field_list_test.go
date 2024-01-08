@@ -513,3 +513,97 @@ func TestRunList_Empty(t *testing.T) {
 		err,
 		"Project 1 for owner @me has no fields")
 }
+
+func TestRunList_JSON(t *testing.T) {
+	defer gock.Off()
+	// gock.Observe(gock.DumpRequest)
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// list project fields
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  queries.LimitMax,
+				"afterItems":  nil,
+				"firstFields": queries.LimitDefault,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"fields": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"__typename": "ProjectV2Field",
+									"name":       "FieldTitle",
+									"id":         "field ID",
+								},
+								{
+									"__typename": "ProjectV2SingleSelectField",
+									"name":       "Status",
+									"id":         "status ID",
+								},
+								{
+									"__typename": "ProjectV2IterationField",
+									"name":       "Iterations",
+									"id":         "iteration ID",
+								},
+							},
+							"totalCount": 3,
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := listConfig{
+		opts: listOpts{
+			number:   1,
+			owner:    "monalisa",
+			exporter: cmdutil.NewJSONExporter(),
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"fields":[{"id":"field ID","name":"FieldTitle","type":"ProjectV2Field"},{"id":"status ID","name":"Status","type":"ProjectV2SingleSelectField"},{"id":"iteration ID","name":"Iterations","type":"ProjectV2IterationField"}],"totalCount":3}`,
+		stdout.String())
+}

@@ -111,7 +111,7 @@ func runEdit(config editConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printJSON(config, *project)
+		return printJSON(config, query.UpdateProjectV2.ProjectV2)
 	}
 
 	return printResults(config, query.UpdateProjectV2.ProjectV2)
