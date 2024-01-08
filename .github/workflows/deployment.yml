@@ -215,9 +215,6 @@ jobs:
           Get-ChildItem -Path .\dist -Filter *.msi | ForEach-Object {
             .\script\sign.ps1 $_.FullName
           }
-        env:
-          CERT_FILE: ${{ steps.obtain_cert.outputs.cert-file }}
-          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
       - uses: actions/upload-artifact@v3
         with:
           name: windows
