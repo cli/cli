@@ -6,41 +6,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 )
 
-// JSONProject serializes a Project to JSON.
-func JSONProject(project queries.Project) ProjectJSON {
-	return ProjectJSON{
-		Number:           project.Number,
-		URL:              project.URL,
-		ShortDescription: project.ShortDescription,
-		Public:           project.Public,
-		Closed:           project.Closed,
-		// The Template field is commented out due to https://github.com/cli/cli/issues/8103.
-		// The Template field does not exist on GHES 3.8 and older, once GHES 3.8 gets
-		// deprecated on 2024-03-07 we can start populating this field again.
-		// Template: project.Template,
-		Title:  project.Title,
-		ID:     project.ID,
-		Readme: project.Readme,
-		Items: struct {
-			TotalCount int `json:"totalCount"`
-		}{
-			TotalCount: project.Items.TotalCount,
-		},
-		Fields: struct {
-			TotalCount int `json:"totalCount"`
-		}{
-			TotalCount: project.Fields.TotalCount,
-		},
-		Owner: struct {
-			Type  string `json:"type"`
-			Login string `json:"login"`
-		}{
-			Type:  project.OwnerType(),
-			Login: project.OwnerLogin(),
-		},
-	}
-}
-
 // JSONProjects serializes a slice of Projects to JSON.
 // JSON fields are `totalCount` and `projects`.
 func JSONProjects(projects []queries.Project, totalCount int) ProjectsJSON {

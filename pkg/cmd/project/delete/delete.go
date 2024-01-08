@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -97,7 +96,7 @@ func runDelete(config deleteConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printJSON(config, query.DeleteProject.Project)
+		return config.opts.exporter.Write(config.io, query.DeleteProject.Project)
 	}
 
 	return printResults(config, query.DeleteProject.Project)
@@ -123,9 +122,4 @@ func printResults(config deleteConfig, project queries.Project) error {
 
 	_, err := fmt.Fprintf(config.io.Out, "Deleted project %d\n", project.Number)
 	return err
-}
-
-func printJSON(config deleteConfig, project queries.Project) error {
-	projectJSON := format.JSONProject(project)
-	return config.opts.exporter.Write(config.io, projectJSON)
 }

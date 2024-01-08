@@ -144,6 +144,29 @@ type Project struct {
 	}
 }
 
+func (p Project) ExportData(_ []string) map[string]interface{} {
+	return map[string]interface{}{
+		"number":           p.Number,
+		"url":              p.URL,
+		"shortDescription": p.ShortDescription,
+		"public":           p.Public,
+		"closed":           p.Closed,
+		"title":            p.Title,
+		"id":               p.ID,
+		"readme":           p.Readme,
+		"items": map[string]interface{}{
+			"totalCount": p.Items.TotalCount,
+		},
+		"fields": map[string]interface{}{
+			"totalCount": p.Fields.TotalCount,
+		},
+		"owner": map[string]interface{}{
+			"type":  p.OwnerType(),
+			"login": p.OwnerLogin(),
+		},
+	}
+}
+
 func (p Project) OwnerType() string {
 	return p.Owner.TypeName
 }

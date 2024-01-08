@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Regression test from before ExportData was implemented.
 func TestJSONProject_User(t *testing.T) {
 	project := queries.Project{
 		ID:               "123",
@@ -23,12 +24,13 @@ func TestJSONProject_User(t *testing.T) {
 	project.Fields.TotalCount = 2
 	project.Owner.TypeName = "User"
 	project.Owner.User.Login = "monalisa"
-	b, err := json.Marshal(JSONProject(project))
+	b, err := json.Marshal(project.ExportData(nil))
 	assert.NoError(t, err)
 
-	assert.Equal(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"User","login":"monalisa"}}`, string(b))
+	assert.JSONEq(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"User","login":"monalisa"}}`, string(b))
 }
 
+// Regression test from before ExportData was implemented.
 func TestJSONProject_Org(t *testing.T) {
 	project := queries.Project{
 		ID:               "123",
@@ -43,10 +45,10 @@ func TestJSONProject_Org(t *testing.T) {
 	project.Fields.TotalCount = 2
 	project.Owner.TypeName = "Organization"
 	project.Owner.Organization.Login = "github"
-	b, err := json.Marshal(JSONProject(project))
+	b, err := json.Marshal(project.ExportData(nil))
 	assert.NoError(t, err)
 
-	assert.Equal(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"Organization","login":"github"}}`, string(b))
+	assert.JSONEq(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"Organization","login":"github"}}`, string(b))
 }
 
 func TestJSONProjects(t *testing.T) {
