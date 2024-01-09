@@ -125,9 +125,9 @@ func printResults(config deleteItemConfig) error {
 	return err
 }
 
-func printJSON(config deleteItemConfig, ID githubv4.ID) error {
+func printJSON(config deleteItemConfig, id githubv4.ID) error {
 	m := map[string]interface{}{
-		"id": ID,
+		"id": id,
 	}
 	return config.opts.exporter.Write(config.io, m)
 }

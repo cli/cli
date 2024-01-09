@@ -85,7 +85,7 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	})
 }
 
-func checkJSONFlags(cmd *cobra.Command) (*exportFormat, error) {
+func checkJSONFlags(cmd *cobra.Command) (*jsonExporter, error) {
 	f := cmd.Flags()
 	jsonFlag := f.Lookup("json")
 	jqFlag := f.Lookup("jq")
@@ -97,7 +97,7 @@ func checkJSONFlags(cmd *cobra.Command) (*exportFormat, error) {
 			return nil, errors.New("cannot use `--web` with `--json`")
 		}
 		jv := jsonFlag.Value.(pflag.SliceValue)
-		return &exportFormat{
+		return &jsonExporter{
 			fields:   jv.GetSlice(),
 			filter:   jqFlag.Value.String(),
 			template: tplFlag.Value.String(),
@@ -138,7 +138,7 @@ func AddFormatFlags(cmd *cobra.Command, exportTarget *Exporter) {
 	}
 }
 
-func checkFormatFlags(cmd *cobra.Command) (*exportFormat, error) {
+func checkFormatFlags(cmd *cobra.Command) (*jsonExporter, error) {
 	f := cmd.Flags()
 	formatFlag := f.Lookup("format")
 	formatValue := formatFlag.Value.String()
@@ -150,7 +150,7 @@ func checkFormatFlags(cmd *cobra.Command) (*exportFormat, error) {
 		if webFlag != nil && webFlag.Changed {
 			return nil, errors.New("cannot use `--web` with `--format`")
 		}
-		return &exportFormat{
+		return &jsonExporter{
 			filter:   jqFlag.Value.String(),
 			template: tplFlag.Value.String(),
 		}, nil
@@ -167,32 +167,25 @@ type Exporter interface {
 	Write(io *iostreams.IOStreams, data interface{}) error
 }
 
-type exportFormat struct {
+type jsonExporter struct {
 	fields   []string
 	filter   string
 	template string
 }
 
 // NewJSONExporter returns an Exporter to emit JSON.
-func NewJSONExporter(opts ...JSONExporterOption) Exporter {
-	e := &exportFormat{}
-	for _, opt := range opts {
-		opt(e)
-	}
-	return e
+func NewJSONExporter() Exporter {
+	return &jsonExporter{}
 }
 
-// JSONExporterOption customizes a JSON Exporter for NewJSONExporter.
-type JSONExporterOption func(e *exportFormat)
-
-func (e *exportFormat) Fields() []string {
+func (e *jsonExporter) Fields() []string {
 	return e.fields
 }
 
 // Write serializes data into JSON output written to w. If the object passed as data implements exportable,
 // or if data is a map or slice of exportable object, ExportData() will be called on each object to obtain
 // raw data for serialization.
-func (e *exportFormat) Write(ios *iostreams.IOStreams, data interface{}) error {
+func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
 	buf := bytes.Buffer{}
 	encoder := json.NewEncoder(&buf)
 	encoder.SetEscapeHTML(false)
@@ -226,7 +219,7 @@ func (e *exportFormat) Write(ios *iostreams.IOStreams, data interface{}) error {
 	return err
 }
 
-func (e *exportFormat) exportData(v reflect.Value) interface{} {
+func (e *jsonExporter) exportData(v reflect.Value) interface{} {
 	switch v.Kind() {
 	case reflect.Ptr, reflect.Interface:
 		if !v.IsNil() {

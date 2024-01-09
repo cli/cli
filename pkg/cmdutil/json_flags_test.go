@@ -16,7 +16,7 @@ func TestAddJSONFlags(t *testing.T) {
 		name        string
 		fields      []string
 		args        []string
-		wantsExport *exportFormat
+		wantsExport *jsonExporter
 		wantsError  string
 	}{
 		{
@@ -64,7 +64,7 @@ func TestAddJSONFlags(t *testing.T) {
 			name:   "with JSON fields",
 			fields: []string{"id", "number", "title"},
 			args:   []string{"--json", "number,title"},
-			wantsExport: &exportFormat{
+			wantsExport: &jsonExporter{
 				fields:   []string{"number", "title"},
 				filter:   "",
 				template: "",
@@ -74,7 +74,7 @@ func TestAddJSONFlags(t *testing.T) {
 			name:   "with jq filter",
 			fields: []string{"id", "number", "title"},
 			args:   []string{"--json", "number", "-q.number"},
-			wantsExport: &exportFormat{
+			wantsExport: &jsonExporter{
 				fields:   []string{"number"},
 				filter:   ".number",
 				template: "",
@@ -84,7 +84,7 @@ func TestAddJSONFlags(t *testing.T) {
 			name:   "with Go template",
 			fields: []string{"id", "number", "title"},
 			args:   []string{"--json", "number", "-t", "{{.number}}"},
-			wantsExport: &exportFormat{
+			wantsExport: &jsonExporter{
 				fields:   []string{"number"},
 				filter:   "",
 				template: "{{.number}}",
@@ -120,7 +120,7 @@ func TestAddFormatFlags(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        []string
-		wantsExport *exportFormat
+		wantsExport *jsonExporter
 		wantsError  string
 	}{
 		{
@@ -161,7 +161,7 @@ func TestAddFormatFlags(t *testing.T) {
 		{
 			name: "with json format",
 			args: []string{"--format", "json"},
-			wantsExport: &exportFormat{
+			wantsExport: &jsonExporter{
 				filter:   "",
 				template: "",
 			},
@@ -169,7 +169,7 @@ func TestAddFormatFlags(t *testing.T) {
 		{
 			name: "with jq filter",
 			args: []string{"--format", "json", "-q.number"},
-			wantsExport: &exportFormat{
+			wantsExport: &jsonExporter{
 				filter:   ".number",
 				template: "",
 			},
@@ -177,7 +177,7 @@ func TestAddFormatFlags(t *testing.T) {
 		{
 			name: "with Go template",
 			args: []string{"--format", "json", "-t", "{{.number}}"},
-			wantsExport: &exportFormat{
+			wantsExport: &jsonExporter{
 				filter:   "",
 				template: "{{.number}}",
 			},
@@ -214,7 +214,7 @@ func Test_exportFormat_Write(t *testing.T) {
 	}
 	tests := []struct {
 		name     string
-		exporter exportFormat
+		exporter jsonExporter
 		args     args
 		wantW    string
 		wantErr  bool
@@ -222,7 +222,7 @@ func Test_exportFormat_Write(t *testing.T) {
 	}{
 		{
 			name:     "regular JSON output",
-			exporter: exportFormat{},
+			exporter: jsonExporter{},
 			args: args{
 				data: map[string]string{"name": "hubot"},
 			},
@@ -232,7 +232,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		},
 		{
 			name:     "call ExportData",
-			exporter: exportFormat{fields: []string{"field1", "field2"}},
+			exporter: jsonExporter{fields: []string{"field1", "field2"}},
 			args: args{
 				data: &exportableItem{"item1"},
 			},
@@ -242,7 +242,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		},
 		{
 			name:     "recursively call ExportData",
-			exporter: exportFormat{fields: []string{"f1", "f2"}},
+			exporter: jsonExporter{fields: []string{"f1", "f2"}},
 			args: args{
 				data: map[string]interface{}{
 					"s1": []exportableItem{{"i1"}, {"i2"}},
@@ -255,7 +255,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		},
 		{
 			name:     "with jq filter",
-			exporter: exportFormat{filter: ".name"},
+			exporter: jsonExporter{filter: ".name"},
 			args: args{
 				data: map[string]string{"name": "hubot"},
 			},
@@ -265,7 +265,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		},
 		{
 			name:     "with jq filter pretty printing",
-			exporter: exportFormat{filter: "."},
+			exporter: jsonExporter{filter: "."},
 			args: args{
 				data: map[string]string{"name": "hubot"},
 			},
@@ -275,7 +275,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		},
 		{
 			name:     "with Go template",
-			exporter: exportFormat{template: "{{.name}}"},
+			exporter: jsonExporter{template: "{{.name}}"},
 			args: args{
 				data: map[string]string{"name": "hubot"},
 			},
