@@ -22,7 +22,7 @@ type copyOpts struct {
 	sourceOwner        string
 	targetOwner        string
 	title              string
-	format             string
+	exporter           cmdutil.Exporter
 }
 
 type copyConfig struct {
@@ -79,7 +79,7 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 	copyCmd.Flags().StringVar(&opts.targetOwner, "target-owner", "", "Login of the target owner. Use \"@me\" for the current user.")
 	copyCmd.Flags().StringVar(&opts.title, "title", "", "Title for the new project")
 	copyCmd.Flags().BoolVar(&opts.includeDraftIssues, "drafts", false, "Include draft issues when copying")
-	cmdutil.StringEnumFlag(copyCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(copyCmd, &opts.exporter)
 
 	_ = copyCmd.MarkFlagRequired("title")
 
@@ -113,7 +113,7 @@ func runCopy(config copyConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printJSON(config, query.CopyProjectV2.ProjectV2)
 	}
 
@@ -144,10 +144,6 @@ func printResults(config copyConfig, project queries.Project) error {
 }
 
 func printJSON(config copyConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-	_, err = config.io.Out.Write(b)
-	return err
+	projectJSON := format.JSONProject(project)
+	return config.opts.exporter.Write(config.io, projectJSON)
 }

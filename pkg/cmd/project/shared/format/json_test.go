@@ -1,6 +1,7 @@
 package format
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -22,7 +23,7 @@ func TestJSONProject_User(t *testing.T) {
 	project.Fields.TotalCount = 2
 	project.Owner.TypeName = "User"
 	project.Owner.User.Login = "monalisa"
-	b, err := JSONProject(project)
+	b, err := json.Marshal(JSONProject(project))
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"User","login":"monalisa"}}`, string(b))
@@ -42,7 +43,7 @@ func TestJSONProject_Org(t *testing.T) {
 	project.Fields.TotalCount = 2
 	project.Owner.TypeName = "Organization"
 	project.Owner.Organization.Login = "github"
-	b, err := JSONProject(project)
+	b, err := json.Marshal(JSONProject(project))
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"number":2,"url":"a url","shortDescription":"short description","public":true,"closed":false,"title":"","id":"123","readme":"readme","items":{"totalCount":1},"fields":{"totalCount":2},"owner":{"type":"Organization","login":"github"}}`, string(b))
@@ -76,7 +77,8 @@ func TestJSONProjects(t *testing.T) {
 	orgProject.Fields.TotalCount = 2
 	orgProject.Owner.TypeName = "Organization"
 	orgProject.Owner.Organization.Login = "github"
-	b, err := JSONProjects([]queries.Project{userProject, orgProject}, 2)
+	projectsJSON := JSONProjects([]queries.Project{userProject, orgProject}, 2)
+	b, err := json.Marshal(projectsJSON)
 	assert.NoError(t, err)
 
 	assert.Equal(
@@ -91,7 +93,7 @@ func TestJSONProjectField_FieldType(t *testing.T) {
 	field.Field.ID = "123"
 	field.Field.Name = "name"
 
-	b, err := JSONProjectField(field)
+	b, err := json.Marshal(JSONProjectField(field))
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"id":"123","name":"name","type":"ProjectV2Field"}`, string(b))
@@ -113,7 +115,7 @@ func TestJSONProjectField_SingleSelectType(t *testing.T) {
 		},
 	}
 
-	b, err := JSONProjectField(field)
+	b, err := json.Marshal(JSONProjectField(field))
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"id":"123","name":"name","type":"ProjectV2SingleSelectField","options":[{"id":"123","name":"name"},{"id":"456","name":"name2"}]}`, string(b))
@@ -125,7 +127,7 @@ func TestJSONProjectField_ProjectV2IterationField(t *testing.T) {
 	field.IterationField.ID = "123"
 	field.IterationField.Name = "name"
 
-	b, err := JSONProjectField(field)
+	b, err := json.Marshal(JSONProjectField(field))
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"id":"123","name":"name","type":"ProjectV2IterationField"}`, string(b))
@@ -162,7 +164,8 @@ func TestJSONProjectFields(t *testing.T) {
 			TotalCount: 5,
 		},
 	}
-	b, err := JSONProjectFields(p)
+	projectFieldsJSON := JSONProjectFields(p)
+	b, err := json.Marshal(projectFieldsJSON)
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"fields":[{"id":"123","name":"name","type":"ProjectV2Field"},{"id":"123","name":"name","type":"ProjectV2SingleSelectField","options":[{"id":"123","name":"name"},{"id":"456","name":"name2"}]}],"totalCount":5}`, string(b))
@@ -175,7 +178,7 @@ func TestJSONProjectItem_DraftIssue(t *testing.T) {
 	item.Content.DraftIssue.Title = "title"
 	item.Content.DraftIssue.Body = "a body"
 
-	b, err := JSONProjectItem(item)
+	b, err := json.Marshal(JSONProjectItem(item))
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"id":"123","title":"title","body":"a body","type":"DraftIssue"}`, string(b))
@@ -189,7 +192,7 @@ func TestJSONProjectItem_Issue(t *testing.T) {
 	item.Content.Issue.Body = "a body"
 	item.Content.Issue.URL = "a-url"
 
-	b, err := JSONProjectItem(item)
+	b, err := json.Marshal(JSONProjectItem(item))
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"id":"123","title":"title","body":"a body","type":"Issue","url":"a-url"}`, string(b))
@@ -203,7 +206,7 @@ func TestJSONProjectItem_PullRequest(t *testing.T) {
 	item.Content.PullRequest.Body = "a body"
 	item.Content.PullRequest.URL = "a-url"
 
-	b, err := JSONProjectItem(item)
+	b, err := json.Marshal(JSONProjectItem(item))
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"id":"123","title":"title","body":"a body","type":"PullRequest","url":"a-url"}`, string(b))
@@ -259,7 +262,7 @@ func TestJSONProjectDetailedItems(t *testing.T) {
 		},
 	}
 
-	out, err := JSONProjectDetailedItems(p)
+	out, err := json.Marshal(JSONProjectDetailedItems(p))
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -273,7 +276,7 @@ func TestJSONProjectDraftIssue(t *testing.T) {
 	item.Title = "title"
 	item.Body = "a body"
 
-	b, err := JSONProjectDraftIssue(item)
+	b, err := json.Marshal(JSONProjectDraftIssue(item))
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"id":"123","title":"title","body":"a body","type":"DraftIssue"}`, string(b))
@@ -308,7 +311,7 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldIterationValue(t *testing.
 		draftIssue,
 	}
 
-	out, err := JSONProjectDetailedItems(p)
+	out, err := json.Marshal(JSONProjectDetailedItems(p))
 	assert.NoError(t, err)
 	assert.JSONEq(
 		t,
@@ -346,7 +349,7 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldMilestoneValue(t *testing.
 		draftIssue,
 	}
 
-	out, err := JSONProjectDetailedItems(p)
+	out, err := json.Marshal(JSONProjectDetailedItems(p))
 	assert.NoError(t, err)
 	assert.JSONEq(
 		t,
@@ -356,8 +359,8 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldMilestoneValue(t *testing.
 }
 
 func TestCamelCase(t *testing.T) {
-	assert.Equal(t, "camelCase", CamelCase("camelCase"))
-	assert.Equal(t, "camelCase", CamelCase("CamelCase"))
-	assert.Equal(t, "c", CamelCase("C"))
-	assert.Equal(t, "", CamelCase(""))
+	assert.Equal(t, "camelCase", camelCase("camelCase"))
+	assert.Equal(t, "camelCase", camelCase("CamelCase"))
+	assert.Equal(t, "c", camelCase("C"))
+	assert.Equal(t, "", camelCase(""))
 }
