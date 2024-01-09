@@ -127,7 +127,7 @@ func TestPrintFlagsHTMLShowsDefaultValues(t *testing.T) {
 	}
 	output := buf.String()
 
-	checkStringContains(t, output, "(Default: 30)")
+	checkStringContains(t, output, "(default 30)")
 
 	// Bool flag should hide it if default is false
 	c = &cobra.Command{}
@@ -142,7 +142,7 @@ func TestPrintFlagsHTMLShowsDefaultValues(t *testing.T) {
 	}
 	output = buf.String()
 
-	checkStringOmits(t, output, "(Default: ")
+	checkStringOmits(t, output, "(default ")
 
 	// Bool flag should show it if default is true
 	c = &cobra.Command{}
@@ -156,7 +156,7 @@ func TestPrintFlagsHTMLShowsDefaultValues(t *testing.T) {
 	}
 	output = buf.String()
 
-	checkStringContains(t, output, "(Default: true)")
+	checkStringContains(t, output, "(default true)")
 
 	// String flag should show it if default is not an empty string
 	c = &cobra.Command{}
@@ -170,7 +170,7 @@ func TestPrintFlagsHTMLShowsDefaultValues(t *testing.T) {
 	}
 	output = buf.String()
 
-	checkStringContains(t, output, "(Default: T1)")
+	checkStringContains(t, output, "(default &#34;T1&#34;)")
 
 	// String flag should hide it if default is an empty string
 	c = &cobra.Command{}
@@ -185,7 +185,7 @@ func TestPrintFlagsHTMLShowsDefaultValues(t *testing.T) {
 	}
 	output = buf.String()
 
-	checkStringOmits(t, output, "(Default: ")
+	checkStringOmits(t, output, "(default ")
 
 	// String slice flag should hide it if default is an empty slice
 	c = &cobra.Command{}
@@ -199,7 +199,7 @@ func TestPrintFlagsHTMLShowsDefaultValues(t *testing.T) {
 	}
 	output = buf.String()
 
-	checkStringOmits(t, output, "(Default: ")
+	checkStringOmits(t, output, "(default ")
 
 	// String slice flag should show it if default is not an empty slice
 	c = &cobra.Command{}
@@ -213,5 +213,5 @@ func TestPrintFlagsHTMLShowsDefaultValues(t *testing.T) {
 	}
 	output = buf.String()
 
-	checkStringContains(t, output, "(Default: [apples,oranges])")
+	checkStringContains(t, output, "(default [apples,oranges])")
 }

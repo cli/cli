@@ -107,7 +107,7 @@ func TestManPrintFlagsHidesShortDeprecated(t *testing.T) {
 	manPrintFlags(buf, c.Flags())
 
 	got := buf.String()
-	expected := "`--foo` `<string> (Default: default)`\n:   Foo flag\n\n"
+	expected := "`--foo` `<string> (default \"default\")`\n:   Foo flag\n\n"
 	if got != expected {
 		t.Errorf("Expected %q, got %q", expected, got)
 	}
@@ -147,7 +147,7 @@ func TestManPrintFlagsShowsDefaultValues(t *testing.T) {
 	manPrintFlags(buf, c.Flags())
 
 	got := buf.String()
-	expected := "`--limit` `<int> (Default: 30)`\n:   Some limit\n\n"
+	expected := "`--limit` `<int> (default 30)`\n:   Some limit\n\n"
 	if got != expected {
 		t.Errorf("Expected %q, got %q", expected, got)
 	}
@@ -173,7 +173,7 @@ func TestManPrintFlagsShowsDefaultValues(t *testing.T) {
 	manPrintFlags(buf, c.Flags())
 
 	got = buf.String()
-	expected = "`--no-archived` `(Default: true)`\n:   Hide archived\n\n"
+	expected = "`--no-archived` `(default true)`\n:   Hide archived\n\n"
 	if got != expected {
 		t.Errorf("Expected %q, got %q", expected, got)
 	}
@@ -186,7 +186,7 @@ func TestManPrintFlagsShowsDefaultValues(t *testing.T) {
 	manPrintFlags(buf, c.Flags())
 
 	got = buf.String()
-	expected = "`--template` `<string> (Default: T1)`\n:   Some template\n\n"
+	expected = "`--template` `<string> (default \"T1\")`\n:   Some template\n\n"
 	if got != expected {
 		t.Errorf("Expected %q, got %q", expected, got)
 	}
@@ -225,7 +225,7 @@ func TestManPrintFlagsShowsDefaultValues(t *testing.T) {
 	manPrintFlags(buf, c.Flags())
 
 	got = buf.String()
-	expected = "`--topic` `<strings> (Default: [apples,oranges])`\n:   Some topics\n\n"
+	expected = "`--topic` `<strings> (default [apples,oranges])`\n:   Some topics\n\n"
 	if got != expected {
 		t.Errorf("Expected %q, got %q", expected, got)
 	}

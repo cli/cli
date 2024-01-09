@@ -67,7 +67,7 @@ func getDefaultValueDisplayString(f *pflag.Flag) string {
 	if dvf, found := defaultValFormats[f.Value.Type()]; found {
 		return fmt.Sprintf(dvf, f.Value)
 	}
-	return fmt.Sprintf(" (default: %s)", f.Value)
+	return fmt.Sprintf(" (default %s)", f.Value)
 
 }
 
