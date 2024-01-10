@@ -18,7 +18,7 @@ func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
 	longDoc.WriteString("Display or change configuration settings for gh.\n\n")
 	longDoc.WriteString("Current respected settings:\n")
 	for _, co := range config.ConfigOptions() {
-		longDoc.WriteString(fmt.Sprintf("- %s: %s", co.Key, co.Description))
+		longDoc.WriteString(fmt.Sprintf("- `%s`: %s", co.Key, co.Description))
 		if co.DefaultValue != "" {
 			longDoc.WriteString(fmt.Sprintf(" (default: %q)", co.DefaultValue))
 		}
