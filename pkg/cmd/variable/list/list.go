@@ -3,7 +3,6 @@ package list
 import (
 	"fmt"
 	"net/http"
-	"reflect"
 	"strings"
 	"time"
 
@@ -172,12 +171,16 @@ func listRun(opts *ListOptions) error {
 }
 
 type Variable struct {
-	Name             string
-	Value            string
-	UpdatedAt        time.Time `json:"updated_at"`
-	Visibility       shared.Visibility
-	SelectedReposURL string `json:"selected_repositories_url"`
-	NumSelectedRepos int
+	Name             string            `json:"name"`
+	Value            string            `json:"value"`
+	UpdatedAt        time.Time         `json:"updated_at"`
+	Visibility       shared.Visibility `json:"visibility"`
+	SelectedReposURL string            `json:"selected_repositories_url"`
+	NumSelectedRepos int               `json:"num_selected_repos"`
+}
+
+func (v *Variable) ExportData(fields []string) map[string]interface{} {
+	return cmdutil.StructExportData(v, fields)
 }
 
 func fmtVisibility(s Variable) string {
@@ -252,21 +255,4 @@ func populateSelectedRepositoryInformation(client *http.Client, host string, var
 		variables[i].NumSelectedRepos = response.TotalCount
 	}
 	return nil
-}
-
-func (v *Variable) ExportData(fields []string) map[string]interface{} {
-	e := reflect.ValueOf(v).Elem()
-	fieldByName := func(val reflect.Value, field string) reflect.Value {
-		return val.FieldByNameFunc(func(s string) bool {
-			return strings.EqualFold(field, s)
-		})
-	}
-	data := map[string]interface{}{}
-
-	for _, f := range fields {
-		sf := fieldByName(e, f)
-		data[f] = sf.Interface()
-	}
-
-	return data
 }
