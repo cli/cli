@@ -18,7 +18,7 @@ type deleteOpts struct {
 	owner     string
 	number    int32
 	projectID string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type deleteConfig struct {
@@ -72,7 +72,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 	}
 
 	deleteCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
-	cmdutil.StringEnumFlag(deleteCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(deleteCmd, &opts.exporter)
 
 	return deleteCmd
 }
@@ -96,8 +96,8 @@ func runDelete(config deleteConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, *project)
+	if config.opts.exporter != nil {
+		return printJSON(config, query.DeleteProject.Project)
 	}
 
 	return printResults(config, query.DeleteProject.Project)
@@ -126,11 +126,6 @@ func printResults(config deleteConfig, project queries.Project) error {
 }
 
 func printJSON(config deleteConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
+	projectJSON := format.JSONProject(project)
+	return config.opts.exporter.Write(config.io, projectJSON)
 }

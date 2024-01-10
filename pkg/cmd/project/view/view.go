@@ -16,10 +16,10 @@ import (
 )
 
 type viewOpts struct {
-	web    bool
-	owner  string
-	number int32
-	format string
+	web      bool
+	owner    string
+	number   int32
+	exporter cmdutil.Exporter
 }
 
 type viewConfig struct {
@@ -77,7 +77,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(config viewConfig) error) *cobra.C
 
 	viewCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	viewCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open a project in the browser")
-	cmdutil.StringEnumFlag(viewCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(viewCmd, &opts.exporter)
 
 	return viewCmd
 }
@@ -106,7 +106,7 @@ func runView(config viewConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printJSON(config, *project)
 	}
 
@@ -193,11 +193,6 @@ func printResults(config viewConfig, project *queries.Project) error {
 }
 
 func printJSON(config viewConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
+	projectJSON := format.JSONProject(project)
+	return config.opts.exporter.Write(config.io, projectJSON)
 }

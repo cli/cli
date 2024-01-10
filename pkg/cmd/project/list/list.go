@@ -15,11 +15,11 @@ import (
 )
 
 type listOpts struct {
-	limit  int
-	web    bool
-	owner  string
-	closed bool
-	format string
+	limit    int
+	web      bool
+	owner    string
+	closed   bool
+	exporter cmdutil.Exporter
 }
 
 type listConfig struct {
@@ -69,7 +69,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner")
 	listCmd.Flags().BoolVarP(&opts.closed, "closed", "", false, "Include closed projects")
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser")
-	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(listCmd, &opts.exporter)
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of projects to fetch")
 
 	return listCmd
@@ -103,7 +103,7 @@ func runList(config listConfig) error {
 	}
 	projects = filterProjects(projects, config)
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printJSON(config, projects, totalCount)
 	}
 
@@ -156,16 +156,17 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 
 	tp := tableprinter.New(config.io, tableprinter.WithHeader("Number", "Title", "State", "ID"))
 
+	cs := config.io.ColorScheme()
 	for _, p := range projects {
-		tp.AddField(strconv.Itoa(int(p.Number)), tableprinter.WithTruncate(nil))
+		tp.AddField(
+			strconv.Itoa(int(p.Number)),
+			tableprinter.WithTruncate(nil),
+		)
 		tp.AddField(p.Title)
-		var state string
-		if p.Closed {
-			state = "closed"
-		} else {
-			state = "open"
-		}
-		tp.AddField(state)
+		tp.AddField(
+			format.ProjectState(p),
+			tableprinter.WithColor(cs.ColorFromString(format.ColorForProjectState(p))),
+		)
 		tp.AddField(p.ID, tableprinter.WithTruncate(nil))
 		tp.EndRow()
 	}
@@ -174,11 +175,6 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 }
 
 func printJSON(config listConfig, projects []queries.Project, totalCount int) error {
-	b, err := format.JSONProjects(projects, totalCount)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
+	projectsJSON := format.JSONProjects(projects, totalCount)
+	return config.opts.exporter.Write(config.io, projectsJSON)
 }
