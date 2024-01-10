@@ -20,6 +20,7 @@ type SetupGitOptions struct {
 	IO           *iostreams.IOStreams
 	Config       func() (config.Config, error)
 	Hostname     string
+	Force        bool
 	gitConfigure gitConfigurator
 }
 
@@ -64,6 +65,7 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname to configure git for")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Add credential helper for unknown host")
 
 	return cmd
 }
@@ -93,8 +95,10 @@ func setupGitRun(opts *SetupGitOptions) error {
 	hostnamesToSetup := hostnames
 
 	if opts.Hostname != "" {
-		if !has(opts.Hostname, hostnames) {
-			return fmt.Errorf("You are not logged into the GitHub host %q\n", opts.Hostname)
+		if !opts.Force {
+			if !has(opts.Hostname, hostnames) {
+				return fmt.Errorf("You are not logged into the GitHub host %q\n", opts.Hostname)
+			}
 		}
 		hostnamesToSetup = []string{opts.Hostname}
 	}
