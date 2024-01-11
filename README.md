@@ -55,7 +55,7 @@ Additional Conda installation options available on the [gh-feedstock page](https
 | ----------------------------------- | ---------------- |
 | `curl -sS https://webi.sh/gh \| sh` | `webi gh@stable` |
 
-For more information about the Webi installer see [it's homepage](https://webinstall.dev/).
+For more information about the Webi installer see [its homepage](https://webinstall.dev/).
 
 ### Linux & BSD
 
