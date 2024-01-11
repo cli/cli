@@ -432,7 +432,7 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 		state.Title = humanize(headRef)
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
-			fmt.Fprintf(&body, "- %s\n", commits[i].Title)
+			fmt.Fprintf(&body, "- **%s**\n", commits[i].Title)
 			if addBody {
 				x := regexPattern.ReplaceAllString(commits[i].Body, "  ")
 				fmt.Fprintf(&body, "%s", x)

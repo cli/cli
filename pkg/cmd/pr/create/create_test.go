@@ -623,7 +623,7 @@ func Test_createRun(t *testing.T) {
 				} } } }
 				`, func(input map[string]interface{}) {
 						assert.Equal(t, "my title", input["title"].(string))
-						assert.Equal(t, "- commit 1\n- commit 0\n\nthis is a bug", input["body"].(string))
+						assert.Equal(t, "- **commit 1**\n- **commit 0**\n\nthis is a bug", input["body"].(string))
 					}))
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
