@@ -19,7 +19,7 @@ type markTemplateOpts struct {
 	undo      bool
 	number    int32
 	projectID string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type markTemplateConfig struct {
@@ -82,7 +82,7 @@ func NewCmdMarkTemplate(f *cmdutil.Factory, runF func(config markTemplateConfig)
 
 	markTemplateCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the org owner.")
 	markTemplateCmd.Flags().BoolVar(&opts.undo, "undo", false, "Unmark the project as a template.")
-	cmdutil.StringEnumFlag(markTemplateCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(markTemplateCmd, &opts.exporter)
 
 	return markTemplateCmd
 }
@@ -107,7 +107,7 @@ func runMarkTemplate(config markTemplateConfig) error {
 			return err
 		}
 
-		if config.opts.format == "json" {
+		if config.opts.exporter != nil {
 			return printJSON(config, *project)
 		}
 
@@ -120,8 +120,8 @@ func runMarkTemplate(config markTemplateConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, *project)
+	if config.opts.exporter != nil {
+		return printJSON(config, query.TemplateProject.Project)
 	}
 
 	return printResults(config, query.TemplateProject.Project)
@@ -166,11 +166,6 @@ func printResults(config markTemplateConfig, project queries.Project) error {
 }
 
 func printJSON(config markTemplateConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
+	projectJSON := format.JSONProject(project)
+	return config.opts.exporter.Write(config.io, projectJSON)
 }

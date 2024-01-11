@@ -20,7 +20,7 @@ type addItemOpts struct {
 	itemURL   string
 	projectID string
 	itemID    string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type addItemConfig struct {
@@ -75,7 +75,7 @@ func NewCmdAddItem(f *cmdutil.Factory, runF func(config addItemConfig) error) *c
 
 	addItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	addItemCmd.Flags().StringVar(&opts.itemURL, "url", "", "URL of the issue or pull request to add to the project")
-	cmdutil.StringEnumFlag(addItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(addItemCmd, &opts.exporter)
 
 	_ = addItemCmd.MarkFlagRequired("url")
 
@@ -107,7 +107,7 @@ func runAddItem(config addItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printJSON(config, query.CreateProjectItem.ProjectV2Item)
 	}
 
@@ -134,11 +134,6 @@ func printResults(config addItemConfig, item queries.ProjectItem) error {
 }
 
 func printJSON(config addItemConfig, item queries.ProjectItem) error {
-	b, err := format.JSONProjectItem(item)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
+	projectItemJSON := format.JSONProjectItem(item)
+	return config.opts.exporter.Write(config.io, projectItemJSON)
 }

@@ -13,8 +13,8 @@ import (
 )
 
 type deleteFieldOpts struct {
-	fieldID string
-	format  string
+	fieldID  string
+	exporter cmdutil.Exporter
 }
 
 type deleteFieldConfig struct {
@@ -55,7 +55,7 @@ func NewCmdDeleteField(f *cmdutil.Factory, runF func(config deleteFieldConfig) e
 	}
 
 	deleteFieldCmd.Flags().StringVar(&opts.fieldID, "id", "", "ID of the field to delete")
-	cmdutil.StringEnumFlag(deleteFieldCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(deleteFieldCmd, &opts.exporter)
 
 	_ = deleteFieldCmd.MarkFlagRequired("id")
 
@@ -70,7 +70,7 @@ func runDeleteField(config deleteFieldConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printJSON(config, query.DeleteProjectV2Field.Field)
 	}
 
@@ -95,11 +95,6 @@ func printResults(config deleteFieldConfig, field queries.ProjectField) error {
 }
 
 func printJSON(config deleteFieldConfig, field queries.ProjectField) error {
-	b, err := format.JSONProjectField(field)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
+	projectFieldJSON := format.JSONProjectField(field)
+	return config.opts.exporter.Write(config.io, projectFieldJSON)
 }

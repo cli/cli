@@ -20,7 +20,7 @@ type createItemOpts struct {
 	owner     string
 	number    int32
 	projectID string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type createItemConfig struct {
@@ -76,7 +76,7 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 	createItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	createItemCmd.Flags().StringVar(&opts.title, "title", "", "Title for the draft issue")
 	createItemCmd.Flags().StringVar(&opts.body, "body", "", "Body for the draft issue")
-	cmdutil.StringEnumFlag(createItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(createItemCmd, &opts.exporter)
 
 	_ = createItemCmd.MarkFlagRequired("title")
 
@@ -103,7 +103,7 @@ func runCreateItem(config createItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printJSON(config, query.CreateProjectDraftItem.ProjectV2Item)
 	}
 
@@ -130,11 +130,6 @@ func printResults(config createItemConfig, item queries.ProjectItem) error {
 }
 
 func printJSON(config createItemConfig, item queries.ProjectItem) error {
-	b, err := format.JSONProjectItem(item)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
+	projectItemJSON := format.JSONProjectItem(item)
+	return config.opts.exporter.Write(config.io, projectItemJSON)
 }

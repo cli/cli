@@ -16,7 +16,7 @@ func TestAddJSONFlags(t *testing.T) {
 		name        string
 		fields      []string
 		args        []string
-		wantsExport *exportFormat
+		wantsExport *jsonExporter
 		wantsError  string
 	}{
 		{
@@ -64,7 +64,7 @@ func TestAddJSONFlags(t *testing.T) {
 			name:   "with JSON fields",
 			fields: []string{"id", "number", "title"},
 			args:   []string{"--json", "number,title"},
-			wantsExport: &exportFormat{
+			wantsExport: &jsonExporter{
 				fields:   []string{"number", "title"},
 				filter:   "",
 				template: "",
@@ -74,7 +74,7 @@ func TestAddJSONFlags(t *testing.T) {
 			name:   "with jq filter",
 			fields: []string{"id", "number", "title"},
 			args:   []string{"--json", "number", "-q.number"},
-			wantsExport: &exportFormat{
+			wantsExport: &jsonExporter{
 				fields:   []string{"number"},
 				filter:   ".number",
 				template: "",
@@ -84,7 +84,7 @@ func TestAddJSONFlags(t *testing.T) {
 			name:   "with Go template",
 			fields: []string{"id", "number", "title"},
 			args:   []string{"--json", "number", "-t", "{{.number}}"},
-			wantsExport: &exportFormat{
+			wantsExport: &jsonExporter{
 				fields:   []string{"number"},
 				filter:   "",
 				template: "{{.number}}",
@@ -116,13 +116,105 @@ func TestAddJSONFlags(t *testing.T) {
 	}
 }
 
+func TestAddFormatFlags(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		wantsExport *jsonExporter
+		wantsError  string
+	}{
+		{
+			name:        "no format flag",
+			args:        []string{},
+			wantsExport: nil,
+		},
+		{
+			name:        "empty format flag",
+			args:        []string{"--format"},
+			wantsExport: nil,
+			wantsError:  "flag needs an argument: --format",
+		},
+		{
+			name:        "invalid format field",
+			args:        []string{"--format", "idontexist"},
+			wantsExport: nil,
+			wantsError:  "invalid argument \"idontexist\" for \"--format\" flag: valid values are {json}",
+		},
+		{
+			name:        "cannot combine --format with --web",
+			args:        []string{"--format", "json", "--web"},
+			wantsExport: nil,
+			wantsError:  "cannot use `--web` with `--format`",
+		},
+		{
+			name:        "cannot use --jq without --format",
+			args:        []string{"--jq", ".number"},
+			wantsExport: nil,
+			wantsError:  "cannot use `--jq` without specifying `--format json`",
+		},
+		{
+			name:        "cannot use --template without --format",
+			args:        []string{"--template", "{{.number}}"},
+			wantsExport: nil,
+			wantsError:  "cannot use `--template` without specifying `--format json`",
+		},
+		{
+			name: "with json format",
+			args: []string{"--format", "json"},
+			wantsExport: &jsonExporter{
+				filter:   "",
+				template: "",
+			},
+		},
+		{
+			name: "with jq filter",
+			args: []string{"--format", "json", "-q.number"},
+			wantsExport: &jsonExporter{
+				filter:   ".number",
+				template: "",
+			},
+		},
+		{
+			name: "with Go template",
+			args: []string{"--format", "json", "-t", "{{.number}}"},
+			wantsExport: &jsonExporter{
+				filter:   "",
+				template: "{{.number}}",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{Run: func(*cobra.Command, []string) {}}
+			cmd.Flags().Bool("web", false, "")
+			var exporter Exporter
+			AddFormatFlags(cmd, &exporter)
+			cmd.SetArgs(tt.args)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			_, err := cmd.ExecuteC()
+			if tt.wantsError == "" {
+				require.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantsError)
+				return
+			}
+			if tt.wantsExport == nil {
+				assert.Nil(t, exporter)
+			} else {
+				assert.Equal(t, tt.wantsExport, exporter)
+			}
+		})
+	}
+}
+
 func Test_exportFormat_Write(t *testing.T) {
 	type args struct {
 		data interface{}
 	}
 	tests := []struct {
 		name     string
-		exporter exportFormat
+		exporter jsonExporter
 		args     args
 		wantW    string
 		wantErr  bool
@@ -130,7 +222,7 @@ func Test_exportFormat_Write(t *testing.T) {
 	}{
 		{
 			name:     "regular JSON output",
-			exporter: exportFormat{},
+			exporter: jsonExporter{},
 			args: args{
 				data: map[string]string{"name": "hubot"},
 			},
@@ -140,7 +232,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		},
 		{
 			name:     "call ExportData",
-			exporter: exportFormat{fields: []string{"field1", "field2"}},
+			exporter: jsonExporter{fields: []string{"field1", "field2"}},
 			args: args{
 				data: &exportableItem{"item1"},
 			},
@@ -150,7 +242,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		},
 		{
 			name:     "recursively call ExportData",
-			exporter: exportFormat{fields: []string{"f1", "f2"}},
+			exporter: jsonExporter{fields: []string{"f1", "f2"}},
 			args: args{
 				data: map[string]interface{}{
 					"s1": []exportableItem{{"i1"}, {"i2"}},
@@ -163,7 +255,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		},
 		{
 			name:     "with jq filter",
-			exporter: exportFormat{filter: ".name"},
+			exporter: jsonExporter{filter: ".name"},
 			args: args{
 				data: map[string]string{"name": "hubot"},
 			},
@@ -173,7 +265,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		},
 		{
 			name:     "with jq filter pretty printing",
-			exporter: exportFormat{filter: "."},
+			exporter: jsonExporter{filter: "."},
 			args: args{
 				data: map[string]string{"name": "hubot"},
 			},
@@ -183,7 +275,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		},
 		{
 			name:     "with Go template",
-			exporter: exportFormat{template: "{{.name}}"},
+			exporter: jsonExporter{template: "{{.name}}"},
 			args: args{
 				data: map[string]string{"name": "hubot"},
 			},

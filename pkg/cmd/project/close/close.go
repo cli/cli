@@ -19,7 +19,7 @@ type closeOpts struct {
 	owner     string
 	reopen    bool
 	projectID string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type closeConfig struct {
@@ -78,7 +78,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 
 	closeCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	closeCmd.Flags().BoolVar(&opts.reopen, "undo", false, "Reopen a closed project")
-	closeCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'")
+	cmdutil.AddFormatFlags(closeCmd, &opts.exporter)
 
 	return closeCmd
 }
@@ -103,8 +103,8 @@ func runClose(config closeConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, *project)
+	if config.opts.exporter != nil {
+		return printJSON(config, query.UpdateProjectV2.ProjectV2)
 	}
 
 	return printResults(config, query.UpdateProjectV2.ProjectV2)
@@ -134,10 +134,6 @@ func printResults(config closeConfig, project queries.Project) error {
 }
 
 func printJSON(config closeConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-	_, err = config.io.Out.Write(b)
-	return err
+	projectJSON := format.JSONProject(project)
+	return config.opts.exporter.Write(config.io, projectJSON)
 }
