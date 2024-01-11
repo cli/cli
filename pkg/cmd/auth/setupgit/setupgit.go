@@ -81,7 +81,13 @@ func setupGitRun(opts *SetupGitOptions) error {
 
 	stderr := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()
-
+	if opts.Force && opts.Hostname == "" {
+		fmt.Fprintf(
+			stderr,
+			"You must use the `--force` flag in conjunction with the `--hostname` flag.\n",
+		)
+		return cmdutil.SilentError
+	}
 	if len(hostnames) == 0 {
 		fmt.Fprintf(
 			stderr,

@@ -49,12 +49,12 @@ func Test_setupGitRun(t *testing.T) {
 			expectedErrOut: "You are not logged into any GitHub hosts. Run gh auth login to authenticate.\n",
 		},
 		{
-			name: "if no hostname is specified, the force flag will be ignored.",
+			name: "force flag must be use with hostname flag",
 			opts: &SetupGitOptions{
 				Force: true,
 			},
 			expectedErr:    "SilentError",
-			expectedErrOut: "You are not logged into any GitHub hosts. Run gh auth login to authenticate.\n",
+			expectedErrOut: "You must use the `--force` flag in conjunction with the `--hostname` flag.\n",
 		},
 		{
 			name: "not authenticated with the hostname given as flag",
@@ -70,12 +70,20 @@ func Test_setupGitRun(t *testing.T) {
 		{
 			name: "add credential helper for unknown host",
 			opts: &SetupGitOptions{
-				Hostname: "foo",
+				Hostname: "ghe.io",
 				Force:    true,
 			},
 			cfgStubs: func(t *testing.T, cfg config.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
+		},
+		{
+			name: "setup credential helper for unknown host",
+			opts: &SetupGitOptions{},
+			cfgStubs: func(t *testing.T, cfg config.Config) {
+				login(t, cfg, "ghe.io", "test-user", "gho_ABCDEFG", "https", false)
+			},
+			expectedHostsSetup: []string{"ghe.io"},
 		},
 		{
 			name:     "error setting up git for hostname",
