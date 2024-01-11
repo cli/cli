@@ -34,6 +34,11 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 			Without the %[1]s--hostname%[1]s flag, the default host is chosen.
 
 			Without the %[1]s--user%[1]s flag, the active account for the host is chosen.
+
+   			This command can be used with %[1]docker login%[1] to configure authentication with the GitHub Container Registry:
+
+      				gh auth token | docker login ghcr.io --user=[USER] --password-stdin
+
 		`, "`"),
 		Args: cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
