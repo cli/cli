@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -698,6 +699,127 @@ func TestBuildDisplayName(t *testing.T) {
 
 			if displayName != tt.expectedDisplayName {
 				t.Errorf("displayName = %q, expectedDisplayName %q", displayName, tt.expectedDisplayName)
+			}
+		})
+	}
+}
+
+type MockSurveyPrompter struct {
+	AskFunc func(qs []*survey.Question, response interface{}) error
+}
+
+func (m *MockSurveyPrompter) Ask(qs []*survey.Question, response interface{}) error {
+	return m.AskFunc(qs, response)
+}
+
+type MockBrowser struct {
+	Err error
+}
+
+func (b *MockBrowser) Browse(url string) error {
+	if b.Err != nil {
+		return b.Err
+	}
+
+	return nil
+}
+
+func TestHandleAdditionalPermissions(t *testing.T) {
+	tests := []struct {
+		name                  string
+		isInteractive         bool
+		accept                string
+		permissionsOptOut     bool
+		browserErr            error
+		pollForPermissionsErr error
+		createCodespaceErr    error
+		wantErr               bool
+	}{
+		{
+			name:              "non-interactive",
+			isInteractive:     false,
+			permissionsOptOut: false,
+			wantErr:           true,
+		},
+		{
+			name:              "interactive, continue in browser, browser error",
+			isInteractive:     true,
+			accept:            "Continue in browser to review and authorize additional permissions (Recommended)",
+			permissionsOptOut: false,
+			browserErr:        fmt.Errorf("browser error"),
+			wantErr:           true,
+		},
+		{
+			name:                  "interactive, continue in browser, poll for permissions error",
+			isInteractive:         true,
+			accept:                "Continue in browser to review and authorize additional permissions (Recommended)",
+			permissionsOptOut:     false,
+			pollForPermissionsErr: fmt.Errorf("poll for permissions error"),
+			wantErr:               true,
+		},
+		{
+			name:               "interactive, continue in browser, create codespace error",
+			isInteractive:      true,
+			accept:             "Continue in browser to review and authorize additional permissions (Recommended)",
+			permissionsOptOut:  false,
+			createCodespaceErr: fmt.Errorf("create codespace error"),
+			wantErr:            true,
+		},
+		{
+			name:               "interactive, continue without authorizing",
+			isInteractive:      true,
+			accept:             "Continue without authorizing additional permissions",
+			permissionsOptOut:  true,
+			createCodespaceErr: fmt.Errorf("create codespace error"),
+			wantErr:            true,
+		},
+		{
+			name:              "interactive, continue without authorizing, create codespace success",
+			isInteractive:     true,
+			accept:            "Continue without authorizing additional permissions",
+			permissionsOptOut: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			a := &App{
+				io: ios,
+				browser: &MockBrowser{
+					Err: tt.browserErr,
+				},
+				apiClient: &apiClientMock{
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return nil, tt.createCodespaceErr
+					},
+					GetCodespacesPermissionsCheckFunc: func(ctx context.Context, repoID int, branch string, devcontainerPath string) (bool, error) {
+						if tt.pollForPermissionsErr != nil {
+							return false, tt.pollForPermissionsErr
+						}
+						return true, nil
+					},
+				},
+			}
+
+			if tt.isInteractive {
+				a.io.SetStdinTTY(true)
+				a.io.SetStdoutTTY(true)
+				a.io.SetStderrTTY(true)
+			}
+
+			params := &api.CreateCodespaceParams{}
+			_, err := a.handleAdditionalPermissions(context.Background(), &MockSurveyPrompter{
+				AskFunc: func(qs []*survey.Question, response interface{}) error {
+					*response.(*struct{ Accept string }) = struct{ Accept string }{Accept: tt.accept}
+					return nil
+				},
+			}, params, "http://example.com")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("handleAdditionalPermissions() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.permissionsOptOut != params.PermissionsOptOut {
+				t.Errorf("handleAdditionalPermissions() permissionsOptOut = %v, want %v", params.PermissionsOptOut, tt.permissionsOptOut)
 			}
 		})
 	}
