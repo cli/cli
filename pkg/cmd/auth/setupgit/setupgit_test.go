@@ -59,12 +59,12 @@ func Test_setupGitRun(t *testing.T) {
 		{
 			name: "not authenticated with the hostname given as flag",
 			opts: &SetupGitOptions{
-				Hostname: "foo",
+				Hostname: "ghe.io",
 			},
 			cfgStubs: func(t *testing.T, cfg config.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
-			expectedErr:    "You are not logged into the GitHub host \"foo\"\n",
+			expectedErr:    "You are not logged into the GitHub host \"ghe.io\"\n",
 			expectedErrOut: "",
 		},
 		{
