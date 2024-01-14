@@ -188,7 +188,7 @@ var HelpTopics = []helpTopic{
 			cli-maintainer
 
 			# --jq can be used to implement more complex filtering and output changes:
-			$ bin/gh issue list --json number,title,labels --jq \
+			$ gh issue list --json number,title,labels --jq \
 			  'map(select((.labels | length) > 0))    # must have labels
 			  | map(.labels = (.labels | map(.name))) # show only the label names
 			  | .[:3]                                 # select the first 3 results'

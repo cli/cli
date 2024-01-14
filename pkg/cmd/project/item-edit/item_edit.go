@@ -30,7 +30,7 @@ type editItemOpts struct {
 	iterationID          string
 	clear                bool
 	// format
-	format string
+	exporter cmdutil.Exporter
 }
 
 type editItemConfig struct {
@@ -116,7 +116,7 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	}
 
 	editItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to edit")
-	cmdutil.StringEnumFlag(editItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(editItemCmd, &opts.exporter)
 
 	editItemCmd.Flags().StringVar(&opts.title, "title", "", "Title of the draft issue item")
 	editItemCmd.Flags().StringVar(&opts.body, "body", "", "Body of the draft issue item")
@@ -220,12 +220,8 @@ func printDraftIssueResults(config editItemConfig, item queries.DraftIssue) erro
 }
 
 func printDraftIssueJSON(config editItemConfig, item queries.DraftIssue) error {
-	b, err := format.JSONProjectDraftIssue(item)
-	if err != nil {
-		return err
-	}
-	_, err = config.io.Out.Write(b)
-	return err
+	projectDraftItemJSON := format.JSONProjectDraftIssue(item)
+	return config.opts.exporter.Write(config.io, projectDraftItemJSON)
 }
 
 func printItemResults(config editItemConfig, item *queries.ProjectItem) error {
@@ -237,13 +233,8 @@ func printItemResults(config editItemConfig, item *queries.ProjectItem) error {
 }
 
 func printItemJSON(config editItemConfig, item *queries.ProjectItem) error {
-	b, err := format.JSONProjectItem(*item)
-	if err != nil {
-		return err
-	}
-	_, err = config.io.Out.Write(b)
-	return err
-
+	projectItemJSON := format.JSONProjectItem(*item)
+	return config.opts.exporter.Write(config.io, projectItemJSON)
 }
 
 func clearItemFieldValue(config editItemConfig) error {
@@ -256,7 +247,7 @@ func clearItemFieldValue(config editItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printItemJSON(config, &query.Clear.Item)
 	}
 
@@ -275,7 +266,7 @@ func updateDraftIssue(config editItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printDraftIssueJSON(config, query.UpdateProjectV2DraftIssue.DraftIssue)
 	}
 
@@ -302,7 +293,7 @@ func updateItemValues(config editItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
+	if config.opts.exporter != nil {
 		return printItemJSON(config, &query.Update.Item)
 	}
 
