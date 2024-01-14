@@ -1,0 +1,8 @@
+~/Projects$ gh repo fork cli/cli
+- Forking cli/cli...
+✓ Created fork cli/cli
+? Would you like to clone the fork? Yes
+Cloning into 'cli'...
+✓ Cloned fork
+~/Projects$ cd cli
+~/Projects/cli$
