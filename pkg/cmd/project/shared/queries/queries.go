@@ -128,12 +128,8 @@ type Project struct {
 		TotalCount int
 		Nodes      []ProjectItem
 	} `graphql:"items(first: $firstItems, after: $afterItems)"`
-	Fields struct {
-		TotalCount int
-		Nodes      []ProjectField
-		PageInfo   PageInfo
-	} `graphql:"fields(first: $firstFields, after: $afterFields)"`
-	Owner struct {
+	Fields ProjectFields `graphql:"fields(first: $firstFields, after: $afterFields)"`
+	Owner  struct {
 		TypeName string `graphql:"__typename"`
 		User     struct {
 			Login string
@@ -141,6 +137,13 @@ type Project struct {
 		Organization struct {
 			Login string
 		} `graphql:"... on Organization"`
+	}
+}
+
+func (p Project) DetailedItems() map[string]interface{} {
+	return map[string]interface{}{
+		"items":      serializeProjectWithItems(&p),
+		"totalCount": p.Items.TotalCount,
 	}
 }
 
@@ -201,6 +204,9 @@ type ProjectItem struct {
 	FieldValues struct {
 		Nodes []FieldValueNodes
 	} `graphql:"fieldValues(first: 100)"` // hardcoded to 100 for now on the assumption that this is a reasonable limit
+}
+
+type ProjectItems struct {
 }
 
 type ProjectItemContent struct {
@@ -323,6 +329,18 @@ type DraftIssue struct {
 	Title string
 }
 
+func (i DraftIssue) ExportData(_ []string) map[string]interface{} {
+	v := map[string]interface{}{
+		"title": i.Title,
+		"body":  i.Body,
+		"type":  "DraftIssue",
+	}
+	if i.ID != "" {
+		v["id"] = i.ID
+	}
+	return v
+}
+
 type PullRequest struct {
 	Body       string
 	Title      string
@@ -330,6 +348,17 @@ type PullRequest struct {
 	URL        string
 	Repository struct {
 		NameWithOwner string
+	}
+}
+
+func (pr PullRequest) ExportData(_ []string) map[string]interface{} {
+	return map[string]interface{}{
+		"type":       "PullRequest",
+		"body":       pr.Body,
+		"title":      pr.Title,
+		"number":     pr.Number,
+		"repository": pr.Repository.NameWithOwner,
+		"url":        pr.URL,
 	}
 }
 
@@ -341,6 +370,50 @@ type Issue struct {
 	Repository struct {
 		NameWithOwner string
 	}
+}
+
+func (i Issue) ExportData(_ []string) map[string]interface{} {
+	return map[string]interface{}{
+		"type":       "Issue",
+		"body":       i.Body,
+		"title":      i.Title,
+		"number":     i.Number,
+		"repository": i.Repository.NameWithOwner,
+		"url":        i.URL,
+	}
+}
+
+func (p ProjectItem) DetailedItem() exportable {
+	switch p.Type() {
+	case "DraftIssue":
+		return DraftIssue{
+			Body:  p.Body(),
+			Title: p.Title(),
+		}
+
+	case "Issue":
+		return Issue{
+			Body:   p.Body(),
+			Title:  p.Title(),
+			Number: p.Number(),
+			Repository: struct{ NameWithOwner string }{
+				NameWithOwner: p.Repo(),
+			},
+			URL: p.URL(),
+		}
+
+	case "PullRequest":
+		return PullRequest{
+			Body:   p.Body(),
+			Title:  p.Title(),
+			Number: p.Number(),
+			Repository: struct{ NameWithOwner string }{
+				NameWithOwner: p.Repo(),
+			},
+			URL: p.URL(),
+		}
+	}
+	return nil
 }
 
 // Type is the underlying type of the project item.
@@ -411,6 +484,20 @@ func (p ProjectItem) URL() string {
 		return p.Content.PullRequest.URL
 	}
 	return ""
+}
+
+func (p ProjectItem) ExportData(_ []string) map[string]interface{} {
+	v := map[string]interface{}{
+		"id":    p.ID(),
+		"title": p.Title(),
+		"body":  p.Body(),
+		"type":  p.Type(),
+	}
+	// Emulate omitempty.
+	if url := p.URL(); url != "" {
+		v["url"] = url
+	}
+	return v
 }
 
 // ProjectItems returns the items of a project. If the OwnerType is VIEWER, no login is required.
@@ -670,6 +757,13 @@ type SingleSelectFieldOptions struct {
 	Name string
 }
 
+func (f SingleSelectFieldOptions) ExportData(_ []string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":   f.ID,
+		"name": f.Name,
+	}
+}
+
 func (p ProjectField) Options() []SingleSelectFieldOptions {
 	if p.TypeName == "ProjectV2SingleSelectField" {
 		var options []SingleSelectFieldOptions
@@ -682,6 +776,40 @@ func (p ProjectField) Options() []SingleSelectFieldOptions {
 		return options
 	}
 	return nil
+}
+
+func (p ProjectField) ExportData(_ []string) map[string]interface{} {
+	v := map[string]interface{}{
+		"id":   p.ID(),
+		"name": p.Name(),
+		"type": p.Type(),
+	}
+	// Emulate omitempty
+	if opts := p.Options(); len(opts) != 0 {
+		options := make([]map[string]interface{}, len(opts))
+		for i, opt := range opts {
+			options[i] = opt.ExportData(nil)
+		}
+		v["options"] = options
+	}
+	return v
+}
+
+type ProjectFields struct {
+	TotalCount int
+	Nodes      []ProjectField
+	PageInfo   PageInfo
+}
+
+func (p ProjectFields) ExportData(_ []string) map[string]interface{} {
+	fields := make([]map[string]interface{}, len(p.Nodes))
+	for i := range p.Nodes {
+		fields[i] = p.Nodes[i].ExportData(nil)
+	}
+	return map[string]interface{}{
+		"fields":     fields,
+		"totalCount": p.TotalCount,
+	}
 }
 
 // ProjectFields returns a project with fields. If the OwnerType is VIEWER, no login is required.
@@ -1262,4 +1390,109 @@ func requiredScopesFromServerMessage(msg string) []string {
 		scopes = append(scopes, strings.Trim(mm, "' "))
 	}
 	return scopes
+}
+
+func projectFieldValueData(v FieldValueNodes) interface{} {
+	switch v.Type {
+	case "ProjectV2ItemFieldDateValue":
+		return v.ProjectV2ItemFieldDateValue.Date
+	case "ProjectV2ItemFieldIterationValue":
+		return map[string]interface{}{
+			"title":     v.ProjectV2ItemFieldIterationValue.Title,
+			"startDate": v.ProjectV2ItemFieldIterationValue.StartDate,
+			"duration":  v.ProjectV2ItemFieldIterationValue.Duration,
+		}
+	case "ProjectV2ItemFieldNumberValue":
+		return v.ProjectV2ItemFieldNumberValue.Number
+	case "ProjectV2ItemFieldSingleSelectValue":
+		return v.ProjectV2ItemFieldSingleSelectValue.Name
+	case "ProjectV2ItemFieldTextValue":
+		return v.ProjectV2ItemFieldTextValue.Text
+	case "ProjectV2ItemFieldMilestoneValue":
+		return map[string]interface{}{
+			"title":       v.ProjectV2ItemFieldMilestoneValue.Milestone.Title,
+			"description": v.ProjectV2ItemFieldMilestoneValue.Milestone.Description,
+			"dueOn":       v.ProjectV2ItemFieldMilestoneValue.Milestone.DueOn,
+		}
+	case "ProjectV2ItemFieldLabelValue":
+		names := make([]string, 0)
+		for _, p := range v.ProjectV2ItemFieldLabelValue.Labels.Nodes {
+			names = append(names, p.Name)
+		}
+		return names
+	case "ProjectV2ItemFieldPullRequestValue":
+		urls := make([]string, 0)
+		for _, p := range v.ProjectV2ItemFieldPullRequestValue.PullRequests.Nodes {
+			urls = append(urls, p.Url)
+		}
+		return urls
+	case "ProjectV2ItemFieldRepositoryValue":
+		return v.ProjectV2ItemFieldRepositoryValue.Repository.Url
+	case "ProjectV2ItemFieldUserValue":
+		logins := make([]string, 0)
+		for _, p := range v.ProjectV2ItemFieldUserValue.Users.Nodes {
+			logins = append(logins, p.Login)
+		}
+		return logins
+	case "ProjectV2ItemFieldReviewerValue":
+		names := make([]string, 0)
+		for _, p := range v.ProjectV2ItemFieldReviewerValue.Reviewers.Nodes {
+			if p.Type == "Team" {
+				names = append(names, p.Team.Name)
+			} else if p.Type == "User" {
+				names = append(names, p.User.Login)
+			}
+		}
+		return names
+
+	}
+
+	return nil
+}
+
+// serialize creates a map from field to field values
+func serializeProjectWithItems(project *Project) []map[string]interface{} {
+	fields := make(map[string]string)
+
+	// make a map of fields by ID
+	for _, f := range project.Fields.Nodes {
+		fields[f.ID()] = camelCase(f.Name())
+	}
+	itemsSlice := make([]map[string]interface{}, 0)
+
+	// for each value, look up the name by ID
+	// and set the value to the field value
+	for _, i := range project.Items.Nodes {
+		o := make(map[string]interface{})
+		o["id"] = i.Id
+		if projectItem := i.DetailedItem(); projectItem != nil {
+			o["content"] = projectItem.ExportData(nil)
+		} else {
+			o["content"] = nil
+		}
+		for _, v := range i.FieldValues.Nodes {
+			id := v.ID()
+			value := projectFieldValueData(v)
+
+			o[fields[id]] = value
+		}
+		itemsSlice = append(itemsSlice, o)
+	}
+	return itemsSlice
+}
+
+// camelCase converts a string to camelCase, which is useful for turning Go field names to JSON keys.
+func camelCase(s string) string {
+	if len(s) == 0 {
+		return ""
+	}
+
+	if len(s) == 1 {
+		return strings.ToLower(s)
+	}
+	return strings.ToLower(s[0:1]) + s[1:]
+}
+
+type exportable interface {
+	ExportData([]string) map[string]interface{}
 }
