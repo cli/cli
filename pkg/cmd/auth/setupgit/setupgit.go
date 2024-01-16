@@ -56,7 +56,9 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 				Executable: f.Executable(),
 				GitClient:  f.GitClient,
 			}
-
+			if opts.Hostname == "" && opts.Force {
+				return cmdutil.FlagErrorf("cannot use `--force` without `--hostname`")
+			}
 			if runF != nil {
 				return runF(opts)
 			}
@@ -65,7 +67,7 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname to configure git for")
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Add credential helper for unknown host")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Force setup even if the host is not known. Must be used in conjunction with `--hostname`")
 
 	return cmd
 }
@@ -81,21 +83,17 @@ func setupGitRun(opts *SetupGitOptions) error {
 
 	stderr := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()
-	if opts.Force && opts.Hostname == "" {
-		fmt.Fprintf(
-			stderr,
-			"You must use the `--force` flag in conjunction with the `--hostname` flag.\n",
-		)
-		return cmdutil.SilentError
-	}
-	if len(hostnames) == 0 {
-		fmt.Fprintf(
-			stderr,
-			"You are not logged into any GitHub hosts. Run %s to authenticate.\n",
-			cs.Bold("gh auth login"),
-		)
 
-		return cmdutil.SilentError
+	if !opts.Force {
+		if len(hostnames) == 0 {
+			fmt.Fprintf(
+				stderr,
+				"You are not logged into any GitHub hosts. Run %s to authenticate.\n",
+				cs.Bold("gh auth login"),
+			)
+
+			return cmdutil.SilentError
+		}
 	}
 
 	hostnamesToSetup := hostnames

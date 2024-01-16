@@ -1,11 +1,15 @@
 package setupgit
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +26,56 @@ func (gf *mockGitConfigurer) Setup(hostname, username, authToken string) error {
 	gf.hosts = append(gf.hosts, hostname)
 	return gf.setupErr
 }
+func TestNewCmdSetupGit(t *testing.T) {
+	tests := []struct {
+		name     string
+		cli      string
+		wantsErr bool
+		errMsg   string
+	}{
+		{
+			name:     "--force without hostname",
+			cli:      "--force",
+			wantsErr: true,
+			errMsg:   "cannot use `--force` without `--hostname`",
+		},
+		{
+			name:     "no error when --force used with hostname",
+			cli:      "--force --hostname ghe.io",
+			wantsErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &cmdutil.Factory{}
 
+			argv, err := shlex.Split(tt.cli)
+			assert.NoError(t, err)
+
+			cmd := NewCmdSetupGit(f, func(opts *SetupGitOptions) error {
+				return nil
+			})
+
+			// TODO cobra hack-around
+			cmd.Flags().BoolP("help", "x", false, "")
+
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				assert.Equal(t, err.Error(), tt.errMsg)
+				return
+			} else {
+				assert.NoError(t, err)
+			}
+
+		})
+	}
+}
 func Test_setupGitRun(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -49,14 +102,6 @@ func Test_setupGitRun(t *testing.T) {
 			expectedErrOut: "You are not logged into any GitHub hosts. Run gh auth login to authenticate.\n",
 		},
 		{
-			name: "force flag must be use with hostname flag",
-			opts: &SetupGitOptions{
-				Force: true,
-			},
-			expectedErr:    "SilentError",
-			expectedErrOut: "You must use the `--force` flag in conjunction with the `--hostname` flag.\n",
-		},
-		{
 			name: "not authenticated with the hostname given as flag",
 			opts: &SetupGitOptions{
 				Hostname: "ghe.io",
@@ -66,24 +111,6 @@ func Test_setupGitRun(t *testing.T) {
 			},
 			expectedErr:    "You are not logged into the GitHub host \"ghe.io\"\n",
 			expectedErrOut: "",
-		},
-		{
-			name: "add credential helper for unknown host",
-			opts: &SetupGitOptions{
-				Hostname: "ghe.io",
-				Force:    true,
-			},
-			cfgStubs: func(t *testing.T, cfg config.Config) {
-				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
-			},
-		},
-		{
-			name: "setup credential helper for unknown host",
-			opts: &SetupGitOptions{},
-			cfgStubs: func(t *testing.T, cfg config.Config) {
-				login(t, cfg, "ghe.io", "test-user", "gho_ABCDEFG", "https", false)
-			},
-			expectedHostsSetup: []string{"ghe.io"},
 		},
 		{
 			name:     "error setting up git for hostname",
@@ -111,6 +138,14 @@ func Test_setupGitRun(t *testing.T) {
 			},
 			cfgStubs: func(t *testing.T, cfg config.Config) {
 				login(t, cfg, "ghe.io", "test-user", "gho_ABCDEFG", "https", false)
+			},
+			expectedHostsSetup: []string{"ghe.io"},
+		},
+		{
+			name: "when the force flag is provided, it sets up the credential helper even if there are no known hosts",
+			opts: &SetupGitOptions{
+				Hostname: "ghe.io",
+				Force:    true,
 			},
 			expectedHostsSetup: []string{"ghe.io"},
 		},
