@@ -64,15 +64,15 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			return cmdutil.SilentError
 		}
 		if io.IsStdoutTTY() {
-			successStr := "Successfully"
+			successStr := "upgraded successfully"
 			if flagDryRun {
-				successStr = "Would have"
+				successStr = "already up to date"
 			}
-			extensionStr := "extension"
+			extensionStr := "Extension"
 			if name == "" {
-				extensionStr = "extensions"
+				extensionStr = "Extensions"
 			}
-			fmt.Fprintf(io.Out, "%s %s upgraded %s\n", cs.SuccessIcon(), successStr, extensionStr)
+			fmt.Fprintf(io.Out, "%s %s %s\n", cs.SuccessIcon(), extensionStr, successStr)
 		}
 		return nil
 	}
