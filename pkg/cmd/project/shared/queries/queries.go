@@ -206,9 +206,6 @@ type ProjectItem struct {
 	} `graphql:"fieldValues(first: 100)"` // hardcoded to 100 for now on the assumption that this is a reasonable limit
 }
 
-type ProjectItems struct {
-}
-
 type ProjectItemContent struct {
 	TypeName    string      `graphql:"__typename"`
 	DraftIssue  DraftIssue  `graphql:"... on DraftIssue"`
@@ -335,6 +332,7 @@ func (i DraftIssue) ExportData(_ []string) map[string]interface{} {
 		"body":  i.Body,
 		"type":  "DraftIssue",
 	}
+	// Emulate omitempty.
 	if i.ID != "" {
 		v["id"] = i.ID
 	}
@@ -1486,7 +1484,6 @@ func camelCase(s string) string {
 	if len(s) == 0 {
 		return ""
 	}
-
 	if len(s) == 1 {
 		return strings.ToLower(s)
 	}
