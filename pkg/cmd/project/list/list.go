@@ -139,17 +139,17 @@ func buildURL(config listConfig) (string, error) {
 }
 
 func filterProjects(nodes queries.Projects, config listConfig) queries.Projects {
-	projects := queries.Projects{
+	filtered := queries.Projects{
 		Nodes:      make([]queries.Project, 0, len(nodes.Nodes)),
 		TotalCount: nodes.TotalCount,
 	}
-	for _, p := range nodes.Nodes {
-		if !config.opts.closed && p.Closed {
+	for _, project := range nodes.Nodes {
+		if !config.opts.closed && project.Closed {
 			continue
 		}
-		projects.Nodes = append(projects.Nodes, p)
+		filtered.Nodes = append(filtered.Nodes, project)
 	}
-	return projects
+	return filtered
 }
 
 func printResults(config listConfig, projects queries.Projects, owner string) error {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -71,7 +70,7 @@ func runDeleteField(config deleteFieldConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printJSON(config, query.DeleteProjectV2Field.Field)
+		return config.opts.exporter.Write(config.io, query.DeleteProjectV2Field.Field)
 	}
 
 	return printResults(config, query.DeleteProjectV2Field.Field)
@@ -92,9 +91,4 @@ func printResults(config deleteFieldConfig, field queries.ProjectField) error {
 
 	_, err := fmt.Fprintf(config.io.Out, "Deleted field\n")
 	return err
-}
-
-func printJSON(config deleteFieldConfig, field queries.ProjectField) error {
-	projectFieldJSON := format.JSONProjectField(field)
-	return config.opts.exporter.Write(config.io, projectFieldJSON)
 }
