@@ -8,12 +8,12 @@ import (
 	"io"
 	"net/url"
 	"path"
-	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
 	"golang.org/x/text/transform"
@@ -51,21 +51,7 @@ func (w *Workflow) Base() string {
 }
 
 func (w *Workflow) ExportData(fields []string) map[string]interface{} {
-	fieldByName := func(v reflect.Value, field string) reflect.Value {
-		return v.FieldByNameFunc(func(s string) bool {
-			return strings.EqualFold(field, s)
-		})
-	}
-	v := reflect.ValueOf(w).Elem()
-	data := map[string]interface{}{}
-	for _, f := range fields {
-		switch f {
-		default:
-			sf := fieldByName(v, f)
-			data[f] = sf.Interface()
-		}
-	}
-	return data
+	return cmdutil.StructExportData(w, fields)
 }
 
 func GetWorkflows(client *api.Client, repo ghrepo.Interface, limit int) ([]Workflow, error) {
