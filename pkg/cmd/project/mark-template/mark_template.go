@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -108,7 +107,7 @@ func runMarkTemplate(config markTemplateConfig) error {
 		}
 
 		if config.opts.exporter != nil {
-			return printJSON(config, *project)
+			return config.opts.exporter.Write(config.io, *project)
 		}
 
 		return printResults(config, query.TemplateProject.Project)
@@ -121,7 +120,7 @@ func runMarkTemplate(config markTemplateConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printJSON(config, query.TemplateProject.Project)
+		return config.opts.exporter.Write(config.io, query.TemplateProject.Project)
 	}
 
 	return printResults(config, query.TemplateProject.Project)
@@ -163,9 +162,4 @@ func printResults(config markTemplateConfig, project queries.Project) error {
 
 	_, err := fmt.Fprintf(config.io.Out, "Marked project %d as a template.\n", project.Number)
 	return err
-}
-
-func printJSON(config markTemplateConfig, project queries.Project) error {
-	projectJSON := format.JSONProject(project)
-	return config.opts.exporter.Write(config.io, projectJSON)
 }

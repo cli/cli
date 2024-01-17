@@ -7,7 +7,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -107,7 +106,7 @@ func runView(config viewConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printJSON(config, *project)
+		return config.opts.exporter.Write(config.io, *project)
 	}
 
 	return printResults(config, project)
@@ -190,9 +189,4 @@ func printResults(config viewConfig, project *queries.Project) error {
 	}
 	_, err = fmt.Fprint(config.io.Out, out)
 	return err
-}
-
-func printJSON(config viewConfig, project queries.Project) error {
-	projectJSON := format.JSONProject(project)
-	return config.opts.exporter.Write(config.io, projectJSON)
 }

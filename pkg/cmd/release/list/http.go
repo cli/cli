@@ -6,8 +6,19 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/shurcooL/githubv4"
 )
+
+var releaseFields = []string{
+	"name",
+	"tagName",
+	"isDraft",
+	"isLatest",
+	"isPrerelease",
+	"createdAt",
+	"publishedAt",
+}
 
 type Release struct {
 	Name         string
@@ -17,6 +28,10 @@ type Release struct {
 	IsPrerelease bool
 	CreatedAt    time.Time
 	PublishedAt  time.Time
+}
+
+func (r *Release) ExportData(fields []string) map[string]interface{} {
+	return cmdutil.StructExportData(r, fields)
 }
 
 func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, excludeDrafts bool, excludePreReleases bool) ([]Release, error) {

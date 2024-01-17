@@ -144,7 +144,7 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("failed to get secrets: %w", err)
 	}
 
-	if len(secrets) == 0 {
+	if len(secrets) == 0 && opts.Exporter == nil {
 		return cmdutil.NewNoResultsError("no secrets found")
 	}
 
@@ -193,6 +193,10 @@ type Secret struct {
 	Visibility       shared.Visibility `json:"visibility"`
 	SelectedReposURL string            `json:"selected_repositories_url"`
 	NumSelectedRepos int               `json:"num_selected_repos"`
+}
+
+func (s *Secret) ExportData(fields []string) map[string]interface{} {
+	return cmdutil.StructExportData(s, fields)
 }
 
 func fmtVisibility(s Secret) string {

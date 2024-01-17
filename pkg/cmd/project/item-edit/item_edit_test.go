@@ -546,6 +546,7 @@ func TestRunItemEdit_JSON(t *testing.T) {
 			"data": map[string]interface{}{
 				"updateProjectV2DraftIssue": map[string]interface{}{
 					"draftIssue": map[string]interface{}{
+						"id":    "DI_item_id",
 						"title": "a title",
 						"body":  "a new body",
 					},
@@ -571,6 +572,6 @@ func TestRunItemEdit_JSON(t *testing.T) {
 	assert.NoError(t, err)
 	assert.JSONEq(
 		t,
-		`{"id":"","title":"a title","body":"a new body","type":"DraftIssue"}`,
+		`{"id":"DI_item_id","title":"a title","body":"a new body","type":"DraftIssue"}`,
 		stdout.String())
 }
