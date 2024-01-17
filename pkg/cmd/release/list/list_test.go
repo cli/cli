@@ -214,3 +214,24 @@ func Test_listRun(t *testing.T) {
 		})
 	}
 }
+
+func TestExportReleases(t *testing.T) {
+	ios, _, stdout, _ := iostreams.Test()
+	createdAt, _ := time.Parse(time.RFC3339, "2024-01-01T00:00:00Z")
+	publishedAt, _ := time.Parse(time.RFC3339, "2024-02-01T00:00:00Z")
+	rs := []Release{{
+		Name:         "v1",
+		TagName:      "tag",
+		IsDraft:      true,
+		IsLatest:     false,
+		IsPrerelease: true,
+		CreatedAt:    createdAt,
+		PublishedAt:  publishedAt,
+	}}
+	exporter := cmdutil.NewJSONExporter()
+	exporter.SetFields(releaseFields)
+	require.NoError(t, exporter.Write(ios, rs))
+	require.JSONEq(t,
+		`[{"createdAt":"2024-01-01T00:00:00Z","isDraft":true,"isLatest":false,"isPrerelease":true,"name":"v1","publishedAt":"2024-02-01T00:00:00Z","tagName":"tag"}]`,
+		stdout.String())
+}
