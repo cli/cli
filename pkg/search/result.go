@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
 var CodeFields = []string{
@@ -293,16 +295,7 @@ func (code Code) ExportData(fields []string) map[string]interface{} {
 }
 
 func (textMatch TextMatch) ExportData(fields []string) map[string]interface{} {
-	v := reflect.ValueOf(textMatch)
-	data := map[string]interface{}{}
-	for _, f := range fields {
-		switch f {
-		default:
-			sf := fieldByName(v, f)
-			data[f] = sf.Interface()
-		}
-	}
-	return data
+	return cmdutil.StructExportData(textMatch, fields)
 }
 
 func (commit Commit) ExportData(fields []string) map[string]interface{} {

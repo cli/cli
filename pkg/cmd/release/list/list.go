@@ -18,6 +18,8 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
+	Exporter cmdutil.Exporter
+
 	LimitResults       int
 	ExcludeDrafts      bool
 	ExcludePreReleases bool
@@ -48,6 +50,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
 	cmd.Flags().BoolVar(&opts.ExcludeDrafts, "exclude-drafts", false, "Exclude draft releases")
 	cmd.Flags().BoolVar(&opts.ExcludePreReleases, "exclude-pre-releases", false, "Exclude pre-releases")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, releaseFields)
 
 	return cmd
 }
@@ -68,7 +71,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	if len(releases) == 0 {
+	if len(releases) == 0 && opts.Exporter == nil {
 		return cmdutil.NewNoResultsError("no releases found")
 	}
 
@@ -76,6 +79,10 @@ func listRun(opts *ListOptions) error {
 		defer opts.IO.StopPager()
 	} else {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, releases)
 	}
 
 	table := tableprinter.New(opts.IO, tableprinter.WithHeader("Title", "Type", "Tag name", "Published"))
