@@ -7,7 +7,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -219,22 +218,12 @@ func printDraftIssueResults(config editItemConfig, item queries.DraftIssue) erro
 	return err
 }
 
-func printDraftIssueJSON(config editItemConfig, item queries.DraftIssue) error {
-	projectDraftItemJSON := format.JSONProjectDraftIssue(item)
-	return config.opts.exporter.Write(config.io, projectDraftItemJSON)
-}
-
 func printItemResults(config editItemConfig, item *queries.ProjectItem) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
 	_, err := fmt.Fprintf(config.io.Out, "Edited item %q\n", item.Title())
 	return err
-}
-
-func printItemJSON(config editItemConfig, item *queries.ProjectItem) error {
-	projectItemJSON := format.JSONProjectItem(*item)
-	return config.opts.exporter.Write(config.io, projectItemJSON)
 }
 
 func clearItemFieldValue(config editItemConfig) error {
@@ -248,7 +237,7 @@ func clearItemFieldValue(config editItemConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printItemJSON(config, &query.Clear.Item)
+		return config.opts.exporter.Write(config.io, &query.Clear.Item)
 	}
 
 	return printItemResults(config, &query.Clear.Item)
@@ -267,7 +256,7 @@ func updateDraftIssue(config editItemConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printDraftIssueJSON(config, query.UpdateProjectV2DraftIssue.DraftIssue)
+		return config.opts.exporter.Write(config.io, query.UpdateProjectV2DraftIssue.DraftIssue)
 	}
 
 	return printDraftIssueResults(config, query.UpdateProjectV2DraftIssue.DraftIssue)
@@ -294,7 +283,7 @@ func updateItemValues(config editItemConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printItemJSON(config, &query.Update.Item)
+		return config.opts.exporter.Write(config.io, &query.Update.Item)
 	}
 
 	return printItemResults(config, &query.Update.Item)

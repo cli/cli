@@ -97,14 +97,14 @@ func runList(config listConfig) error {
 		return err
 	}
 
-	projects, totalCount, err := config.client.Projects(config.opts.owner, owner.Type, config.opts.limit, false)
+	projects, err := config.client.Projects(config.opts.owner, owner.Type, config.opts.limit, false)
 	if err != nil {
 		return err
 	}
 	projects = filterProjects(projects, config)
 
 	if config.opts.exporter != nil {
-		return printJSON(config, projects, totalCount)
+		return config.opts.exporter.Write(config.io, projects)
 	}
 
 	return printResults(config, projects, owner.Login)
@@ -138,26 +138,29 @@ func buildURL(config listConfig) (string, error) {
 	return url, nil
 }
 
-func filterProjects(nodes []queries.Project, config listConfig) []queries.Project {
-	projects := make([]queries.Project, 0, len(nodes))
-	for _, p := range nodes {
-		if !config.opts.closed && p.Closed {
+func filterProjects(nodes queries.Projects, config listConfig) queries.Projects {
+	filtered := queries.Projects{
+		Nodes:      make([]queries.Project, 0, len(nodes.Nodes)),
+		TotalCount: nodes.TotalCount,
+	}
+	for _, project := range nodes.Nodes {
+		if !config.opts.closed && project.Closed {
 			continue
 		}
-		projects = append(projects, p)
+		filtered.Nodes = append(filtered.Nodes, project)
 	}
-	return projects
+	return filtered
 }
 
-func printResults(config listConfig, projects []queries.Project, owner string) error {
-	if len(projects) == 0 {
+func printResults(config listConfig, projects queries.Projects, owner string) error {
+	if len(projects.Nodes) == 0 {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("No projects found for %s", owner))
 	}
 
 	tp := tableprinter.New(config.io, tableprinter.WithHeader("Number", "Title", "State", "ID"))
 
 	cs := config.io.ColorScheme()
-	for _, p := range projects {
+	for _, p := range projects.Nodes {
 		tp.AddField(
 			strconv.Itoa(int(p.Number)),
 			tableprinter.WithTruncate(nil),
@@ -172,9 +175,4 @@ func printResults(config listConfig, projects []queries.Project, owner string) e
 	}
 
 	return tp.Render()
-}
-
-func printJSON(config listConfig, projects []queries.Project, totalCount int) error {
-	projectsJSON := format.JSONProjects(projects, totalCount)
-	return config.opts.exporter.Write(config.io, projectsJSON)
 }
