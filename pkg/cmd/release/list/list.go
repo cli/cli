@@ -50,7 +50,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
 	cmd.Flags().BoolVar(&opts.ExcludeDrafts, "exclude-drafts", false, "Exclude draft releases")
 	cmd.Flags().BoolVar(&opts.ExcludePreReleases, "exclude-pre-releases", false, "Exclude pre-releases")
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, ReleaseFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, releaseFields)
 
 	return cmd
 }

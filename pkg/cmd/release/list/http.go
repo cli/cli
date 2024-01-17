@@ -2,16 +2,15 @@ package list
 
 import (
 	"net/http"
-	"reflect"
-	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/shurcooL/githubv4"
 )
 
-var ReleaseFields = []string{
+var releaseFields = []string{
 	"name",
 	"tagName",
 	"isDraft",
@@ -29,6 +28,10 @@ type Release struct {
 	IsPrerelease bool
 	CreatedAt    time.Time
 	PublishedAt  time.Time
+}
+
+func (r *Release) ExportData(fields []string) map[string]interface{} {
+	return cmdutil.StructExportData(r, fields)
 }
 
 func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, excludeDrafts bool, excludePreReleases bool) ([]Release, error) {
@@ -87,21 +90,4 @@ loop:
 	}
 
 	return releases, nil
-}
-
-func (r *Release) ExportData(fields []string) map[string]interface{} {
-	v := reflect.ValueOf(r).Elem()
-	fieldByName := func(v reflect.Value, field string) reflect.Value {
-		return v.FieldByNameFunc(func(s string) bool {
-			return strings.EqualFold(field, s)
-		})
-	}
-	data := map[string]interface{}{}
-
-	for _, f := range fields {
-		sf := fieldByName(v, f)
-		data[f] = sf.Interface()
-	}
-
-	return data
 }
