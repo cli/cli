@@ -102,6 +102,19 @@ type PageInfo struct {
 	HasNextPage bool
 }
 
+// Repository is a Repository GraphQL object https://docs.github.com/en/graphql/reference/objects#repository
+type Repository struct {
+	Name    string
+	ID      string
+	URL     string
+	Project struct {
+		Title  string
+		ID     string
+		Number int32
+		URL    string
+	} `graphql:"projectV2(number: $projectNumber)"`
+}
+
 // Project is a ProjectV2 GraphQL object https://docs.github.com/en/graphql/reference/objects#projectv2.
 type Project struct {
 	Number           int32
