@@ -319,7 +319,7 @@ func TestDevelopRun(t *testing.T) {
 			expectedOut: "github.com/OWNER/REPO/tree/my-issue-1\n",
 		},
 		{
-			name: "develop new branch in diffferent repo than issue",
+			name: "develop new branch in different repo than issue",
 			opts: &DevelopOptions{
 				IssueSelector: "123",
 				BranchRepo:    "OWNER2/REPO",

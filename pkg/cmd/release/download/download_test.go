@@ -280,7 +280,7 @@ func Test_downloadRun(t *testing.T) {
 			},
 		},
 		{
-			name:  "download single asset from matching patter into output option",
+			name:  "download single asset from matching pattern into output option",
 			isTTY: true,
 			opts: DownloadOptions{
 				OutputFile:   "./tmp/my-tarball.tgz",
@@ -296,7 +296,7 @@ func Test_downloadRun(t *testing.T) {
 			},
 		},
 		{
-			name:  "download single asset from matching patter into output 'stdout´",
+			name:  "download single asset from matching pattern into output 'stdout´",
 			isTTY: true,
 			opts: DownloadOptions{
 				OutputFile:   "-",

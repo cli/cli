@@ -122,7 +122,7 @@ func switchRun(opts *SwitchOptions) error {
 		username = candidates[0].user
 	} else if len(candidates) == 2 &&
 		candidates[0].host == candidates[1].host {
-		// If there is a single host with two users, automatically swith to the
+		// If there is a single host with two users, automatically switch to the
 		// inactive user without prompting.
 		hostname = candidates[0].host
 		username = candidates[0].user
