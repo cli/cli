@@ -109,7 +109,7 @@ if there are any remaining logged into the host:
 
 ## What is out of scope for this release?
 
-As mentioned above, we know that this only addreses some of the requests around supporting multiple accounts. While
+As mentioned above, we know that this only addresses some of the requests around supporting multiple accounts. While
 these are not out of scope forever, for this release some of the big things we have intentionally not included are:
  * Automatic account switching based on some context (e.g. `pwd`, `git remote`, etc)
  * Automatic configuration of git config such as `user.name` and `user.email` when switching
@@ -123,19 +123,19 @@ sharp edges in this release.
 ### Data Migration
 
 The trickiest piece of this work was that the `hosts.yml` file only supported a mapping of one-to-one in the host to
-account relationship. Having persistent data on disk that required a schema change presented a compatability challenge
+account relationship. Having persistent data on disk that required a schema change presented a compatibility challenge
 both backwards for those who use [`go-gh`](https://github.com/cli/go-gh/) outside of `gh`, and forward for `gh` itself
 where we try to ensure that it's possible to use older versions in case we accidentally make a breaking change for users.
 
 As such, from this release, running any command will attempt to migrate this data into a new format, and will
 additionally add a `version` field into the `config.yml` to aid in our future maintainability. While we have tried
-to maintain forward compatability (except in one edge case outlined below), and in the worst case you should be able
+to maintain forward compatibility (except in one edge case outlined below), and in the worst case you should be able
 to remove these files and start from scratch, if you are concerned about the data in these files, we advise you to take
 a backup.
 
-#### Forward Compatability Exclusion
+#### Forward Compatibility Exclusion
 
-There is one known case using `--insecure-storage` that we don't maintain complete forward and backward compatability.
+There is one known case using `--insecure-storage` that we don't maintain complete forward and backward compatibility.
 This occurs if you `auth login --insecure-storage`, upgrade to this release (which performs the data migration), run
 `auth login --insecure-storage` again on an older release, then at some time later use `auth switch` to make this
 account active. The symptom here would be usage of an older token (which may for example have different scopes).

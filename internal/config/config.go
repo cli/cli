@@ -47,7 +47,7 @@ type Config interface {
 	Version() string
 }
 
-// Migration is the interace that config migrations must implement.
+// Migration is the interface that config migrations must implement.
 //
 // Migrations will receive a copy of the config, and should modify that copy
 // as necessary. After migration has completed, the modified config contents
@@ -167,7 +167,7 @@ func (c *cfg) Version() string {
 func (c *cfg) Migrate(m Migration) error {
 	version := c.Version()
 
-	// If migration has already occured then do not attempt to migrate again.
+	// If migration has already occurred then do not attempt to migrate again.
 	if m.PostVersion() == version {
 		return nil
 	}
@@ -241,7 +241,7 @@ func (c *AuthConfig) HasEnvToken() bool {
 			return true
 		}
 	}
-	// TODO: This is _extremely_ knowledgable about the implementation of TokenFromEnvOrConfig
+	// TODO: This is _extremely_ knowledgeable about the implementation of TokenFromEnvOrConfig
 	// It has to use a hostname that is not going to be found in the hosts so that it
 	// can guarantee that tokens will only be returned from a set env var.
 	// Discussed here, but maybe worth revisiting: https://github.com/cli/cli/pull/7169#discussion_r1136979033

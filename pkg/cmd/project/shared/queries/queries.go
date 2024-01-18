@@ -113,10 +113,10 @@ type Project struct {
 	// We released gh v2.34.0 without realizing the Template field does not exist
 	// on GHES 3.8 and older. This broke all project commands for users targeting GHES 3.8
 	// and older. In order to fix this we will no longer query the Template field until
-	// GHES 3.8 gets deprecated on 2024-03-07. This solution was simplier and quicker
+	// GHES 3.8 gets deprecated on 2024-03-07. This solution was simpler and quicker
 	// than adding a feature detection measure to every place this query is used.
 	// It does have the negative consequence that we have had to remove the
-	// Template field when outputing projects to JSON using the --format flag supported
+	// Template field when outputting projects to JSON using the --format flag supported
 	// by a number of project commands. See `pkg/cmd/project/shared/format/json.go` for
 	// implementation.
 	// Template         bool
@@ -1166,7 +1166,7 @@ type Owner struct {
 // NewOwner creates a project Owner
 // If canPrompt is false, login is required as we cannot prompt for it.
 // If login is not empty, it is used to lookup the project owner.
-// If login is empty, interative mode is used to select an owner.
+// If login is empty, interactive mode is used to select an owner.
 // from the current viewer and their organizations
 func (c *Client) NewOwner(canPrompt bool, login string) (*Owner, error) {
 	if login != "" {
