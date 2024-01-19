@@ -1,4 +1,4 @@
-package link
+package unlink
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 	"strconv"
 )
 
-type linkOpts struct {
+type unlinkOpts struct {
 	number    int32
 	owner     string
 	repo      string
@@ -25,27 +25,27 @@ type linkOpts struct {
 	exporter  cmdutil.Exporter
 }
 
-type linkConfig struct {
+type unlinkConfig struct {
 	httpClient func() (*http.Client, error)
 	client     *queries.Client
-	opts       linkOpts
+	opts       unlinkOpts
 	io         *iostreams.IOStreams
 }
 
-type linkProjectToRepoMutation struct {
-	LinkProjectV2ToRepository struct {
+type unlinkProjectFromRepoMutation struct {
+	UnlinkProjectV2FromRepository struct {
 		Repository queries.Repository `graphql:"repository"`
-	} `graphql:"linkProjectV2ToRepository(input:$input)"`
+	} `graphql:"unlinkProjectV2FromRepository(input:$input)"`
 }
 
-func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.Command {
-	opts := linkOpts{}
+func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cobra.Command {
+	opts := unlinkOpts{}
 	linkCmd := &cobra.Command{
-		Short: "Link a project to a repository",
-		Use:   "link [<number>] [flag]",
+		Short: "Unlink a project from a repository",
+		Use:   "unlink [<number>] [flag]",
 		Example: heredoc.Doc(`
-			# link monalisa's project "1" to her repository "my_repo"
-			gh project link 1 --repo my_repo
+			# unlink monalisa's project "1" from her repository "my_repo"
+			gh project unlink 1 --repo my_repo
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := client.New(f)
@@ -61,7 +61,7 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 				opts.number = int32(num)
 			}
 
-			config := linkConfig{
+			config := unlinkConfig{
 				httpClient: f.HttpClient,
 				client:     client,
 				opts:       opts,
@@ -76,18 +76,18 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 			if runF != nil {
 				return runF(config)
 			}
-			return runLink(config)
+			return runUnlink(config)
 		},
 	}
 
 	linkCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
-	linkCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "The repository to be linked to this project")
+	linkCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "The repository to be unlinked from this project")
 	cmdutil.AddFormatFlags(linkCmd, &opts.exporter)
 
 	return linkCmd
 }
 
-func runLink(config linkConfig) error {
+func runUnlink(config unlinkConfig) error {
 	canPrompt := config.io.CanPrompt()
 	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
@@ -112,28 +112,28 @@ func runLink(config linkConfig) error {
 	}
 	config.opts.repoID = repo.ID
 
-	query, variable := linkRepoArgs(config)
-	err = config.client.Mutate("LinkProjectV2ToRepository", query, variable)
+	query, variable := unlinkRepoArgs(config)
+	err = config.client.Mutate("UnlinkProjectV2FromRepository", query, variable)
 	if err != nil {
 		return err
 	}
 
 	if config.opts.exporter != nil {
-		return config.opts.exporter.Write(config.io, query.LinkProjectV2ToRepository.Repository)
+		return config.opts.exporter.Write(config.io, query.UnlinkProjectV2FromRepository.Repository)
 	}
-	return printResults(config, query.LinkProjectV2ToRepository.Repository)
+	return printResults(config, query.UnlinkProjectV2FromRepository.Repository)
 }
 
-func linkRepoArgs(config linkConfig) (*linkProjectToRepoMutation, map[string]interface{}) {
-	return &linkProjectToRepoMutation{}, map[string]interface{}{
-		"input": githubv4.LinkProjectV2ToRepositoryInput{
+func unlinkRepoArgs(config unlinkConfig) (*unlinkProjectFromRepoMutation, map[string]interface{}) {
+	return &unlinkProjectFromRepoMutation{}, map[string]interface{}{
+		"input": githubv4.UnlinkProjectV2FromRepositoryInput{
 			ProjectID:    githubv4.ID(config.opts.projectID),
 			RepositoryID: githubv4.ID(config.opts.repoID),
 		},
 	}
 }
 
-func printResults(config linkConfig, repo queries.Repository) error {
+func printResults(config unlinkConfig, repo queries.Repository) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
