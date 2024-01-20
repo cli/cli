@@ -109,6 +109,11 @@ type Repository struct {
 	URL  string
 }
 
+type Team struct {
+	ID  string
+	URL string
+}
+
 // Project is a ProjectV2 GraphQL object https://docs.github.com/en/graphql/reference/objects#projectv2.
 type Project struct {
 	Number           int32
