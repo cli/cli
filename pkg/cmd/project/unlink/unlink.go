@@ -55,7 +55,7 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 			# unlink monalisa's project 1 from her repository "my_repo"
 			gh project unlink 1 --owner monalisa --repo my_repo
 
-			# unlink monalisa's project 1 from her team "my_team"
+			# unlink monalisa's organization's project 1 from her team "my_team"
 			gh project unlink 1 --owner my_organization --team my_team
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {

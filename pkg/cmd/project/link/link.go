@@ -55,7 +55,7 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 			# link monalisa's project 1 to her repository "my_repo"
 			gh project link 1 --owner monalisa --repo my_repo
 
-			# link monalisa's project 1 to her team "my_team"
+			# link monalisa's organization's project 1 to her team "my_team"
 			gh project link 1 --owner my_organization --team my_team
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
