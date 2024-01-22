@@ -108,10 +108,17 @@ func mainRun() exitCode {
 		expandedArgs = os.Args[1:]
 	}
 
-	// translate `gh help <command>` to `gh <command> --help` for extensions.
-	if len(expandedArgs) >= 2 && expandedArgs[0] == "help" && isExtensionCommand(rootCmd, expandedArgs[1:]) {
-		expandedArgs = expandedArgs[1:]
-		expandedArgs = append(expandedArgs, "--help")
+	if len(expandedArgs) >= 2 && isExtensionCommand(rootCmd, expandedArgs[1:]) {
+		switch expandedArgs[0] {
+		// translate `gh help <command>` to `gh <command> --help` for extensions.
+		case "help":
+			expandedArgs = expandedArgs[1:]
+			expandedArgs = append(expandedArgs, "--help")
+
+		// translate `gh __complete <command> $@` to `gh <command> __complete $@` for extensions.
+		case "__complete":
+			expandedArgs[0], expandedArgs[1] = expandedArgs[1], expandedArgs[0]
+		}
 	}
 
 	rootCmd.SetArgs(expandedArgs)
