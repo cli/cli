@@ -80,9 +80,9 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 			}
 
 			if config.opts.repo != "" && config.opts.team != "" {
-				return fmt.Errorf("specify only one repo or team")
+				return fmt.Errorf("specify only one of `--repo` or `--team`")
 			} else if config.opts.repo == "" && config.opts.team == "" {
-				return fmt.Errorf("specify at least one repo or team")
+				return fmt.Errorf("specify either `--repo` or `--team`")
 			}
 
 			// allow testing of the command without actually running it
@@ -121,50 +121,49 @@ func runLink(config linkConfig) error {
 	c := api.NewClientFromHTTP(httpClient)
 
 	if config.opts.repo != "" {
-		repo, err := api.GitHubRepo(c, ghrepo.New(owner.Login, config.opts.repo))
-		if err != nil {
-			return err
-		}
-		config.opts.repoID = repo.ID
-
-		query, variable := linkRepoArgs(config)
-		err = config.client.Mutate("LinkProjectV2ToRepository", query, variable)
-		if err != nil {
-			return err
-		}
-
-		if config.opts.exporter != nil {
-			return config.opts.exporter.Write(config.io, query.LinkProjectV2ToRepository.Repository)
-		}
-		return printResults(config, query.LinkProjectV2ToRepository.Repository.URL)
-
+		return linkRepo(c, owner, config)
 	} else if config.opts.team != "" {
-		teams, err := api.OrganizationTeams(c, ghrepo.New(owner.Login, ""))
-		if err != nil {
-			return err
-		}
-		for _, team := range teams {
-			if team.Slug == config.opts.team {
-				config.opts.teamID = team.ID
-				break
-			}
-		}
-		if config.opts.teamID == "" {
-			return fmt.Errorf("can't find team %s", config.opts.team)
-		}
-
-		query, variable := linkTeamArgs(config)
-		err = config.client.Mutate("LinkProjectV2ToTeam", query, variable)
-		if err != nil {
-			return err
-		}
-
-		if config.opts.exporter != nil {
-			return config.opts.exporter.Write(config.io, query.LinkProjectV2ToTeam.Team)
-		}
-		return printResults(config, query.LinkProjectV2ToTeam.Team.URL)
+		return linkTeam(c, owner, config)
 	}
-	return fmt.Errorf("specify at least one repo or team")
+	return nil
+}
+
+func linkRepo(c *api.Client, owner *queries.Owner, config linkConfig) error {
+	repo, err := api.GitHubRepo(c, ghrepo.New(owner.Login, config.opts.repo))
+	if err != nil {
+		return err
+	}
+	config.opts.repoID = repo.ID
+
+	query, variable := linkRepoArgs(config)
+	err = config.client.Mutate("LinkProjectV2ToRepository", query, variable)
+	if err != nil {
+		return err
+	}
+
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.LinkProjectV2ToRepository.Repository)
+	}
+	return printResults(config, query.LinkProjectV2ToRepository.Repository.URL)
+}
+
+func linkTeam(c *api.Client, owner *queries.Owner, config linkConfig) error {
+	team, err := api.OrganizationTeam(c, ghrepo.New(owner.Login, ""), config.opts.team)
+	if err != nil {
+		return err
+	}
+	config.opts.teamID = team.ID
+
+	query, variable := linkTeamArgs(config)
+	err = config.client.Mutate("LinkProjectV2ToTeam", query, variable)
+	if err != nil {
+		return err
+	}
+
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.LinkProjectV2ToTeam.Team)
+	}
+	return printResults(config, query.LinkProjectV2ToTeam.Team.URL)
 }
 
 func linkRepoArgs(config linkConfig) (*linkProjectToRepoMutation, map[string]interface{}) {

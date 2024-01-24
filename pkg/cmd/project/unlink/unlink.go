@@ -80,9 +80,9 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 			}
 
 			if config.opts.repo != "" && config.opts.team != "" {
-				return fmt.Errorf("specify only one repo or team")
+				return fmt.Errorf("specify only one of `--repo` or `--team`")
 			} else if config.opts.repo == "" && config.opts.team == "" {
-				return fmt.Errorf("specify at least one repo or team")
+				return fmt.Errorf("specify either `--repo` or `--team`")
 			}
 
 			// allow testing of the command without actually running it
@@ -121,50 +121,49 @@ func runUnlink(config unlinkConfig) error {
 	c := api.NewClientFromHTTP(httpClient)
 
 	if config.opts.repo != "" {
-		repo, err := api.GitHubRepo(c, ghrepo.New(owner.Login, config.opts.repo))
-		if err != nil {
-			return err
-		}
-		config.opts.repoID = repo.ID
-
-		query, variable := unlinkRepoArgs(config)
-		err = config.client.Mutate("UnlinkProjectV2FromRepository", query, variable)
-		if err != nil {
-			return err
-		}
-
-		if config.opts.exporter != nil {
-			return config.opts.exporter.Write(config.io, query.UnlinkProjectV2FromRepository.Repository)
-		}
-		return printResults(config, query.UnlinkProjectV2FromRepository.Repository.URL)
-
+		return unlinkRepo(c, owner, config)
 	} else if config.opts.team != "" {
-		teams, err := api.OrganizationTeams(c, ghrepo.New(owner.Login, ""))
-		if err != nil {
-			return err
-		}
-		for _, team := range teams {
-			if team.Slug == config.opts.team {
-				config.opts.teamID = team.ID
-				break
-			}
-		}
-		if config.opts.teamID == "" {
-			return fmt.Errorf("can't find team %s", config.opts.team)
-		}
-
-		query, variable := unlinkTeamArgs(config)
-		err = config.client.Mutate("UnlinkProjectV2FromTeam", query, variable)
-		if err != nil {
-			return err
-		}
-
-		if config.opts.exporter != nil {
-			return config.opts.exporter.Write(config.io, query.UnlinkProjectV2FromTeam.Team)
-		}
-		return printResults(config, query.UnlinkProjectV2FromTeam.Team.URL)
+		return unlinkTeam(c, owner, config)
 	}
-	return fmt.Errorf("specify at least one repo or team")
+	return nil
+}
+
+func unlinkRepo(c *api.Client, owner *queries.Owner, config unlinkConfig) error {
+	repo, err := api.GitHubRepo(c, ghrepo.New(owner.Login, config.opts.repo))
+	if err != nil {
+		return err
+	}
+	config.opts.repoID = repo.ID
+
+	query, variable := unlinkRepoArgs(config)
+	err = config.client.Mutate("UnlinkProjectV2FromRepository", query, variable)
+	if err != nil {
+		return err
+	}
+
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.UnlinkProjectV2FromRepository.Repository)
+	}
+	return printResults(config, query.UnlinkProjectV2FromRepository.Repository.URL)
+}
+
+func unlinkTeam(c *api.Client, owner *queries.Owner, config unlinkConfig) error {
+	team, err := api.OrganizationTeam(c, ghrepo.New(owner.Login, ""), config.opts.team)
+	if err != nil {
+		return err
+	}
+	config.opts.teamID = team.ID
+
+	query, variable := unlinkTeamArgs(config)
+	err = config.client.Mutate("UnlinkProjectV2FromTeam", query, variable)
+	if err != nil {
+		return err
+	}
+
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.UnlinkProjectV2FromTeam.Team)
+	}
+	return printResults(config, query.UnlinkProjectV2FromTeam.Team.URL)
 }
 
 func unlinkRepoArgs(config unlinkConfig) (*unlinkProjectFromRepoMutation, map[string]interface{}) {

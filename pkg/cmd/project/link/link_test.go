@@ -31,13 +31,13 @@ func TestNewCmdLink(t *testing.T) {
 			name:        "specify-nothing",
 			cli:         "",
 			wantsErr:    true,
-			wantsErrMsg: "specify at least one repo or team",
+			wantsErrMsg: "specify either `--repo` or `--team`",
 		},
 		{
 			name:        "specify-repo-and-team",
 			cli:         "--repo my-repo --team my-team",
 			wantsErr:    true,
-			wantsErrMsg: "specify only one repo or team",
+			wantsErrMsg: "specify only one of `--repo` or `--team`",
 		},
 		{
 			name: "repo",
@@ -316,8 +316,8 @@ func TestRunLink_Team(t *testing.T) {
 	defer httpReg.Verify(t)
 
 	httpReg.Register(
-		httpmock.GraphQL(`query OrganizationTeamList\b`),
-		httpmock.StringResponse(`{"data":{"organization":{"teams":{"nodes": [{"id": "team-ID", "slug": "my-team"}]}}}}`),
+		httpmock.GraphQL(`query OrganizationTeam\b`),
+		httpmock.StringResponse(`{"data":{"organization":{"team":{"id": "team-ID"}}}}`),
 	)
 	httpClient := newTestClient(httpReg)
 
