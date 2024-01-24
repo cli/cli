@@ -332,7 +332,7 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
@@ -396,7 +396,7 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
@@ -443,7 +443,7 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
@@ -495,7 +495,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register("git remote rename origin upstream", 0, "")
 				cs.Register(`git remote add origin https://github.com/monalisa/REPO.git`, 0, "")
-				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
@@ -773,7 +773,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
@@ -806,7 +806,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:refs/heads/feature`, 0, "")
 
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
