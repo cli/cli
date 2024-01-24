@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 	"net/http"
 	"strconv"
@@ -32,18 +31,6 @@ type unlinkConfig struct {
 	client     *queries.Client
 	opts       unlinkOpts
 	io         *iostreams.IOStreams
-}
-
-type unlinkProjectFromRepoMutation struct {
-	UnlinkProjectV2FromRepository struct {
-		Repository queries.Repository `graphql:"repository"`
-	} `graphql:"unlinkProjectV2FromRepository(input:$input)"`
-}
-
-type unlinkProjectFromTeamMutation struct {
-	UnlinkProjectV2FromTeam struct {
-		Team queries.Team `graphql:"team"`
-	} `graphql:"unlinkProjectV2FromTeam(input:$input)"`
 }
 
 func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cobra.Command {
@@ -79,10 +66,11 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 				io:         f.IOStreams,
 			}
 
-			if config.opts.repo != "" && config.opts.team != "" {
-				return fmt.Errorf("specify only one of `--repo` or `--team`")
-			} else if config.opts.repo == "" && config.opts.team == "" {
-				return fmt.Errorf("specify either `--repo` or `--team`")
+			if err := cmdutil.MutuallyExclusive("specify only one of `--repo` or `--team`", opts.repo != "", opts.team != ""); err != nil {
+				return err
+			}
+			if err := cmdutil.MutuallyExclusive("specify either `--repo` or `--team`", opts.repo == "", opts.team == ""); err != nil {
+				return err
 			}
 
 			// allow testing of the command without actually running it
@@ -135,16 +123,15 @@ func unlinkRepo(c *api.Client, owner *queries.Owner, config unlinkConfig) error 
 	}
 	config.opts.repoID = repo.ID
 
-	query, variable := unlinkRepoArgs(config)
-	err = config.client.Mutate("UnlinkProjectV2FromRepository", query, variable)
+	result, err := config.client.UnlinkProjectFromRepository(config.opts.projectID, config.opts.repoID)
 	if err != nil {
 		return err
 	}
 
 	if config.opts.exporter != nil {
-		return config.opts.exporter.Write(config.io, query.UnlinkProjectV2FromRepository.Repository)
+		return config.opts.exporter.Write(config.io, result)
 	}
-	return printResults(config, query.UnlinkProjectV2FromRepository.Repository.URL)
+	return printResults(config, result.URL)
 }
 
 func unlinkTeam(c *api.Client, owner *queries.Owner, config unlinkConfig) error {
@@ -154,34 +141,15 @@ func unlinkTeam(c *api.Client, owner *queries.Owner, config unlinkConfig) error 
 	}
 	config.opts.teamID = team.ID
 
-	query, variable := unlinkTeamArgs(config)
-	err = config.client.Mutate("UnlinkProjectV2FromTeam", query, variable)
+	result, err := config.client.UnlinkProjectFromTeam(config.opts.projectID, config.opts.teamID)
 	if err != nil {
 		return err
 	}
 
 	if config.opts.exporter != nil {
-		return config.opts.exporter.Write(config.io, query.UnlinkProjectV2FromTeam.Team)
+		return config.opts.exporter.Write(config.io, result)
 	}
-	return printResults(config, query.UnlinkProjectV2FromTeam.Team.URL)
-}
-
-func unlinkRepoArgs(config unlinkConfig) (*unlinkProjectFromRepoMutation, map[string]interface{}) {
-	return &unlinkProjectFromRepoMutation{}, map[string]interface{}{
-		"input": githubv4.UnlinkProjectV2FromRepositoryInput{
-			ProjectID:    githubv4.ID(config.opts.projectID),
-			RepositoryID: githubv4.ID(config.opts.repoID),
-		},
-	}
-}
-
-func unlinkTeamArgs(config unlinkConfig) (*unlinkProjectFromTeamMutation, map[string]interface{}) {
-	return &unlinkProjectFromTeamMutation{}, map[string]interface{}{
-		"input": githubv4.UnlinkProjectV2FromTeamInput{
-			ProjectID: githubv4.ID(config.opts.projectID),
-			TeamID:    githubv4.ID(config.opts.teamID),
-		},
-	}
+	return printResults(config, result.URL)
 }
 
 func printResults(config unlinkConfig, url string) error {

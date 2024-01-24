@@ -1365,6 +1365,98 @@ func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) (Pr
 	}
 }
 
+type linkProjectToRepoMutation struct {
+	LinkProjectV2ToRepository struct {
+		Repository Repository `graphql:"repository"`
+	} `graphql:"linkProjectV2ToRepository(input:$input)"`
+}
+
+type linkProjectToTeamMutation struct {
+	LinkProjectV2ToTeam struct {
+		Team Team `graphql:"team"`
+	} `graphql:"linkProjectV2ToTeam(input:$input)"`
+}
+
+type unlinkProjectFromRepoMutation struct {
+	UnlinkProjectV2FromRepository struct {
+		Repository Repository `graphql:"repository"`
+	} `graphql:"unlinkProjectV2FromRepository(input:$input)"`
+}
+
+type unlinkProjectFromTeamMutation struct {
+	UnlinkProjectV2FromTeam struct {
+		Team Team `graphql:"team"`
+	} `graphql:"unlinkProjectV2FromTeam(input:$input)"`
+}
+
+// LinkProjectToRepository links a project to a repository.
+func (c *Client) LinkProjectToRepository(projectID string, repoID string) (*Repository, error) {
+	var mutation linkProjectToRepoMutation
+	variables := map[string]interface{}{
+		"input": githubv4.LinkProjectV2ToRepositoryInput{
+			ProjectID:    githubv4.String(projectID),
+			RepositoryID: githubv4.ID(repoID),
+		},
+	}
+
+	err := c.Mutate("LinkProjectV2ToRepository", &mutation, variables)
+	if err != nil {
+		return nil, err
+	}
+	return &mutation.LinkProjectV2ToRepository.Repository, nil
+}
+
+// LinkProjectToTeam links a project to a team.
+func (c *Client) LinkProjectToTeam(projectID string, teamID string) (*Team, error) {
+	var mutation linkProjectToTeamMutation
+	variables := map[string]interface{}{
+		"input": githubv4.LinkProjectV2ToTeamInput{
+			ProjectID: githubv4.String(projectID),
+			TeamID:    githubv4.ID(teamID),
+		},
+	}
+
+	err := c.Mutate("LinkProjectV2ToTeam", &mutation, variables)
+	if err != nil {
+		return nil, err
+	}
+	return &mutation.LinkProjectV2ToTeam.Team, nil
+}
+
+// UnlinkProjectFromRepository unlinks a project from a repository.
+func (c *Client) UnlinkProjectFromRepository(projectID string, repoID string) (*Repository, error) {
+	var mutation unlinkProjectFromRepoMutation
+	variables := map[string]interface{}{
+		"input": githubv4.UnlinkProjectV2FromRepositoryInput{
+			ProjectID:    githubv4.String(projectID),
+			RepositoryID: githubv4.ID(repoID),
+		},
+	}
+
+	err := c.Mutate("UnlinkProjectV2FromRepository", &mutation, variables)
+	if err != nil {
+		return nil, err
+	}
+	return &mutation.UnlinkProjectV2FromRepository.Repository, nil
+}
+
+// UnlinkProjectFromTeam unlinks a project from a team.
+func (c *Client) UnlinkProjectFromTeam(projectID string, teamID string) (*Team, error) {
+	var mutation unlinkProjectFromTeamMutation
+	variables := map[string]interface{}{
+		"input": githubv4.UnlinkProjectV2FromTeamInput{
+			ProjectID: githubv4.String(projectID),
+			TeamID:    githubv4.ID(teamID),
+		},
+	}
+
+	err := c.Mutate("UnlinkProjectV2FromTeam", &mutation, variables)
+	if err != nil {
+		return nil, err
+	}
+	return &mutation.UnlinkProjectV2FromTeam.Team, nil
+}
+
 func handleError(err error) error {
 	var gerr api.GraphQLError
 	if errors.As(err, &gerr) {

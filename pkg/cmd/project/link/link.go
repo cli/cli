@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 	"net/http"
 	"strconv"
@@ -32,18 +31,6 @@ type linkConfig struct {
 	client     *queries.Client
 	opts       linkOpts
 	io         *iostreams.IOStreams
-}
-
-type linkProjectToRepoMutation struct {
-	LinkProjectV2ToRepository struct {
-		Repository queries.Repository `graphql:"repository"`
-	} `graphql:"linkProjectV2ToRepository(input:$input)"`
-}
-
-type linkProjectToTeamMutation struct {
-	LinkProjectV2ToTeam struct {
-		Team queries.Team `graphql:"team"`
-	} `graphql:"linkProjectV2ToTeam(input:$input)"`
 }
 
 func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.Command {
@@ -79,10 +66,11 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 				io:         f.IOStreams,
 			}
 
-			if config.opts.repo != "" && config.opts.team != "" {
-				return fmt.Errorf("specify only one of `--repo` or `--team`")
-			} else if config.opts.repo == "" && config.opts.team == "" {
-				return fmt.Errorf("specify either `--repo` or `--team`")
+			if err := cmdutil.MutuallyExclusive("specify only one of `--repo` or `--team`", opts.repo != "", opts.team != ""); err != nil {
+				return err
+			}
+			if err := cmdutil.MutuallyExclusive("specify either `--repo` or `--team`", opts.repo == "", opts.team == ""); err != nil {
+				return err
 			}
 
 			// allow testing of the command without actually running it
@@ -135,16 +123,15 @@ func linkRepo(c *api.Client, owner *queries.Owner, config linkConfig) error {
 	}
 	config.opts.repoID = repo.ID
 
-	query, variable := linkRepoArgs(config)
-	err = config.client.Mutate("LinkProjectV2ToRepository", query, variable)
+	result, err := config.client.LinkProjectToRepository(config.opts.projectID, config.opts.repoID)
 	if err != nil {
 		return err
 	}
 
 	if config.opts.exporter != nil {
-		return config.opts.exporter.Write(config.io, query.LinkProjectV2ToRepository.Repository)
+		return config.opts.exporter.Write(config.io, result)
 	}
-	return printResults(config, query.LinkProjectV2ToRepository.Repository.URL)
+	return printResults(config, result.URL)
 }
 
 func linkTeam(c *api.Client, owner *queries.Owner, config linkConfig) error {
@@ -154,34 +141,15 @@ func linkTeam(c *api.Client, owner *queries.Owner, config linkConfig) error {
 	}
 	config.opts.teamID = team.ID
 
-	query, variable := linkTeamArgs(config)
-	err = config.client.Mutate("LinkProjectV2ToTeam", query, variable)
+	result, err := config.client.LinkProjectToTeam(config.opts.projectID, config.opts.teamID)
 	if err != nil {
 		return err
 	}
 
 	if config.opts.exporter != nil {
-		return config.opts.exporter.Write(config.io, query.LinkProjectV2ToTeam.Team)
+		return config.opts.exporter.Write(config.io, result)
 	}
-	return printResults(config, query.LinkProjectV2ToTeam.Team.URL)
-}
-
-func linkRepoArgs(config linkConfig) (*linkProjectToRepoMutation, map[string]interface{}) {
-	return &linkProjectToRepoMutation{}, map[string]interface{}{
-		"input": githubv4.LinkProjectV2ToRepositoryInput{
-			ProjectID:    githubv4.ID(config.opts.projectID),
-			RepositoryID: githubv4.ID(config.opts.repoID),
-		},
-	}
-}
-
-func linkTeamArgs(config linkConfig) (*linkProjectToTeamMutation, map[string]interface{}) {
-	return &linkProjectToTeamMutation{}, map[string]interface{}{
-		"input": githubv4.LinkProjectV2ToTeamInput{
-			ProjectID: githubv4.ID(config.opts.projectID),
-			TeamID:    githubv4.ID(config.opts.teamID),
-		},
-	}
+	return printResults(config, result.URL)
 }
 
 func printResults(config linkConfig, url string) error {
