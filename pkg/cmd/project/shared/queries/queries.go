@@ -113,10 +113,10 @@ type Project struct {
 	// We released gh v2.34.0 without realizing the Template field does not exist
 	// on GHES 3.8 and older. This broke all project commands for users targeting GHES 3.8
 	// and older. In order to fix this we will no longer query the Template field until
-	// GHES 3.8 gets deprecated on 2024-03-07. This solution was simplier and quicker
+	// GHES 3.8 gets deprecated on 2024-03-07. This solution was simpler and quicker
 	// than adding a feature detection measure to every place this query is used.
 	// It does have the negative consequence that we have had to remove the
-	// Template field when outputing projects to JSON using the --format flag supported
+	// Template field when outputting projects to JSON using the --format flag supported
 	// by a number of project commands. See `pkg/cmd/project/shared/format/json.go` for
 	// implementation.
 	// Template         bool
@@ -128,12 +128,8 @@ type Project struct {
 		TotalCount int
 		Nodes      []ProjectItem
 	} `graphql:"items(first: $firstItems, after: $afterItems)"`
-	Fields struct {
-		TotalCount int
-		Nodes      []ProjectField
-		PageInfo   PageInfo
-	} `graphql:"fields(first: $firstFields, after: $afterFields)"`
-	Owner struct {
+	Fields ProjectFields `graphql:"fields(first: $firstFields, after: $afterFields)"`
+	Owner  struct {
 		TypeName string `graphql:"__typename"`
 		User     struct {
 			Login string
@@ -141,6 +137,36 @@ type Project struct {
 		Organization struct {
 			Login string
 		} `graphql:"... on Organization"`
+	}
+}
+
+func (p Project) DetailedItems() map[string]interface{} {
+	return map[string]interface{}{
+		"items":      serializeProjectWithItems(&p),
+		"totalCount": p.Items.TotalCount,
+	}
+}
+
+func (p Project) ExportData(_ []string) map[string]interface{} {
+	return map[string]interface{}{
+		"number":           p.Number,
+		"url":              p.URL,
+		"shortDescription": p.ShortDescription,
+		"public":           p.Public,
+		"closed":           p.Closed,
+		"title":            p.Title,
+		"id":               p.ID,
+		"readme":           p.Readme,
+		"items": map[string]interface{}{
+			"totalCount": p.Items.TotalCount,
+		},
+		"fields": map[string]interface{}{
+			"totalCount": p.Fields.TotalCount,
+		},
+		"owner": map[string]interface{}{
+			"type":  p.OwnerType(),
+			"login": p.OwnerLogin(),
+		},
 	}
 }
 
@@ -153,6 +179,22 @@ func (p Project) OwnerLogin() string {
 		return p.Owner.User.Login
 	}
 	return p.Owner.Organization.Login
+}
+
+type Projects struct {
+	Nodes      []Project
+	TotalCount int
+}
+
+func (p Projects) ExportData(_ []string) map[string]interface{} {
+	v := make([]map[string]interface{}, len(p.Nodes))
+	for i := range p.Nodes {
+		v[i] = p.Nodes[i].ExportData(nil)
+	}
+	return map[string]interface{}{
+		"projects":   v,
+		"totalCount": p.TotalCount,
+	}
 }
 
 // ProjectItem is a ProjectV2Item GraphQL object https://docs.github.com/en/graphql/reference/objects#projectv2item.
@@ -284,6 +326,19 @@ type DraftIssue struct {
 	Title string
 }
 
+func (i DraftIssue) ExportData(_ []string) map[string]interface{} {
+	v := map[string]interface{}{
+		"title": i.Title,
+		"body":  i.Body,
+		"type":  "DraftIssue",
+	}
+	// Emulate omitempty.
+	if i.ID != "" {
+		v["id"] = i.ID
+	}
+	return v
+}
+
 type PullRequest struct {
 	Body       string
 	Title      string
@@ -291,6 +346,17 @@ type PullRequest struct {
 	URL        string
 	Repository struct {
 		NameWithOwner string
+	}
+}
+
+func (pr PullRequest) ExportData(_ []string) map[string]interface{} {
+	return map[string]interface{}{
+		"type":       "PullRequest",
+		"body":       pr.Body,
+		"title":      pr.Title,
+		"number":     pr.Number,
+		"repository": pr.Repository.NameWithOwner,
+		"url":        pr.URL,
 	}
 }
 
@@ -302,6 +368,50 @@ type Issue struct {
 	Repository struct {
 		NameWithOwner string
 	}
+}
+
+func (i Issue) ExportData(_ []string) map[string]interface{} {
+	return map[string]interface{}{
+		"type":       "Issue",
+		"body":       i.Body,
+		"title":      i.Title,
+		"number":     i.Number,
+		"repository": i.Repository.NameWithOwner,
+		"url":        i.URL,
+	}
+}
+
+func (p ProjectItem) DetailedItem() exportable {
+	switch p.Type() {
+	case "DraftIssue":
+		return DraftIssue{
+			Body:  p.Body(),
+			Title: p.Title(),
+		}
+
+	case "Issue":
+		return Issue{
+			Body:   p.Body(),
+			Title:  p.Title(),
+			Number: p.Number(),
+			Repository: struct{ NameWithOwner string }{
+				NameWithOwner: p.Repo(),
+			},
+			URL: p.URL(),
+		}
+
+	case "PullRequest":
+		return PullRequest{
+			Body:   p.Body(),
+			Title:  p.Title(),
+			Number: p.Number(),
+			Repository: struct{ NameWithOwner string }{
+				NameWithOwner: p.Repo(),
+			},
+			URL: p.URL(),
+		}
+	}
+	return nil
 }
 
 // Type is the underlying type of the project item.
@@ -372,6 +482,20 @@ func (p ProjectItem) URL() string {
 		return p.Content.PullRequest.URL
 	}
 	return ""
+}
+
+func (p ProjectItem) ExportData(_ []string) map[string]interface{} {
+	v := map[string]interface{}{
+		"id":    p.ID(),
+		"title": p.Title(),
+		"body":  p.Body(),
+		"type":  p.Type(),
+	}
+	// Emulate omitempty.
+	if url := p.URL(); url != "" {
+		v["url"] = url
+	}
+	return v
 }
 
 // ProjectItems returns the items of a project. If the OwnerType is VIEWER, no login is required.
@@ -631,6 +755,13 @@ type SingleSelectFieldOptions struct {
 	Name string
 }
 
+func (f SingleSelectFieldOptions) ExportData(_ []string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":   f.ID,
+		"name": f.Name,
+	}
+}
+
 func (p ProjectField) Options() []SingleSelectFieldOptions {
 	if p.TypeName == "ProjectV2SingleSelectField" {
 		var options []SingleSelectFieldOptions
@@ -643,6 +774,40 @@ func (p ProjectField) Options() []SingleSelectFieldOptions {
 		return options
 	}
 	return nil
+}
+
+func (p ProjectField) ExportData(_ []string) map[string]interface{} {
+	v := map[string]interface{}{
+		"id":   p.ID(),
+		"name": p.Name(),
+		"type": p.Type(),
+	}
+	// Emulate omitempty
+	if opts := p.Options(); len(opts) != 0 {
+		options := make([]map[string]interface{}, len(opts))
+		for i, opt := range opts {
+			options[i] = opt.ExportData(nil)
+		}
+		v["options"] = options
+	}
+	return v
+}
+
+type ProjectFields struct {
+	TotalCount int
+	Nodes      []ProjectField
+	PageInfo   PageInfo
+}
+
+func (p ProjectFields) ExportData(_ []string) map[string]interface{} {
+	fields := make([]map[string]interface{}, len(p.Nodes))
+	for i := range p.Nodes {
+		fields[i] = p.Nodes[i].ExportData(nil)
+	}
+	return map[string]interface{}{
+		"fields":     fields,
+		"totalCount": p.TotalCount,
+	}
 }
 
 // ProjectFields returns a project with fields. If the OwnerType is VIEWER, no login is required.
@@ -1001,7 +1166,7 @@ type Owner struct {
 // NewOwner creates a project Owner
 // If canPrompt is false, login is required as we cannot prompt for it.
 // If login is not empty, it is used to lookup the project owner.
-// If login is empty, interative mode is used to select an owner.
+// If login is empty, interactive mode is used to select an owner.
 // from the current viewer and their organizations
 func (c *Client) NewOwner(canPrompt bool, login string) (*Owner, error) {
 	if login != "" {
@@ -1084,17 +1249,17 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool)
 		return nil, fmt.Errorf("project number is required when not running interactively")
 	}
 
-	projects, _, err := c.Projects(o.Login, o.Type, 0, fields)
+	projects, err := c.Projects(o.Login, o.Type, 0, fields)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(projects) == 0 {
+	if len(projects.Nodes) == 0 {
 		return nil, fmt.Errorf("no projects found for %s", o.Login)
 	}
 
-	options := make([]string, 0, len(projects))
-	for _, p := range projects {
+	options := make([]string, 0, len(projects.Nodes))
+	for _, p := range projects.Nodes {
 		title := fmt.Sprintf("%s (#%d)", p.Title, p.Number)
 		options = append(options, title)
 	}
@@ -1104,16 +1269,17 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool)
 		return nil, err
 	}
 
-	return &projects[answerIndex], nil
+	return &projects.Nodes[answerIndex], nil
 }
 
 // Projects returns all the projects for an Owner. If the OwnerType is VIEWER, no login is required.
 // If limit is 0, the default limit is used.
-func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) ([]Project, int, error) {
-	projects := make([]Project, 0)
+func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) (Projects, error) {
+	projects := Projects{
+		Nodes: make([]Project, 0),
+	}
 	cursor := (*githubv4.String)(nil)
 	hasNextPage := false
-	totalCount := 0
 
 	if limit == 0 {
 		limit = LimitDefault
@@ -1149,38 +1315,38 @@ func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) ([]
 		if t == UserOwner {
 			var query userProjects
 			if err := c.doQuery("UserProjects", &query, variables); err != nil {
-				return projects, 0, err
+				return projects, err
 			}
-			projects = append(projects, query.Owner.Projects.Nodes...)
+			projects.Nodes = append(projects.Nodes, query.Owner.Projects.Nodes...)
 			hasNextPage = query.Owner.Projects.PageInfo.HasNextPage
 			cursor = &query.Owner.Projects.PageInfo.EndCursor
-			totalCount = query.Owner.Projects.TotalCount
+			projects.TotalCount = query.Owner.Projects.TotalCount
 		} else if t == OrgOwner {
 			var query orgProjects
 			if err := c.doQuery("OrgProjects", &query, variables); err != nil {
-				return projects, 0, err
+				return projects, err
 			}
-			projects = append(projects, query.Owner.Projects.Nodes...)
+			projects.Nodes = append(projects.Nodes, query.Owner.Projects.Nodes...)
 			hasNextPage = query.Owner.Projects.PageInfo.HasNextPage
 			cursor = &query.Owner.Projects.PageInfo.EndCursor
-			totalCount = query.Owner.Projects.TotalCount
+			projects.TotalCount = query.Owner.Projects.TotalCount
 		} else if t == ViewerOwner {
 			var query viewerProjects
 			if err := c.doQuery("ViewerProjects", &query, variables); err != nil {
-				return projects, 0, err
+				return projects, err
 			}
-			projects = append(projects, query.Owner.Projects.Nodes...)
+			projects.Nodes = append(projects.Nodes, query.Owner.Projects.Nodes...)
 			hasNextPage = query.Owner.Projects.PageInfo.HasNextPage
 			cursor = &query.Owner.Projects.PageInfo.EndCursor
-			totalCount = query.Owner.Projects.TotalCount
+			projects.TotalCount = query.Owner.Projects.TotalCount
 		}
 
-		if !hasNextPage || len(projects) >= limit {
-			return projects, totalCount, nil
+		if !hasNextPage || len(projects.Nodes) >= limit {
+			return projects, nil
 		}
 
-		if len(projects)+LimitMax > limit {
-			first := limit - len(projects)
+		if len(projects.Nodes)+LimitMax > limit {
+			first := limit - len(projects.Nodes)
 			variables["first"] = githubv4.Int(first)
 		}
 		variables["after"] = cursor
@@ -1222,4 +1388,108 @@ func requiredScopesFromServerMessage(msg string) []string {
 		scopes = append(scopes, strings.Trim(mm, "' "))
 	}
 	return scopes
+}
+
+func projectFieldValueData(v FieldValueNodes) interface{} {
+	switch v.Type {
+	case "ProjectV2ItemFieldDateValue":
+		return v.ProjectV2ItemFieldDateValue.Date
+	case "ProjectV2ItemFieldIterationValue":
+		return map[string]interface{}{
+			"title":     v.ProjectV2ItemFieldIterationValue.Title,
+			"startDate": v.ProjectV2ItemFieldIterationValue.StartDate,
+			"duration":  v.ProjectV2ItemFieldIterationValue.Duration,
+		}
+	case "ProjectV2ItemFieldNumberValue":
+		return v.ProjectV2ItemFieldNumberValue.Number
+	case "ProjectV2ItemFieldSingleSelectValue":
+		return v.ProjectV2ItemFieldSingleSelectValue.Name
+	case "ProjectV2ItemFieldTextValue":
+		return v.ProjectV2ItemFieldTextValue.Text
+	case "ProjectV2ItemFieldMilestoneValue":
+		return map[string]interface{}{
+			"title":       v.ProjectV2ItemFieldMilestoneValue.Milestone.Title,
+			"description": v.ProjectV2ItemFieldMilestoneValue.Milestone.Description,
+			"dueOn":       v.ProjectV2ItemFieldMilestoneValue.Milestone.DueOn,
+		}
+	case "ProjectV2ItemFieldLabelValue":
+		names := make([]string, 0)
+		for _, p := range v.ProjectV2ItemFieldLabelValue.Labels.Nodes {
+			names = append(names, p.Name)
+		}
+		return names
+	case "ProjectV2ItemFieldPullRequestValue":
+		urls := make([]string, 0)
+		for _, p := range v.ProjectV2ItemFieldPullRequestValue.PullRequests.Nodes {
+			urls = append(urls, p.Url)
+		}
+		return urls
+	case "ProjectV2ItemFieldRepositoryValue":
+		return v.ProjectV2ItemFieldRepositoryValue.Repository.Url
+	case "ProjectV2ItemFieldUserValue":
+		logins := make([]string, 0)
+		for _, p := range v.ProjectV2ItemFieldUserValue.Users.Nodes {
+			logins = append(logins, p.Login)
+		}
+		return logins
+	case "ProjectV2ItemFieldReviewerValue":
+		names := make([]string, 0)
+		for _, p := range v.ProjectV2ItemFieldReviewerValue.Reviewers.Nodes {
+			if p.Type == "Team" {
+				names = append(names, p.Team.Name)
+			} else if p.Type == "User" {
+				names = append(names, p.User.Login)
+			}
+		}
+		return names
+
+	}
+
+	return nil
+}
+
+// serialize creates a map from field to field values
+func serializeProjectWithItems(project *Project) []map[string]interface{} {
+	fields := make(map[string]string)
+
+	// make a map of fields by ID
+	for _, f := range project.Fields.Nodes {
+		fields[f.ID()] = camelCase(f.Name())
+	}
+	itemsSlice := make([]map[string]interface{}, 0)
+
+	// for each value, look up the name by ID
+	// and set the value to the field value
+	for _, i := range project.Items.Nodes {
+		o := make(map[string]interface{})
+		o["id"] = i.Id
+		if projectItem := i.DetailedItem(); projectItem != nil {
+			o["content"] = projectItem.ExportData(nil)
+		} else {
+			o["content"] = nil
+		}
+		for _, v := range i.FieldValues.Nodes {
+			id := v.ID()
+			value := projectFieldValueData(v)
+
+			o[fields[id]] = value
+		}
+		itemsSlice = append(itemsSlice, o)
+	}
+	return itemsSlice
+}
+
+// camelCase converts a string to camelCase, which is useful for turning Go field names to JSON keys.
+func camelCase(s string) string {
+	if len(s) == 0 {
+		return ""
+	}
+	if len(s) == 1 {
+		return strings.ToLower(s)
+	}
+	return strings.ToLower(s[0:1]) + s[1:]
+}
+
+type exportable interface {
+	ExportData([]string) map[string]interface{}
 }

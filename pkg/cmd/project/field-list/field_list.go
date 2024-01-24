@@ -7,7 +7,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -95,7 +94,7 @@ func runList(config listConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printJSON(config, project)
+		return config.opts.exporter.Write(config.io, project.Fields)
 	}
 
 	return printResults(config, project.Fields.Nodes, owner.Login)
@@ -116,9 +115,4 @@ func printResults(config listConfig, fields []queries.ProjectField, login string
 	}
 
 	return tp.Render()
-}
-
-func printJSON(config listConfig, project *queries.Project) error {
-	projectsJSON := format.JSONProjectFields(project)
-	return config.opts.exporter.Write(config.io, projectsJSON)
 }
