@@ -200,7 +200,7 @@ func Test_createRun(t *testing.T) {
 			name:       "interactive create from scratch with gitignore and license",
 			opts:       &CreateOptions{Interactive: true},
 			tty:        true,
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n  https://github.com/OWNER/REPO\n",
 			promptStubs: func(p *prompter.PrompterMock) {
 				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
 					switch message {
@@ -266,7 +266,7 @@ func Test_createRun(t *testing.T) {
 			name:       "interactive create from scratch but with prompted owner",
 			opts:       &CreateOptions{Interactive: true},
 			tty:        true,
-			wantStdout: "✓ Created repository org1/REPO on GitHub\n",
+			wantStdout: "✓ Created repository org1/REPO on GitHub\n  https://github.com/org1/REPO\n",
 			promptStubs: func(p *prompter.PrompterMock) {
 				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
 					switch message {
@@ -440,7 +440,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
 				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
 			},
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n  https://github.com/OWNER/REPO\n",
 		},
 		{
 			name: "interactive with existing repository public add remote and push",
@@ -508,7 +508,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
 				cs.Register(`git -C . push --set-upstream origin HEAD`, 0, "")
 			},
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n  https://github.com/OWNER/REPO\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
 		},
 		{
 			name: "interactive create from a template repository",
@@ -585,7 +585,7 @@ func Test_createRun(t *testing.T) {
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone --branch main https://github.com/OWNER/REPO`, 0, "")
 			},
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n  https://github.com/OWNER/REPO\n",
 		},
 		{
 			name: "interactive create from template repo but there are no template repos",

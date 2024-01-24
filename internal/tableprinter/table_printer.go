@@ -16,7 +16,7 @@ type TablePrinter struct {
 	cs    *iostreams.ColorScheme
 }
 
-// IsTTY gets wether the TablePrinter will render to a terminal.
+// IsTTY gets whether the TablePrinter will render to a terminal.
 func (t *TablePrinter) IsTTY() bool {
 	return t.isTTY
 }
