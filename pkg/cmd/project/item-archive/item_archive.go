@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -110,7 +109,7 @@ func runArchiveItem(config archiveItemConfig) error {
 		}
 
 		if config.opts.exporter != nil {
-			return printJSON(config, query.UnarchiveProjectItem.ProjectV2Item)
+			return config.opts.exporter.Write(config.io, query.UnarchiveProjectItem.ProjectV2Item)
 		}
 
 		return printResults(config, query.UnarchiveProjectItem.ProjectV2Item)
@@ -122,7 +121,7 @@ func runArchiveItem(config archiveItemConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printJSON(config, query.ArchiveProjectItem.ProjectV2Item)
+		return config.opts.exporter.Write(config.io, query.ArchiveProjectItem.ProjectV2Item)
 	}
 
 	return printResults(config, query.ArchiveProjectItem.ProjectV2Item)
@@ -158,9 +157,4 @@ func printResults(config archiveItemConfig, item queries.ProjectItem) error {
 
 	_, err := fmt.Fprintf(config.io.Out, "Archived item\n")
 	return err
-}
-
-func printJSON(config archiveItemConfig, item queries.ProjectItem) error {
-	projectItemJSON := format.JSONProjectItem(item)
-	return config.opts.exporter.Write(config.io, projectItemJSON)
 }

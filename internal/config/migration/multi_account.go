@@ -64,7 +64,7 @@ type tokenSource struct {
 // The reason for this is that we can then add new users under a host.
 // Note that we are only copying the config under a new users key, and
 // under a specific user. The original config is left alone. This is to
-// allow forward compatability for older versions of gh and also to avoid
+// allow forward compatibility for older versions of gh and also to avoid
 // breaking existing users of go-gh which looks at a specific location
 // in the config for oauth tokens that are stored insecurely.
 
@@ -195,7 +195,7 @@ func migrateToken(hostname, username string, tokenSource tokenSource) error {
 }
 
 func migrateConfig(c *config.Config, hostname, username string) error {
-	// Set the user key incase it was previously an anonymous user.
+	// Set the user key in case it was previously an anonymous user.
 	c.Set(append(hostsKey, hostname, "user"), username)
 	// Create the username key with an empty value so it will be
 	// written even if there are no keys set under it.

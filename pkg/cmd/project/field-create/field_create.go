@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -114,7 +113,7 @@ func runCreateField(config createFieldConfig) error {
 	}
 
 	if config.opts.exporter != nil {
-		return printJSON(config, query.CreateProjectV2Field.Field)
+		return config.opts.exporter.Write(config.io, query.CreateProjectV2Field.Field)
 	}
 
 	return printResults(config, query.CreateProjectV2Field.Field)
@@ -150,9 +149,4 @@ func printResults(config createFieldConfig, field queries.ProjectField) error {
 
 	_, err := fmt.Fprintf(config.io.Out, "Created field\n")
 	return err
-}
-
-func printJSON(config createFieldConfig, field queries.ProjectField) error {
-	projectFieldJSON := format.JSONProjectField(field)
-	return config.opts.exporter.Write(config.io, projectFieldJSON)
 }

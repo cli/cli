@@ -333,6 +333,16 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`auto-merge:\tenabled\thubot\tsquash\n`,
 			},
 		},
+		"PR with nil project": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithNilProject.json",
+			},
+			expectedOutputs: []string{
+				`projects:\t\n`,
+			},
+		},
 	}
 
 	for name, tc := range tests {

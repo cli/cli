@@ -65,6 +65,9 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 
 			# search repositories without topic "linux"
 			$ gh search repos -- -topic:linux
+
+			# search repositories excluding archived repositories
+			$ gh search repos --archived=false
     `),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {

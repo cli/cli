@@ -428,3 +428,10 @@ func TestProjectItems_FieldTitle(t *testing.T) {
 	assert.Equal(t, project.Items.Nodes[0].FieldValues.Nodes[0].ProjectV2ItemFieldIterationValue.Title, "Iteration Title 1")
 	assert.Equal(t, project.Items.Nodes[0].FieldValues.Nodes[1].ProjectV2ItemFieldMilestoneValue.Milestone.Title, "Milestone Title 1")
 }
+
+func TestCamelCase(t *testing.T) {
+	assert.Equal(t, "camelCase", camelCase("camelCase"))
+	assert.Equal(t, "camelCase", camelCase("CamelCase"))
+	assert.Equal(t, "c", camelCase("C"))
+	assert.Equal(t, "", camelCase(""))
+}
