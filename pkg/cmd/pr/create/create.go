@@ -700,7 +700,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	pr, err := api.CreatePullRequest(client, ctx.BaseRepo, params)
 	opts.IO.StopProgressIndicator()
 	if pr != nil {
-		fmt.Fprintln(opts.IO.Out, pr.URL)
+		fmt.Fprintln(opts.IO.Out, text.DisplayURL(pr.URL))
 	}
 	if err != nil {
 		if pr != nil {
