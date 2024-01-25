@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -151,7 +152,14 @@ func addParamsSlice(m map[string]interface{}, prevkey, newkey string) (map[strin
 	return newMap, nil
 }
 
+type JSONBoi map[string]any
+
 func magicFieldValue(v string, opts *ApiOptions) (interface{}, error) {
+	var jsonBoi JSONBoi
+	if err := json.Unmarshal([]byte(v), &jsonBoi); err == nil {
+		return jsonBoi, nil
+	}
+
 	if strings.HasPrefix(v, "@") {
 		b, err := opts.IO.ReadUserFile(v[1:])
 		if err != nil {
