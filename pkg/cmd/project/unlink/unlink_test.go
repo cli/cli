@@ -1,6 +1,7 @@
 package unlink
 
 import (
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -209,7 +210,7 @@ func TestRunUnlink_Repo(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
-	config := unlinkConfig{
+	cfg := unlinkConfig{
 		opts: unlinkOpts{
 			number: 1,
 			repo:   "my-repo",
@@ -219,10 +220,13 @@ func TestRunUnlink_Repo(t *testing.T) {
 		httpClient: func() (*http.Client, error) {
 			return http.DefaultClient, nil
 		},
+		config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 		io: ios,
 	}
 
-	err := runUnlink(config)
+	err := runUnlink(cfg)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
@@ -322,7 +326,7 @@ func TestRunUnlink_Team(t *testing.T) {
 
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
-	config := unlinkConfig{
+	cfg := unlinkConfig{
 		opts: unlinkOpts{
 			number: 1,
 			team:   "my-team",
@@ -332,10 +336,13 @@ func TestRunUnlink_Team(t *testing.T) {
 		httpClient: func() (*http.Client, error) {
 			return http.DefaultClient, nil
 		},
+		config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 		io: ios,
 	}
 
-	err := runUnlink(config)
+	err := runUnlink(cfg)
 	assert.NoError(t, err)
 	assert.Equal(
 		t,

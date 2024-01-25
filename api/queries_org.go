@@ -49,7 +49,7 @@ type OrgTeam struct {
 }
 
 // OrganizationTeam fetch the team in an organization with the given slug
-func OrganizationTeam(client *Client, repo ghrepo.Interface, teamSlug string) (*OrgTeam, error) {
+func OrganizationTeam(client *Client, hostname string, org string, teamSlug string) (*OrgTeam, error) {
 	type responseData struct {
 		Organization struct {
 			Team OrgTeam `graphql:"team(slug: $teamSlug)"`
@@ -57,12 +57,12 @@ func OrganizationTeam(client *Client, repo ghrepo.Interface, teamSlug string) (*
 	}
 
 	variables := map[string]interface{}{
-		"owner":    githubv4.String(repo.RepoOwner()),
+		"owner":    githubv4.String(org),
 		"teamSlug": githubv4.String(teamSlug),
 	}
 
 	var query responseData
-	err := client.Query(repo.RepoHost(), "OrganizationTeam", &query, variables)
+	err := client.Query(hostname, "OrganizationTeam", &query, variables)
 	if err != nil {
 		return nil, err
 	}

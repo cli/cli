@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -28,6 +29,7 @@ type unlinkOpts struct {
 
 type unlinkConfig struct {
 	httpClient func() (*http.Client, error)
+	config     func() (config.Config, error)
 	client     *queries.Client
 	opts       unlinkOpts
 	io         *iostreams.IOStreams
@@ -61,6 +63,7 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 
 			config := unlinkConfig{
 				httpClient: f.HttpClient,
+				config:     f.Config,
 				client:     client,
 				opts:       opts,
 				io:         f.IOStreams,
@@ -108,16 +111,22 @@ func runUnlink(config unlinkConfig) error {
 	}
 	c := api.NewClientFromHTTP(httpClient)
 
+	cfg, err := config.config()
+	if err != nil {
+		return err
+	}
+	host, _ := cfg.Authentication().DefaultHost()
+
 	if config.opts.repo != "" {
-		return unlinkRepo(c, owner, config)
+		return unlinkRepo(c, owner, host, config)
 	} else if config.opts.team != "" {
-		return unlinkTeam(c, owner, config)
+		return unlinkTeam(c, owner, host, config)
 	}
 	return nil
 }
 
-func unlinkRepo(c *api.Client, owner *queries.Owner, config unlinkConfig) error {
-	repo, err := api.GitHubRepo(c, ghrepo.New(owner.Login, config.opts.repo))
+func unlinkRepo(c *api.Client, owner *queries.Owner, host string, config unlinkConfig) error {
+	repo, err := api.GitHubRepo(c, ghrepo.NewWithHost(owner.Login, config.opts.repo, host))
 	if err != nil {
 		return err
 	}
@@ -134,8 +143,8 @@ func unlinkRepo(c *api.Client, owner *queries.Owner, config unlinkConfig) error 
 	return printResults(config, result.URL)
 }
 
-func unlinkTeam(c *api.Client, owner *queries.Owner, config unlinkConfig) error {
-	team, err := api.OrganizationTeam(c, ghrepo.New(owner.Login, ""), config.opts.team)
+func unlinkTeam(c *api.Client, owner *queries.Owner, host string, config unlinkConfig) error {
+	team, err := api.OrganizationTeam(c, host, owner.Login, config.opts.team)
 	if err != nil {
 		return err
 	}
