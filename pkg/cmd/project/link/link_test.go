@@ -3,7 +3,6 @@ package link
 import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -119,12 +118,6 @@ func TestNewCmdLink(t *testing.T) {
 	}
 }
 
-func newTestClient(reg *httpmock.Registry) *http.Client {
-	client := &http.Client{}
-	httpmock.ReplaceTripper(client, reg)
-	return client
-}
-
 func TestRunLink_Repo(t *testing.T) {
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
@@ -200,17 +193,19 @@ func TestRunLink_Repo(t *testing.T) {
 				},
 			},
 		})
-	client := queries.NewTestClient()
 
 	// get repo ID
-	httpReg := &httpmock.Registry{}
-	defer httpReg.Verify(t)
-
-	httpReg.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
-		httpmock.StringResponse(`{"data":{"repository":{"id": "repo-ID"}}}`),
-	)
-	httpClient := newTestClient(httpReg)
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`.*query RepositoryInfo.*`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"repository": map[string]interface{}{
+					"id": "repo-ID",
+				},
+			},
+		})
 
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
@@ -220,9 +215,9 @@ func TestRunLink_Repo(t *testing.T) {
 			repo:   "my-repo",
 			owner:  "monalisa",
 		},
-		client: client,
+		client: queries.NewTestClient(),
 		httpClient: func() (*http.Client, error) {
-			return httpClient, nil
+			return http.DefaultClient, nil
 		},
 		io: ios,
 	}
@@ -309,17 +304,21 @@ func TestRunLink_Team(t *testing.T) {
 				},
 			},
 		})
-	client := queries.NewTestClient()
 
 	// get team ID
-	httpReg := &httpmock.Registry{}
-	defer httpReg.Verify(t)
-
-	httpReg.Register(
-		httpmock.GraphQL(`query OrganizationTeam\b`),
-		httpmock.StringResponse(`{"data":{"organization":{"team":{"id": "team-ID"}}}}`),
-	)
-	httpClient := newTestClient(httpReg)
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`.*query OrganizationTeam.*`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"organization": map[string]interface{}{
+					"team": map[string]interface{}{
+						"id": "team-ID",
+					},
+				},
+			},
+		})
 
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
@@ -329,9 +328,9 @@ func TestRunLink_Team(t *testing.T) {
 			team:   "my-team",
 			owner:  "monalisa-org",
 		},
-		client: client,
+		client: queries.NewTestClient(),
 		httpClient: func() (*http.Client, error) {
-			return httpClient, nil
+			return http.DefaultClient, nil
 		},
 		io: ios,
 	}
