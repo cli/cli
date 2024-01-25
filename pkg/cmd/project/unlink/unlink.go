@@ -140,7 +140,7 @@ func unlinkRepo(c *api.Client, owner *queries.Owner, host string, config unlinkC
 	if config.opts.exporter != nil {
 		return config.opts.exporter.Write(config.io, result)
 	}
-	return printResults(config, result.URL)
+	return printResults(config, owner, config.opts.repo)
 }
 
 func unlinkTeam(c *api.Client, owner *queries.Owner, host string, config unlinkConfig) error {
@@ -158,14 +158,14 @@ func unlinkTeam(c *api.Client, owner *queries.Owner, host string, config unlinkC
 	if config.opts.exporter != nil {
 		return config.opts.exporter.Write(config.io, result)
 	}
-	return printResults(config, result.URL)
+	return printResults(config, owner, config.opts.team)
 }
 
-func printResults(config unlinkConfig, url string) error {
+func printResults(config unlinkConfig, owner *queries.Owner, linkedTarget string) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
 
-	_, err := fmt.Fprintf(config.io.Out, "%s\n", url)
+	_, err := fmt.Fprintf(config.io.Out, "Unlinked '%s/%s' from project #%d\n", owner.Login, linkedTarget, config.opts.number)
 	return err
 }

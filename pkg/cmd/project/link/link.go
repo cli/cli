@@ -140,7 +140,7 @@ func linkRepo(c *api.Client, owner *queries.Owner, host string, config linkConfi
 	if config.opts.exporter != nil {
 		return config.opts.exporter.Write(config.io, result)
 	}
-	return printResults(config, result.URL)
+	return printResults(config, owner, config.opts.repo)
 }
 
 func linkTeam(c *api.Client, owner *queries.Owner, host string, config linkConfig) error {
@@ -158,14 +158,14 @@ func linkTeam(c *api.Client, owner *queries.Owner, host string, config linkConfi
 	if config.opts.exporter != nil {
 		return config.opts.exporter.Write(config.io, result)
 	}
-	return printResults(config, result.URL)
+	return printResults(config, owner, config.opts.team)
 }
 
-func printResults(config linkConfig, url string) error {
+func printResults(config linkConfig, owner *queries.Owner, linkedTarget string) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
 
-	_, err := fmt.Fprintf(config.io.Out, "%s\n", url)
+	_, err := fmt.Fprintf(config.io.Out, "Linked '%s/%s' to project #%d\n", owner.Login, linkedTarget, config.opts.number)
 	return err
 }

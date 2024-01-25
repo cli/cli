@@ -230,7 +230,7 @@ func TestRunLink_Repo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"http://a-url.com\n",
+		"Linked 'monalisa/my-repo' to project #1\n",
 		stdout.String())
 }
 
@@ -346,6 +346,6 @@ func TestRunLink_Team(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"http://a-url.com\n",
+		"Linked 'monalisa-org/my-team' to project #1\n",
 		stdout.String())
 }

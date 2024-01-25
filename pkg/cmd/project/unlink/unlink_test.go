@@ -230,7 +230,7 @@ func TestRunUnlink_Repo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"http://a-url.com\n",
+		"Unlinked 'monalisa/my-repo' from project #1\n",
 		stdout.String())
 }
 
@@ -346,6 +346,6 @@ func TestRunUnlink_Team(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"http://a-url.com\n",
+		"Unlinked 'monalisa-org/my-team' from project #1\n",
 		stdout.String())
 }
