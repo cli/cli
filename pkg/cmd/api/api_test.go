@@ -832,8 +832,18 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 	err := apiRun(&options)
 	require.NoError(t, err)
 
-	assert.Contains(t, stdout.String(), `"page one"`)
-	assert.Contains(t, stdout.String(), `"page two"`)
+	assert.JSONEq(t, stdout.String(), `{
+		"data": {
+			"nodes": [
+				"page one",
+				"page two"
+			],
+			"pageInfo": {
+				"endCursor": "PAGE2_END",
+				"hasNextPage": false
+			}
+		}
+	}`)
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	var requestData struct {

@@ -25,6 +25,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/cli/go-gh/v2/pkg/jq"
+	"github.com/cli/go-gh/v2/pkg/jsonmerge"
 	"github.com/cli/go-gh/v2/pkg/template"
 	"github.com/spf13/cobra"
 )
@@ -36,6 +37,7 @@ type ApiOptions struct {
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Merger     jsonmerge.Merger
 
 	Hostname            string
 	RequestMethod       string
@@ -265,8 +267,28 @@ func apiRun(opts *ApiOptions) error {
 		method = "POST"
 	}
 
+	var bodyWriter io.Writer = opts.IO.Out
+	var headersWriter io.Writer = opts.IO.Out
+	if opts.Silent {
+		bodyWriter = io.Discard
+	}
+	if opts.Verbose {
+		// httpClient handles output when verbose flag is specified.
+		bodyWriter = io.Discard
+		headersWriter = io.Discard
+	}
+
 	if opts.Paginate && !isGraphQL {
 		requestPath = addPerPage(requestPath, 100, params)
+	}
+
+	// Merge JSON arrays and object if paginating without a filter or template.
+	if opts.Paginate && opts.FilterOutput == "" && opts.Template == "" {
+		if isGraphQL {
+			opts.Merger = jsonmerge.NewObjectMerger(bodyWriter)
+		} else {
+			opts.Merger = jsonmerge.NewArrayMerger()
+		}
 	}
 
 	if opts.RequestInputFile != "" {
@@ -322,17 +344,6 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	var bodyWriter io.Writer = opts.IO.Out
-	var headersWriter io.Writer = opts.IO.Out
-	if opts.Silent {
-		bodyWriter = io.Discard
-	}
-	if opts.Verbose {
-		// httpClient handles output when verbose flag is specified.
-		bodyWriter = io.Discard
-		headersWriter = io.Discard
-	}
-
 	host, _ := cfg.Authentication().DefaultHost()
 
 	if opts.Hostname != "" {
@@ -378,6 +389,10 @@ func apiRun(opts *ApiOptions) error {
 		if hasNextPage && opts.ShowResponseHeaders {
 			fmt.Fprint(opts.IO.Out, "\n")
 		}
+	}
+
+	if opts.Merger != nil {
+		return opts.Merger.Close()
 	}
 
 	return tmpl.Flush()
@@ -431,14 +446,18 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	} else if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
 	} else {
-		if isJSON && opts.Paginate && !isGraphQLPaginate && !opts.ShowResponseHeaders {
-			responseBody = &paginatedArrayReader{
-				Reader:      responseBody,
-				isFirstPage: isFirstPage,
-				isLastPage:  isLastPage,
-			}
+		if isJSON && opts.Merger != nil && !opts.ShowResponseHeaders {
+			responseBody = opts.Merger.NewPage(responseBody, isLastPage)
 		}
+
 		_, err = io.Copy(bodyWriter, responseBody)
+		if err != nil {
+			return
+		}
+
+		if closer, ok := responseBody.(io.ReadCloser); ok {
+			err = closer.Close()
+		}
 	}
 	if err != nil {
 		return
