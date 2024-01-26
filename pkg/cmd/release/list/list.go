@@ -23,7 +23,7 @@ type ListOptions struct {
 	LimitResults       int
 	ExcludeDrafts      bool
 	ExcludePreReleases bool
-	Order string
+	Order              string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
