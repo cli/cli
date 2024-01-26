@@ -34,7 +34,7 @@ func Test_NewCmdList(t *testing.T) {
 				LimitResults:       30,
 				ExcludeDrafts:      false,
 				ExcludePreReleases: false,
-				Order: "desc",
+				Order:              "desc",
 			},
 		},
 		{
@@ -44,7 +44,7 @@ func Test_NewCmdList(t *testing.T) {
 				LimitResults:       30,
 				ExcludeDrafts:      true,
 				ExcludePreReleases: false,
-				Order: "desc",
+				Order:              "desc",
 			},
 		},
 		{
@@ -54,17 +54,17 @@ func Test_NewCmdList(t *testing.T) {
 				LimitResults:       30,
 				ExcludeDrafts:      false,
 				ExcludePreReleases: true,
-				Order: "desc",
+				Order:              "desc",
 			},
 		},
 		{
 			name: "with order",
 			args: "--order asc",
 			want: ListOptions{
-				LimitResults: 30,
-				ExcludeDrafts: false,
+				LimitResults:       30,
+				ExcludeDrafts:      false,
 				ExcludePreReleases: false,
-				Order: "asc",
+				Order:              "asc",
 			},
 		},
 	}
