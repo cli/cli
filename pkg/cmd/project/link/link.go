@@ -113,6 +113,9 @@ func runLink(config linkConfig) error {
 		return err
 	}
 	config.opts.projectID = project.ID
+	if config.opts.number == 0 {
+		config.opts.number = project.Number
+	}
 
 	httpClient, err := config.httpClient()
 	if err != nil {
