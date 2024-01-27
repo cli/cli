@@ -2,6 +2,7 @@ package link
 
 import (
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -28,16 +29,18 @@ func TestNewCmdLink(t *testing.T) {
 			wantsErrMsg: "invalid number: x",
 		},
 		{
-			name:        "specify-nothing",
-			cli:         "",
-			wantsErr:    true,
-			wantsErrMsg: "specify either `--repo` or `--team`",
-		},
-		{
 			name:        "specify-repo-and-team",
 			cli:         "--repo my-repo --team my-team",
 			wantsErr:    true,
 			wantsErrMsg: "specify only one of `--repo` or `--team`",
+		},
+		{
+			name: "specify-nothing",
+			cli:  "",
+			wants: linkOpts{
+				repo:  "REPO",
+				owner: "OWNER",
+			},
 		},
 		{
 			name: "repo",
@@ -62,11 +65,19 @@ func TestNewCmdLink(t *testing.T) {
 			},
 		},
 		{
-			name: "owner",
+			name: "owner-with-repo-flag",
 			cli:  "--repo my-repo --owner monalisa",
 			wants: linkOpts{
 				owner: "monalisa",
 				repo:  "my-repo",
+			},
+		},
+		{
+			name: "owner-without-repo-flag",
+			cli:  "--owner monalisa",
+			wants: linkOpts{
+				owner: "monalisa",
+				repo:  "REPO",
 			},
 		},
 		{
@@ -86,6 +97,9 @@ func TestNewCmdLink(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.New("OWNER", "REPO"), nil
+				},
 			}
 
 			argv, err := shlex.Split(tt.cli)

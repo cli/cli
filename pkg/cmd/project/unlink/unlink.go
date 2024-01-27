@@ -61,19 +61,27 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 				opts.number = int32(num)
 			}
 
+			if opts.repo == "" && opts.team == "" {
+				repo, err := f.BaseRepo()
+				if err != nil {
+					return err
+				}
+				opts.repo = repo.RepoName()
+				if opts.owner == "" {
+					opts.owner = repo.RepoOwner()
+				}
+			}
+
+			if err := cmdutil.MutuallyExclusive("specify only one of `--repo` or `--team`", opts.repo != "", opts.team != ""); err != nil {
+				return err
+			}
+
 			config := unlinkConfig{
 				httpClient: f.HttpClient,
 				config:     f.Config,
 				client:     client,
 				opts:       opts,
 				io:         f.IOStreams,
-			}
-
-			if err := cmdutil.MutuallyExclusive("specify only one of `--repo` or `--team`", opts.repo != "", opts.team != ""); err != nil {
-				return err
-			}
-			if err := cmdutil.MutuallyExclusive("specify either `--repo` or `--team`", opts.repo == "", opts.team == ""); err != nil {
-				return err
 			}
 
 			// allow testing of the command without actually running it
@@ -84,6 +92,7 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 		},
 	}
 
+	cmdutil.EnableRepoOverride(linkCmd, f)
 	linkCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	linkCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "The repository to be unlinked from this project")
 	linkCmd.Flags().StringVarP(&opts.team, "team", "T", "", "The team to be unlinked from this project")
