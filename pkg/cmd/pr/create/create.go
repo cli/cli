@@ -803,7 +803,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
 			defer w.Flush()
 			gitClient := ctx.GitClient
-			ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
+			ref := fmt.Sprintf("HEAD:refs/heads/%s", ctx.HeadBranch)
 			bo := backoff.NewConstantBackOff(2 * time.Second)
 			ctx := context.Background()
 			return backoff.Retry(func() error {
