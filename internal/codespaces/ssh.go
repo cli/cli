@@ -19,9 +19,9 @@ type printer interface {
 // port-forwarding session. It runs until the shell is terminated
 // (including by cancellation of the context).
 func Shell(
-	ctx context.Context, p printer, sshArgs []string, port int, destination string, printConnDetails bool,
+	ctx context.Context, keepAliveOverride chan (bool), p printer, sshArgs []string, port int, destination string, printConnDetails bool,
 ) error {
-	cmd, connArgs, err := newSSHCommand(ctx, port, destination, sshArgs)
+	cmd, connArgs, err := newSSHCommand(ctx, keepAliveOverride, port, destination, sshArgs)
 	if err != nil {
 		return fmt.Errorf("failed to create ssh command: %w", err)
 	}
@@ -51,13 +51,13 @@ func Copy(ctx context.Context, scpArgs []string, port int, destination string) e
 // NewRemoteCommand returns an exec.Cmd that will securely run a shell
 // command on the remote machine.
 func NewRemoteCommand(ctx context.Context, tunnelPort int, destination string, sshArgs ...string) (*exec.Cmd, error) {
-	cmd, _, err := newSSHCommand(ctx, tunnelPort, destination, sshArgs)
+	cmd, _, err := newSSHCommand(ctx, nil, tunnelPort, destination, sshArgs)
 	return cmd, err
 }
 
 // newSSHCommand populates an exec.Cmd to run a command (or if blank,
 // an interactive shell) over ssh.
-func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) (*exec.Cmd, []string, error) {
+func newSSHCommand(ctx context.Context, keepAliveOverride chan (bool), port int, dst string, cmdArgs []string) (*exec.Cmd, []string, error) {
 	connArgs := []string{
 		"-p", strconv.Itoa(port),
 		"-o", "NoHostAuthenticationForLocalhost=yes",
@@ -81,6 +81,12 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 
 	if command != nil {
 		cmdArgs = append(cmdArgs, command...)
+
+		// If the user specified a command to run non-interactively,
+		// make sure we send activity signals to keep the connection alive
+		if keepAliveOverride != nil {
+			keepAliveOverride <- true
+		}
 	}
 
 	exe, err := safeexec.LookPath("ssh")
