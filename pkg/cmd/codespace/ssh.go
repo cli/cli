@@ -281,17 +281,22 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 			// args is the correct variable to use here, we just use scpArgs as the check for which command to run
 			err = codespaces.Copy(ctx, args, localSSHServerPort, connectDestination)
 		} else {
-			// Create a channel to send down to the shell to keep it alive
-			keepAliveOverride := make(chan bool, 1)
-			go func() {
-				// If we receive true on the channel, ignore the timeout
-				if <-keepAliveOverride {
-					invoker.KeepAlive()
-				}
-			}()
+			// Parse the ssh args to determine if the user specified a command
+			args, command, err := codespaces.ParseSSHArgs(args)
+			if err != nil {
+				shellClosed <- err
+				return
+			}
+
+			// If the user specified a command, we need to keep the shell alive
+			// since it will be non-interactive and the codespace might shut down
+			// before the command finishes
+			if command != nil {
+				invoker.KeepAlive()
+			}
 
 			err = codespaces.Shell(
-				ctx, keepAliveOverride, a.errLogger, args, localSSHServerPort, connectDestination, opts.printConnDetails,
+				ctx, a.errLogger, args, command, localSSHServerPort, connectDestination, opts.printConnDetails,
 			)
 		}
 		shellClosed <- err
