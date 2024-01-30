@@ -31,6 +31,7 @@ const (
 	codespacesInternalSessionName = "CodespacesInternal"
 	clientName                    = "gh"
 	connectedEventName            = "connected"
+	keepAliveEventName            = "keepAlive"
 )
 
 type StartSSHServerOptions struct {
@@ -43,16 +44,18 @@ type Invoker interface {
 	RebuildContainer(ctx context.Context, full bool) error
 	StartSSHServer(ctx context.Context) (int, string, error)
 	StartSSHServerWithOptions(ctx context.Context, options StartSSHServerOptions) (int, string, error)
+	KeepAlive()
 }
 
 type invoker struct {
-	conn            *grpc.ClientConn
-	fwd             portforwarder.PortForwarder
-	listener        net.Listener
-	jupyterClient   jupyter.JupyterServerHostClient
-	codespaceClient codespace.CodespaceHostClient
-	sshClient       ssh.SshServerHostClient
-	cancelPF        context.CancelFunc
+	conn              *grpc.ClientConn
+	fwd               portforwarder.PortForwarder
+	listener          net.Listener
+	jupyterClient     jupyter.JupyterServerHostClient
+	codespaceClient   codespace.CodespaceHostClient
+	sshClient         ssh.SshServerHostClient
+	cancelPF          context.CancelFunc
+	keepAliveOverride bool
 }
 
 // Connects to the internal RPC server and returns a new invoker for it
@@ -256,6 +259,12 @@ func listenTCP() (*net.TCPListener, error) {
 	return listener, nil
 }
 
+// KeepAlive sets a flag to continuously send activity signals to
+// the codespace even if there is no other activity (e.g. stdio)
+func (i *invoker) KeepAlive() {
+	i.keepAliveOverride = true
+}
+
 // Periodically check whether there is a reason to keep the connection alive, and if so, notify the codespace to do so
 func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
@@ -266,7 +275,15 @@ func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			reason := i.fwd.GetKeepAliveReason()
+			reason := ""
+
+			// If the keep alive override flag is set, we don't need to check for activity on the forwarder
+			// Otherwise, grab the reason from the forwarder
+			if i.keepAliveOverride {
+				reason = keepAliveEventName
+			} else {
+				reason = i.fwd.GetKeepAliveReason()
+			}
 			_ = i.notifyCodespaceOfClientActivity(ctx, reason)
 		}
 	}
