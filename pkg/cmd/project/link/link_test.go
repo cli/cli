@@ -80,14 +80,6 @@ func TestNewCmdLink(t *testing.T) {
 				repo:  "REPO",
 			},
 		},
-		{
-			name: "json",
-			cli:  "--repo my-repo --format json",
-			wants: linkOpts{
-				repo: "my-repo",
-			},
-			wantsExporter: true,
-		},
 	}
 
 	t.Setenv("GH_TOKEN", "auth-token")
@@ -127,8 +119,6 @@ func TestNewCmdLink(t *testing.T) {
 			assert.Equal(t, tt.wants.projectID, gotOpts.projectID)
 			assert.Equal(t, tt.wants.repoID, gotOpts.repoID)
 			assert.Equal(t, tt.wants.teamID, gotOpts.teamID)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
-			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }
@@ -183,7 +173,8 @@ func TestRunLink_Repo(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"projectV2": map[string]string{
-						"id": "project-ID",
+						"id":    "project-ID",
+						"title": "first-project",
 					},
 				},
 			},
@@ -199,13 +190,7 @@ func TestRunLink_Repo(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
-				"linkProjectV2ToRepository": map[string]interface{}{
-					"repository": map[string]interface{}{
-						"name": "my-repo",
-						"id":   "repo-ID",
-						"url":  "http://a-url.com",
-					},
-				},
+				"linkProjectV2ToRepository": map[string]interface{}{},
 			},
 		})
 
@@ -244,7 +229,7 @@ func TestRunLink_Repo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Linked 'monalisa/my-repo' to project #1\n",
+		"Linked 'monalisa/my-repo' to project #1 'first-project'\n",
 		stdout.String())
 }
 
@@ -298,7 +283,8 @@ func TestRunLink_Team(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"projectV2": map[string]string{
-						"id": "project-ID",
+						"id":    "project-ID",
+						"title": "first-project",
 					},
 				},
 			},
@@ -314,12 +300,7 @@ func TestRunLink_Team(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
-				"linkProjectV2ToTeam": map[string]interface{}{
-					"team": map[string]interface{}{
-						"id":  "team-ID",
-						"url": "http://a-url.com",
-					},
-				},
+				"linkProjectV2ToTeam": map[string]interface{}{},
 			},
 		})
 
@@ -360,6 +341,6 @@ func TestRunLink_Team(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Linked 'monalisa-org/my-team' to project #1\n",
+		"Linked 'monalisa-org/my-team' to project #1 'first-project'\n",
 		stdout.String())
 }

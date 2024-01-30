@@ -80,14 +80,6 @@ func TestNewCmdUnlink(t *testing.T) {
 				repo:  "REPO",
 			},
 		},
-		{
-			name: "json",
-			cli:  "--repo my-repo --format json",
-			wants: unlinkOpts{
-				repo: "my-repo",
-			},
-			wantsExporter: true,
-		},
 	}
 
 	t.Setenv("GH_TOKEN", "auth-token")
@@ -127,8 +119,6 @@ func TestNewCmdUnlink(t *testing.T) {
 			assert.Equal(t, tt.wants.projectID, gotOpts.projectID)
 			assert.Equal(t, tt.wants.repoID, gotOpts.repoID)
 			assert.Equal(t, tt.wants.teamID, gotOpts.teamID)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
-			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }
@@ -183,7 +173,8 @@ func TestRunUnlink_Repo(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"projectV2": map[string]string{
-						"id": "project-ID",
+						"id":    "project-ID",
+						"title": "first-project",
 					},
 				},
 			},
@@ -199,13 +190,7 @@ func TestRunUnlink_Repo(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
-				"unlinkProjectV2FromRepository": map[string]interface{}{
-					"repository": map[string]interface{}{
-						"name": "my-repo",
-						"id":   "repo-ID",
-						"url":  "http://a-url.com",
-					},
-				},
+				"unlinkProjectV2FromRepository": map[string]interface{}{},
 			},
 		})
 
@@ -244,7 +229,7 @@ func TestRunUnlink_Repo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Unlinked 'monalisa/my-repo' from project #1\n",
+		"Unlinked 'monalisa/my-repo' from project #1 'first-project'\n",
 		stdout.String())
 }
 
@@ -298,7 +283,8 @@ func TestRunUnlink_Team(t *testing.T) {
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
 					"projectV2": map[string]string{
-						"id": "project-ID",
+						"id":    "project-ID",
+						"title": "first-project",
 					},
 				},
 			},
@@ -314,12 +300,7 @@ func TestRunUnlink_Team(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
-				"unlinkProjectV2FromTeam": map[string]interface{}{
-					"team": map[string]interface{}{
-						"id":  "team-ID",
-						"url": "http://a-url.com",
-					},
-				},
+				"unlinkProjectV2FromTeam": map[string]interface{}{},
 			},
 		})
 
@@ -360,6 +341,6 @@ func TestRunUnlink_Team(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(
 		t,
-		"Unlinked 'monalisa-org/my-team' from project #1\n",
+		"Unlinked 'monalisa-org/my-team' from project #1 'first-project'\n",
 		stdout.String())
 }

@@ -102,18 +102,6 @@ type PageInfo struct {
 	HasNextPage bool
 }
 
-// Repository is a Repository GraphQL object https://docs.github.com/en/graphql/reference/objects#repository
-type Repository struct {
-	Name string
-	ID   string
-	URL  string
-}
-
-type Team struct {
-	ID  string
-	URL string
-}
-
 // Project is a ProjectV2 GraphQL object https://docs.github.com/en/graphql/reference/objects#projectv2.
 type Project struct {
 	Number           int32
@@ -1367,30 +1355,30 @@ func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) (Pr
 
 type linkProjectToRepoMutation struct {
 	LinkProjectV2ToRepository struct {
-		Repository Repository `graphql:"repository"`
+		ClientMutationId string `graphql:"clientMutationId"`
 	} `graphql:"linkProjectV2ToRepository(input:$input)"`
 }
 
 type linkProjectToTeamMutation struct {
 	LinkProjectV2ToTeam struct {
-		Team Team `graphql:"team"`
+		ClientMutationId string `graphql:"clientMutationId"`
 	} `graphql:"linkProjectV2ToTeam(input:$input)"`
 }
 
 type unlinkProjectFromRepoMutation struct {
 	UnlinkProjectV2FromRepository struct {
-		Repository Repository `graphql:"repository"`
+		ClientMutationId string `graphql:"clientMutationId"`
 	} `graphql:"unlinkProjectV2FromRepository(input:$input)"`
 }
 
 type unlinkProjectFromTeamMutation struct {
 	UnlinkProjectV2FromTeam struct {
-		Team Team `graphql:"team"`
+		ClientMutationId string `graphql:"clientMutationId"`
 	} `graphql:"unlinkProjectV2FromTeam(input:$input)"`
 }
 
 // LinkProjectToRepository links a project to a repository.
-func (c *Client) LinkProjectToRepository(projectID string, repoID string) (*Repository, error) {
+func (c *Client) LinkProjectToRepository(projectID string, repoID string) error {
 	var mutation linkProjectToRepoMutation
 	variables := map[string]interface{}{
 		"input": githubv4.LinkProjectV2ToRepositoryInput{
@@ -1399,15 +1387,11 @@ func (c *Client) LinkProjectToRepository(projectID string, repoID string) (*Repo
 		},
 	}
 
-	err := c.Mutate("LinkProjectV2ToRepository", &mutation, variables)
-	if err != nil {
-		return nil, err
-	}
-	return &mutation.LinkProjectV2ToRepository.Repository, nil
+	return c.Mutate("LinkProjectV2ToRepository", &mutation, variables)
 }
 
 // LinkProjectToTeam links a project to a team.
-func (c *Client) LinkProjectToTeam(projectID string, teamID string) (*Team, error) {
+func (c *Client) LinkProjectToTeam(projectID string, teamID string) error {
 	var mutation linkProjectToTeamMutation
 	variables := map[string]interface{}{
 		"input": githubv4.LinkProjectV2ToTeamInput{
@@ -1416,15 +1400,11 @@ func (c *Client) LinkProjectToTeam(projectID string, teamID string) (*Team, erro
 		},
 	}
 
-	err := c.Mutate("LinkProjectV2ToTeam", &mutation, variables)
-	if err != nil {
-		return nil, err
-	}
-	return &mutation.LinkProjectV2ToTeam.Team, nil
+	return c.Mutate("LinkProjectV2ToTeam", &mutation, variables)
 }
 
 // UnlinkProjectFromRepository unlinks a project from a repository.
-func (c *Client) UnlinkProjectFromRepository(projectID string, repoID string) (*Repository, error) {
+func (c *Client) UnlinkProjectFromRepository(projectID string, repoID string) error {
 	var mutation unlinkProjectFromRepoMutation
 	variables := map[string]interface{}{
 		"input": githubv4.UnlinkProjectV2FromRepositoryInput{
@@ -1433,15 +1413,11 @@ func (c *Client) UnlinkProjectFromRepository(projectID string, repoID string) (*
 		},
 	}
 
-	err := c.Mutate("UnlinkProjectV2FromRepository", &mutation, variables)
-	if err != nil {
-		return nil, err
-	}
-	return &mutation.UnlinkProjectV2FromRepository.Repository, nil
+	return c.Mutate("UnlinkProjectV2FromRepository", &mutation, variables)
 }
 
 // UnlinkProjectFromTeam unlinks a project from a team.
-func (c *Client) UnlinkProjectFromTeam(projectID string, teamID string) (*Team, error) {
+func (c *Client) UnlinkProjectFromTeam(projectID string, teamID string) error {
 	var mutation unlinkProjectFromTeamMutation
 	variables := map[string]interface{}{
 		"input": githubv4.UnlinkProjectV2FromTeamInput{
@@ -1450,11 +1426,7 @@ func (c *Client) UnlinkProjectFromTeam(projectID string, teamID string) (*Team, 
 		},
 	}
 
-	err := c.Mutate("UnlinkProjectV2FromTeam", &mutation, variables)
-	if err != nil {
-		return nil, err
-	}
-	return &mutation.UnlinkProjectV2FromTeam.Team, nil
+	return c.Mutate("UnlinkProjectV2FromTeam", &mutation, variables)
 }
 
 func handleError(err error) error {

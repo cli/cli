@@ -16,15 +16,14 @@ import (
 )
 
 type linkOpts struct {
-	number    int32
-	owner     string
-	repo      string
-	team      string
-	projectID string
-	repoID    string
-	teamID    string
-	format    string
-	exporter  cmdutil.Exporter
+	number       int32
+	owner        string
+	repo         string
+	team         string
+	projectID    string
+	projectTitle string
+	repoID       string
+	teamID       string
 }
 
 type linkConfig struct {
@@ -46,6 +45,9 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 
 			# link monalisa's organization's project 1 to her team "my_team"
 			gh project link 1 --owner my_organization --team my_team
+
+			# link monalisa's project 1 to the repository of current directory if neither --repo nor --team is specified
+			gh project link 1
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := client.New(f)
@@ -96,7 +98,6 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 	linkCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	linkCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "The repository to be linked to this project")
 	linkCmd.Flags().StringVarP(&opts.team, "team", "T", "", "The team to be linked to this project")
-	cmdutil.AddFormatFlags(linkCmd, &opts.exporter)
 
 	return linkCmd
 }
@@ -112,6 +113,7 @@ func runLink(config linkConfig) error {
 	if err != nil {
 		return err
 	}
+	config.opts.projectTitle = project.Title
 	config.opts.projectID = project.ID
 	if config.opts.number == 0 {
 		config.opts.number = project.Number
@@ -144,14 +146,11 @@ func linkRepo(c *api.Client, owner *queries.Owner, host string, config linkConfi
 	}
 	config.opts.repoID = repo.ID
 
-	result, err := config.client.LinkProjectToRepository(config.opts.projectID, config.opts.repoID)
+	err = config.client.LinkProjectToRepository(config.opts.projectID, config.opts.repoID)
 	if err != nil {
 		return err
 	}
 
-	if config.opts.exporter != nil {
-		return config.opts.exporter.Write(config.io, result)
-	}
 	return printResults(config, owner, config.opts.repo)
 }
 
@@ -162,14 +161,11 @@ func linkTeam(c *api.Client, owner *queries.Owner, host string, config linkConfi
 	}
 	config.opts.teamID = team.ID
 
-	result, err := config.client.LinkProjectToTeam(config.opts.projectID, config.opts.teamID)
+	err = config.client.LinkProjectToTeam(config.opts.projectID, config.opts.teamID)
 	if err != nil {
 		return err
 	}
 
-	if config.opts.exporter != nil {
-		return config.opts.exporter.Write(config.io, result)
-	}
 	return printResults(config, owner, config.opts.team)
 }
 
@@ -178,6 +174,6 @@ func printResults(config linkConfig, owner *queries.Owner, linkedTarget string) 
 		return nil
 	}
 
-	_, err := fmt.Fprintf(config.io.Out, "Linked '%s/%s' to project #%d\n", owner.Login, linkedTarget, config.opts.number)
+	_, err := fmt.Fprintf(config.io.Out, "Linked '%s/%s' to project #%d '%s'\n", owner.Login, linkedTarget, config.opts.number, config.opts.projectTitle)
 	return err
 }
