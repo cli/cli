@@ -20,12 +20,12 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/jsonmerge"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/cli/go-gh/v2/pkg/jq"
-	"github.com/cli/go-gh/v2/pkg/jsonmerge"
 	"github.com/cli/go-gh/v2/pkg/template"
 	"github.com/spf13/cobra"
 )

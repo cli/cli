@@ -3,6 +3,7 @@ module github.com/cli/cli/v2
 go 1.21
 
 require (
+	dario.cat/mergo v1.0.0
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.18.1
