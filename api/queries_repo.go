@@ -545,7 +545,7 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org, newName string, defaul
 		hostname:         repo.RepoHost(),
 	}
 
-	// The GitHub API will happily return a HTTP 200 when attempting to fork own repo even though no forking
+	// The GitHub API will happily return an HTTP 200 when attempting to fork own repo even though no forking
 	// actually took place. Ensure that we raise an error instead.
 	if ghrepo.IsSame(repo, newRepo) {
 		return newRepo, fmt.Errorf("%s cannot be forked", ghrepo.FullName(repo))

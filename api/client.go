@@ -151,7 +151,7 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 	return next, nil
 }
 
-// HandleHTTPError parses a http.Response into a HTTPError.
+// HandleHTTPError parses a http.Response into an HTTPError.
 func HandleHTTPError(resp *http.Response) error {
 	return handleResponse(ghAPI.HandleHTTPError(resp))
 }
