@@ -1,6 +1,9 @@
 package link
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -8,9 +11,8 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
-	"net/http"
-	"testing"
 )
 
 func TestNewCmdLink(t *testing.T) {
@@ -35,12 +37,9 @@ func TestNewCmdLink(t *testing.T) {
 			wantsErrMsg: "specify only one of `--repo` or `--team`",
 		},
 		{
-			name: "specify-nothing",
-			cli:  "",
-			wants: linkOpts{
-				repo:  "REPO",
-				owner: "OWNER",
-			},
+			name:  "specify-nothing",
+			cli:   "",
+			wants: linkOpts{},
 		},
 		{
 			name: "repo",
@@ -53,7 +52,7 @@ func TestNewCmdLink(t *testing.T) {
 			name: "team",
 			cli:  "--team my-team",
 			wants: linkOpts{
-				team: "my-team",
+				teamSlug: "my-team",
 			},
 		},
 		{
@@ -77,7 +76,6 @@ func TestNewCmdLink(t *testing.T) {
 			cli:  "--owner monalisa",
 			wants: linkOpts{
 				owner: "monalisa",
-				repo:  "REPO",
 			},
 		},
 	}
@@ -95,7 +93,7 @@ func TestNewCmdLink(t *testing.T) {
 			}
 
 			argv, err := shlex.Split(tt.cli)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var gotOpts linkOpts
 			cmd := NewCmdLink(f, func(config linkConfig) error {
@@ -106,19 +104,16 @@ func TestNewCmdLink(t *testing.T) {
 			cmd.SetArgs(argv)
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, tt.wantsErrMsg, err.Error())
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
 			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.repo, gotOpts.repo)
-			assert.Equal(t, tt.wants.team, gotOpts.team)
-			assert.Equal(t, tt.wants.projectID, gotOpts.projectID)
-			assert.Equal(t, tt.wants.repoID, gotOpts.repoID)
-			assert.Equal(t, tt.wants.teamID, gotOpts.teamID)
+			assert.Equal(t, tt.wants.teamSlug, gotOpts.teamSlug)
 		})
 	}
 }
@@ -172,9 +167,14 @@ func TestRunLink_Repo(t *testing.T) {
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
 				"user": map[string]interface{}{
-					"projectV2": map[string]string{
-						"id":    "project-ID",
-						"title": "first-project",
+					"projectV2": map[string]interface{}{
+						"number": 1,
+						"id":     "project-ID",
+						"title":  "first-project",
+						"owner": map[string]string{
+							"__typename": "User",
+							"login":      "monalisa",
+						},
 					},
 				},
 			},
@@ -212,10 +212,10 @@ func TestRunLink_Repo(t *testing.T) {
 	cfg := linkConfig{
 		opts: linkOpts{
 			number: 1,
-			repo:   "my-repo",
+			repo:   "monalisa/my-repo",
 			owner:  "monalisa",
 		},
-		client: queries.NewTestClient(),
+		queryClient: queries.NewTestClient(),
 		httpClient: func() (*http.Client, error) {
 			return http.DefaultClient, nil
 		},
@@ -226,7 +226,7 @@ func TestRunLink_Repo(t *testing.T) {
 	}
 
 	err := runLink(cfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(
 		t,
 		"Linked 'monalisa/my-repo' to project #1 'first-project'\n",
@@ -250,7 +250,7 @@ func TestRunLink_Team(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
-				"user": map[string]interface{}{
+				"organization": map[string]interface{}{
 					"id":    "an ID",
 					"login": "monalisa-org",
 				},
@@ -258,17 +258,17 @@ func TestRunLink_Team(t *testing.T) {
 			"errors": []interface{}{
 				map[string]interface{}{
 					"type": "NOT_FOUND",
-					"path": []string{"organization"},
+					"path": []string{"user"},
 				},
 			},
 		})
 
-	// get user project ID
+	// get org project ID
 	gock.New("https://api.github.com").
 		Post("/graphql").
 		MatchType("json").
 		JSON(map[string]interface{}{
-			"query": "query UserProject.*",
+			"query": "query OrgProject.*",
 			"variables": map[string]interface{}{
 				"login":       "monalisa-org",
 				"number":      1,
@@ -281,10 +281,30 @@ func TestRunLink_Team(t *testing.T) {
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
-				"user": map[string]interface{}{
-					"projectV2": map[string]string{
-						"id":    "project-ID",
-						"title": "first-project",
+				"organization": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"number": 1,
+						"id":     "project-ID",
+						"title":  "first-project",
+						"owner": map[string]string{
+							"__typename": "Organization",
+							"login":      "monalisa-org",
+						},
+					},
+				},
+			},
+		})
+
+	// get team ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`.*query OrganizationTeam.*`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"organization": map[string]interface{}{
+					"team": map[string]interface{}{
+						"id": "team-ID",
 					},
 				},
 			},
@@ -304,30 +324,15 @@ func TestRunLink_Team(t *testing.T) {
 			},
 		})
 
-	// get team ID
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		BodyString(`.*query OrganizationTeam.*`).
-		Reply(200).
-		JSON(map[string]interface{}{
-			"data": map[string]interface{}{
-				"organization": map[string]interface{}{
-					"team": map[string]interface{}{
-						"id": "team-ID",
-					},
-				},
-			},
-		})
-
 	ios, _, stdout, _ := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	cfg := linkConfig{
 		opts: linkOpts{
-			number: 1,
-			team:   "my-team",
-			owner:  "monalisa-org",
+			number:   1,
+			teamSlug: "my-team",
+			owner:    "monalisa-org",
 		},
-		client: queries.NewTestClient(),
+		queryClient: queries.NewTestClient(),
 		httpClient: func() (*http.Client, error) {
 			return http.DefaultClient, nil
 		},
@@ -338,7 +343,7 @@ func TestRunLink_Team(t *testing.T) {
 	}
 
 	err := runLink(cfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(
 		t,
 		"Linked 'monalisa-org/my-team' to project #1 'first-project'\n",

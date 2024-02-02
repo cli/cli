@@ -2,6 +2,9 @@ package unlink
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
@@ -11,8 +14,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
-	"net/http"
-	"strconv"
 )
 
 type unlinkOpts struct {
@@ -94,9 +95,8 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 		},
 	}
 
-	cmdutil.EnableRepoOverride(linkCmd, f)
+	cmdutil.EnableRepoOverrideVar(linkCmd, f, &opts.repo)
 	linkCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
-	linkCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "The repository to be unlinked from this project")
 	linkCmd.Flags().StringVarP(&opts.team, "team", "T", "", "The team to be unlinked from this project")
 
 	return linkCmd

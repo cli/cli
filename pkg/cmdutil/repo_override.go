@@ -19,8 +19,8 @@ func executeParentHooks(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
-	cmd.PersistentFlags().StringP("repo", "R", "", "Select another repository using the `[HOST/]OWNER/REPO` format")
+func EnableRepoOverrideVar(cmd *cobra.Command, f *Factory, repoOpt *string) {
+	cmd.PersistentFlags().StringVarP(repoOpt, "repo", "R", "", "Select another repository using the `[HOST/]OWNER/REPO` format")
 	_ = cmd.RegisterFlagCompletionFunc("repo", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		remotes, err := f.Remotes()
 		if err != nil {
@@ -51,10 +51,14 @@ func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 		if err := executeParentHooks(cmd, args); err != nil {
 			return err
 		}
-		repoOverride, _ := cmd.Flags().GetString("repo")
-		f.BaseRepo = OverrideBaseRepoFunc(f, repoOverride)
+		f.BaseRepo = OverrideBaseRepoFunc(f, *repoOpt)
 		return nil
 	}
+}
+
+func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
+	var repoOpt string
+	EnableRepoOverrideVar(cmd, f, &repoOpt)
 }
 
 func OverrideBaseRepoFunc(f *Factory, override string) func() (ghrepo.Interface, error) {
