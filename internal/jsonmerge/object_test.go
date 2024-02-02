@@ -9,6 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestObjectMerger_nothingWritten(t *testing.T) {
+	w := &bytes.Buffer{}
+	merger := NewObjectMerger(w)
+
+	require.NoError(t, merger.Close())
+	assert.Equal(t, ``, w.String())
+}
+
 func TestObjectMerger_singleEmptyObject(t *testing.T) {
 	w := &bytes.Buffer{}
 	merger := NewObjectMerger(w)

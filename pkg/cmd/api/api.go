@@ -118,7 +118,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			there are no more pages of results. For GraphQL requests, this requires that the
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
 			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection. Each page is a separate
-			JSON array or object. Pass %[1]s--merge-pages%[1]s to merge all pages into a single JSON array or object.
+			JSON array or object. Pass %[1]s--merge-pages%[1]s to merge all pages into a single JSON array or object
+			when piping or redirecting standard output.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list releases in the current repository
@@ -241,7 +242,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
 	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "GitHub API preview `names` to request (without the \"-preview\" suffix)")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
-	cmd.Flags().BoolVar(&opts.MergePages, "merge-pages", false, "Use with \"--paginate\" to merge all pages of JSON arrays or objects")
+	cmd.Flags().BoolVar(&opts.MergePages, "merge-pages", false, "Use with \"--paginate\" to merge all pages of JSON arrays or objects when piping or redirecting standard output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")

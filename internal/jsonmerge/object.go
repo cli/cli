@@ -17,7 +17,6 @@ type objectMerger struct {
 func NewObjectMerger(w io.Writer) Merger {
 	return &objectMerger{
 		Writer: w,
-		dst:    make(map[string]interface{}),
 	}
 }
 
@@ -29,6 +28,10 @@ func (merger *objectMerger) NewPage(r io.Reader, isLastPage bool) io.ReadCloser 
 }
 
 func (merger *objectMerger) Close() error {
+	if merger.dst == nil {
+		return nil
+	}
+
 	// Marshal to JSON and write to output.
 	buf, err := json.Marshal(merger.dst)
 	if err != nil {
@@ -60,6 +63,10 @@ func (page *objectMergerPage) Close() error {
 	err := json.Unmarshal(page.buffer.Bytes(), &src)
 	if err != nil {
 		return err
+	}
+
+	if page.merger.dst == nil {
+		page.merger.dst = make(map[string]interface{})
 	}
 
 	return mergo.Merge(&page.merger.dst, src, mergo.WithAppendSlice, mergo.WithOverride)
