@@ -329,6 +329,11 @@ func Test_NewCmdApi(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name:     "--merge-pages without --paginate",
+			cli:      "user --merge-pages",
+			wantsErr: true,
+		},
+		{
 			name: "with verbose",
 			cli:  "user --verbose",
 			wants: ApiOptions{
@@ -801,7 +806,8 @@ func Test_apiRun_paginationREST_merge(t *testing.T) {
 		RequestMethod:       "GET",
 		RequestMethodPassed: true,
 		RequestPath:         "issues",
-		PaginateAll:         true,
+		Paginate:            true,
+		MergePages:          true,
 		RawFields:           []string{"per_page=50", "page=1"},
 	}
 
@@ -1018,7 +1024,8 @@ func Test_apiRun_arrayPaginationREST_merge(t *testing.T) {
 		RequestMethod:       "GET",
 		RequestMethodPassed: true,
 		RequestPath:         "issues",
-		PaginateAll:         true,
+		Paginate:            true,
+		MergePages:          true,
 		RawFields:           []string{"per_page=50", "page=1"},
 	}
 
@@ -1185,7 +1192,8 @@ func Test_apiRun_paginationGraphQL_merge(t *testing.T) {
 		RawFields:     []string{"foo=bar"},
 		RequestMethod: "POST",
 		RequestPath:   "graphql",
-		PaginateAll:   true,
+		Paginate:      true,
+		MergePages:    true,
 	}
 
 	err := apiRun(&options)
