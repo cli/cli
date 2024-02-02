@@ -37,7 +37,7 @@ type ApiOptions struct {
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Merger     jsonmerge.Merger
+	merger     jsonmerge.Merger
 
 	Hostname            string
 	RequestMethod       string
@@ -50,7 +50,7 @@ type ApiOptions struct {
 	Previews            []string
 	ShowResponseHeaders bool
 	Paginate            bool
-	PaginateAll         bool
+	MergePages          bool
 	Silent              bool
 	Template            string
 	CacheTTL            time.Duration
@@ -117,9 +117,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			In %[1]s--paginate%[1]s mode, all pages of results will sequentially be requested until
 			there are no more pages of results. For GraphQL requests, this requires that the
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
-			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection.
-			Pass %[1]s--paginate-all%[1]s (experimental) instead to merge REST arrays and GraphQL objects
-			into valid JSON output.
+			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection. Each page is a separate
+			JSON array or object. Pass %[1]s--merge-pages%[1]s to merge all pages into a single JSON array or object.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list releases in the current repository
@@ -159,7 +158,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			'
 
 			# list all repositories for a user
-			$ gh api graphql --paginate -f query='
+			$ gh api graphql --paginate --merge-pages -f query='
 			  query($endCursor: String) {
 			    viewer {
 			      repositories(first: 100, after: $endCursor) {
@@ -202,24 +201,20 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				}
 			}
 
-			if opts.shouldPaginate() && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
-				return cmdutil.FlagErrorf("the `--paginate` and `--paginate-all` options are not supported for non-GET requests")
+			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
+				return cmdutil.FlagErrorf("the `--paginate` option is not supported for non-GET requests")
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"the `--paginate` and `--paginate-all` options are not supported with `--input`",
-				opts.shouldPaginate(),
+				"the `--paginate` option is not supported with `--input`",
+				opts.Paginate,
 				opts.RequestInputFile != "",
 			); err != nil {
 				return err
 			}
 
-			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--paginate` or `--paginate-all`",
-				opts.Paginate,
-				opts.PaginateAll,
-			); err != nil {
-				return err
+			if opts.MergePages && !opts.Paginate {
+				return cmdutil.FlagErrorf("`--paginate` required when passing `--merge-pages`")
 			}
 
 			if err := cmdutil.MutuallyExclusive(
@@ -246,8 +241,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
 	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "GitHub API preview `names` to request (without the \"-preview\" suffix)")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
+	cmd.Flags().BoolVar(&opts.MergePages, "merge-pages", false, "Use with \"--paginate\" to merge all pages of JSON arrays or objects")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
-	cmd.Flags().BoolVar(&opts.PaginateAll, "paginate-all", false, "[Experimental] Make additional HTTP requests to fetch all pages and merge results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
@@ -255,10 +250,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 	return cmd
-}
-
-func (opts *ApiOptions) shouldPaginate() bool {
-	return opts.Paginate || opts.PaginateAll
 }
 
 func apiRun(opts *ApiOptions) error {
@@ -294,16 +285,17 @@ func apiRun(opts *ApiOptions) error {
 		headersWriter = io.Discard
 	}
 
-	if opts.shouldPaginate() && !isGraphQL {
+	if opts.Paginate && !isGraphQL {
 		requestPath = addPerPage(requestPath, 100, params)
 	}
 
-	// Merge JSON arrays and objects if paginating without filtering or templating (experimental).
-	if opts.PaginateAll && opts.FilterOutput == "" && opts.Template == "" {
+	// Merge JSON arrays and objects if paginating without filtering or templating.
+	// MergePages retains compatibility with older versions but may be the default behavior with future major releases.
+	if opts.Paginate && opts.MergePages && opts.FilterOutput == "" && opts.Template == "" {
 		if isGraphQL {
-			opts.Merger = jsonmerge.NewObjectMerger(bodyWriter)
+			opts.merger = jsonmerge.NewObjectMerger(bodyWriter)
 		} else {
-			opts.Merger = jsonmerge.NewArrayMerger()
+			opts.merger = jsonmerge.NewArrayMerger()
 		}
 	}
 
@@ -391,7 +383,7 @@ func apiRun(opts *ApiOptions) error {
 		}
 		isFirstPage = false
 
-		if !opts.shouldPaginate() {
+		if !opts.Paginate {
 			break
 		}
 
@@ -407,8 +399,8 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	if opts.Merger != nil {
-		return opts.Merger.Close()
+	if opts.merger != nil {
+		return opts.merger.Close()
 	}
 
 	return tmpl.Flush()
@@ -438,7 +430,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	}
 
 	var bodyCopy *bytes.Buffer
-	isGraphQLPaginate := isJSON && resp.StatusCode == 200 && opts.shouldPaginate() && opts.RequestPath == "graphql"
+	isGraphQLPaginate := isJSON && resp.StatusCode == 200 && opts.Paginate && opts.RequestPath == "graphql"
 	if isGraphQLPaginate {
 		bodyCopy = &bytes.Buffer{}
 		responseBody = io.TeeReader(responseBody, bodyCopy)
@@ -462,8 +454,8 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	} else if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
 	} else {
-		if isJSON && opts.Merger != nil && !opts.ShowResponseHeaders {
-			responseBody = opts.Merger.NewPage(responseBody, isLastPage)
+		if isJSON && opts.merger != nil && !opts.ShowResponseHeaders {
+			responseBody = opts.merger.NewPage(responseBody, isLastPage)
 		}
 
 		_, err = io.Copy(bodyWriter, responseBody)
