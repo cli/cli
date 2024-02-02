@@ -2,14 +2,11 @@ package link
 
 import (
 	"fmt"
-	"net/http"
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -23,16 +20,18 @@ type linkOpts struct {
 	teamSlug string
 }
 
-type linkConfig struct {
-	io          *iostreams.IOStreams
-	httpClient  func() (*http.Client, error)
-	config      func() (config.Config, error)
-	baseRepo    func() (ghrepo.Interface, error)
-	queryClient *queries.Client
-	opts        linkOpts
+type linkable interface {
+	LinkWith(project project) error
 }
 
-func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.Command {
+type linkCfg struct {
+	owner          string
+	projectNumber  int32
+	projectFetcher projectFetcher
+	linkable       linkable
+}
+
+func NewCmdLink(f *cmdutil.Factory, runF func(config linkCfg) error) *cobra.Command {
 	opts := linkOpts{}
 	linkCmd := &cobra.Command{
 		Short: "Link a project to a repository or a team",
@@ -48,11 +47,7 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 			gh project link 1
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			queryClient, err := client.New(f)
-			if err != nil {
-				return err
-			}
-
+			// Argument validation
 			if len(args) == 1 {
 				num, err := strconv.ParseInt(args[0], 10, 32)
 				if err != nil {
@@ -65,13 +60,57 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 				return err
 			}
 
-			config := linkConfig{
-				io:          f.IOStreams,
-				httpClient:  f.HttpClient,
-				config:      f.Config,
-				baseRepo:    f.BaseRepo,
-				queryClient: queryClient,
-				opts:        opts,
+			// Collect all the various client and config we need from the context
+			ghCfg, err := f.Config()
+			if err != nil {
+				return err
+			}
+			defaultHost, _ := ghCfg.Authentication().DefaultHost()
+
+			httpClient, err := f.HttpClient()
+			if err != nil {
+				return err
+			}
+			apiClient := api.NewClientFromHTTP(httpClient)
+			projectQueryClient := queries.NewClient(httpClient, defaultHost, f.IOStreams)
+
+			// And now we start slotting lego pieces together. You can find the lego pieces below.
+			var linkable linkable
+			if opts.teamSlug != "" {
+				// If a team slug was provided we know we're linking a project to a team
+				linkable = linkableTeam{
+					slug: opts.teamSlug,
+					teamIDFetcher: teamIDFetcher{
+						apiClient: apiClient,
+						host:      defaultHost,
+					},
+					projectTeamLinker: projectQueryClient,
+				}
+			} else {
+				// If it wasn't provided then we know we're linking a project to a repository
+				// and we'll get the repo from the --repo flag, the current directory, or GH_HOST
+				repo, err := f.BaseRepo()
+				if err != nil {
+					return err
+				}
+
+				linkable = linkableRepo{
+					repo:              repo,
+					repoIDFetcher:     repoIDFetcher{apiClient: apiClient},
+					projectRepoLinker: projectQueryClient,
+				}
+			}
+
+			config := linkCfg{
+				owner:         opts.owner,
+				projectNumber: opts.number,
+				projectFetcher: projectFetcher{
+					ios: f.IOStreams,
+					// Maybe make a new interface here but it might be overkill, it kind
+					// of depends what our preferred testing method is.
+					queryClient: projectQueryClient,
+				},
+				linkable: linkable,
 			}
 
 			// allow testing of the command without actually running it
@@ -89,100 +128,127 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 	return linkCmd
 }
 
-func runLink(config linkConfig) error {
-	canPrompt := config.io.CanPrompt()
-	owner, err := config.queryClient.NewOwner(canPrompt, config.opts.owner)
+func runLink(cfg linkCfg) error {
+	project, err := cfg.projectFetcher.FetchProject(cfg.owner, cfg.projectNumber)
+	if err != nil {
+		return fmt.Errorf("failed to fetch project: %s", err)
+	}
+
+	return cfg.linkable.LinkWith(project)
+}
+
+// Here are all the lego pieces...
+
+// First we deal with the concept of fetching a project...
+type project struct {
+	id    string
+	owner string
+}
+
+type projectFetcher struct {
+	ios         *iostreams.IOStreams
+	queryClient *queries.Client
+}
+
+func (f *projectFetcher) FetchProject(owner string, number int32) (project, error) {
+	canPrompt := f.ios.CanPrompt()
+	apiHydratedOwner, err := f.queryClient.NewOwner(canPrompt, owner)
+	if err != nil {
+		return project{}, fmt.Errorf("failed to fetch project owner: %s", err)
+	}
+
+	apiHydratedProject, err := f.queryClient.NewProject(canPrompt, apiHydratedOwner, number, false)
+	if err != nil {
+		return project{}, fmt.Errorf("failed to fetch project: %s", err)
+	}
+
+	return project{
+		id:    apiHydratedProject.ID,
+		owner: apiHydratedProject.OwnerLogin(),
+	}, nil
+}
+
+// Then we deal with the types required for linking projects to teams...
+type teamIDFetcher struct {
+	apiClient *api.Client
+	host      string
+}
+
+func (f *teamIDFetcher) Fetch(org string, slug string) (string, error) {
+	team, err := api.OrganizationTeam(f.apiClient, f.host, org, slug)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch team ID: %s", err)
+	}
+
+	return team.ID, nil
+}
+
+// Note that I've removed this interface but you could imagine it being used by linkableTeam
+// (and similar patterns for other abstractions over the query client)
+//
+// type projectTeamLinker interface {
+//   LinkProjectToTeam(projectID string, teamID string) error
+// }
+//
+// Doing this makes it _extremely_ obvious what a linkableTeam depends upon, and also allows for
+// very easy testing. I removed it because I don't want you to drown in indirection.
+//
+// I also decided to remove lots of new types like:
+//   type teamID string
+//
+// I removed it because I also didn't want to go too far, but if you have your own wrappers for
+// the parts that matter then its trivial to add type safety over bare strings.
+
+type linkableTeam struct {
+	slug              string
+	teamIDFetcher     teamIDFetcher
+	projectTeamLinker *queries.Client
+	// projectTeamLinker projectTeamLinker (for example)
+}
+
+func (lt linkableTeam) LinkWith(project project) error {
+	teamID, err := lt.teamIDFetcher.Fetch(project.owner, lt.slug)
 	if err != nil {
 		return err
 	}
 
-	project, err := config.queryClient.NewProject(canPrompt, owner, config.opts.number, false)
+	err = lt.projectTeamLinker.LinkProjectToTeam(string(project.id), string(teamID))
 	if err != nil {
-		return err
-	}
-
-	httpClient, err := config.httpClient()
-	if err != nil {
-		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	cfg, err := config.config()
-	if err != nil {
-		return err
-	}
-	host, _ := cfg.Authentication().DefaultHost()
-
-	// If we have a team slug, we'll link the project and team together
-	if config.opts.teamSlug != "" {
-		if err != linkTeam(apiClient, host, config.queryClient, project, config.opts.teamSlug) {
-			return err
-		}
-
-		if config.io.IsStdoutTTY() {
-			fmt.Fprintf(config.io.Out, "Linked '%s/%s' to project #%d '%s'\n", project.OwnerLogin(), config.opts.teamSlug, project.Number, project.Title)
-		}
-
-		return nil
-	}
-
-	// Otherwise, we'll see if a repo arg was provided, and if not then we'll try to use
-	// whichever repo we happen to be in (or the value of GH_HOST)
-	var repo ghrepo.Interface
-	if config.opts.repo != "" {
-		if repo, err = ghrepo.FromFullName(config.opts.repo); err != nil {
-			return err
-		}
-	} else {
-		if repo, err = config.baseRepo(); err != nil {
-			return err
-		}
-	}
-
-	// If the repo points at a different host than the other clients (which use GH_HOST or DefaultHost)
-	// then consider this an error. This could be fixed up later with some refactoring.
-	if repo.RepoHost() != host {
-		return fmt.Errorf("the provided repo's host cannot be different than the default host")
-	}
-
-	if repo.RepoOwner() != config.opts.owner {
-		return fmt.Errorf("the repo owner and project owner must be the same")
-	}
-
-	if err := linkRepo(apiClient, config.queryClient, project, repo); err != nil {
-		return err
-	}
-
-	if config.io.IsStdoutTTY() {
-		fmt.Fprintf(config.io.Out, "Linked '%s' to project #%d '%s'\n", ghrepo.FullName(repo), project.Number, project.Title)
+		return fmt.Errorf("failed to link project to team: %s", err)
 	}
 
 	return nil
 }
 
-func linkTeam(apiClient *api.Client, host string, queryClient *queries.Client, project *queries.Project, targetTeam string) error {
-	team, err := api.OrganizationTeam(apiClient, host, project.OwnerLogin(), targetTeam)
-	if err != nil {
-		return err
-	}
-
-	err = queryClient.LinkProjectToTeam(project.ID, team.ID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+// Finally we deal with the types required for linking projects to repos..
+type repoIDFetcher struct {
+	apiClient *api.Client
 }
 
-func linkRepo(apiClient *api.Client, queryClient *queries.Client, project *queries.Project, targetRepo ghrepo.Interface) error {
-	apiHydratedRepo, err := api.GitHubRepo(apiClient, targetRepo)
+func (f *repoIDFetcher) Fetch(ghRepo ghrepo.Interface) (string, error) {
+	apiHydratedRepo, err := api.GitHubRepo(f.apiClient, ghRepo)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch repository ID: %s", err)
+	}
+
+	return apiHydratedRepo.ID, nil
+}
+
+type linkableRepo struct {
+	repo              ghrepo.Interface
+	repoIDFetcher     repoIDFetcher
+	projectRepoLinker *queries.Client
+}
+
+func (lr linkableRepo) LinkWith(project project) error {
+	repoID, err := lr.repoIDFetcher.Fetch(lr.repo)
 	if err != nil {
 		return err
 	}
 
-	err = queryClient.LinkProjectToRepository(project.ID, apiHydratedRepo.ID)
+	err = lr.projectRepoLinker.LinkProjectToRepository(project.id, repoID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to link project to repo: %s", err)
 	}
 
 	return nil
