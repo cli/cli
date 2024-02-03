@@ -197,10 +197,12 @@ func Test_createRun(t *testing.T) {
 		errMsg      string
 	}{
 		{
-			name:       "interactive create from scratch with gitignore and license",
-			opts:       &CreateOptions{Interactive: true},
+			name: "interactive create from scratch with gitignore and license",
+			opts: &CreateOptions{
+				Interactive: true,
+			},
 			tty:        true,
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n  https://github.com/OWNER/REPO\n",
+			wantStdout: "✓ Created repository OWNER/REPO on github.com\n  https://github.com/OWNER/REPO\n",
 			promptStubs: func(p *prompter.PrompterMock) {
 				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
 					switch message {
@@ -210,7 +212,7 @@ func Test_createRun(t *testing.T) {
 						return true, nil
 					case "Would you like to add a license?":
 						return true, nil
-					case `This will create "REPO" as a private repository on GitHub. Continue?`:
+					case `This will create "REPO" as a private repository on github.com. Continue?`:
 						return defaultValue, nil
 					case "Clone the new repository locally?":
 						return defaultValue, nil
@@ -231,7 +233,7 @@ func Test_createRun(t *testing.T) {
 				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
 					switch message {
 					case "What would you like to do?":
-						return prompter.IndexFor(options, "Create a new repository on GitHub from scratch")
+						return prompter.IndexFor(options, "Create a new repository on github.com from scratch")
 					case "Visibility":
 						return prompter.IndexFor(options, "Private")
 					case "Choose a license":
@@ -266,7 +268,7 @@ func Test_createRun(t *testing.T) {
 			name:       "interactive create from scratch but with prompted owner",
 			opts:       &CreateOptions{Interactive: true},
 			tty:        true,
-			wantStdout: "✓ Created repository org1/REPO on GitHub\n  https://github.com/org1/REPO\n",
+			wantStdout: "✓ Created repository org1/REPO on github.com\n  https://github.com/org1/REPO\n",
 			promptStubs: func(p *prompter.PrompterMock) {
 				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
 					switch message {
@@ -276,7 +278,7 @@ func Test_createRun(t *testing.T) {
 						return false, nil
 					case "Would you like to add a license?":
 						return false, nil
-					case `This will create "org1/REPO" as a private repository on GitHub. Continue?`:
+					case `This will create "org1/REPO" as a private repository on github.com. Continue?`:
 						return true, nil
 					case "Clone the new repository locally?":
 						return false, nil
@@ -299,7 +301,7 @@ func Test_createRun(t *testing.T) {
 					case "Repository owner":
 						return prompter.IndexFor(options, "org1")
 					case "What would you like to do?":
-						return prompter.IndexFor(options, "Create a new repository on GitHub from scratch")
+						return prompter.IndexFor(options, "Create a new repository on github.com from scratch")
 					case "Visibility":
 						return prompter.IndexFor(options, "Private")
 					default:
@@ -344,7 +346,7 @@ func Test_createRun(t *testing.T) {
 						return false, nil
 					case "Would you like to add a license?":
 						return false, nil
-					case `This will create "REPO" as a private repository on GitHub. Continue?`:
+					case `This will create "REPO" as a private repository on github.com. Continue?`:
 						return false, nil
 					default:
 						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
@@ -363,7 +365,7 @@ func Test_createRun(t *testing.T) {
 				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
 					switch message {
 					case "What would you like to do?":
-						return prompter.IndexFor(options, "Create a new repository on GitHub from scratch")
+						return prompter.IndexFor(options, "Create a new repository on github.com from scratch")
 					case "Visibility":
 						return prompter.IndexFor(options, "Private")
 					default:
@@ -440,7 +442,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
 				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
 			},
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n  https://github.com/OWNER/REPO\n",
+			wantStdout: "✓ Created repository OWNER/REPO on github.com\n  https://github.com/OWNER/REPO\n",
 		},
 		{
 			name: "interactive with existing repository public add remote and push",
@@ -508,7 +510,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
 				cs.Register(`git -C . push --set-upstream origin HEAD`, 0, "")
 			},
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n  https://github.com/OWNER/REPO\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
+			wantStdout: "✓ Created repository OWNER/REPO on github.com\n  https://github.com/OWNER/REPO\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
 		},
 		{
 			name: "interactive create from a template repository",
@@ -517,7 +519,7 @@ func Test_createRun(t *testing.T) {
 			promptStubs: func(p *prompter.PrompterMock) {
 				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
 					switch message {
-					case `This will create "OWNER/REPO" as a private repository on GitHub. Continue?`:
+					case `This will create "OWNER/REPO" as a private repository on github.com. Continue?`:
 						return defaultValue, nil
 					case "Clone the new repository locally?":
 						return defaultValue, nil
@@ -542,7 +544,7 @@ func Test_createRun(t *testing.T) {
 					case "Choose a template repository":
 						return prompter.IndexFor(options, "REPO")
 					case "What would you like to do?":
-						return prompter.IndexFor(options, "Create a new repository on GitHub from a template repository")
+						return prompter.IndexFor(options, "Create a new repository on github.com from a template repository")
 					case "Visibility":
 						return prompter.IndexFor(options, "Private")
 					default:
@@ -585,7 +587,7 @@ func Test_createRun(t *testing.T) {
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone --branch main https://github.com/OWNER/REPO`, 0, "")
 			},
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n  https://github.com/OWNER/REPO\n",
+			wantStdout: "✓ Created repository OWNER/REPO on github.com\n  https://github.com/OWNER/REPO\n",
 		},
 		{
 			name: "interactive create from template repo but there are no template repos",
@@ -611,7 +613,7 @@ func Test_createRun(t *testing.T) {
 				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
 					switch message {
 					case "What would you like to do?":
-						return prompter.IndexFor(options, "Create a new repository on GitHub from a template repository")
+						return prompter.IndexFor(options, "Create a new repository on github.com from a template repository")
 					case "Visibility":
 						return prompter.IndexFor(options, "Private")
 					default:
