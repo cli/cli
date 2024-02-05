@@ -30,6 +30,7 @@ func TestNewCmdList(t *testing.T) {
 				Limit: 30,
 				Order: "desc",
 				Sort:  "last_accessed_at",
+				Key:   "",
 			},
 		},
 		{
@@ -39,6 +40,7 @@ func TestNewCmdList(t *testing.T) {
 				Limit: 100,
 				Order: "desc",
 				Sort:  "last_accessed_at",
+				Key:   "",
 			},
 		},
 		{
@@ -53,6 +55,7 @@ func TestNewCmdList(t *testing.T) {
 				Limit: 30,
 				Order: "desc",
 				Sort:  "created_at",
+				Key:   "",
 			},
 		},
 		{
@@ -62,6 +65,17 @@ func TestNewCmdList(t *testing.T) {
 				Limit: 30,
 				Order: "asc",
 				Sort:  "last_accessed_at",
+				Key:   "",
+			},
+		},
+		{
+			name:  "with key",
+			input: "--key cache-key-prefix-",
+			wants: ListOptions{
+				Limit: 30,
+				Order: "desc",
+				Sort:  "last_accessed_at",
+				Key:   "cache-key-prefix-",
 			},
 		},
 	}
@@ -90,6 +104,7 @@ func TestNewCmdList(t *testing.T) {
 			assert.Equal(t, tt.wants.Limit, gotOpts.Limit)
 			assert.Equal(t, tt.wants.Sort, gotOpts.Sort)
 			assert.Equal(t, tt.wants.Order, gotOpts.Order)
+			assert.Equal(t, tt.wants.Key, gotOpts.Key)
 		})
 	}
 }
