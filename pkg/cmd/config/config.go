@@ -19,8 +19,11 @@ func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
 	longDoc.WriteString("Current respected settings:\n")
 	for _, co := range config.ConfigOptions() {
 		longDoc.WriteString(fmt.Sprintf("- `%s`: %s", co.Key, co.Description))
+		if len(co.AllowedValues) > 0 {
+			longDoc.WriteString(fmt.Sprintf(" {%s}", strings.Join(co.AllowedValues, "|")))
+		}
 		if co.DefaultValue != "" {
-			longDoc.WriteString(fmt.Sprintf(" (default: %q)", co.DefaultValue))
+			longDoc.WriteString(fmt.Sprintf(" (default %s)", co.DefaultValue))
 		}
 		longDoc.WriteRune('\n')
 	}
