@@ -24,6 +24,11 @@ type createOptions struct {
 	Environment string
 }
 
+type deploymentRequest struct {
+	Ref         string `json:"ref,omitempty"`
+	Environment string `json:"environment,omitempty"`
+}
+
 func NewCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Command {
 	opts := createOptions{
 		HttpClient: f.HttpClient,
@@ -93,10 +98,12 @@ func createRun(opts *createOptions) error {
 	path := fmt.Sprintf("repos/%s/%s/deployments",
 		repo.RepoOwner(), repo.RepoName())
 
-	requestByte, err := json.Marshal(map[string]string{
-		"ref":         ref,
-		"environment": opts.Environment,
-	})
+	deploymentRequest := deploymentRequest{
+		Ref:         ref,
+		Environment: opts.Environment,
+	}
+
+	requestByte, err := json.Marshal(deploymentRequest)
 	if err != nil {
 		return fmt.Errorf("failed to serialize deployment inputs: %w", err)
 	}
@@ -113,8 +120,8 @@ func createRun(opts *createOptions) error {
 	if opts.IO.IsStdoutTTY() {
 		out := opts.IO.Out
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(out, "%s Deployment created for %s\n",
-			cs.SuccessIcon(), cs.Bold(ref))
+		fmt.Fprintf(out, "%s Created deployment for %s in %s\n",
+			cs.SuccessIcon(), cs.Bold(ref), ghrepo.FullName(repo))
 	}
 
 	return nil
