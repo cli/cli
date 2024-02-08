@@ -94,7 +94,7 @@ func Test_createRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/deployments"),
-					httpmock.RESTPayload(201, `{"id": 1}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(201, `{}`, func(payload map[string]interface{}) {
 						assert.Equal(t, map[string]interface{}{
 							"ref": "main",
 						}, payload)
@@ -112,7 +112,7 @@ func Test_createRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/deployments"),
-					httpmock.RESTPayload(201, `{"id": 1}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(201, `{}`, func(payload map[string]interface{}) {
 						assert.Equal(t, map[string]interface{}{
 							"ref": "trunk",
 						}, payload)
@@ -130,7 +130,7 @@ func Test_createRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/deployments"),
-					httpmock.RESTPayload(201, `{"id": 1}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(201, `{}`, func(payload map[string]interface{}) {
 						assert.Equal(t, map[string]interface{}{
 							"ref":         "main",
 							"environment": "production",
@@ -150,7 +150,7 @@ func Test_createRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/deployments"),
-					httpmock.RESTPayload(201, `{"id": 1}`, func(payload map[string]interface{}) {
+					httpmock.RESTPayload(201, `{}`, func(payload map[string]interface{}) {
 						assert.Equal(t, map[string]interface{}{
 							"ref":         "trunk",
 							"environment": "production",
@@ -159,6 +159,22 @@ func Test_createRun(t *testing.T) {
 				)
 			},
 			wantStdout: "✓ Created deployment for trunk in OWNER/REPO\n",
+		},
+		{
+			name:  "no TTY",
+			opts:  &createOptions{},
+			isTTY: false,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/deployments"),
+					httpmock.RESTPayload(201, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"ref": "main",
+						}, payload)
+					}),
+				)
+			},
+			wantStdout: "",
 		},
 	}
 
