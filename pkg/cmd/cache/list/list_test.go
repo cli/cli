@@ -187,6 +187,26 @@ ID  KEY  SIZE      CREATED            ACCESSED
 			wantStdout: "1\tfoo\t100 B\t2021-01-01T01:01:01Z\t2022-01-01T01:01:01Z\n2\tbar\t1.00 KiB\t2021-01-01T01:01:01Z\t2022-01-01T01:01:01Z\n",
 		},
 		{
+			name: "only requests caches with the provided key prefix",
+			opts: ListOptions{
+				Key: "test-key",
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					func(req *http.Request) bool {
+						return req.URL.Query().Get("key") == "test-key"
+					},
+					httpmock.JSONResponse(shared.CachePayload{
+						ActionsCaches: []shared.Cache{},
+						TotalCount:    0,
+					}))
+			},
+			// We could put anything here, we're really asserting that the key is passed
+			// to the API.
+			wantErr:    true,
+			wantErrMsg: "No caches found in OWNER/REPO",
+		},
+		{
 			name: "displays no results",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
