@@ -49,7 +49,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		# List caches sorted by least recently accessed
 		$ gh cache list --sort last_accessed_at --order asc
 
-		# List caches with a prefix (or exact match)
+		# List caches that have keys matching a prefix (or that match exactly)
 		$ gh cache list --key key-prefix
 		`),
 		Aliases: []string{"ls"},
