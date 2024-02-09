@@ -70,7 +70,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of caches to fetch")
 	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "O", "desc", []string{"asc", "desc"}, "Order of caches returned")
 	cmdutil.StringEnumFlag(cmd, &opts.Sort, "sort", "S", "last_accessed_at", []string{"created_at", "last_accessed_at", "size_in_bytes"}, "Sort fetched caches")
-	cmd.Flags().StringVarP(&opts.Key, "key", "K", "", "Filter by cache key prefix")
+	cmd.Flags().StringVarP(&opts.Key, "key", "k", "", "Filter by cache key prefix")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.CacheFields)
 
 	return cmd
