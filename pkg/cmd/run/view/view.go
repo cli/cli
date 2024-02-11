@@ -484,6 +484,8 @@ func promptForJob(prompter shared.Prompter, cs *iostreams.ColorScheme, jobs []sh
 	return nil, nil
 }
 
+const MAX_ZIP_FILE_PATH_LENGTH = 89
+
 func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	// As described in https://github.com/cli/cli/issues/5011#issuecomment-1570713070, there are a number of steps
 	// the server can take when producing the downloaded zip file that can result in a mismatch between the job name
@@ -497,6 +499,11 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	// constructs a job name by constructing a job name of `<JOB_NAME`> / <ACTION_NAME>`. This means that logs will
 	// never be found for jobs that use composite actions.
 	sanitizedJobName := strings.ReplaceAll(job.Name, "/", "")
+	// Truncate the job name to 89 characters due to zip limilation, see issue
+	// https://github.com/cli/cli/issues/7642.
+	if len(sanitizedJobName) > MAX_ZIP_FILE_PATH_LENGTH {
+		sanitizedJobName = sanitizedJobName[:MAX_ZIP_FILE_PATH_LENGTH]
+	}
 	re := fmt.Sprintf(`%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
 }

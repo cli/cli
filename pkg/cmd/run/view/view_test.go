@@ -1466,6 +1466,18 @@ func Test_attachRunLog(t *testing.T) {
 			// not the double space in the dir name, as the slash has been removed
 			wantFilename: "cool job  with slash/1_fob the barz.txt",
 		},
+		{
+			name: "Job name with really long name (over the ZIP limit)",
+			job: shared.Job{
+				Name: "1TwentryCharacters--2TwentryCharacters--3TwentryCharacters--4TwentryCharacters--cutoff---All of this should get truncated by the new logic. This is just random content to make the job name really really really long",
+				Steps: []shared.Step{{
+					Name:   "Orca FTW",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "1TwentryCharacters--2TwentryCharacters--3TwentryCharacters--4TwentryCharacters--cutoff---/1_Orca FTW.txt",
+		},
 	}
 
 	rlz, err := zip.OpenReader("./fixtures/run_log.zip")
@@ -1480,9 +1492,9 @@ func Test_attachRunLog(t *testing.T) {
 			for _, step := range tt.job.Steps {
 				log := step.Log
 				logPresent := log != nil
-				require.Equal(t, tt.wantMatch, logPresent)
+				require.Equal(t, tt.wantMatch, logPresent, "Log mismatch")
 				if logPresent {
-					require.Equal(t, tt.wantFilename, log.Name)
+					require.Equal(t, tt.wantFilename, log.Name, "Filename mismatch")
 				}
 			}
 		})
