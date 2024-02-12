@@ -27,6 +27,7 @@ type ListOptions struct {
 	Limit int
 	Order string
 	Sort  string
+	Key   string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -47,6 +48,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 		# List caches sorted by least recently accessed
 		$ gh cache list --sort last_accessed_at --order asc
+
+		# List caches that have keys matching a prefix (or that match exactly)
+		$ gh cache list --key key-prefix
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -69,6 +73,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of caches to fetch")
 	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "O", "desc", []string{"asc", "desc"}, "Order of caches returned")
 	cmdutil.StringEnumFlag(cmd, &opts.Sort, "sort", "S", "last_accessed_at", []string{"created_at", "last_accessed_at", "size_in_bytes"}, "Sort fetched caches")
+	cmd.Flags().StringVarP(&opts.Key, "key", "k", "", "Filter by cache key prefix")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.CacheFields)
 
 	return cmd
@@ -87,7 +92,7 @@ func listRun(opts *ListOptions) error {
 	client := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	result, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order})
+	result, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order, Key: opts.Key})
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("%s Failed to get caches: %w", opts.IO.ColorScheme().FailureIcon(), err)
