@@ -1,0 +1,4 @@
+*     @cli/cli-reviewers
+
+# Limit Package Security team ownership to the attestation command package
+/pkg/cmd/attestation @cli/package-security-reviewers
