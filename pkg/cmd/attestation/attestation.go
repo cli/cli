@@ -13,9 +13,9 @@ func NewCmdAttestation(io *iostreams.IOStreams, version, buildDate string) *cobr
 		Short:   "attestations",
 	}
 
-	root.AddCommand(app.NewDownloadCmd(version, buildDate))
-	root.AddCommand(app.NewVerifyCmd(version, buildDate))
-	root.AddCommand(app.NewTUFRootVerifyCmd())
+	root.AddCommand(app.NewDownloadCmd(io, version, buildDate))
+	root.AddCommand(app.NewVerifyCmd(io, version, buildDate))
+	root.AddCommand(app.NewTUFRootVerifyCmd(io))
 
 	return root
 }

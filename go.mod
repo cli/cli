@@ -16,7 +16,7 @@ require (
 	github.com/creack/pty v1.1.21
 	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/gdamore/tcell/v2 v2.5.4
-	github.com/github/gh-attestation v0.3.0
+	github.com/github/gh-attestation v0.3.1-0.20240213221736-bd06290fa8ee
 	github.com/google/go-cmp v0.6.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/gorilla/websocket v1.5.0
