@@ -159,7 +159,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			'
 
 			# list all repositories for a user
-			$ gh api graphql --paginate --merge-pages -f query='
+			$ gh api graphql --paginate -f query='
 			  query($endCursor: String) {
 			    viewer {
 			      repositories(first: 100, after: $endCursor) {
@@ -172,6 +172,23 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			    }
 			  }
 			'
+
+			# get the percentage of forks for the current user
+			# without --merge-pages you will get a different percentage for each page
+			$ gh api graphql --paginate --merge-pages -f query='
+			  query($endCursor: String) {
+			    viewer {
+			      repositories(first: 100, after: $endCursor) {
+			        nodes { isFork }
+			        pageInfo {
+			          hasNextPage
+			          endCursor
+			        }
+			      }
+			    }
+			  }
+			' | jq 'def count(s): reduce s as $_ (0;.+1);
+			.data.viewer.repositories.nodes as $r | count(select($r[].isFork)) / count($r[])'
 		`),
 		Annotations: map[string]string{
 			"help:environment": heredoc.Doc(`
@@ -292,13 +309,18 @@ func apiRun(opts *ApiOptions) error {
 
 	// Merge JSON arrays and objects if paginating without filtering or templating.
 	// MergePages retains compatibility with older versions but may be the default behavior with future major releases.
-	if opts.Paginate && opts.MergePages && opts.FilterOutput == "" && opts.Template == "" {
-		if isGraphQL {
-			opts.merger = jsonmerge.NewObjectMerger(bodyWriter)
-		} else {
+	if opts.Paginate && opts.FilterOutput == "" && opts.Template == "" {
+		if !isGraphQL {
 			opts.merger = jsonmerge.NewArrayMerger()
+		} else if opts.MergePages {
+			opts.merger = jsonmerge.NewObjectMerger(bodyWriter)
 		}
 	}
+
+	if opts.merger == nil {
+		opts.merger = jsonmerge.NewNopMerger()
+	}
+	defer opts.merger.Close()
 
 	if opts.RequestInputFile != "" {
 		file, size, err := openUserFile(opts.RequestInputFile, opts.IO.In)
@@ -400,10 +422,6 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	if opts.merger != nil {
-		return opts.merger.Close()
-	}
-
 	return tmpl.Flush()
 }
 
@@ -455,7 +473,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	} else if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
 	} else {
-		if isJSON && opts.merger != nil && !opts.ShowResponseHeaders {
+		if isJSON && opts.Paginate && !opts.ShowResponseHeaders {
 			responseBody = opts.merger.NewPage(responseBody, isLastPage)
 		}
 
