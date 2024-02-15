@@ -7,7 +7,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 	"net/http"
 	"testing"
@@ -95,7 +95,7 @@ func TestNewCmdUnlink(t *testing.T) {
 			}
 
 			argv, err := shlex.Split(tt.cli)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var gotOpts unlinkOpts
 			cmd := NewCmdUnlink(f, func(config unlinkConfig) error {
@@ -106,19 +106,19 @@ func TestNewCmdUnlink(t *testing.T) {
 			cmd.SetArgs(argv)
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.wantsErrMsg, err.Error())
+				require.Error(t, err)
+				require.Equal(t, tt.wantsErrMsg, err.Error())
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
-			assert.Equal(t, tt.wants.number, gotOpts.number)
-			assert.Equal(t, tt.wants.owner, gotOpts.owner)
-			assert.Equal(t, tt.wants.repo, gotOpts.repo)
-			assert.Equal(t, tt.wants.team, gotOpts.team)
-			assert.Equal(t, tt.wants.projectID, gotOpts.projectID)
-			assert.Equal(t, tt.wants.repoID, gotOpts.repoID)
-			assert.Equal(t, tt.wants.teamID, gotOpts.teamID)
+			require.Equal(t, tt.wants.number, gotOpts.number)
+			require.Equal(t, tt.wants.owner, gotOpts.owner)
+			require.Equal(t, tt.wants.repo, gotOpts.repo)
+			require.Equal(t, tt.wants.team, gotOpts.team)
+			require.Equal(t, tt.wants.projectID, gotOpts.projectID)
+			require.Equal(t, tt.wants.repoID, gotOpts.repoID)
+			require.Equal(t, tt.wants.teamID, gotOpts.teamID)
 		})
 	}
 }
@@ -226,8 +226,8 @@ func TestRunUnlink_Repo(t *testing.T) {
 	}
 
 	err := runUnlink(cfg)
-	assert.NoError(t, err)
-	assert.Equal(
+	require.NoError(t, err)
+	require.Equal(
 		t,
 		"Unlinked 'monalisa/my-repo' from project #1 'first-project'\n",
 		stdout.String())
@@ -338,8 +338,8 @@ func TestRunUnlink_Team(t *testing.T) {
 	}
 
 	err := runUnlink(cfg)
-	assert.NoError(t, err)
-	assert.Equal(
+	require.NoError(t, err)
+	require.Equal(
 		t,
 		"Unlinked 'monalisa-org/my-team' from project #1 'first-project'\n",
 		stdout.String())
