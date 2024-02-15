@@ -131,6 +131,10 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	}
 	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
 
+	if len(command.Aliases) > 0 {
+		helpEntries = append(helpEntries, helpEntry{"ALIASES", strings.Join(command.Aliases, "\n")})
+	}
+
 	for _, g := range GroupedCommands(command) {
 		var names []string
 		for _, c := range g.Commands {

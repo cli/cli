@@ -67,6 +67,7 @@ func (r TrackingRef) String() string {
 type Commit struct {
 	Sha   string
 	Title string
+	Body  string
 }
 
 type BranchConfig struct {
