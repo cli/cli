@@ -157,6 +157,7 @@ func runLink(config linkConfig) error {
 	if err != nil {
 		return err
 	}
+	config.opts.owner = owner.Login
 
 	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, false)
 	if err != nil {
@@ -184,15 +185,15 @@ func runLink(config linkConfig) error {
 	}
 
 	if config.opts.repo != "" {
-		return linkRepo(c, owner, config)
+		return linkRepo(c, config)
 	} else if config.opts.team != "" {
-		return linkTeam(c, owner, config)
+		return linkTeam(c, config)
 	}
 	return nil
 }
 
-func linkRepo(c *api.Client, owner *queries.Owner, config linkConfig) error {
-	repo, err := api.GitHubRepo(c, ghrepo.NewWithHost(owner.Login, config.opts.repo, config.opts.host))
+func linkRepo(c *api.Client, config linkConfig) error {
+	repo, err := api.GitHubRepo(c, ghrepo.NewWithHost(config.opts.owner, config.opts.repo, config.opts.host))
 	if err != nil {
 		return err
 	}
@@ -203,11 +204,11 @@ func linkRepo(c *api.Client, owner *queries.Owner, config linkConfig) error {
 		return err
 	}
 
-	return printResults(config, owner, config.opts.repo)
+	return printResults(config, config.opts.repo)
 }
 
-func linkTeam(c *api.Client, owner *queries.Owner, config linkConfig) error {
-	team, err := api.OrganizationTeam(c, config.opts.host, owner.Login, config.opts.team)
+func linkTeam(c *api.Client, config linkConfig) error {
+	team, err := api.OrganizationTeam(c, config.opts.host, config.opts.owner, config.opts.team)
 	if err != nil {
 		return err
 	}
@@ -218,14 +219,14 @@ func linkTeam(c *api.Client, owner *queries.Owner, config linkConfig) error {
 		return err
 	}
 
-	return printResults(config, owner, config.opts.team)
+	return printResults(config, config.opts.team)
 }
 
-func printResults(config linkConfig, owner *queries.Owner, linkedTarget string) error {
+func printResults(config linkConfig, linkedTarget string) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
 
-	_, err := fmt.Fprintf(config.io.Out, "Linked '%s/%s' to project #%d '%s'\n", owner.Login, linkedTarget, config.opts.number, config.opts.projectTitle)
+	_, err := fmt.Fprintf(config.io.Out, "Linked '%s/%s' to project #%d '%s'\n", config.opts.owner, linkedTarget, config.opts.number, config.opts.projectTitle)
 	return err
 }

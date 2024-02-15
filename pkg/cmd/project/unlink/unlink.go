@@ -157,6 +157,7 @@ func runUnlink(config unlinkConfig) error {
 	if err != nil {
 		return err
 	}
+	config.opts.owner = owner.Login
 
 	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, false)
 	if err != nil {
@@ -184,15 +185,15 @@ func runUnlink(config unlinkConfig) error {
 	}
 
 	if config.opts.repo != "" {
-		return unlinkRepo(c, owner, config)
+		return unlinkRepo(c, config)
 	} else if config.opts.team != "" {
-		return unlinkTeam(c, owner, config)
+		return unlinkTeam(c, config)
 	}
 	return nil
 }
 
-func unlinkRepo(c *api.Client, owner *queries.Owner, config unlinkConfig) error {
-	repo, err := api.GitHubRepo(c, ghrepo.NewWithHost(owner.Login, config.opts.repo, config.opts.host))
+func unlinkRepo(c *api.Client, config unlinkConfig) error {
+	repo, err := api.GitHubRepo(c, ghrepo.NewWithHost(config.opts.owner, config.opts.repo, config.opts.host))
 	if err != nil {
 		return err
 	}
@@ -203,11 +204,11 @@ func unlinkRepo(c *api.Client, owner *queries.Owner, config unlinkConfig) error 
 		return err
 	}
 
-	return printResults(config, owner, config.opts.repo)
+	return printResults(config, config.opts.repo)
 }
 
-func unlinkTeam(c *api.Client, owner *queries.Owner, config unlinkConfig) error {
-	team, err := api.OrganizationTeam(c, config.opts.host, owner.Login, config.opts.team)
+func unlinkTeam(c *api.Client, config unlinkConfig) error {
+	team, err := api.OrganizationTeam(c, config.opts.host, config.opts.owner, config.opts.team)
 	if err != nil {
 		return err
 	}
@@ -218,14 +219,14 @@ func unlinkTeam(c *api.Client, owner *queries.Owner, config unlinkConfig) error 
 		return err
 	}
 
-	return printResults(config, owner, config.opts.team)
+	return printResults(config, config.opts.team)
 }
 
-func printResults(config unlinkConfig, owner *queries.Owner, linkedTarget string) error {
+func printResults(config unlinkConfig, linkedTarget string) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
 
-	_, err := fmt.Fprintf(config.io.Out, "Unlinked '%s/%s' from project #%d '%s'\n", owner.Login, linkedTarget, config.opts.number, config.opts.projectTitle)
+	_, err := fmt.Fprintf(config.io.Out, "Unlinked '%s/%s' from project #%d '%s'\n", config.opts.owner, linkedTarget, config.opts.number, config.opts.projectTitle)
 	return err
 }
