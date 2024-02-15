@@ -50,11 +50,69 @@ func TestNewCmdUnlink(t *testing.T) {
 			},
 		},
 		{
+			name: "repo-flag-contains-owner",
+			cli:  "--repo monalisa/my-repo",
+			wants: unlinkOpts{
+				owner: "monalisa",
+				repo:  "my-repo",
+			},
+		},
+		{
+			name: "repo-flag-contains-owner-and-host",
+			cli:  "--repo github.com/monalisa/my-repo",
+			wants: unlinkOpts{
+				host:  "github.com",
+				owner: "monalisa",
+				repo:  "my-repo",
+			},
+		},
+		{
+			name:        "repo-flag-contains-wrong-format",
+			cli:         "--repo h/e/l/l/o",
+			wantsErr:    true,
+			wantsErrMsg: "expected the \"[HOST/]OWNER/REPO\" or \"REPO\" format, got \"h/e/l/l/o\"",
+		},
+		{
+			name:        "repo-flag-with-owner-different-from-owner-flag",
+			cli:         "--repo monalisa/my-repo --owner leonardo",
+			wantsErr:    true,
+			wantsErrMsg: "'monalisa/my-repo' has different owner from 'leonardo'",
+		},
+		{
 			name: "team",
 			cli:  "--team my-team",
 			wants: unlinkOpts{
 				team: "my-team",
 			},
+		},
+		{
+			name: "team-flag-contains-owner",
+			cli:  "--team my-org/my-team",
+			wants: unlinkOpts{
+				owner: "my-org",
+				team:  "my-team",
+			},
+		},
+		{
+			name: "team-flag-contains-owner-and-host",
+			cli:  "--team github.com/my-org/my-team",
+			wants: unlinkOpts{
+				host:  "github.com",
+				owner: "my-org",
+				team:  "my-team",
+			},
+		},
+		{
+			name:        "team-flag-contains-wrong-format",
+			cli:         "--team h/e/l/l/o",
+			wantsErr:    true,
+			wantsErrMsg: "expected the \"[HOST/]OWNER/TEAM\" or \"TEAM\" format, got \"h/e/l/l/o\"",
+		},
+		{
+			name:        "team-flag-with-owner-different-from-owner-flag",
+			cli:         "--team my-org/my-team --owner her-org",
+			wantsErr:    true,
+			wantsErrMsg: "'my-org/my-team' has different owner from 'her-org'",
 		},
 		{
 			name: "number",

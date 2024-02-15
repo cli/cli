@@ -13,10 +13,12 @@ import (
 	"github.com/spf13/cobra"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type linkOpts struct {
 	number       int32
+	host         string
 	owner        string
 	repo         string
 	team         string
@@ -78,6 +80,10 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 				return err
 			}
 
+			if err = validateRepoOrTeamFlag(&opts); err != nil {
+				return err
+			}
+
 			config := linkConfig{
 				httpClient: f.HttpClient,
 				config:     f.Config,
@@ -100,6 +106,49 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 	linkCmd.Flags().StringVarP(&opts.team, "team", "T", "", "The team to be linked to this project")
 
 	return linkCmd
+}
+
+func validateRepoOrTeamFlag(opts *linkOpts) error {
+
+	linkedTarget := ""
+	if opts.repo != "" {
+		linkedTarget = opts.repo
+	} else if opts.team != "" {
+		linkedTarget = opts.team
+	}
+
+	if strings.Contains(linkedTarget, "/") {
+		nameArgs := strings.Split(linkedTarget, "/")
+		var host, owner, name string
+
+		if len(nameArgs) == 2 {
+			owner = nameArgs[0]
+			name = nameArgs[1]
+		} else if len(nameArgs) == 3 {
+			host = nameArgs[0]
+			owner = nameArgs[1]
+			name = nameArgs[2]
+		} else {
+			if opts.repo != "" {
+				return fmt.Errorf("expected the \"[HOST/]OWNER/REPO\" or \"REPO\" format, got \"%s\"", linkedTarget)
+			} else if opts.team != "" {
+				return fmt.Errorf("expected the \"[HOST/]OWNER/TEAM\" or \"TEAM\" format, got \"%s\"", linkedTarget)
+			}
+		}
+
+		if opts.owner != "" && opts.owner != owner {
+			return fmt.Errorf("'%s' has different owner from '%s'", linkedTarget, opts.owner)
+		}
+
+		opts.owner = owner
+		opts.host = host
+		if opts.repo != "" {
+			opts.repo = name
+		} else if opts.team != "" {
+			opts.team = name
+		}
+	}
+	return nil
 }
 
 func runLink(config linkConfig) error {
@@ -125,22 +174,25 @@ func runLink(config linkConfig) error {
 	}
 	c := api.NewClientFromHTTP(httpClient)
 
-	cfg, err := config.config()
-	if err != nil {
-		return err
+	if config.opts.host == "" {
+		cfg, err := config.config()
+		if err != nil {
+			return err
+		}
+		host, _ := cfg.Authentication().DefaultHost()
+		config.opts.host = host
 	}
-	host, _ := cfg.Authentication().DefaultHost()
 
 	if config.opts.repo != "" {
-		return linkRepo(c, owner, host, config)
+		return linkRepo(c, owner, config)
 	} else if config.opts.team != "" {
-		return linkTeam(c, owner, host, config)
+		return linkTeam(c, owner, config)
 	}
 	return nil
 }
 
-func linkRepo(c *api.Client, owner *queries.Owner, host string, config linkConfig) error {
-	repo, err := api.GitHubRepo(c, ghrepo.NewWithHost(owner.Login, config.opts.repo, host))
+func linkRepo(c *api.Client, owner *queries.Owner, config linkConfig) error {
+	repo, err := api.GitHubRepo(c, ghrepo.NewWithHost(owner.Login, config.opts.repo, config.opts.host))
 	if err != nil {
 		return err
 	}
@@ -154,8 +206,8 @@ func linkRepo(c *api.Client, owner *queries.Owner, host string, config linkConfi
 	return printResults(config, owner, config.opts.repo)
 }
 
-func linkTeam(c *api.Client, owner *queries.Owner, host string, config linkConfig) error {
-	team, err := api.OrganizationTeam(c, host, owner.Login, config.opts.team)
+func linkTeam(c *api.Client, owner *queries.Owner, config linkConfig) error {
+	team, err := api.OrganizationTeam(c, config.opts.host, owner.Login, config.opts.team)
 	if err != nil {
 		return err
 	}

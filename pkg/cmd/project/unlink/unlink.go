@@ -13,10 +13,12 @@ import (
 	"github.com/spf13/cobra"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type unlinkOpts struct {
 	number       int32
+	host         string
 	owner        string
 	repo         string
 	team         string
@@ -78,6 +80,10 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 				return err
 			}
 
+			if err = validateRepoOrTeamFlag(&opts); err != nil {
+				return err
+			}
+
 			config := unlinkConfig{
 				httpClient: f.HttpClient,
 				config:     f.Config,
@@ -100,6 +106,49 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 	linkCmd.Flags().StringVarP(&opts.team, "team", "T", "", "The team to be unlinked from this project")
 
 	return linkCmd
+}
+
+func validateRepoOrTeamFlag(opts *unlinkOpts) error {
+
+	unlinkedTarget := ""
+	if opts.repo != "" {
+		unlinkedTarget = opts.repo
+	} else if opts.team != "" {
+		unlinkedTarget = opts.team
+	}
+
+	if strings.Contains(unlinkedTarget, "/") {
+		nameArgs := strings.Split(unlinkedTarget, "/")
+		var host, owner, name string
+
+		if len(nameArgs) == 2 {
+			owner = nameArgs[0]
+			name = nameArgs[1]
+		} else if len(nameArgs) == 3 {
+			host = nameArgs[0]
+			owner = nameArgs[1]
+			name = nameArgs[2]
+		} else {
+			if opts.repo != "" {
+				return fmt.Errorf("expected the \"[HOST/]OWNER/REPO\" or \"REPO\" format, got \"%s\"", unlinkedTarget)
+			} else if opts.team != "" {
+				return fmt.Errorf("expected the \"[HOST/]OWNER/TEAM\" or \"TEAM\" format, got \"%s\"", unlinkedTarget)
+			}
+		}
+
+		if opts.owner != "" && opts.owner != owner {
+			return fmt.Errorf("'%s' has different owner from '%s'", unlinkedTarget, opts.owner)
+		}
+
+		opts.owner = owner
+		opts.host = host
+		if opts.repo != "" {
+			opts.repo = name
+		} else if opts.team != "" {
+			opts.team = name
+		}
+	}
+	return nil
 }
 
 func runUnlink(config unlinkConfig) error {
@@ -125,22 +174,25 @@ func runUnlink(config unlinkConfig) error {
 	}
 	c := api.NewClientFromHTTP(httpClient)
 
-	cfg, err := config.config()
-	if err != nil {
-		return err
+	if config.opts.host == "" {
+		cfg, err := config.config()
+		if err != nil {
+			return err
+		}
+		host, _ := cfg.Authentication().DefaultHost()
+		config.opts.host = host
 	}
-	host, _ := cfg.Authentication().DefaultHost()
 
 	if config.opts.repo != "" {
-		return unlinkRepo(c, owner, host, config)
+		return unlinkRepo(c, owner, config)
 	} else if config.opts.team != "" {
-		return unlinkTeam(c, owner, host, config)
+		return unlinkTeam(c, owner, config)
 	}
 	return nil
 }
 
-func unlinkRepo(c *api.Client, owner *queries.Owner, host string, config unlinkConfig) error {
-	repo, err := api.GitHubRepo(c, ghrepo.NewWithHost(owner.Login, config.opts.repo, host))
+func unlinkRepo(c *api.Client, owner *queries.Owner, config unlinkConfig) error {
+	repo, err := api.GitHubRepo(c, ghrepo.NewWithHost(owner.Login, config.opts.repo, config.opts.host))
 	if err != nil {
 		return err
 	}
@@ -154,8 +206,8 @@ func unlinkRepo(c *api.Client, owner *queries.Owner, host string, config unlinkC
 	return printResults(config, owner, config.opts.repo)
 }
 
-func unlinkTeam(c *api.Client, owner *queries.Owner, host string, config unlinkConfig) error {
-	team, err := api.OrganizationTeam(c, host, owner.Login, config.opts.team)
+func unlinkTeam(c *api.Client, owner *queries.Owner, config unlinkConfig) error {
+	team, err := api.OrganizationTeam(c, config.opts.host, owner.Login, config.opts.team)
 	if err != nil {
 		return err
 	}
