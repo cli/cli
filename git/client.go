@@ -227,8 +227,14 @@ func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+func isGitSha(s string) bool {
+	shaRegex := regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
+	ret := shaRegex.MatchString(s)
+	return ret
+}
+
 func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commit, error) {
-	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
+	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s,%b", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
@@ -240,15 +246,39 @@ func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commi
 	commits := []*Commit{}
 	sha := 0
 	title := 1
-	for _, line := range outputLines(out) {
-		split := strings.SplitN(line, ",", 2)
-		if len(split) != 2 {
-			continue
+	body := 2
+	lines := outputLines(out)
+	for i := 0; i < len(lines); i++ {
+		split := strings.SplitN(lines[i], ",", 3)
+		if isGitSha(split[sha]) {
+			c := &Commit{
+				Sha:   split[sha],
+				Title: split[title],
+			}
+
+			if len(split) == 2 {
+				commits = append(commits, c)
+				continue
+			}
+
+			c.Body = split[body]
+			// This consumes all lines until the next commit and adds them to the body.
+			for {
+				i++
+				if i >= len(lines) {
+					break
+				}
+
+				possibleSplit := strings.SplitN(lines[i], ",", 3)
+				if len(possibleSplit) > 2 && isGitSha(possibleSplit[sha]) {
+					i--
+					break
+				}
+				c.Body += "\n"
+				c.Body += lines[i]
+			}
+			commits = append(commits, c)
 		}
-		commits = append(commits, &Commit{
-			Sha:   split[sha],
-			Title: split[title],
-		})
 	}
 	if len(commits) == 0 {
 		return nil, fmt.Errorf("could not find any commits between %s and %s", baseRef, headRef)
