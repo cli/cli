@@ -309,8 +309,8 @@ func Test_createRun(t *testing.T) {
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
 		{
-			name: "dry-run",
-			tty:  true,
+			name: "dry-run-nontty",
+			tty:  false,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.TitleProvided = true
 				opts.BodyProvided = true
@@ -328,7 +328,34 @@ func Test_createRun(t *testing.T) {
 				`my body`,
 				``,
 			},
-			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+			expectedErrOut: "",
+		},
+		{
+			name: "dry-run-tty",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.DryRun = true
+				return func() {}
+			},
+			expectedOut: heredoc.Doc(`
+				my title
+				
+
+				  my body                                                                     
+				
+				
+			`),
+			// TODO: why?
+			expectedErrOut: heredoc.Doc(`
+
+			Creating pull request for feature into master in OWNER/REPO
+
+		`),
 		},
 		{
 			name: "survey",
