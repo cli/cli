@@ -249,7 +249,7 @@ func TestReposRun(t *testing.T) {
 				WebMode: true,
 			},
 			tty:        true,
-			wantStderr: "Opening github.com/search in your browser.\n",
+			wantStderr: "Opening https://github.com/search in your browser.\n",
 		},
 		{
 			name: "opens browser for web mode notty",
