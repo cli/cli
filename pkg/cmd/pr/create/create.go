@@ -46,6 +46,7 @@ type CreateOptions struct {
 	RepoOverride    string
 
 	Autofill    bool
+	FillVerbose bool
 	FillFirst   bool
 	WebMode     bool
 	RecoverFile string
@@ -121,8 +122,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			By default, users with write access to the base repository can push new commits to the
 			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
 
-			Adding a pull request to projects requires authorization with the "project" scope.
-			To authorize, run "gh auth refresh -s project".
+			Adding a pull request to projects requires authorization with the %[1]sproject%[1]s scope.
+			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
@@ -166,6 +167,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--fill` is not supported with `--fill-first`")
 			}
 
+			if opts.FillVerbose && opts.FillFirst {
+				return cmdutil.FlagErrorf("`--fill-verbose` is not supported with `--fill-first`")
+			}
+
+			if opts.FillVerbose && opts.Autofill {
+				return cmdutil.FlagErrorf("`--fill-verbose` is not supported with `--fill`")
+			}
+
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			if bodyFile != "" {
 				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
@@ -180,8 +189,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--template` is not supported when using `--body` or `--body-file`")
 			}
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !(opts.Autofill || opts.FillFirst) && (!opts.TitleProvided || !opts.BodyProvided) {
-				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `fill-first`) when not running interactively")
+			if !opts.IO.CanPrompt() && !opts.WebMode && !(opts.FillVerbose || opts.Autofill || opts.FillFirst) && (!opts.TitleProvided || !opts.BodyProvided) {
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `fill-first` or `--fillverbose`) when not running interactively")
 			}
 
 			if opts.DryRun && opts.WebMode {
@@ -201,8 +210,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.Body, "body", "b", "", "Body for the pull request")
 	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
-	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
+	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default [current branch])")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
+	fl.BoolVarP(&opts.FillVerbose, "fill-verbose", "", false, "Use commits msg+body for description")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Use commit info for title and body")
 	fl.BoolVar(&opts.FillFirst, "fill-first", false, "Use first commit info for title and body")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
@@ -300,7 +310,7 @@ func createRun(opts *CreateOptions) (err error) {
 			ghrepo.FullName(ctx.BaseRepo))
 	}
 
-	if opts.Autofill || opts.FillFirst || (opts.TitleProvided && opts.BodyProvided) {
+	if opts.FillVerbose || opts.Autofill || opts.FillFirst || (opts.TitleProvided && opts.BodyProvided) {
 		err = handlePush(*opts, *ctx)
 		if err != nil {
 			return
@@ -411,7 +421,9 @@ func createRun(opts *CreateOptions) (err error) {
 	return
 }
 
-func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool) error {
+var regexPattern = regexp.MustCompile(`(?m)^`)
+
+func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool, addBody bool) error {
 	baseRef := ctx.BaseTrackingBranch
 	headRef := ctx.HeadBranch
 	gitClient := ctx.GitClient
@@ -420,19 +432,24 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 	if err != nil {
 		return err
 	}
-	if len(commits) == 1 || useFirstCommit {
-		commitIndex := len(commits) - 1
-		state.Title = commits[commitIndex].Title
-		body, err := gitClient.CommitBody(context.Background(), commits[commitIndex].Sha)
-		if err != nil {
-			return err
-		}
-		state.Body = body
+
+	if useFirstCommit {
+		state.Title = commits[len(commits)-1].Title
+		state.Body = commits[len(commits)-1].Body
 	} else {
 		state.Title = humanize(headRef)
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
-			fmt.Fprintf(&body, "- %s\n", commits[i].Title)
+			fmt.Fprintf(&body, "- **%s**\n", commits[i].Title)
+			if addBody {
+				x := regexPattern.ReplaceAllString(commits[i].Body, "  ")
+				fmt.Fprintf(&body, "%s", x)
+
+				if i > 0 {
+					fmt.Fprintln(&body)
+					fmt.Fprintln(&body)
+				}
+			}
 		}
 		state.Body = body.String()
 	}
@@ -503,9 +520,9 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 		Draft:      opts.IsDraft,
 	}
 
-	if opts.Autofill || opts.FillFirst || !opts.TitleProvided || !opts.BodyProvided {
-		err := initDefaultTitleBody(ctx, state, opts.FillFirst)
-		if err != nil && (opts.Autofill || opts.FillFirst) {
+	if opts.FillVerbose || opts.Autofill || opts.FillFirst || !opts.TitleProvided || !opts.BodyProvided {
+		err := initDefaultTitleBody(ctx, state, opts.FillFirst, opts.FillVerbose)
+		if err != nil && (opts.FillVerbose || opts.Autofill || opts.FillFirst) {
 			return nil, fmt.Errorf("could not compute title or body defaults: %w", err)
 		}
 	}
@@ -667,7 +684,6 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		Client:             client,
 		GitClient:          gitClient,
 	}, nil
-
 }
 
 func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
@@ -786,7 +802,6 @@ func previewPR(opts CreateOptions, openURL string) error {
 		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 	}
 	return opts.Browser.Browse(openURL)
-
 }
 
 func handlePush(opts CreateOptions, ctx CreateContext) error {
@@ -873,7 +888,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
 			defer w.Flush()
 			gitClient := ctx.GitClient
-			ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
+			ref := fmt.Sprintf("HEAD:refs/heads/%s", ctx.HeadBranch)
 			bo := backoff.NewConstantBackOff(2 * time.Second)
 			ctx := context.Background()
 			return backoff.Retry(func() error {

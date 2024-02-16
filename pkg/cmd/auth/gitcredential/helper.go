@@ -14,8 +14,8 @@ import (
 const tokenUser = "x-access-token"
 
 type config interface {
-	Token(string) (string, string)
-	User(string) (string, error)
+	ActiveToken(string) (string, string)
+	ActiveUser(string) (string, error)
 }
 
 type CredentialOptions struct {
@@ -112,16 +112,16 @@ func helperRun(opts *CredentialOptions) error {
 
 	lookupHost := wants["host"]
 	var gotUser string
-	gotToken, source := cfg.Token(lookupHost)
+	gotToken, source := cfg.ActiveToken(lookupHost)
 	if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
 		lookupHost = strings.TrimPrefix(lookupHost, "gist.")
-		gotToken, source = cfg.Token(lookupHost)
+		gotToken, source = cfg.ActiveToken(lookupHost)
 	}
 
 	if strings.HasSuffix(source, "_TOKEN") {
 		gotUser = tokenUser
 	} else {
-		gotUser, _ = cfg.User(lookupHost)
+		gotUser, _ = cfg.ActiveUser(lookupHost)
 		if gotUser == "" {
 			gotUser = tokenUser
 		}

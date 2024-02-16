@@ -227,8 +227,14 @@ func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+func isGitSha(s string) bool {
+	shaRegex := regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
+	ret := shaRegex.MatchString(s)
+	return ret
+}
+
 func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commit, error) {
-	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
+	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s,%b", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
@@ -240,15 +246,39 @@ func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commi
 	commits := []*Commit{}
 	sha := 0
 	title := 1
-	for _, line := range outputLines(out) {
-		split := strings.SplitN(line, ",", 2)
-		if len(split) != 2 {
-			continue
+	body := 2
+	lines := outputLines(out)
+	for i := 0; i < len(lines); i++ {
+		split := strings.SplitN(lines[i], ",", 3)
+		if isGitSha(split[sha]) {
+			c := &Commit{
+				Sha:   split[sha],
+				Title: split[title],
+			}
+
+			if len(split) == 2 {
+				commits = append(commits, c)
+				continue
+			}
+
+			c.Body = split[body]
+			// This consumes all lines until the next commit and adds them to the body.
+			for {
+				i++
+				if i >= len(lines) {
+					break
+				}
+
+				possibleSplit := strings.SplitN(lines[i], ",", 3)
+				if len(possibleSplit) > 2 && isGitSha(possibleSplit[sha]) {
+					i--
+					break
+				}
+				c.Body += "\n"
+				c.Body += lines[i]
+			}
+			commits = append(commits, c)
 		}
-		commits = append(commits, &Commit{
-			Sha:   split[sha],
-			Title: split[title],
-		})
 	}
 	if len(commits) == 0 {
 		return nil, fmt.Errorf("could not find any commits between %s and %s", baseRef, headRef)
@@ -472,6 +502,39 @@ func (c *Client) SetRemoteBranches(ctx context.Context, remote string, refspec s
 	return nil
 }
 
+func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBranches []string) (*Remote, error) {
+	args := []string{"remote", "add"}
+	for _, branch := range trackingBranches {
+		args = append(args, "-t", branch)
+	}
+	args = append(args, name, urlStr)
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := cmd.Output(); err != nil {
+		return nil, err
+	}
+	var urlParsed *url.URL
+	if strings.HasPrefix(urlStr, "https") {
+		urlParsed, err = url.Parse(urlStr)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		urlParsed, err = ParseURL(urlStr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	remote := &Remote{
+		Name:     name,
+		FetchURL: urlParsed,
+		PushURL:  urlParsed,
+	}
+	return remote, nil
+}
+
 // Below are commands that make network calls and need authentication credentials supplied from gh.
 
 func (c *Client) Fetch(ctx context.Context, remote string, refspec string, mods ...CommandModifier) error {
@@ -539,42 +602,6 @@ func (c *Client) Clone(ctx context.Context, cloneURL string, args []string, mods
 		return "", err
 	}
 	return target, nil
-}
-
-func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBranches []string, mods ...CommandModifier) (*Remote, error) {
-	args := []string{"remote", "add"}
-	for _, branch := range trackingBranches {
-		args = append(args, "-t", branch)
-	}
-	args = append(args, name, urlStr)
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return nil, err
-	}
-	for _, mod := range mods {
-		mod(cmd)
-	}
-	if _, err := cmd.Output(); err != nil {
-		return nil, err
-	}
-	var urlParsed *url.URL
-	if strings.HasPrefix(urlStr, "https") {
-		urlParsed, err = url.Parse(urlStr)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		urlParsed, err = ParseURL(urlStr)
-		if err != nil {
-			return nil, err
-		}
-	}
-	remote := &Remote{
-		Name:     name,
-		FetchURL: urlParsed,
-		PushURL:  urlParsed,
-	}
-	return remote, nil
 }
 
 func resolveGitPath() (string, error) {

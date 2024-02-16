@@ -78,17 +78,17 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "merge [<number> | <url> | <branch>]",
 		Short: "Merge a pull request",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Merge a pull request on GitHub.
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
 
 			When targeting a branch that requires a merge queue, no merge strategy is required.
-			If required checks have not yet passed, AutoMerge will be enabled.
+			If required checks have not yet passed, auto-merge will be enabled.
 			If required checks have passed, the pull request will be added to the merge queue.
-			To bypass a merge queue and merge directly, pass the '--admin' flag.
-    	`),
+			To bypass a merge queue and merge directly, pass the %[1]s--admin%[1]s flag.
+    	`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
@@ -301,6 +301,8 @@ func (m *mergeContext) merge() error {
 			if !m.opts.IO.CanPrompt() {
 				return cmdutil.FlagErrorf("--merge, --rebase, or --squash required when not running interactively")
 			}
+
+			_ = m.infof("Merging pull request #%d (%s)\n", m.pr.Number, m.pr.Title)
 
 			apiClient := api.NewClientFromHTTP(m.httpClient)
 			r, err := api.GitHubRepo(apiClient, m.baseRepo)

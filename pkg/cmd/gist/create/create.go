@@ -50,14 +50,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create [<filename>... | -]",
 		Short: "Create a new gist",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Create a new GitHub gist with given contents.
 
-			Gists can be created from one or multiple files. Alternatively, pass "-" as
+			Gists can be created from one or multiple files. Alternatively, pass %[1]s-%[1]s as
 			file name to read from standard input.
 
-			By default, gists are secret; use '--public' to make publicly listed ones.
-		`),
+			By default, gists are secret; use %[1]s--public%[1]s to make publicly listed ones.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# publish file 'hello.py' as a public gist
 			$ gh gist create --public hello.py
@@ -96,7 +96,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().StringVarP(&opts.Description, "desc", "d", "", "A description for this gist")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser with created gist")
-	cmd.Flags().BoolVarP(&opts.Public, "public", "p", false, "List the gist publicly (default: secret)")
+	cmd.Flags().BoolVarP(&opts.Public, "public", "p", false, "List the gist publicly (default \"secret\")")
 	cmd.Flags().StringVarP(&opts.FilenameOverride, "filename", "f", "", "Provide a filename to be used when reading from standard input")
 	return cmd
 }

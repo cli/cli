@@ -1,8 +1,10 @@
 package shared
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPreciseAgo(t *testing.T) {
@@ -101,6 +104,100 @@ func TestRun_Duration(t *testing.T) {
 			var r Run
 			assert.NoError(t, json.Unmarshal([]byte(tt.json), &r))
 			assert.Equal(t, tt.wants, r.Duration(now).String())
+		})
+	}
+}
+
+func TestRunExportData(t *testing.T) {
+	oldestStartedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:20:13Z")
+	oldestCompletedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:21:16Z")
+	newestStartedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:20:55Z")
+	newestCompletedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:23:16Z")
+
+	tests := []struct {
+		name   string
+		fields []string
+		run    Run
+		output string
+	}{
+		{
+			name:   "exports workflow run's single job",
+			fields: []string{"jobs"},
+			run: Run{
+				Jobs: []Job{
+					{
+						ID:         123456,
+						Status:     "completed",
+						Conclusion: "success",
+						Name:       "macos",
+						Steps: []Step{
+							{
+								Name:       "Checkout",
+								Status:     "completed",
+								Conclusion: "success",
+								Number:     1,
+							},
+						},
+						StartedAt:   oldestStartedAt,
+						CompletedAt: oldestCompletedAt,
+						URL:         "https://example.com/OWNER/REPO/actions/runs/123456",
+					},
+				},
+			},
+			output: `{"jobs":[{"completedAt":"2022-07-20T11:21:16Z","conclusion":"success","databaseId":123456,"name":"macos","startedAt":"2022-07-20T11:20:13Z","status":"completed","steps":[{"conclusion":"success","name":"Checkout","number":1,"status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/123456"}]}`,
+		},
+		{
+			name:   "exports workflow run's multiple jobs",
+			fields: []string{"jobs"},
+			run: Run{
+				Jobs: []Job{
+					{
+						ID:         123456,
+						Status:     "completed",
+						Conclusion: "success",
+						Name:       "macos",
+						Steps: []Step{
+							{
+								Name:       "Checkout",
+								Status:     "completed",
+								Conclusion: "success",
+								Number:     1,
+							},
+						},
+						StartedAt:   oldestStartedAt,
+						CompletedAt: oldestCompletedAt,
+						URL:         "https://example.com/OWNER/REPO/actions/runs/123456",
+					},
+					{
+						ID:         234567,
+						Status:     "completed",
+						Conclusion: "error",
+						Name:       "windows",
+						Steps: []Step{
+							{
+								Name:       "Checkout",
+								Status:     "completed",
+								Conclusion: "error",
+								Number:     2,
+							},
+						},
+						StartedAt:   newestStartedAt,
+						CompletedAt: newestCompletedAt,
+						URL:         "https://example.com/OWNER/REPO/actions/runs/234567",
+					},
+				},
+			},
+			output: `{"jobs":[{"completedAt":"2022-07-20T11:21:16Z","conclusion":"success","databaseId":123456,"name":"macos","startedAt":"2022-07-20T11:20:13Z","status":"completed","steps":[{"conclusion":"success","name":"Checkout","number":1,"status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/123456"},{"completedAt":"2022-07-20T11:23:16Z","conclusion":"error","databaseId":234567,"name":"windows","startedAt":"2022-07-20T11:20:55Z","status":"completed","steps":[{"conclusion":"error","name":"Checkout","number":2,"status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/234567"}]}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exported := tt.run.ExportData(tt.fields)
+			buf := bytes.Buffer{}
+			enc := json.NewEncoder(&buf)
+			require.NoError(t, enc.Encode(exported))
+			assert.Equal(t, tt.output, strings.TrimSpace(buf.String()))
 		})
 	}
 }

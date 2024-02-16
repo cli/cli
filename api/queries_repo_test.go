@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGitHubRepo_notFound(t *testing.T) {
@@ -536,4 +538,31 @@ func TestRepoExists(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestForkRepoReturnsErrorWhenForkIsNotPossible(t *testing.T) {
+	// Given our API returns 202 with a Fork that is the same as
+	// the repo we provided
+	repoName := "test-repo"
+	ownerLogin := "test-owner"
+	stubbedForkResponse := repositoryV3{
+		Name: repoName,
+		Owner: struct{ Login string }{
+			Login: ownerLogin,
+		},
+	}
+
+	reg := &httpmock.Registry{}
+	reg.Register(
+		httpmock.REST("POST", fmt.Sprintf("repos/%s/%s/forks", ownerLogin, repoName)),
+		httpmock.StatusJSONResponse(202, stubbedForkResponse),
+	)
+
+	client := newTestClient(reg)
+
+	// When we fork the repo
+	_, err := ForkRepo(client, ghrepo.New(ownerLogin, repoName), ownerLogin, "", false)
+
+	// Then it provides a useful error message
+	require.Equal(t, fmt.Errorf("%s/%s cannot be forked. A single user account cannot own both a parent and fork.", ownerLogin, repoName), err)
 }

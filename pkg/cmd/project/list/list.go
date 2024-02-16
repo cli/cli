@@ -15,11 +15,11 @@ import (
 )
 
 type listOpts struct {
-	limit  int
-	web    bool
-	owner  string
-	closed bool
-	format string
+	limit    int
+	web      bool
+	owner    string
+	closed   bool
+	exporter cmdutil.Exporter
 }
 
 type listConfig struct {
@@ -69,7 +69,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner")
 	listCmd.Flags().BoolVarP(&opts.closed, "closed", "", false, "Include closed projects")
 	listCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open projects list in the browser")
-	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(listCmd, &opts.exporter)
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of projects to fetch")
 
 	return listCmd
@@ -97,14 +97,14 @@ func runList(config listConfig) error {
 		return err
 	}
 
-	projects, totalCount, err := config.client.Projects(config.opts.owner, owner.Type, config.opts.limit, false)
+	projects, err := config.client.Projects(config.opts.owner, owner.Type, config.opts.limit, false)
 	if err != nil {
 		return err
 	}
 	projects = filterProjects(projects, config)
 
-	if config.opts.format == "json" {
-		return printJSON(config, projects, totalCount)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, projects)
 	}
 
 	return printResults(config, projects, owner.Login)
@@ -138,47 +138,41 @@ func buildURL(config listConfig) (string, error) {
 	return url, nil
 }
 
-func filterProjects(nodes []queries.Project, config listConfig) []queries.Project {
-	projects := make([]queries.Project, 0, len(nodes))
-	for _, p := range nodes {
-		if !config.opts.closed && p.Closed {
+func filterProjects(nodes queries.Projects, config listConfig) queries.Projects {
+	filtered := queries.Projects{
+		Nodes:      make([]queries.Project, 0, len(nodes.Nodes)),
+		TotalCount: nodes.TotalCount,
+	}
+	for _, project := range nodes.Nodes {
+		if !config.opts.closed && project.Closed {
 			continue
 		}
-		projects = append(projects, p)
+		filtered.Nodes = append(filtered.Nodes, project)
 	}
-	return projects
+	return filtered
 }
 
-func printResults(config listConfig, projects []queries.Project, owner string) error {
-	if len(projects) == 0 {
+func printResults(config listConfig, projects queries.Projects, owner string) error {
+	if len(projects.Nodes) == 0 {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("No projects found for %s", owner))
 	}
 
 	tp := tableprinter.New(config.io, tableprinter.WithHeader("Number", "Title", "State", "ID"))
 
-	for _, p := range projects {
-		tp.AddField(strconv.Itoa(int(p.Number)), tableprinter.WithTruncate(nil))
+	cs := config.io.ColorScheme()
+	for _, p := range projects.Nodes {
+		tp.AddField(
+			strconv.Itoa(int(p.Number)),
+			tableprinter.WithTruncate(nil),
+		)
 		tp.AddField(p.Title)
-		var state string
-		if p.Closed {
-			state = "closed"
-		} else {
-			state = "open"
-		}
-		tp.AddField(state)
+		tp.AddField(
+			format.ProjectState(p),
+			tableprinter.WithColor(cs.ColorFromString(format.ColorForProjectState(p))),
+		)
 		tp.AddField(p.ID, tableprinter.WithTruncate(nil))
 		tp.EndRow()
 	}
 
 	return tp.Render()
-}
-
-func printJSON(config listConfig, projects []queries.Project, totalCount int) error {
-	b, err := format.JSONProjects(projects, totalCount)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
 }

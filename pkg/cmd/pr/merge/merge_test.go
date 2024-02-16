@@ -1275,7 +1275,7 @@ func TestPRMergeTTY(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	assert.Equal(t, "✓ Merged pull request #3 (It was the best of times)\n", output.Stderr())
+	assert.Equal(t, "Merging pull request #3 (It was the best of times)\n✓ Merged pull request #3 (It was the best of times)\n", output.Stderr())
 }
 
 func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
@@ -1346,6 +1346,7 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
+		Merging pull request #3 (It was the best of times)
 		✓ Merged pull request #3 (It was the best of times)
 		✓ Deleted local branch blueberries and switched to branch main
 		✓ Deleted remote branch blueberries
@@ -1437,7 +1438,7 @@ func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "✓ Squashed and merged pull request #123 (title)\n", stderr.String())
+	assert.Equal(t, "Merging pull request #123 (title)\n✓ Squashed and merged pull request #123 (title)\n", stderr.String())
 }
 
 func TestPRMergeEmptyStrategyNonTTY(t *testing.T) {
@@ -1473,7 +1474,7 @@ func TestPRTTY_cancelled(t *testing.T) {
 
 	shared.RunCommandFinder(
 		"",
-		&api.PullRequest{ID: "THE-ID", Number: 123, MergeStateStatus: "CLEAN"},
+		&api.PullRequest{ID: "THE-ID", Number: 123, Title: "title", MergeStateStatus: "CLEAN"},
 		ghrepo.New("OWNER", "REPO"),
 	)
 
@@ -1516,7 +1517,7 @@ func TestPRTTY_cancelled(t *testing.T) {
 		t.Fatalf("got error %v", err)
 	}
 
-	assert.Equal(t, "Cancelled.\n", output.Stderr())
+	assert.Equal(t, "Merging pull request #123 (title)\nCancelled.\n", output.Stderr())
 }
 
 func Test_mergeMethodSurvey(t *testing.T) {
@@ -1866,7 +1867,7 @@ func TestPrAddToMergeQueueAdmin(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Merged pull request #1 (The title of the PR)\n", output.Stderr())
+	assert.Equal(t, "Merging pull request #1 (The title of the PR)\n✓ Merged pull request #1 (The title of the PR)\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueAdminWithMergeStrategy(t *testing.T) {

@@ -34,7 +34,7 @@ func newCmdClone(f *cmdutil.Factory, runF func(*cloneOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "clone <source-repository>",
 		Short: "Clones labels from one repository to another",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Clones labels from a source repository to a destination repository on GitHub.
 			By default, the destination repository is the current repository.
 
@@ -44,8 +44,8 @@ func newCmdClone(f *cmdutil.Factory, runF func(*cloneOptions) error) *cobra.Comm
 
 			Labels from the source repository that already exist in the destination
 			repository will be skipped. You can overwrite existing labels in the
-			destination repository using the --force flag.
-		`),
+			destination repository using the %[1]s--force%[1]s flag.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# clone and overwrite labels from cli/cli repository into the current repository
 			$ gh label clone cli/cli --force

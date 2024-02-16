@@ -13,7 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_NewCmdRefresh(t *testing.T) {
@@ -142,7 +142,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 			ios.SetNeverPrompt(tt.neverPrompt)
 
 			argv, err := shlex.Split(tt.cli)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var gotOpts *RefreshOptions
 			cmd := NewCmdRefresh(f, func(opts *RefreshOptions) error {
@@ -159,12 +159,12 @@ func Test_NewCmdRefresh(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
-			assert.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
+			require.NoError(t, err)
+			require.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
+			require.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
 		})
 	}
 }
@@ -176,13 +176,19 @@ type authArgs struct {
 	secureStorage bool
 }
 
+type authOut struct {
+	username string
+	token    string
+	err      error
+}
+
 func Test_refreshRun(t *testing.T) {
 	tests := []struct {
 		name          string
 		opts          *RefreshOptions
 		prompterStubs func(*prompter.PrompterMock)
 		cfgHosts      []string
-		config        config.Config
+		authOut       authOut
 		oldScopes     string
 		wantErr       string
 		nontty        bool
@@ -194,7 +200,7 @@ func Test_refreshRun(t *testing.T) {
 			wantErr: `not logged in to any hosts`,
 		},
 		{
-			name: "hostname given but dne",
+			name: "hostname given but not previously authenticated with it",
 			cfgHosts: []string{
 				"github.com",
 				"aline.cedrac",
@@ -404,26 +410,36 @@ func Test_refreshRun(t *testing.T) {
 				secureStorage: true,
 			},
 		},
+		{
+			name: "errors when active user does not match user returned by auth flow",
+			cfgHosts: []string{
+				"github.com",
+			},
+			authOut: authOut{
+				username: "not-test-user",
+				token:    "xyz456",
+			},
+			opts:    &RefreshOptions{},
+			wantErr: "error refreshing credentials for test-user, received credentials for not-test-user, did you use the correct account in the browser?",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			tt.opts.AuthFlow = func(_ *config.AuthConfig, _ *iostreams.IOStreams, hostname string, scopes []string, interactive, secureStorage bool) error {
+			tt.opts.AuthFlow = func(_ *iostreams.IOStreams, hostname string, scopes []string, interactive bool) (token, username, error) {
 				aa.hostname = hostname
 				aa.scopes = scopes
 				aa.interactive = interactive
-				aa.secureStorage = secureStorage
-				return nil
+				if tt.authOut != (authOut{}) {
+					return token(tt.authOut.token), username(tt.authOut.username), tt.authOut.err
+				}
+				return token("xyz456"), username("test-user"), nil
 			}
 
-			var cfg config.Config
-			if tt.config != nil {
-				cfg = tt.config
-			} else {
-				cfg = config.NewFromString("")
-				for _, hostname := range tt.cfgHosts {
-					cfg.Set(hostname, "oauth_token", "abc123")
-				}
+			cfg, _ := config.NewIsolatedTestConfig(t)
+			for _, hostname := range tt.cfgHosts {
+				_, err := cfg.Authentication().Login(hostname, "test-user", "abc123", "https", false)
+				require.NoError(t, err)
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
@@ -462,17 +478,21 @@ func Test_refreshRun(t *testing.T) {
 
 			err := refreshRun(tt.opts)
 			if tt.wantErr != "" {
-				if assert.Error(t, err) {
-					assert.Contains(t, err.Error(), tt.wantErr)
-				}
-			} else {
-				assert.NoError(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+				return
 			}
 
-			assert.Equal(t, tt.wantAuthArgs.hostname, aa.hostname)
-			assert.Equal(t, tt.wantAuthArgs.scopes, aa.scopes)
-			assert.Equal(t, tt.wantAuthArgs.interactive, aa.interactive)
-			assert.Equal(t, tt.wantAuthArgs.secureStorage, aa.secureStorage)
+			require.NoError(t, err)
+
+			require.Equal(t, tt.wantAuthArgs.hostname, aa.hostname)
+			require.Equal(t, tt.wantAuthArgs.scopes, aa.scopes)
+			require.Equal(t, tt.wantAuthArgs.interactive, aa.interactive)
+
+			authCfg := cfg.Authentication()
+			activeUser, _ := authCfg.ActiveUser(aa.hostname)
+			activeToken, _ := authCfg.ActiveToken(aa.hostname)
+			require.Equal(t, "test-user", activeUser)
+			require.Equal(t, "xyz456", activeToken)
 		})
 	}
 }

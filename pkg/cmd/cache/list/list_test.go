@@ -30,6 +30,7 @@ func TestNewCmdList(t *testing.T) {
 				Limit: 30,
 				Order: "desc",
 				Sort:  "last_accessed_at",
+				Key:   "",
 			},
 		},
 		{
@@ -39,6 +40,7 @@ func TestNewCmdList(t *testing.T) {
 				Limit: 100,
 				Order: "desc",
 				Sort:  "last_accessed_at",
+				Key:   "",
 			},
 		},
 		{
@@ -53,6 +55,7 @@ func TestNewCmdList(t *testing.T) {
 				Limit: 30,
 				Order: "desc",
 				Sort:  "created_at",
+				Key:   "",
 			},
 		},
 		{
@@ -62,6 +65,17 @@ func TestNewCmdList(t *testing.T) {
 				Limit: 30,
 				Order: "asc",
 				Sort:  "last_accessed_at",
+				Key:   "",
+			},
+		},
+		{
+			name:  "with key",
+			input: "--key cache-key-prefix-",
+			wants: ListOptions{
+				Limit: 30,
+				Order: "desc",
+				Sort:  "last_accessed_at",
+				Key:   "cache-key-prefix-",
 			},
 		},
 	}
@@ -90,6 +104,7 @@ func TestNewCmdList(t *testing.T) {
 			assert.Equal(t, tt.wants.Limit, gotOpts.Limit)
 			assert.Equal(t, tt.wants.Sort, gotOpts.Sort)
 			assert.Equal(t, tt.wants.Order, gotOpts.Order)
+			assert.Equal(t, tt.wants.Key, gotOpts.Key)
 		})
 	}
 }
@@ -170,6 +185,26 @@ ID  KEY  SIZE      CREATED            ACCESSED
 				)
 			},
 			wantStdout: "1\tfoo\t100 B\t2021-01-01T01:01:01Z\t2022-01-01T01:01:01Z\n2\tbar\t1.00 KiB\t2021-01-01T01:01:01Z\t2022-01-01T01:01:01Z\n",
+		},
+		{
+			name: "only requests caches with the provided key prefix",
+			opts: ListOptions{
+				Key: "test-key",
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					func(req *http.Request) bool {
+						return req.URL.Query().Get("key") == "test-key"
+					},
+					httpmock.JSONResponse(shared.CachePayload{
+						ActionsCaches: []shared.Cache{},
+						TotalCount:    0,
+					}))
+			},
+			// We could put anything here, we're really asserting that the key is passed
+			// to the API.
+			wantErr:    true,
+			wantErrMsg: "No caches found in OWNER/REPO",
 		},
 		{
 			name: "displays no results",

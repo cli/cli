@@ -25,6 +25,10 @@ func (c tinyConfig) Login(host, username, token, gitProtocol string, encrypt boo
 	return false, nil
 }
 
+func (c tinyConfig) UsersForHost(hostname string) []string {
+	return nil
+}
+
 func TestLogin_ssh(t *testing.T) {
 	dir := t.TempDir()
 	ios, _, stdout, stderr := iostreams.Test()
@@ -48,7 +52,7 @@ func TestLogin_ssh(t *testing.T) {
 	pm := &prompter.PrompterMock{}
 	pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 		switch prompt {
-		case "What is your preferred protocol for Git operations?":
+		case "What is your preferred protocol for Git operations on this host?":
 			return prompter.IndexFor(opts, "SSH")
 		case "How would you like to authenticate GitHub CLI?":
 			return prompter.IndexFor(opts, "Paste an authentication token")

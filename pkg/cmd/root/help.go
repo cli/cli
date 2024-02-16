@@ -131,6 +131,10 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	}
 	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
 
+	if len(command.Aliases) > 0 {
+		helpEntries = append(helpEntries, helpEntry{"ALIASES", strings.Join(command.Aliases, "\n")})
+	}
+
 	for _, g := range GroupedCommands(command) {
 		var names []string
 		for _, c := range g.Commands {
@@ -171,9 +175,10 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	if _, ok := command.Annotations["help:environment"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"ENVIRONMENT VARIABLES", command.Annotations["help:environment"]})
 	}
-	helpEntries = append(helpEntries, helpEntry{"LEARN MORE", `
-Use 'gh <command> <subcommand> --help' for more information about a command.
-Read the manual at https://cli.github.com/manual`})
+	helpEntries = append(helpEntries, helpEntry{"LEARN MORE", heredoc.Docf(`
+		Use %[1]sgh <command> <subcommand> --help%[1]s for more information about a command.
+		Read the manual at https://cli.github.com/manual
+	`, "`")})
 
 	out := f.IOStreams.Out
 	for _, e := range helpEntries {

@@ -7,7 +7,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -30,7 +29,7 @@ type editItemOpts struct {
 	iterationID          string
 	clear                bool
 	// format
-	format string
+	exporter cmdutil.Exporter
 }
 
 type editItemConfig struct {
@@ -62,13 +61,13 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	editItemCmd := &cobra.Command{
 		Use:   "item-edit",
 		Short: "Edit an item in a project",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Edit either a draft issue or a project item. Both usages require the ID of the item to edit.
 			
 			For non-draft issues, the ID of the project is also required, and only a single field value can be updated per invocation.
 
-			Remove project item field value using "--clear" flag.
-		`),
+			Remove project item field value using %[1]s--clear%[1]s flag.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# edit an item's text field value
 			gh project item-edit --id <item-ID> --field-id <field-ID> --project-id <project-ID> --text "new text"
@@ -116,7 +115,7 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	}
 
 	editItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to edit")
-	cmdutil.StringEnumFlag(editItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(editItemCmd, &opts.exporter)
 
 	editItemCmd.Flags().StringVar(&opts.title, "title", "", "Title of the draft issue item")
 	editItemCmd.Flags().StringVar(&opts.body, "body", "", "Body of the draft issue item")
@@ -219,31 +218,12 @@ func printDraftIssueResults(config editItemConfig, item queries.DraftIssue) erro
 	return err
 }
 
-func printDraftIssueJSON(config editItemConfig, item queries.DraftIssue) error {
-	b, err := format.JSONProjectDraftIssue(item)
-	if err != nil {
-		return err
-	}
-	_, err = config.io.Out.Write(b)
-	return err
-}
-
 func printItemResults(config editItemConfig, item *queries.ProjectItem) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}
 	_, err := fmt.Fprintf(config.io.Out, "Edited item %q\n", item.Title())
 	return err
-}
-
-func printItemJSON(config editItemConfig, item *queries.ProjectItem) error {
-	b, err := format.JSONProjectItem(*item)
-	if err != nil {
-		return err
-	}
-	_, err = config.io.Out.Write(b)
-	return err
-
 }
 
 func clearItemFieldValue(config editItemConfig) error {
@@ -256,8 +236,8 @@ func clearItemFieldValue(config editItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printItemJSON(config, &query.Clear.Item)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, &query.Clear.Item)
 	}
 
 	return printItemResults(config, &query.Clear.Item)
@@ -275,8 +255,8 @@ func updateDraftIssue(config editItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printDraftIssueJSON(config, query.UpdateProjectV2DraftIssue.DraftIssue)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.UpdateProjectV2DraftIssue.DraftIssue)
 	}
 
 	return printDraftIssueResults(config, query.UpdateProjectV2DraftIssue.DraftIssue)
@@ -302,8 +282,8 @@ func updateItemValues(config editItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printItemJSON(config, &query.Update.Item)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, &query.Update.Item)
 	}
 
 	return printItemResults(config, &query.Update.Item)

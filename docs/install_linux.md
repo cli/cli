@@ -105,7 +105,7 @@ There are [so many issues with Snap](https://github.com/casperdcl/cli/issues/7) 
 
 ### Arch Linux
 
-Arch Linux users can install from the [community repo][arch linux repo]:
+Arch Linux users can install from the [extra repo][arch linux repo]:
 
 ```bash
 sudo pacman -S github-cli
@@ -234,6 +234,6 @@ sudo xbps-install github-cli
 ```
 
 [releases page]: https://github.com/cli/cli/releases/latest
-[arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
+[arch linux repo]: https://www.archlinux.org/packages/extra/x86_64/github-cli
 [arch linux aur]: https://aur.archlinux.org/packages/github-cli-git
 [^1]: https://wiki.alpinelinux.org/wiki/Package_management#Repository_pinning

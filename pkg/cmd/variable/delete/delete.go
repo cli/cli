@@ -37,9 +37,9 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		Short: "Delete variables",
 		Long: heredoc.Doc(`
 			Delete a variable on one of the following levels:
-			- repository (default): available to Actions runs or Dependabot in a repository
-			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs or Dependabot within an organization
+			- repository (default): available to GitHub Actions runs or Dependabot in a repository
+			- environment: available to GitHub Actions runs for a deployment environment in a repository
+			- organization: available to GitHub Actions runs or Dependabot within an organization
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -126,7 +126,7 @@ func removeRun(opts *DeleteOptions) error {
 		if envName != "" {
 			fmt.Fprintf(opts.IO.Out, "%s Deleted variable %s from %s environment on %s\n", cs.SuccessIconWithColor(cs.Red), opts.VariableName, envName, target)
 		} else {
-			fmt.Fprintf(opts.IO.Out, "%s Deleted Actions variable %s from %s\n", cs.SuccessIconWithColor(cs.Red), opts.VariableName, target)
+			fmt.Fprintf(opts.IO.Out, "%s Deleted variable %s from %s\n", cs.SuccessIconWithColor(cs.Red), opts.VariableName, target)
 		}
 	}
 

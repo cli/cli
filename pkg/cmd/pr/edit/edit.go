@@ -47,15 +47,15 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "edit [<number> | <url> | <branch>]",
 		Short: "Edit a pull request",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Edit a pull request.
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
 
-			Editing a pull request's projects requires authorization with the "project" scope.
-			To authorize, run "gh auth refresh -s project".
-		`),
+			Editing a pull request's projects requires authorization with the %[1]sproject%[1]s scope.
+			To authorize, run %[1]sgh auth refresh -s project%[1]s.
+		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh pr edit 23 --add-label "bug,help wanted" --remove-label "core"

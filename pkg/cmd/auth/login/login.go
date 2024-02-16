@@ -53,32 +53,37 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "login",
 		Args:  cobra.ExactArgs(0),
-		Short: "Authenticate with a GitHub host",
+		Short: "Log in to a GitHub account",
 		Long: heredoc.Docf(`
 			Authenticate with a GitHub host.
 
 			The default authentication mode is a web-based browser flow. After completion, an
 			authentication token will be stored securely in the system credential store.
-			If a credential store is not found or there is an issue using it gh will fallback to writing the token to a plain text file.
-			See %[1]sgh auth status%[1]s for its stored location.
+			If a credential store is not found or there is an issue using it gh will fallback
+			to writing the token to a plain text file. See %[1]sgh auth status%[1]s for its
+			stored location.
 
 			Alternatively, use %[1]s--with-token%[1]s to pass in a token on standard input.
-			The minimum required scopes for the token are: "repo", "read:org".
+			The minimum required scopes for the token are: %[1]srepo%[1]s, %[1]sread:org%[1]s, and %[1]sgist%[1]s.
 
 			Alternatively, gh will use the authentication token found in environment variables.
 			This method is most suitable for "headless" use of gh such as in automation. See
 			%[1]sgh help environment%[1]s for more info.
 
-			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to "env".
+			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to %[1]senv%[1]s.
+
+			The git protocol to use for git operations on this host can be set with %[1]s--git-protocol%[1]s,
+			or during the interactive prompting. Although login is for a single account on a host, setting
+			the git protocol will take effect for all users on the host.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# start interactive setup
+			# Start interactive setup
 			$ gh auth login
 
-			# authenticate against github.com by reading the token from a file
+			# Authenticate against github.com by reading the token from a file
 			$ gh auth login --with-token < mytoken.txt
 
-			# authenticate with a specific GitHub instance
+			# Authenticate with specific host
 			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -125,7 +130,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes to request")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
-	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
+	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations on this host")
 
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
@@ -173,22 +178,14 @@ func loginRun(opts *LoginOptions) error {
 		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
-		// Adding a user key ensures that a nonempty host section gets written to the config file.
-		_, loginErr := authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
-		return loginErr
-	}
-
-	existingToken, _ := authCfg.Token(hostname)
-	if existingToken != "" && opts.Interactive {
-		if err := shared.HasMinimumScopes(httpClient, hostname, existingToken); err == nil {
-			keepGoing, err := opts.Prompter.Confirm(fmt.Sprintf("You're already logged into %s. Do you want to re-authenticate?", hostname), false)
-			if err != nil {
-				return err
-			}
-			if !keepGoing {
-				return nil
-			}
+		username, err := shared.GetCurrentLogin(httpClient, hostname, opts.Token)
+		if err != nil {
+			return fmt.Errorf("error retrieving current user: %w", err)
 		}
+
+		// Adding a user key ensures that a nonempty host section gets written to the config file.
+		_, loginErr := authCfg.Login(hostname, username, opts.Token, opts.GitProtocol, !opts.InsecureStorage)
+		return loginErr
 	}
 
 	return shared.Login(&shared.LoginOptions{

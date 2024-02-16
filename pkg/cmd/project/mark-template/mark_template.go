@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -19,7 +18,7 @@ type markTemplateOpts struct {
 	undo      bool
 	number    int32
 	projectID string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type markTemplateConfig struct {
@@ -82,7 +81,7 @@ func NewCmdMarkTemplate(f *cmdutil.Factory, runF func(config markTemplateConfig)
 
 	markTemplateCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the org owner.")
 	markTemplateCmd.Flags().BoolVar(&opts.undo, "undo", false, "Unmark the project as a template.")
-	cmdutil.StringEnumFlag(markTemplateCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(markTemplateCmd, &opts.exporter)
 
 	return markTemplateCmd
 }
@@ -107,8 +106,8 @@ func runMarkTemplate(config markTemplateConfig) error {
 			return err
 		}
 
-		if config.opts.format == "json" {
-			return printJSON(config, *project)
+		if config.opts.exporter != nil {
+			return config.opts.exporter.Write(config.io, *project)
 		}
 
 		return printResults(config, query.TemplateProject.Project)
@@ -120,8 +119,8 @@ func runMarkTemplate(config markTemplateConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, *project)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.TemplateProject.Project)
 	}
 
 	return printResults(config, query.TemplateProject.Project)
@@ -162,15 +161,5 @@ func printResults(config markTemplateConfig, project queries.Project) error {
 	}
 
 	_, err := fmt.Fprintf(config.io.Out, "Marked project %d as a template.\n", project.Number)
-	return err
-}
-
-func printJSON(config markTemplateConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
 	return err
 }

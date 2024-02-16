@@ -101,7 +101,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 		Long: heredoc.Docf(`
 			Edit repository settings.
 
-			To toggle a setting off, use the %[1]s--flag=false%[1]s syntax.
+			To toggle a setting off, use the %[1]s--<flag>=false%[1]s syntax.
 
 			Note that changing repository visibility to private will cause loss of stars and watchers.
 		`, "`"),

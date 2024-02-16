@@ -42,14 +42,14 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "view [<number> | <url> | <branch>]",
 		Short: "View a pull request",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Display the title, body, and other information about a pull request.
 
 			Without an argument, the pull request that belongs to the current branch
 			is displayed.
 
-			With '--web', open the pull request in a web browser instead.
-		`),
+			With %[1]s--web%[1]s flag, open the pull request in a web browser instead.
+		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
@@ -439,6 +439,9 @@ func prProjectList(pr api.PullRequest) string {
 
 	projectNames := make([]string, 0, len(pr.ProjectCards.Nodes))
 	for _, project := range pr.ProjectCards.Nodes {
+		if project == nil {
+			continue
+		}
 		colName := project.Column.Name
 		if colName == "" {
 			colName = "Awaiting triage"
