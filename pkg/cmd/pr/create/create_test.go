@@ -1004,14 +1004,9 @@ func Test_createRun(t *testing.T) {
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(
-					"git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature",
+					"git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry origin/master...feature",
 					0,
-					"343jdfe47c9e3a30093cd17e48934ce354148e80,first commit of pr\n\nfirst commit description\n",
-				)
-				cs.Register(
-					"git -c log.ShowSignature=false show -s --pretty=format:%b 343jdfe47c9e3a30093cd17e48934ce354148e80",
-					0,
-					"first commit description",
+					"3a9b48085046d156c5acce8f3b3a0532cd706a4a,first commit of pr,first commit description\n",
 				)
 				cs.Register(`git rev-parse --show-toplevel`, 0, "")
 			},
