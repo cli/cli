@@ -291,7 +291,7 @@ func createRun(opts *CreateOptions) (err error) {
 	if err != nil && !errors.As(err, &notFound) {
 		return fmt.Errorf("error checking for existing pull request: %w", err)
 	}
-	if err == nil && !opts.DryRun {
+	if err == nil {
 		return fmt.Errorf("a pull request for branch %q into branch %q already exists:\n%s",
 			ctx.HeadBranchLabel, ctx.BaseBranch, existingPR.URL)
 	}
