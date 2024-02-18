@@ -723,15 +723,10 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 
 	if opts.DryRun {
 		if opts.IO.IsStdoutTTY() {
-			if err := renderPullRequestTTY(opts.IO, params, &state); err != nil {
-				return err
-			}
+			return renderPullRequestTTY(opts.IO, params, &state)
 		} else {
-			if err := renderPullRequestPlain(opts.IO.Out, params, &state); err != nil {
-				return err
-			}
+			return renderPullRequestPlain(opts.IO.Out, params, &state)
 		}
-		return nil
 	}
 
 	opts.IO.StartProgressIndicator()
