@@ -192,7 +192,7 @@ func TestListRun(t *testing.T) {
 												"databaseId": 1,
 												"environment": "production",
 												"latestStatus": {
-													"state": "in_progress",
+													"state": "IN_PROGRESS",
 													"createdAt": "2020-10-11T20:38:03Z"
 												},
 												"ref": {
@@ -204,7 +204,7 @@ func TestListRun(t *testing.T) {
 												"databaseId": 2,
 												"environment": "test",
 												"latestStatus": {
-													"state": "success",
+													"state": "SUCCESS",
 													"createdAt": "2020-10-11T20:38:03Z"
 												},
 												"ref": {
@@ -227,6 +227,104 @@ func TestListRun(t *testing.T) {
 			wantStdout: heredoc.Doc(`
 				1	production	in_progress	main	2020-10-11T20:38:03Z
 				2	test	success	test	2020-10-11T20:38:03Z
+			`),
+		},
+		{
+			name: "no status deployments",
+			tty:  false,
+			opts: &listOptions{},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryDeployments\b`),
+					httpmock.StringResponse(`
+						{
+							"data": {
+								"repository": {
+									"deployments": {
+										"nodes": [
+											{
+												"databaseId": 1,
+												"environment": "production",
+												"latestStatus": null,
+												"ref": {
+													"name": "main"
+												},
+												"createdAt": "2020-10-11T20:38:03Z"
+											},
+											{
+												"databaseId": 2,
+												"environment": "test",
+												"latestStatus": {
+													"state": "SUCCESS",
+													"createdAt": "2020-10-11T20:38:03Z"
+												},
+												"ref": {
+													"name": "test"
+												},
+												"createdAt": "2020-10-11T20:38:03Z"
+											}
+										],
+										"pageInfo": {
+											"hasNextPage": false,
+											"endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMC0xMVQwMTozODowMyswODowMM5f3HZq"
+										}
+									}
+								}
+							}
+						}`,
+					),
+				)
+			},
+			wantStdout: heredoc.Doc(`
+				1	production	none	main	2020-10-11T20:38:03Z
+				2	test	success	test	2020-10-11T20:38:03Z
+			`),
+		},
+		{
+			name: "no ref deployments",
+			tty:  false,
+			opts: &listOptions{},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryDeployments\b`),
+					httpmock.StringResponse(`
+						{
+							"data": {
+								"repository": {
+									"deployments": {
+										"nodes": [
+											{
+												"databaseId": 1,
+												"environment": "production",
+												"latestStatus": null,
+												"ref": null,
+												"createdAt": "2020-10-11T20:38:03Z"
+											},
+											{
+												"databaseId": 2,
+												"environment": "test",
+												"latestStatus": {
+													"state": "SUCCESS",
+													"createdAt": "2020-10-11T20:38:03Z"
+												},
+												"ref": null,
+												"createdAt": "2020-10-11T20:38:03Z"
+											}
+										],
+										"pageInfo": {
+											"hasNextPage": false,
+											"endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMC0xMVQwMTozODowMyswODowMM5f3HZq"
+										}
+									}
+								}
+							}
+						}`,
+					),
+				)
+			},
+			wantStdout: heredoc.Doc(`
+				1	production	none	none	2020-10-11T20:38:03Z
+				2	test	success	none	2020-10-11T20:38:03Z
 			`),
 		},
 	}

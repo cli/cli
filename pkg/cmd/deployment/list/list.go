@@ -28,29 +28,24 @@ type listOptions struct {
 }
 
 type deployment struct {
-	ID  int
-	Ref *struct {
-		Name string
-	}
-	Environment  string
-	LatestStatus *struct {
-		State     string
-		CreatedAt time.Time
-	}
-	CreatedAt time.Time
+	ID          int
+	Ref         *string
+	Environment string
+	Status      *string
+	CreatedAt   time.Time
 }
 
-type listDeploymentsQuery struct {
+type deploymentsQuery struct {
 	Repository struct {
 		Deployments struct {
 			Nodes []struct {
-				DatabaseID int
-				Ref        *struct {
+				DatabaseID  int
+				Environment string
+				Ref         *struct {
 					Name string
 				}
-				Environment  string
 				LatestStatus *struct {
-					State     string
+					State     githubv4.DeploymentStatusState
 					CreatedAt time.Time
 				}
 				CreatedAt time.Time
@@ -146,8 +141,8 @@ func listRun(opts *listOptions) error {
 		tp.AddField(deployment.Environment, tableprinter.WithColor(cs.Bold))
 
 		status := "none"
-		if deployment.LatestStatus != nil {
-			status = strings.ToLower(deployment.LatestStatus.State)
+		if deployment.Status != nil {
+			status = *deployment.Status
 		}
 		switch status {
 		case "error", "failure":
@@ -158,14 +153,13 @@ func listRun(opts *listOptions) error {
 			tp.AddField(status, tableprinter.WithColor(cs.Blue))
 		case "success":
 			tp.AddField(status, tableprinter.WithColor(cs.Green))
-		case "inactive":
 		default:
 			tp.AddField(status, tableprinter.WithColor(cs.Gray))
 		}
 
 		ref := "none"
 		if deployment.Ref != nil {
-			ref = deployment.Ref.Name
+			ref = *deployment.Ref
 		}
 		tp.AddField(ref)
 
@@ -198,7 +192,7 @@ func listDeployments(client *api.Client, repo ghrepo.Interface, limit int, envir
 
 pagination:
 	for {
-		var result listDeploymentsQuery
+		var result deploymentsQuery
 		err := client.Query(repo.RepoHost(), "RepositoryDeployments", &result, variables)
 		if err != nil {
 			return nil, err
@@ -206,12 +200,21 @@ pagination:
 
 		for _, node := range result.Repository.Deployments.Nodes {
 			deployment := deployment{
-				ID:           node.DatabaseID,
-				Ref:          node.Ref,
-				Environment:  node.Environment,
-				LatestStatus: node.LatestStatus,
-				CreatedAt:    node.CreatedAt,
+				ID:          node.DatabaseID,
+				Environment: node.Environment,
+				CreatedAt:   node.CreatedAt,
 			}
+
+			if node.Ref != nil {
+				ref := node.Ref.Name
+				deployment.Ref = &ref
+			}
+
+			if node.LatestStatus != nil {
+				state := strings.ToLower(string(node.LatestStatus.State))
+				deployment.Status = &state
+			}
+
 			deployments = append(deployments, deployment)
 
 			if len(deployments) == limit {
