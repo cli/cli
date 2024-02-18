@@ -86,6 +86,7 @@ func Test_createRun(t *testing.T) {
 		isTTY      bool
 		httpStubs  func(t *testing.T, reg *httpmock.Registry)
 		wantStdout string
+		wantStderr string
 	}{
 		{
 			name:  "no flags",
@@ -167,20 +168,18 @@ func Test_createRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/deployments"),
-					httpmock.RESTPayload(201, `{}`, func(payload map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
-							"ref": "main",
-						}, payload)
-					}),
+					httpmock.StatusJSONResponse(201, struct {
+						ID int `json:"id"`
+					}{ID: 1234}),
 				)
 			},
-			wantStdout: "",
+			wantStdout: "1234\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, _ := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdoutTTY(tt.isTTY)
 			ios.SetStdinTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
@@ -206,6 +205,7 @@ func Test_createRun(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }

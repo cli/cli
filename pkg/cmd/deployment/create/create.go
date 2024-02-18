@@ -110,8 +110,12 @@ func createRun(opts *createOptions) error {
 
 	body := bytes.NewReader(requestByte)
 
+	var deployment = struct {
+		ID int `json:"id"`
+	}{}
+
 	opts.IO.StartProgressIndicator()
-	err = client.REST(repo.RepoHost(), "POST", path, body, nil)
+	err = client.REST(repo.RepoHost(), "POST", path, body, &deployment)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("could not create deployment: %w", err)
@@ -122,6 +126,8 @@ func createRun(opts *createOptions) error {
 		cs := opts.IO.ColorScheme()
 		fmt.Fprintf(out, "%s Created deployment for %s in %s\n",
 			cs.SuccessIcon(), cs.Bold(ref), ghrepo.FullName(repo))
+	} else {
+		fmt.Fprintf(opts.IO.Out, "%d\n", deployment.ID)
 	}
 
 	return nil
