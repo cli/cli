@@ -23,7 +23,8 @@ type listOptions struct {
 	IO         *iostreams.IOStreams
 	Now        time.Time
 
-	Limit int
+	Limit       int
+	Environment string
 }
 
 type deployment struct {
@@ -58,7 +59,7 @@ type listDeploymentsQuery struct {
 				HasNextPage bool
 				EndCursor   string
 			}
-		} `graphql:"deployments(first: $per_page, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC})"`
+		} `graphql:"deployments(first: $per_page, environments: $environments, after: $endCursor, orderBy: {field: CREATED_AT, direction: DESC})"`
 	} `graphql:"repository(owner: $owner, name: $name)"`
 }
 
@@ -73,10 +74,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 		Short: "List deployments",
 		Long: heredoc.Docf(`
 			List deployments.
-
-			If the repository only has one deployment, you can delete the
-			deployment regardless of its status. If the repository has more
-			than one deployment, you can only delete inactive deployments.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# List deployments in the current repository
@@ -84,6 +81,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 
 			# List deployments in a specific repository
 			$ gh deployment list --repo owner/repo
+
+			# List deployments in a specific environment
+			$ gh deployment list --environment production
 
 			# List more than 10 deployments
 			$ gh deployment list --limit 100
@@ -100,55 +100,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 10, "Maximum number of deployments to fetch")
+	cmd.Flags().StringVarP(&opts.Environment, "environment", "e", "", "Filter deployments by environment")
 
 	return cmd
-}
-
-func listDeployments(client *api.Client, repo ghrepo.Interface, limit int) ([]deployment, error) {
-	perPage := limit
-	if perPage > 100 {
-		perPage = 100
-	}
-
-	variables := map[string]interface{}{
-		"owner":     githubv4.String(repo.RepoOwner()),
-		"name":      githubv4.String(repo.RepoName()),
-		"per_page":  githubv4.Int(perPage),
-		"endCursor": (*githubv4.String)(nil),
-	}
-
-	deployments := []deployment{}
-
-pagination:
-	for {
-		var result listDeploymentsQuery
-		err := client.Query(repo.RepoHost(), "RepositoryDeployments", &result, variables)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, node := range result.Repository.Deployments.Nodes {
-			deployment := deployment{
-				ID:           node.DatabaseID,
-				Ref:          node.Ref,
-				Environment:  node.Environment,
-				LatestStatus: node.LatestStatus,
-				CreatedAt:    node.CreatedAt,
-			}
-			deployments = append(deployments, deployment)
-
-			if len(deployments) == limit {
-				break pagination
-			}
-		}
-
-		if !result.Repository.Deployments.PageInfo.HasNextPage {
-			break
-		}
-		variables["endCursor"] = githubv4.String(result.Repository.Deployments.PageInfo.EndCursor)
-	}
-
-	return deployments, nil
 }
 
 func listRun(opts *listOptions) error {
@@ -164,7 +118,7 @@ func listRun(opts *listOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	deployments, err := listDeployments(client, repo, opts.Limit)
+	deployments, err := listDeployments(client, repo, opts.Limit, opts.Environment)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("could not list deployments: %w", err)
@@ -220,4 +174,56 @@ func listRun(opts *listOptions) error {
 	}
 
 	return tp.Render()
+}
+
+func listDeployments(client *api.Client, repo ghrepo.Interface, limit int, environment string) ([]deployment, error) {
+	perPage := limit
+	if perPage > 100 {
+		perPage = 100
+	}
+
+	variables := map[string]interface{}{
+		"owner":        githubv4.String(repo.RepoOwner()),
+		"name":         githubv4.String(repo.RepoName()),
+		"per_page":     githubv4.Int(perPage),
+		"environments": (*[]githubv4.String)(nil),
+		"endCursor":    (*githubv4.String)(nil),
+	}
+
+	if environment != "" {
+		variables["environments"] = []githubv4.String{githubv4.String(environment)}
+	}
+
+	deployments := []deployment{}
+
+pagination:
+	for {
+		var result listDeploymentsQuery
+		err := client.Query(repo.RepoHost(), "RepositoryDeployments", &result, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, node := range result.Repository.Deployments.Nodes {
+			deployment := deployment{
+				ID:           node.DatabaseID,
+				Ref:          node.Ref,
+				Environment:  node.Environment,
+				LatestStatus: node.LatestStatus,
+				CreatedAt:    node.CreatedAt,
+			}
+			deployments = append(deployments, deployment)
+
+			if len(deployments) == limit {
+				break pagination
+			}
+		}
+
+		if !result.Repository.Deployments.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(result.Repository.Deployments.PageInfo.EndCursor)
+	}
+
+	return deployments, nil
 }

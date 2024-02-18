@@ -36,6 +36,14 @@ func TestNewCmdList(t *testing.T) {
 				Limit: 1000,
 			},
 		},
+		{
+			name: "filter by environment",
+			cli:  "--environment test",
+			wants: listOptions{
+				Limit:       10,
+				Environment: "test",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -217,7 +225,6 @@ func TestListRun(t *testing.T) {
 				)
 			},
 			wantStdout: heredoc.Doc(`
-				ID	ENVIRONMENT	STATUS	REF	CREATED
 				1	production	in_progress	main	2020-10-11T20:38:03Z
 				2	test	success	test	2020-10-11T20:38:03Z
 			`),
