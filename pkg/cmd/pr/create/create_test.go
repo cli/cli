@@ -309,7 +309,7 @@ func Test_createRun(t *testing.T) {
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
 		{
-			name: "dry-run-nontty",
+			name: "dry-run-nontty-with-default-base",
 			tty:  false,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.TitleProvided = true
@@ -324,6 +324,8 @@ func Test_createRun(t *testing.T) {
 				"Would have created a Pull Request with:",
 				`title:	my title`,
 				`draft:	false`,
+				`base:	master`,
+				`head:	feature`,
 				`--`,
 				`my body`,
 				``,
@@ -331,7 +333,72 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "",
 		},
 		{
-			name: "dry-run-tty",
+			name: "dry-run-nontty-with-all-opts",
+			tty:  false,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "TITLE"
+				opts.Body = "BODY"
+				opts.BaseBranch = "trunk"
+				opts.HeadBranch = "feature"
+				opts.Assignees = []string{"monalisa"}
+				opts.Labels = []string{"bug", "todo"}
+				opts.Projects = []string{"roadmap"}
+				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
+				opts.Milestone = "big one.oh"
+				opts.DryRun = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+					httpmock.StringResponse(`
+					{ "data": {
+						"u000": { "login": "MonaLisa", "id": "MONAID" },
+						"u001": { "login": "hubot", "id": "HUBOTID" },
+						"repository": {
+							"l000": { "name": "bug", "id": "BUGID" },
+							"l001": { "name": "TODO", "id": "TODOID" }
+						},
+						"organization": {
+							"t000": { "slug": "core", "id": "COREID" },
+							"t001": { "slug": "robots", "id": "ROBOTID" }
+						}
+					} }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "milestones": {
+						"nodes": [
+							{ "title": "GA", "id": "GAID" },
+							{ "title": "Big One.oh", "id": "BIGONEID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				mockRetrieveProjects(t, reg)
+			},
+			expectedOutputs: []string{
+				"Would have created a Pull Request with:",
+				`title:	TITLE`,
+				`draft:	false`,
+				`base:	trunk`,
+				`head:	feature`,
+				`labels:	[bug todo]`,
+				`reviewers:	[hubot monalisa /core /robots]`,
+				`assignees:	[monalisa]`,
+				`milestones:	[big one.oh]`,
+				`projects:	[roadmap]`,
+				`--`,
+				`BODY`,
+				``,
+			},
+			expectedErrOut: "",
+		},
+		{
+			name: "dry-run-tty-with-default-base",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.TitleProvided = true
@@ -344,13 +411,114 @@ func Test_createRun(t *testing.T) {
 			},
 			expectedOut: heredoc.Doc(`
 				my title
-				
+				Draft: false
+				Base: master
+				Head: feature
+
 
 				  my body                                                                     
 				
 				
 			`),
-			// TODO: why?
+			expectedErrOut: heredoc.Doc(`
+
+			Creating pull request for feature into master in OWNER/REPO
+
+		`),
+		},
+		{
+			name: "dry-run-tty-with-all-opts",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "TITLE"
+				opts.Body = "BODY"
+				opts.BaseBranch = "trunk"
+				opts.HeadBranch = "feature"
+				opts.Assignees = []string{"monalisa"}
+				opts.Labels = []string{"bug", "todo"}
+				opts.Projects = []string{"roadmap"}
+				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
+				opts.Milestone = "big one.oh"
+				opts.DryRun = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+					httpmock.StringResponse(`
+					{ "data": {
+						"u000": { "login": "MonaLisa", "id": "MONAID" },
+						"u001": { "login": "hubot", "id": "HUBOTID" },
+						"repository": {
+							"l000": { "name": "bug", "id": "BUGID" },
+							"l001": { "name": "TODO", "id": "TODOID" }
+						},
+						"organization": {
+							"t000": { "slug": "core", "id": "COREID" },
+							"t001": { "slug": "robots", "id": "ROBOTID" }
+						}
+					} }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "milestones": {
+						"nodes": [
+							{ "title": "GA", "id": "GAID" },
+							{ "title": "Big One.oh", "id": "BIGONEID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				mockRetrieveProjects(t, reg)
+			},
+			expectedOut: heredoc.Doc(`
+				TITLE
+				Draft: false
+				Base: trunk
+				Head: feature
+				Labels: [bug todo]
+				Reviewers: [hubot monalisa /core /robots]
+				Assignees: [monalisa]
+				Milestones: [big one.oh]
+				Projects: [roadmap]
+
+
+				  BODY                                                                        
+				
+				
+			`),
+			expectedErrOut: heredoc.Doc(`
+
+			Creating pull request for feature into trunk in OWNER/REPO
+
+		`),
+		},
+		{
+			name: "dry-run-tty-with-empty-body",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "TITLE"
+				opts.Body = ""
+				opts.HeadBranch = "feature"
+				opts.DryRun = true
+				return func() {}
+			},
+			expectedOut: heredoc.Doc(`
+				TITLE
+				Draft: false
+				Base: master
+				Head: feature
+
+
+				  No description provided
+				
+				
+			`),
 			expectedErrOut: heredoc.Doc(`
 
 			Creating pull request for feature into master in OWNER/REPO

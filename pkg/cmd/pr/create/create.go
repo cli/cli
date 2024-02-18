@@ -753,6 +753,8 @@ func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *s
 	fmt.Fprint(w, "Would have created a Pull Request with:\n")
 	fmt.Fprintf(w, "title:\t%s\n", params["title"])
 	fmt.Fprintf(w, "draft:\t%t\n", params["draft"])
+	fmt.Fprintf(w, "base:\t%s\n", params["baseRefName"])
+	fmt.Fprintf(w, "head:\t%s\n", params["headRefName"])
 	if len(state.Labels) != 0 {
 		fmt.Fprintf(w, "labels:\t%v\n", state.Labels)
 	}
@@ -780,6 +782,9 @@ func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}
 	out := io.Out
 
 	fmt.Fprintf(out, "%s\n", iofmt.Bold(params["title"].(string)))
+	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("Draft"), params["draft"])
+	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Base"), params["baseRefName"])
+	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Head"), params["headRefName"])
 	if len(state.Labels) != 0 {
 		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Labels"), state.Labels)
 	}
