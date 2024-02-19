@@ -81,7 +81,7 @@ func TestNewCmdList(t *testing.T) {
 	}
 }
 
-func TestListRun(t *testing.T) {
+func Test_listRun(t *testing.T) {
 	var now = time.Date(2023, 1, 1, 1, 1, 1, 1, time.UTC)
 	tests := []struct {
 		name       string
