@@ -22,11 +22,11 @@ type createOptions struct {
 
 	Ref         string
 	Environment string
+	Status      string
 }
 
-type deploymentRequest struct {
-	Ref         string `json:"ref,omitempty"`
-	Environment string `json:"environment,omitempty"`
+type deployment struct {
+	ID int `json:"id"`
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Command {
@@ -53,12 +53,23 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 
 			# Create a deployment for a specific environment
 			$ gh deployment create --environment test
+
+			# Create a deployment with an initial status
+			$ gh deployment create --status in_progress
 		`),
-		Args: func(cmd *cobra.Command, args []string) error {
-			return nil
-		},
+		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
+
+			// Validate the status flag
+			if opts.Status != "" {
+				switch opts.Status {
+				case "queued", "in_progress", "inactive", "in_review", "approved", "rejected", "pending", "error", "failure", "success":
+				default:
+					return fmt.Errorf("invalid status: %s", opts.Status)
+				}
+			}
+
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -68,6 +79,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "The `branch`, `tag` or `SHA` to deploy (default [current branch])")
 	cmd.Flags().StringVarP(&opts.Environment, "environment", "e", "", "The `environment` that the deployment is for")
+	cmd.Flags().StringVarP(&opts.Status, "status", "s", "", "The initial `status` of the deployment")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "ref")
 
@@ -95,30 +107,17 @@ func createRun(opts *createOptions) error {
 		}
 	}
 
-	path := fmt.Sprintf("repos/%s/%s/deployments",
-		repo.RepoOwner(), repo.RepoName())
-
-	deploymentRequest := deploymentRequest{
-		Ref:         ref,
-		Environment: opts.Environment,
+	var deployment deployment
+	err = createDeployment(client, opts, repo, ref, opts.Environment, &deployment)
+	if err != nil {
+		return err
 	}
 
-	requestByte, err := json.Marshal(deploymentRequest)
-	if err != nil {
-		return fmt.Errorf("failed to serialize deployment inputs: %w", err)
-	}
-
-	body := bytes.NewReader(requestByte)
-
-	var deployment = struct {
-		ID int `json:"id"`
-	}{}
-
-	opts.IO.StartProgressIndicator()
-	err = client.REST(repo.RepoHost(), "POST", path, body, &deployment)
-	opts.IO.StopProgressIndicator()
-	if err != nil {
-		return fmt.Errorf("could not create deployment: %w", err)
+	if opts.Status != "" {
+		err = createDeploymentStatus(client, opts, repo, deployment)
+		if err != nil {
+			return err
+		}
 	}
 
 	if opts.IO.IsStdoutTTY() {
@@ -128,6 +127,64 @@ func createRun(opts *createOptions) error {
 			cs.SuccessIcon(), cs.Bold(ref), ghrepo.FullName(repo))
 	} else {
 		fmt.Fprintf(opts.IO.Out, "%d\n", deployment.ID)
+	}
+
+	return nil
+}
+
+func createDeployment(client *api.Client, opts *createOptions, repo ghrepo.Interface, ref string, environment string, result *deployment) error {
+	path := fmt.Sprintf("repos/%s/%s/deployments",
+		repo.RepoOwner(), repo.RepoName())
+
+	request := struct {
+		Ref         string `json:"ref,omitempty"`
+		Environment string `json:"environment,omitempty"`
+	}{
+		Ref:         ref,
+		Environment: environment,
+	}
+
+	requestByte, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("failed to serialize deployment inputs: %w", err)
+	}
+
+	body := bytes.NewReader(requestByte)
+
+	opts.IO.StartProgressIndicator()
+	err = client.REST(repo.RepoHost(), "POST", path, body, &result)
+	opts.IO.StopProgressIndicator()
+
+	if err != nil {
+		return fmt.Errorf("failed to create deployment: %w", err)
+	}
+
+	return nil
+}
+
+func createDeploymentStatus(client *api.Client, opts *createOptions, repo ghrepo.Interface, deployment deployment) error {
+	path := fmt.Sprintf("repos/%s/%s/deployments/%d/statuses",
+		repo.RepoOwner(), repo.RepoName(), deployment.ID)
+
+	request := struct {
+		State string `json:"state"`
+	}{
+		State: opts.Status,
+	}
+
+	requestByte, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("failed to serialize deployment status inputs: %w", err)
+	}
+
+	body := bytes.NewReader(requestByte)
+
+	opts.IO.StartProgressIndicator()
+	err = client.REST(repo.RepoHost(), "POST", path, body, nil)
+	opts.IO.StopProgressIndicator()
+
+	if err != nil {
+		return fmt.Errorf("failed to create deployment status: %w", err)
 	}
 
 	return nil

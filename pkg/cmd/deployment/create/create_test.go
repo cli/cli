@@ -15,9 +15,10 @@ import (
 
 func TestNewCmdCreate(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants createOptions
+		name     string
+		cli      string
+		wants    createOptions
+		wantsErr bool
 	}{
 		{
 			name:  "no flags",
@@ -46,6 +47,18 @@ func TestNewCmdCreate(t *testing.T) {
 				Environment: "production",
 			},
 		},
+		{
+			name: "status flag",
+			cli:  "--status in_progress",
+			wants: createOptions{
+				Status: "in_progress",
+			},
+		},
+		{
+			name:     "invalid status flag",
+			cli:      "--status invalid",
+			wantsErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -70,6 +83,11 @@ func TestNewCmdCreate(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			}
 
 			assert.NoError(t, err)
 
@@ -174,6 +192,26 @@ func Test_createRun(t *testing.T) {
 				)
 			},
 			wantStdout: "1234\n",
+		},
+		{
+			name: "include status",
+			opts: &createOptions{
+				Status: "in_progress",
+			},
+			isTTY: true,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/deployments"),
+					httpmock.StatusJSONResponse(201, struct {
+						ID int `json:"id"`
+					}{ID: 1234}),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/deployments/1234/statuses"),
+					httpmock.StatusStringResponse(201, `{}`),
+				)
+			},
+			wantStdout: "✓ Created deployment for main in OWNER/REPO\n",
 		},
 	}
 
