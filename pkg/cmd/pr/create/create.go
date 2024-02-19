@@ -765,6 +765,7 @@ func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *s
 	if len(state.Projects) != 0 {
 		fmt.Fprintf(w, "projects:\t%v\n", state.Projects)
 	}
+	fmt.Fprintf(w, "maintainerCanModify:\t%t\n", params["maintainerCanModify"])
 	if len(params["body"].(string)) != 0 {
 		fmt.Fprintln(w, "--")
 		fmt.Fprintln(w, params["body"])
@@ -795,6 +796,7 @@ func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}
 	if len(state.Projects) != 0 {
 		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Projects"), state.Projects)
 	}
+	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("MaintainerCanModify"), params["maintainerCanModify"])
 
 	// Body
 	var md string

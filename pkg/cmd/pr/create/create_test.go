@@ -326,6 +326,7 @@ func Test_createRun(t *testing.T) {
 				`draft:	false`,
 				`base:	master`,
 				`head:	feature`,
+				`maintainerCanModify:	false`,
 				`--`,
 				`my body`,
 				``,
@@ -391,6 +392,7 @@ func Test_createRun(t *testing.T) {
 				`assignees:	[monalisa]`,
 				`milestones:	[big one.oh]`,
 				`projects:	[roadmap]`,
+				`maintainerCanModify:	false`,
 				`--`,
 				`BODY`,
 				``,
@@ -414,6 +416,7 @@ func Test_createRun(t *testing.T) {
 				Draft: false
 				Base: master
 				Head: feature
+				MaintainerCanModify: false
 
 
 				  my body                                                                     
@@ -484,6 +487,7 @@ func Test_createRun(t *testing.T) {
 				Assignees: [monalisa]
 				Milestones: [big one.oh]
 				Projects: [roadmap]
+				MaintainerCanModify: false
 
 
 				  BODY                                                                        
@@ -513,6 +517,7 @@ func Test_createRun(t *testing.T) {
 				Draft: false
 				Base: master
 				Head: feature
+				MaintainerCanModify: false
 
 
 				  No description provided
