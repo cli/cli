@@ -57,7 +57,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			$ gh search prs -- -label:bug
 
 			# search pull requests only from un-archived repositories (default is all repositories)
-  		$ gh search prs --owner github --archived=false
+			$ gh search prs --owner github --archived=false
     `),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
