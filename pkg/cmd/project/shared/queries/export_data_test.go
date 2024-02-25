@@ -270,7 +270,7 @@ func TestJSONProjectDetailedItems(t *testing.T) {
 	assert.NoError(t, err)
 	assert.JSONEq(
 		t,
-		`{"items":[{"content":{"type":"Issue","body":"a body","title":"Issue title","number":1,"repository":"cli/go-gh","url":"issue-url"},"id":"issueId"},{"content":{"type":"PullRequest","body":"a body","title":"Pull Request title","number":2,"repository":"cli/go-gh","url":"pr-url"},"id":"pullRequestId"},{"content":{"type":"DraftIssue","body":"a body","title":"Pull Request title"},"id":"draftIssueId"}],"totalCount":5}`,
+		`{"items":[{"content":{"type":"Issue","body":"a body","title":"Issue title","number":1,"repository":"cli/go-gh","url":"issue-url"},"id":"issueId"},{"content":{"type":"PullRequest","body":"a body","title":"Pull Request title","number":2,"repository":"cli/go-gh","url":"pr-url"},"id":"pullRequestId"},{"content":{"type":"DraftIssue","body":"a body","title":"Pull Request title","id":"draftIssueId"},"id":"draftIssueId"}],"totalCount":5}`,
 		string(out))
 }
 
@@ -319,7 +319,7 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldIterationValue(t *testing.
 	assert.NoError(t, err)
 	assert.JSONEq(
 		t,
-		`{"items":[{"sprint":{"title":"Iteration Title","startDate":"","duration":0},"content":{"type":"DraftIssue","body":"a body","title":"Pull Request title"},"id":"draftIssueId"}],"totalCount":5}`,
+		`{"items":[{"sprint":{"title":"Iteration Title","startDate":"","duration":0},"content":{"type":"DraftIssue","body":"a body","title":"Pull Request title","id":"draftIssueId"},"id":"draftIssueId"}],"totalCount":5}`,
 		string(out))
 
 }
@@ -357,7 +357,7 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldMilestoneValue(t *testing.
 	assert.NoError(t, err)
 	assert.JSONEq(
 		t,
-		`{"items":[{"milestone":{"title":"Milestone Title","dueOn":"","description":""},"content":{"type":"DraftIssue","body":"a body","title":"Pull Request title"},"id":"draftIssueId"}],"totalCount":5}`,
+		`{"items":[{"milestone":{"title":"Milestone Title","dueOn":"","description":""},"content":{"type":"DraftIssue","body":"a body","title":"Pull Request title","id":"draftIssueId"},"id":"draftIssueId"}],"totalCount":5}`,
 		string(out))
 
 }
