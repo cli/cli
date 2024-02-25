@@ -385,6 +385,7 @@ func (p ProjectItem) DetailedItem() exportable {
 	switch p.Type() {
 	case "DraftIssue":
 		return DraftIssue{
+			ID:    p.ID(),
 			Body:  p.Body(),
 			Title: p.Title(),
 		}
@@ -459,7 +460,12 @@ func (p ProjectItem) Number() int {
 
 // ID is the id of the ProjectItem.
 func (p ProjectItem) ID() string {
-	return p.Id
+	switch p.Content.TypeName {
+	case "DraftIssue":
+		return p.Content.DraftIssue.ID
+	default:
+		return p.Id
+	}
 }
 
 // Repo is the repository of the project item. It is only valid for issues and pull requests.
