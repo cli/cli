@@ -178,7 +178,7 @@ func TestJSONProjectFields(t *testing.T) {
 func TestJSONProjectItem_DraftIssue(t *testing.T) {
 	item := ProjectItem{}
 	item.Content.TypeName = "DraftIssue"
-	item.Id = "123"
+	item.Content.DraftIssue.ID = "123"
 	item.Content.DraftIssue.Title = "title"
 	item.Content.DraftIssue.Body = "a body"
 
@@ -261,6 +261,7 @@ func TestJSONProjectDetailedItems(t *testing.T) {
 				DraftIssue: DraftIssue{
 					Title: "Pull Request title",
 					Body:  "a body",
+					ID:    "draftIssueId",
 				},
 			},
 		},
@@ -302,6 +303,7 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldIterationValue(t *testing.
 			DraftIssue: DraftIssue{
 				Title: "Pull Request title",
 				Body:  "a body",
+				ID:    "draftIssueId",
 			},
 		},
 	}
@@ -340,6 +342,7 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldMilestoneValue(t *testing.
 			DraftIssue: DraftIssue{
 				Title: "Pull Request title",
 				Body:  "a body",
+				ID:    "draftIssueId",
 			},
 		},
 	}
