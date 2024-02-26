@@ -29,16 +29,31 @@ func NewClient(httpClient *http.Client, hostname string, ios *iostreams.IOStream
 	}
 }
 
-func NewTestClient() *Client {
+// TestClientOpt is a test option for the test client.
+type TestClientOpt func(*Client)
+
+// WithPrompter is a test option to set the prompter for the test client.
+func WithPrompter(p iprompter) TestClientOpt {
+	return func(c *Client) {
+		c.prompter = p
+	}
+}
+
+func NewTestClient(opts ...TestClientOpt) *Client {
 	apiClient := &hostScopedClient{
 		hostname: "github.com",
 		Client:   api.NewClientFromHTTP(http.DefaultClient),
 	}
-	return &Client{
+	c := &Client{
 		apiClient: apiClient,
 		spinner:   false,
 		prompter:  nil,
 	}
+
+	for _, o := range opts {
+		o(c)
+	}
+	return c
 }
 
 type iprompter interface {
