@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -539,4 +540,107 @@ func TestRunViewWeb_Me(t *testing.T) {
 	err := runView(config)
 	assert.NoError(t, err)
 	assert.Equal(t, "https://github.com/users/theviewer/projects/8", buf.String())
+}
+
+func TestRunViewWeb_TTY(t *testing.T) {
+	tests := []struct {
+		name           string
+		setup          func(*viewOpts, *testing.T) func()
+		promptStubs    func(*prompter.PrompterMock)
+		gqlStubs       func(*testing.T)
+		expectedOut    string
+		expectedErrOut string
+		expectedBrowse string
+		wantErr        string
+		tty            bool
+	}{
+		{
+			name: "web with tty",
+			tty:  true,
+			setup: func(vo *viewOpts, t *testing.T) func() {
+				return func() {
+					vo.web = true
+				}
+			},
+			gqlStubs: func(t *testing.T) {
+				gock.New("https://api.github.com").
+					Post("/graphql").
+					MatchType("json").
+					JSON(map[string]interface{}{
+						"query": "query ViewerLoginAndOrgs.*",
+						"variables": map[string]interface{}{
+							"after": nil,
+						},
+					}).
+					Reply(200).
+					JSON(map[string]interface{}{
+						"data": map[string]interface{}{
+							"viewer": map[string]interface{}{
+								"id":    "an ID",
+								"login": "monalisa",
+								"organizations": map[string]interface{}{
+									"nodes": []interface{}{
+										map[string]interface{}{
+											"login":                   "github",
+											"viewerCanCreateProjects": true,
+										},
+									},
+								},
+							},
+						},
+					})
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+					if prompt == "Which owner would you like to use?" {
+						return prompter.IndexFor(opts, "monalisa")
+					}
+					return -1, prompter.NoSuchPromptErr(prompt)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			gock.Observe(gock.DumpRequest)
+
+			if tt.gqlStubs != nil {
+				tt.gqlStubs(t)
+			}
+
+			pm := &prompter.PrompterMock{}
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
+			}
+
+			opts := viewOpts{}
+			if tt.setup != nil {
+				tt.setup(&opts, t)()
+			}
+
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+
+			buf := bytes.Buffer{}
+
+			client := queries.NewTestClient(queries.WithPrompter(pm))
+
+			config := viewConfig{
+				opts: opts,
+				URLOpener: func(url string) error {
+					buf.WriteString(url)
+					return nil
+				},
+				client: client,
+				io:     ios,
+			}
+
+			err := runView(config)
+			assert.NoError(t, err)
+		})
+	}
 }

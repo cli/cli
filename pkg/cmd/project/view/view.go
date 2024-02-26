@@ -82,6 +82,17 @@ func NewCmdView(f *cmdutil.Factory, runF func(config viewConfig) error) *cobra.C
 }
 
 func runView(config viewConfig) error {
+	canPrompt := config.io.CanPrompt()
+	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
+	if err != nil {
+		return err
+	}
+
+	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, true)
+	if err != nil {
+		return err
+	}
+
 	if config.opts.web {
 		url, err := buildURL(config)
 		if err != nil {
@@ -92,17 +103,6 @@ func runView(config viewConfig) error {
 			return err
 		}
 		return nil
-	}
-
-	canPrompt := config.io.CanPrompt()
-	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
-	if err != nil {
-		return err
-	}
-
-	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, true)
-	if err != nil {
-		return err
 	}
 
 	if config.opts.exporter != nil {
