@@ -589,13 +589,50 @@ func TestRunViewWeb_TTY(t *testing.T) {
 							},
 						},
 					})
+
+				gock.New("https://api.github.com").
+					Post("/graphql").
+					MatchType("json").
+					JSON(map[string]interface{}{
+						"query": "query OrgProjects.*",
+						"variables": map[string]interface{}{
+							"after":       nil,
+							"afterFields": nil,
+							"afterItems":  nil,
+							"first":       30,
+							"firstFields": 100,
+							"firstItems":  0,
+							"login":       "github",
+						},
+					}).
+					Reply(200).
+					JSON(map[string]interface{}{
+						"data": map[string]interface{}{
+							"organization": map[string]interface{}{
+								"login": "github",
+								"projectsV2": map[string]interface{}{
+									"nodes": []interface{}{
+										map[string]interface{}{
+											"id":     "a-project-ID",
+											"title":  "Get it done!",
+											"number": 1,
+										},
+									},
+								},
+							},
+						},
+					})
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
-					if prompt == "Which owner would you like to use?" {
-						return prompter.IndexFor(opts, "monalisa")
+					switch prompt {
+					case "Which owner would you like to use?":
+						return prompter.IndexFor(opts, "github")
+					case "Which project would you like to use?":
+						return prompter.IndexFor(opts, "Get it done! (#1)")
+					default:
+						return -1, prompter.NoSuchPromptErr(prompt)
 					}
-					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 			},
 		},
