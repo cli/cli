@@ -483,7 +483,7 @@ func TestClientCommits(t *testing.T) {
 		wantErrorMsg string
 	}{
 		{
-			name: "get commits",
+			name: "single commit no body",
 			testData: stubbedCommitsCommandData{
 				Commits: []stubbedCommit{
 					{
@@ -500,7 +500,7 @@ func TestClientCommits(t *testing.T) {
 			}},
 		},
 		{
-			name: "get commits with body",
+			name: "single commit with body",
 			testData: stubbedCommitsCommandData{
 				Commits: []stubbedCommit{
 					{
@@ -516,6 +516,94 @@ func TestClientCommits(t *testing.T) {
 				Title: "testing testability test",
 				Body:  "This is the body",
 			}},
+		},
+		{
+			name: "multiple commits with bodies",
+			testData: stubbedCommitsCommandData{
+				Commits: []stubbedCommit{
+					{
+						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+						Title: "testing testability test",
+						Body:  "This is the body",
+					},
+					{
+						Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+						Title: "testing testability test 2",
+						Body:  "This is the body 2",
+					},
+				},
+			},
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCommits: []*Commit{
+				{
+					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+					Title: "testing testability test",
+					Body:  "This is the body",
+				},
+				{
+					Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+					Title: "testing testability test 2",
+					Body:  "This is the body 2",
+				},
+			},
+		},
+		{
+			name: "multiple commits mixed bodies",
+			testData: stubbedCommitsCommandData{
+				Commits: []stubbedCommit{
+					{
+						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+						Title: "testing testability test",
+					},
+					{
+						Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+						Title: "testing testability test 2",
+						Body:  "This is the body 2",
+					},
+				},
+			},
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCommits: []*Commit{
+				{
+					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+					Title: "testing testability test",
+				},
+				{
+					Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+					Title: "testing testability test 2",
+					Body:  "This is the body 2",
+				},
+			},
+		},
+		{
+			name: "multiple commits newlines in bodies",
+			testData: stubbedCommitsCommandData{
+				Commits: []stubbedCommit{
+					{
+						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+						Title: "testing testability test",
+						Body:  "This is the body\nwith a newline",
+					},
+					{
+						Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+						Title: "testing testability test 2",
+						Body:  "This is the body 2",
+					},
+				},
+			},
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCommits: []*Commit{
+				{
+					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+					Title: "testing testability test",
+					Body:  "This is the body\nwith a newline",
+				},
+				{
+					Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+					Title: "testing testability test 2",
+					Body:  "This is the body 2",
+				},
+			},
 		},
 		{
 			name: "no commits between SHAs",
@@ -572,6 +660,7 @@ func TestCommitsHelperProcess(t *testing.T) {
 			sb.WriteString(commit.Title)
 			sb.WriteString(",")
 			sb.WriteString(commit.Body)
+			sb.WriteString("\n")
 		}
 		fmt.Fprint(os.Stdout, sb.String())
 	}
