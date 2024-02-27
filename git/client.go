@@ -234,7 +234,12 @@ func isGitSha(s string) bool {
 }
 
 func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commit, error) {
-	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s,%b", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
+	// The formatting directive %x00 indicates that git should include the null byte as a separator.
+	// We use this because it is not a valid character to include in a commit message. Previously,
+	// commas were used here but when we Split on them, we would get incorrect results if commit titles
+	// happened to contain them.
+	// https://git-scm.com/docs/pretty-formats#Documentation/pretty-formats.txt-emx00em
+	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H%x00%s%x00%b", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
@@ -249,7 +254,7 @@ func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commi
 	body := 2
 	lines := outputLines(out)
 	for i := 0; i < len(lines); i++ {
-		split := strings.SplitN(lines[i], ",", 3)
+		split := strings.SplitN(lines[i], "\u0000", 3)
 		if isGitSha(split[sha]) {
 			c := &Commit{
 				Sha:   split[sha],
@@ -264,7 +269,7 @@ func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commi
 					break
 				}
 
-				possibleSplit := strings.SplitN(lines[i], ",", 3)
+				possibleSplit := strings.SplitN(lines[i], "\u0000", 3)
 				if len(possibleSplit) > 2 && isGitSha(possibleSplit[sha]) {
 					i--
 					break

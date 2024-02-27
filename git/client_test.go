@@ -493,7 +493,7 @@ func TestClientCommits(t *testing.T) {
 					},
 				},
 			},
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b --cherry SHA1...SHA2`,
 			wantCommits: []*Commit{{
 				Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
 				Title: "testing testability test",
@@ -510,7 +510,7 @@ func TestClientCommits(t *testing.T) {
 					},
 				},
 			},
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b --cherry SHA1...SHA2`,
 			wantCommits: []*Commit{{
 				Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
 				Title: "testing testability test",
@@ -533,7 +533,7 @@ func TestClientCommits(t *testing.T) {
 					},
 				},
 			},
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b --cherry SHA1...SHA2`,
 			wantCommits: []*Commit{
 				{
 					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
@@ -562,7 +562,7 @@ func TestClientCommits(t *testing.T) {
 					},
 				},
 			},
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b --cherry SHA1...SHA2`,
 			wantCommits: []*Commit{
 				{
 					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
@@ -591,7 +591,7 @@ func TestClientCommits(t *testing.T) {
 					},
 				},
 			},
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b --cherry SHA1...SHA2`,
 			wantCommits: []*Commit{
 				{
 					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
@@ -610,7 +610,7 @@ func TestClientCommits(t *testing.T) {
 			testData: stubbedCommitsCommandData{
 				Commits: []stubbedCommit{},
 			},
-			wantCmdArgs:  `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCmdArgs:  `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b --cherry SHA1...SHA2`,
 			wantErrorMsg: "could not find any commits between SHA1 and SHA2",
 		},
 		{
@@ -619,7 +619,7 @@ func TestClientCommits(t *testing.T) {
 				ErrMsg:     "git error message",
 				ExitStatus: 1,
 			},
-			wantCmdArgs:  `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			wantCmdArgs:  `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b --cherry SHA1...SHA2`,
 			wantErrorMsg: "failed to run git: git error message",
 		},
 	}
@@ -656,9 +656,9 @@ func TestCommitsHelperProcess(t *testing.T) {
 		var sb strings.Builder
 		for _, commit := range td.Commits {
 			sb.WriteString(commit.Sha)
-			sb.WriteString(",")
+			sb.WriteString("\u0000")
 			sb.WriteString(commit.Title)
-			sb.WriteString(",")
+			sb.WriteString("\u0000")
 			sb.WriteString(commit.Body)
 			sb.WriteString("\n")
 		}
