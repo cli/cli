@@ -256,11 +256,6 @@ func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commi
 				Title: split[title],
 			}
 
-			if len(split) == 2 {
-				commits = append(commits, c)
-				continue
-			}
-
 			c.Body = split[body]
 			// This consumes all lines until the next commit and adds them to the body.
 			for {
