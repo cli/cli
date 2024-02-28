@@ -627,7 +627,7 @@ func Test_createRun(t *testing.T) {
 					}))
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "d3476a1,commit 0\n7a6ea13,commit 1")
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "d3476a1\u0000commit 0\u0000\u0000\n7a6ea13\u0000commit 1\u0000\u0000")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
@@ -851,7 +851,7 @@ func Test_createRun(t *testing.T) {
 					}))
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry origin/master...feature`, 0, "")
+				cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry origin/master...feature`, 0, "")
 				cs.Register(`git rev-parse --show-toplevel`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
@@ -1004,9 +1004,9 @@ func Test_createRun(t *testing.T) {
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(
-					"git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry origin/master...feature",
+					"git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry origin/master...feature",
 					0,
-					"3a9b48085046d156c5acce8f3b3a0532cd706a4a,first commit of pr,first commit description\n",
+					"3a9b48085046d156c5acce8f3b3a0532cd706a4a\u0000first commit of pr\u0000first commit description\u0000\n",
 				)
 				cs.Register(`git rev-parse --show-toplevel`, 0, "")
 			},
@@ -1079,10 +1079,10 @@ func Test_createRun(t *testing.T) {
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(
-					"git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry origin/master...feature",
+					"git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry origin/master...feature",
 					0,
-					"56b6f8bb7c9e3a30093cd17e48934ce354148e80,second commit of pr\n"+
-						"3a9b48085046d156c5acce8f3b3a0532cd706a4a,first commit of pr,first commit description\n",
+					"56b6f8bb7c9e3a30093cd17e48934ce354148e80\u0000second commit of pr\u0000\u0000\n"+
+						"3a9b48085046d156c5acce8f3b3a0532cd706a4a\u0000first commit of pr\u0000first commit description\u0000\n",
 				)
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
@@ -1115,20 +1115,20 @@ func Test_createRun(t *testing.T) {
 			},
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(
-					"git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry origin/master...feature",
+					"git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry origin/master...feature",
 					0,
-					"56b6f8bb7c9e3a30093cd17e48934ce354148e80,second commit of pr,second commit description\n"+
-						"3a9b48085046d156c5acce8f3b3a0532cd706a4a,first commit of pr,first commit with super long description, with super long description, with super long description, with super long description.\n",
+					"56b6f8bb7c9e3a30093cd17e48934ce354148e80\u0000second commit of pr\u0000second commit description\u0000\n"+
+						"3a9b48085046d156c5acce8f3b3a0532cd706a4a\u0000first commit of pr\u0000first commit with super long description, with super long description, with super long description, with super long description.\u0000\n",
 				)
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
-						{ 
+						{
 						"data": { "createPullRequest": { "pullRequest": {
 							"URL": "https://github.com/OWNER/REPO/pull/12"
-							} } } 
+							} } }
 						}
 						`,
 						func(input map[string]interface{}) {

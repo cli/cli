@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClientCommand(t *testing.T) {
@@ -458,29 +460,57 @@ func TestClientUncommittedChangeCount(t *testing.T) {
 	}
 }
 
+type stubbedCommit struct {
+	Sha   string
+	Title string
+	Body  string
+}
+
+type stubbedCommitsCommandData struct {
+	ExitStatus int
+
+	ErrMsg string
+
+	Commits []stubbedCommit
+}
+
 func TestClientCommits(t *testing.T) {
 	tests := []struct {
-		name          string
-		cmdExitStatus int
-		cmdStdout     string
-		cmdStderr     string
-		wantCmdArgs   string
-		wantCommits   []*Commit
-		wantErrorMsg  string
+		name         string
+		testData     stubbedCommitsCommandData
+		wantCmdArgs  string
+		wantCommits  []*Commit
+		wantErrorMsg string
 	}{
 		{
-			name:        "get commits",
-			cmdStdout:   "6a6872b918c601a0e730710ad8473938a7516d30,testing testability test",
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			name: "single commit no body",
+			testData: stubbedCommitsCommandData{
+				Commits: []stubbedCommit{
+					{
+						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+						Title: "testing testability test",
+						Body:  "",
+					},
+				},
+			},
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
 			wantCommits: []*Commit{{
 				Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
 				Title: "testing testability test",
 			}},
 		},
 		{
-			name:        "get commits with body",
-			cmdStdout:   "6a6872b918c601a0e730710ad8473938a7516d30,testing testability test,This is the body",
-			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			name: "single commit with body",
+			testData: stubbedCommitsCommandData{
+				Commits: []stubbedCommit{
+					{
+						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+						Title: "testing testability test",
+						Body:  "This is the body",
+					},
+				},
+			},
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
 			wantCommits: []*Commit{{
 				Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
 				Title: "testing testability test",
@@ -488,34 +518,172 @@ func TestClientCommits(t *testing.T) {
 			}},
 		},
 		{
-			name:         "no commits between SHAs",
-			wantCmdArgs:  `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
+			name: "multiple commits with bodies",
+			testData: stubbedCommitsCommandData{
+				Commits: []stubbedCommit{
+					{
+						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+						Title: "testing testability test",
+						Body:  "This is the body",
+					},
+					{
+						Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+						Title: "testing testability test 2",
+						Body:  "This is the body 2",
+					},
+				},
+			},
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
+			wantCommits: []*Commit{
+				{
+					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+					Title: "testing testability test",
+					Body:  "This is the body",
+				},
+				{
+					Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+					Title: "testing testability test 2",
+					Body:  "This is the body 2",
+				},
+			},
+		},
+		{
+			name: "multiple commits mixed bodies",
+			testData: stubbedCommitsCommandData{
+				Commits: []stubbedCommit{
+					{
+						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+						Title: "testing testability test",
+					},
+					{
+						Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+						Title: "testing testability test 2",
+						Body:  "This is the body 2",
+					},
+				},
+			},
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
+			wantCommits: []*Commit{
+				{
+					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+					Title: "testing testability test",
+				},
+				{
+					Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+					Title: "testing testability test 2",
+					Body:  "This is the body 2",
+				},
+			},
+		},
+		{
+			name: "multiple commits newlines in bodies",
+			testData: stubbedCommitsCommandData{
+				Commits: []stubbedCommit{
+					{
+						Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+						Title: "testing testability test",
+						Body:  "This is the body\nwith a newline",
+					},
+					{
+						Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+						Title: "testing testability test 2",
+						Body:  "This is the body 2",
+					},
+				},
+			},
+			wantCmdArgs: `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
+			wantCommits: []*Commit{
+				{
+					Sha:   "6a6872b918c601a0e730710ad8473938a7516d30",
+					Title: "testing testability test",
+					Body:  "This is the body\nwith a newline",
+				},
+				{
+					Sha:   "7a6872b918c601a0e730710ad8473938a7516d31",
+					Title: "testing testability test 2",
+					Body:  "This is the body 2",
+				},
+			},
+		},
+		{
+			name: "no commits between SHAs",
+			testData: stubbedCommitsCommandData{
+				Commits: []stubbedCommit{},
+			},
+			wantCmdArgs:  `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
 			wantErrorMsg: "could not find any commits between SHA1 and SHA2",
 		},
 		{
-			name:          "git error",
-			cmdExitStatus: 1,
-			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git -c log.ShowSignature=false log --pretty=format:%H,%s,%b --cherry SHA1...SHA2`,
-			wantErrorMsg:  "failed to run git: git error message",
+			name: "git error",
+			testData: stubbedCommitsCommandData{
+				ErrMsg:     "git error message",
+				ExitStatus: 1,
+			},
+			wantCmdArgs:  `path/to/git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry SHA1...SHA2`,
+			wantErrorMsg: "failed to run git: git error message",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
+			cmd, cmdCtx := createCommitsCommandContext(t, tt.testData)
 			client := Client{
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
 			commits, err := client.Commits(context.Background(), "SHA1", "SHA2")
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			require.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
 			if tt.wantErrorMsg != "" {
-				assert.EqualError(t, err, tt.wantErrorMsg)
+				require.EqualError(t, err, tt.wantErrorMsg)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
-			assert.Equal(t, tt.wantCommits, commits)
+			require.Equal(t, tt.wantCommits, commits)
 		})
+	}
+}
+
+func TestCommitsHelperProcess(t *testing.T) {
+	if os.Getenv("GH_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+
+	var td stubbedCommitsCommandData
+	_ = json.Unmarshal([]byte(os.Getenv("GH_COMMITS_TEST_DATA")), &td)
+
+	if td.ErrMsg != "" {
+		fmt.Fprint(os.Stderr, td.ErrMsg)
+	} else {
+		var sb strings.Builder
+		for _, commit := range td.Commits {
+			sb.WriteString(commit.Sha)
+			sb.WriteString("\u0000")
+			sb.WriteString(commit.Title)
+			sb.WriteString("\u0000")
+			sb.WriteString(commit.Body)
+			sb.WriteString("\u0000")
+			sb.WriteString("\n")
+		}
+		fmt.Fprint(os.Stdout, sb.String())
+	}
+
+	os.Exit(td.ExitStatus)
+}
+
+func createCommitsCommandContext(t *testing.T, testData stubbedCommitsCommandData) (*exec.Cmd, commandCtx) {
+	t.Helper()
+
+	b, err := json.Marshal(testData)
+	require.NoError(t, err)
+
+	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestCommitsHelperProcess", "--")
+	cmd.Env = []string{
+		"GH_WANT_HELPER_PROCESS=1",
+		"GH_COMMITS_TEST_DATA=" + string(b),
+	}
+	return cmd, func(ctx context.Context, exe string, args ...string) *exec.Cmd {
+		cmd.Args = append(cmd.Args, exe)
+		cmd.Args = append(cmd.Args, args...)
+		return cmd
 	}
 }
 
