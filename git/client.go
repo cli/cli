@@ -21,8 +21,8 @@ import (
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
 // This regexp exists to match lines of the following form:
-// \u00006a6872b918c601a0e730710ad8473938a7516d30\u0000title 1\u0000Body 1\u0000\n
-// \u00007a6872b918c601a0e730710ad8473938a7516d31\u0000title 2\u0000Body 2\u0000
+// 6a6872b918c601a0e730710ad8473938a7516d30\u0000title 1\u0000Body 1\u0000\n
+// 7a6872b918c601a0e730710ad8473938a7516d31\u0000title 2\u0000Body 2\u0000
 //
 // This is the format we use when collecting commit information,
 // with null bytes as separators. Using null bytes this way allows for us
