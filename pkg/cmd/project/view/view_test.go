@@ -224,6 +224,7 @@ func TestRunView_Viewer(t *testing.T) {
 							"items": {
 								"totalCount": 10
 							},
+							"url":"https://github.com/orgs/github/projects/8",
 							"readme": null,
 							"fields": {
 								"nodes": [
@@ -295,6 +296,7 @@ func TestRunView_Org(t *testing.T) {
 							"items": {
 								"totalCount": 10
 							},
+							"url":"https://github.com/orgs/github/projects/8",
 							"readme": null,
 							"fields": {
 								"nodes": [
@@ -362,10 +364,11 @@ func TestRunViewWeb_User(t *testing.T) {
 				{
 					"login":"monalisa",
 					"projectV2": {
-						"number": 1,
+						"number": 8,
 						"items": {
 							"totalCount": 10
 						},
+						"url":"https://github.com/users/monalisa/projects/8",
 						"readme": null,
 						"fields": {
 							"nodes": [
@@ -382,6 +385,7 @@ func TestRunViewWeb_User(t *testing.T) {
 
 	client := queries.NewTestClient()
 	buf := bytes.Buffer{}
+	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
 		opts: viewOpts{
 			owner:  "monalisa",
@@ -393,6 +397,7 @@ func TestRunViewWeb_User(t *testing.T) {
 			return nil
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runView(config)
@@ -437,10 +442,11 @@ func TestRunViewWeb_Org(t *testing.T) {
 				{
 					"login":"github",
 					"projectV2": {
-						"number": 1,
+						"number": 8,
 						"items": {
 							"totalCount": 10
 						},
+						"url": "https://github.com/orgs/github/projects/8",
 						"readme": null,
 						"fields": {
 							"nodes": [
@@ -457,6 +463,7 @@ func TestRunViewWeb_Org(t *testing.T) {
 
 	client := queries.NewTestClient()
 	buf := bytes.Buffer{}
+	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
 		opts: viewOpts{
 			owner:  "github",
@@ -468,6 +475,7 @@ func TestRunViewWeb_Org(t *testing.T) {
 			return nil
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runView(config)
@@ -497,18 +505,24 @@ func TestRunViewWeb_Me(t *testing.T) {
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query":     "query ViewerProject.*",
+			"variables": map[string]interface{}{"afterFields": nil, "afterItems": nil, "firstFields": 100, "firstItems": 0, "number": 8},
+		}).
 		Reply(200).
 		JSON(`
 		{"data":
-			{"user":
+			{"viewer":
 				{
 					"login":"github",
 					"projectV2": {
-						"number": 1,
+						"number": 8,
 						"items": {
 							"totalCount": 10
 						},
 						"readme": null,
+						"url": "https://github.com/users/theviewer/projects/8",
 						"fields": {
 							"nodes": [
 								{
@@ -524,6 +538,7 @@ func TestRunViewWeb_Me(t *testing.T) {
 
 	client := queries.NewTestClient()
 	buf := bytes.Buffer{}
+	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
 		opts: viewOpts{
 			owner:  "@me",
@@ -535,6 +550,7 @@ func TestRunViewWeb_Me(t *testing.T) {
 			return nil
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runView(config)
@@ -548,14 +564,13 @@ func TestRunViewWeb_TTY(t *testing.T) {
 		setup          func(*viewOpts, *testing.T) func()
 		promptStubs    func(*prompter.PrompterMock)
 		gqlStubs       func(*testing.T)
-		expectedOut    string
-		expectedErrOut string
 		expectedBrowse string
-		wantErr        string
 		tty            bool
+		// TODO: Remove me
+		skip bool
 	}{
 		{
-			name: "web with tty",
+			name: "Org project --web with tty",
 			tty:  true,
 			setup: func(vo *viewOpts, t *testing.T) func() {
 				return func() {
@@ -576,7 +591,7 @@ func TestRunViewWeb_TTY(t *testing.T) {
 					JSON(map[string]interface{}{
 						"data": map[string]interface{}{
 							"viewer": map[string]interface{}{
-								"id":    "an ID",
+								"id":    "monalisa-ID",
 								"login": "monalisa",
 								"organizations": map[string]interface{}{
 									"nodes": []interface{}{
@@ -615,6 +630,7 @@ func TestRunViewWeb_TTY(t *testing.T) {
 										map[string]interface{}{
 											"id":     "a-project-ID",
 											"title":  "Get it done!",
+											"url":    "https://github.com/orgs/github/projects/1",
 											"number": 1,
 										},
 									},
@@ -635,11 +651,26 @@ func TestRunViewWeb_TTY(t *testing.T) {
 					}
 				}
 			},
+			expectedBrowse: "https://github.com/orgs/github/projects/1",
+		},
+		{
+			skip: true,
+			name: "User project --web with tty",
+			tty:  true,
+			setup: func(vo *viewOpts, t *testing.T) func() {
+				return func() {
+					vo.web = true
+				}
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.skip {
+				t.Skip()
+			}
+
 			defer gock.Off()
 			gock.Observe(gock.DumpRequest)
 
@@ -669,8 +700,8 @@ func TestRunViewWeb_TTY(t *testing.T) {
 			config := viewConfig{
 				opts: opts,
 				URLOpener: func(url string) error {
-					buf.WriteString(url)
-					return nil
+					_, err := buf.WriteString(url)
+					return err
 				},
 				client: client,
 				io:     ios,
@@ -678,6 +709,7 @@ func TestRunViewWeb_TTY(t *testing.T) {
 
 			err := runView(config)
 			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedBrowse, buf.String())
 		})
 	}
 }

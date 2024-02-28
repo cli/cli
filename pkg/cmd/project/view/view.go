@@ -94,12 +94,7 @@ func runView(config viewConfig) error {
 	}
 
 	if config.opts.web {
-		url, err := buildURL(config)
-		if err != nil {
-			return err
-		}
-
-		if err := config.URLOpener(url); err != nil {
+		if err := config.URLOpener(project.URL); err != nil {
 			return err
 		}
 		return nil
