@@ -566,8 +566,6 @@ func TestRunViewWeb_TTY(t *testing.T) {
 		gqlStubs       func(*testing.T)
 		expectedBrowse string
 		tty            bool
-		// TODO: Remove me
-		skip bool
 	}{
 		{
 			name: "Org project --web with tty",
@@ -654,7 +652,6 @@ func TestRunViewWeb_TTY(t *testing.T) {
 			expectedBrowse: "https://github.com/orgs/github/projects/1",
 		},
 		{
-			skip: true,
 			name: "User project --web with tty",
 			tty:  true,
 			setup: func(vo *viewOpts, t *testing.T) func() {
@@ -662,15 +659,81 @@ func TestRunViewWeb_TTY(t *testing.T) {
 					vo.web = true
 				}
 			},
+			gqlStubs: func(t *testing.T) {
+				gock.New("https://api.github.com").
+					Post("/graphql").
+					MatchType("json").
+					JSON(map[string]interface{}{
+						"query": "query ViewerLoginAndOrgs.*",
+						"variables": map[string]interface{}{
+							"after": nil,
+						},
+					}).
+					Reply(200).
+					JSON(map[string]interface{}{
+						"data": map[string]interface{}{
+							"viewer": map[string]interface{}{
+								"id":    "monalisa-ID",
+								"login": "monalisa",
+								"organizations": map[string]interface{}{
+									"nodes": []interface{}{
+										map[string]interface{}{
+											"login":                   "github",
+											"viewerCanCreateProjects": true,
+										},
+									},
+								},
+							},
+						},
+					})
+
+				gock.New("https://api.github.com").
+					Post("/graphql").
+					MatchType("json").
+					JSON(map[string]interface{}{
+						"query": "query ViewerProjects.*",
+						"variables": map[string]interface{}{
+							"after": nil, "afterFields": nil, "afterItems": nil, "first": 30, "firstFields": 100, "firstItems": 0,
+						},
+					}).
+					Reply(200).
+					JSON(map[string]interface{}{
+						"data": map[string]interface{}{
+							"viewer": map[string]interface{}{
+								"login": "monalisa",
+								"projectsV2": map[string]interface{}{
+									"totalCount": 1,
+									"nodes": []interface{}{
+										map[string]interface{}{
+											"id":     "a-project-ID",
+											"number": 1,
+											"title":  "@monalia's first project",
+											"url":    "https://github.com/users/monalisa/projects/1",
+										},
+									},
+								},
+							},
+						},
+					})
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+					switch prompt {
+					case "Which owner would you like to use?":
+						return prompter.IndexFor(opts, "monalisa")
+					case "Which project would you like to use?":
+						return prompter.IndexFor(opts, "@monalia's first project (#1)")
+					default:
+						return -1, prompter.NoSuchPromptErr(prompt)
+					}
+				}
+			},
+			expectedBrowse: "https://github.com/users/monalisa/projects/1",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.skip {
-				t.Skip()
-			}
-
 			defer gock.Off()
 			gock.Observe(gock.DumpRequest)
 
