@@ -237,6 +237,8 @@ ID  KEY  SIZE      CREATED            ACCESSED
 						TotalCount:    0,
 					}))
 			},
+			// We could put anything here, we're really asserting that the key is passed
+			// to the API.
 			wantErr:    true,
 			wantErrMsg: "No caches found in OWNER/REPO",
 		},

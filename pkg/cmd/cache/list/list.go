@@ -55,6 +55,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 		# To list caches for a specific branch, replace <branch-name> with the actual branch name
 		$ gh cache list --ref refs/heads/<branch-name>
+
 		# To list caches for a specific pull request, replace <pr-number> with the actual pull request number
 		$ gh cache list --ref refs/pull/<pr-number>/merge
 		`),
@@ -80,7 +81,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "O", "desc", []string{"asc", "desc"}, "Order of caches returned")
 	cmdutil.StringEnumFlag(cmd, &opts.Sort, "sort", "S", "last_accessed_at", []string{"created_at", "last_accessed_at", "size_in_bytes"}, "Sort fetched caches")
 	cmd.Flags().StringVarP(&opts.Key, "key", "k", "", "Filter by cache key prefix")
-	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "Filter by ref")
+	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "Filter by ref, formatted as refs/heads/<branch name> or refs/pull/<number>/merge")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.CacheFields)
 
 	return cmd
