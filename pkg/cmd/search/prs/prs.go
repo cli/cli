@@ -148,7 +148,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 
 	// Issue query qualifier flags
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
-	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Filter based on status of the repository archived status {true|false}")
+	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Filter based on the repository archived state {true|false}")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Assignee, "assignee", "", "Filter by assignee")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Author, "author", "", "Filter by author")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Closed, "closed", "", "Filter on closed at `date`")
