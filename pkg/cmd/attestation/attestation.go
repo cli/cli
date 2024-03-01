@@ -1,21 +1,30 @@
 package attestation
 
 import (
-	"github.com/github/gh-attestation/cmd/app"
-
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verify"
 	"github.com/cli/cli/v2/pkg/iostreams"
+
 	"github.com/spf13/cobra"
 )
 
-func NewCmdAttestation(io *iostreams.IOStreams, version, buildDate string) *cobra.Command {
+func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 	root := &cobra.Command{
-		Use:     "attestation",
-		Short:   "attestations",
+		Use:     "attestation [subcommand]",
+		Short:   "Work with attestations.",
+		Aliases: []string{"at"},
+		Long: heredoc.Docf(`
+		Work with attestations that represent trusted metadata about artifacts and images.
+
+		The %[1]sattestation%[1]s command and all subcommands support the following account types:
+		* Free tier
+		* Pro tier
+		* Team tier
+		* GHEC
+		* GHEC EMU
+	`, "`"),
 	}
 
-	root.AddCommand(app.NewDownloadCmd(io, version, buildDate))
-	root.AddCommand(app.NewVerifyCmd(io, version, buildDate))
-	root.AddCommand(app.NewTUFRootVerifyCmd(io))
+	root.AddCommand(verify.NewVerifyCmd(f))
 
 	return root
 }
