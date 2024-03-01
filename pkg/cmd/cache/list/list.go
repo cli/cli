@@ -28,6 +28,7 @@ type ListOptions struct {
 	Order string
 	Sort  string
 	Key   string
+	Ref   string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -51,6 +52,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 		# List caches that have keys matching a prefix (or that match exactly)
 		$ gh cache list --key key-prefix
+
+		# To list caches for a specific branch, replace <branch-name> with the actual branch name
+		$ gh cache list --ref refs/heads/<branch-name>
+
+		# To list caches for a specific pull request, replace <pr-number> with the actual pull request number
+		$ gh cache list --ref refs/pull/<pr-number>/merge
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -74,6 +81,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "O", "desc", []string{"asc", "desc"}, "Order of caches returned")
 	cmdutil.StringEnumFlag(cmd, &opts.Sort, "sort", "S", "last_accessed_at", []string{"created_at", "last_accessed_at", "size_in_bytes"}, "Sort fetched caches")
 	cmd.Flags().StringVarP(&opts.Key, "key", "k", "", "Filter by cache key prefix")
+	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "Filter by ref, formatted as refs/heads/<branch name> or refs/pull/<number>/merge")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.CacheFields)
 
 	return cmd
@@ -92,7 +100,7 @@ func listRun(opts *ListOptions) error {
 	client := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	result, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order, Key: opts.Key})
+	result, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order, Key: opts.Key, Ref: opts.Ref})
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("%s Failed to get caches: %w", opts.IO.ColorScheme().FailureIcon(), err)

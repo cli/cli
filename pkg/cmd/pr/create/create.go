@@ -425,7 +425,7 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 		return err
 	}
 
-	if useFirstCommit {
+	if len(commits) == 1 || useFirstCommit {
 		state.Title = commits[len(commits)-1].Title
 		state.Body = commits[len(commits)-1].Body
 	} else {
