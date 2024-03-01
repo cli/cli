@@ -94,10 +94,7 @@ func runView(config viewConfig) error {
 	}
 
 	if config.opts.web {
-		if err := config.URLOpener(project.URL); err != nil {
-			return err
-		}
-		return nil
+		return config.URLOpener(project.URL)
 	}
 
 	if config.opts.exporter != nil {
