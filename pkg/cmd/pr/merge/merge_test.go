@@ -369,7 +369,7 @@ func TestPrMerge_blocked(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Docf(`
-		X Pull request #1 is not mergeable: the base branch policy prohibits the merge.
+		X Pull request OWNER/REPO#1 is not mergeable: the base branch policy prohibits the merge.
 		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
 		To use administrator privileges to immediately merge the pull request, add the %[1]s--admin%[1]s flag.
 		`, "`"), output.Stderr())
@@ -402,7 +402,7 @@ func TestPrMerge_dirty(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Docf(`
-		X Pull request #123 is not mergeable: the merge commit cannot be cleanly created.
+		X Pull request OWNER/REPO#123 is not mergeable: the merge commit cannot be cleanly created.
 		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
 		Run the following to resolve the merge conflicts locally:
 		  gh pr checkout 123 && git fetch origin trunk && git merge origin/trunk
@@ -1085,7 +1085,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 
 	pm := &prompter.PrompterMock{
 		ConfirmFunc: func(p string, d bool) (bool, error) {
-			if p == "Pull request #4 was already merged. Delete the branch locally?" {
+			if p == "Pull request OWNER/REPO#4 was already merged. Delete the branch locally?" {
 				return true, nil
 			} else {
 				return false, prompter.NoSuchPromptErr(p)
@@ -1129,7 +1129,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "! Pull request #4 was already merged\n", output.Stderr())
+	assert.Equal(t, "! Pull request OWNER/REPO#4 was already merged\n", output.Stderr())
 }
 
 func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
@@ -1156,7 +1156,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 
 	pm := &prompter.PrompterMock{
 		ConfirmFunc: func(p string, d bool) (bool, error) {
-			if p == "Pull request #4 was already merged. Delete the branch locally?" {
+			if p == "Pull request OWNER/REPO#4 was already merged. Delete the branch locally?" {
 				return true, nil
 			} else {
 				return false, prompter.NoSuchPromptErr(p)
@@ -1196,7 +1196,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {
 
 	pm := &prompter.PrompterMock{
 		ConfirmFunc: func(p string, d bool) (bool, error) {
-			if p == "Pull request #4 was already merged. Delete the branch locally?" {
+			if p == "Pull request OWNER/REPO#4 was already merged. Delete the branch locally?" {
 				return d, nil
 			} else {
 				return false, prompter.NoSuchPromptErr(p)
@@ -1576,7 +1576,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "✓ Pull request #123 will be automatically merged via squash when all requirements are met\n", stderr.String())
+	assert.Equal(t, "✓ Pull request OWNER/REPO#123 will be automatically merged via squash when all requirements are met\n", stderr.String())
 }
 
 func TestMergeRun_autoMerge_directMerge(t *testing.T) {
@@ -1649,7 +1649,7 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "✓ Auto-merge disabled for pull request #123\n", stderr.String())
+	assert.Equal(t, "✓ Auto-merge disabled for pull request OWNER/REPO#123\n", stderr.String())
 }
 
 func TestPrInMergeQueue(t *testing.T) {
@@ -1680,7 +1680,7 @@ func TestPrInMergeQueue(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "! Pull request #1 is already queued to merge\n", output.Stderr())
+	assert.Equal(t, "! Pull request OWNER/REPO#1 is already queued to merge\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
@@ -1718,7 +1718,7 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "! The merge strategy for main is set by the merge queue\n✓ Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
+	assert.Equal(t, "! The merge strategy for main is set by the merge queue\n✓ Pull request OWNER/REPO#1 will be added to the merge queue for main when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueClean(t *testing.T) {
@@ -1758,7 +1758,7 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
+	assert.Equal(t, "✓ Pull request OWNER/REPO#1 will be added to the merge queue for main when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueBlocked(t *testing.T) {
@@ -1798,7 +1798,7 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
+	assert.Equal(t, "✓ Pull request OWNER/REPO#1 will be added to the merge queue for main when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueAdmin(t *testing.T) {
