@@ -86,9 +86,6 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 		// when RunE is used, the command usage will be printed
 		// We only want to print the error, not usage
 		Run: func(cmd *cobra.Command, args []string) {
-			// Configure the GitHub API client
-			apiClient := api.NewClientFromHTTP(httpClient)
-
 			if err := runVerify(opts); err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Redf("Failed to verify the artifact: %s", err.Error()))
 				os.Exit(1)
