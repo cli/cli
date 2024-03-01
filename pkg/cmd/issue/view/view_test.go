@@ -183,7 +183,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue without metadata": {
 			fixture: "./fixtures/issueView_preview.json",
 			expectedOutputs: []string{
-				`ix of coins #123`,
+				`ix of coins OWNER/REPO#123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -192,7 +192,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue with metadata": {
 			fixture: "./fixtures/issueView_previewWithMetadata.json",
 			expectedOutputs: []string{
-				`ix of coins #123`,
+				`ix of coins OWNER/REPO#123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`8 \x{1f615} • 7 \x{1f440} • 6 \x{2764}\x{fe0f} • 5 \x{1f389} • 4 \x{1f604} • 3 \x{1f680} • 2 \x{1f44e} • 1 \x{1f44d}`,
 				`Assignees:.*marseilles, monaco\n`,
@@ -206,7 +206,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue with empty body": {
 			fixture: "./fixtures/issueView_previewWithEmptyBody.json",
 			expectedOutputs: []string{
-				`ix of coins #123`,
+				`ix of coins OWNER/REPO#123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`No description provided`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -215,7 +215,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Closed issue": {
 			fixture: "./fixtures/issueView_previewClosedState.json",
 			expectedOutputs: []string{
-				`ix of coins #123`,
+				`ix of coins OWNER/REPO#123`,
 				`Closed.*marseilles opened about 9 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -329,7 +329,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				"IssueByNumber": "./fixtures/issueView_previewSingleComment.json",
 			},
 			expectedOutputs: []string{
-				`some title #123`,
+				`some title OWNER/REPO#123`,
 				`some body`,
 				`———————— Not showing 5 comments ————————`,
 				`marseilles \(Collaborator\) • Jan  1, 2020 • Newest comment`,
@@ -345,7 +345,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				"CommentsForIssue": "./fixtures/issueView_previewFullComments.json",
 			},
 			expectedOutputs: []string{
-				`some title #123`,
+				`some title OWNER/REPO#123`,
 				`some body`,
 				`monalisa • Jan  1, 2020 • Edited`,
 				`1 \x{1f615} • 2 \x{1f440} • 3 \x{2764}\x{fe0f} • 4 \x{1f389} • 5 \x{1f604} • 6 \x{1f680} • 7 \x{1f44e} • 8 \x{1f44d}`,
