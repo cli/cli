@@ -236,16 +236,15 @@ func gardenRun(opts *GardenOptions) error {
 		}
 	}()
 
-mainLoop:
 	for {
 		oldX := player.X
 		oldY := player.Y
 
 		d := <-dirc
 		if d == Quit {
-			break mainLoop
+			break
 		} else if !player.move(d) {
-			continue mainLoop
+			continue
 		}
 
 		underPlayer := garden[player.Y][player.X]

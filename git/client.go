@@ -20,6 +20,26 @@ import (
 
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
+// This regexp exists to match lines of the following form:
+// 6a6872b918c601a0e730710ad8473938a7516d30\u0000title 1\u0000Body 1\u0000\n
+// 7a6872b918c601a0e730710ad8473938a7516d31\u0000title 2\u0000Body 2\u0000
+//
+// This is the format we use when collecting commit information,
+// with null bytes as separators. Using null bytes this way allows for us
+// to easily maintain newlines that might be in the body.
+//
+// The ?m modifier is the multi-line modifier, meaning that ^ and $
+// match the beginning and end of lines, respectively.
+//
+// The [\S\s] matches any whitespace or non-whitespace character,
+// which is different from .* because it allows for newlines as well.
+//
+// The ? following .* and [\S\s] is a lazy modifier, meaning that it will
+// match as few characters as possible while still satisfying the rest of the regexp.
+// This is important because it allows us to match the first null byte after the title and body,
+// rather than the last null byte in the entire string.
+var commitLogRE = regexp.MustCompile(`(?m)^[0-9a-fA-F]{7,40}\x00.*?\x00[\S\s]*?\x00$`)
+
 type errWithExitCode interface {
 	ExitCode() int
 }
@@ -227,14 +247,13 @@ func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-func isGitSha(s string) bool {
-	shaRegex := regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
-	ret := shaRegex.MatchString(s)
-	return ret
-}
-
 func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commit, error) {
-	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s,%b", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
+	// The formatting directive %x00 indicates that git should include the null byte as a separator.
+	// We use this because it is not a valid character to include in a commit message. Previously,
+	// commas were used here but when we Split on them, we would get incorrect results if commit titles
+	// happened to contain them.
+	// https://git-scm.com/docs/pretty-formats#Documentation/pretty-formats.txt-emx00em
+	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H%x00%s%x00%b%x00", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
@@ -243,46 +262,33 @@ func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commi
 	if err != nil {
 		return nil, err
 	}
+
 	commits := []*Commit{}
-	sha := 0
-	title := 1
-	body := 2
-	lines := outputLines(out)
-	for i := 0; i < len(lines); i++ {
-		split := strings.SplitN(lines[i], ",", 3)
-		if isGitSha(split[sha]) {
-			c := &Commit{
-				Sha:   split[sha],
-				Title: split[title],
-			}
+	commitLogs := commitLogRE.FindAllString(string(out), -1)
+	for _, commitLog := range commitLogs {
+		//  Each line looks like this:
+		//  6a6872b918c601a0e730710ad8473938a7516d30\u0000title 1\u0000Body 1\u0000\n
 
-			if len(split) == 2 {
-				commits = append(commits, c)
-				continue
-			}
+		//  Or with an optional body:
+		//  6a6872b918c601a0e730710ad8473938a7516d30\u0000title 1\u0000\u0000\n
 
-			c.Body = split[body]
-			// This consumes all lines until the next commit and adds them to the body.
-			for {
-				i++
-				if i >= len(lines) {
-					break
-				}
+		//  Therefore after splitting we will have:
+		//  ["6a6872b918c601a0e730710ad8473938a7516d30", "title 1", "Body 1", ""]
 
-				possibleSplit := strings.SplitN(lines[i], ",", 3)
-				if len(possibleSplit) > 2 && isGitSha(possibleSplit[sha]) {
-					i--
-					break
-				}
-				c.Body += "\n"
-				c.Body += lines[i]
-			}
-			commits = append(commits, c)
-		}
+		//  Or with an optional body:
+		//  ["6a6872b918c601a0e730710ad8473938a7516d30", "title 1", "", ""]
+		commitLogParts := strings.Split(commitLog, "\u0000")
+		commits = append(commits, &Commit{
+			Sha:   commitLogParts[0],
+			Title: commitLogParts[1],
+			Body:  commitLogParts[2],
+		})
 	}
+
 	if len(commits) == 0 {
 		return nil, fmt.Errorf("could not find any commits between %s and %s", baseRef, headRef)
 	}
+
 	return commits, nil
 }
 
