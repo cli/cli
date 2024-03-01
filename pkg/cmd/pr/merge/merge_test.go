@@ -1576,7 +1576,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
-    assert.Equal(t, "✓ Pull request #123 will be automatically merged via squash when all requirements are met\n", stderr.String())
+	assert.Equal(t, "✓ Pull request #123 will be automatically merged via squash when all requirements are met\n", stderr.String())
 }
 
 func TestMergeRun_autoMerge_directMerge(t *testing.T) {
