@@ -91,35 +91,6 @@ func TestNewCmdview(t *testing.T) {
 	}
 }
 
-func TestBuildURLViewer(t *testing.T) {
-	defer gock.Off()
-
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		Reply(200).
-		JSON(`
-			{"data":
-				{"viewer":
-					{
-						"login":"theviewer"
-					}
-				}
-			}
-		`)
-
-	client := queries.NewTestClient()
-
-	url, err := buildURL(viewConfig{
-		opts: viewOpts{
-			number: 1,
-			owner:  "@me",
-		},
-		client: client,
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "https://github.com/users/theviewer/projects/1", url)
-}
-
 func TestRunView_User(t *testing.T) {
 	defer gock.Off()
 

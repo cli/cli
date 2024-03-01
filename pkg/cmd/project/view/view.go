@@ -107,31 +107,6 @@ func runView(config viewConfig) error {
 	return printResults(config, project)
 }
 
-// TODO: support non-github.com hostnames
-func buildURL(config viewConfig) (string, error) {
-	var url string
-	if config.opts.owner == "@me" {
-		owner, err := config.client.ViewerLoginName()
-		if err != nil {
-			return "", err
-		}
-		url = fmt.Sprintf("https://github.com/users/%s/projects/%d", owner, config.opts.number)
-	} else {
-		_, ownerType, err := config.client.OwnerIDAndType(config.opts.owner)
-		if err != nil {
-			return "", err
-		}
-
-		if ownerType == queries.UserOwner {
-			url = fmt.Sprintf("https://github.com/users/%s/projects/%d", config.opts.owner, config.opts.number)
-		} else {
-			url = fmt.Sprintf("https://github.com/orgs/%s/projects/%d", config.opts.owner, config.opts.number)
-		}
-	}
-
-	return url, nil
-}
-
 func printResults(config viewConfig, project *queries.Project) error {
 	var sb strings.Builder
 	sb.WriteString("# Title\n")
