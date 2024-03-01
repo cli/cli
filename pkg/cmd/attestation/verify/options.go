@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/github/gh-attestation/pkg/artifact/digest"
+	"github.com/cli/cli/v2/pkg/cmd/artifact/digest"
 	"github.com/github/gh-attestation/pkg/artifact/oci"
 	"github.com/github/gh-attestation/pkg/github"
 	"github.com/github/gh-attestation/pkg/output"
