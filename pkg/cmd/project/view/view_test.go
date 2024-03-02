@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -88,35 +89,6 @@ func TestNewCmdview(t *testing.T) {
 			assert.Equal(t, tt.wants.web, gotOpts.web)
 		})
 	}
-}
-
-func TestBuildURLViewer(t *testing.T) {
-	defer gock.Off()
-
-	gock.New("https://api.github.com").
-		Post("/graphql").
-		Reply(200).
-		JSON(`
-			{"data":
-				{"viewer":
-					{
-						"login":"theviewer"
-					}
-				}
-			}
-		`)
-
-	client := queries.NewTestClient()
-
-	url, err := buildURL(viewConfig{
-		opts: viewOpts{
-			number: 1,
-			owner:  "@me",
-		},
-		client: client,
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "https://github.com/users/theviewer/projects/1", url)
 }
 
 func TestRunView_User(t *testing.T) {
@@ -223,6 +195,7 @@ func TestRunView_Viewer(t *testing.T) {
 							"items": {
 								"totalCount": 10
 							},
+							"url":"https://github.com/orgs/github/projects/8",
 							"readme": null,
 							"fields": {
 								"nodes": [
@@ -294,6 +267,7 @@ func TestRunView_Org(t *testing.T) {
 							"items": {
 								"totalCount": 10
 							},
+							"url":"https://github.com/orgs/github/projects/8",
 							"readme": null,
 							"fields": {
 								"nodes": [
@@ -361,10 +335,11 @@ func TestRunViewWeb_User(t *testing.T) {
 				{
 					"login":"monalisa",
 					"projectV2": {
-						"number": 1,
+						"number": 8,
 						"items": {
 							"totalCount": 10
 						},
+						"url":"https://github.com/users/monalisa/projects/8",
 						"readme": null,
 						"fields": {
 							"nodes": [
@@ -381,6 +356,7 @@ func TestRunViewWeb_User(t *testing.T) {
 
 	client := queries.NewTestClient()
 	buf := bytes.Buffer{}
+	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
 		opts: viewOpts{
 			owner:  "monalisa",
@@ -392,6 +368,7 @@ func TestRunViewWeb_User(t *testing.T) {
 			return nil
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runView(config)
@@ -436,10 +413,11 @@ func TestRunViewWeb_Org(t *testing.T) {
 				{
 					"login":"github",
 					"projectV2": {
-						"number": 1,
+						"number": 8,
 						"items": {
 							"totalCount": 10
 						},
+						"url": "https://github.com/orgs/github/projects/8",
 						"readme": null,
 						"fields": {
 							"nodes": [
@@ -456,6 +434,7 @@ func TestRunViewWeb_Org(t *testing.T) {
 
 	client := queries.NewTestClient()
 	buf := bytes.Buffer{}
+	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
 		opts: viewOpts{
 			owner:  "github",
@@ -467,6 +446,7 @@ func TestRunViewWeb_Org(t *testing.T) {
 			return nil
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runView(config)
@@ -496,18 +476,24 @@ func TestRunViewWeb_Me(t *testing.T) {
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query":     "query ViewerProject.*",
+			"variables": map[string]interface{}{"afterFields": nil, "afterItems": nil, "firstFields": 100, "firstItems": 0, "number": 8},
+		}).
 		Reply(200).
 		JSON(`
 		{"data":
-			{"user":
+			{"viewer":
 				{
 					"login":"github",
 					"projectV2": {
-						"number": 1,
+						"number": 8,
 						"items": {
 							"totalCount": 10
 						},
 						"readme": null,
+						"url": "https://github.com/users/theviewer/projects/8",
 						"fields": {
 							"nodes": [
 								{
@@ -523,6 +509,7 @@ func TestRunViewWeb_Me(t *testing.T) {
 
 	client := queries.NewTestClient()
 	buf := bytes.Buffer{}
+	ios, _, _, _ := iostreams.Test()
 	config := viewConfig{
 		opts: viewOpts{
 			owner:  "@me",
@@ -534,9 +521,229 @@ func TestRunViewWeb_Me(t *testing.T) {
 			return nil
 		},
 		client: client,
+		io:     ios,
 	}
 
 	err := runView(config)
 	assert.NoError(t, err)
 	assert.Equal(t, "https://github.com/users/theviewer/projects/8", buf.String())
+}
+
+func TestRunViewWeb_TTY(t *testing.T) {
+	tests := []struct {
+		name           string
+		setup          func(*viewOpts, *testing.T) func()
+		promptStubs    func(*prompter.PrompterMock)
+		gqlStubs       func(*testing.T)
+		expectedBrowse string
+		tty            bool
+	}{
+		{
+			name: "Org project --web with tty",
+			tty:  true,
+			setup: func(vo *viewOpts, t *testing.T) func() {
+				return func() {
+					vo.web = true
+				}
+			},
+			gqlStubs: func(t *testing.T) {
+				gock.New("https://api.github.com").
+					Post("/graphql").
+					MatchType("json").
+					JSON(map[string]interface{}{
+						"query": "query ViewerLoginAndOrgs.*",
+						"variables": map[string]interface{}{
+							"after": nil,
+						},
+					}).
+					Reply(200).
+					JSON(map[string]interface{}{
+						"data": map[string]interface{}{
+							"viewer": map[string]interface{}{
+								"id":    "monalisa-ID",
+								"login": "monalisa",
+								"organizations": map[string]interface{}{
+									"nodes": []interface{}{
+										map[string]interface{}{
+											"login":                   "github",
+											"viewerCanCreateProjects": true,
+										},
+									},
+								},
+							},
+						},
+					})
+
+				gock.New("https://api.github.com").
+					Post("/graphql").
+					MatchType("json").
+					JSON(map[string]interface{}{
+						"query": "query OrgProjects.*",
+						"variables": map[string]interface{}{
+							"after":       nil,
+							"afterFields": nil,
+							"afterItems":  nil,
+							"first":       30,
+							"firstFields": 100,
+							"firstItems":  0,
+							"login":       "github",
+						},
+					}).
+					Reply(200).
+					JSON(map[string]interface{}{
+						"data": map[string]interface{}{
+							"organization": map[string]interface{}{
+								"login": "github",
+								"projectsV2": map[string]interface{}{
+									"nodes": []interface{}{
+										map[string]interface{}{
+											"id":     "a-project-ID",
+											"title":  "Get it done!",
+											"url":    "https://github.com/orgs/github/projects/1",
+											"number": 1,
+										},
+									},
+								},
+							},
+						},
+					})
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+					switch prompt {
+					case "Which owner would you like to use?":
+						return prompter.IndexFor(opts, "github")
+					case "Which project would you like to use?":
+						return prompter.IndexFor(opts, "Get it done! (#1)")
+					default:
+						return -1, prompter.NoSuchPromptErr(prompt)
+					}
+				}
+			},
+			expectedBrowse: "https://github.com/orgs/github/projects/1",
+		},
+		{
+			name: "User project --web with tty",
+			tty:  true,
+			setup: func(vo *viewOpts, t *testing.T) func() {
+				return func() {
+					vo.web = true
+				}
+			},
+			gqlStubs: func(t *testing.T) {
+				gock.New("https://api.github.com").
+					Post("/graphql").
+					MatchType("json").
+					JSON(map[string]interface{}{
+						"query": "query ViewerLoginAndOrgs.*",
+						"variables": map[string]interface{}{
+							"after": nil,
+						},
+					}).
+					Reply(200).
+					JSON(map[string]interface{}{
+						"data": map[string]interface{}{
+							"viewer": map[string]interface{}{
+								"id":    "monalisa-ID",
+								"login": "monalisa",
+								"organizations": map[string]interface{}{
+									"nodes": []interface{}{
+										map[string]interface{}{
+											"login":                   "github",
+											"viewerCanCreateProjects": true,
+										},
+									},
+								},
+							},
+						},
+					})
+
+				gock.New("https://api.github.com").
+					Post("/graphql").
+					MatchType("json").
+					JSON(map[string]interface{}{
+						"query": "query ViewerProjects.*",
+						"variables": map[string]interface{}{
+							"after": nil, "afterFields": nil, "afterItems": nil, "first": 30, "firstFields": 100, "firstItems": 0,
+						},
+					}).
+					Reply(200).
+					JSON(map[string]interface{}{
+						"data": map[string]interface{}{
+							"viewer": map[string]interface{}{
+								"login": "monalisa",
+								"projectsV2": map[string]interface{}{
+									"totalCount": 1,
+									"nodes": []interface{}{
+										map[string]interface{}{
+											"id":     "a-project-ID",
+											"number": 1,
+											"title":  "@monalia's first project",
+											"url":    "https://github.com/users/monalisa/projects/1",
+										},
+									},
+								},
+							},
+						},
+					})
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+					switch prompt {
+					case "Which owner would you like to use?":
+						return prompter.IndexFor(opts, "monalisa")
+					case "Which project would you like to use?":
+						return prompter.IndexFor(opts, "@monalia's first project (#1)")
+					default:
+						return -1, prompter.NoSuchPromptErr(prompt)
+					}
+				}
+			},
+			expectedBrowse: "https://github.com/users/monalisa/projects/1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			gock.Observe(gock.DumpRequest)
+
+			if tt.gqlStubs != nil {
+				tt.gqlStubs(t)
+			}
+
+			pm := &prompter.PrompterMock{}
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
+			}
+
+			opts := viewOpts{}
+			if tt.setup != nil {
+				tt.setup(&opts, t)()
+			}
+
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+
+			buf := bytes.Buffer{}
+
+			client := queries.NewTestClient(queries.WithPrompter(pm))
+
+			config := viewConfig{
+				opts: opts,
+				URLOpener: func(url string) error {
+					_, err := buf.WriteString(url)
+					return err
+				},
+				client: client,
+				io:     ios,
+			}
+
+			err := runView(config)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedBrowse, buf.String())
+		})
+	}
 }
