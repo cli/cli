@@ -3,8 +3,7 @@ package verify
 import (
 	"fmt"
 
-	"github.com/github/gh-attestation/pkg/github"
-	"github.com/github/gh-attestation/pkg/output"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/github"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"

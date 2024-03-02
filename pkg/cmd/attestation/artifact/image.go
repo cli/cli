@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/distribution/reference"
-	"github.com/github/gh-attestation/pkg/artifact/oci"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 )
 
 func digestContainerImageArtifact(url string, client oci.Client) (*DigestedArtifact, error) {

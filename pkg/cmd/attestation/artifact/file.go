@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/github/gh-attestation/pkg/artifact/digest"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/digest"
 )
 
 func digestLocalFileArtifact(filename, digestAlg string) (*DigestedArtifact, error) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/github/gh-attestation/pkg/artifact/oci"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/stretchr/testify/assert"
 )
 

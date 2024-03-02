@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/pkg/github"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/github"
 	
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"

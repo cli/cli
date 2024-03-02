@@ -3,7 +3,7 @@ package verify
 import (
 	"testing"
 
-	"github.com/github/gh-attestation/test"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 
 	"github.com/stretchr/testify/assert"
 )

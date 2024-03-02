@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/github/gh-attestation/pkg/artifact/oci"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 )
 
 type artifactType int

@@ -3,8 +3,8 @@ package verify
 import (
 	"testing"
 
-	"github.com/github/gh-attestation/pkg/artifact"
-	"github.com/github/gh-attestation/pkg/github"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

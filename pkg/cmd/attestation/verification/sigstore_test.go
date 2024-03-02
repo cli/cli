@@ -3,11 +3,11 @@ package verify
 import (
 	"testing"
 
-	"github.com/github/gh-attestation/pkg/artifact"
-	"github.com/github/gh-attestation/pkg/artifact/oci"
-	"github.com/github/gh-attestation/pkg/github"
-	"github.com/github/gh-attestation/pkg/output"
-	"github.com/github/gh-attestation/test"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/github"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
