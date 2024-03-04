@@ -77,7 +77,7 @@ func TestRunVerify(t *testing.T) {
 	t.Run("with owner", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.BundlePath = ""
-		opts.Owner = "github"
+		opts.Owner = "sigstore"
 
 		assert.Nil(t, RunVerify(&opts))
 	})
