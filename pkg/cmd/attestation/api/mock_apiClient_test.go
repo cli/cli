@@ -9,12 +9,7 @@ import (
 )
 
 type mockAPIClient struct {
-	OnREST func(hostname, method, p string, body io.Reader, data interface{}) error
 	OnRESTWithNext func(hostname, method, p string, body io.Reader, data interface{}) (string, error) 
-}
-
-func (m mockAPIClient) REST(hostname, method, p string, body io.Reader, data interface{}) error {
-	return m.OnREST(hostname, method, p, body, data)
 }
 
 func (m mockAPIClient) RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
@@ -23,10 +18,6 @@ func (m mockAPIClient) RESTWithNext(hostname, method, p string, body io.Reader, 
 
 type mockDataGenerator struct {
 	NumAttestations int
-}
-
-func (m mockDataGenerator) OnRESTSuccess(hostname, method, p string, body io.Reader, data interface{}) error {
-	return m.OnRESTSuccessHelper(hostname, method, p, body, data, false)
 }
 
 func (m mockDataGenerator) OnRESTSuccessWithNextPage(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
@@ -38,31 +29,6 @@ func (m mockDataGenerator) OnRESTSuccessWithNextPage(hostname, method, p string,
 
 	// if path contain after, it means second time hitting the mock server and will not return the link header
 	return m.OnRESTWithNextSuccessHelper(hostname, method, p, body, data, false)
-}
-
-func (m mockDataGenerator) OnRESTSuccessHelper(hostname, method, p string, body io.Reader, data interface{}, hasNext bool) error {
-	atts := make([]*Attestation, m.NumAttestations)
-	for j := 0; j < m.NumAttestations; j++ {
-		att := makeTestAttestation()
-		atts[j] = &att
-	}
-
-	resp := AttestationsResponse{
-		Attestations: atts,
-	}
-
-	// // Convert the attestations to JSON
-	b, err := json.Marshal(resp)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(b, &data)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (m mockDataGenerator) OnRESTWithNextSuccessHelper(hostname, method, p string, body io.Reader, data interface{}, hasNext bool) (string, error) {
@@ -95,41 +61,23 @@ func (m mockDataGenerator) OnRESTWithNextSuccessHelper(hostname, method, p strin
 	return "", nil
 }
 
-func (m mockDataGenerator) OnRESTNoAttestations(hostname, method, p string, body io.Reader, data interface{}) error {
-	var resp AttestationsResponse
-	resp.Attestations = make([]*Attestation, 0)
-
-	data = resp
-
-	// Convert the attestations to JSON
-	// jsonResponse, err := json.Marshal(resp)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // Create a buffer containing the JSON response
-	// responseReader := bytes.NewBuffer(jsonResponse)
-
-	return nil
-}
-
 func (m mockDataGenerator) OnRESTWithNextNoAttestations(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
-	var resp AttestationsResponse
-	resp.Attestations = make([]*Attestation, 0)
+	resp := AttestationsResponse{
+		Attestations:  make([]*Attestation, 0),
+	}
 
-	data = resp
+	// // Convert the attestations to JSON
+	b, err := json.Marshal(resp)
+	if err != nil {
+		return "", err
+	}
 
-	// Convert the attestations to JSON
-	// data, err := json.Marshal(resp)
-	// if err != nil {
-	// 	return err
-	// }
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return "", err
+	}
 
 	return "", nil
-}
-
-func (m mockDataGenerator) OnRESTError(hostname, method, p string, body io.Reader, data interface{}) error {
-	return errors.New("failed to get attestations")
 }
 
 func (m mockDataGenerator) OnRESTWithNextError(hostname, method, p string, body io.Reader, data interface{}) (string, error) {

@@ -20,7 +20,6 @@ func NewClientWithMockGHClient() Client {
 
 	return &LiveClient{
 		api: mockAPIClient{
-			OnREST: fetcher.OnRESTSuccess,
 			OnRESTWithNext: fetcher.OnRESTSuccessWithNextPage,
 		},
 	}
@@ -125,8 +124,7 @@ func TestGetByDigest_NoAttestationsFound(t *testing.T) {
 
 	c := LiveClient{
 		api: mockAPIClient{
-			OnREST: fetcher.OnRESTNoAttestations,
-			OnRESTWithNext: fetcher.OnRESTSuccessWithNextPage,
+			OnRESTWithNext: fetcher.OnRESTWithNextNoAttestations,
 		},
 	}
 
@@ -148,8 +146,7 @@ func TestGetByDigest_Error(t *testing.T) {
 
 	c := LiveClient{
 		api: mockAPIClient{
-			OnREST: fetcher.OnRESTError,
-			OnRESTWithNext: fetcher.OnRESTSuccessWithNextPage,
+			OnRESTWithNext: fetcher.OnRESTWithNextError,
 		},
 	}
 

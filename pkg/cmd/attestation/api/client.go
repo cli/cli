@@ -16,7 +16,6 @@ const (
 )
 
 type apiClient interface {
-	REST(hostname, method, p string, body io.Reader, data interface{}) error
 	RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error) 
 }
 
