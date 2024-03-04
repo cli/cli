@@ -57,7 +57,7 @@ func (l *Logger) VerbosePrint(msg string) (int, error) {
 		return 0, nil
 	}
 
-	return fmt.Fprintf(l.IO.ErrOut, msg)
+	return fmt.Fprintln(l.IO.ErrOut, msg)
 }
 
 func (l *Logger) VerbosePrintf(f string, v ...interface{}) (int, error) {
