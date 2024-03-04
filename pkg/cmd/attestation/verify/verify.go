@@ -137,6 +137,7 @@ func RunVerify(opts *Options) error {
 
 	c := verification.FetchAttestationsConfig{
 		APIClient: opts.APIClient,
+		BundlePath: opts.BundlePath,
 		Digest: 	   artifact.DigestWithAlg(),
 		Limit:     opts.Limit,
 		Owner:          opts.Owner,
