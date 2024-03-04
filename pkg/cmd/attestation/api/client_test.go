@@ -13,14 +13,22 @@ const (
 	testDigest = "sha256:12313213"
 )
 
-func NewClientWithMockGHClient() Client {
+func NewClientWithMockGHClient(hasNextPage bool) Client {
 	fetcher := mockDataGenerator{
 		NumAttestations: 5,
 	}
 
+	if hasNextPage {
+		return &LiveClient{
+			api: mockAPIClient{
+				OnRESTWithNext: fetcher.OnRESTSuccessWithNextPage,
+			},
+		}
+	}
+
 	return &LiveClient{
 		api: mockAPIClient{
-			OnRESTWithNext: fetcher.OnRESTSuccessWithNextPage,
+			OnRESTWithNext: fetcher.OnRESTSuccess,
 		},
 	}
 }
@@ -44,7 +52,7 @@ func TestGetURL(t *testing.T) {
 }
 
 func TestGetByDigest(t *testing.T) {
-	c := NewClientWithMockGHClient()
+	c := NewClientWithMockGHClient(false)
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
 	require.NoError(t, err)
 
@@ -61,7 +69,7 @@ func TestGetByDigest(t *testing.T) {
 }
 
 func TestGetByDigestGreaterThanLimit(t *testing.T) {
-	c := NewClientWithMockGHClient()
+	c := NewClientWithMockGHClient(false)
 
 	limit := 3
 	// The method should return five results when the limit is not set
@@ -81,7 +89,7 @@ func TestGetByDigestGreaterThanLimit(t *testing.T) {
 }
 
 func TestGetByDigestWithNextPage(t *testing.T) {
-	c := NewClientWithMockGHClient()
+	c := NewClientWithMockGHClient(true)
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
 	require.NoError(t, err)
 
@@ -98,7 +106,7 @@ func TestGetByDigestWithNextPage(t *testing.T) {
 }
 
 func TestGetByDigestGreaterThanLimitWithNextPage(t *testing.T) {
-	c := NewClientWithMockGHClient()
+	c := NewClientWithMockGHClient(true)
 
 	limit := 7
 	// The method should return five results when the limit is not set

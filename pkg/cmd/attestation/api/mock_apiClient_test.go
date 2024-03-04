@@ -20,6 +20,10 @@ type mockDataGenerator struct {
 	NumAttestations int
 }
 
+func (m mockDataGenerator) OnRESTSuccess(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+	return m.OnRESTWithNextSuccessHelper(hostname, method, p, body, data, false)
+}
+
 func (m mockDataGenerator) OnRESTSuccessWithNextPage(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
 	// if path doesn't contain after, it means first time hitting the mock server
 	// so return the first page and return the link header in the response
