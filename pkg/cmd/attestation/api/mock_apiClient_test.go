@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -46,25 +47,20 @@ func (m mockDataGenerator) OnRESTSuccessHelper(hostname, method, p string, body 
 		atts[j] = &att
 	}
 
-	var resp AttestationsResponse
-	resp.Attestations = atts
-
-	data = resp
+	resp := AttestationsResponse{
+		Attestations: atts,
+	}
 
 	// // Convert the attestations to JSON
-	// jsonResponse, err := json.Marshal(resp)
-	// if err != nil {
-	// 	return err
-	// }
+	b, err := json.Marshal(resp)
+	if err != nil {
+		return err
+	}
 
-	// // Create a buffer containing the JSON response
-	// responseReader := bytes.NewBuffer(jsonResponse)
-
-	// linkHeader := ""
-	// if hasNext {
-	// 	// Create a link header with the next page
-	// 	linkHeader = fmt.Sprintf("<%s&after=2>; rel=\"next\"", p)
-	// }
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -76,38 +72,27 @@ func (m mockDataGenerator) OnRESTWithNextSuccessHelper(hostname, method, p strin
 		atts[j] = &att
 	}
 
-	var resp AttestationsResponse
-	resp.Attestations = atts
-
-	data = resp
-
-	// // Convert the attestations to JSON
-	// jsonResponse, err := json.Marshal(resp)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // Create a buffer containing the JSON response
-	// responseReader := bytes.NewBuffer(jsonResponse)
-	
-	// b, err := io.ReadAll(resp.Body)
-	// if err != nil {
-	// 	return "", err
-	// }
-
-	// err = json.Unmarshal(b, &data)
-	// if err != nil {
-	// 	return "", err
-	// }
-
-
-	linkHeader := ""
-	if hasNext {
-		// Create a link header with the next page
-		linkHeader = fmt.Sprintf("<%s&after=2>; rel=\"next\"", p)
+	resp := AttestationsResponse{
+		Attestations: atts,
 	}
 
-	return linkHeader, nil
+	// // Convert the attestations to JSON
+	b, err := json.Marshal(resp)
+	if err != nil {
+		return "", err
+	}
+
+	err = json.Unmarshal(b, &data)
+	if err != nil {
+		return "", err
+	}
+
+	if hasNext {
+		// return a link header with the next page
+		return fmt.Sprintf("<%s&after=2>; rel=\"next\"", p), nil
+	}
+
+	return "", nil
 }
 
 func (m mockDataGenerator) OnRESTNoAttestations(hostname, method, p string, body io.Reader, data interface{}) error {

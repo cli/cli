@@ -26,19 +26,6 @@ func NewClientWithMockGHClient() Client {
 	}
 }
 
-func NewClientWithMockGHClientWithNextPage() Client {
-	fetcher := mockDataGenerator{
-		NumAttestations: 5,
-	}
-
-	return &LiveClient{
-		api: mockAPIClient{
-			OnREST: fetcher.OnRESTSuccess,
-			OnRESTWithNext: fetcher.OnRESTSuccessWithNextPage,
-		},
-	}
-}
-
 func TestGetURL(t *testing.T) {
 	c := LiveClient{}
 
@@ -62,14 +49,14 @@ func TestGetByDigest(t *testing.T) {
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
 	require.NoError(t, err)
 
-	assert.Equal(t, len(attestations), 5)
+	assert.Equal(t, 5, len(attestations))
 	bundle := (attestations)[0].Bundle
 	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 
 	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
 	require.NoError(t, err)
 
-	assert.Equal(t, len(attestations), 5)
+	assert.Equal(t, 5, len(attestations))
 	bundle = (attestations)[0].Bundle
 	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 }
@@ -82,7 +69,7 @@ func TestGetByDigestGreaterThanLimit(t *testing.T) {
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, limit)
 	require.NoError(t, err)
 
-	assert.Equal(t, len(attestations), 3)
+	assert.Equal(t, 3, len(attestations))
 	bundle := (attestations)[0].Bundle
 	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 
@@ -95,7 +82,7 @@ func TestGetByDigestGreaterThanLimit(t *testing.T) {
 }
 
 func TestGetByDigestWithNextPage(t *testing.T) {
-	c := NewClientWithMockGHClientWithNextPage()
+	c := NewClientWithMockGHClient()
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
 	require.NoError(t, err)
 
@@ -112,7 +99,7 @@ func TestGetByDigestWithNextPage(t *testing.T) {
 }
 
 func TestGetByDigestGreaterThanLimitWithNextPage(t *testing.T) {
-	c := NewClientWithMockGHClientWithNextPage()
+	c := NewClientWithMockGHClient()
 
 	limit := 7
 	// The method should return five results when the limit is not set

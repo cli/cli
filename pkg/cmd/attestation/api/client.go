@@ -78,7 +78,7 @@ func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*At
 	var err error
 	// if no attestation or less than limit, then keep fetching
 	for url != "" && len(attestations) < limit {
-		url, err = c.api.RESTWithNext(c.host, http.MethodGet, url, nil, resp)
+		url, err = c.api.RESTWithNext(c.host, http.MethodGet, url, nil, &resp)
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +86,7 @@ func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*At
 		attestations = append(attestations, resp.Attestations...)
 	}
 
-	if len(resp.Attestations) == 0 {
+	if len(attestations) == 0 {
 		return nil, newErrNoAttestations(name, digest)
 	}
 
