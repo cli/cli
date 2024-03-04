@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewInspectCmd() *cobra.Command {
+func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{}
 	inspectCmd := &cobra.Command{
 		Use:   "inspect [<file path> | oci://<OCI image URI>]",
