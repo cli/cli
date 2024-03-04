@@ -1,6 +1,7 @@
 package attestation
 
 import (
+	"github.com/cli/cli/v2/pkg/cmd/attestation/download"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verify"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	
@@ -11,7 +12,7 @@ import (
 func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 	root := &cobra.Command{
 		Use:     "attestation [subcommand]",
-		Short:   "Work with attestations.",
+		Short:   "Work with attestations",
 		Aliases: []string{"at"},
 		Long: heredoc.Docf(`
 		Work with attestations that represent trusted metadata about artifacts and images.
@@ -25,6 +26,7 @@ func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 	`, "`"),
 	}
 
+	root.AddCommand(download.NewDownloadCmd(f))
 	root.AddCommand(verify.NewVerifyCmd(f))
 
 	return root
