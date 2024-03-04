@@ -209,7 +209,7 @@ func RunVerify(opts *Options) error {
 }
 
 func verifySLSAPredicateType(logger *logging.Logger, apr []*verification.AttestationProcessingResult) error {
-	logger.VerbosePrintf("Evaluating attestations have valid SLSA predicate type...\n")
+	logger.VerbosePrint("Evaluating attestations have valid SLSA predicate type...\n")
 
 	for _, result := range apr {
 		if result.VerificationResult.Statement.PredicateType != SLSAPredicateType {
