@@ -34,7 +34,7 @@ func NewVerifyTUFRootCmd(f *cmdutil.Factory) *cobra.Command {
 			gh attestation tuf-root-verify --mirror https://tuf-repo.github.com --root /path/to/1.root.json
 		`),
 		Run: func(cmd *cobra.Command, args []string) {
-			logger := logger.NewDefaultLogger()
+			logger := logger.NewDefaultLogger(f.IOStreams)
 			if err := verifyTUFRoot(mirror, root); err != nil {
 				fmt.Sprintln(logger.IO.Out, logger.ColorScheme.Redf("Failed to verify the TUF repository: %s", err))
 				os.Exit(1)

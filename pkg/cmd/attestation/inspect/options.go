@@ -25,12 +25,6 @@ func (opts *Options) Clean() {
 	opts.BundlePath = filepath.Clean(opts.BundlePath)
 }
 
-// ConfigureLogger configures a logger using configuration provided
-// through the options
-func (opts *Options) ConfigureLogger() {
-	opts.Logger = logger.NewLogger(false, opts.Verbose)
-}
-
 // AreFlagsValid checks that the provided flag combination is valid
 // and returns an error otherwise
 func (opts *Options) AreFlagsValid() error {

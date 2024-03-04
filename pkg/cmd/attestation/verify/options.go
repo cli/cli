@@ -38,12 +38,6 @@ func (opts *Options) ConfigureOCIClient() {
 	opts.OCIClient = oci.NewLiveClient()
 }
 
-// ConfigureLogger configures a logger using configuration provided
-// through the options
-func (opts *Options) ConfigureLogger() {
-	opts.Logger = logger.NewLogger(opts.Quiet, opts.Verbose)
-}
-
 // Clean cleans the file path option values
 func (opts *Options) Clean() {
 	if opts.BundlePath != "" {

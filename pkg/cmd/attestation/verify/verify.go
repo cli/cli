@@ -71,7 +71,7 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 			opts.APIClient = api.NewLiveClient()
 			
 			// Create a logger for use throughout the verify command
-			opts.ConfigureLogger()
+			opts.Logger = logger.NewLogger(f.IOStreams, opts.Quiet, opts.Verbose)
 
 			// Configure the live OCI client
 			opts.ConfigureOCIClient()

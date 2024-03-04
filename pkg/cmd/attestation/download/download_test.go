@@ -31,7 +31,7 @@ func TestRunDownload(t *testing.T) {
 		DigestAlgorithm: "sha512",
 		OutputPath:      tempDir,
 		Limit:           30,
-		Logger:          logger.NewDefaultLogger(),
+		Logger:          logger.NewSystemLogger(),
 	}
 
 	t.Run("fetch and store attestations successfully", func(t *testing.T) {

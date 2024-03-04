@@ -23,7 +23,7 @@ func TestRunInspect(t *testing.T) {
 	res := test.SuppressAndRestoreOutput()
 	defer res()
 
-	logger := logger.NewDefaultLogger()
+	logger := logger.NewSystemLogger()
 
 	opts := Options{
 		ArtifactPath:    artifactPath,

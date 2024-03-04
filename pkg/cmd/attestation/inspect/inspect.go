@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 
 	"github.com/MakeNowJust/heredoc"
@@ -49,7 +50,7 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Create a logger for use throughout the inspect command
-			opts.ConfigureLogger()
+			opts.Logger = logger.NewDefaultLogger(f.IOStreams)
 
 			// set the artifact path
 			opts.ArtifactPath = args[0]

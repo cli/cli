@@ -21,12 +21,6 @@ type Options struct {
 	Verbose         bool
 }
 
-// ConfigureLogger configures a logger using configuration provided
-// through the options
-func (opts *Options) ConfigureLogger() {
-	opts.Logger = logger.NewLogger(false, opts.Verbose)
-}
-
 // ConfigureOCIClient configures an OCI client
 func (opts *Options) ConfigureOCIClient() {
 	opts.OCIClient = oci.NewLiveClient()

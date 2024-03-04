@@ -15,11 +15,9 @@ type Logger struct {
 	verbose bool
 }
 
-func NewLogger(isQuiet, isVerbose bool) *Logger {
-	io := iostreams.System()
-	colorScheme := io.ColorScheme()
+func NewLogger(io *iostreams.IOStreams, isQuiet, isVerbose bool) *Logger {
 	return &Logger{
-		ColorScheme: colorScheme,
+		ColorScheme: io.ColorScheme(),
 		IO:          io,
 		quiet:       isQuiet,
 		verbose:     isVerbose,
@@ -27,11 +25,15 @@ func NewLogger(isQuiet, isVerbose bool) *Logger {
 }
 
 // NewDefaultLogger returns a Logger that with the default logging settings
-func NewDefaultLogger() *Logger {
+func NewDefaultLogger(io *iostreams.IOStreams) *Logger {
 	isQuiet := false
 	isVerbose := false
 
-	return NewLogger(isQuiet, isVerbose)
+	return NewLogger(io, isQuiet, isVerbose)
+}
+
+func NewSystemLogger() *Logger {
+	return NewDefaultLogger(iostreams.System())
 }
 
 // Printf writes the formatted arguments to the stdout writer.
