@@ -5,7 +5,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 
@@ -24,7 +24,7 @@ func TestRunVerify(t *testing.T) {
 	res := test.SuppressAndRestoreOutput()
 	defer res()
 
-	logger := logger.NewSystemLogger()
+	logger := logging.NewSystemLogger()
 
 	publicGoodOpts := Options{
 		ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
@@ -176,7 +176,7 @@ func TestVerifySLSAPredicateType_InvalidPredicate(t *testing.T) {
 		},
 	}
 
-	err := verifySLSAPredicateType(logger.NewSystemLogger(), apr)
+	err := verifySLSAPredicateType(logging.NewSystemLogger(), apr)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, ErrNoMatchingSLSAPredicate)
 }

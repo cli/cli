@@ -8,7 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
@@ -57,7 +57,7 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 			opts.APIClient = api.NewLiveClient()
 
 			// Create a logger for use throughout the download command
-			opts.Logger = logger.NewLogger(f.IOStreams, false, opts.Verbose)
+			opts.Logger = logging.NewLogger(f.IOStreams, false, opts.Verbose)
 
 			// Configure the live OCI client
 			opts.ConfigureOCIClient()

@@ -3,7 +3,7 @@ package inspect
 import (
 	"testing"
 
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ func TestRunInspect(t *testing.T) {
 	res := test.SuppressAndRestoreOutput()
 	defer res()
 
-	logger := logger.NewSystemLogger()
+	logger := logging.NewSystemLogger()
 
 	opts := Options{
 		ArtifactPath:    artifactPath,

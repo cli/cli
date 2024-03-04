@@ -9,7 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 
 	"github.com/stretchr/testify/assert"
@@ -31,7 +31,7 @@ func TestRunDownload(t *testing.T) {
 		DigestAlgorithm: "sha512",
 		OutputPath:      tempDir,
 		Limit:           30,
-		Logger:          logger.NewSystemLogger(),
+		Logger:          logging.NewSystemLogger(),
 	}
 
 	t.Run("fetch and store attestations successfully", func(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/digest"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 )
 
 // Options captures the options for the inspect command
@@ -16,7 +16,7 @@ type Options struct {
 	DigestAlgorithm   string
 	JsonResult        bool
 	Verbose           bool
-	Logger            *logger.Logger
+	Logger            *logging.Logger
 	OCIClient         oci.Client
 }
 

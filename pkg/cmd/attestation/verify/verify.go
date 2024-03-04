@@ -9,7 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	
 	"github.com/MakeNowJust/heredoc"
@@ -71,7 +71,7 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 			opts.APIClient = api.NewLiveClient()
 			
 			// Create a logger for use throughout the verify command
-			opts.Logger = logger.NewLogger(f.IOStreams, opts.Quiet, opts.Verbose)
+			opts.Logger = logging.NewLogger(f.IOStreams, opts.Quiet, opts.Verbose)
 
 			// Configure the live OCI client
 			opts.ConfigureOCIClient()
@@ -208,7 +208,7 @@ func RunVerify(opts *Options) error {
 	return nil
 }
 
-func verifySLSAPredicateType(logger *logger.Logger, apr []*verification.AttestationProcessingResult) error {
+func verifySLSAPredicateType(logger *logging.Logger, apr []*verification.AttestationProcessingResult) error {
 	logger.VerbosePrintf("Evaluating attestations have valid SLSA predicate type...\n")
 
 	for _, result := range apr {

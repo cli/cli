@@ -6,14 +6,14 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/digest"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 )
 
 type Options struct {
 	ArtifactPath    string
 	DigestAlgorithm string
 	APIClient    api.Client
-	Logger          *logger.Logger
+	Logger          *logging.Logger
 	Limit           int
 	OCIClient       oci.Client
 	OutputPath      string

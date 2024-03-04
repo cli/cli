@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	
 	"github.com/MakeNowJust/heredoc"
@@ -34,7 +34,7 @@ func NewVerifyTUFRootCmd(f *cmdutil.Factory) *cobra.Command {
 			gh attestation tuf-root-verify --mirror https://tuf-repo.github.com --root /path/to/1.root.json
 		`),
 		Run: func(cmd *cobra.Command, args []string) {
-			logger := logger.NewDefaultLogger(f.IOStreams)
+			logger := logging.NewDefaultLogger(f.IOStreams)
 			if err := verifyTUFRoot(mirror, root); err != nil {
 				fmt.Sprintln(logger.IO.Out, logger.ColorScheme.Redf("Failed to verify the TUF repository: %s", err))
 				os.Exit(1)
