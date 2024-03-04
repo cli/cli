@@ -9,7 +9,7 @@ import (
 )
 
 type mockAPIClient struct {
-	OnRESTWithNext func(hostname, method, p string, body io.Reader, data interface{}) (string, error) 
+	OnRESTWithNext func(hostname, method, p string, body io.Reader, data interface{}) (string, error)
 }
 
 func (m mockAPIClient) RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
@@ -67,7 +67,7 @@ func (m mockDataGenerator) OnRESTWithNextSuccessHelper(hostname, method, p strin
 
 func (m mockDataGenerator) OnRESTWithNextNoAttestations(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
 	resp := AttestationsResponse{
-		Attestations:  make([]*Attestation, 0),
+		Attestations: make([]*Attestation, 0),
 	}
 
 	// // Convert the attestations to JSON

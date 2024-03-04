@@ -26,7 +26,7 @@ func TestRunDownload(t *testing.T) {
 
 	baseOpts := Options{
 		ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
-		APIClient:    api.NewTestClient(),
+		APIClient:       api.NewTestClient(),
 		OCIClient:       oci.NewMockClient(),
 		DigestAlgorithm: "sha512",
 		OutputPath:      tempDir,

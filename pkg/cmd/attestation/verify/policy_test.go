@@ -19,10 +19,10 @@ func TestBuildPolicy(t *testing.T) {
 	require.NoError(t, err)
 
 	opts := &Options{
-		ArtifactPath:    artifactPath,
-		OIDCIssuer: GitHubOIDCIssuer,
-		Owner:           "sigstore",
-		SANRegex:        "^https://github.com/sigstore/",
+		ArtifactPath: artifactPath,
+		OIDCIssuer:   GitHubOIDCIssuer,
+		Owner:        "sigstore",
+		SANRegex:     "^https://github.com/sigstore/",
 	}
 
 	_, err = buildVerifyPolicy(opts, *artifact)

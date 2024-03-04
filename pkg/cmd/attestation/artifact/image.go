@@ -3,8 +3,8 @@ package artifact
 import (
 	"fmt"
 
-	"github.com/distribution/reference"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
+	"github.com/distribution/reference"
 )
 
 func digestContainerImageArtifact(url string, client oci.Client) (*DigestedArtifact, error) {

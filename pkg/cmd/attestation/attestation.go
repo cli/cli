@@ -3,10 +3,10 @@ package attestation
 import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/download"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/inspect"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/verifytufroot"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verify"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verifytufroot"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 )

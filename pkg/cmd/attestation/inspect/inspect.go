@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
@@ -84,7 +84,6 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 	return inspectCmd
 }
 
-
 func RunInspect(opts *Options) error {
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
@@ -99,7 +98,7 @@ func RunInspect(opts *Options) error {
 	}
 
 	config := verification.SigstoreConfig{
-		Logger:            opts.Logger,
+		Logger: opts.Logger,
 	}
 
 	policy, err := buildPolicy(*artifact)

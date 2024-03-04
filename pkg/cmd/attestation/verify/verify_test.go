@@ -30,7 +30,7 @@ func TestRunVerify(t *testing.T) {
 		ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 		BundlePath:      test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
 		DigestAlgorithm: "sha512",
-		APIClient:    api.NewTestClient(),
+		APIClient:       api.NewTestClient(),
 		Logger:          logger,
 		OCIClient:       oci.NewMockClient(),
 		OIDCIssuer:      GitHubOIDCIssuer,
@@ -122,7 +122,7 @@ func TestRunVerify(t *testing.T) {
 		opts := Options{
 			ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
 			BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
-			APIClient:    api.NewTestClient(),
+			APIClient:       api.NewTestClient(),
 			DigestAlgorithm: "sha512",
 			Logger:          logger,
 			OIDCIssuer:      GitHubOIDCIssuer,

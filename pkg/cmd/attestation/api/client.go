@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	DefaultLimit    = 30
-	maxLimitForFlag = 1000
+	DefaultLimit     = 30
+	maxLimitForFlag  = 1000
 	maxLimitForFetch = 100
 )
 
 type apiClient interface {
-	RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error) 
+	RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error)
 }
 
 type Client interface {
@@ -26,14 +26,14 @@ type Client interface {
 
 type LiveClient struct {
 	host string
-	api apiClient
+	api  apiClient
 }
 
 func NewLiveClient() *LiveClient {
 	liveAPIClient := api.NewClientFromHTTP(http.DefaultClient)
 	return &LiveClient{
 		host: "https://api.github.com",
-		api: liveAPIClient,
+		api:  liveAPIClient,
 	}
 }
 

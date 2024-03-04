@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/digest"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 )
 
@@ -27,7 +27,7 @@ type Options struct {
 	SAN                  string
 	SANRegex             string
 	Verbose              bool
-	APIClient         api.Client
+	APIClient            api.Client
 	Logger               *logging.Logger
 	Limit                int
 	OCIClient            oci.Client

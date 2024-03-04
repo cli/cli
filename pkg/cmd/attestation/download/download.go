@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
-	
+	"github.com/cli/cli/v2/pkg/cmdutil"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 )
@@ -90,7 +90,6 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 
 	return downloadCmd
 }
-
 
 func RunDownload(opts *Options) error {
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)

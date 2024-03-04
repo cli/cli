@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
-	
+	"github.com/cli/cli/v2/pkg/cmdutil"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 )
@@ -69,7 +69,7 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 		// along with information about how use the command
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			opts.APIClient = api.NewLiveClient()
-			
+
 			// Create a logger for use throughout the verify command
 			opts.Logger = logging.NewLogger(f.IOStreams, opts.Quiet, opts.Verbose)
 
@@ -136,12 +136,12 @@ func RunVerify(opts *Options) error {
 	opts.Logger.Printf("Verifying attestations for the artifact found at %s\n", artifact.URL)
 
 	c := verification.FetchAttestationsConfig{
-		APIClient: opts.APIClient,
+		APIClient:  opts.APIClient,
 		BundlePath: opts.BundlePath,
-		Digest: 	   artifact.DigestWithAlg(),
-		Limit:     opts.Limit,
-		Owner:          opts.Owner,
-		Repo:           opts.Repo,
+		Digest:     artifact.DigestWithAlg(),
+		Limit:      opts.Limit,
+		Owner:      opts.Owner,
+		Repo:       opts.Repo,
 	}
 	attestations, err := verification.GetAttestations(c)
 	if err != nil {

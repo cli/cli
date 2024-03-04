@@ -11,13 +11,13 @@ import (
 
 // Options captures the options for the inspect command
 type Options struct {
-	ArtifactPath      string
-	BundlePath        string
-	DigestAlgorithm   string
-	JsonResult        bool
-	Verbose           bool
-	Logger            *logging.Logger
-	OCIClient         oci.Client
+	ArtifactPath    string
+	BundlePath      string
+	DigestAlgorithm string
+	JsonResult      bool
+	Verbose         bool
+	Logger          *logging.Logger
+	OCIClient       oci.Client
 }
 
 // Clean cleans the file path option values

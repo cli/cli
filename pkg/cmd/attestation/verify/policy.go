@@ -1,10 +1,10 @@
 package verify
 
-import 	(
+import (
 	"fmt"
 
-	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"

@@ -12,7 +12,7 @@ import (
 type Options struct {
 	ArtifactPath    string
 	DigestAlgorithm string
-	APIClient    api.Client
+	APIClient       api.Client
 	Logger          *logging.Logger
 	Limit           int
 	OCIClient       oci.Client

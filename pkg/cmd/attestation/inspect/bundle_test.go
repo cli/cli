@@ -3,8 +3,8 @@ package inspect
 import (
 	"testing"
 
-	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -10,9 +10,9 @@ import (
 
 type Logger struct {
 	ColorScheme *iostreams.ColorScheme
-	IO      *iostreams.IOStreams
-	quiet   bool
-	verbose bool
+	IO          *iostreams.IOStreams
+	quiet       bool
+	verbose     bool
 }
 
 func NewLogger(io *iostreams.IOStreams, isQuiet, isVerbose bool) *Logger {

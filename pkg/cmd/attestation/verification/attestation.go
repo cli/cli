@@ -15,10 +15,10 @@ import (
 var ErrLocalAttestations = errors.New("failed to load local attestations")
 
 type FetchAttestationsConfig struct {
-	APIClient api.Client
+	APIClient  api.Client
 	BundlePath string
-	Digest string
-	Limit int
+	Digest     string
+	Limit      int
 	Owner      string
 	Repo       string
 }

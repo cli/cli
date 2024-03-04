@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
-	
+	"github.com/cli/cli/v2/pkg/cmdutil"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/spf13/cobra"
