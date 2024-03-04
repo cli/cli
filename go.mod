@@ -24,6 +24,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.3.0
 	github.com/henvic/httpretty v0.1.3
+	github.com/in-toto/in-toto-golang v0.9.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mattn/go-colorable v0.1.13
@@ -34,6 +35,7 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/rivo/tview v0.0.0-20221029100920-c4a7e501810d
 	github.com/shurcooL/githubv4 v0.0.0-20230704064427-599ae7bbf278
+	github.com/sigstore/protobuf-specs v0.3.0
 	github.com/sigstore/sigstore-go v0.2.1-0.20240222221148-8bd2a8139edc
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
@@ -95,7 +97,6 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.5 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/in-toto/in-toto-golang v0.9.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/itchyny/gojq v0.12.13 // indirect
 	github.com/itchyny/timefmt-go v0.1.5 // indirect
@@ -128,7 +129,6 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466 // indirect
-	github.com/sigstore/protobuf-specs v0.3.0 // indirect
 	github.com/sigstore/rekor v1.3.5 // indirect
 	github.com/sigstore/sigstore v1.8.1 // indirect
 	github.com/sigstore/timestamp-authority v1.2.2 // indirect
