@@ -1,53 +1,49 @@
-package verify
+package verification
 
 import (
 	"testing"
 
+	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/github"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
+
+	"github.com/sigstore/sigstore-go/pkg/verify"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var logger = output.NewDefaultLogger()
-
-var publicGoodOpts = Options{
-	ArtifactPath:    test.NormalizeRelativePath("../../test/data/public-good/sigstore-js-2.1.0.tgz"),
-	BundlePath:      test.NormalizeRelativePath("../../test/data/public-good/sigstore-js-2.1.0-bundle.json"),
-	DigestAlgorithm: "sha512",
-	GitHubClient:    github.NewTestClient(),
-	Logger:          logger,
-	OIDCIssuer:      GitHubOIDCIssuer,
-	Owner:           "sigstore",
-	Limit:           30,
-	OCIClient:       oci.NewMockClient(),
-	SANRegex:        "^https://github.com/sigstore/",
-}
+var (
+	artifactPath = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz")
+	bundlePath = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json")
+	ociClient = oci.NewMockClient()
+)
 
 func TestVerify_PublicGoodSuccess(t *testing.T) {
-	t.Skip()
 	res := test.SuppressAndRestoreOutput()
 	defer res()
 
-	artifact, err := artifact.NewDigestedArtifact(publicGoodOpts.OCIClient, publicGoodOpts.ArtifactPath, publicGoodOpts.DigestAlgorithm)
+	artifact, err := artifact.NewDigestedArtifact(ociClient, artifactPath, "sha512")
 	require.NoError(t, err)
 
-	attestations, err := getAttestations(&publicGoodOpts, artifact.Digest())
-	require.NoError(t, err)
+	c := FetchAttestationsConfig{
+		APIClient: api.NewTestClient(),
+		BundlePath: test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
+		Digest: artifact.DigestWithAlg(),
+		Owner: "sigstore",
+	}
 
-	policy, err := buildVerifyPolicy(&publicGoodOpts, artifact.Digest())
+	attestations, err := GetAttestations(c)
 	require.NoError(t, err)
 
 	config := SigstoreConfig{
-		CustomTrustedRoot: publicGoodOpts.CustomTrustedRoot,
-		Logger:            publicGoodOpts.Logger,
-		NoPublicGood:      publicGoodOpts.NoPublicGood,
+		Logger:            logger.NewDefaultLogger(),
+		NoPublicGood:      false,
 	}
 
-	v, err := NewSigstoreVerifier(config, policy)
+	v, err := NewSigstoreVerifier(config, verify.PolicyBuilder{})
 	require.NoError(t, err)
 
 	resp := v.Verify(attestations)
@@ -62,32 +58,27 @@ func TestVerify_PublicGoodSuccess(t *testing.T) {
 }
 
 func TestVerify_PublicGoodFail_WithNoPublicGoodFlag(t *testing.T) {
-	t.Skip()
 	res := test.SuppressAndRestoreOutput()
 	defer res()
 
-	opts := publicGoodOpts
-	opts.NoPublicGood = true
-
-	err := opts.AreFlagsValid()
+	artifact, err := artifact.NewDigestedArtifact(ociClient, artifactPath, "sha512")
 	require.NoError(t, err)
 
-	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
-	require.NoError(t, err)
+	c := FetchAttestationsConfig{
+		BundlePath: bundlePath,
+		Digest: artifact.Digest(),
+		Owner: "sigstore",
+	}
 
-	attestations, err := getAttestations(&opts, artifact.Digest())
-	require.NoError(t, err)
-
-	policy, err := buildVerifyPolicy(&publicGoodOpts, artifact.Digest())
+	attestations, err := GetAttestations(c)
 	require.NoError(t, err)
 
 	config := SigstoreConfig{
-		CustomTrustedRoot: opts.CustomTrustedRoot,
-		Logger:            opts.Logger,
-		NoPublicGood:      opts.NoPublicGood,
+		Logger:            logger.NewDefaultLogger(),
+		NoPublicGood:      true,
 	}
 
-	v, err := NewSigstoreVerifier(config, policy)
+	v, err := NewSigstoreVerifier(config, verify.PolicyBuilder{})
 	require.NoError(t, err)
 
 	resp := v.Verify(attestations)
@@ -99,28 +90,24 @@ func TestVerify_Failure(t *testing.T) {
 	res := test.SuppressAndRestoreOutput()
 	defer res()
 
-	opts := publicGoodOpts
-	opts.DigestAlgorithm = "sha256"
-
-	err := opts.AreFlagsValid()
+	artifact, err := artifact.NewDigestedArtifact(ociClient, artifactPath, "sha512")
 	require.NoError(t, err)
 
-	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
-	require.NoError(t, err)
+	c := FetchAttestationsConfig{
+		BundlePath: bundlePath,
+		Digest: artifact.Digest(),
+		Owner: "sigstore",
+	}
 
-	attestations, err := getAttestations(&opts, artifact.Digest())
-	require.NoError(t, err)
-
-	policy, err := buildVerifyPolicy(&opts, artifact.Digest())
+	attestations, err := GetAttestations(c)
 	require.NoError(t, err)
 
 	config := SigstoreConfig{
-		CustomTrustedRoot: opts.CustomTrustedRoot,
-		Logger:            opts.Logger,
-		NoPublicGood:      opts.NoPublicGood,
+		Logger:            logger.NewDefaultLogger(),
+		NoPublicGood:      true,
 	}
 
-	v, err := NewSigstoreVerifier(config, policy)
+	v, err := NewSigstoreVerifier(config, verify.PolicyBuilder{})
 	require.NoError(t, err)
 
 	resp := v.Verify(attestations)

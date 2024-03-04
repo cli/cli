@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	publicGoodArtifactPath = test.NormalizeRelativePath("../../test/data/public-good/sigstore-js-2.1.0.tgz")
-	publicGoodBundlePath   = test.NormalizeRelativePath("../../test/data/public-good/sigstore-js-2.1.0-bundle.json")
+	publicGoodArtifactPath = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz")
+	publicGoodBundlePath   = test.NormalizeRelativePath("../test/data/psigstore-js-2.1.0-bundle.json")
 )
 
 func TestAreFlagsValid(t *testing.T) {
@@ -194,36 +194,4 @@ func TestClean(t *testing.T) {
 
 	opts.Clean()
 	assert.Equal(t, validBundlePath, opts.BundlePath)
-}
-
-func TestMode(t *testing.T) {
-	t.Run("run in offline mode when bundle is provided", func(t *testing.T) {
-		opts := Options{
-			ArtifactPath: publicGoodArtifactPath,
-			BundlePath:   publicGoodBundlePath,
-		}
-
-		assert.Equal(t, OfflineMode, opts.Mode())
-	})
-
-	t.Run("run in offline mode when bundle and repo are provided", func(t *testing.T) {
-		opts := &Options{
-			ArtifactPath:    publicGoodArtifactPath,
-			BundlePath:      publicGoodBundlePath,
-			DigestAlgorithm: "sha512",
-			Repo:            "sigstore/sigstore-js",
-		}
-
-		assert.Equal(t, OfflineMode, opts.Mode())
-	})
-
-	t.Run("run in online mode when repo are provided", func(t *testing.T) {
-		opts := &Options{
-			ArtifactPath:    publicGoodArtifactPath,
-			DigestAlgorithm: "sha512",
-			Repo:            "sigstore/sigstore-js",
-		}
-
-		assert.Equal(t, OnlineMode, opts.Mode())
-	})
 }

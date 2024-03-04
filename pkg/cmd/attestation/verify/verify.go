@@ -1,17 +1,25 @@
 package verify
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 
-	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/github"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 )
 
+var ErrNoMatchingSLSAPredicate = fmt.Errorf("the attestation does not have the expected SLSA predicate type: %s", SLSAPredicateType)
+
 func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
-	opts := &verify.Options{}
+	opts := &Options{}
 	verifyCmd := &cobra.Command{
 		Use:   "verify <artifact-path-or-url>",
 		Args:  cobra.ExactArgs(1),
@@ -60,6 +68,8 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 		// If an error is returned, its message will be printed to the terminal
 		// along with information about how use the command
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			opts.APIClient = api.NewLiveClient()
+			
 			// Create a logger for use throughout the verify command
 			opts.ConfigureLogger()
 
@@ -86,7 +96,7 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 		// when RunE is used, the command usage will be printed
 		// We only want to print the error, not usage
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := runVerify(opts); err != nil {
+			if err := RunVerify(opts); err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Redf("Failed to verify the artifact: %s", err.Error()))
 				os.Exit(1)
 			}
@@ -99,24 +109,25 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 	verifyCmd.Flags().StringVarP(&opts.Owner, "owner", "o", "", "GitHub organization to scope attestation lookup by")
 	verifyCmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Repository name in the format <owner>/<repo>")
 	verifyCmd.MarkFlagsMutuallyExclusive("owner", "repo")
+	verifyCmd.MarkFlagsOneRequired("owner", "repo")
 	verifyCmd.Flags().BoolVarP(&opts.NoPublicGood, "no-public-good", "", false, "Only verify attestations signed with GitHub's Sigstore instance")
 	verifyCmd.Flags().BoolVarP(&opts.JsonResult, "json-result", "j", false, "Output verification result as JSON lines")
 	verifyCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "If set to true, the CLI will not print any diagnostic logging.")
 	verifyCmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "If set to true, the CLI will print verbose diagnostic logging.")
 	verifyCmd.MarkFlagsMutuallyExclusive("quiet", "verbose")
 	verifyCmd.Flags().StringVarP(&opts.CustomTrustedRoot, "custom-trusted-root", "", "", "Path to a custom trustedroot.json file to use for verification")
-	verifyCmd.Flags().IntVarP(&opts.Limit, "limit", "L", github.DefaultLimit, "Maximum number of attestations to fetch")
+	verifyCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
 	// policy enforcement flags
 	verifyCmd.Flags().BoolVarP(&opts.DenySelfHostedRunner, "deny-self-hosted-runners", "", false, "Fail verification for attestations generated on self-hosted runners.")
 	verifyCmd.Flags().StringVarP(&opts.SAN, "cert-identity", "", "", "Enforce that the certificate's subject alternative name matches the provided value exactly")
 	verifyCmd.Flags().StringVarP(&opts.SANRegex, "cert-identity-regex", "i", "", "Enforce that the certificate's subject alternative name matches the provided regex")
 	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex")
-	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", verify.GitHubOIDCIssuer, "Issuer of the OIDC token")
+	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", GitHubOIDCIssuer, "Issuer of the OIDC token")
 
 	return verifyCmd
 }
 
-func runVerify(opts *Options) error {
+func RunVerify(opts *Options) error {
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
 		return fmt.Errorf("failed to digest artifact: %s", err)
@@ -124,26 +135,33 @@ func runVerify(opts *Options) error {
 
 	opts.Logger.Printf("Verifying attestations for the artifact found at %s\n", artifact.URL)
 
-	attestations, err := getAttestations(opts, artifact.DigestWithAlg())
+	c := verification.FetchAttestationsConfig{
+		APIClient: opts.APIClient,
+		Digest: 	   artifact.DigestWithAlg(),
+		Limit:     opts.Limit,
+		Owner:          opts.Owner,
+		Repo:           opts.Repo,
+	}
+	attestations, err := verification.GetAttestations(c)
 	if err != nil {
-		if ok := errors.Is(err, github.ErrNoAttestations{}); ok {
+		if ok := errors.Is(err, api.ErrNoAttestations{}); ok {
 			return fmt.Errorf("no attestations found for subject: %s", artifact.DigestWithAlg())
 		}
 		return fmt.Errorf("failed to fetch attestations for subject: %s", artifact.DigestWithAlg())
 	}
 
-	policy, err := buildVerifyPolicy(opts, artifact.Digest())
+	policy, err := buildVerifyPolicy(opts, *artifact)
 	if err != nil {
 		return fmt.Errorf("failed to build policy: %w", err)
 	}
 
-	config := SigstoreConfig{
+	config := verification.SigstoreConfig{
 		CustomTrustedRoot: opts.CustomTrustedRoot,
 		Logger:            opts.Logger,
 		NoPublicGood:      opts.NoPublicGood,
 	}
 
-	sv, err := NewSigstoreVerifier(config, policy)
+	sv, err := verification.NewSigstoreVerifier(config, policy)
 	if err != nil {
 		return err
 	}
@@ -189,7 +207,7 @@ func runVerify(opts *Options) error {
 	return nil
 }
 
-func verifySLSAPredicateType(logger *output.Logger, apr []*AttestationProcessingResult) error {
+func verifySLSAPredicateType(logger *logger.Logger, apr []*verification.AttestationProcessingResult) error {
 	logger.VerbosePrintf("Evaluating attestations have valid SLSA predicate type...\n")
 
 	for _, result := range apr {

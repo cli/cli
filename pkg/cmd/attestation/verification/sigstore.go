@@ -1,9 +1,10 @@
-package verify
+package verification
 
 import (
 	"fmt"
 
-	"github.com/cli/cli/v2/pkg/cmd/attestation/github"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
@@ -16,9 +17,20 @@ const (
 	GitHubIssuerOrg     = "GitHub, Inc."
 )
 
+// AttestationProcessingResult captures processing a given attestation's signature verification and policy evaluation
+type AttestationProcessingResult struct {
+	Attestation        *api.Attestation
+	VerificationResult *verify.VerificationResult
+}
+
+type SigstoreResults struct {
+	VerifyResults []*AttestationProcessingResult
+	Error         error
+}
+
 type SigstoreConfig struct {
 	CustomTrustedRoot string
-	Logger            *output.Logger
+	Logger            *logger.Logger
 	NoPublicGood      bool
 }
 
@@ -28,7 +40,7 @@ type SigstoreVerifier struct {
 	customVerifier       *verify.SignedEntityVerifier
 	policy               verify.PolicyBuilder
 	onlyVerifyWithGithub bool
-	Logger               *output.Logger
+	Logger               *logger.Logger
 }
 
 // NewSigstoreVerifier creates a new SigstoreVerifier struct
@@ -91,7 +103,7 @@ func (v *SigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify.Sig
 	return nil, "", fmt.Errorf("leaf certificate issuer is not recognized")
 }
 
-func (v *SigstoreVerifier) Verify(attestations []*github.Attestation) *SigstoreResults {
+func (v *SigstoreVerifier) Verify(attestations []*api.Attestation) *SigstoreResults {
 	// initialize the processing results before attempting to verify
 	// with multiple verifiers
 	results := make([]*AttestationProcessingResult, len(attestations))

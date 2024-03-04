@@ -6,6 +6,7 @@ import 	(
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 )
 
@@ -16,19 +17,20 @@ const (
 	GitHubRunner = "github-hosted"
 )
 
-func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error) {
-	if opts.SAN != "" || opts.SANRegex != "" {
-		sanMatcher, err := verify.NewSANMatcher(opts.SAN, "", opts.SANRegex)
-		if err != nil {
-			return verify.SubjectAlternativeNameMatcher{}, err
-		}
-		return sanMatcher, nil
+func buildSANMatcher(san, sanRegex string) (verify.SubjectAlternativeNameMatcher, error) {
+	if san == "" && sanRegex == "" {
+		return verify.SubjectAlternativeNameMatcher{}, nil
 	}
-	return verify.SubjectAlternativeNameMatcher{}, nil
+
+	sanMatcher, err := verify.NewSANMatcher(san, "", sanRegex)
+	if err != nil {
+		return verify.SubjectAlternativeNameMatcher{}, err
+	}
+	return sanMatcher, nil
 }
 
 func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.PolicyOption, error) {
-	sanMatcher, err := buildSANMatcher(opts)
+	sanMatcher, err := buildSANMatcher(opts.SAN, opts.SANRegex)
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +69,8 @@ func buildVerifyCertIdOption(opts *Options) (verify.PolicyOption, error) {
 	return withAnyRunner, nil
 }
 
-func buildVerifyPolicy(opts *Options, artifactDigest string) (verify.PolicyBuilder, error) {
-	artifactDigestPolicyOption, err := verification.BuildDigestPolicyOption(artifactDigest, opts.DigestAlgorithm)
+func buildVerifyPolicy(opts *Options, a artifact.DigestedArtifact) (verify.PolicyBuilder, error) {
+	artifactDigestPolicyOption, err := verification.BuildDigestPolicyOption(a)
 	if err != nil {
 		return verify.PolicyBuilder{}, err
 	}

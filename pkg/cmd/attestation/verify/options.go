@@ -7,15 +7,8 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/digest"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/github"
-)
-
-const (
-	// OfflineMode is used when the user provides a bundle path
-	OfflineMode = "offline"
-	// OnlineMode is used when the user does not provide a bundle path
-	// An owner or repo scope is used to fetch attestations from GitHub
-	OnlineMode = "online"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logger"
 )
 
 // Options captures the options for the verify command
@@ -34,33 +27,10 @@ type Options struct {
 	SAN                  string
 	SANRegex             string
 	Verbose              bool
-	GitHubClient         github.Client
-	Logger               *output.Logger
+	APIClient         api.Client
+	Logger               *logger.Logger
 	Limit                int
 	OCIClient            oci.Client
-}
-
-// Mode returns a string indicating either online or offline mode
-func (opts *Options) Mode() string {
-	if opts.BundlePath == "" {
-		return OnlineMode
-	}
-	return OfflineMode
-}
-
-// ConfigureGitHubClient configures a live GitHub client if the tool
-// is running in online mode
-func (opts *Options) ConfigureGitHubClient(version, date string) error {
-	if opts.Mode() == OfflineMode {
-		return nil
-	}
-
-	client, err := github.NewLiveClient(version, date)
-	if err != nil {
-		return err
-	}
-	opts.GitHubClient = client
-	return nil
 }
 
 // ConfigureOCIClient configures an OCI client
@@ -71,7 +41,7 @@ func (opts *Options) ConfigureOCIClient() {
 // ConfigureLogger configures a logger using configuration provided
 // through the options
 func (opts *Options) ConfigureLogger() {
-	opts.Logger = output.NewLogger(opts.Quiet, opts.Verbose)
+	opts.Logger = logger.NewLogger(opts.Quiet, opts.Verbose)
 }
 
 // Clean cleans the file path option values

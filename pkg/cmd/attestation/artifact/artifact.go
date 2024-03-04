@@ -63,9 +63,14 @@ func NewDigestedArtifact(client oci.Client, reference, digestAlg string) (artifa
 	return digestLocalFileArtifact(normalized, digestAlg)
 }
 
-// Digest returns the digest of the artifact
+// Digest returns the artifact's digest
 func (a *DigestedArtifact) Digest() string {
 	return a.digest
+}
+
+// Algorithm returns the artifact's algorithm
+func (a *DigestedArtifact) Algorithm() string {
+	return a.digestAlg
 }
 
 // DigestWithAlg returns the digest:algorithm of the artifact
