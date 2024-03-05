@@ -1,4 +1,4 @@
-package verifytufroot
+package tufrootverify
 
 import (
 	"fmt"
@@ -14,21 +14,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewVerifyTUFRootCmd(f *cmdutil.Factory) *cobra.Command {
+func NewTUFRootVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 	var mirror string
 	var root string
 	var cmd = cobra.Command{
-		Use:   "verify-tuf-root --mirror <mirror-url> --root <root.json>",
+		Use:   "tuf-root-verify --mirror <mirror-url> --root <root.json>",
 		Args:  cobra.ExactArgs(0),
 		Short: "Verify the TUF repository from a provided TUF root",
 		Long: heredoc.Docf(`
-			Verify a TUF repository from a local TUF root.
+			Verify a TUF repository with a local TUF root.
 
 			The command requires you provide the %[1]s--mirror%[1]s flag, which should be the URL 
 			of the TUF repository mirror.
 			
 			The command also requires you provide the %[1]s--root%[1]s flag, which should be the 
 			path to the TUF root file.
+
+			GitHub relies on TUF to securely deliver the trust root for our signing authority.
+			For more information on TUF, see the official documentation: <https://theupdateframework.github.io/>.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Verify the TUF repository from a provided TUF root
