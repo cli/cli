@@ -21,11 +21,6 @@ type Options struct {
 	Verbose         bool
 }
 
-// ConfigureOCIClient configures an OCI client
-func (opts *Options) ConfigureOCIClient() {
-	opts.OCIClient = oci.NewLiveClient()
-}
-
 func (opts *Options) AreFlagsValid() error {
 	if opts.Owner == "" {
 		return fmt.Errorf("owner must be provided")

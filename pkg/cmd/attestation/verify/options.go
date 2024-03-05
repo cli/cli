@@ -33,11 +33,6 @@ type Options struct {
 	OCIClient            oci.Client
 }
 
-// ConfigureOCIClient configures an OCI client
-func (opts *Options) ConfigureOCIClient() {
-	opts.OCIClient = oci.NewLiveClient()
-}
-
 // Clean cleans the file path option values
 func (opts *Options) Clean() {
 	if opts.BundlePath != "" {

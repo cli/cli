@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
@@ -15,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
+func NewInspectCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
 	opts := &Options{}
 	inspectCmd := &cobra.Command{
 		Use:   "inspect [<file path> | oci://<OCI image URI>]",
@@ -50,6 +51,8 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 			$ gh attestation inspect oci://<my-OCI-image> --bundle <path-to-bundle>
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			opts.OCIClient = oc
+
 			// Create a logger for use throughout the inspect command
 			opts.Logger = logging.NewDefaultLogger(f.IOStreams)
 

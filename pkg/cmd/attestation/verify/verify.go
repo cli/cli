@@ -8,6 +8,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
@@ -19,7 +20,7 @@ import (
 
 var ErrNoMatchingSLSAPredicate = fmt.Errorf("the attestation does not have the expected SLSA predicate type: %s", SLSAPredicateType)
 
-func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
+func NewVerifyCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
 	opts := &Options{}
 	verifyCmd := &cobra.Command{
 		Use:   "verify <artifact-path-or-url>",
@@ -75,7 +76,7 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 			opts.Logger = logging.NewLogger(f.IOStreams, opts.Quiet, opts.Verbose)
 
 			// Configure the live OCI client
-			opts.ConfigureOCIClient()
+			opts.OCIClient = oc
 
 			// set the artifact path
 			opts.ArtifactPath = args[0]

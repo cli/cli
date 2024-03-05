@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -15,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
+func NewDownloadCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
 	opts := &Options{}
 	downloadCmd := &cobra.Command{
 		Use:   "download [<file path> | oci://<OCI image URI>]",
@@ -61,7 +62,7 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 			opts.Logger = logging.NewLogger(f.IOStreams, false, opts.Verbose)
 
 			// Configure the live OCI client
-			opts.ConfigureOCIClient()
+			opts.OCIClient = oc
 
 			// set the artifact path
 			opts.ArtifactPath = args[0]
