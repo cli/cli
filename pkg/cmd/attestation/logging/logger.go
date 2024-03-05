@@ -36,7 +36,7 @@ func NewSystemLogger() *Logger {
 	return NewDefaultLogger(iostreams.System())
 }
 
-// Printf writes the formatted arguments to the stdout writer.
+// Printf writes the formatted arguments to the stderr writer.
 func (l *Logger) Printf(f string, v ...interface{}) (int, error) {
 	if l.quiet || !l.IO.IsStdoutTTY() {
 		return 0, nil
@@ -44,7 +44,7 @@ func (l *Logger) Printf(f string, v ...interface{}) (int, error) {
 	return fmt.Fprintf(l.IO.ErrOut, f, v...)
 }
 
-// Println writes the arguments to the stdout writer with a newline at the end.
+// Println writes the arguments to the stderr writer with a newline at the end.
 func (l *Logger) Println(v ...interface{}) (int, error) {
 	if l.quiet || !l.IO.IsStdoutTTY() {
 		return 0, nil

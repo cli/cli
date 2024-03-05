@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -35,6 +36,12 @@ func NewVerifyTUFRootCmd(f *cmdutil.Factory) *cobra.Command {
 		`),
 		Run: func(cmd *cobra.Command, args []string) {
 			logger := logging.NewDefaultLogger(f.IOStreams)
+
+			if err := auth.IsHostSupported(); err != nil {
+				fmt.Sprintln(logger.IO.Out, logger.ColorScheme.Red(err.Error()))
+				os.Exit(1)
+			}
+
 			if err := verifyTUFRoot(mirror, root); err != nil {
 				fmt.Sprintln(logger.IO.Out, logger.ColorScheme.Redf("Failed to verify the TUF repository: %s", err))
 				os.Exit(1)

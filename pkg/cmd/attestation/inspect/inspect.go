@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -69,6 +70,10 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 		// when RunE is used, the command usage will be printed
 		// We only want to print the error, not usage
 		Run: func(cmd *cobra.Command, args []string) {
+			if err := auth.IsHostSupported(); err != nil {
+				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
+				os.Exit(1)
+			}
 			if err := RunInspect(opts); err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Redf("Failed to inspect the artifact and bundle: %s", err.Error()))
 				os.Exit(1)
