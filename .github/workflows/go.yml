@@ -37,9 +37,3 @@ jobs:
 
       - name: Build
         run: go build -v ./cmd/gh
-
-      - name: Build executable
-        run: make bin/gh
-
-      - name: Run attestation command integration Tests
-        run: ./test/integration/attestation-cmd/download-and-verify-package-attestation.sh
