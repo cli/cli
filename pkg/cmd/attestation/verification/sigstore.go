@@ -114,8 +114,9 @@ func (v *SigstoreVerifier) Verify(attestations []*api.Attestation) *SigstoreResu
 		results[i] = apr
 	}
 
+	totalAttestations := len(attestations)
 	for i, apr := range results {
-		v.Logger.VerbosePrintf("Verifying attestation #%d against the configured Sigstore trust roots\n", i+1)
+		v.Logger.VerbosePrintf("Verifying attestation %d/%d against the configured Sigstore trust roots\n", i+1, totalAttestations)
 
 		// determine which verifier should attempt verification against the bundle
 		verifier, issuer, err := v.chooseVerifier(apr.Attestation.Bundle)
@@ -125,7 +126,7 @@ func (v *SigstoreVerifier) Verify(attestations []*api.Attestation) *SigstoreResu
 			}
 		}
 
-		v.Logger.VerbosePrintf("Attempting verification against issuer \"%s\"...\n", issuer)
+		v.Logger.VerbosePrintf("Attempting verification against issuer \"%s\"\n", issuer)
 		// attempt to verify the attestation
 		result, err := verifier.Verify(apr.Attestation.Bundle, v.policy)
 		// if verification fails, create the error and exit verification early

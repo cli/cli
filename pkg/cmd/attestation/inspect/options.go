@@ -16,6 +16,7 @@ type Options struct {
 	DigestAlgorithm string
 	JsonResult      bool
 	Verbose         bool
+	Quiet           bool
 	Logger          *logging.Logger
 	OCIClient       oci.Client
 }

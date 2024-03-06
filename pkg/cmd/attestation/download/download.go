@@ -77,7 +77,7 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
 				os.Exit(1)
 			}
-			opts.APIClient = api.NewLiveClient(hc)
+			opts.APIClient = api.NewLiveClient(hc, opts.Logger)
 
 			opts.OCIClient = oci.NewLiveClient()
 

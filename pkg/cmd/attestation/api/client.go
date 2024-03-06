@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 )
 
 const (
@@ -25,15 +26,17 @@ type Client interface {
 }
 
 type LiveClient struct {
-	host string
-	api  apiClient
+	api    apiClient
+	host   string
+	logger *logging.Logger
 }
 
-func NewLiveClient(hc *http.Client) *LiveClient {
+func NewLiveClient(hc *http.Client, l *logging.Logger) *LiveClient {
 	liveAPIClient := api.NewClientFromHTTP(hc)
 	return &LiveClient{
-		host: "https://api.github.com",
-		api:  liveAPIClient,
+		api:    liveAPIClient,
+		host:   "https://api.github.com",
+		logger: l,
 	}
 }
 
@@ -60,6 +63,8 @@ func (c *LiveClient) GetByOwnerAndDigest(owner, digest string, limit int) ([]*At
 }
 
 func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*Attestation, error) {
+	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
+
 	perPage := limit
 	if perPage <= 0 || perPage > maxLimitForFlag {
 		return nil, fmt.Errorf("limit must be greater than 0 and less than or equal to %d", maxLimitForFlag)

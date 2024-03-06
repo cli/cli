@@ -98,7 +98,7 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
 				os.Exit(1)
 			}
-			opts.APIClient = api.NewLiveClient(hc)
+			opts.APIClient = api.NewLiveClient(hc, opts.Logger)
 
 			opts.OCIClient = oci.NewLiveClient()
 
@@ -183,7 +183,7 @@ func RunVerify(opts *Options) error {
 	}
 
 	opts.Logger.VerbosePrint(opts.Logger.ColorScheme.Green(
-		"Successfully verified all attestations against Sigstore!\n\n",
+		"Successfully verified all attestations against Sigstore!\n",
 	))
 
 	// Try verifying the attestation's predicate type against the expect SLSA predicate type
@@ -219,7 +219,7 @@ func RunVerify(opts *Options) error {
 }
 
 func verifySLSAPredicateType(logger *logging.Logger, apr []*verification.AttestationProcessingResult) error {
-	logger.VerbosePrint("Evaluating attestations have valid SLSA predicate type...\n")
+	logger.VerbosePrint("Evaluating attestations have valid SLSA predicate type")
 
 	for _, result := range apr {
 		if result.VerificationResult.Statement.PredicateType != SLSAPredicateType {
