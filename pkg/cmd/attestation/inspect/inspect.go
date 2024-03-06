@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewInspectCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
+func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{}
 	inspectCmd := &cobra.Command{
 		Use:   "inspect [<file path> | oci://<OCI image URI>]",
@@ -51,8 +51,6 @@ func NewInspectCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
 			$ gh attestation inspect oci://<my-OCI-image> --bundle <path-to-bundle>
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			opts.OCIClient = oc
-
 			// Create a logger for use throughout the inspect command
 			opts.Logger = logging.NewDefaultLogger(f.IOStreams)
 
@@ -73,6 +71,8 @@ func NewInspectCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
 		// when RunE is used, the command usage will be printed
 		// We only want to print the error, not usage
 		Run: func(cmd *cobra.Command, args []string) {
+			opts.OCIClient = oci.NewLiveClient()
+
 			if err := auth.IsHostSupported(); err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
 				os.Exit(1)

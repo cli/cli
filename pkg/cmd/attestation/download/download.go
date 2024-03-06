@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewDownloadCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
+func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{}
 	downloadCmd := &cobra.Command{
 		Use:   "download [<file path> | oci://<OCI image URI>]",
@@ -56,13 +56,8 @@ func NewDownloadCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
 		// If an error is returned, its message will be printed to the terminal
 		// along with information about how use the command
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			opts.APIClient = api.NewLiveClient()
-
 			// Create a logger for use throughout the download command
 			opts.Logger = logging.NewLogger(f.IOStreams, false, opts.Verbose)
-
-			// Configure the live OCI client
-			opts.OCIClient = oc
 
 			// set the artifact path
 			opts.ArtifactPath = args[0]
@@ -77,6 +72,15 @@ func NewDownloadCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
 		// when RunE is used, the command usage will be printed
 		// We only want to print the error, not usage
 		Run: func(cmd *cobra.Command, args []string) {
+			hc, err := f.HttpClient()
+			if err != nil {
+				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
+				os.Exit(1)
+			}
+			opts.APIClient = api.NewLiveClient(hc)
+
+			opts.OCIClient = oci.NewLiveClient()
+
 			if err := auth.IsHostSupported(); err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
 				os.Exit(1)

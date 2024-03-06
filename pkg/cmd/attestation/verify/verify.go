@@ -20,7 +20,7 @@ import (
 
 var ErrNoMatchingSLSAPredicate = fmt.Errorf("the attestation does not have the expected SLSA predicate type: %s", SLSAPredicateType)
 
-func NewVerifyCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
+func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{}
 	verifyCmd := &cobra.Command{
 		Use:   "verify <artifact-path-or-url>",
@@ -70,13 +70,8 @@ func NewVerifyCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
 		// If an error is returned, its message will be printed to the terminal
 		// along with information about how use the command
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			opts.APIClient = api.NewLiveClient()
-
 			// Create a logger for use throughout the verify command
 			opts.Logger = logging.NewLogger(f.IOStreams, opts.Quiet, opts.Verbose)
-
-			// Configure the live OCI client
-			opts.OCIClient = oc
 
 			// set the artifact path
 			opts.ArtifactPath = args[0]
@@ -98,6 +93,15 @@ func NewVerifyCmd(f *cmdutil.Factory, oc oci.Client) *cobra.Command {
 		// when RunE is used, the command usage will be printed
 		// We only want to print the error, not usage
 		Run: func(cmd *cobra.Command, args []string) {
+			hc, err := f.HttpClient()
+			if err != nil {
+				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
+				os.Exit(1)
+			}
+			opts.APIClient = api.NewLiveClient(hc)
+
+			opts.OCIClient = oci.NewLiveClient()
+
 			if err := auth.IsHostSupported(); err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
 				os.Exit(1)

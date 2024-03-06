@@ -29,8 +29,8 @@ type LiveClient struct {
 	api  apiClient
 }
 
-func NewLiveClient() *LiveClient {
-	liveAPIClient := api.NewClientFromHTTP(http.DefaultClient)
+func NewLiveClient(hc *http.Client) *LiveClient {
+	liveAPIClient := api.NewClientFromHTTP(hc)
 	return &LiveClient{
 		host: "https://api.github.com",
 		api:  liveAPIClient,

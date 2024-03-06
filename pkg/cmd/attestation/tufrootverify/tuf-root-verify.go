@@ -18,10 +18,10 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 	var mirror string
 	var root string
 	var cmd = cobra.Command{
-		Use:   "tuf-root-verify --mirror <mirror-url> --root <root.json>",
-		Args:  cobra.ExactArgs(0),
+		Use:    "tuf-root-verify --mirror <mirror-url> --root <root.json>",
+		Args:   cobra.ExactArgs(0),
 		Hidden: true,
-		Short: "Verify the TUF repository from a provided TUF root",
+		Short:  "Verify the TUF repository from a provided TUF root",
 		Long: heredoc.Docf(`
 			Verify a TUF repository with a local TUF root.
 

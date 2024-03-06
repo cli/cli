@@ -1,7 +1,6 @@
 package attestation
 
 import (
-	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/download"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/inspect"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/tufrootverify"
@@ -29,11 +28,9 @@ func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 	`, "`"),
 	}
 
-	ociClient := oci.NewLiveClient()
-
-	root.AddCommand(download.NewDownloadCmd(f, ociClient))
-	root.AddCommand(inspect.NewInspectCmd(f, ociClient))
-	root.AddCommand(verify.NewVerifyCmd(f, ociClient))
+	root.AddCommand(download.NewDownloadCmd(f))
+	root.AddCommand(inspect.NewInspectCmd(f))
+	root.AddCommand(verify.NewVerifyCmd(f))
 	root.AddCommand(tufrootverify.NewTUFRootVerifyCmd(f))
 
 	return root
