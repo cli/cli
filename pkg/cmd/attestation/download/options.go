@@ -10,12 +10,12 @@ import (
 )
 
 type Options struct {
+	APIClient       api.Client
 	ArtifactPath    string
 	DigestAlgorithm string
-	APIClient       api.Client
 	Logger          *logging.Logger
 	Limit           int
-	OCIClient       oci.Client
+	OCIClient       *oci.Client
 	OutputPath      string
 	Owner           string
 	Verbose         bool

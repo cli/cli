@@ -3,6 +3,7 @@ package inspect
 import (
 	"testing"
 
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 
@@ -30,6 +31,7 @@ func TestRunInspect(t *testing.T) {
 		BundlePath:      bundlePath,
 		DigestAlgorithm: "sha512",
 		Logger:          logger,
+		OCIClient:       oci.NewMockClient(),
 	}
 
 	t.Run("with valid artifact and bundle", func(t *testing.T) {
@@ -62,5 +64,12 @@ func TestRunInspect(t *testing.T) {
 		customOpts := opts
 		customOpts.BundlePath = "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl"
 		assert.Nil(t, RunInspect(&customOpts))
+	})
+
+	t.Run("with missing OCI client", func(t *testing.T) {
+		customOpts := opts
+		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
+		customOpts.OCIClient = nil
+		assert.Error(t, RunInspect(&customOpts))
 	})
 }

@@ -108,6 +108,19 @@ func TestRunDownload(t *testing.T) {
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "failed to digest artifact")
 	})
+
+	t.Run("with missing OCI client", func(t *testing.T) {
+		customOpts := baseOpts
+		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
+		customOpts.OCIClient = nil
+		assert.Error(t, RunDownload(&customOpts))
+	})
+
+	t.Run("with missing API client", func(t *testing.T) {
+		customOpts := baseOpts
+		customOpts.APIClient = nil
+		assert.Error(t, RunDownload(&customOpts))
+	})
 }
 
 func TestCreateJSONLinesFilePath(t *testing.T) {

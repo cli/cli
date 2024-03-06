@@ -19,23 +19,34 @@ func TestDigestContainerImageArtifact(t *testing.T) {
 	assert.Equal(t, "sha256", digestedArtifact.digestAlg)
 }
 
-func TestFetchImageFailure(t *testing.T) {
+func TestParseImageRefFailure(t *testing.T) {
 	client := oci.NewReferenceFailClient()
 	url := "example.com/repo:tag"
 	_, err := digestContainerImageArtifact(url, client)
 	assert.Error(t, err)
 }
 
-func TestRegistryAuthFailure(t *testing.T) {
-	client := oci.NewAuthFailClient()
-	url := "example.com/repo:tag"
-	_, err := digestContainerImageArtifact(url, client)
-	assert.ErrorIs(t, err, oci.ErrRegistryAuthz)
-}
+func TestFetchImageFailure(t *testing.T) {
+	testcase := []struct {
+		name        string
+		client      *oci.Client
+		expectedErr error
+	}{
+		{
+			name:        "Fail to authorize with registry",
+			client:      oci.NewAuthFailClient(),
+			expectedErr: oci.ErrRegistryAuthz,
+		},
+		{
+			name:        "Fail to fetch image due to denial",
+			client:      oci.NewDeniedClient(),
+			expectedErr: oci.ErrDenied,
+		},
+	}
 
-func TestDeniedFailure(t *testing.T) {
-	client := oci.NewDeniedClient()
-	url := "example.com/repo:tag"
-	_, err := digestContainerImageArtifact(url, client)
-	assert.ErrorIs(t, err, oci.ErrDenied)
+	for _, tc := range testcase {
+		url := "example.com/repo:tag"
+		_, err := digestContainerImageArtifact(url, tc.client)
+		assert.ErrorIs(t, err, tc.expectedErr)
+	}
 }

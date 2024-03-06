@@ -52,15 +52,15 @@ func (c Client) GetImageDigest(imgName string) (*v1.Hash, error) {
 	return &desc.Digest, nil
 }
 
-func NewLiveClient() Client {
-	return Client{
+func NewLiveClient() *Client {
+	return &Client{
 		ParseReference: name.ParseReference,
 		Get:            remote.Get,
 	}
 }
 
-func NewMockClient() Client {
-	return Client{
+func NewMockClient() *Client {
+	return &Client{
 		ParseReference: func(string, ...name.Option) (name.Reference, error) {
 			return name.Tag{}, nil
 		},
@@ -76,8 +76,8 @@ func NewMockClient() Client {
 	}
 }
 
-func NewReferenceFailClient() Client {
-	return Client{
+func NewReferenceFailClient() *Client {
+	return &Client{
 		ParseReference: func(string, ...name.Option) (name.Reference, error) {
 			return nil, fmt.Errorf("failed to parse reference")
 		},
@@ -87,8 +87,8 @@ func NewReferenceFailClient() Client {
 	}
 }
 
-func NewAuthFailClient() Client {
-	return Client{
+func NewAuthFailClient() *Client {
+	return &Client{
 		ParseReference: func(string, ...name.Option) (name.Reference, error) {
 			return name.Tag{}, nil
 		},
@@ -98,8 +98,8 @@ func NewAuthFailClient() Client {
 	}
 }
 
-func NewDeniedClient() Client {
-	return Client{
+func NewDeniedClient() *Client {
+	return &Client{
 		ParseReference: func(string, ...name.Option) (name.Reference, error) {
 			return name.Tag{}, nil
 		},

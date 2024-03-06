@@ -162,6 +162,20 @@ func TestRunVerify(t *testing.T) {
 		opts.BundlePath = "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl"
 		assert.Nil(t, RunVerify(&opts))
 	})
+
+	t.Run("with missing OCI client", func(t *testing.T) {
+		customOpts := publicGoodOpts
+		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
+		customOpts.OCIClient = nil
+		assert.Error(t, RunVerify(&customOpts))
+	})
+
+	t.Run("with missing API client", func(t *testing.T) {
+		customOpts := publicGoodOpts
+		customOpts.APIClient = nil
+		customOpts.BundlePath = ""
+		assert.Error(t, RunVerify(&customOpts))
+	})
 }
 
 func TestVerifySLSAPredicateType_InvalidPredicate(t *testing.T) {

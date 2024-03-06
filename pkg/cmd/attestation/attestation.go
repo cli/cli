@@ -16,6 +16,7 @@ func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 		Use:     "attestation [subcommand]",
 		Short:   "Work with attestations",
 		Aliases: []string{"at"},
+		Hidden:  true,
 		Long: heredoc.Docf(`
 		Work with attestations that represent trusted metadata about artifacts and images.
 

@@ -102,6 +102,9 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 }
 
 func RunDownload(opts *Options) error {
+	if opts.APIClient == nil {
+		return fmt.Errorf("missing API client")
+	}
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
 		return fmt.Errorf("failed to digest artifact: %w", err)

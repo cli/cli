@@ -7,7 +7,10 @@ import (
 	"github.com/distribution/reference"
 )
 
-func digestContainerImageArtifact(url string, client oci.Client) (*DigestedArtifact, error) {
+func digestContainerImageArtifact(url string, client *oci.Client) (*DigestedArtifact, error) {
+	if client == nil {
+		return nil, fmt.Errorf("missing OCI client")
+	}
 	// try to parse the url as a valid registry reference
 	named, err := reference.Parse(url)
 	if err != nil {

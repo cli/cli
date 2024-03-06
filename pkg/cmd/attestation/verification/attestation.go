@@ -93,6 +93,9 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 }
 
 func getRemoteAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
+	if c.APIClient == nil {
+		return nil, fmt.Errorf("api client must be provided")
+	}
 	// check if Repo is set first because if Repo has been set, Owner will be set using the value of Repo.
 	// If Repo is not set, the field will remain empty. It will not be populated using the value of Owner.
 	if c.Repo != "" {
