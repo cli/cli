@@ -39,4 +39,4 @@ jobs:
         run: go build -v ./cmd/gh
 
       - name: Run attestation command integration Tests
-        run: ./test/integration/attestation-cmd/test/download-and-verify-package-attestation.sh
+        run: ./test/integration/attestation-cmd/download-and-verify-package-attestation.sh
