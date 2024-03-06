@@ -21,35 +21,39 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 	downloadCmd := &cobra.Command{
 		Use:   "download [<file path> | oci://<OCI image URI>]",
 		Args:  cobra.ExactArgs(1),
-		Short: "Download trusted metadata about a binary artifact for offline use",
+		Short: "Download an artifact's Sigstore bundle(s) for offline use",
 		Long: heredoc.Docf(`
-			Download trusted metadata about a binary artifact for offline use.
+			Download an artifact's Sigstore bundle(s) for offline use.
 			
-			The command accepts either:
-			* a relative path to a local artifact
-			* a container image URI (e.g. oci://<my-OCI-URI>) 
+			The command requires either:
+			* a relative path to a local artifact, or
+			* a container image URI (e.g. %[1]soci://<my-OCI-image-URI>%[1]s)
 
-			Note that you must already be authenticated with a container registry 
-			if you provide an OCI image URI as the artifact.
+			Note that if you provide an OCI URI for the artifact you must already
+			be authenticated with a container registry.
 
-			The command also requires you provide either the %[1]s--owner%[1]s or %[1]s--repo%[1]s flag.
-			The value of the %[1]s--owner%[1]s flag should be the name of the GitHub organization 
-			that the artifact is associated with.
-			The value of the %[1]s--repo%[1]s flag should be the name of the GitHub repository 
-			that the artifact is associated with.
+			In addition, the command also requires either:
+			* the %[1]s--owner%[1]s flag (e.g. github), or
+			* the %[1]s--repo%[1]s flag (e.g. github/example).
 
-			Metadata is written to a file in the current directory named after the artifact's digest.
-			For example, if the artifact's digest is "sha256:1234", the metadata will be 
-			written to "sha256:1234.jsonl".
+			The value of the %[1]s--owner%[1]s flag must match the name of the GitHub
+			organization that the artifact is associated with.
+
+			The value of the %[1]s--repo%[1]s flag must match the name of the GitHub
+			repository that the artifact is associated with.
+
+			The corresponding Sigstore bundle(s) will be written to a file in the
+			current directory named after the artifact's digest. For example, if the
+			artifact's digest is "sha256:1234", the file will be named "sha256:1234.jsonl".
 		`, "`"),
 		Example: heredoc.Doc(`
-			# Download trusted metadata for a local artifact associated with a GitHub organization
+			# Download Sigstore bundle(s) for a local artifact associated with a GitHub organization
 			$ gh attestation download <my-artifact> -o <GitHub organization>
 
-			# Download trusted metadata for a local artifact associated with a GitHub repository
+			# Download Sigstore bundle(s) for a local artifact associated with a GitHub repository
 			$ gh attestation download <my-artifact> -R <GitHub repo>
 
-			# Download trusted metadata for an OCI image associated with a GitHub organization
+			# Download Sigstore bundle(s) for an OCI image associated with a GitHub organization
 			$ gh attestation download oci://<my-OCI-image> -o <GitHub organization>
 		`),
 		// PreRunE is used to validate flags before the command is run
@@ -86,7 +90,7 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 				os.Exit(1)
 			}
 			if err := RunDownload(opts); err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Redf("Failed to download the artifact's trusted metadata: %s", err.Error()))
+				opts.Logger.ColorScheme.Redf("Failed to download the artifact's bundle(s): %s", err.Error())
 				os.Exit(1)
 			}
 		},

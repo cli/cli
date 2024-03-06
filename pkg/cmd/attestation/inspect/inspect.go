@@ -19,35 +19,35 @@ import (
 func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{}
 	inspectCmd := &cobra.Command{
-		Use:   "inspect [<file path> | oci://<OCI image URI>]",
+		Use:   "inspect [<file path> | oci://<OCI image URI>] --bundle <path-to-bundle>",
 		Args:  cobra.ExactArgs(1),
-		Short: "Inspect an artifact's trusted metadata bundle",
+		Short: "Inspect a sigstore bundle",
 		Long: heredoc.Docf(`
-			Inspect downloaded trusted metadata associated with a given artifact.
+			Inspect a downloaded Sigstore bundle for a given artifact.
 				
-			The command accepts either:
-			* a relative path to a local artifact
-			* a container image URI (e.g. %[1]soci://<my-OCI-image-URI>%[1]s) 
+			The command requires either:
+			* a relative path to a local artifact, or
+			* a container image URI (e.g. %[1]soci://<my-OCI-image-URI>%[1]s)
 
-			Note that you must already be authenticated with a container registry 
-			if you provide an OCI image URI as the artifact.
+			Note that if you provide an OCI URI for the artifact you must already
+			be authenticated with a container registry.
 
-			The command also requires you provide the path a local trusted metadata bundle with 
-			the %[1]s--bundle%[1]s flag.
-			You can download a trusted metadata bundle using the %[1]sdownload%[1]s command.
+			The command also requires the %[1]s--bundle%[1]s flag, which provides a file
+			path to a previously downloaded Sigstore bundle. (See also the %[1]sdownload%[1]s
+			command).
 
 			By default, the command will print information about the bundle in a table format.
 			If the %[1]s--json-result%[1]s flag is provided, the command will print the 
 			information in JSON format.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# Inspect a local artifact bundle and print the results in table format
+			# Inspect a Sigstore bundle and print the results in table format
 			$ gh attestation inspect <my-artifact> --bundle <path-to-bundle>
 
-			# Inspect a local artifact bundle and print the results in JSON format
+			# Inspect a Sigstore bundle and print the results in JSON format
 			$ gh attestation inspect <my-artifact> --bundle <path-to-bundle> --json-result
 
-			# Inspect an OCI image bundle and print the results in table format
+			# Inspect a Sigsore bundle for an OCI artifact, and print the results in table format
 			$ gh attestation inspect oci://<my-OCI-image> --bundle <path-to-bundle>
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
