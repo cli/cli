@@ -141,7 +141,7 @@ func getTunnelManager(tunnelProperties api.TunnelProperties, httpClient *http.Cl
 }
 
 // getTunnelClient creates a tunnel client for the given tunnel.
-// The tunnel client is used to connect to the the tunnel and allows
+// The tunnel client is used to connect to the tunnel and allows
 // for ports to be forwarded locally.
 func getTunnelClient(ctx context.Context, tunnelManager *tunnels.Manager, tunnel *tunnels.Tunnel, options *tunnels.TunnelRequestOptions) (tunnelClient *TunnelClient, err error) {
 	// Get the tunnel that we want to connect to
