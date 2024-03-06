@@ -1,8 +1,5 @@
-name: Unit Tests
+name: Integration Tests
 on: [push, pull_request]
-
-permissions:
-  contents: read
 
 jobs:
   build:
@@ -11,6 +8,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      GH_TOKEN: ${{ github.token }}
 
     steps:
       - name: Set up Go 1.21
@@ -20,23 +19,6 @@ jobs:
 
       - name: Check out code
         uses: actions/checkout@v4
-
-      - name: Restore Go modules cache
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: go-${{ runner.os }}-${{ hashFiles('go.mod') }}
-          restore-keys: |
-            go-${{ runner.os }}-
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Run tests
-        run: go test -race ./...
-
-      - name: Build
-        run: go build -v ./cmd/gh
 
       - name: Build executable
         run: make bin/gh
