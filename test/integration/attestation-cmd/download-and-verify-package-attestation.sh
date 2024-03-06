@@ -28,7 +28,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-$ghBuildPath attestation verify $packageFile -b $attestationFile --digest-alg=sha512 --repo=sigstore-js
+$ghBuildPath attestation verify $packageFile -b $attestationFile --digest-alg=sha512 --repo=sigstore/sigstore-js
 if [ $? -ne 0 ]; then
     # cleanup test data
     echo "Failed to verify package with --repo flag"
