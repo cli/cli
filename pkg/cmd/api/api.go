@@ -20,7 +20,6 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/jsonmerge"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -30,6 +29,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	ttyIndent = "  "
+)
+
 type ApiOptions struct {
 	AppVersion string
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -37,7 +40,6 @@ type ApiOptions struct {
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	merger     jsonmerge.Merger
 
 	Hostname            string
 	RequestMethod       string
@@ -50,7 +52,7 @@ type ApiOptions struct {
 	Previews            []string
 	ShowResponseHeaders bool
 	Paginate            bool
-	MergePages          bool
+	Slurp               bool
 	Silent              bool
 	Template            string
 	CacheTTL            time.Duration
@@ -174,8 +176,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			'
 
 			# get the percentage of forks for the current user
-			# without --merge-pages you will get a different percentage for each page
-			$ gh api graphql --paginate --merge-pages -f query='
+			# without --slurp you will get a different percentage for each page
+			$ gh api graphql --paginate --slurp -f query='
 			  query($endCursor: String) {
 			    viewer {
 			      repositories(first: 100, after: $endCursor) {
@@ -187,8 +189,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			      }
 			    }
 			  }
-			' | jq 'def count(s): reduce s as $_ (0;.+1);
-			.data.viewer.repositories.nodes as $r | count(select($r[].isFork)) / count($r[])'
+			' | jq 'def count(e): reduce e as $_ (0;.+1);
+			[.[].data.viewer.repositories.nodes[]] as $r | count(select($r[].isFork))/count($r[])'
 		`),
 		Annotations: map[string]string{
 			"help:environment": heredoc.Doc(`
@@ -231,8 +233,17 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return err
 			}
 
-			if opts.MergePages && !opts.Paginate {
-				return cmdutil.FlagErrorf("`--paginate` required when passing `--merge-pages`")
+			if opts.Slurp && !opts.Paginate {
+				return cmdutil.FlagErrorf("`--paginate` required when passing `--slurp`")
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"the `--slurp` option is not supported with `--jq` or `--template`",
+				opts.Slurp,
+				opts.FilterOutput != "",
+				opts.Template != "",
+			); err != nil {
+				return err
 			}
 
 			if err := cmdutil.MutuallyExclusive(
@@ -259,7 +270,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
 	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "GitHub API preview `names` to request (without the \"-preview\" suffix)")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
-	cmd.Flags().BoolVar(&opts.MergePages, "merge-pages", false, "Use with \"--paginate\" to merge all pages of JSON arrays or objects when piping or redirecting standard output")
+	cmd.Flags().BoolVar(&opts.Slurp, "slurp", false, "Use with \"--paginate\" to return an array of all pages of either JSON arrays or objects")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
@@ -307,20 +318,16 @@ func apiRun(opts *ApiOptions) error {
 		requestPath = addPerPage(requestPath, 100, params)
 	}
 
-	// Merge JSON arrays and objects if paginating without filtering or templating.
-	// MergePages retains compatibility with older versions but may be the default behavior with future major releases.
-	if opts.Paginate && opts.FilterOutput == "" && opts.Template == "" {
-		if !isGraphQL {
-			opts.merger = jsonmerge.NewArrayMerger()
-		} else if opts.MergePages {
-			opts.merger = jsonmerge.NewObjectMerger(bodyWriter)
+	// Similar to `jq --slurp`, write all pages JSON arrays or objects into a JSON array.
+	if opts.Paginate && opts.Slurp {
+		w := &jsonArrayWriter{
+			Writer: bodyWriter,
+			color:  opts.IO.ColorEnabled(),
 		}
-	}
+		defer w.Close()
 
-	if opts.merger == nil {
-		opts.merger = jsonmerge.NewNopMerger()
+		bodyWriter = w
 	}
-	defer opts.merger.Close()
 
 	if opts.RequestInputFile != "" {
 		file, size, err := openUserFile(opts.RequestInputFile, opts.IO.In)
@@ -400,6 +407,12 @@ func apiRun(opts *ApiOptions) error {
 			requestBody = nil // prevent repeating GET parameters
 		}
 
+		// Tell optional jsonArrayWriter to start a new page.
+		err = startPage(bodyWriter)
+		if err != nil {
+			return err
+		}
+
 		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, tmpl, isFirstPage, !hasNextPage)
 		if err != nil {
 			return err
@@ -459,7 +472,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 		// TODO: reuse parsed query across pagination invocations
 		indent := ""
 		if opts.IO.IsStdoutTTY() {
-			indent = "  "
+			indent = ttyIndent
 		}
 		err = jq.EvaluateFormatted(responseBody, bodyWriter, opts.FilterOutput, indent, opts.IO.ColorEnabled())
 		if err != nil {
@@ -471,20 +484,16 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 			return
 		}
 	} else if isJSON && opts.IO.ColorEnabled() {
-		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
+		err = jsoncolor.Write(bodyWriter, responseBody, ttyIndent)
 	} else {
-		if isJSON && opts.Paginate && !opts.ShowResponseHeaders {
-			responseBody = opts.merger.NewPage(responseBody, isLastPage)
+		if isJSON && opts.Paginate && !opts.Slurp && !isGraphQLPaginate && !opts.ShowResponseHeaders {
+			responseBody = &paginatedArrayReader{
+				Reader:      responseBody,
+				isFirstPage: isFirstPage,
+				isLastPage:  isLastPage,
+			}
 		}
-
 		_, err = io.Copy(bodyWriter, responseBody)
-		if err != nil {
-			return
-		}
-
-		if closer, ok := responseBody.(io.ReadCloser); ok {
-			err = closer.Close()
-		}
 	}
 	if err != nil {
 		return
