@@ -20,16 +20,14 @@ curl -s "$packageURL" -o "$packageFile"
 curl -s "$attestationURL" | jq '.attestations[1].bundle' > "$attestationFile"
 
 # Verify the package with the --owner flag
-$ghBuildPath attestation verify "$packageFile" -b "$attestationFile" --digest-alg=sha512 --owner=sigstore
-if ! mycmd; then
+if ! $ghBuildPath attestation verify "$packageFile" -b "$attestationFile" --digest-alg=sha512 --owner=sigstore; then
     # cleanup test data
     echo "Failed to verify package with --owner flag"
     rm "$packageFile" "$attestationFile"
     exit 1
 fi
 
-$ghBuildPath attestation verify "$packageFile" -b "$attestationFile" --digest-alg=sha512 --repo=sigstore/sigstore-js
-if ! mycmd; then
+if ! $ghBuildPath attestation verify "$packageFile" -b "$attestationFile" --digest-alg=sha512 --repo=sigstore/sigstore-js; then
     # cleanup test data
     echo "Failed to verify package with --repo flag"
     rm "$packageFile" "$attestationFile"
