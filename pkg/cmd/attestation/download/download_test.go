@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
@@ -112,46 +113,42 @@ func TestRunDownload(t *testing.T) {
 
 func TestCreateJSONLinesFilePath(t *testing.T) {
 	tempDir := t.TempDir()
+	artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
+	require.NoError(t, err)
 
-	t.Run("with output path", func(t *testing.T) {
-		artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
-		require.NoError(t, err)
-		path := createJSONLinesFilePath(artifact.DigestWithAlg(), tempDir)
+	outputFileName := fmt.Sprintf("%s.jsonl", artifact.DigestWithAlg())
 
-		expectedPath := fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg())
-		require.Equal(t, expectedPath, path)
-	})
+	testCases := []struct {
+		name       string
+		outputPath string
+		expected   string
+	}{
+		{
+			name:       "with output path",
+			outputPath: tempDir,
+			expected:   path.Join(tempDir, outputFileName),
+		},
+		{
+			name:       "with nested output path",
+			outputPath: path.Join(tempDir, "subdir"),
+			expected:   path.Join(tempDir, "subdir", outputFileName),
+		},
+		{
+			name:       "with output path with beginning slash",
+			outputPath: path.Join("/", tempDir, "subdir"),
+			expected:   path.Join("/", tempDir, "subdir", outputFileName),
+		},
+		{
+			name:       "without output path",
+			outputPath: "",
+			expected:   outputFileName,
+		},
+	}
 
-	t.Run("with nested output path", func(t *testing.T) {
-		artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
-		require.NoError(t, err)
-
-		nestedPath := fmt.Sprintf("%s/subdir", tempDir)
-		path := createJSONLinesFilePath(artifact.DigestWithAlg(), nestedPath)
-
-		expectedPath := fmt.Sprintf("%s/subdir/%s.jsonl", tempDir, artifact.DigestWithAlg())
-		require.Equal(t, expectedPath, path)
-	})
-
-	t.Run("with output path with beginning slash", func(t *testing.T) {
-		artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
-		require.NoError(t, err)
-
-		nestedPath := fmt.Sprintf("/%s/subdir", tempDir)
-		path := createJSONLinesFilePath(artifact.DigestWithAlg(), nestedPath)
-
-		expectedPath := fmt.Sprintf("/%s/subdir/%s.jsonl", tempDir, artifact.DigestWithAlg())
-		require.Equal(t, expectedPath, path)
-	})
-
-	t.Run("without output path", func(t *testing.T) {
-		artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
-		require.NoError(t, err)
-		path := createJSONLinesFilePath(artifact.DigestWithAlg(), "")
-
-		expectedPath := fmt.Sprintf("%s.jsonl", artifact.DigestWithAlg())
-		require.Equal(t, expectedPath, path)
-	})
+	for _, tc := range testCases {
+		actualPath := createJSONLinesFilePath(artifact.DigestWithAlg(), tc.outputPath)
+		require.Equal(t, tc.expected, actualPath)
+	}
 }
 
 func countLines(path string) (int, error) {
