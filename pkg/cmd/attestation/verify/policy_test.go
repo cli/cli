@@ -10,7 +10,7 @@ import (
 )
 
 func TestBuildPolicy(t *testing.T) {
-	ociClient := oci.NewMockClient()
+	ociClient := oci.MockClient{}
 	artifactPath := "../test/data/sigstore-js-2.1.0.tgz"
 	digestAlg := "sha256"
 

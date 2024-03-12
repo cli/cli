@@ -29,7 +29,7 @@ func TestRunVerify(t *testing.T) {
 		DigestAlgorithm: "sha512",
 		APIClient:       api.NewTestClient(),
 		Logger:          logger,
-		OCIClient:       oci.NewMockClient(),
+		OCIClient:       oci.MockClient{},
 		OIDCIssuer:      GitHubOIDCIssuer,
 		Owner:           "sigstore",
 		SANRegex:        "^https://github.com/sigstore/",
@@ -42,7 +42,7 @@ func TestRunVerify(t *testing.T) {
 	t.Run("with failing OCI artifact fetch", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.ArtifactPath = "oci://ghcr.io/github/test"
-		opts.OCIClient = oci.NewReferenceFailClient()
+		opts.OCIClient = oci.ReferenceFailClient{}
 
 		err := RunVerify(&opts)
 		require.Error(t, err)

@@ -15,7 +15,7 @@ type Options struct {
 	DigestAlgorithm string
 	Logger          *logging.Logger
 	Limit           int
-	OCIClient       *oci.Client
+	OCIClient       oci.Client
 	OutputPath      string
 	Owner           string
 	Verbose         bool

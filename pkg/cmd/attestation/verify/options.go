@@ -30,7 +30,7 @@ type Options struct {
 	APIClient            api.Client
 	Logger               *logging.Logger
 	Limit                int
-	OCIClient            *oci.Client
+	OCIClient            oci.Client
 }
 
 // Clean cleans the file path option values

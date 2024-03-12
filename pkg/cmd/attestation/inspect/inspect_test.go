@@ -26,7 +26,7 @@ func TestRunInspect(t *testing.T) {
 		BundlePath:      bundlePath,
 		DigestAlgorithm: "sha512",
 		Logger:          logging.NewTestLogger(),
-		OCIClient:       oci.NewMockClient(),
+		OCIClient:       oci.MockClient{},
 	}
 
 	t.Run("with valid artifact and bundle", func(t *testing.T) {

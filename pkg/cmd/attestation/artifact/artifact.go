@@ -51,7 +51,7 @@ func normalizeReference(reference string, pathSeparator rune) (normalized string
 	return filepath.Clean(reference), fileArtifactType, nil
 }
 
-func NewDigestedArtifact(client *oci.Client, reference, digestAlg string) (artifact *DigestedArtifact, err error) {
+func NewDigestedArtifact(client oci.Client, reference, digestAlg string) (artifact *DigestedArtifact, err error) {
 	normalized, artifactType, err := normalizeReference(reference, os.PathSeparator)
 	if err != nil {
 		return nil, err

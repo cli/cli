@@ -10,7 +10,7 @@ import (
 
 func TestDigestContainerImageArtifact(t *testing.T) {
 	expectedDigest := "1234567890abcdef"
-	client := oci.NewMockClient()
+	client := oci.MockClient{}
 	url := "example.com/repo:tag"
 	digestedArtifact, err := digestContainerImageArtifact(url, client)
 	require.NoError(t, err)
@@ -20,7 +20,7 @@ func TestDigestContainerImageArtifact(t *testing.T) {
 }
 
 func TestParseImageRefFailure(t *testing.T) {
-	client := oci.NewReferenceFailClient()
+	client := oci.ReferenceFailClient{}
 	url := "example.com/repo:tag"
 	_, err := digestContainerImageArtifact(url, client)
 	require.Error(t, err)
@@ -29,17 +29,17 @@ func TestParseImageRefFailure(t *testing.T) {
 func TestFetchImageFailure(t *testing.T) {
 	testcase := []struct {
 		name        string
-		client      *oci.Client
+		client      oci.Client
 		expectedErr error
 	}{
 		{
 			name:        "Fail to authorize with registry",
-			client:      oci.NewAuthFailClient(),
+			client:      oci.AuthFailClient{},
 			expectedErr: oci.ErrRegistryAuthz,
 		},
 		{
 			name:        "Fail to fetch image due to denial",
-			client:      oci.NewDeniedClient(),
+			client:      oci.DeniedClient{},
 			expectedErr: oci.ErrDenied,
 		},
 	}

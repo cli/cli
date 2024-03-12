@@ -18,7 +18,7 @@ type Options struct {
 	Verbose         bool
 	Quiet           bool
 	Logger          *logging.Logger
-	OCIClient       *oci.Client
+	OCIClient       oci.Client
 }
 
 // Clean cleans the file path option values

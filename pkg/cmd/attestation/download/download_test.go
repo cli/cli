@@ -22,7 +22,7 @@ func TestRunDownload(t *testing.T) {
 	baseOpts := Options{
 		ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
 		APIClient:       api.NewTestClient(),
-		OCIClient:       oci.NewMockClient(),
+		OCIClient:       oci.MockClient{},
 		DigestAlgorithm: "sha512",
 		OutputPath:      tempDir,
 		Limit:           30,
@@ -97,7 +97,7 @@ func TestRunDownload(t *testing.T) {
 	t.Run("cannot download OCI artifact", func(t *testing.T) {
 		opts := baseOpts
 		opts.ArtifactPath = "oci://ghcr.io/github/test"
-		opts.OCIClient = oci.NewReferenceFailClient()
+		opts.OCIClient = oci.ReferenceFailClient{}
 
 		err := RunDownload(&opts)
 		require.Error(t, err)
@@ -124,7 +124,7 @@ func TestCreateJSONLinesFilePath(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	t.Run("with output path", func(t *testing.T) {
-		artifact, err := artifact.NewDigestedArtifact(oci.NewMockClient(), "../test/data/sigstore-js-2.1.0.tgz", "sha512")
+		artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
 		require.NoError(t, err)
 		path := createJSONLinesFilePath(artifact.DigestWithAlg(), tempDir)
 
@@ -133,7 +133,7 @@ func TestCreateJSONLinesFilePath(t *testing.T) {
 	})
 
 	t.Run("with nested output path", func(t *testing.T) {
-		artifact, err := artifact.NewDigestedArtifact(oci.NewMockClient(), "../test/data/sigstore-js-2.1.0.tgz", "sha512")
+		artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
 		require.NoError(t, err)
 
 		nestedPath := fmt.Sprintf("%s/subdir", tempDir)
@@ -144,7 +144,7 @@ func TestCreateJSONLinesFilePath(t *testing.T) {
 	})
 
 	t.Run("with output path with beginning slash", func(t *testing.T) {
-		artifact, err := artifact.NewDigestedArtifact(oci.NewMockClient(), "../test/data/sigstore-js-2.1.0.tgz", "sha512")
+		artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
 		require.NoError(t, err)
 
 		nestedPath := fmt.Sprintf("/%s/subdir", tempDir)
@@ -155,7 +155,7 @@ func TestCreateJSONLinesFilePath(t *testing.T) {
 	})
 
 	t.Run("without output path", func(t *testing.T) {
-		artifact, err := artifact.NewDigestedArtifact(oci.NewMockClient(), "../test/data/sigstore-js-2.1.0.tgz", "sha512")
+		artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
 		require.NoError(t, err)
 		path := createJSONLinesFilePath(artifact.DigestWithAlg(), "")
 
