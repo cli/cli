@@ -41,9 +41,6 @@ func TestRunDownload(t *testing.T) {
 
 		expectedLineCount := 2
 		require.Equal(t, expectedLineCount, actualLineCount)
-
-		err = os.Remove(fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
-		require.NoError(t, err)
 	})
 
 	t.Run("download OCI image attestations successfully", func(t *testing.T) {
@@ -63,9 +60,6 @@ func TestRunDownload(t *testing.T) {
 
 		expectedLineCount := 2
 		require.Equal(t, expectedLineCount, actualLineCount)
-
-		err = os.Remove(fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
-		require.NoError(t, err)
 	})
 
 	t.Run("cannot find artifact", func(t *testing.T) {
