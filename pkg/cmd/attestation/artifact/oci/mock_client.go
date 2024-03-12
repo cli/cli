@@ -6,8 +6,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1"
 )
 
-
-type MockClient struct {}
+type MockClient struct{}
 
 func (c MockClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 	return &v1.Hash{
@@ -16,19 +15,19 @@ func (c MockClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 	}, nil
 }
 
-type ReferenceFailClient struct {}
+type ReferenceFailClient struct{}
 
 func (c ReferenceFailClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 	return nil, fmt.Errorf("failed to parse reference")
 }
 
-type AuthFailClient struct {}
+type AuthFailClient struct{}
 
 func (c AuthFailClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 	return nil, ErrRegistryAuthz
 }
 
-type DeniedClient struct {}
+type DeniedClient struct{}
 
 func (c DeniedClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 	return nil, ErrDenied
