@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
@@ -92,24 +91,22 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 		// Use Run instead of RunE because if an error is returned by RunVerify
 		// when RunE is used, the command usage will be printed
 		// We only want to print the error, not usage
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			hc, err := f.HttpClient()
 			if err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
-				os.Exit(1)
+				return err
 			}
 			opts.APIClient = api.NewLiveClient(hc, opts.Logger)
 
 			opts.OCIClient = oci.NewLiveClient()
 
 			if err := auth.IsHostSupported(); err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
-				os.Exit(1)
+				return err
 			}
 			if err := RunVerify(opts); err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Redf("Failed to verify the artifact: %s", err.Error()))
-				os.Exit(1)
+				return fmt.Errorf("Failed to verify the artifact: %w", err)
 			}
+			return nil
 		},
 	}
 

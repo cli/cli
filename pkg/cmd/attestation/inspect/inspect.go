@@ -3,7 +3,6 @@ package inspect
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
@@ -70,17 +69,16 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 		// Use Run instead of RunE because if an error is returned by RunInspect
 		// when RunE is used, the command usage will be printed
 		// We only want to print the error, not usage
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.OCIClient = oci.NewLiveClient()
 
 			if err := auth.IsHostSupported(); err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
-				os.Exit(1)
+				return err
 			}
 			if err := RunInspect(opts); err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Redf("Failed to inspect the artifact and bundle: %s", err.Error()))
-				os.Exit(1)
+				return fmt.Errorf("Failed to inspect the artifact and bundle: %w", err)
 			}
+			return nil
 		},
 	}
 

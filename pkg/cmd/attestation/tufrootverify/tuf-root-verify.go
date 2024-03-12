@@ -37,19 +37,18 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 			# Verify the TUF repository from a provided TUF root
 			gh attestation tuf-root-verify --mirror https://tuf-repo.github.com --root /path/to/1.root.json
 		`),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := logging.NewDefaultLogger(f.IOStreams)
 
 			if err := auth.IsHostSupported(); err != nil {
-				fmt.Sprintln(logger.IO.Out, logger.ColorScheme.Red(err.Error()))
-				os.Exit(1)
+				return err
 			}
 
 			if err := verifyTUFRoot(mirror, root); err != nil {
-				fmt.Sprintln(logger.IO.Out, logger.ColorScheme.Redf("Failed to verify the TUF repository: %s", err))
-				os.Exit(1)
+				return fmt.Errorf("Failed to verify the TUF repository: %w", err)
 			}
 			fmt.Sprintln(logger.IO.Out, logger.ColorScheme.Green("Successfully verified the TUF repository"))
+			return nil
 		},
 	}
 
