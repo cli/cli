@@ -175,7 +175,7 @@ func createMetadataFile(attestationsResp []*api.Attestation, filePath string) (s
 	}
 
 	if err = f.Close(); err != nil {
-		return "", fmt.Errorf("failed ot close file after writing metadata: %w", err)
+		return "", fmt.Errorf("failed to close file after writing metadata: %w", err)
 	}
 
 	return filePath, nil
