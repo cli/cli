@@ -86,7 +86,7 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 
 	inspectCmd.Flags().StringVarP(&opts.BundlePath, "bundle", "b", "", "Path to bundle on disk, either a single bundle in a JSON file or a JSON lines file with multiple bundles")
 	inspectCmd.MarkFlagRequired("bundle") //nolint:errcheck
-	inspectCmd.Flags().StringVarP(&opts.DigestAlgorithm, "digest-alg", "d", "sha256", "The algorithm used to compute a digest of the artifact (sha256 or sha512)")
+	cmdutil.StringEnumFlag(inspectCmd, &opts.DigestAlgorithm, "digest-alg", "d", "sha256", []string{"sha256", "sha512"}, "The algorithm used to compute a digest of the artifact")
 	inspectCmd.Flags().BoolVarP(&opts.JsonResult, "json-result", "j", false, "Output inspect result as JSON lines")
 	inspectCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "If set to true, the CLI will not print any diagnostic logging.")
 	inspectCmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "If set to true, the CLI will print verbose diagnostic logging.")

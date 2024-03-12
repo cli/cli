@@ -115,7 +115,7 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 
 	// general flags
 	verifyCmd.Flags().StringVarP(&opts.BundlePath, "bundle", "b", "", "Path to bundle on disk, either a single bundle in a JSON file or a JSON lines file with multiple bundles")
-	verifyCmd.Flags().StringVarP(&opts.DigestAlgorithm, "digest-alg", "d", "sha256", "The algorithm used to compute a digest of the artifact (sha256 or sha512)")
+	cmdutil.StringEnumFlag(verifyCmd, &opts.DigestAlgorithm, "digest-alg", "d", "sha256", []string{"sha256", "sha512"}, "The algorithm used to compute a digest of the artifact")
 	verifyCmd.Flags().StringVarP(&opts.Owner, "owner", "o", "", "GitHub organization to scope attestation lookup by")
 	verifyCmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Repository name in the format <owner>/<repo>")
 	verifyCmd.MarkFlagsMutuallyExclusive("owner", "repo")
