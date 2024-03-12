@@ -39,9 +39,13 @@ jobs:
         run: go build -v ./cmd/gh
 
   integration-tests:
-    runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Set up Go 1.21
