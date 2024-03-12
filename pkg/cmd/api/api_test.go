@@ -329,8 +329,18 @@ func Test_NewCmdApi(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:     "--merge-pages without --paginate",
-			cli:      "user --merge-pages",
+			name:     "--slurp without --paginate",
+			cli:      "user --slurp",
+			wantsErr: true,
+		},
+		{
+			name:     "slurp with --jq",
+			cli:      "user --paginate --slurp --jq .foo",
+			wantsErr: true,
+		},
+		{
+			name:     "slurp with --template",
+			cli:      "user --paginate --slurp --template '{{.foo}}'",
 			wantsErr: true,
 		},
 		{
@@ -993,7 +1003,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 	assert.Equal(t, "PAGE1_END", endCursor)
 }
 
-func Test_apiRun_paginationGraphQL_merge(t *testing.T) {
+func Test_apiRun_paginationGraphQL_slurp(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 
 	requestCount := 0
@@ -1047,121 +1057,33 @@ func Test_apiRun_paginationGraphQL_merge(t *testing.T) {
 		RequestMethod: "POST",
 		RequestPath:   "graphql",
 		Paginate:      true,
-		MergePages:    true,
+		Slurp:         true,
 	}
 
 	err := apiRun(&options)
 	require.NoError(t, err)
 
-	assert.JSONEq(t, stdout.String(), `{
-		"data": {
-			"nodes": [
-				"page one",
-				"page two"
-			],
-			"pageInfo": {
-				"endCursor": "PAGE2_END",
-				"hasNextPage": false
-			}
-		}
-	}`)
-	assert.Equal(t, "", stderr.String(), "stderr")
-
-	var requestData struct {
-		Variables map[string]interface{}
-	}
-
-	bb, err := io.ReadAll(responses[0].Request.Body)
-	require.NoError(t, err)
-	err = json.Unmarshal(bb, &requestData)
-	require.NoError(t, err)
-	_, hasCursor := requestData.Variables["endCursor"].(string)
-	assert.Equal(t, false, hasCursor)
-
-	bb, err = io.ReadAll(responses[1].Request.Body)
-	require.NoError(t, err)
-	err = json.Unmarshal(bb, &requestData)
-	require.NoError(t, err)
-	endCursor, hasCursor := requestData.Variables["endCursor"].(string)
-	assert.Equal(t, true, hasCursor)
-	assert.Equal(t, "PAGE1_END", endCursor)
-}
-
-func Test_apiRun_paginationGraphQL_merge_tty(t *testing.T) {
-	ios, _, stdout, stderr := iostreams.Test()
-
-	// Backcompat: setting color-enabled disables merging, but not TTY.
-	ios.SetStdoutTTY(true)
-
-	requestCount := 0
-	responses := []*http.Response{
+	assert.JSONEq(t, stdout.String(), `[
 		{
-			StatusCode: 200,
-			Header:     http.Header{"Content-Type": []string{`application/json`}},
-			Body: io.NopCloser(bytes.NewBufferString(heredoc.Doc(`
-			{
-				"data": {
-					"nodes": ["page one"],
-					"pageInfo": {
-						"endCursor": "PAGE1_END",
-						"hasNextPage": true
-					}
+			"data": {
+				"nodes": ["page one"],
+				"pageInfo": {
+					"endCursor": "PAGE1_END",
+					"hasNextPage": true
 				}
-			}`))),
+			}
 		},
 		{
-			StatusCode: 200,
-			Header:     http.Header{"Content-Type": []string{`application/json`}},
-			Body: io.NopCloser(bytes.NewBufferString(heredoc.Doc(`
-			{
-				"data": {
-					"nodes": ["page two"],
-					"pageInfo": {
-						"endCursor": "PAGE2_END",
-						"hasNextPage": false
-					}
+
+			"data": {
+				"nodes": ["page two"],
+				"pageInfo": {
+					"endCursor": "PAGE2_END",
+					"hasNextPage": false
 				}
-			}`))),
-		},
-	}
-
-	options := ApiOptions{
-		IO: ios,
-		HttpClient: func() (*http.Client, error) {
-			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
-				resp := responses[requestCount]
-				resp.Request = req
-				requestCount++
-				return resp, nil
-			}
-			return &http.Client{Transport: tr}, nil
-		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
-
-		RawFields:     []string{"foo=bar"},
-		RequestMethod: "POST",
-		RequestPath:   "graphql",
-		Paginate:      true,
-		MergePages:    true,
-	}
-
-	err := apiRun(&options)
-	require.NoError(t, err)
-
-	assert.JSONEq(t, stdout.String(), `{
-		"data": {
-			"nodes": [
-				"page one",
-				"page two"
-			],
-			"pageInfo": {
-				"endCursor": "PAGE2_END",
-				"hasNextPage": false
 			}
 		}
-	}`)
+	]`)
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	var requestData struct {
