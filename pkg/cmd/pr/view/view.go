@@ -10,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -94,7 +95,7 @@ func viewRun(opts *ViewOptions) error {
 	} else if opts.Exporter != nil {
 		findOptions.Fields = opts.Exporter.Fields()
 	}
-	pr, _, err := opts.Finder.Find(findOptions)
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
@@ -121,7 +122,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if connectedToTerminal {
-		return printHumanPrPreview(opts, pr)
+		return printHumanPrPreview(opts, baseRepo, pr)
 	}
 
 	if opts.Comments {
@@ -173,12 +174,12 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	return nil
 }
 
-func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
+func printHumanPrPreview(opts *ViewOptions, baseRepo ghrepo.Interface, pr *api.PullRequest) error {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintf(out, "%s #%d\n", cs.Bold(pr.Title), pr.Number)
+	fmt.Fprintf(out, "%s %s#%d\n", cs.Bold(pr.Title), ghrepo.FullName(baseRepo), pr.Number)
 	fmt.Fprintf(out,
 		"%s • %s wants to merge %s into %s from %s • %s\n",
 		shared.StateTitleWithColor(cs, *pr),

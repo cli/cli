@@ -222,7 +222,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
-			wantOut: "\n✓ trunk CI #2898 · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3\n",
+			wantOut: "\n✓ trunk CI OWNER/REPO#2898 · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3\n",
 		},
 		{
 			name: "associate with PR with attempt",
@@ -266,7 +266,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
-			wantOut: "\n✓ trunk CI #2898 · 3 (Attempt #3)\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3/attempts/3\n",
+			wantOut: "\n✓ trunk CI OWNER/REPO#2898 · 3 (Attempt #3)\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3/attempts/3\n",
 		},
 		{
 			name: "exit status, failed run",
