@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build executable
-        run: make bin/gh
+        run: make
 
       - name: Run attestation command integration Tests
         run: ./test/integration/attestation-cmd/download-and-verify-package-attestation.sh
