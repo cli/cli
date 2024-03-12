@@ -21,10 +21,7 @@ const (
 )
 
 func TestRunVerify(t *testing.T) {
-	res := test.SuppressAndRestoreOutput()
-	defer res()
-
-	logger := logging.NewSystemLogger()
+	logger := logging.NewTestLogger()
 
 	publicGoodOpts := Options{
 		ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
@@ -190,7 +187,7 @@ func TestVerifySLSAPredicateType_InvalidPredicate(t *testing.T) {
 		},
 	}
 
-	err := verifySLSAPredicateType(logging.NewSystemLogger(), apr)
+	err := verifySLSAPredicateType(logging.NewTestLogger(), apr)
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrNoMatchingSLSAPredicate)
 }

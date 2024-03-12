@@ -18,7 +18,7 @@ func NewClientWithMockGHClient(hasNextPage bool) Client {
 	fetcher := mockDataGenerator{
 		NumAttestations: 5,
 	}
-	l := logging.NewSystemLogger()
+	l := logging.NewTestLogger()
 
 	if hasNextPage {
 		return &LiveClient{
@@ -138,7 +138,7 @@ func TestGetByDigest_NoAttestationsFound(t *testing.T) {
 		api: mockAPIClient{
 			OnRESTWithNext: fetcher.OnRESTWithNextNoAttestations,
 		},
-		logger: logging.NewSystemLogger(),
+		logger: logging.NewTestLogger(),
 	}
 
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
@@ -161,7 +161,7 @@ func TestGetByDigest_Error(t *testing.T) {
 		api: mockAPIClient{
 			OnRESTWithNext: fetcher.OnRESTWithNextError,
 		},
-		logger: logging.NewSystemLogger(),
+		logger: logging.NewTestLogger(),
 	}
 
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)

@@ -21,16 +21,11 @@ var (
 )
 
 func TestRunInspect(t *testing.T) {
-	res := test.SuppressAndRestoreOutput()
-	defer res()
-
-	logger := logging.NewSystemLogger()
-
 	opts := Options{
 		ArtifactPath:    artifactPath,
 		BundlePath:      bundlePath,
 		DigestAlgorithm: "sha512",
-		Logger:          logger,
+		Logger:          logging.NewTestLogger(),
 		OCIClient:       oci.NewMockClient(),
 	}
 

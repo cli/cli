@@ -32,8 +32,9 @@ func NewDefaultLogger(io *iostreams.IOStreams) *Logger {
 	return NewLogger(io, isQuiet, isVerbose)
 }
 
-func NewSystemLogger() *Logger {
-	return NewDefaultLogger(iostreams.System())
+func NewTestLogger() *Logger {
+	testIO, _, _, _ := iostreams.Test()
+	return NewDefaultLogger(testIO)
 }
 
 // Printf writes the formatted arguments to the stderr writer.

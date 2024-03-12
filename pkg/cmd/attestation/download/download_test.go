@@ -10,15 +10,11 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestRunDownload(t *testing.T) {
-	res := test.SuppressAndRestoreOutput()
-	defer res()
-
 	tempDir, err := os.MkdirTemp("", "gh-attestation-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
@@ -30,7 +26,7 @@ func TestRunDownload(t *testing.T) {
 		DigestAlgorithm: "sha512",
 		OutputPath:      tempDir,
 		Limit:           30,
-		Logger:          logging.NewSystemLogger(),
+		Logger:          logging.NewTestLogger(),
 	}
 
 	t.Run("fetch and store attestations successfully", func(t *testing.T) {
