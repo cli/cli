@@ -200,9 +200,9 @@ func reason(reason string) string {
 // is parameterized on a bunch of options.
 //
 // Example output: "Locked as RESOLVED: Issue #31 (Title of issue)"
-func status(state string, lockable *api.Issue, opts *LockOptions) string {
-	return fmt.Sprintf("%sed%s: %s #%d (%s)",
-		state, reason(opts.Reason), alias[opts.ParentCmd].FullName, lockable.Number, lockable.Title)
+func status(state string, lockable *api.Issue, baseRepo ghrepo.Interface, opts *LockOptions) string {
+	return fmt.Sprintf("%sed%s: %s %s#%d (%s)",
+		state, reason(opts.Reason), alias[opts.ParentCmd].FullName, ghrepo.FullName(baseRepo), lockable.Number, lockable.Title)
 }
 
 // lockRun will lock or unlock a conversation.
@@ -224,10 +224,10 @@ func lockRun(state string, opts *LockOptions) error {
 		currentType := alias[parent.Typename]
 		correctType := alias[issuePr.Typename]
 
-		return fmt.Errorf("%s %s #%d not found, but found %s #%d.  Use `gh %s %s %d` instead",
+		return fmt.Errorf("%s %s %s#%d not found, but found %s %s#%d.  Use `gh %s %s %d` instead",
 			cs.FailureIconWithColor(cs.Red),
-			currentType.FullName, issuePr.Number,
-			strings.ToLower(correctType.FullName), issuePr.Number,
+			currentType.FullName, ghrepo.FullName(baseRepo), issuePr.Number,
+			strings.ToLower(correctType.FullName), ghrepo.FullName(baseRepo), issuePr.Number,
 			correctType.Name, strings.ToLower(state), issuePr.Number)
 	}
 
@@ -243,7 +243,7 @@ func lockRun(state string, opts *LockOptions) error {
 	}
 
 	successMsg := fmt.Sprintf("%s %s\n",
-		cs.SuccessIconWithColor(cs.Green), status(state, issuePr, opts))
+		cs.SuccessIconWithColor(cs.Green), status(state, issuePr, baseRepo, opts))
 
 	switch state {
 	case Lock:
@@ -254,8 +254,8 @@ func lockRun(state string, opts *LockOptions) error {
 			relocked, err = relockLockable(httpClient, baseRepo, issuePr, opts)
 
 			if !relocked {
-				successMsg = fmt.Sprintf("%s #%d already locked%s.  Nothing changed.\n",
-					parent.FullName, issuePr.Number, reason(issuePr.ActiveLockReason))
+				successMsg = fmt.Sprintf("%s %s#%d already locked%s.  Nothing changed.\n",
+					parent.FullName, ghrepo.FullName(baseRepo), issuePr.Number, reason(issuePr.ActiveLockReason))
 			}
 		}
 
@@ -263,8 +263,8 @@ func lockRun(state string, opts *LockOptions) error {
 		if issuePr.Locked {
 			err = unlockLockable(httpClient, baseRepo, issuePr, opts)
 		} else {
-			successMsg = fmt.Sprintf("%s #%d already unlocked.  Nothing changed.\n",
-				parent.FullName, issuePr.Number)
+			successMsg = fmt.Sprintf("%s %s#%d already unlocked.  Nothing changed.\n",
+				parent.FullName, ghrepo.FullName(baseRepo), issuePr.Number)
 		}
 	default:
 		panic("bad state")
@@ -334,8 +334,8 @@ func relockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *ap
 		return false, errors.New("already locked")
 	}
 
-	prompt := fmt.Sprintf("%s #%d already locked%s. Unlock and lock again%s?",
-		alias[opts.ParentCmd].FullName, lockable.Number, reason(lockable.ActiveLockReason), reason(opts.Reason))
+	prompt := fmt.Sprintf("%s %s#%d already locked%s. Unlock and lock again%s?",
+		alias[opts.ParentCmd].FullName, ghrepo.FullName(repo), lockable.Number, reason(lockable.ActiveLockReason), reason(opts.Reason))
 
 	relocked, err := opts.Prompter.Confirm(prompt, true)
 	if err != nil {
