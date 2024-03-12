@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 )
@@ -62,53 +62,3 @@ func NewLiveClient() *LiveClient {
 		Get:            remote.Get,
 	}
 }
-
-// func NewMockClient() *Client {
-// 	return &Client{
-// 		ParseReference: func(string, ...name.Option) (name.Reference, error) {
-// 			return name.Tag{}, nil
-// 		},
-// 		Get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
-// 			d := remote.Descriptor{}
-// 			d.Digest = v1.Hash{
-// 				Hex:       "1234567890abcdef",
-// 				Algorithm: "sha256",
-// 			}
-
-// 			return &d, nil
-// 		},
-// 	}
-// }
-
-// func NewReferenceFailClient() *Client {
-// 	return &Client{
-// 		ParseReference: func(string, ...name.Option) (name.Reference, error) {
-// 			return nil, fmt.Errorf("failed to parse reference")
-// 		},
-// 		Get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
-// 			return nil, nil
-// 		},
-// 	}
-// }
-
-// func NewAuthFailClient() *Client {
-// 	return &Client{
-// 		ParseReference: func(string, ...name.Option) (name.Reference, error) {
-// 			return name.Tag{}, nil
-// 		},
-// 		Get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
-// 			return nil, &transport.Error{Errors: []transport.Diagnostic{{Code: transport.UnauthorizedErrorCode}}}
-// 		},
-// 	}
-// }
-
-// func NewDeniedClient() *Client {
-// 	return &Client{
-// 		ParseReference: func(string, ...name.Option) (name.Reference, error) {
-// 			return name.Tag{}, nil
-// 		},
-// 		Get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
-// 			return nil, &transport.Error{Errors: []transport.Diagnostic{{Code: transport.DeniedErrorCode}}}
-// 		},
-// 	}
-// }
