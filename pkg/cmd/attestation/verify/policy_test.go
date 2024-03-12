@@ -6,7 +6,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,5 +25,5 @@ func TestBuildPolicy(t *testing.T) {
 	}
 
 	_, err = buildVerifyPolicy(opts, *artifact)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

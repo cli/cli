@@ -7,7 +7,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -35,19 +35,19 @@ func TestRunInspect(t *testing.T) {
 	}
 
 	t.Run("with valid artifact and bundle", func(t *testing.T) {
-		assert.Nil(t, RunInspect(&opts))
+		require.Nil(t, RunInspect(&opts))
 	})
 
 	t.Run("with missing artifact path", func(t *testing.T) {
 		customOpts := opts
 		customOpts.ArtifactPath = "../test/data/non-existent-artifact.zip"
-		assert.Error(t, RunInspect(&customOpts))
+		require.Error(t, RunInspect(&customOpts))
 	})
 
 	t.Run("with missing bundle path", func(t *testing.T) {
 		customOpts := opts
 		customOpts.BundlePath = "../test/data/non-existent-sigstoreBundle.json"
-		assert.Error(t, RunInspect(&customOpts))
+		require.Error(t, RunInspect(&customOpts))
 	})
 
 	t.Run("with invalid signature", func(t *testing.T) {
@@ -55,21 +55,21 @@ func TestRunInspect(t *testing.T) {
 		customOpts.BundlePath = "../test/data/sigstoreBundle-invalid-signature.json"
 
 		err := RunInspect(&customOpts)
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "at least one attestation failed to verify")
-		assert.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\"")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "at least one attestation failed to verify")
+		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\"")
 	})
 
 	t.Run("with valid artifact and JSON lines file containing multiple bundles", func(t *testing.T) {
 		customOpts := opts
 		customOpts.BundlePath = "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl"
-		assert.Nil(t, RunInspect(&customOpts))
+		require.Nil(t, RunInspect(&customOpts))
 	})
 
 	t.Run("with missing OCI client", func(t *testing.T) {
 		customOpts := opts
 		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
 		customOpts.OCIClient = nil
-		assert.Error(t, RunInspect(&customOpts))
+		require.Error(t, RunInspect(&customOpts))
 	})
 }

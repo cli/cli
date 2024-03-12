@@ -6,7 +6,7 @@ package artifact
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNormalizeReference(t *testing.T) {
@@ -48,11 +48,11 @@ func TestNormalizeReference(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			result, artifactType, err := normalizeReference(tc.reference, tc.pathSeparator)
 			if tc.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tc.expectedResult, result)
-				assert.Equal(t, tc.expectedType, artifactType)
+				require.NoError(t, err)
+				require.Equal(t, tc.expectedResult, result)
+				require.Equal(t, tc.expectedType, artifactType)
 			}
 		})
 	}

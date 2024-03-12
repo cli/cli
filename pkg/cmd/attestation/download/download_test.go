@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,18 +35,18 @@ func TestRunDownload(t *testing.T) {
 
 	t.Run("fetch and store attestations successfully", func(t *testing.T) {
 		err = RunDownload(&baseOpts)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		artifact, err := artifact.NewDigestedArtifact(baseOpts.OCIClient, baseOpts.ArtifactPath, baseOpts.DigestAlgorithm)
 		require.NoError(t, err)
 
-		assert.FileExists(t, fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
+		require.FileExists(t, fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
 
 		actualLineCount, err := countLines(fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
 		require.NoError(t, err)
 
 		expectedLineCount := 2
-		assert.Equal(t, expectedLineCount, actualLineCount)
+		require.Equal(t, expectedLineCount, actualLineCount)
 
 		err = os.Remove(fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
 		require.NoError(t, err)
@@ -58,18 +57,18 @@ func TestRunDownload(t *testing.T) {
 		opts.ArtifactPath = "oci://ghcr.io/github/test"
 
 		err = RunDownload(&opts)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 		require.NoError(t, err)
 
-		assert.FileExists(t, fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
+		require.FileExists(t, fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
 
 		actualLineCount, err := countLines(fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
 		require.NoError(t, err)
 
 		expectedLineCount := 2
-		assert.Equal(t, expectedLineCount, actualLineCount)
+		require.Equal(t, expectedLineCount, actualLineCount)
 
 		err = os.Remove(fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
 		require.NoError(t, err)
@@ -80,7 +79,7 @@ func TestRunDownload(t *testing.T) {
 		opts.ArtifactPath = "../test/data/not-real.zip"
 
 		err := RunDownload(&opts)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("no attestations found", func(t *testing.T) {
@@ -92,11 +91,11 @@ func TestRunDownload(t *testing.T) {
 		}
 
 		err := RunDownload(&opts)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 		require.NoError(t, err)
-		assert.NoFileExists(t, artifact.DigestWithAlg())
+		require.NoFileExists(t, artifact.DigestWithAlg())
 	})
 
 	t.Run("cannot download OCI artifact", func(t *testing.T) {
@@ -105,21 +104,21 @@ func TestRunDownload(t *testing.T) {
 		opts.OCIClient = oci.NewReferenceFailClient()
 
 		err := RunDownload(&opts)
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "failed to digest artifact")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to digest artifact")
 	})
 
 	t.Run("with missing OCI client", func(t *testing.T) {
 		customOpts := baseOpts
 		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
 		customOpts.OCIClient = nil
-		assert.Error(t, RunDownload(&customOpts))
+		require.Error(t, RunDownload(&customOpts))
 	})
 
 	t.Run("with missing API client", func(t *testing.T) {
 		customOpts := baseOpts
 		customOpts.APIClient = nil
-		assert.Error(t, RunDownload(&customOpts))
+		require.Error(t, RunDownload(&customOpts))
 	})
 }
 
@@ -134,7 +133,7 @@ func TestCreateJSONLinesFilePath(t *testing.T) {
 		path := createJSONLinesFilePath(artifact.DigestWithAlg(), tempDir)
 
 		expectedPath := fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg())
-		assert.Equal(t, expectedPath, path)
+		require.Equal(t, expectedPath, path)
 	})
 
 	t.Run("with nested output path", func(t *testing.T) {
@@ -145,7 +144,7 @@ func TestCreateJSONLinesFilePath(t *testing.T) {
 		path := createJSONLinesFilePath(artifact.DigestWithAlg(), nestedPath)
 
 		expectedPath := fmt.Sprintf("%s/subdir/%s.jsonl", tempDir, artifact.DigestWithAlg())
-		assert.Equal(t, expectedPath, path)
+		require.Equal(t, expectedPath, path)
 	})
 
 	t.Run("with output path with beginning slash", func(t *testing.T) {
@@ -156,7 +155,7 @@ func TestCreateJSONLinesFilePath(t *testing.T) {
 		path := createJSONLinesFilePath(artifact.DigestWithAlg(), nestedPath)
 
 		expectedPath := fmt.Sprintf("/%s/subdir/%s.jsonl", tempDir, artifact.DigestWithAlg())
-		assert.Equal(t, expectedPath, path)
+		require.Equal(t, expectedPath, path)
 	})
 
 	t.Run("without output path", func(t *testing.T) {
@@ -165,7 +164,7 @@ func TestCreateJSONLinesFilePath(t *testing.T) {
 		path := createJSONLinesFilePath(artifact.DigestWithAlg(), "")
 
 		expectedPath := fmt.Sprintf("%s.jsonl", artifact.DigestWithAlg())
-		assert.Equal(t, expectedPath, path)
+		require.Equal(t, expectedPath, path)
 	})
 }
 

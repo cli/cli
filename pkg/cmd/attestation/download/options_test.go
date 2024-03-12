@@ -3,7 +3,7 @@ package download
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAreFlagsValid(t *testing.T) {
@@ -13,8 +13,8 @@ func TestAreFlagsValid(t *testing.T) {
 		}
 
 		err := opts.AreFlagsValid()
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "owner must be provided")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "owner must be provided")
 	})
 
 	t.Run("missing DigestAlgorithm", func(t *testing.T) {
@@ -23,8 +23,8 @@ func TestAreFlagsValid(t *testing.T) {
 		}
 
 		err := opts.AreFlagsValid()
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "digest-alg cannot be empty")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "digest-alg cannot be empty")
 	})
 
 	t.Run("Limit is too low", func(t *testing.T) {
@@ -35,8 +35,8 @@ func TestAreFlagsValid(t *testing.T) {
 		}
 
 		err := opts.AreFlagsValid()
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "limit 0 not allowed, must be between 1 and 1000")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "limit 0 not allowed, must be between 1 and 1000")
 	})
 
 	t.Run("Limit is too high", func(t *testing.T) {
@@ -47,7 +47,7 @@ func TestAreFlagsValid(t *testing.T) {
 		}
 
 		err := opts.AreFlagsValid()
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "limit 1001 not allowed, must be between 1 and 1000")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "limit 1001 not allowed, must be between 1 and 1000")
 	})
 }

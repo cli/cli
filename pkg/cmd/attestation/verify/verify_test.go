@@ -12,7 +12,7 @@ import (
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -39,7 +39,7 @@ func TestRunVerify(t *testing.T) {
 	}
 
 	t.Run("with valid artifact and bundle", func(t *testing.T) {
-		assert.Nil(t, RunVerify(&publicGoodOpts))
+		require.Nil(t, RunVerify(&publicGoodOpts))
 	})
 
 	t.Run("with failing OCI artifact fetch", func(t *testing.T) {
@@ -48,20 +48,20 @@ func TestRunVerify(t *testing.T) {
 		opts.OCIClient = oci.NewReferenceFailClient()
 
 		err := RunVerify(&opts)
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "failed to digest artifact")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to digest artifact")
 	})
 
 	t.Run("with missing artifact path", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.ArtifactPath = "../test/data/non-existent-artifact.zip"
-		assert.Error(t, RunVerify(&opts))
+		require.Error(t, RunVerify(&opts))
 	})
 
 	t.Run("with missing bundle path", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.BundlePath = "../test/data/non-existent-sigstoreBundle.json"
-		assert.Error(t, RunVerify(&opts))
+		require.Error(t, RunVerify(&opts))
 	})
 
 	t.Run("with invalid signature", func(t *testing.T) {
@@ -69,9 +69,9 @@ func TestRunVerify(t *testing.T) {
 		opts.BundlePath = "../test/data/sigstoreBundle-invalid-signature.json"
 
 		err := RunVerify(&opts)
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "at least one attestation failed to verify")
-		assert.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\"")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "at least one attestation failed to verify")
+		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\"")
 	})
 
 	t.Run("with owner", func(t *testing.T) {
@@ -79,7 +79,7 @@ func TestRunVerify(t *testing.T) {
 		opts.BundlePath = ""
 		opts.Owner = "sigstore"
 
-		assert.Nil(t, RunVerify(&opts))
+		require.Nil(t, RunVerify(&opts))
 	})
 
 	t.Run("with repo", func(t *testing.T) {
@@ -87,7 +87,7 @@ func TestRunVerify(t *testing.T) {
 		opts.BundlePath = ""
 		opts.Repo = "github/example"
 
-		assert.Nil(t, RunVerify(&opts))
+		require.Nil(t, RunVerify(&opts))
 	})
 
 	t.Run("with invalid repo", func(t *testing.T) {
@@ -97,8 +97,8 @@ func TestRunVerify(t *testing.T) {
 		opts.APIClient = api.NewFailTestClient()
 
 		err := RunVerify(&opts)
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "failed to fetch attestations for subject")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to fetch attestations for subject")
 	})
 
 	t.Run("with invalid owner", func(t *testing.T) {
@@ -108,14 +108,14 @@ func TestRunVerify(t *testing.T) {
 		opts.Owner = "wrong-owner"
 
 		err := RunVerify(&opts)
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "failed to fetch attestations for subject")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to fetch attestations for subject")
 	})
 
 	t.Run("with invalid OIDC issuer", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.OIDCIssuer = "not-a-real-issuer"
-		assert.Error(t, RunVerify(&opts))
+		require.Error(t, RunVerify(&opts))
 	})
 
 	t.Run("with SAN enforcement", func(t *testing.T) {
@@ -129,52 +129,52 @@ func TestRunVerify(t *testing.T) {
 			Owner:           "sigstore",
 			SAN:             SigstoreSanValue,
 		}
-		assert.Nil(t, RunVerify(&opts))
+		require.Nil(t, RunVerify(&opts))
 	})
 
 	t.Run("with invalid SAN", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.SAN = "fake san"
-		assert.Error(t, RunVerify(&opts))
+		require.Error(t, RunVerify(&opts))
 	})
 
 	t.Run("with SAN regex enforcement", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.SANRegex = SigstoreSanRegex
-		assert.Nil(t, RunVerify(&opts))
+		require.Nil(t, RunVerify(&opts))
 	})
 
 	t.Run("with invalid SAN regex", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.SANRegex = "^https://github.com/sigstore/not-real/"
-		assert.Error(t, RunVerify(&opts))
+		require.Error(t, RunVerify(&opts))
 	})
 
 	t.Run("with no matching OIDC issuer", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.OIDCIssuer = "some-other-issuer"
 
-		assert.Error(t, RunVerify(&opts))
+		require.Error(t, RunVerify(&opts))
 	})
 
 	t.Run("with valid artifact and JSON lines file containing multiple Sigstore bundles", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.BundlePath = "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl"
-		assert.Nil(t, RunVerify(&opts))
+		require.Nil(t, RunVerify(&opts))
 	})
 
 	t.Run("with missing OCI client", func(t *testing.T) {
 		customOpts := publicGoodOpts
 		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
 		customOpts.OCIClient = nil
-		assert.Error(t, RunVerify(&customOpts))
+		require.Error(t, RunVerify(&customOpts))
 	})
 
 	t.Run("with missing API client", func(t *testing.T) {
 		customOpts := publicGoodOpts
 		customOpts.APIClient = nil
 		customOpts.BundlePath = ""
-		assert.Error(t, RunVerify(&customOpts))
+		require.Error(t, RunVerify(&customOpts))
 	})
 }
 
@@ -191,6 +191,6 @@ func TestVerifySLSAPredicateType_InvalidPredicate(t *testing.T) {
 	}
 
 	err := verifySLSAPredicateType(logging.NewSystemLogger(), apr)
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, ErrNoMatchingSLSAPredicate)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrNoMatchingSLSAPredicate)
 }

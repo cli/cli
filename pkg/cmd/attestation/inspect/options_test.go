@@ -5,7 +5,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAreFlagsValid(t *testing.T) {
@@ -19,8 +19,8 @@ func TestAreFlagsValid(t *testing.T) {
 		}
 
 		err := opts.AreFlagsValid()
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "bundle must be provided")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "bundle must be provided")
 	})
 
 	t.Run("missing DigestAlgorithm", func(t *testing.T) {
@@ -30,8 +30,8 @@ func TestAreFlagsValid(t *testing.T) {
 		}
 
 		err := opts.AreFlagsValid()
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "digest-alg cannot be empty")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "digest-alg cannot be empty")
 	})
 
 	t.Run("invalid DigestAlgorithm", func(t *testing.T) {
@@ -42,7 +42,7 @@ func TestAreFlagsValid(t *testing.T) {
 		}
 
 		err := opts.AreFlagsValid()
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "invalid digest algorithm 'sha1' provided in digest-alg")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "invalid digest algorithm 'sha1' provided in digest-alg")
 	})
 }

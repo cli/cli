@@ -5,7 +5,6 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,7 +51,7 @@ func TestGetURL(t *testing.T) {
 
 	for _, data := range testData {
 		s := c.BuildRepoAndDigestURL(data.repo, data.digest)
-		assert.Equal(t, data.expected, s)
+		require.Equal(t, data.expected, s)
 	}
 }
 
@@ -61,16 +60,16 @@ func TestGetByDigest(t *testing.T) {
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
 	require.NoError(t, err)
 
-	assert.Equal(t, 5, len(attestations))
+	require.Equal(t, 5, len(attestations))
 	bundle := (attestations)[0].Bundle
-	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
+	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 
 	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
 	require.NoError(t, err)
 
-	assert.Equal(t, 5, len(attestations))
+	require.Equal(t, 5, len(attestations))
 	bundle = (attestations)[0].Bundle
-	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
+	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 }
 
 func TestGetByDigestGreaterThanLimit(t *testing.T) {
@@ -81,16 +80,16 @@ func TestGetByDigestGreaterThanLimit(t *testing.T) {
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, limit)
 	require.NoError(t, err)
 
-	assert.Equal(t, 3, len(attestations))
+	require.Equal(t, 3, len(attestations))
 	bundle := (attestations)[0].Bundle
-	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
+	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 
 	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, limit)
 	require.NoError(t, err)
 
-	assert.Equal(t, len(attestations), limit)
+	require.Equal(t, len(attestations), limit)
 	bundle = (attestations)[0].Bundle
-	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
+	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 }
 
 func TestGetByDigestWithNextPage(t *testing.T) {
@@ -98,16 +97,16 @@ func TestGetByDigestWithNextPage(t *testing.T) {
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
 	require.NoError(t, err)
 
-	assert.Equal(t, len(attestations), 10)
+	require.Equal(t, len(attestations), 10)
 	bundle := (attestations)[0].Bundle
-	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
+	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 
 	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
 	require.NoError(t, err)
 
-	assert.Equal(t, len(attestations), 10)
+	require.Equal(t, len(attestations), 10)
 	bundle = (attestations)[0].Bundle
-	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
+	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 }
 
 func TestGetByDigestGreaterThanLimitWithNextPage(t *testing.T) {
@@ -118,16 +117,16 @@ func TestGetByDigestGreaterThanLimitWithNextPage(t *testing.T) {
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, limit)
 	require.NoError(t, err)
 
-	assert.Equal(t, len(attestations), limit)
+	require.Equal(t, len(attestations), limit)
 	bundle := (attestations)[0].Bundle
-	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
+	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 
 	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, limit)
 	require.NoError(t, err)
 
-	assert.Equal(t, len(attestations), limit)
+	require.Equal(t, len(attestations), limit)
 	bundle = (attestations)[0].Bundle
-	assert.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
+	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle+json;version=0.1")
 }
 
 func TestGetByDigest_NoAttestationsFound(t *testing.T) {
@@ -143,14 +142,14 @@ func TestGetByDigest_NoAttestationsFound(t *testing.T) {
 	}
 
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
-	assert.Error(t, err)
-	assert.IsType(t, ErrNoAttestations{}, err)
-	assert.Nil(t, attestations)
+	require.Error(t, err)
+	require.IsType(t, ErrNoAttestations{}, err)
+	require.Nil(t, attestations)
 
 	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
-	assert.Error(t, err)
-	assert.IsType(t, ErrNoAttestations{}, err)
-	assert.Nil(t, attestations)
+	require.Error(t, err)
+	require.IsType(t, ErrNoAttestations{}, err)
+	require.Nil(t, attestations)
 }
 
 func TestGetByDigest_Error(t *testing.T) {
@@ -166,10 +165,10 @@ func TestGetByDigest_Error(t *testing.T) {
 	}
 
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
-	assert.Error(t, err)
-	assert.Nil(t, attestations)
+	require.Error(t, err)
+	require.Nil(t, attestations)
 
 	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
-	assert.Error(t, err)
-	assert.Nil(t, attestations)
+	require.Error(t, err)
+	require.Nil(t, attestations)
 }

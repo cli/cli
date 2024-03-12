@@ -4,15 +4,15 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGitHubTUFOptions(t *testing.T) {
 	os.Setenv("CODESPACES", "true")
 	opts, err := GitHubTUFOptions()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	assert.Equal(t, GitHubTUFMirror, opts.RepositoryBaseURL)
-	assert.NotNil(t, opts.Root)
-	assert.True(t, opts.DisableLocalCache)
+	require.Equal(t, GitHubTUFMirror, opts.RepositoryBaseURL)
+	require.NotNil(t, opts.Root)
+	require.True(t, opts.DisableLocalCache)
 }
