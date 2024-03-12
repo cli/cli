@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
 	"github.com/MakeNowJust/heredoc"
@@ -97,7 +98,9 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	downloadCmd.Flags().StringVarP(&opts.Owner, "owner", "o", "", "a GitHub organization to scope attestation lookup by")
-	downloadCmd.MarkFlagRequired("owner") //nolint:errcheck
+	downloadCmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Repository name in the format <owner>/<repo>")
+	downloadCmd.MarkFlagsMutuallyExclusive("owner", "repo")
+	downloadCmd.MarkFlagsOneRequired("owner", "repo")
 	cmdutil.StringEnumFlag(downloadCmd, &opts.DigestAlgorithm, "digest-alg", "d", "sha256", []string{"sha256", "sha512"}, "The algorithm used to compute a digest of the artifact")
 	downloadCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
 	downloadCmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "If set to true, the CLI will output verbose information.")
@@ -115,7 +118,15 @@ func RunDownload(opts *Options) error {
 	}
 
 	opts.Logger.VerbosePrintf("Downloading trusted metadata for artifact %s\n\n", opts.ArtifactPath)
-	attestations, err := opts.APIClient.GetByOwnerAndDigest(opts.Owner, artifact.DigestWithAlg(), opts.Limit)
+
+	c := verification.FetchAttestationsConfig{
+		APIClient: opts.APIClient,
+		Digest:    artifact.DigestWithAlg(),
+		Limit:     opts.Limit,
+		Owner:     opts.Owner,
+		Repo:      opts.Repo,
+	}
+	attestations, err := verification.GetRemoteAttestations(c)
 	if err != nil {
 		return fmt.Errorf("failed to fetch attestations: %w", err)
 	}

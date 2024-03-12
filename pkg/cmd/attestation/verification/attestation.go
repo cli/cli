@@ -31,7 +31,7 @@ func GetAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
 	if c.IsBundleProvided() {
 		return GetLocalAttestations(c.BundlePath)
 	}
-	return getRemoteAttestations(c)
+	return GetRemoteAttestations(c)
 }
 
 // GetLocalAttestations returns a slice of attestations read from a local bundle file.
@@ -92,7 +92,7 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	return attestations, nil
 }
 
-func getRemoteAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
+func GetRemoteAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
 	if c.APIClient == nil {
 		return nil, fmt.Errorf("api client must be provided")
 	}

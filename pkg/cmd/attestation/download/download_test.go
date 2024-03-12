@@ -23,16 +23,37 @@ func TestRunDownload(t *testing.T) {
 		APIClient:       api.NewTestClient(),
 		OCIClient:       oci.MockClient{},
 		DigestAlgorithm: "sha512",
+		Owner:           "sigstore",
 		OutputPath:      tempDir,
 		Limit:           30,
 		Logger:          logging.NewTestLogger(),
 	}
 
-	t.Run("fetch and store attestations successfully", func(t *testing.T) {
+	t.Run("fetch and store attestations successfully with owner", func(t *testing.T) {
 		err := RunDownload(&baseOpts)
 		require.NoError(t, err)
 
 		artifact, err := artifact.NewDigestedArtifact(baseOpts.OCIClient, baseOpts.ArtifactPath, baseOpts.DigestAlgorithm)
+		require.NoError(t, err)
+
+		require.FileExists(t, fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
+
+		actualLineCount, err := countLines(fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
+		require.NoError(t, err)
+
+		expectedLineCount := 2
+		require.Equal(t, expectedLineCount, actualLineCount)
+	})
+
+	t.Run("fetch and store attestations successfully with repo", func(t *testing.T) {
+		opts := baseOpts
+		opts.Owner = ""
+		opts.Repo = "sigstore/sigstore-js"
+
+		err := RunDownload(&opts)
+		require.NoError(t, err)
+
+		artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 		require.NoError(t, err)
 
 		require.FileExists(t, fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))

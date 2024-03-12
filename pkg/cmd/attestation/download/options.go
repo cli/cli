@@ -18,6 +18,7 @@ type Options struct {
 	OCIClient       oci.Client
 	OutputPath      string
 	Owner           string
+	Repo            string
 	Verbose         bool
 }
 
