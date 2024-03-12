@@ -16,25 +16,25 @@ attestationURL="https://registry.npmjs.org/-/npm/v1/attestations/$labRatPackageN
 
 echo "Testing with package $packageFile and attestation $attestationFile"
 
-curl -s $packageURL -o $packageFile
-curl -s $attestationURL | jq '.attestations[1].bundle' > $attestationFile
+curl -s "$packageURL" -o "$packageFile"
+curl -s "$attestationURL" | jq '.attestations[1].bundle' > "$attestationFile"
 
 # Verify the package with the --owner flag
-$ghBuildPath attestation verify $packageFile -b $attestationFile --digest-alg=sha512 --owner=sigstore
-if [ $? -ne 0 ]; then
+$ghBuildPath attestation verify "$packageFile" -b "$attestationFile" --digest-alg=sha512 --owner=sigstore
+if ! mycmd; then
     # cleanup test data
     echo "Failed to verify package with --owner flag"
-    rm $packageFile $attestationFile
+    rm "$packageFile" "$attestationFile"
     exit 1
 fi
 
-$ghBuildPath attestation verify $packageFile -b $attestationFile --digest-alg=sha512 --repo=sigstore/sigstore-js
-if [ $? -ne 0 ]; then
+$ghBuildPath attestation verify "$packageFile" -b "$attestationFile" --digest-alg=sha512 --repo=sigstore/sigstore-js
+if ! mycmd; then
     # cleanup test data
     echo "Failed to verify package with --repo flag"
-    rm $packageFile $attestationFile
+    rm "$packageFile" "$attestationFile"
     exit 1
 fi
 
 # cleanup test data
-rm $packageFile $attestationFile
+rm "$packageFile" "$attestationFile"
