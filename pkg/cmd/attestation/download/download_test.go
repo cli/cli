@@ -15,9 +15,7 @@ import (
 )
 
 func TestRunDownload(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "gh-attestation-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	baseOpts := Options{
 		ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
@@ -30,7 +28,7 @@ func TestRunDownload(t *testing.T) {
 	}
 
 	t.Run("fetch and store attestations successfully", func(t *testing.T) {
-		err = RunDownload(&baseOpts)
+		err := RunDownload(&baseOpts)
 		require.NoError(t, err)
 
 		artifact, err := artifact.NewDigestedArtifact(baseOpts.OCIClient, baseOpts.ArtifactPath, baseOpts.DigestAlgorithm)
@@ -52,7 +50,7 @@ func TestRunDownload(t *testing.T) {
 		opts := baseOpts
 		opts.ArtifactPath = "oci://ghcr.io/github/test"
 
-		err = RunDownload(&opts)
+		err := RunDownload(&opts)
 		require.NoError(t, err)
 
 		artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
@@ -119,9 +117,7 @@ func TestRunDownload(t *testing.T) {
 }
 
 func TestCreateJSONLinesFilePath(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "gh-attestation-test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	t.Run("with output path", func(t *testing.T) {
 		artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
