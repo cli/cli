@@ -73,9 +73,6 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 			}
 			return nil
 		},
-		// Use Run instead of RunE because if an error is returned by RunVerify
-		// when RunE is used, the command usage will be printed
-		// We only want to print the error, not usage
 		RunE: func(cmd *cobra.Command, args []string) error {
 			hc, err := f.HttpClient()
 			if err != nil {

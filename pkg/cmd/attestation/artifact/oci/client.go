@@ -43,7 +43,7 @@ func (c LiveClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 	}
 
 	// The user must already be authenticated with the container registry
-	// The authn.DefaultKeychain argument indicates that Get should checks the 
+	// The authn.DefaultKeychain argument indicates that Get should checks the
 	// user's configuration for the registry credentials
 	desc, err := c.Get(name, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	if err != nil {
