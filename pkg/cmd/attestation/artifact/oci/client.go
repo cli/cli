@@ -42,6 +42,9 @@ func (c LiveClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 		return nil, fmt.Errorf("failed to create image tag: %w", err)
 	}
 
+	// The user must already be authenticated with the container registry
+	// The authn.DefaultKeychain argument indicates that Get should checks the 
+	// user's configuration for the registry credentials
 	desc, err := c.Get(name, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	if err != nil {
 		var transportErr *transport.Error
