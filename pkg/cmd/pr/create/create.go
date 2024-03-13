@@ -769,8 +769,8 @@ func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *s
 		fmt.Fprintf(w, "projects:\t%v\n", state.Projects)
 	}
 	fmt.Fprintf(w, "maintainerCanModify:\t%t\n", params["maintainerCanModify"])
+	fmt.Fprintf(w, "body:\n")
 	if len(params["body"].(string)) != 0 {
-		fmt.Fprintln(w, "--")
 		fmt.Fprintln(w, params["body"])
 	}
 	return nil
@@ -780,7 +780,8 @@ func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}
 	iofmt := io.ColorScheme()
 	out := io.Out
 
-	fmt.Fprintf(out, "%s\n", iofmt.Bold(params["title"].(string)))
+	fmt.Fprint(out, "Would have created a Pull Request with:\n")
+	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Title"), params["title"].(string))
 	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("Draft"), params["draft"])
 	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Base"), params["baseRefName"])
 	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Head"), params["headRefName"])
@@ -801,11 +802,12 @@ func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}
 	}
 	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("MaintainerCanModify"), params["maintainerCanModify"])
 
+	fmt.Fprintf(out, "%s\n", iofmt.Bold("Body:"))
 	// Body
 	var md string
 	var err error
 	if len(params["body"].(string)) == 0 {
-		md = fmt.Sprintf("\n  %s\n\n", iofmt.Gray("No description provided"))
+		md = fmt.Sprintf("%s", iofmt.Gray("No description provided"))
 	} else {
 		md, err = markdown.Render(params["body"].(string),
 			markdown.WithTheme(io.TerminalTheme()),
@@ -814,7 +816,7 @@ func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}
 			return err
 		}
 	}
-	fmt.Fprintf(out, "\n%s\n", md)
+	fmt.Fprintf(out, "%s\n", md)
 
 	return nil
 }
