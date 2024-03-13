@@ -327,7 +327,7 @@ func Test_createRun(t *testing.T) {
 				`base:	master`,
 				`head:	feature`,
 				`maintainerCanModify:	false`,
-				`--`,
+				`body:`,
 				`my body`,
 				``,
 			},
@@ -387,13 +387,13 @@ func Test_createRun(t *testing.T) {
 				`draft:	false`,
 				`base:	trunk`,
 				`head:	feature`,
-				`labels:	[bug todo]`,
-				`reviewers:	[hubot monalisa /core /robots]`,
-				`assignees:	[monalisa]`,
-				`milestones:	[big one.oh]`,
-				`projects:	[roadmap]`,
+				`labels:	bug, todo`,
+				`reviewers:	hubot, monalisa, /core, /robots`,
+				`assignees:	monalisa`,
+				`milestones:	big one.oh`,
+				`projects:	roadmap`,
 				`maintainerCanModify:	false`,
-				`--`,
+				`body:`,
 				`BODY`,
 				``,
 			},
@@ -411,21 +411,22 @@ func Test_createRun(t *testing.T) {
 				opts.DryRun = true
 				return func() {}
 			},
-			expectedOut: heredoc.Doc(`
-				my title
-				Draft: false
-				Base: master
-				Head: feature
-				MaintainerCanModify: false
-
-
-				  my body                                                                     
-				
-				
-			`),
+			expectedOutputs: []string{
+				`Would have created a Pull Request with:`,
+				`Title: my title`,
+				`Draft: false`,
+				`Base: master`,
+				`Head: feature`,
+				`MaintainerCanModify: false`,
+				`Body:`,
+				``,
+				`  my body                                                                     `,
+				``,
+				``,
+			},
 			expectedErrOut: heredoc.Doc(`
 
-			Creating pull request for feature into master in OWNER/REPO
+			Dry Running pull request for feature into master in OWNER/REPO
 
 		`),
 		},
@@ -477,26 +478,27 @@ func Test_createRun(t *testing.T) {
 					`))
 				mockRetrieveProjects(t, reg)
 			},
-			expectedOut: heredoc.Doc(`
-				TITLE
-				Draft: false
-				Base: trunk
-				Head: feature
-				Labels: [bug todo]
-				Reviewers: [hubot monalisa /core /robots]
-				Assignees: [monalisa]
-				Milestones: [big one.oh]
-				Projects: [roadmap]
-				MaintainerCanModify: false
-
-
-				  BODY                                                                        
-				
-				
-			`),
+			expectedOutputs: []string{
+				`Would have created a Pull Request with:`,
+				`Title: TITLE`,
+				`Draft: false`,
+				`Base: trunk`,
+				`Head: feature`,
+				`Labels: bug, todo`,
+				`Reviewers: hubot, monalisa, /core, /robots`,
+				`Assignees: monalisa`,
+				`Milestones: big one.oh`,
+				`Projects: roadmap`,
+				`MaintainerCanModify: false`,
+				`Body:`,
+				``,
+				`  BODY                                                                        `,
+				``,
+				``,
+			},
 			expectedErrOut: heredoc.Doc(`
 
-			Creating pull request for feature into trunk in OWNER/REPO
+			Dry Running pull request for feature into trunk in OWNER/REPO
 
 		`),
 		},
@@ -513,20 +515,18 @@ func Test_createRun(t *testing.T) {
 				return func() {}
 			},
 			expectedOut: heredoc.Doc(`
-				TITLE
+				Would have created a Pull Request with:
+				Title: TITLE
 				Draft: false
 				Base: master
 				Head: feature
 				MaintainerCanModify: false
-
-
-				  No description provided
-				
-				
+				Body:
+				No description provided
 			`),
 			expectedErrOut: heredoc.Doc(`
 
-			Creating pull request for feature into master in OWNER/REPO
+			Dry Running pull request for feature into master in OWNER/REPO
 
 		`),
 		},

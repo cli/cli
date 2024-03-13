@@ -766,7 +766,7 @@ func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *s
 		fmt.Fprintf(w, "milestones:\t%v\n", strings.Join(state.Milestones, ", "))
 	}
 	if len(state.Projects) != 0 {
-		fmt.Fprintf(w, "projects:\t%v\n", state.Projects)
+		fmt.Fprintf(w, "projects:\t%v\n", strings.Join(state.Projects, ", "))
 	}
 	fmt.Fprintf(w, "maintainerCanModify:\t%t\n", params["maintainerCanModify"])
 	fmt.Fprint(w, "body:\n")
@@ -807,7 +807,7 @@ func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}
 	var md string
 	var err error
 	if len(params["body"].(string)) == 0 {
-		md = fmt.Sprintf("%s", iofmt.Gray("No description provided"))
+		md = fmt.Sprintf("%s\n", iofmt.Gray("No description provided"))
 	} else {
 		md, err = markdown.Render(params["body"].(string),
 			markdown.WithTheme(io.TerminalTheme()),
@@ -816,7 +816,7 @@ func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}
 			return err
 		}
 	}
-	fmt.Fprintf(out, "%s\n", md)
+	fmt.Fprintf(out, "%s", md)
 
 	return nil
 }
