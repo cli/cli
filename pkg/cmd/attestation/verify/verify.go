@@ -88,7 +88,7 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 
 			return nil
 		},
-		// Use Run instead of RunE because if an error is returned by RunVerify
+		// Use Run instead of RunE because if an error is returned by runVerify
 		// when RunE is used, the command usage will be printed
 		// We only want to print the error, not usage
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -103,7 +103,7 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 			if err := auth.IsHostSupported(); err != nil {
 				return err
 			}
-			if err := RunVerify(opts); err != nil {
+			if err := runVerify(opts); err != nil {
 				return fmt.Errorf("Failed to verify the artifact: %w", err)
 			}
 			return nil
@@ -134,7 +134,7 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 	return verifyCmd
 }
 
-func RunVerify(opts *Options) error {
+func runVerify(opts *Options) error {
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
 		return fmt.Errorf("failed to digest artifact: %s", err)

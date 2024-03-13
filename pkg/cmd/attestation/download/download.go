@@ -88,7 +88,7 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 			if err := auth.IsHostSupported(); err != nil {
 				return err
 			}
-			if err := RunDownload(opts); err != nil {
+			if err := runDownload(opts); err != nil {
 				return fmt.Errorf("Failed to download the artifact's bundle(s): %w", err)
 			}
 			return nil
@@ -106,7 +106,7 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 	return downloadCmd
 }
 
-func RunDownload(opts *Options) error {
+func runDownload(opts *Options) error {
 	if opts.APIClient == nil {
 		return fmt.Errorf("missing API client")
 	}

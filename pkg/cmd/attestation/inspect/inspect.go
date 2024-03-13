@@ -66,7 +66,7 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 
 			return nil
 		},
-		// Use Run instead of RunE because if an error is returned by RunInspect
+		// Use Run instead of RunE because if an error is returned by runInspect
 		// when RunE is used, the command usage will be printed
 		// We only want to print the error, not usage
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,7 +75,7 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 			if err := auth.IsHostSupported(); err != nil {
 				return err
 			}
-			if err := RunInspect(opts); err != nil {
+			if err := runInspect(opts); err != nil {
 				return fmt.Errorf("Failed to inspect the artifact and bundle: %w", err)
 			}
 			return nil
@@ -93,7 +93,7 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 	return inspectCmd
 }
 
-func RunInspect(opts *Options) error {
+func runInspect(opts *Options) error {
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
 		return fmt.Errorf("failed to digest artifact: %s", err)

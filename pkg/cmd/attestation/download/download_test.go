@@ -30,7 +30,7 @@ func TestRunDownload(t *testing.T) {
 	}
 
 	t.Run("fetch and store attestations successfully with owner", func(t *testing.T) {
-		err := RunDownload(&baseOpts)
+		err := runDownload(&baseOpts)
 		require.NoError(t, err)
 
 		artifact, err := artifact.NewDigestedArtifact(baseOpts.OCIClient, baseOpts.ArtifactPath, baseOpts.DigestAlgorithm)
@@ -50,7 +50,7 @@ func TestRunDownload(t *testing.T) {
 		opts.Owner = ""
 		opts.Repo = "sigstore/sigstore-js"
 
-		err := RunDownload(&opts)
+		err := runDownload(&opts)
 		require.NoError(t, err)
 
 		artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
@@ -69,7 +69,7 @@ func TestRunDownload(t *testing.T) {
 		opts := baseOpts
 		opts.ArtifactPath = "oci://ghcr.io/github/test"
 
-		err := RunDownload(&opts)
+		err := runDownload(&opts)
 		require.NoError(t, err)
 
 		artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
@@ -88,7 +88,7 @@ func TestRunDownload(t *testing.T) {
 		opts := baseOpts
 		opts.ArtifactPath = "../test/data/not-real.zip"
 
-		err := RunDownload(&opts)
+		err := runDownload(&opts)
 		require.Error(t, err)
 	})
 
@@ -100,7 +100,7 @@ func TestRunDownload(t *testing.T) {
 			},
 		}
 
-		err := RunDownload(&opts)
+		err := runDownload(&opts)
 		require.NoError(t, err)
 
 		artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
@@ -113,7 +113,7 @@ func TestRunDownload(t *testing.T) {
 		opts.ArtifactPath = "oci://ghcr.io/github/test"
 		opts.OCIClient = oci.ReferenceFailClient{}
 
-		err := RunDownload(&opts)
+		err := runDownload(&opts)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to digest artifact")
 	})
@@ -122,13 +122,13 @@ func TestRunDownload(t *testing.T) {
 		customOpts := baseOpts
 		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
 		customOpts.OCIClient = nil
-		require.Error(t, RunDownload(&customOpts))
+		require.Error(t, runDownload(&customOpts))
 	})
 
 	t.Run("with missing API client", func(t *testing.T) {
 		customOpts := baseOpts
 		customOpts.APIClient = nil
-		require.Error(t, RunDownload(&customOpts))
+		require.Error(t, runDownload(&customOpts))
 	})
 }
 
