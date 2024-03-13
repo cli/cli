@@ -372,7 +372,7 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
-	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL)
+	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL) && !opts.DryRun
 	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
 	action, err := shared.ConfirmPRSubmission(opts.Prompter, allowPreview, allowMetadata, state.Draft)
 	if err != nil {
@@ -391,7 +391,7 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata(), false, state.Draft)
+		action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata() && !opts.DryRun, false, state.Draft)
 		if err != nil {
 			return
 		}
