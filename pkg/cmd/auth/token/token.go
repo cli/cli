@@ -46,7 +46,7 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance authenticated with")
-	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to log out of")
+	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to output the token for")
 	cmd.Flags().BoolVarP(&opts.SecureStorage, "secure-storage", "", false, "Search only secure credential store for authentication token")
 	_ = cmd.Flags().MarkHidden("secure-storage")
 

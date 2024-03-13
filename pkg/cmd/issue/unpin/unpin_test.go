@@ -107,7 +107,7 @@ func TestUnpinRun(t *testing.T) {
 				)
 			},
 			wantStdout: "",
-			wantStderr: "✓ Unpinned issue #20 (Issue Title) from OWNER/REPO\n",
+			wantStderr: "✓ Unpinned issue OWNER/REPO#20 (Issue Title)\n",
 		},
 		{
 			name: "issue not pinned",
@@ -122,7 +122,7 @@ func TestUnpinRun(t *testing.T) {
             } } }`),
 				)
 			},
-			wantStderr: "! Issue #20 (Issue Title) is not pinned to OWNER/REPO\n",
+			wantStderr: "! Issue OWNER/REPO#20 (Issue Title) is not pinned\n",
 		},
 	}
 	for _, tt := range tests {

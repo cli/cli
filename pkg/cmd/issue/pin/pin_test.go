@@ -107,7 +107,7 @@ func TestPinRun(t *testing.T) {
 				)
 			},
 			wantStdout: "",
-			wantStderr: "✓ Pinned issue #20 (Issue Title) to OWNER/REPO\n",
+			wantStderr: "✓ Pinned issue OWNER/REPO#20 (Issue Title)\n",
 		},
 		{
 			name: "issue already pinned",
@@ -122,7 +122,7 @@ func TestPinRun(t *testing.T) {
             } } }`),
 				)
 			},
-			wantStderr: "! Issue #20 (Issue Title) is already pinned to OWNER/REPO\n",
+			wantStderr: "! Issue OWNER/REPO#20 (Issue Title) is already pinned\n",
 		},
 	}
 	for _, tt := range tests {
