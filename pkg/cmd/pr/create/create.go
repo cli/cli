@@ -754,16 +754,16 @@ func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *s
 	fmt.Fprintf(w, "base:\t%s\n", params["baseRefName"])
 	fmt.Fprintf(w, "head:\t%s\n", params["headRefName"])
 	if len(state.Labels) != 0 {
-		fmt.Fprintf(w, "labels:\t%v\n", state.Labels)
+		fmt.Fprintf(w, "labels:\t%v\n", strings.Join(state.Labels, ", "))
 	}
 	if len(state.Reviewers) != 0 {
-		fmt.Fprintf(w, "reviewers:\t%v\n", state.Reviewers)
+		fmt.Fprintf(w, "reviewers:\t%v\n", strings.Join(state.Reviewers, ", "))
 	}
 	if len(state.Assignees) != 0 {
-		fmt.Fprintf(w, "assignees:\t%v\n", state.Assignees)
+		fmt.Fprintf(w, "assignees:\t%v\n", strings.Join(state.Assignees, ", "))
 	}
 	if len(state.Milestones) != 0 {
-		fmt.Fprintf(w, "milestones:\t%v\n", state.Milestones)
+		fmt.Fprintf(w, "milestones:\t%v\n", strings.Join(state.Milestones, ", "))
 	}
 	if len(state.Projects) != 0 {
 		fmt.Fprintf(w, "projects:\t%v\n", state.Projects)
@@ -785,19 +785,19 @@ func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}
 	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Base"), params["baseRefName"])
 	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Head"), params["headRefName"])
 	if len(state.Labels) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Labels"), state.Labels)
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Labels"), strings.Join(state.Labels, ", "))
 	}
 	if len(state.Reviewers) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Reviewers"), state.Reviewers)
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Reviewers"), strings.Join(state.Reviewers, ", "))
 	}
 	if len(state.Assignees) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Assignees"), state.Assignees)
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Assignees"), strings.Join(state.Assignees, ", "))
 	}
 	if len(state.Milestones) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Milestones"), state.Milestones)
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Milestones"), strings.Join(state.Milestones, ", "))
 	}
 	if len(state.Projects) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Projects"), state.Projects)
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Projects"), strings.Join(state.Projects, ", "))
 	}
 	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("MaintainerCanModify"), params["maintainerCanModify"])
 
