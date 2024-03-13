@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/digest"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 )
@@ -63,35 +62,6 @@ func (opts *Options) SetPolicyFlags() {
 // AreFlagsValid checks that the provided flag combination is valid
 // and returns an error otherwise
 func (opts *Options) AreFlagsValid() error {
-	// either BundlePath or Repo must be set to configure offline or online mode
-	if opts.BundlePath == "" && opts.Repo == "" && opts.Owner == "" {
-		return fmt.Errorf("either bundle or repo or owner must be provided")
-	}
-
-	// DigestAlgorithm must not be empty
-	if opts.DigestAlgorithm == "" {
-		return fmt.Errorf("digest-alg cannot be empty")
-	}
-
-	if !digest.IsValidDigestAlgorithm(opts.DigestAlgorithm) {
-		return fmt.Errorf("invalid digtest algorithm '%s' provided in digest-alg", opts.DigestAlgorithm)
-	}
-
-	// OIDCIssuer must not be empty
-	if opts.OIDCIssuer == "" {
-		return fmt.Errorf("cert-oidc-issuer cannot be empty")
-	}
-
-	// either Owner or Repo must be supplied
-	if opts.Owner == "" && opts.Repo == "" {
-		return fmt.Errorf("owner or repo must be provided")
-	}
-
-	// SAN or SAN regex are mutually exclusive, only one can be provided
-	if opts.SAN != "" && opts.SANRegex != "" {
-		return fmt.Errorf("cert-identity and cert-identity-regex cannot both be provided")
-	}
-
 	// check that Repo is in the expected format if provided
 	if opts.Repo != "" {
 		// we expect the repo argument to be in the format <OWNER>/<REPO>

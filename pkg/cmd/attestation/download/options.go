@@ -4,9 +4,13 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/digest"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+)
+
+const (
+	minLimit = 1
+	maxLimit = 1000
 )
 
 type Options struct {
@@ -23,22 +27,9 @@ type Options struct {
 }
 
 func (opts *Options) AreFlagsValid() error {
-	if opts.Owner == "" {
-		return fmt.Errorf("owner must be provided")
-	}
-
-	// DigestAlgorithm must not be empty
-	if opts.DigestAlgorithm == "" {
-		return fmt.Errorf("digest-alg cannot be empty")
-	}
-
-	if !digest.IsValidDigestAlgorithm(opts.DigestAlgorithm) {
-		return fmt.Errorf("invalid digest algorithm '%s' provided in digest-alg", opts.DigestAlgorithm)
-	}
-
 	// Check that limit is between 1 and 1000
-	if opts.Limit < 1 || opts.Limit > 1000 {
-		return fmt.Errorf("limit %d not allowed, must be between 1 and 1000", opts.Limit)
+	if opts.Limit < minLimit || opts.Limit > maxLimit {
+		return fmt.Errorf("limit %d not allowed, must be between %d and %d", opts.Limit, minLimit, maxLimit)
 	}
 
 	return nil

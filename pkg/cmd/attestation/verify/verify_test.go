@@ -1,6 +1,8 @@
 package verify
 
 import (
+	"bytes"
+	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
@@ -8,6 +10,12 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/sigstore/sigstore-go/pkg/verify"
@@ -19,6 +27,199 @@ const (
 	SigstoreSanValue = "https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main"
 	SigstoreSanRegex = "^https://github.com/sigstore/sigstore-js/"
 )
+
+func TestNewVerifyCmd(t *testing.T) {
+	testIO, _, _, _ := iostreams.Test()
+	f := &cmdutil.Factory{
+		IOStreams: testIO,
+		HttpClient: func() (*http.Client, error) {
+			reg := &httpmock.Registry{}
+			client := &http.Client{}
+			httpmock.ReplaceTripper(client, reg)
+			return client, nil
+		},
+	}
+
+	testcases := []struct {
+		name     string
+		cli      string
+		wants    Options
+		wantsErr bool
+	}{
+		{
+			name: "Invalid digest-alg flag",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --digest-alg sha384 --owner sigstore",
+			wants: Options{
+				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+				DigestAlgorithm: "sha384",
+				Limit:           30,
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Owner:           "sigstore",
+			},
+			wantsErr: true,
+		},
+		{
+			name: "Use default digest-alg value",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --owner sigstore",
+			wants: Options{
+				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+				DigestAlgorithm: "sha256",
+				Limit:           30,
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Owner:           "sigstore",
+				SANRegex:        "^https://github.com/sigstore/",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "Use custom digest-alg value",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --digest-alg sha512 --owner sigstore",
+			wants: Options{
+				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+				DigestAlgorithm: "sha512",
+				Limit:           30,
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Owner:           "sigstore",
+				SANRegex:        "^https://github.com/sigstore/",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "Missing owner and repo flags",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz",
+			wants: Options{
+				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				DigestAlgorithm: "sha256",
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Owner:           "sigstore",
+				Limit:           30,
+				SANRegex:        "^https://github.com/sigstore/",
+			},
+			wantsErr: true,
+		},
+		{
+			name: "Has both owner and repo flags",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --repo sigstore/sigstore-js",
+			wants: Options{
+				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				DigestAlgorithm: "sha256",
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Owner:           "sigstore",
+				Repo:            "sigstore/sigstore-js",
+				Limit:           30,
+			},
+			wantsErr: true,
+		},
+		{
+			name: "Uses default limit flag",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore",
+			wants: Options{
+				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				DigestAlgorithm: "sha256",
+				Limit:           30,
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Owner:           "sigstore",
+				SANRegex:        "^https://github.com/sigstore/",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "Uses custom limit flag",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --limit 101",
+			wants: Options{
+				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				DigestAlgorithm: "sha256",
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Owner:           "sigstore",
+				Limit:           101,
+				SANRegex:        "^https://github.com/sigstore/",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "Uses invalid limit flag",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --limit 0",
+			wants: Options{
+				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				DigestAlgorithm: "sha256",
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Owner:           "sigstore",
+				Limit:           0,
+				SANRegex:        "^https://github.com/sigstore/",
+			},
+			wantsErr: true,
+		},
+		{
+			name: "Has both verbose and quiet flags",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --owner sigstore --verbose --quiet",
+			wants: Options{
+				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+				DigestAlgorithm: "sha256",
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Verbose:         true,
+				Quiet:           true,
+			},
+			wantsErr: true,
+		},
+		{
+			name: "Has both cert-identity and cert-identity-regex flags",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --cert-identity https://github.com/sigstore/ --cert-identity-regex ^https://github.com/sigstore/",
+			wants: Options{
+				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				DigestAlgorithm: "sha256",
+				Limit:           30,
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Owner:           "sigstore",
+				SAN:             "https://github.com/sigstore/",
+				SANRegex:        "^https://github.com/sigstore/",
+			},
+			wantsErr: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			var opts *Options
+			cmd := NewVerifyCmd(f, func(o *Options) error {
+				opts = o
+				return nil
+			})
+
+			argv, err := shlex.Split(tc.cli)
+			assert.NoError(t, err)
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+			_, err = cmd.ExecuteC()
+			if tc.wantsErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+
+			assert.Equal(t, tc.wants.ArtifactPath, opts.ArtifactPath)
+			assert.Equal(t, tc.wants.BundlePath, opts.BundlePath)
+			assert.Equal(t, tc.wants.CustomTrustedRoot, opts.CustomTrustedRoot)
+			assert.Equal(t, tc.wants.DenySelfHostedRunner, opts.DenySelfHostedRunner)
+			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
+			assert.Equal(t, tc.wants.JsonResult, opts.JsonResult)
+			assert.Equal(t, tc.wants.Limit, opts.Limit)
+			assert.Equal(t, tc.wants.NoPublicGood, opts.NoPublicGood)
+			assert.Equal(t, tc.wants.OIDCIssuer, opts.OIDCIssuer)
+			assert.Equal(t, tc.wants.Owner, opts.Owner)
+			assert.Equal(t, tc.wants.Quiet, opts.Quiet)
+			assert.Equal(t, tc.wants.Repo, opts.Repo)
+			assert.Equal(t, tc.wants.SAN, opts.SAN)
+			assert.Equal(t, tc.wants.SANRegex, opts.SANRegex)
+			assert.Equal(t, tc.wants.Verbose, opts.Verbose)
+		})
+	}
+}
 
 func TestRunVerify(t *testing.T) {
 	logger := logging.NewTestLogger()

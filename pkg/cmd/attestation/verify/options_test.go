@@ -14,60 +14,6 @@ var (
 )
 
 func TestAreFlagsValid(t *testing.T) {
-	t.Run("missing BundlePath, Repo, and Owner", func(t *testing.T) {
-		opts := Options{
-			ArtifactPath:    publicGoodArtifactPath,
-			DigestAlgorithm: "sha512",
-			OIDCIssuer:      "some issuer",
-		}
-
-		err := opts.AreFlagsValid()
-		require.Error(t, err)
-		require.ErrorContains(t, err, "either bundle or repo or owner must be provided")
-	})
-
-	t.Run("missing DigestAlgorithm", func(t *testing.T) {
-		opts := Options{
-			ArtifactPath: publicGoodArtifactPath,
-			BundlePath:   publicGoodBundlePath,
-			OIDCIssuer:   "some issuer",
-			Owner:        "sigstore",
-		}
-
-		err := opts.AreFlagsValid()
-		require.Error(t, err)
-		require.ErrorContains(t, err, "digest-alg cannot be empty")
-	})
-
-	t.Run("missing Owner and Repo", func(t *testing.T) {
-		opts := Options{
-			ArtifactPath:    publicGoodArtifactPath,
-			BundlePath:      publicGoodBundlePath,
-			DigestAlgorithm: "sha512",
-			OIDCIssuer:      "some issuer",
-		}
-
-		err := opts.AreFlagsValid()
-		require.Error(t, err)
-		require.ErrorContains(t, err, "owner or repo must be provided")
-	})
-
-	t.Run("has both SAN and SANRegex", func(t *testing.T) {
-		opts := Options{
-			ArtifactPath:    publicGoodArtifactPath,
-			BundlePath:      publicGoodBundlePath,
-			DigestAlgorithm: "sha512",
-			OIDCIssuer:      "some issuer",
-			Owner:           "sigstore",
-			SAN:             "some san",
-			SANRegex:        "^some san regex$",
-		}
-
-		err := opts.AreFlagsValid()
-		require.Error(t, err)
-		require.ErrorContains(t, err, "cert-identity and cert-identity-regex cannot both be provided")
-	})
-
 	t.Run("has invalid Repo value", func(t *testing.T) {
 		opts := Options{
 			ArtifactPath:    publicGoodArtifactPath,
@@ -79,19 +25,6 @@ func TestAreFlagsValid(t *testing.T) {
 		err := opts.AreFlagsValid()
 		require.Error(t, err)
 		require.ErrorContains(t, err, "invalid value provided for repo")
-	})
-
-	t.Run("missing OIDCIssuer", func(t *testing.T) {
-		opts := Options{
-			ArtifactPath:    publicGoodArtifactPath,
-			BundlePath:      publicGoodBundlePath,
-			DigestAlgorithm: "sha512",
-			Owner:           "sigstore",
-		}
-
-		err := opts.AreFlagsValid()
-		require.Error(t, err)
-		require.ErrorContains(t, err, "cert-oidc-issuer cannot be empty")
 	})
 
 	t.Run("invalid limit < 0", func(t *testing.T) {

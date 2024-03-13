@@ -19,7 +19,7 @@ import (
 
 var ErrNoMatchingSLSAPredicate = fmt.Errorf("the attestation does not have the expected SLSA predicate type: %s", SLSAPredicateType)
 
-func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
+func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	verifyCmd := &cobra.Command{
 		Use:   "verify <artifact-path-or-url>",
@@ -100,6 +100,11 @@ func NewVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 			if err := auth.IsHostSupported(); err != nil {
 				return err
 			}
+
+			if runF != nil {
+				return runF(opts)
+			}
+
 			if err := runVerify(opts); err != nil {
 				return fmt.Errorf("Failed to verify the artifact: %w", err)
 			}

@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
+func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	downloadCmd := &cobra.Command{
 		Use:   "download [<file path> | oci://<OCI image URI>]",
@@ -85,6 +85,11 @@ func NewDownloadCmd(f *cmdutil.Factory) *cobra.Command {
 			if err := auth.IsHostSupported(); err != nil {
 				return err
 			}
+
+			if runF != nil {
+				return runF(opts)
+			}
+
 			if err := runDownload(opts); err != nil {
 				return fmt.Errorf("Failed to download the artifact's bundle(s): %w", err)
 			}

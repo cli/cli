@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
+func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	inspectCmd := &cobra.Command{
 		Use:   "inspect [<file path> | oci://<OCI image URI>] --bundle <path-to-bundle>",
@@ -56,11 +56,6 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 			// set the artifact path
 			opts.ArtifactPath = args[0]
 
-			// Check that the given flag combination is valid
-			if err := opts.AreFlagsValid(); err != nil {
-				return err
-			}
-
 			// Clean file path options
 			opts.Clean()
 
@@ -72,6 +67,11 @@ func NewInspectCmd(f *cmdutil.Factory) *cobra.Command {
 			if err := auth.IsHostSupported(); err != nil {
 				return err
 			}
+
+			if runF != nil {
+				return runF(opts)
+			}
+
 			if err := runInspect(opts); err != nil {
 				return fmt.Errorf("Failed to inspect the artifact and bundle: %w", err)
 			}

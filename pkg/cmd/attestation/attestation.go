@@ -29,9 +29,9 @@ func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 	`, "`"),
 	}
 
-	root.AddCommand(download.NewDownloadCmd(f))
-	root.AddCommand(inspect.NewInspectCmd(f))
-	root.AddCommand(verify.NewVerifyCmd(f))
+	root.AddCommand(download.NewDownloadCmd(f, nil))
+	root.AddCommand(inspect.NewInspectCmd(f, nil))
+	root.AddCommand(verify.NewVerifyCmd(f, nil))
 	root.AddCommand(tufrootverify.NewTUFRootVerifyCmd(f))
 
 	return root
