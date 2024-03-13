@@ -301,6 +301,9 @@ func createRun(opts *CreateOptions) (err error) {
 	if state.Draft {
 		message = "\nCreating draft pull request for %s into %s in %s\n\n"
 	}
+	if opts.DryRun {
+		message = "\nDry Running pull request for %s into %s in %s\n\n"
+	}
 
 	cs := opts.IO.ColorScheme()
 
