@@ -44,7 +44,7 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 				return err
 			}
 
-			if err := verifyTUFRoot(mirror, root); err != nil {
+			if err := tufRootVerify(mirror, root); err != nil {
 				return fmt.Errorf("Failed to verify the TUF repository: %w", err)
 			}
 			fmt.Sprintln(logger.IO.Out, logger.ColorScheme.Green("Successfully verified the TUF repository"))
@@ -60,7 +60,7 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cmd
 }
 
-func verifyTUFRoot(mirror, root string) error {
+func tufRootVerify(mirror, root string) error {
 	rb, err := os.ReadFile(root)
 	if err != nil {
 		return fmt.Errorf("failed to read root file %s: %w", root, err)
