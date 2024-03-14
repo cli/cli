@@ -18,9 +18,10 @@ import (
 func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	inspectCmd := &cobra.Command{
-		Use:   "inspect [<file path> | oci://<OCI image URI>] --bundle <path-to-bundle>",
-		Args:  cobra.ExactArgs(1),
-		Short: "Inspect a sigstore bundle",
+		Use:    "inspect [<file path> | oci://<OCI image URI>] --bundle <path-to-bundle>",
+		Args:   cobra.ExactArgs(1),
+		Hidden: true,
+		Short:  "Inspect a sigstore bundle",
 		Long: heredoc.Docf(`
 			Inspect a downloaded Sigstore bundle for a given artifact.
 				
@@ -144,7 +145,9 @@ func runInspect(opts *Options) error {
 
 		rows := make([][]string, 1)
 		rows[0] = jsonResults
-		opts.Logger.PrintTableToStdOut(nil, rows)
+		if err = opts.Logger.PrintTableToStdOut(nil, rows); err != nil {
+			return fmt.Errorf("failed to print output as JSON: %w", err)
+		}
 
 		return nil
 	}
@@ -155,7 +158,9 @@ func runInspect(opts *Options) error {
 	}
 
 	headerRow := []string{"Repo Name", "Repo ID", "Org Name", "Org ID", "Workflow ID"}
-	opts.Logger.PrintTableToStdOut(headerRow, details)
+	if err = opts.Logger.PrintTableToStdOut(headerRow, details); err != nil {
+		return fmt.Errorf("failed to print output as table: %w", err)
+	}
 
 	return nil
 }

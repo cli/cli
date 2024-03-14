@@ -2,7 +2,6 @@ package logging
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/tableprinter"
@@ -69,9 +68,9 @@ func (l *Logger) VerbosePrintf(f string, v ...interface{}) (int, error) {
 	return fmt.Fprintf(l.IO.ErrOut, f, v...)
 }
 
-func (l *Logger) PrintTableToStdOut(headers []string, rows [][]string) {
+func (l *Logger) PrintTableToStdOut(headers []string, rows [][]string) error {
 	if rows == nil {
-		return
+		return nil
 	}
 	t := tableprinter.New(l.IO.Out, l.IO.IsStdoutTTY(), l.IO.TerminalWidth())
 
@@ -88,6 +87,7 @@ func (l *Logger) PrintTableToStdOut(headers []string, rows [][]string) {
 	}
 
 	if err := t.Render(); err != nil {
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }
