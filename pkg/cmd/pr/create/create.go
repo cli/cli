@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -64,6 +66,8 @@ type CreateOptions struct {
 
 	MaintainerCanModify bool
 	Template            string
+
+	DryRun bool
 }
 
 type CreateContext struct {
@@ -190,6 +194,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `fill-first` or `--fillverbose`) when not running interactively")
 			}
 
+			if opts.DryRun && opts.WebMode {
+				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -216,6 +224,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
+	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -292,6 +301,9 @@ func createRun(opts *CreateOptions) (err error) {
 	if state.Draft {
 		message = "\nCreating draft pull request for %s into %s in %s\n\n"
 	}
+	if opts.DryRun {
+		message = "\nDry Running pull request for %s into %s in %s\n\n"
+	}
 
 	cs := opts.IO.ColorScheme()
 
@@ -360,7 +372,7 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
-	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL)
+	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL) && !opts.DryRun
 	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
 	action, err := shared.ConfirmPRSubmission(opts.Prompter, allowPreview, allowMetadata, state.Draft)
 	if err != nil {
@@ -379,7 +391,7 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata(), false, state.Draft)
+		action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata() && !opts.DryRun, false, state.Draft)
 		if err != nil {
 			return
 		}
@@ -712,6 +724,14 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		return err
 	}
 
+	if opts.DryRun {
+		if opts.IO.IsStdoutTTY() {
+			return renderPullRequestTTY(opts.IO, params, &state)
+		} else {
+			return renderPullRequestPlain(opts.IO.Out, params, &state)
+		}
+	}
+
 	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.BaseRepo, params)
 	opts.IO.StopProgressIndicator()
@@ -724,6 +744,80 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		}
 		return fmt.Errorf("pull request create failed: %w", err)
 	}
+	return nil
+}
+
+func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *shared.IssueMetadataState) error {
+	fmt.Fprint(w, "Would have created a Pull Request with:\n")
+	fmt.Fprintf(w, "title:\t%s\n", params["title"])
+	fmt.Fprintf(w, "draft:\t%t\n", params["draft"])
+	fmt.Fprintf(w, "base:\t%s\n", params["baseRefName"])
+	fmt.Fprintf(w, "head:\t%s\n", params["headRefName"])
+	if len(state.Labels) != 0 {
+		fmt.Fprintf(w, "labels:\t%v\n", strings.Join(state.Labels, ", "))
+	}
+	if len(state.Reviewers) != 0 {
+		fmt.Fprintf(w, "reviewers:\t%v\n", strings.Join(state.Reviewers, ", "))
+	}
+	if len(state.Assignees) != 0 {
+		fmt.Fprintf(w, "assignees:\t%v\n", strings.Join(state.Assignees, ", "))
+	}
+	if len(state.Milestones) != 0 {
+		fmt.Fprintf(w, "milestones:\t%v\n", strings.Join(state.Milestones, ", "))
+	}
+	if len(state.Projects) != 0 {
+		fmt.Fprintf(w, "projects:\t%v\n", strings.Join(state.Projects, ", "))
+	}
+	fmt.Fprintf(w, "maintainerCanModify:\t%t\n", params["maintainerCanModify"])
+	fmt.Fprint(w, "body:\n")
+	if len(params["body"].(string)) != 0 {
+		fmt.Fprintln(w, params["body"])
+	}
+	return nil
+}
+
+func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}, state *shared.IssueMetadataState) error {
+	iofmt := io.ColorScheme()
+	out := io.Out
+
+	fmt.Fprint(out, "Would have created a Pull Request with:\n")
+	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Title"), params["title"].(string))
+	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("Draft"), params["draft"])
+	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Base"), params["baseRefName"])
+	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Head"), params["headRefName"])
+	if len(state.Labels) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Labels"), strings.Join(state.Labels, ", "))
+	}
+	if len(state.Reviewers) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Reviewers"), strings.Join(state.Reviewers, ", "))
+	}
+	if len(state.Assignees) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Assignees"), strings.Join(state.Assignees, ", "))
+	}
+	if len(state.Milestones) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Milestones"), strings.Join(state.Milestones, ", "))
+	}
+	if len(state.Projects) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Projects"), strings.Join(state.Projects, ", "))
+	}
+	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("MaintainerCanModify"), params["maintainerCanModify"])
+
+	fmt.Fprintf(out, "%s\n", iofmt.Bold("Body:"))
+	// Body
+	var md string
+	var err error
+	if len(params["body"].(string)) == 0 {
+		md = fmt.Sprintf("%s\n", iofmt.Gray("No description provided"))
+	} else {
+		md, err = markdown.Render(params["body"].(string),
+			markdown.WithTheme(io.TerminalTheme()),
+			markdown.WithWrap(io.TerminalWidth()))
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(out, "%s", md)
+
 	return nil
 }
 
