@@ -19,10 +19,10 @@ func TestGetImageDigest_Success(t *testing.T) {
 	}
 
 	c := LiveClient{
-		ParseReference: func(string, ...name.Option) (name.Reference, error) {
+		parseReference: func(string, ...name.Option) (name.Reference, error) {
 			return name.Tag{}, nil
 		},
-		Get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
+		get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
 			d := remote.Descriptor{}
 			d.Digest = expectedDigest
 
@@ -37,10 +37,10 @@ func TestGetImageDigest_Success(t *testing.T) {
 
 func TestGetImageDigest_ReferenceFail(t *testing.T) {
 	c := LiveClient{
-		ParseReference: func(string, ...name.Option) (name.Reference, error) {
+		parseReference: func(string, ...name.Option) (name.Reference, error) {
 			return nil, fmt.Errorf("failed to parse reference")
 		},
-		Get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
+		get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
 			return nil, nil
 		},
 	}
@@ -52,10 +52,10 @@ func TestGetImageDigest_ReferenceFail(t *testing.T) {
 
 func TestGetImageDigest_AuthFail(t *testing.T) {
 	c := LiveClient{
-		ParseReference: func(string, ...name.Option) (name.Reference, error) {
+		parseReference: func(string, ...name.Option) (name.Reference, error) {
 			return name.Tag{}, nil
 		},
-		Get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
+		get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
 			return nil, &transport.Error{Errors: []transport.Diagnostic{{Code: transport.UnauthorizedErrorCode}}}
 		},
 	}
@@ -68,10 +68,10 @@ func TestGetImageDigest_AuthFail(t *testing.T) {
 
 func TestGetImageDigest_Denied(t *testing.T) {
 	c := LiveClient{
-		ParseReference: func(string, ...name.Option) (name.Reference, error) {
+		parseReference: func(string, ...name.Option) (name.Reference, error) {
 			return name.Tag{}, nil
 		},
-		Get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
+		get: func(name.Reference, ...remote.Option) (*remote.Descriptor, error) {
 			return nil, &transport.Error{Errors: []transport.Diagnostic{{Code: transport.DeniedErrorCode}}}
 		},
 	}

@@ -31,13 +31,13 @@ func checkForUnauthorizedOrDeniedErr(err transport.Error) error {
 }
 
 type LiveClient struct {
-	ParseReference func(string, ...name.Option) (name.Reference, error)
-	Get            func(name.Reference, ...remote.Option) (*remote.Descriptor, error)
+	parseReference func(string, ...name.Option) (name.Reference, error)
+	get            func(name.Reference, ...remote.Option) (*remote.Descriptor, error)
 }
 
 // where name is formed like ghcr.io/github/my-image-repo
 func (c LiveClient) GetImageDigest(imgName string) (*v1.Hash, error) {
-	name, err := c.ParseReference(imgName)
+	name, err := c.parseReference(imgName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create image tag: %w", err)
 	}
@@ -45,7 +45,7 @@ func (c LiveClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 	// The user must already be authenticated with the container registry
 	// The authn.DefaultKeychain argument indicates that Get should checks the
 	// user's configuration for the registry credentials
-	desc, err := c.Get(name, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	desc, err := c.get(name, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	if err != nil {
 		var transportErr *transport.Error
 		if errors.As(err, &transportErr) {
@@ -61,7 +61,7 @@ func (c LiveClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 
 func NewLiveClient() *LiveClient {
 	return &LiveClient{
-		ParseReference: name.ParseReference,
-		Get:            remote.Get,
+		parseReference: name.ParseReference,
+		get:            remote.Get,
 	}
 }
