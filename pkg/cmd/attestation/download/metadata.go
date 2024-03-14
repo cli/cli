@@ -9,7 +9,6 @@ import (
 )
 
 type MetadataStore interface {
-	createJSONLinesFilePath(artifact string) string
 	createMetadataFile(artifactDigest string, attestationsResp []*api.Attestation) (string, error)
 }
 
@@ -56,4 +55,16 @@ func (s *LiveStore) createMetadataFile(artifactDigest string, attestationsResp [
 	}
 
 	return metadataFilePath, nil
+}
+
+type MockStore struct {
+	OnCreateMetadataFile func(artifactDigest string, attestationsResp []*api.Attestation) (string, error)
+}
+
+func (s *MockStore) createMetadataFile(artifact string, attestationsResp []*api.Attestation) (string, error) {
+	return s.OnCreateMetadataFile(artifact, attestationsResp)
+}
+
+func OnCreateMetadataFileFailure(artifactDigest string, attestationsResp []*api.Attestation) (string, error) {
+	return "", fmt.Errorf("failed to create trusted metadata file")
 }

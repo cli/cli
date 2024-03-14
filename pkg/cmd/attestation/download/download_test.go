@@ -301,4 +301,14 @@ func TestRunDownload(t *testing.T) {
 		customOpts.APIClient = nil
 		require.Error(t, runDownload(&customOpts))
 	})
+
+	t.Run("fail to write attestations to metadata file", func(t *testing.T) {
+		opts := baseOpts
+		opts.Store = &MockStore{
+			OnCreateMetadataFile: OnCreateMetadataFileFailure,
+		}
+
+		err := runDownload(&opts)
+		require.Error(t, err)
+	})
 }
