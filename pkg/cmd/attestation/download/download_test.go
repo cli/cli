@@ -33,7 +33,10 @@ func TestNewDownloadCmd(t *testing.T) {
 			return client, nil
 		},
 	}
-	tempDir := t.TempDir()
+
+	store := &MetadataStore{
+		outputPath: t.TempDir(),
+	}
 
 	testcases := []struct {
 		name     string
@@ -50,7 +53,7 @@ func TestNewDownloadCmd(t *testing.T) {
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha384",
 				Owner:           "sigstore",
-				OutputPath:      tempDir,
+				Store:           store,
 				Limit:           30,
 			},
 			wantsErr: true,
@@ -64,7 +67,7 @@ func TestNewDownloadCmd(t *testing.T) {
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
 				Owner:           "sigstore",
-				OutputPath:      tempDir,
+				Store:           store,
 				Limit:           30,
 			},
 			wantsErr: false,
@@ -78,7 +81,7 @@ func TestNewDownloadCmd(t *testing.T) {
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
 				Owner:           "sigstore",
-				OutputPath:      tempDir,
+				Store:           store,
 				Limit:           30,
 			},
 			wantsErr: true,
@@ -92,7 +95,7 @@ func TestNewDownloadCmd(t *testing.T) {
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
 				Owner:           "sigstore",
-				OutputPath:      tempDir,
+				Store:           store,
 				Repo:            "sigstore/sigstore-js",
 				Limit:           30,
 			},
@@ -107,7 +110,7 @@ func TestNewDownloadCmd(t *testing.T) {
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
 				Owner:           "sigstore",
-				OutputPath:      tempDir,
+				Store:           store,
 				Limit:           30,
 			},
 			wantsErr: false,
@@ -121,7 +124,7 @@ func TestNewDownloadCmd(t *testing.T) {
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
 				Owner:           "sigstore",
-				OutputPath:      tempDir,
+				Store:           store,
 				Limit:           101,
 			},
 			wantsErr: false,
@@ -135,7 +138,7 @@ func TestNewDownloadCmd(t *testing.T) {
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
 				Owner:           "sigstore",
-				OutputPath:      tempDir,
+				Store:           store,
 				Limit:           0,
 			},
 			wantsErr: true,
@@ -173,6 +176,9 @@ func TestNewDownloadCmd(t *testing.T) {
 
 func TestRunDownload(t *testing.T) {
 	tempDir := t.TempDir()
+	store := &MetadataStore{
+		outputPath: tempDir,
+	}
 
 	baseOpts := Options{
 		ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
@@ -180,7 +186,7 @@ func TestRunDownload(t *testing.T) {
 		OCIClient:       oci.MockClient{},
 		DigestAlgorithm: "sha512",
 		Owner:           "sigstore",
-		OutputPath:      tempDir,
+		Store:           store,
 		Limit:           30,
 		Logger:          logging.NewTestLogger(),
 	}

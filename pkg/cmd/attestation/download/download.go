@@ -136,13 +136,11 @@ func runDownload(opts *Options) error {
 		return fmt.Errorf("failed to fetch attestations: %w", err)
 	}
 
-	filePath := createJSONLinesFilePath(artifact.DigestWithAlg(), opts.OutputPath)
-	fmt.Fprintf(opts.Logger.IO.Out, "Writing attestations to file %s.\nAny previous content will be overwritten\n\n", filePath)
-
-	metadataFilePath, err := createMetadataFile(attestations, filePath)
+	metadataFilePath, err := opts.Store.createMetadataFile(artifact.DigestWithAlg(), attestations)
 	if err != nil {
 		return fmt.Errorf("failed to write attestation: %w", err)
 	}
+	fmt.Fprintf(opts.Logger.IO.Out, "Wrote attestations to file %s.\nAny previous content has been overwritten\n\n", metadataFilePath)
 
 	fmt.Fprint(opts.Logger.IO.Out,
 		opts.Logger.ColorScheme.Greenf(
