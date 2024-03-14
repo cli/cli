@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestArtifactDigestWithAlgorithm(t *testing.T) {
@@ -24,6 +25,13 @@ func TestArtifactDigestWithAlgorithm(t *testing.T) {
 		digest, err := CalculateDigestWithAlgorithm(reader, "sha512")
 		assert.Nil(t, err)
 		assert.Equal(t, sha512TestDigest, digest)
+	})
+
+	t.Run("fail with sha384", func(t *testing.T) {
+		reader := strings.NewReader(testString)
+		_, err := CalculateDigestWithAlgorithm(reader, "sha384")
+		require.Error(t, err)
+		require.ErrorAs(t, err, &errUnsupportedAlgorithm)
 	})
 }
 

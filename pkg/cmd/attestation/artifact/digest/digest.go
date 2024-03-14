@@ -14,7 +14,10 @@ const (
 	SHA512DigestAlgorithm = "sha512"
 )
 
-var validDigestAlgorithms = [...]string{SHA256DigestAlgorithm, SHA512DigestAlgorithm}
+var (
+	errUnsupportedAlgorithm = fmt.Errorf("unsupported digest algorithm")
+	validDigestAlgorithms   = [...]string{SHA256DigestAlgorithm, SHA512DigestAlgorithm}
+)
 
 // IsValidDigestAlgorithm returns true if the provided algorithm is supported
 func IsValidDigestAlgorithm(alg string) bool {
@@ -39,7 +42,7 @@ func CalculateDigestWithAlgorithm(r io.Reader, alg string) (string, error) {
 	case SHA512DigestAlgorithm:
 		h = sha512.New()
 	default:
-		h = sha256.New()
+		return "", errUnsupportedAlgorithm
 	}
 
 	if _, err := io.Copy(h, r); err != nil {
