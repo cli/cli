@@ -19,7 +19,7 @@ type Options struct {
 	DigestAlgorithm string
 	Logger          *logging.Logger
 	Limit           int
-	Store           *MetadataStore
+	Store           MetadataStore
 	OCIClient       oci.Client
 	Owner           string
 	Repo            string

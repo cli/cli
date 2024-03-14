@@ -8,11 +8,16 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 )
 
-type MetadataStore struct {
+type MetadataStore interface {
+	createJSONLinesFilePath(artifact string) string
+	createMetadataFile(artifactDigest string, attestationsResp []*api.Attestation) (string, error)
+}
+
+type LiveStore struct {
 	outputPath string
 }
 
-func (s *MetadataStore) createJSONLinesFilePath(artifact string) string {
+func (s *LiveStore) createJSONLinesFilePath(artifact string) string {
 	path := fmt.Sprintf("%s.jsonl", artifact)
 	if s.outputPath != "" {
 		return fmt.Sprintf("%s/%s", s.outputPath, path)
@@ -20,7 +25,7 @@ func (s *MetadataStore) createJSONLinesFilePath(artifact string) string {
 	return path
 }
 
-func (s *MetadataStore) createMetadataFile(artifactDigest string, attestationsResp []*api.Attestation) (string, error) {
+func (s *LiveStore) createMetadataFile(artifactDigest string, attestationsResp []*api.Attestation) (string, error) {
 	metadataFilePath := s.createJSONLinesFilePath(artifactDigest)
 
 	f, err := os.Create(metadataFilePath)

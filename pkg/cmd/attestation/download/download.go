@@ -1,10 +1,8 @@
 package download
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
@@ -149,43 +147,4 @@ func runDownload(opts *Options) error {
 	)
 
 	return nil
-}
-
-func createJSONLinesFilePath(artifact, outputPath string) string {
-	path := fmt.Sprintf("%s.jsonl", artifact)
-	if outputPath != "" {
-		return fmt.Sprintf("%s/%s", outputPath, path)
-	}
-	return path
-}
-
-func createMetadataFile(attestationsResp []*api.Attestation, filePath string) (string, error) {
-	f, err := os.Create(filePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to create trusted metadata file: %w", err)
-	}
-
-	for _, resp := range attestationsResp {
-		bundle := resp.Bundle
-		attBytes, err := json.Marshal(bundle)
-		if err != nil {
-			return "", fmt.Errorf("failed to marshall attestation to JSON: %w", err)
-		}
-
-		withNewline := fmt.Sprintf("%s\n", attBytes)
-		_, err = f.Write([]byte(withNewline))
-		if err != nil {
-			if err = f.Close(); err != nil {
-				return "", fmt.Errorf("failed to close file while handling write error: %w", err)
-			}
-
-			return "", fmt.Errorf("failed to write trusted metadata: %w", err)
-		}
-	}
-
-	if err = f.Close(); err != nil {
-		return "", fmt.Errorf("failed to close file after writing metadata: %w", err)
-	}
-
-	return filePath, nil
 }
