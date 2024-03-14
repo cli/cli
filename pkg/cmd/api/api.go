@@ -318,13 +318,14 @@ func apiRun(opts *ApiOptions) error {
 		requestPath = addPerPage(requestPath, 100, params)
 	}
 
+	var closer = func() error { return nil }
 	// Similar to `jq --slurp`, write all pages JSON arrays or objects into a JSON array.
 	if opts.Paginate && opts.Slurp {
 		w := &jsonArrayWriter{
 			Writer: bodyWriter,
 			color:  opts.IO.ColorEnabled(),
 		}
-		defer w.Close()
+		closer = w.Close
 
 		bodyWriter = w
 	}
@@ -434,6 +435,8 @@ func apiRun(opts *ApiOptions) error {
 			fmt.Fprint(opts.IO.Out, "\n")
 		}
 	}
+
+	closer()
 
 	return tmpl.Flush()
 }
