@@ -87,3 +87,5 @@ require (
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
+
+replace github.com/zalando/go-keyring => github.com/williammartin/go-keyring v0.2.4-0.20240314194719-89384d90943e
