@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -194,6 +195,12 @@ func TestNewCmdCreate(t *testing.T) {
 			cli:      "--fill --fill-first",
 			wantsErr: true,
 		},
+		{
+			name:     "dry-run and web",
+			tty:      false,
+			cli:      "--web --dry-run",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -250,16 +257,17 @@ func TestNewCmdCreate(t *testing.T) {
 
 func Test_createRun(t *testing.T) {
 	tests := []struct {
-		name           string
-		setup          func(*CreateOptions, *testing.T) func()
-		cmdStubs       func(*run.CommandStubber)
-		promptStubs    func(*prompter.PrompterMock)
-		httpStubs      func(*httpmock.Registry, *testing.T)
-		expectedOut    string
-		expectedErrOut string
-		expectedBrowse string
-		wantErr        string
-		tty            bool
+		name            string
+		setup           func(*CreateOptions, *testing.T) func()
+		cmdStubs        func(*run.CommandStubber)
+		promptStubs     func(*prompter.PrompterMock)
+		httpStubs       func(*httpmock.Registry, *testing.T)
+		expectedOutputs []string
+		expectedOut     string
+		expectedErrOut  string
+		expectedBrowse  string
+		wantErr         string
+		tty             bool
 	}{
 		{
 			name: "nontty web",
@@ -299,6 +307,228 @@ func Test_createRun(t *testing.T) {
 				return func() {}
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
+		},
+		{
+			name: "dry-run-nontty-with-default-base",
+			tty:  false,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.DryRun = true
+				return func() {}
+			},
+			expectedOutputs: []string{
+				"Would have created a Pull Request with:",
+				`title:	my title`,
+				`draft:	false`,
+				`base:	master`,
+				`head:	feature`,
+				`maintainerCanModify:	false`,
+				`body:`,
+				`my body`,
+				``,
+			},
+			expectedErrOut: "",
+		},
+		{
+			name: "dry-run-nontty-with-all-opts",
+			tty:  false,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "TITLE"
+				opts.Body = "BODY"
+				opts.BaseBranch = "trunk"
+				opts.HeadBranch = "feature"
+				opts.Assignees = []string{"monalisa"}
+				opts.Labels = []string{"bug", "todo"}
+				opts.Projects = []string{"roadmap"}
+				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
+				opts.Milestone = "big one.oh"
+				opts.DryRun = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+					httpmock.StringResponse(`
+					{ "data": {
+						"u000": { "login": "MonaLisa", "id": "MONAID" },
+						"u001": { "login": "hubot", "id": "HUBOTID" },
+						"repository": {
+							"l000": { "name": "bug", "id": "BUGID" },
+							"l001": { "name": "TODO", "id": "TODOID" }
+						},
+						"organization": {
+							"t000": { "slug": "core", "id": "COREID" },
+							"t001": { "slug": "robots", "id": "ROBOTID" }
+						}
+					} }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "milestones": {
+						"nodes": [
+							{ "title": "GA", "id": "GAID" },
+							{ "title": "Big One.oh", "id": "BIGONEID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				mockRetrieveProjects(t, reg)
+			},
+			expectedOutputs: []string{
+				"Would have created a Pull Request with:",
+				`title:	TITLE`,
+				`draft:	false`,
+				`base:	trunk`,
+				`head:	feature`,
+				`labels:	bug, todo`,
+				`reviewers:	hubot, monalisa, /core, /robots`,
+				`assignees:	monalisa`,
+				`milestones:	big one.oh`,
+				`projects:	roadmap`,
+				`maintainerCanModify:	false`,
+				`body:`,
+				`BODY`,
+				``,
+			},
+			expectedErrOut: "",
+		},
+		{
+			name: "dry-run-tty-with-default-base",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.DryRun = true
+				return func() {}
+			},
+			expectedOutputs: []string{
+				`Would have created a Pull Request with:`,
+				`Title: my title`,
+				`Draft: false`,
+				`Base: master`,
+				`Head: feature`,
+				`MaintainerCanModify: false`,
+				`Body:`,
+				``,
+				`  my body                                                                     `,
+				``,
+				``,
+			},
+			expectedErrOut: heredoc.Doc(`
+
+			Dry Running pull request for feature into master in OWNER/REPO
+
+		`),
+		},
+		{
+			name: "dry-run-tty-with-all-opts",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "TITLE"
+				opts.Body = "BODY"
+				opts.BaseBranch = "trunk"
+				opts.HeadBranch = "feature"
+				opts.Assignees = []string{"monalisa"}
+				opts.Labels = []string{"bug", "todo"}
+				opts.Projects = []string{"roadmap"}
+				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
+				opts.Milestone = "big one.oh"
+				opts.DryRun = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+					httpmock.StringResponse(`
+					{ "data": {
+						"u000": { "login": "MonaLisa", "id": "MONAID" },
+						"u001": { "login": "hubot", "id": "HUBOTID" },
+						"repository": {
+							"l000": { "name": "bug", "id": "BUGID" },
+							"l001": { "name": "TODO", "id": "TODOID" }
+						},
+						"organization": {
+							"t000": { "slug": "core", "id": "COREID" },
+							"t001": { "slug": "robots", "id": "ROBOTID" }
+						}
+					} }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "milestones": {
+						"nodes": [
+							{ "title": "GA", "id": "GAID" },
+							{ "title": "Big One.oh", "id": "BIGONEID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				mockRetrieveProjects(t, reg)
+			},
+			expectedOutputs: []string{
+				`Would have created a Pull Request with:`,
+				`Title: TITLE`,
+				`Draft: false`,
+				`Base: trunk`,
+				`Head: feature`,
+				`Labels: bug, todo`,
+				`Reviewers: hubot, monalisa, /core, /robots`,
+				`Assignees: monalisa`,
+				`Milestones: big one.oh`,
+				`Projects: roadmap`,
+				`MaintainerCanModify: false`,
+				`Body:`,
+				``,
+				`  BODY                                                                        `,
+				``,
+				``,
+			},
+			expectedErrOut: heredoc.Doc(`
+
+			Dry Running pull request for feature into trunk in OWNER/REPO
+
+		`),
+		},
+		{
+			name: "dry-run-tty-with-empty-body",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "TITLE"
+				opts.Body = ""
+				opts.HeadBranch = "feature"
+				opts.DryRun = true
+				return func() {}
+			},
+			expectedOut: heredoc.Doc(`
+				Would have created a Pull Request with:
+				Title: TITLE
+				Draft: false
+				Base: master
+				Head: feature
+				MaintainerCanModify: false
+				Body:
+				No description provided
+			`),
+			expectedErrOut: heredoc.Doc(`
+
+			Dry Running pull request for feature into master in OWNER/REPO
+
+		`),
 		},
 		{
 			name: "survey",
@@ -1219,7 +1449,12 @@ func Test_createRun(t *testing.T) {
 				assert.EqualError(t, err, tt.wantErr)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedOut, output.String())
+				if tt.expectedOut != "" {
+					assert.Equal(t, tt.expectedOut, output.String())
+				}
+				if len(tt.expectedOutputs) > 0 {
+					assert.Equal(t, tt.expectedOutputs, strings.Split(output.String(), "\n"))
+				}
 				assert.Equal(t, tt.expectedErrOut, output.Stderr())
 				assert.Equal(t, tt.expectedBrowse, output.BrowsedURL)
 			}
