@@ -120,8 +120,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			there are no more pages of results. For GraphQL requests, this requires that the
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
 			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection. Each page is a separate
-			JSON array or object. Pass %[1]s--merge-pages%[1]s to merge all pages into a single JSON array or object
-			when piping or redirecting standard output.
+			JSON array or object. Pass %[1]s--slurp%[1]s to wrap all pages of JSON arrays or objects
+			into an outer JSON array.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list releases in the current repository
