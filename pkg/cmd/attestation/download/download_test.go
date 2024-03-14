@@ -310,5 +310,6 @@ func TestRunDownload(t *testing.T) {
 
 		err := runDownload(&opts)
 		require.Error(t, err)
+		require.ErrorAs(t, err, &ErrAttestationFileCreation)
 	})
 }
