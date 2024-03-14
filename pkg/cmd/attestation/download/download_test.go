@@ -252,7 +252,7 @@ func TestRunDownload(t *testing.T) {
 		opts := baseOpts
 		opts.APIClient = api.MockClient{
 			OnGetByOwnerAndDigest: func(repo, digest string, limit int) ([]*api.Attestation, error) {
-				return nil, nil
+				return nil, api.ErrNoAttestations{}
 			},
 		}
 
@@ -262,6 +262,18 @@ func TestRunDownload(t *testing.T) {
 		artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 		require.NoError(t, err)
 		require.NoFileExists(t, artifact.DigestWithAlg())
+	})
+
+	t.Run("failed to fetch attestations", func(t *testing.T) {
+		opts := baseOpts
+		opts.APIClient = api.MockClient{
+			OnGetByOwnerAndDigest: func(repo, digest string, limit int) ([]*api.Attestation, error) {
+				return nil, fmt.Errorf("failed to fetch attestations")
+			},
+		}
+
+		err := runDownload(&opts)
+		require.Error(t, err)
 	})
 
 	t.Run("cannot download OCI artifact", func(t *testing.T) {

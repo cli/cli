@@ -2,6 +2,7 @@ package download
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
@@ -128,12 +129,11 @@ func runDownload(opts *Options) error {
 	}
 	attestations, err := verification.GetRemoteAttestations(c)
 	if err != nil {
+		if errors.Is(err, api.ErrNoAttestations{}) {
+			fmt.Fprintf(opts.Logger.IO.Out, "No attestations found for %s\n", opts.ArtifactPath)
+			return nil
+		}
 		return fmt.Errorf("failed to fetch attestations: %w", err)
-	}
-
-	if attestations == nil {
-		fmt.Fprintf(opts.Logger.IO.Out, "No attestations found for %s\n", opts.ArtifactPath)
-		return nil
 	}
 
 	filePath := createJSONLinesFilePath(artifact.DigestWithAlg(), opts.OutputPath)
