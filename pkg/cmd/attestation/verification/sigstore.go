@@ -172,10 +172,7 @@ func newCustomVerifier(trustedRootFilePath string) (*verify.SignedEntityVerifier
 }
 
 func newGitHubVerifier() (*verify.SignedEntityVerifier, error) {
-	opts, err := GitHubTUFOptions()
-	if err != nil {
-		return nil, err
-	}
+	opts := GitHubTUFOptions()
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client: %w", err)

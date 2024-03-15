@@ -26,11 +26,11 @@ func DefaultOptionsWithCacheSetting() *tuf.Options {
 	return opts
 }
 
-func GitHubTUFOptions() (*tuf.Options, error) {
+func GitHubTUFOptions() *tuf.Options {
 	opts := DefaultOptionsWithCacheSetting()
 
 	opts.Root = githubRoot
 	opts.RepositoryBaseURL = GitHubTUFMirror
 
-	return opts, nil
+	return opts
 }

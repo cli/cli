@@ -9,8 +9,7 @@ import (
 
 func TestGitHubTUFOptions(t *testing.T) {
 	os.Setenv("CODESPACES", "true")
-	opts, err := GitHubTUFOptions()
-	require.NoError(t, err)
+	opts := GitHubTUFOptions()
 
 	require.Equal(t, GitHubTUFMirror, opts.RepositoryBaseURL)
 	require.NotNil(t, opts.Root)

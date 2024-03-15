@@ -68,10 +68,7 @@ func tufRootVerify(mirror, root string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read root file %s: %w", root, err)
 	}
-	opts, err := verification.GitHubTUFOptions()
-	if err != nil {
-		return err
-	}
+	opts := verification.GitHubTUFOptions()
 	opts.Root = rb
 	opts.RepositoryBaseURL = mirror
 	// The purpose is the verify the TUF root and repository, make
