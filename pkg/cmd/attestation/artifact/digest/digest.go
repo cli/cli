@@ -49,5 +49,5 @@ func CalculateDigestWithAlgorithm(r io.Reader, alg string) (string, error) {
 		return "", fmt.Errorf("failed to calculate digest: %w", err)
 	}
 	digest := h.Sum(nil)
-	return hex.EncodeToString(digest[:]), nil
+	return hex.EncodeToString(digest), nil
 }
