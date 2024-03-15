@@ -262,16 +262,6 @@ func TestRunVerify(t *testing.T) {
 		require.Error(t, runVerify(&opts))
 	})
 
-	t.Run("with invalid signature", func(t *testing.T) {
-		opts := publicGoodOpts
-		opts.BundlePath = "../test/data/sigstoreBundle-invalid-signature.json"
-
-		err := runVerify(&opts)
-		require.Error(t, err)
-		require.ErrorContains(t, err, "at least one attestation failed to verify")
-		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\"")
-	})
-
 	t.Run("with owner", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.BundlePath = ""
@@ -353,12 +343,6 @@ func TestRunVerify(t *testing.T) {
 		opts.OIDCIssuer = "some-other-issuer"
 
 		require.Error(t, runVerify(&opts))
-	})
-
-	t.Run("with valid artifact and JSON lines file containing multiple Sigstore bundles", func(t *testing.T) {
-		opts := publicGoodOpts
-		opts.BundlePath = "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl"
-		require.Nil(t, runVerify(&opts))
 	})
 
 	t.Run("with missing OCI client", func(t *testing.T) {

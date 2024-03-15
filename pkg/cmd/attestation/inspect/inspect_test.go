@@ -160,21 +160,6 @@ func TestRunInspect(t *testing.T) {
 		require.Error(t, runInspect(&customOpts))
 	})
 
-	t.Run("with invalid signature", func(t *testing.T) {
-		customOpts := opts
-		customOpts.BundlePath = "../test/data/sigstoreBundle-invalid-signature.json"
-
-		err := runInspect(&customOpts)
-		require.Error(t, err)
-		require.ErrorContains(t, err, "at least one attestation failed to verify")
-	})
-
-	t.Run("with valid artifact and JSON lines file containing multiple bundles", func(t *testing.T) {
-		customOpts := opts
-		customOpts.BundlePath = "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl"
-		require.Nil(t, runInspect(&customOpts))
-	})
-
 	t.Run("with missing OCI client", func(t *testing.T) {
 		customOpts := opts
 		customOpts.ArtifactPath = "oci://ghcr.io/github/test"

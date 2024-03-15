@@ -23,28 +23,38 @@ func buildPolicy(a artifact.DigestedArtifact) (verify.PolicyBuilder, error) {
 
 func TestNewSigstoreVerifier(t *testing.T) {
 	artifactPath := test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz")
+	artifact, err := artifact.NewDigestedArtifact(nil, artifactPath, "sha512")
+	require.NoError(t, err)
+
+	policy, err := buildPolicy(*artifact)
+	require.NoError(t, err)
+
+	c := SigstoreConfig{
+		Logger: logging.NewTestLogger(),
+	}
+	verifier, err := NewSigstoreVerifier(c, policy)
+	require.NoError(t, err)
 
 	t.Run("with invalid signature", func(t *testing.T) {
-		artifact, err := artifact.NewDigestedArtifact(nil, artifactPath, "sha512")
-		require.NoError(t, err)
-
 		bundlePath := test.NormalizeRelativePath("../test/data/sigstoreBundle-invalid-signature.json")
 		attestations, err := GetLocalAttestations(bundlePath)
 		require.NotNil(t, attestations)
-		require.NoError(t, err)
-
-		policy, err := buildPolicy(*artifact)
-		require.NoError(t, err)
-
-		c := SigstoreConfig{
-			Logger: logging.NewTestLogger(),
-		}
-		verifier, err := NewSigstoreVerifier(c, policy)
 		require.NoError(t, err)
 
 		res := verifier.Verify(attestations)
 		require.Error(t, res.Error)
 		require.ErrorContains(t, res.Error, "verifying with issuer \"sigstore.dev\"")
 		require.Nil(t, res.VerifyResults)
+	})
+
+	t.Run("with valid artifact and JSON lines file containing multiple Sigstore bundles", func(t *testing.T) {
+		bundlePath := test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl")
+		attestations, err := GetLocalAttestations(bundlePath)
+		require.Len(t, attestations, 2)
+		require.NoError(t, err)
+
+		res := verifier.Verify(attestations)
+		require.Len(t, res.VerifyResults, 2)
+		require.NoError(t, res.Error)
 	})
 }
