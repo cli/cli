@@ -39,6 +39,9 @@ func (s *LiveStore) createMetadataFile(artifactDigest string, attestationsResp [
 		bundle := resp.Bundle
 		attBytes, err := json.Marshal(bundle)
 		if err != nil {
+			if err = f.Close(); err != nil {
+				return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to close file while marshalling JSON: %w", err))
+			}
 			return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to marshall attestation to JSON while writing to file: %w", err))
 		}
 
