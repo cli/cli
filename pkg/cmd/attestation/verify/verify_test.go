@@ -169,7 +169,7 @@ func TestNewVerifyCmd(t *testing.T) {
 			name: "Has both cert-identity and cert-identity-regex flags",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --cert-identity https://github.com/sigstore/ --cert-identity-regex ^https://github.com/sigstore/",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				DigestAlgorithm: "sha256",
 				Limit:           30,
 				OIDCIssuer:      GitHubOIDCIssuer,
