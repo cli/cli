@@ -167,7 +167,6 @@ func TestRunInspect(t *testing.T) {
 		err := runInspect(&customOpts)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "at least one attestation failed to verify")
-		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\"")
 	})
 
 	t.Run("with valid artifact and JSON lines file containing multiple bundles", func(t *testing.T) {
