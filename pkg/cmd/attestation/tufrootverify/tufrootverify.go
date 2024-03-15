@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
@@ -14,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewTUFRootVerifyCmd(f *cmdutil.Factory) *cobra.Command {
+func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 	var mirror string
 	var root string
 	var cmd = cobra.Command{
@@ -38,16 +37,20 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory) *cobra.Command {
 			gh attestation tuf-root-verify --mirror https://tuf-repo.github.com --root /path/to/1.root.json
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := logging.NewDefaultLogger(f.IOStreams)
-
 			if err := auth.IsHostSupported(); err != nil {
 				return err
+			}
+
+			if runF != nil {
+				return runF()
 			}
 
 			if err := tufRootVerify(mirror, root); err != nil {
 				return fmt.Errorf("Failed to verify the TUF repository: %w", err)
 			}
-			fmt.Sprintln(logger.IO.Out, logger.ColorScheme.Green("Successfully verified the TUF repository"))
+
+			io := f.IOStreams
+			fmt.Sprintln(io.Out, io.ColorScheme().Green("Successfully verified the TUF repository"))
 			return nil
 		},
 	}

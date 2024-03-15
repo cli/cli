@@ -32,7 +32,7 @@ func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 	root.AddCommand(download.NewDownloadCmd(f, nil))
 	root.AddCommand(inspect.NewInspectCmd(f, nil))
 	root.AddCommand(verify.NewVerifyCmd(f, nil))
-	root.AddCommand(tufrootverify.NewTUFRootVerifyCmd(f))
+	root.AddCommand(tufrootverify.NewTUFRootVerifyCmd(f, nil))
 
 	return root
 }
