@@ -50,8 +50,8 @@ func TestNewInspectCmd(t *testing.T) {
 			name: "Invalid digest-alg flag",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --digest-alg sha384",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
-				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+				ArtifactPath:    artifactPath,
+				BundlePath:      bundlePath,
 				DigestAlgorithm: "sha384",
 				OCIClient:       oci.MockClient{},
 			},
@@ -61,8 +61,8 @@ func TestNewInspectCmd(t *testing.T) {
 			name: "Use default digest-alg value",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
-				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+				ArtifactPath:    artifactPath,
+				BundlePath:      bundlePath,
 				DigestAlgorithm: "sha256",
 				OCIClient:       oci.MockClient{},
 			},
@@ -72,8 +72,8 @@ func TestNewInspectCmd(t *testing.T) {
 			name: "Use custom digest-alg value",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --digest-alg sha512",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
-				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+				ArtifactPath:    artifactPath,
+				BundlePath:      bundlePath,
 				DigestAlgorithm: "sha512",
 				OCIClient:       oci.MockClient{},
 			},
@@ -83,7 +83,7 @@ func TestNewInspectCmd(t *testing.T) {
 			name: "Missing bundle flag",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    artifactPath,
 				DigestAlgorithm: "sha256",
 				OCIClient:       oci.MockClient{},
 			},
@@ -135,13 +135,13 @@ func TestRunInspect(t *testing.T) {
 
 	t.Run("with missing artifact path", func(t *testing.T) {
 		customOpts := opts
-		customOpts.ArtifactPath = "../test/data/non-existent-artifact.zip"
+		customOpts.ArtifactPath = test.NormalizeRelativePath("../test/data/non-existent-artifact.zip")
 		require.Error(t, runInspect(&customOpts))
 	})
 
 	t.Run("with missing bundle path", func(t *testing.T) {
 		customOpts := opts
-		customOpts.BundlePath = "../test/data/non-existent-sigstoreBundle.json"
+		customOpts.BundlePath = test.NormalizeRelativePath("../test/data/non-existent-sigstoreBundle.json")
 		require.Error(t, runInspect(&customOpts))
 	})
 
