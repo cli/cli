@@ -7,11 +7,24 @@ import (
 	"path"
 	"testing"
 
+	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 
 	"github.com/stretchr/testify/require"
 )
+
+type MockStore struct {
+	OnCreateMetadataFile func(artifactDigest string, attestationsResp []*api.Attestation) (string, error)
+}
+
+func (s *MockStore) createMetadataFile(artifact string, attestationsResp []*api.Attestation) (string, error) {
+	return s.OnCreateMetadataFile(artifact, attestationsResp)
+}
+
+func OnCreateMetadataFileFailure(artifactDigest string, attestationsResp []*api.Attestation) (string, error) {
+	return "", fmt.Errorf("failed to create trusted metadata file")
+}
 
 func TestCreateJSONLinesFilePath(t *testing.T) {
 	tempDir := t.TempDir()
