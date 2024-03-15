@@ -15,7 +15,7 @@ func digestContainerImageArtifact(url string, client oci.Client) (*DigestedArtif
 	named, err := reference.Parse(url)
 	if err != nil {
 		// cannot be parsed as a registry reference
-		return nil, fmt.Errorf("artifact %s is not a valid registry reference", url)
+		return nil, fmt.Errorf("artifact %s is not a valid registry reference: %w", url, err)
 	}
 
 	digest, err := client.GetImageDigest(named.String())
