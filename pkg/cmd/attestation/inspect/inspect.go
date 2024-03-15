@@ -85,9 +85,6 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 	inspectCmd.MarkFlagRequired("bundle") //nolint:errcheck
 	cmdutil.StringEnumFlag(inspectCmd, &opts.DigestAlgorithm, "digest-alg", "d", "sha256", []string{"sha256", "sha512"}, "The algorithm used to compute a digest of the artifact")
 	inspectCmd.Flags().BoolVarP(&opts.JsonResult, "json-result", "j", false, "Output inspect result as JSON lines")
-	inspectCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "If set to true, the CLI will not print any diagnostic logging.")
-	inspectCmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "If set to true, the CLI will print verbose diagnostic logging.")
-	inspectCmd.MarkFlagsMutuallyExclusive("quiet", "verbose")
 
 	return inspectCmd
 }

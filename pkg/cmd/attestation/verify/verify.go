@@ -121,9 +121,6 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.MarkFlagsOneRequired("owner", "repo")
 	verifyCmd.Flags().BoolVarP(&opts.NoPublicGood, "no-public-good", "", false, "Only verify attestations signed with GitHub's Sigstore instance")
 	verifyCmd.Flags().BoolVarP(&opts.JsonResult, "json-result", "j", false, "Output verification result as JSON lines")
-	verifyCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "If set to true, the CLI will not print any diagnostic logging.")
-	verifyCmd.Flags().BoolVarP(&opts.Verbose, "verbose", "v", false, "If set to true, the CLI will print verbose diagnostic logging.")
-	verifyCmd.MarkFlagsMutuallyExclusive("quiet", "verbose")
 	verifyCmd.Flags().StringVarP(&opts.CustomTrustedRoot, "custom-trusted-root", "", "", "Path to a custom trustedroot.json file to use for verification")
 	verifyCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
 	// policy enforcement flags

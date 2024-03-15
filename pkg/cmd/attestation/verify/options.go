@@ -21,11 +21,9 @@ type Options struct {
 	NoPublicGood         bool
 	OIDCIssuer           string
 	Owner                string
-	Quiet                bool
 	Repo                 string
 	SAN                  string
 	SANRegex             string
-	Verbose              bool
 	APIClient            api.Client
 	Logger               *io.Handler
 	Limit                int

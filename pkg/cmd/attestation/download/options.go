@@ -23,7 +23,6 @@ type Options struct {
 	OCIClient       oci.Client
 	Owner           string
 	Repo            string
-	Verbose         bool
 }
 
 func (opts *Options) AreFlagsValid() error {

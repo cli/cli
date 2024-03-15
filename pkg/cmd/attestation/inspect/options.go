@@ -13,8 +13,6 @@ type Options struct {
 	BundlePath      string
 	DigestAlgorithm string
 	JsonResult      bool
-	Verbose         bool
-	Quiet           bool
 	Logger          *io.Handler
 	OCIClient       oci.Client
 }

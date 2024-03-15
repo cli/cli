@@ -153,19 +153,6 @@ func TestNewVerifyCmd(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name: "Has both verbose and quiet flags",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --owner sigstore --verbose --quiet",
-			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
-				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
-				DigestAlgorithm: "sha256",
-				OIDCIssuer:      GitHubOIDCIssuer,
-				Verbose:         true,
-				Quiet:           true,
-			},
-			wantsErr: true,
-		},
-		{
 			name: "Has both cert-identity and cert-identity-regex flags",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --cert-identity https://github.com/sigstore/ --cert-identity-regex ^https://github.com/sigstore/",
 			wants: Options{
@@ -212,11 +199,9 @@ func TestNewVerifyCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.NoPublicGood, opts.NoPublicGood)
 			assert.Equal(t, tc.wants.OIDCIssuer, opts.OIDCIssuer)
 			assert.Equal(t, tc.wants.Owner, opts.Owner)
-			assert.Equal(t, tc.wants.Quiet, opts.Quiet)
 			assert.Equal(t, tc.wants.Repo, opts.Repo)
 			assert.Equal(t, tc.wants.SAN, opts.SAN)
 			assert.Equal(t, tc.wants.SANRegex, opts.SANRegex)
-			assert.Equal(t, tc.wants.Verbose, opts.Verbose)
 		})
 	}
 }

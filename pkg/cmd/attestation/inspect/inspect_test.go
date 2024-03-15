@@ -89,19 +89,6 @@ func TestNewInspectCmd(t *testing.T) {
 			},
 			wantsErr: true,
 		},
-		{
-			name: "Has both verbose and quiet flags",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --verbose --quiet",
-			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
-				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
-				DigestAlgorithm: "sha256",
-				OCIClient:       oci.MockClient{},
-				Verbose:         true,
-				Quiet:           true,
-			},
-			wantsErr: true,
-		},
 	}
 
 	for _, tc := range testcases {
@@ -129,8 +116,6 @@ func TestNewInspectCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.BundlePath, opts.BundlePath)
 			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
 			assert.Equal(t, tc.wants.JsonResult, opts.JsonResult)
-			assert.Equal(t, tc.wants.Verbose, opts.Verbose)
-			assert.Equal(t, tc.wants.Quiet, opts.Quiet)
 		})
 	}
 }
