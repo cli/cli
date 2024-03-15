@@ -1,30 +1,16 @@
 package verification
 
 import (
-	"embed"
-	"fmt"
+	_ "embed"
 	"os"
 
 	"github.com/sigstore/sigstore-go/pkg/tuf"
 )
 
-//go:embed embed
-var embeddedRepos embed.FS
+//go:embed embed/tuf-repo.github.com/root.json
+var githubRoot []byte
 
 const GitHubTUFMirror = "https://tuf-repo.github.com"
-
-// readEmbeddedRoot reads the embedded trust anchor for the given URL
-func readEmbeddedRoot(url string) ([]byte, error) {
-	// the embed file system always uses forward slashes, even on Windows
-	p := fmt.Sprintf("embed/%s/root.json", tuf.URLToPath(url))
-
-	b, err := embeddedRepos.ReadFile(p)
-	if err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
 
 func DefaultOptionsWithCacheSetting() *tuf.Options {
 	opts := tuf.DefaultOptions()
@@ -43,12 +29,7 @@ func DefaultOptionsWithCacheSetting() *tuf.Options {
 func GitHubTUFOptions() (*tuf.Options, error) {
 	opts := DefaultOptionsWithCacheSetting()
 
-	// replace root and mirror url
-	root, err := readEmbeddedRoot(GitHubTUFMirror)
-	if err != nil {
-		return nil, err
-	}
-	opts.Root = root
+	opts.Root = githubRoot
 	opts.RepositoryBaseURL = GitHubTUFMirror
 
 	return opts, nil
