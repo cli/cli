@@ -178,7 +178,7 @@ func TestJSONProjectFields(t *testing.T) {
 func TestJSONProjectItem_DraftIssue(t *testing.T) {
 	item := ProjectItem{}
 	item.Content.TypeName = "DraftIssue"
-	item.Content.DraftIssue.ID = "123"
+	item.Id = "123"
 	item.Content.DraftIssue.Title = "title"
 	item.Content.DraftIssue.Body = "a body"
 
