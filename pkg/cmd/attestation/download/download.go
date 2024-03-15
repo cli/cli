@@ -8,7 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
@@ -61,7 +61,7 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 		// along with information about how use the command
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Create a logger for use throughout the download command
-			opts.Logger = logging.NewLogger(f.IOStreams, false, opts.Verbose)
+			opts.Logger = io.NewHandler(f.IOStreams)
 
 			// set the artifact path
 			opts.ArtifactPath = args[0]

@@ -5,7 +5,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 )
 
 const (
@@ -17,7 +17,7 @@ type Options struct {
 	APIClient       api.Client
 	ArtifactPath    string
 	DigestAlgorithm string
-	Logger          *logging.Logger
+	Logger          *io.Handler
 	Limit           int
 	Store           MetadataStore
 	OCIClient       oci.Client

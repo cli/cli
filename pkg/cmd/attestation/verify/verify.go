@@ -9,7 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
@@ -70,7 +70,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 		// along with information about how use the command
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Create a logger for use throughout the verify command
-			opts.Logger = logging.NewLogger(f.IOStreams, opts.Quiet, opts.Verbose)
+			opts.Logger = io.NewHandler(f.IOStreams)
 
 			// set the artifact path
 			opts.ArtifactPath = args[0]
@@ -215,7 +215,7 @@ func runVerify(opts *Options) error {
 	return nil
 }
 
-func verifySLSAPredicateType(logger *logging.Logger, apr []*verification.AttestationProcessingResult) error {
+func verifySLSAPredicateType(logger *io.Handler, apr []*verification.AttestationProcessingResult) error {
 	logger.VerbosePrint("Evaluating attestations have valid SLSA predicate type")
 
 	for _, result := range apr {

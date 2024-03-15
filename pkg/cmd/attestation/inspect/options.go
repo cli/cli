@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 )
 
 // Options captures the options for the inspect command
@@ -15,7 +15,7 @@ type Options struct {
 	JsonResult      bool
 	Verbose         bool
 	Quiet           bool
-	Logger          *logging.Logger
+	Logger          *io.Handler
 	OCIClient       oci.Client
 }
 

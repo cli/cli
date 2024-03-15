@@ -7,7 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 )
 
 // Options captures the options for the verify command
@@ -27,7 +27,7 @@ type Options struct {
 	SANRegex             string
 	Verbose              bool
 	APIClient            api.Client
-	Logger               *logging.Logger
+	Logger               *io.Handler
 	Limit                int
 	OCIClient            oci.Client
 }

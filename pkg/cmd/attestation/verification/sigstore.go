@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
@@ -30,7 +30,7 @@ type SigstoreResults struct {
 
 type SigstoreConfig struct {
 	CustomTrustedRoot string
-	Logger            *logging.Logger
+	Logger            *io.Handler
 	NoPublicGood      bool
 }
 
@@ -40,7 +40,7 @@ type SigstoreVerifier struct {
 	customVerifier       *verify.SignedEntityVerifier
 	policy               verify.PolicyBuilder
 	onlyVerifyWithGithub bool
-	Logger               *logging.Logger
+	Logger               *io.Handler
 }
 
 // NewSigstoreVerifier creates a new SigstoreVerifier struct

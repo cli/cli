@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +18,7 @@ func NewClientWithMockGHClient(hasNextPage bool) Client {
 	fetcher := mockDataGenerator{
 		NumAttestations: 5,
 	}
-	l := logging.NewTestLogger()
+	l := io.NewTestHandler()
 
 	if hasNextPage {
 		return &LiveClient{
@@ -138,7 +138,7 @@ func TestGetByDigest_NoAttestationsFound(t *testing.T) {
 		api: mockAPIClient{
 			OnRESTWithNext: fetcher.OnRESTWithNextNoAttestations,
 		},
-		logger: logging.NewTestLogger(),
+		logger: io.NewTestHandler(),
 	}
 
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
@@ -161,7 +161,7 @@ func TestGetByDigest_Error(t *testing.T) {
 		api: mockAPIClient{
 			OnRESTWithNext: fetcher.OnRESTWithNextError,
 		},
-		logger: logging.NewTestLogger(),
+		logger: io.NewTestHandler(),
 	}
 
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)

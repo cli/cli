@@ -8,7 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
@@ -53,7 +53,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Create a logger for use throughout the inspect command
-			opts.Logger = logging.NewDefaultLogger(f.IOStreams)
+			opts.Logger = io.NewHandler(f.IOStreams)
 
 			// set the artifact path
 			opts.ArtifactPath = args[0]

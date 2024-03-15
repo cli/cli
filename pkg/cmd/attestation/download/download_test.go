@@ -9,7 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -185,7 +185,7 @@ func TestRunDownload(t *testing.T) {
 		Owner:           "sigstore",
 		Store:           store,
 		Limit:           30,
-		Logger:          logging.NewTestLogger(),
+		Logger:          io.NewTestHandler(),
 	}
 
 	t.Run("fetch and store attestations successfully with owner", func(t *testing.T) {

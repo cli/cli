@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
@@ -140,7 +140,7 @@ func TestRunInspect(t *testing.T) {
 		ArtifactPath:    artifactPath,
 		BundlePath:      bundlePath,
 		DigestAlgorithm: "sha512",
-		Logger:          logging.NewTestLogger(),
+		Logger:          io.NewTestHandler(),
 		OCIClient:       oci.MockClient{},
 	}
 

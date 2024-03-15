@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	ioconfig "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 )
 
 const (
@@ -28,10 +28,10 @@ type Client interface {
 type LiveClient struct {
 	api    apiClient
 	host   string
-	logger *logging.Logger
+	logger *ioconfig.Handler
 }
 
-func NewLiveClient(hc *http.Client, l *logging.Logger) *LiveClient {
+func NewLiveClient(hc *http.Client, l *ioconfig.Handler) *LiveClient {
 	liveAPIClient := api.NewClientFromHTTP(hc)
 	return &LiveClient{
 		api:    liveAPIClient,

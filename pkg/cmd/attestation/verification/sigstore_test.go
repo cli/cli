@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 
 	"github.com/sigstore/sigstore-go/pkg/verify"
@@ -30,7 +30,7 @@ func TestNewSigstoreVerifier(t *testing.T) {
 	require.NoError(t, err)
 
 	c := SigstoreConfig{
-		Logger: logging.NewTestLogger(),
+		Logger: io.NewTestHandler(),
 	}
 	verifier, err := NewSigstoreVerifier(c, policy)
 	require.NoError(t, err)
