@@ -3,8 +3,8 @@ package logging
 import (
 	"fmt"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 )
 
 type Logger struct {
@@ -69,15 +69,7 @@ func (l *Logger) VerbosePrintf(f string, v ...interface{}) (int, error) {
 }
 
 func (l *Logger) PrintTableToStdOut(headers []string, rows [][]string) error {
-	if rows == nil {
-		return nil
-	}
-	t := tableprinter.New(l.IO.Out, l.IO.IsStdoutTTY(), l.IO.TerminalWidth())
-
-	if headers != nil {
-		// Print the header row in green
-		t.AddHeader(headers, tableprinter.WithColor(l.ColorScheme.Green))
-	}
+	t := tableprinter.New(l.IO, tableprinter.WithHeader(headers...))
 
 	for _, row := range rows {
 		for _, field := range row {
@@ -86,8 +78,5 @@ func (l *Logger) PrintTableToStdOut(headers []string, rows [][]string) error {
 		t.EndRow()
 	}
 
-	if err := t.Render(); err != nil {
-		return err
-	}
-	return nil
+	return t.Render()
 }
