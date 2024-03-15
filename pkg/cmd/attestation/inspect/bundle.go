@@ -55,12 +55,6 @@ type AttestationDetail struct {
 	WorkflowID     string `json:"workflowId"`
 }
 
-// AttestationDetail#Slice returns the fields as string slice in the following order:
-// RepositoryName, RepositoryID, OrgName, OrgID, WorkflowID
-func (d AttestationDetail) Slice() []string {
-	return []string{d.RepositoryName, d.RepositoryID, d.OrgName, d.OrgID, d.WorkflowID}
-}
-
 func getOrgAndRepo(repoURL string) (string, string, error) {
 	after, found := strings.CutPrefix(repoURL, "https://github.com/")
 	if !found {
@@ -115,7 +109,7 @@ func getDetailsAsSlice(results []*verification.AttestationProcessingResult) ([][
 		if err != nil {
 			return nil, fmt.Errorf("failed to get attestation detail: %w", err)
 		}
-		details[i] = detail.Slice()
+		details[i] = []string{detail.RepositoryName, detail.RepositoryID, detail.OrgName, detail.OrgID, detail.WorkflowID}
 	}
 	return details, nil
 }
