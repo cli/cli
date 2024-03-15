@@ -3,7 +3,6 @@ package logging
 import (
 	"fmt"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
@@ -66,17 +65,4 @@ func (l *Logger) VerbosePrintf(f string, v ...interface{}) (int, error) {
 	}
 
 	return fmt.Fprintf(l.IO.ErrOut, f, v...)
-}
-
-func (l *Logger) PrintTableToStdOut(headers []string, rows [][]string) error {
-	t := tableprinter.New(l.IO, tableprinter.WithHeader(headers...))
-
-	for _, row := range rows {
-		for _, field := range row {
-			t.AddField(field, tableprinter.WithTruncate(nil))
-		}
-		t.EndRow()
-	}
-
-	return t.Render()
 }

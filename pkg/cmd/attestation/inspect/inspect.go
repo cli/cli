@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/logging"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/internal/tableprinter"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
@@ -127,6 +128,7 @@ func runInspect(opts *Options) error {
 		"Successfully verified all attestations against Sigstore!\n\n",
 	))
 
+	// If true, print results as a slice of JSON objects
 	if opts.JsonResult {
 		details, err := getAttestationDetails(res.VerifyResults)
 		if err != nil {
@@ -147,14 +149,24 @@ func runInspect(opts *Options) error {
 		return nil
 	}
 
+	// otherwise, print results in a table
 	details, err := getDetailsAsSlice(res.VerifyResults)
 	if err != nil {
 		return fmt.Errorf("failed to parse attestation details: %w", err)
 	}
 
-	headerRow := []string{"Repo Name", "Repo ID", "Org Name", "Org ID", "Workflow ID"}
-	if err = opts.Logger.PrintTableToStdOut(headerRow, details); err != nil {
-		return fmt.Errorf("failed to print output as table: %w", err)
+	headers := []string{"Repo Name", "Repo ID", "Org Name", "Org ID", "Workflow ID"}
+	t := tableprinter.New(opts.Logger.IO, tableprinter.WithHeader(headers...))
+
+	for _, row := range details {
+		for _, field := range row {
+			t.AddField(field, tableprinter.WithTruncate(nil))
+		}
+		t.EndRow()
+	}
+
+	if err = t.Render(); err != nil {
+		return fmt.Errorf("failed to print output: %w", err)
 	}
 
 	return nil
