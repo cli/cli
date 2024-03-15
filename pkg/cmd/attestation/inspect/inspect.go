@@ -143,12 +143,7 @@ func runInspect(opts *Options) error {
 			jsonResults[i] = string(jsonBytes)
 		}
 
-		rows := make([][]string, 1)
-		rows[0] = jsonResults
-		if err = opts.Logger.PrintTableToStdOut(nil, rows); err != nil {
-			return fmt.Errorf("failed to print output as JSON: %w", err)
-		}
-
+		fmt.Fprintf(opts.Logger.IO.Out, "%v", jsonResults)
 		return nil
 	}
 

@@ -208,11 +208,7 @@ func runVerify(opts *Options) error {
 			jsonResults[i] = string(jsonBytes)
 		}
 
-		rows := make([][]string, 1)
-		rows[0] = jsonResults
-		if err := opts.Logger.PrintTableToStdOut(nil, rows); err != nil {
-			return fmt.Errorf("failed to print JSON output")
-		}
+		fmt.Fprintf(opts.Logger.IO.Out, "%v", jsonResults)
 	}
 
 	// All attestations passed verification and policy evaluation
