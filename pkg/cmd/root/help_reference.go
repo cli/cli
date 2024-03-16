@@ -51,9 +51,43 @@ func stringifyReference(cmd *cobra.Command) string {
 	return buf.String()
 }
 
+// replace the normal cobra.Command.NameAndAliases() with a format that is conducive
+// to the help message for 'gh reference'
+func referenceNameAndAlias(c *cobra.Command) string {
+	if len(c.Aliases) == 0 {
+		return c.Name()
+	}
+	return fmt.Sprintf("[%s]", strings.Join(append([]string{c.Name()}, c.Aliases...), "|"))
+}
+
+// replace the normal cobra.Command.CommandPath() to use NameAndAlias vs. just Name
+func referenceCommandPath(c *cobra.Command) string {
+	if c.HasParent() {
+		return c.Parent().CommandPath() + " " + referenceNameAndAlias(c)
+	}
+	return c.NameAndAliases()
+}
+
+// replace the normal cobra.Command.UseLine() to use our NameAndAliases derivative
+func referenceUseLine(c *cobra.Command) string {
+	var useline string
+	if c.HasParent() {
+		useline = referenceCommandPath(c.Parent()) + " " + c.Use
+	} else {
+		useline = c.Use
+	}
+	if c.DisableFlagsInUseLine {
+		return useline
+	}
+	if c.HasAvailableFlags() && !strings.Contains(useline, "[flags]") {
+		useline += " [flags]"
+	}
+	return useline
+}
+
 func cmdRef(w io.Writer, cmd *cobra.Command, depth int) {
 	// Name + Description
-	fmt.Fprintf(w, "%s `%s`\n\n", strings.Repeat("#", depth), cmd.UseLine())
+	fmt.Fprintf(w, "%s `%s`\n\n", strings.Repeat("#", depth), referenceUseLine(cmd))
 	fmt.Fprintf(w, "%s\n\n", cmd.Short)
 
 	// Flags
