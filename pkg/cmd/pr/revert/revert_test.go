@@ -62,7 +62,15 @@ func TestPRRevert(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestRevert\b`),
-		httpmock.GraphQLMutation(`{"id": "SOME-ID"}`,
+		httpmock.GraphQLMutation(`
+			{ "data": { "revertPullRequest": { "pullRequest": {
+				"ID": "SOME-ID"
+			}, "revertPullRequest": {
+               "ID": "NEW-ID",
+			   "Title": "Revert PR title",
+               "Number": 456
+            } } } }
+			`,
 			func(inputs map[string]interface{}) {
 				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
 			}),
@@ -71,7 +79,7 @@ func TestPRRevert(t *testing.T) {
 	output, err := runCommand(http, true, "123")
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created revert PR for pull request OWNER/REPO#123 (The title of the PR)\n", output.Stderr())
+	assert.Equal(t, "✓ Created pull request OWNER/REPO#456 (Revert PR title) that reverts OWNER/REPO#123 (The title of the PR)\n", output.Stderr())
 }
 
 func TestPRRevert_notRevertable(t *testing.T) {
@@ -96,7 +104,7 @@ func TestPRRevert_withAllOpts(t *testing.T) {
 	defer http.Verify(t)
 
 	shared.RunCommandFinder("123", &api.PullRequest{
-		ID:     "THE-ID",
+		ID:     "SOME-ID",
 		Number: 123,
 		State:  "MERGED",
 		Title:  "The title of the PR",
@@ -104,9 +112,17 @@ func TestPRRevert_withAllOpts(t *testing.T) {
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestRevert\b`),
-		httpmock.GraphQLMutation(`{"id": "THE-ID" }`,
+		httpmock.GraphQLMutation(`
+			{ "data": { "revertPullRequest": { "pullRequest": {
+				"ID": "SOME-ID"
+			}, "revertPullRequest": {
+               "ID": "NEW-ID",
+			   "Title": "Revert PR title",
+               "Number": 456
+            } } } }
+			`,
 			func(inputs map[string]interface{}) {
-				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+				assert.Equal(t, inputs["pullRequestId"], "SOME-ID")
 				assert.Equal(t, inputs["title"], "Revert PR title")
 				assert.Equal(t, inputs["body"], "Revert PR body")
 				assert.Equal(t, inputs["draft"], true)
@@ -116,5 +132,5 @@ func TestPRRevert_withAllOpts(t *testing.T) {
 	output, err := runCommand(http, true, "123 --title 'Revert PR title' --body 'Revert PR body' --draft")
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Created revert PR for pull request OWNER/REPO#123 (The title of the PR)\n", output.Stderr())
+	assert.Equal(t, "✓ Created pull request OWNER/REPO#456 (Revert PR title) that reverts OWNER/REPO#123 (The title of the PR)\n", output.Stderr())
 }

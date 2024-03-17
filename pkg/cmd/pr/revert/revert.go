@@ -111,12 +111,22 @@ func revertRun(opts *RevertOptions) error {
 		Draft:         githubv4.NewBoolean(githubv4.Boolean(opts.IsDraft)),
 	}
 
-	err = api.PullRequestRevert(apiClient, baseRepo, params)
+	revertPR, err := api.PullRequestRevert(apiClient, baseRepo, params)
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Created revert PR for pull request %s#%d (%s)\n", cs.SuccessIconWithColor(cs.Green), ghrepo.FullName(baseRepo), pr.Number, pr.Title)
+	fmt.Fprintf(
+		opts.IO.ErrOut,
+		"%s Created pull request %s#%d (%s) that reverts %s#%d (%s)\n",
+		cs.SuccessIconWithColor(cs.Green),
+		ghrepo.FullName(baseRepo),
+		revertPR.Number,
+		revertPR.Title,
+		ghrepo.FullName(baseRepo),
+		pr.Number,
+		pr.Title,
+	)
 
 	return nil
 }
