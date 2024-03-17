@@ -480,8 +480,8 @@ func parseCheckStatusFromCheckConclusionState(state CheckConclusionState) checkS
 func (pr *PullRequest) DisplayableReviews() PullRequestReviews {
 	published := []PullRequestReview{}
 	for _, prr := range pr.Reviews.Nodes {
-		// Dont display pending reviews
-		// Dont display commenting reviews without top level comment body
+		//Dont display pending reviews
+		//Dont display commenting reviews without top level comment body
 		if prr.State != "PENDING" && !(prr.State == "COMMENTED" && prr.Body == "") {
 			published = append(published, prr)
 		}
@@ -561,7 +561,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		reviewParams["teamIds"] = ids
 	}
 
-	// TODO: How much work to extract this into own method and use for create and edit?
+	//TODO: How much work to extract this into own method and use for create and edit?
 	if len(reviewParams) > 0 {
 		reviewQuery := `
 		mutation PullRequestCreateRequestReviews($input: RequestReviewsInput!) {
