@@ -32,12 +32,14 @@ func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Co
 		Use:   "switch",
 		Args:  cobra.ExactArgs(0),
 		Short: "Switch active GitHub account",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Switch the active account for a GitHub host.
 
 			This command changes the authentication configuration that will
 			be used when running commands targeting the specified GitHub host.
-		`),
+
+			For a list of authenticated accounts you can run %[1]sgh auth status%[1]s.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Select what host and account to switch to via a prompt
 			$ gh auth switch
