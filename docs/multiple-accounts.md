@@ -8,7 +8,7 @@ A particular shoutout to @gabe565 and his long term community support for https:
 
 With the release of `v2.40.0`, `gh` has begun supporting multiple accounts for some use cases on github.com and
 in GitHub Enterprise. We recognise that there are a number of missing quality of life features, and we've opted
-not to address the use case of automatic account switching based on some context (e.g. `pwd`, `git remote`, etc).
+not to address the use case of automatic account switching based on some context (e.g. `pwd`, `git remote`).
 However, we hope many of those using these custom solutions will now find it easier to obtain and update tokens (via the standard
 OAuth flow rather than as a PAT), and to store them securely in the system keyring managed by `gh`.
 
@@ -111,7 +111,7 @@ if there are any remaining logged into the host:
 
 As mentioned above, we know that this only addresses some of the requests around supporting multiple accounts. While
 these are not out of scope forever, for this release some of the big things we have intentionally not included are:
- * Automatic account switching based on some context (e.g. `pwd`, `git remote`, etc)
+ * Automatic account switching based on some context (e.g. `pwd`, `git remote`)
  * Automatic configuration of git config such as `user.name` and `user.email` when switching
  * User level configuration e.g. `williammartin` uses `vim` but `wilmartin_microsoft` uses `emacs`
 
