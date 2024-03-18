@@ -116,6 +116,8 @@ func TestNewInspectCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.BundlePath, opts.BundlePath)
 			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
 			assert.Equal(t, tc.wants.JsonResult, opts.JsonResult)
+			assert.NotNil(t, opts.OCIClient)
+			assert.NotNil(t, opts.Logger)
 		})
 	}
 }
@@ -142,13 +144,6 @@ func TestRunInspect(t *testing.T) {
 	t.Run("with missing bundle path", func(t *testing.T) {
 		customOpts := opts
 		customOpts.BundlePath = test.NormalizeRelativePath("../test/data/non-existent-sigstoreBundle.json")
-		require.Error(t, runInspect(&customOpts))
-	})
-
-	t.Run("with missing OCI client", func(t *testing.T) {
-		customOpts := opts
-		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
-		customOpts.OCIClient = nil
 		require.Error(t, runInspect(&customOpts))
 	})
 }

@@ -81,6 +81,8 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 
 			opts.OCIClient = oci.NewLiveClient()
 
+			opts.Store = NewLiveStore("")
+
 			if err := auth.IsHostSupported(); err != nil {
 				return err
 			}
@@ -107,9 +109,6 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 }
 
 func runDownload(opts *Options) error {
-	if opts.APIClient == nil {
-		return fmt.Errorf("missing API client")
-	}
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
 		return fmt.Errorf("failed to digest artifact: %w", err)

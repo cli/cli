@@ -50,8 +50,8 @@ func TestNewVerifyCmd(t *testing.T) {
 			name: "Invalid digest-alg flag",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --digest-alg sha384 --owner sigstore",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
-				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				BundlePath:      test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
 				DigestAlgorithm: "sha384",
 				Limit:           30,
 				OIDCIssuer:      GitHubOIDCIssuer,
@@ -63,8 +63,8 @@ func TestNewVerifyCmd(t *testing.T) {
 			name: "Use default digest-alg value",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --owner sigstore",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
-				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				BundlePath:      test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
 				DigestAlgorithm: "sha256",
 				Limit:           30,
 				OIDCIssuer:      GitHubOIDCIssuer,
@@ -77,8 +77,8 @@ func TestNewVerifyCmd(t *testing.T) {
 			name: "Use custom digest-alg value",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --digest-alg sha512 --owner sigstore",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
-				BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				BundlePath:      test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
 				DigestAlgorithm: "sha512",
 				Limit:           30,
 				OIDCIssuer:      GitHubOIDCIssuer,
@@ -91,7 +91,7 @@ func TestNewVerifyCmd(t *testing.T) {
 			name: "Missing owner and repo flags",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				DigestAlgorithm: "sha256",
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
@@ -104,7 +104,7 @@ func TestNewVerifyCmd(t *testing.T) {
 			name: "Has both owner and repo flags",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --repo sigstore/sigstore-js",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				DigestAlgorithm: "sha256",
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
@@ -117,7 +117,7 @@ func TestNewVerifyCmd(t *testing.T) {
 			name: "Uses default limit flag",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				DigestAlgorithm: "sha256",
 				Limit:           30,
 				OIDCIssuer:      GitHubOIDCIssuer,
@@ -130,7 +130,7 @@ func TestNewVerifyCmd(t *testing.T) {
 			name: "Uses custom limit flag",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --limit 101",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				DigestAlgorithm: "sha256",
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
@@ -143,7 +143,7 @@ func TestNewVerifyCmd(t *testing.T) {
 			name: "Uses invalid limit flag",
 			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --limit 0",
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				DigestAlgorithm: "sha256",
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
@@ -202,6 +202,9 @@ func TestNewVerifyCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.Repo, opts.Repo)
 			assert.Equal(t, tc.wants.SAN, opts.SAN)
 			assert.Equal(t, tc.wants.SANRegex, opts.SANRegex)
+			assert.NotNil(t, opts.APIClient)
+			assert.NotNil(t, opts.Logger)
+			assert.NotNil(t, opts.OCIClient)
 		})
 	}
 }
@@ -328,13 +331,6 @@ func TestRunVerify(t *testing.T) {
 		opts.OIDCIssuer = "some-other-issuer"
 
 		require.Error(t, runVerify(&opts))
-	})
-
-	t.Run("with missing OCI client", func(t *testing.T) {
-		customOpts := publicGoodOpts
-		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
-		customOpts.OCIClient = nil
-		require.Error(t, runVerify(&customOpts))
 	})
 
 	t.Run("with missing API client", func(t *testing.T) {

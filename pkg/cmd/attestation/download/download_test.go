@@ -167,6 +167,10 @@ func TestNewDownloadCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.Limit, opts.Limit)
 			assert.Equal(t, tc.wants.Owner, opts.Owner)
 			assert.Equal(t, tc.wants.Repo, opts.Repo)
+			assert.NotNil(t, opts.APIClient)
+			assert.NotNil(t, opts.OCIClient)
+			assert.NotNil(t, opts.Logger)
+			assert.NotNil(t, opts.Store)
 		})
 	}
 }
@@ -287,13 +291,6 @@ func TestRunDownload(t *testing.T) {
 		err := runDownload(&opts)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to digest artifact")
-	})
-
-	t.Run("with missing OCI client", func(t *testing.T) {
-		customOpts := baseOpts
-		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
-		customOpts.OCIClient = nil
-		require.Error(t, runDownload(&customOpts))
 	})
 
 	t.Run("with missing API client", func(t *testing.T) {

@@ -62,3 +62,9 @@ func (s *LiveStore) createMetadataFile(artifactDigest string, attestationsResp [
 
 	return metadataFilePath, nil
 }
+
+func NewLiveStore(outputPath string) *LiveStore {
+	return &LiveStore{
+		outputPath: outputPath,
+	}
+}
