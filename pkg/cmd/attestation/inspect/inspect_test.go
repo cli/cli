@@ -115,7 +115,6 @@ func TestNewInspectCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.ArtifactPath, opts.ArtifactPath)
 			assert.Equal(t, tc.wants.BundlePath, opts.BundlePath)
 			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
-			assert.Equal(t, tc.wants.JsonResult, opts.JsonResult)
 			assert.NotNil(t, opts.OCIClient)
 			assert.NotNil(t, opts.Logger)
 		})

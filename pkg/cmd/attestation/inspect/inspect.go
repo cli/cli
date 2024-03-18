@@ -84,7 +84,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 	inspectCmd.Flags().StringVarP(&opts.BundlePath, "bundle", "b", "", "Path to bundle on disk, either a single bundle in a JSON file or a JSON lines file with multiple bundles")
 	inspectCmd.MarkFlagRequired("bundle") //nolint:errcheck
 	cmdutil.StringEnumFlag(inspectCmd, &opts.DigestAlgorithm, "digest-alg", "d", "sha256", []string{"sha256", "sha512"}, "The algorithm used to compute a digest of the artifact")
-	inspectCmd.Flags().BoolVarP(&opts.JsonResult, "json-result", "j", false, "Output inspect result as JSON lines")
+	cmdutil.AddFormatFlags(inspectCmd, &opts.exporter)
 
 	return inspectCmd
 }
@@ -125,8 +125,8 @@ func runInspect(opts *Options) error {
 		"Successfully verified all attestations against Sigstore!\n\n",
 	))
 
-	// If true, print results as a slice of JSON objects
-	if opts.JsonResult {
+	// If the user provides the --format=json flag, print the results in JSON format
+	if opts.exporter != nil {
 		details, err := getAttestationDetails(res.VerifyResults)
 		if err != nil {
 			return fmt.Errorf("failed to get attestation detail: %w", err)
@@ -142,7 +142,9 @@ func runInspect(opts *Options) error {
 			jsonResults[i] = string(jsonBytes)
 		}
 
-		fmt.Fprintf(opts.Logger.IO.Out, "%v", jsonResults)
+		if err = opts.exporter.Write(opts.Logger.IO, jsonResults); err != nil {
+			return fmt.Errorf("failed to write JSON output")
+		}
 		return nil
 	}
 
