@@ -194,7 +194,6 @@ func TestNewVerifyCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.CustomTrustedRoot, opts.CustomTrustedRoot)
 			assert.Equal(t, tc.wants.DenySelfHostedRunner, opts.DenySelfHostedRunner)
 			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
-			assert.Equal(t, tc.wants.JsonResult, opts.JsonResult)
 			assert.Equal(t, tc.wants.Limit, opts.Limit)
 			assert.Equal(t, tc.wants.NoPublicGood, opts.NoPublicGood)
 			assert.Equal(t, tc.wants.OIDCIssuer, opts.OIDCIssuer)

@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
 // Options captures the options for the verify command
@@ -17,7 +18,6 @@ type Options struct {
 	CustomTrustedRoot    string
 	DenySelfHostedRunner bool
 	DigestAlgorithm      string
-	JsonResult           bool
 	NoPublicGood         bool
 	OIDCIssuer           string
 	Owner                string
@@ -28,6 +28,7 @@ type Options struct {
 	Logger               *io.Handler
 	Limit                int
 	OCIClient            oci.Client
+	exporter             cmdutil.Exporter
 }
 
 // Clean cleans the file path option values

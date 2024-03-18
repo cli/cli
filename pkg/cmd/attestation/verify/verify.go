@@ -120,9 +120,9 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.MarkFlagsMutuallyExclusive("owner", "repo")
 	verifyCmd.MarkFlagsOneRequired("owner", "repo")
 	verifyCmd.Flags().BoolVarP(&opts.NoPublicGood, "no-public-good", "", false, "Only verify attestations signed with GitHub's Sigstore instance")
-	verifyCmd.Flags().BoolVarP(&opts.JsonResult, "json-result", "j", false, "Output verification result as JSON lines")
 	verifyCmd.Flags().StringVarP(&opts.CustomTrustedRoot, "custom-trusted-root", "", "", "Path to a custom trustedroot.json file to use for verification")
 	verifyCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
+	cmdutil.AddFormatFlags(verifyCmd, &opts.exporter)
 	// policy enforcement flags
 	verifyCmd.Flags().BoolVarP(&opts.DenySelfHostedRunner, "deny-self-hosted-runners", "", false, "Fail verification for attestations generated on self-hosted runners.")
 	verifyCmd.Flags().StringVarP(&opts.SAN, "cert-identity", "", "", "Enforce that the certificate's subject alternative name matches the provided value exactly")
@@ -191,7 +191,7 @@ func runVerify(opts *Options) error {
 
 	opts.Logger.Println(opts.Logger.ColorScheme.Green("All attestations have been successfully verified!"))
 
-	if opts.JsonResult {
+	if opts.exporter != nil {
 		verificationResults := sigstoreRes.VerifyResults
 		// print each result as JSON line
 
@@ -204,8 +204,9 @@ func runVerify(opts *Options) error {
 
 			jsonResults[i] = string(jsonBytes)
 		}
-
-		fmt.Fprintf(opts.Logger.IO.Out, "%v", jsonResults)
+		if err = opts.exporter.Write(opts.Logger.IO, jsonResults); err != nil {
+			return fmt.Errorf("failed to write JSON output")
+		}
 	}
 
 	// All attestations passed verification and policy evaluation
