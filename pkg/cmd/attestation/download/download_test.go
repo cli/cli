@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -18,6 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var artifactPath = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz")
 
 func TestNewDownloadCmd(t *testing.T) {
 	testIO, _, _, _ := iostreams.Test()
@@ -43,9 +46,9 @@ func TestNewDownloadCmd(t *testing.T) {
 	}{
 		{
 			name: "Invalid digest-alg flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --digest-alg sha384",
+			cli:  fmt.Sprintf("%s --owner sigstore --digest-alg sha384", artifactPath),
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    artifactPath,
 				APIClient:       api.NewTestClient(),
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha384",
@@ -57,9 +60,9 @@ func TestNewDownloadCmd(t *testing.T) {
 		},
 		{
 			name: "Missing digest-alg flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore",
+			cli:  fmt.Sprintf("%s --owner sigstore", artifactPath),
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    artifactPath,
 				APIClient:       api.NewTestClient(),
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
@@ -71,9 +74,9 @@ func TestNewDownloadCmd(t *testing.T) {
 		},
 		{
 			name: "Missing owner and repo flags",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz",
+			cli:  artifactPath,
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    artifactPath,
 				APIClient:       api.NewTestClient(),
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
@@ -85,9 +88,9 @@ func TestNewDownloadCmd(t *testing.T) {
 		},
 		{
 			name: "Has both owner and repo flags",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --repo sigstore/sigstore-js",
+			cli:  fmt.Sprintf("%s --owner sigstore --repo sigstore/sigstore-js", artifactPath),
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    artifactPath,
 				APIClient:       api.NewTestClient(),
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
@@ -100,9 +103,9 @@ func TestNewDownloadCmd(t *testing.T) {
 		},
 		{
 			name: "Uses default limit flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore",
+			cli:  fmt.Sprintf("%s --owner sigstore", artifactPath),
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    artifactPath,
 				APIClient:       api.NewTestClient(),
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
@@ -114,9 +117,9 @@ func TestNewDownloadCmd(t *testing.T) {
 		},
 		{
 			name: "Uses custom limit flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --limit 101",
+			cli:  fmt.Sprintf("%s --owner sigstore --limit 101", artifactPath),
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    artifactPath,
 				APIClient:       api.NewTestClient(),
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
@@ -128,9 +131,9 @@ func TestNewDownloadCmd(t *testing.T) {
 		},
 		{
 			name: "Uses invalid limit flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --limit 0",
+			cli:  fmt.Sprintf("%s --owner sigstore --limit 0", artifactPath),
 			wants: Options{
-				ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+				ArtifactPath:    artifactPath,
 				APIClient:       api.NewTestClient(),
 				OCIClient:       oci.MockClient{},
 				DigestAlgorithm: "sha256",
@@ -182,7 +185,7 @@ func TestRunDownload(t *testing.T) {
 	}
 
 	baseOpts := Options{
-		ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
+		ArtifactPath:    artifactPath,
 		APIClient:       api.NewTestClient(),
 		OCIClient:       oci.MockClient{},
 		DigestAlgorithm: "sha512",

@@ -2,6 +2,7 @@ package verify
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -28,6 +29,11 @@ const (
 	SigstoreSanRegex = "^https://github.com/sigstore/sigstore-js/"
 )
 
+var (
+	artifactPath = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz")
+	bundlePath   = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json")
+)
+
 func TestNewVerifyCmd(t *testing.T) {
 	testIO, _, _, _ := iostreams.Test()
 	f := &cmdutil.Factory{
@@ -49,7 +55,7 @@ func TestNewVerifyCmd(t *testing.T) {
 	}{
 		{
 			name: "Invalid digest-alg flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --digest-alg sha384 --owner sigstore",
+			cli:  fmt.Sprintf("%s --bundle %s --digest-alg sha384 --owner sigstore", artifactPath, bundlePath),
 			wants: Options{
 				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				BundlePath:      test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
@@ -62,7 +68,7 @@ func TestNewVerifyCmd(t *testing.T) {
 		},
 		{
 			name: "Use default digest-alg value",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --owner sigstore",
+			cli:  fmt.Sprintf("%s --bundle %s --owner sigstore", artifactPath, bundlePath),
 			wants: Options{
 				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				BundlePath:      test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
@@ -76,7 +82,7 @@ func TestNewVerifyCmd(t *testing.T) {
 		},
 		{
 			name: "Use custom digest-alg value",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --digest-alg sha512 --owner sigstore",
+			cli:  fmt.Sprintf("%s --bundle %s --owner sigstore --digest-alg sha512", artifactPath, bundlePath),
 			wants: Options{
 				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				BundlePath:      test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
@@ -90,7 +96,7 @@ func TestNewVerifyCmd(t *testing.T) {
 		},
 		{
 			name: "Missing owner and repo flags",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz",
+			cli:  artifactPath,
 			wants: Options{
 				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				DigestAlgorithm: "sha256",
@@ -103,9 +109,9 @@ func TestNewVerifyCmd(t *testing.T) {
 		},
 		{
 			name: "Has both owner and repo flags",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --repo sigstore/sigstore-js",
+			cli:  fmt.Sprintf("%s --owner sigstore --repo sigstore/sigstore-js", artifactPath),
 			wants: Options{
-				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				ArtifactPath:    artifactPath,
 				DigestAlgorithm: "sha256",
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
@@ -116,9 +122,9 @@ func TestNewVerifyCmd(t *testing.T) {
 		},
 		{
 			name: "Uses default limit flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore",
+			cli:  fmt.Sprintf("%s --owner sigstore", artifactPath),
 			wants: Options{
-				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				ArtifactPath:    artifactPath,
 				DigestAlgorithm: "sha256",
 				Limit:           30,
 				OIDCIssuer:      GitHubOIDCIssuer,
@@ -129,9 +135,9 @@ func TestNewVerifyCmd(t *testing.T) {
 		},
 		{
 			name: "Uses custom limit flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --limit 101",
+			cli:  fmt.Sprintf("%s --owner sigstore --limit 101", artifactPath),
 			wants: Options{
-				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				ArtifactPath:    artifactPath,
 				DigestAlgorithm: "sha256",
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
@@ -142,9 +148,9 @@ func TestNewVerifyCmd(t *testing.T) {
 		},
 		{
 			name: "Uses invalid limit flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --limit 0",
+			cli:  fmt.Sprintf("%s --owner sigstore --limit 0", artifactPath),
 			wants: Options{
-				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				ArtifactPath:    artifactPath,
 				DigestAlgorithm: "sha256",
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
@@ -155,9 +161,9 @@ func TestNewVerifyCmd(t *testing.T) {
 		},
 		{
 			name: "Has both cert-identity and cert-identity-regex flags",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --owner sigstore --cert-identity https://github.com/sigstore/ --cert-identity-regex ^https://github.com/sigstore/",
+			cli:  fmt.Sprintf("%s --owner sigstore --cert-identity https://github.com/sigstore/ --cert-identity-regex ^https://github.com/sigstore/", artifactPath),
 			wants: Options{
-				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				ArtifactPath:    artifactPath,
 				DigestAlgorithm: "sha256",
 				Limit:           30,
 				OIDCIssuer:      GitHubOIDCIssuer,
@@ -169,10 +175,10 @@ func TestNewVerifyCmd(t *testing.T) {
 		},
 		{
 			name: "Prints output in JSON format",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --owner sigstore --format json",
+			cli:  fmt.Sprintf("%s --bundle %s --owner sigstore --format json", artifactPath, bundlePath),
 			wants: Options{
-				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
-				BundlePath:      test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
+				ArtifactPath:    artifactPath,
+				BundlePath:      bundlePath,
 				DigestAlgorithm: "sha256",
 				Limit:           30,
 				OIDCIssuer:      GitHubOIDCIssuer,
@@ -228,8 +234,8 @@ func TestRunVerify(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	publicGoodOpts := Options{
-		ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
-		BundlePath:      test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
+		ArtifactPath:    artifactPath,
+		BundlePath:      bundlePath,
 		DigestAlgorithm: "sha512",
 		APIClient:       api.NewTestClient(),
 		Logger:          logger,
@@ -311,8 +317,8 @@ func TestRunVerify(t *testing.T) {
 
 	t.Run("with SAN enforcement", func(t *testing.T) {
 		opts := Options{
-			ArtifactPath:    "../test/data/sigstore-js-2.1.0.tgz",
-			BundlePath:      "../test/data/sigstore-js-2.1.0-bundle.json",
+			ArtifactPath:    artifactPath,
+			BundlePath:      bundlePath,
 			APIClient:       api.NewTestClient(),
 			DigestAlgorithm: "sha512",
 			Logger:          logger,
