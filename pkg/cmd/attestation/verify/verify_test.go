@@ -41,10 +41,11 @@ func TestNewVerifyCmd(t *testing.T) {
 	}
 
 	testcases := []struct {
-		name     string
-		cli      string
-		wants    Options
-		wantsErr bool
+		name          string
+		cli           string
+		wants         Options
+		wantsErr      bool
+		wantsExporter bool
 	}{
 		{
 			name: "Invalid digest-alg flag",
@@ -166,6 +167,20 @@ func TestNewVerifyCmd(t *testing.T) {
 			},
 			wantsErr: true,
 		},
+		{
+			name: "Prints output in JSON format",
+			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --owner sigstore --format json",
+			wants: Options{
+				ArtifactPath:    test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				BundlePath:      test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
+				DigestAlgorithm: "sha256",
+				Limit:           30,
+				OIDCIssuer:      GitHubOIDCIssuer,
+				Owner:           "sigstore",
+				SANRegex:        "^https://github.com/sigstore/",
+			},
+			wantsExporter: true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -204,6 +219,7 @@ func TestNewVerifyCmd(t *testing.T) {
 			assert.NotNil(t, opts.APIClient)
 			assert.NotNil(t, opts.Logger)
 			assert.NotNil(t, opts.OCIClient)
+			assert.Equal(t, tc.wantsExporter, opts.exporter != nil)
 		})
 	}
 }

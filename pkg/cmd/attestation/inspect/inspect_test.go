@@ -42,10 +42,11 @@ func TestNewInspectCmd(t *testing.T) {
 	}
 
 	testcases := []struct {
-		name     string
-		cli      string
-		wants    Options
-		wantsErr bool
+		name          string
+		cli           string
+		wants         Options
+		wantsErr      bool
+		wantsExporter bool
 	}{
 		{
 			name: "Invalid digest-alg flag",
@@ -90,6 +91,17 @@ func TestNewInspectCmd(t *testing.T) {
 			},
 			wantsErr: true,
 		},
+		{
+			name: "Prints output in JSON format",
+			cli:  fmt.Sprintf("%s --bundle %s --format json", artifactPath, bundlePath),
+			wants: Options{
+				ArtifactPath:    artifactPath,
+				BundlePath:      bundlePath,
+				DigestAlgorithm: "sha256",
+				OCIClient:       oci.MockClient{},
+			},
+			wantsExporter: true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -118,6 +130,7 @@ func TestNewInspectCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
 			assert.NotNil(t, opts.OCIClient)
 			assert.NotNil(t, opts.Logger)
+			assert.Equal(t, tc.wantsExporter, opts.exporter != nil)
 		})
 	}
 }
