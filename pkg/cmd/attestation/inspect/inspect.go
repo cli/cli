@@ -59,7 +59,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 			opts.ArtifactPath = args[0]
 
 			// Clean file path options
-			opts.Clean()
+			// opts.Clean()
 
 			return nil
 		},
