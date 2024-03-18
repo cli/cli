@@ -59,6 +59,9 @@ func (c LiveClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 	return &desc.Digest, nil
 }
 
+// Unlike other parts of this command set, we cannot pass a custom HTTP client
+// to the go-containerregistry library. This means we have limited visibility
+// into the HTTP requests being made to container registries.
 func NewLiveClient() *LiveClient {
 	return &LiveClient{
 		parseReference: name.ParseReference,
