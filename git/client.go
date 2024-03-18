@@ -247,6 +247,20 @@ func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+func (c *Client) StagedDiff(ctx context.Context) (string, error) {
+	args := []string{"diff", "--staged", "-U0"}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return "", err
+	}
+	outputBytes, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return string(outputBytes), nil
+}
+
 func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commit, error) {
 	// The formatting directive %x00 indicates that git should include the null byte as a separator.
 	// We use this because it is not a valid character to include in a commit message. Previously,
