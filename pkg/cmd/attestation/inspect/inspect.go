@@ -108,7 +108,7 @@ func runInspect(opts *Options) error {
 
 	policy, err := buildPolicy(*artifact)
 	if err != nil {
-		return fmt.Errorf("failed to build policy: %w", err)
+		return fmt.Errorf("failed to build policy: %v", err)
 	}
 
 	sigstore, err := verification.NewSigstoreVerifier(config, policy)
@@ -118,7 +118,7 @@ func runInspect(opts *Options) error {
 
 	res := sigstore.Verify(attestations)
 	if res.Error != nil {
-		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %w", res.Error)
+		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", res.Error)
 	}
 
 	opts.Logger.VerbosePrint(opts.Logger.ColorScheme.Green(
@@ -129,7 +129,7 @@ func runInspect(opts *Options) error {
 	if opts.exporter != nil {
 		details, err := getAttestationDetails(res.VerifyResults)
 		if err != nil {
-			return fmt.Errorf("failed to get attestation detail: %w", err)
+			return fmt.Errorf("failed to get attestation detail: %v", err)
 		}
 
 		jsonResults := make([]string, len(details))
@@ -151,7 +151,7 @@ func runInspect(opts *Options) error {
 	// otherwise, print results in a table
 	details, err := getDetailsAsSlice(res.VerifyResults)
 	if err != nil {
-		return fmt.Errorf("failed to parse attestation details: %w", err)
+		return fmt.Errorf("failed to parse attestation details: %v", err)
 	}
 
 	headers := []string{"Repo Name", "Repo ID", "Org Name", "Org ID", "Workflow ID"}
@@ -165,7 +165,7 @@ func runInspect(opts *Options) error {
 	}
 
 	if err = t.Render(); err != nil {
-		return fmt.Errorf("failed to print output: %w", err)
+		return fmt.Errorf("failed to print output: %v", err)
 	}
 
 	return nil

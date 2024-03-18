@@ -39,7 +39,7 @@ type LiveClient struct {
 func (c LiveClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 	name, err := c.parseReference(imgName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create image tag: %w", err)
+		return nil, fmt.Errorf("failed to create image tag: %v", err)
 	}
 
 	// The user must already be authenticated with the container registry
@@ -53,7 +53,7 @@ func (c LiveClient) GetImageDigest(imgName string) (*v1.Hash, error) {
 				return nil, accessErr
 			}
 		}
-		return nil, fmt.Errorf("failed to fetch remote image: %w", err)
+		return nil, fmt.Errorf("failed to fetch remote image: %v", err)
 	}
 
 	return &desc.Digest, nil

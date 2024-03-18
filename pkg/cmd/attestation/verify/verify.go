@@ -106,7 +106,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			}
 
 			if err := runVerify(opts); err != nil {
-				return fmt.Errorf("Failed to verify the artifact: %w", err)
+				return fmt.Errorf("Failed to verify the artifact: %v", err)
 			}
 			return nil
 		},
@@ -159,7 +159,7 @@ func runVerify(opts *Options) error {
 
 	policy, err := buildVerifyPolicy(opts, *artifact)
 	if err != nil {
-		return fmt.Errorf("failed to build policy: %w", err)
+		return fmt.Errorf("failed to build policy: %v", err)
 	}
 
 	config := verification.SigstoreConfig{
@@ -175,7 +175,7 @@ func runVerify(opts *Options) error {
 
 	sigstoreRes := sv.Verify(attestations)
 	if sigstoreRes.Error != nil {
-		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %w", sigstoreRes.Error)
+		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", sigstoreRes.Error)
 	}
 
 	opts.Logger.VerbosePrint(opts.Logger.ColorScheme.Green(
@@ -184,7 +184,7 @@ func runVerify(opts *Options) error {
 
 	// Try verifying the attestation's predicate type against the expect SLSA predicate type
 	if err = verifySLSAPredicateType(opts.Logger, sigstoreRes.VerifyResults); err != nil {
-		return fmt.Errorf("at least one attestation failed to verify predicate type verification: %w", err)
+		return fmt.Errorf("at least one attestation failed to verify predicate type verification: %v", err)
 	}
 
 	opts.Logger.VerbosePrint(opts.Logger.ColorScheme.Green("Successfully verified the SLSA predicate type of all attestations!\n"))

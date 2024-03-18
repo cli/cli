@@ -49,17 +49,17 @@ type SigstoreVerifier struct {
 func NewSigstoreVerifier(config SigstoreConfig, policy verify.PolicyBuilder) (*SigstoreVerifier, error) {
 	customVerifier, err := newCustomVerifier(config.CustomTrustedRoot)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create custom verifier: %w", err)
+		return nil, fmt.Errorf("failed to create custom verifier: %v", err)
 	}
 
 	publicGoodVerifier, err := newPublicGoodVerifier()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Public Good Sigstore verifier: %w", err)
+		return nil, fmt.Errorf("failed to create Public Good Sigstore verifier: %v", err)
 	}
 
 	ghVerifier, err := newGitHubVerifier()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create GitHub Sigstore verifier: %w", err)
+		return nil, fmt.Errorf("failed to create GitHub Sigstore verifier: %v", err)
 	}
 
 	return &SigstoreVerifier{
@@ -75,7 +75,7 @@ func NewSigstoreVerifier(config SigstoreConfig, policy verify.PolicyBuilder) (*S
 func (v *SigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify.SignedEntityVerifier, string, error) {
 	verifyContent, err := b.VerificationContent()
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to get bundle verification content: %w", err)
+		return nil, "", fmt.Errorf("failed to get bundle verification content: %v", err)
 	}
 	leafCert, ok := verifyContent.HasCertificate()
 	if !ok {
@@ -122,7 +122,7 @@ func (v *SigstoreVerifier) Verify(attestations []*api.Attestation) *SigstoreResu
 		verifier, issuer, err := v.chooseVerifier(apr.Attestation.Bundle)
 		if err != nil {
 			return &SigstoreResults{
-				Error: fmt.Errorf("failed to find recognized issuer from bundle content: %w", err),
+				Error: fmt.Errorf("failed to find recognized issuer from bundle content: %v", err),
 			}
 		}
 
@@ -136,7 +136,7 @@ func (v *SigstoreVerifier) Verify(attestations []*api.Attestation) *SigstoreResu
 			))
 
 			return &SigstoreResults{
-				Error: fmt.Errorf("verifying with issuer \"%s\": %w", issuer, err),
+				Error: fmt.Errorf("verifying with issuer \"%s\": %v", issuer, err),
 			}
 		}
 
@@ -160,12 +160,12 @@ func newCustomVerifier(trustedRootFilePath string) (*verify.SignedEntityVerifier
 
 	trustedRoot, err := root.NewTrustedRootFromPath(trustedRootFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create trusted root from file %s: %w", trustedRootFilePath, err)
+		return nil, fmt.Errorf("failed to create trusted root from file %s: %v", trustedRootFilePath, err)
 	}
 
 	gv, err := verify.NewSignedEntityVerifier(trustedRoot, verify.WithSignedTimestamps(1))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create custom verifier: %w", err)
+		return nil, fmt.Errorf("failed to create custom verifier: %v", err)
 	}
 
 	return gv, nil
@@ -175,7 +175,7 @@ func newGitHubVerifier() (*verify.SignedEntityVerifier, error) {
 	opts := GitHubTUFOptions()
 	client, err := tuf.New(opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create TUF client: %w", err)
+		return nil, fmt.Errorf("failed to create TUF client: %v", err)
 	}
 	trustedRoot, err := root.GetTrustedRoot(client)
 	if err != nil {
@@ -183,7 +183,7 @@ func newGitHubVerifier() (*verify.SignedEntityVerifier, error) {
 	}
 	gv, err := verify.NewSignedEntityVerifier(trustedRoot, verify.WithSignedTimestamps(1))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create GitHub verifier: %w", err)
+		return nil, fmt.Errorf("failed to create GitHub verifier: %v", err)
 	}
 
 	return gv, nil
@@ -192,16 +192,16 @@ func newGitHubVerifier() (*verify.SignedEntityVerifier, error) {
 func newPublicGoodVerifier() (*verify.SignedEntityVerifier, error) {
 	client, err := tuf.DefaultClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create TUF client: %w", err)
+		return nil, fmt.Errorf("failed to create TUF client: %v", err)
 	}
 	trustedRoot, err := root.GetTrustedRoot(client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get trusted root: %w", err)
+		return nil, fmt.Errorf("failed to get trusted root: %v", err)
 	}
 
 	sv, err := verify.NewSignedEntityVerifier(trustedRoot, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Public Good verifier: %w", err)
+		return nil, fmt.Errorf("failed to create Public Good verifier: %v", err)
 	}
 
 	return sv, nil

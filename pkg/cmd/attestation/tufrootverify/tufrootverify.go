@@ -66,7 +66,7 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 func tufRootVerify(mirror, root string) error {
 	rb, err := os.ReadFile(root)
 	if err != nil {
-		return fmt.Errorf("failed to read root file %s: %w", root, err)
+		return fmt.Errorf("failed to read root file %s: %v", root, err)
 	}
 	opts := verification.GitHubTUFOptions()
 	opts.Root = rb
@@ -75,7 +75,7 @@ func tufRootVerify(mirror, root string) error {
 	// sure there is no caching enabled
 	opts.CacheValidity = 0
 	if _, err = tuf.New(opts); err != nil {
-		return fmt.Errorf("failed to create TUF client: %w", err)
+		return fmt.Errorf("failed to create TUF client: %v", err)
 	}
 
 	return nil

@@ -68,28 +68,28 @@ func getOrgAndRepo(repoURL string) (string, string, error) {
 func getAttestationDetail(attr api.Attestation) (AttestationDetail, error) {
 	envelope, err := attr.Bundle.Envelope()
 	if err != nil {
-		return AttestationDetail{}, fmt.Errorf("failed to get envelope from bundle: %w", err)
+		return AttestationDetail{}, fmt.Errorf("failed to get envelope from bundle: %v", err)
 	}
 
 	statement, err := envelope.EnvelopeContent().Statement()
 	if err != nil {
-		return AttestationDetail{}, fmt.Errorf("failed to get statement from envelope: %w", err)
+		return AttestationDetail{}, fmt.Errorf("failed to get statement from envelope: %v", err)
 	}
 
 	var predicate Predicate
 	predicateJson, err := json.Marshal(statement.Predicate)
 	if err != nil {
-		return AttestationDetail{}, fmt.Errorf("failed to marshal predicate: %w", err)
+		return AttestationDetail{}, fmt.Errorf("failed to marshal predicate: %v", err)
 	}
 
 	err = json.Unmarshal(predicateJson, &predicate)
 	if err != nil {
-		return AttestationDetail{}, fmt.Errorf("failed to unmarshal predicate: %w", err)
+		return AttestationDetail{}, fmt.Errorf("failed to unmarshal predicate: %v", err)
 	}
 
 	org, repo, err := getOrgAndRepo(predicate.BuildDefinition.ExternalParameters.Workflow.Repository)
 	if err != nil {
-		return AttestationDetail{}, fmt.Errorf("failed to parse attestation content: %w", err)
+		return AttestationDetail{}, fmt.Errorf("failed to parse attestation content: %v", err)
 	}
 
 	return AttestationDetail{
@@ -107,7 +107,7 @@ func getDetailsAsSlice(results []*verification.AttestationProcessingResult) ([][
 	for i, result := range results {
 		detail, err := getAttestationDetail(*result.Attestation)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get attestation detail: %w", err)
+			return nil, fmt.Errorf("failed to get attestation detail: %v", err)
 		}
 		details[i] = []string{detail.RepositoryName, detail.RepositoryID, detail.OrgName, detail.OrgID, detail.WorkflowID}
 	}
@@ -120,7 +120,7 @@ func getAttestationDetails(results []*verification.AttestationProcessingResult) 
 	for i, result := range results {
 		detail, err := getAttestationDetail(*result.Attestation)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get attestation detail: %w", err)
+			return nil, fmt.Errorf("failed to get attestation detail: %v", err)
 		}
 		details[i] = detail
 	}

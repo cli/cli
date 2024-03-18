@@ -32,7 +32,7 @@ func (s *LiveStore) createMetadataFile(artifactDigest string, attestationsResp [
 
 	f, err := os.Create(metadataFilePath)
 	if err != nil {
-		return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to create file: %w", err))
+		return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to create file: %v", err))
 	}
 
 	for _, resp := range attestationsResp {
@@ -40,24 +40,24 @@ func (s *LiveStore) createMetadataFile(artifactDigest string, attestationsResp [
 		attBytes, err := json.Marshal(bundle)
 		if err != nil {
 			if err = f.Close(); err != nil {
-				return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to close file while marshalling JSON: %w", err))
+				return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to close file while marshalling JSON: %v", err))
 			}
-			return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to marshall attestation to JSON while writing to file: %w", err))
+			return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to marshall attestation to JSON while writing to file: %v", err))
 		}
 
 		withNewline := fmt.Sprintf("%s\n", attBytes)
 		_, err = f.Write([]byte(withNewline))
 		if err != nil {
 			if err = f.Close(); err != nil {
-				return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to close file while handling write error: %w", err))
+				return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to close file while handling write error: %v", err))
 			}
 
-			return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to write attestations: %w", err))
+			return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to write attestations: %v", err))
 		}
 	}
 
 	if err = f.Close(); err != nil {
-		return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to close file after writing attestations: %w", err))
+		return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to close file after writing attestations: %v", err))
 	}
 
 	return metadataFilePath, nil

@@ -92,7 +92,7 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 			}
 
 			if err := runDownload(opts); err != nil {
-				return fmt.Errorf("Failed to download the artifact's bundle(s): %w", err)
+				return fmt.Errorf("Failed to download the artifact's bundle(s): %v", err)
 			}
 			return nil
 		},
@@ -111,7 +111,7 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 func runDownload(opts *Options) error {
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
-		return fmt.Errorf("failed to digest artifact: %w", err)
+		return fmt.Errorf("failed to digest artifact: %v", err)
 	}
 
 	opts.Logger.VerbosePrintf("Downloading trusted metadata for artifact %s\n\n", opts.ArtifactPath)
@@ -129,12 +129,12 @@ func runDownload(opts *Options) error {
 			fmt.Fprintf(opts.Logger.IO.Out, "No attestations found for %s\n", opts.ArtifactPath)
 			return nil
 		}
-		return fmt.Errorf("failed to fetch attestations: %w", err)
+		return fmt.Errorf("failed to fetch attestations: %v", err)
 	}
 
 	metadataFilePath, err := opts.Store.createMetadataFile(artifact.DigestWithAlg(), attestations)
 	if err != nil {
-		return fmt.Errorf("failed to write attestation: %w", err)
+		return fmt.Errorf("failed to write attestation: %v", err)
 	}
 	fmt.Fprintf(opts.Logger.IO.Out, "Wrote attestations to file %s.\nAny previous content has been overwritten\n\n", metadataFilePath)
 

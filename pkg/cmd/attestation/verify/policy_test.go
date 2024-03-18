@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// This tests that a policy can be built from a valid artifact
+// Note that policy use is tested in verify_test.go in this package
 func TestBuildPolicy(t *testing.T) {
 	ociClient := oci.MockClient{}
 	artifactPath := "../test/data/sigstore-js-2.1.0.tgz"

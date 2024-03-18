@@ -41,13 +41,13 @@ func GetLocalAttestations(path string) ([]*api.Attestation, error) {
 	case ".json":
 		attestations, err := loadBundleFromJSONFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("bundle could not be loaded from JSON file: %w", err)
+			return nil, fmt.Errorf("bundle could not be loaded from JSON file: %v", err)
 		}
 		return attestations, nil
 	case ".jsonl":
 		attestations, err := loadBundlesFromJSONLinesFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("bundles could not be loaded from JSON lines file: %w", err)
+			return nil, fmt.Errorf("bundles could not be loaded from JSON lines file: %v", err)
 		}
 		return attestations, nil
 	}
@@ -66,7 +66,7 @@ func loadBundleFromJSONFile(path string) ([]*api.Attestation, error) {
 func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not open file: %w", err)
+		return nil, fmt.Errorf("could not open file: %v", err)
 	}
 	defer file.Close()
 
@@ -79,7 +79,7 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 		bundle.Bundle = new(protobundle.Bundle)
 		err = bundle.UnmarshalJSON(b)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal bundle from JSON: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal bundle from JSON: %v", err)
 		}
 		a := api.Attestation{Bundle: &bundle}
 		attestations = append(attestations, &a)
