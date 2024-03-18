@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -48,7 +49,7 @@ func TestNewInspectCmd(t *testing.T) {
 	}{
 		{
 			name: "Invalid digest-alg flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --digest-alg sha384",
+			cli:  fmt.Sprintf("%s --bundle %s --digest-alg sha384", artifactPath, bundlePath),
 			wants: Options{
 				ArtifactPath:    artifactPath,
 				BundlePath:      bundlePath,
@@ -59,7 +60,7 @@ func TestNewInspectCmd(t *testing.T) {
 		},
 		{
 			name: "Use default digest-alg value",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json",
+			cli:  fmt.Sprintf("%s --bundle %s", artifactPath, bundlePath),
 			wants: Options{
 				ArtifactPath:    artifactPath,
 				BundlePath:      bundlePath,
@@ -70,7 +71,7 @@ func TestNewInspectCmd(t *testing.T) {
 		},
 		{
 			name: "Use custom digest-alg value",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz --bundle ../test/data/sigstore-js-2.1.0-bundle.json --digest-alg sha512",
+			cli:  fmt.Sprintf("%s --bundle %s --digest-alg sha512", artifactPath, bundlePath),
 			wants: Options{
 				ArtifactPath:    artifactPath,
 				BundlePath:      bundlePath,
@@ -81,7 +82,7 @@ func TestNewInspectCmd(t *testing.T) {
 		},
 		{
 			name: "Missing bundle flag",
-			cli:  "../test/data/sigstore-js-2.1.0.tgz",
+			cli:  artifactPath,
 			wants: Options{
 				ArtifactPath:    artifactPath,
 				DigestAlgorithm: "sha256",
