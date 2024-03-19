@@ -2,13 +2,13 @@ package tufrootverify
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 
-	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,13 +47,12 @@ func TestNewTUFRootVerifyCmd(t *testing.T) {
 				return nil
 			})
 
-			argv, err := shlex.Split(tc.cli)
-			assert.NoError(t, err)
+			argv := strings.Split(tc.cli, " ")
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
-			_, err = cmd.ExecuteC()
+			_, err := cmd.ExecuteC()
 			if tc.wantsErr {
 				assert.Error(t, err)
 				return

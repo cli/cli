@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/in-toto/in-toto-golang/in_toto"
@@ -197,13 +197,12 @@ func TestNewVerifyCmd(t *testing.T) {
 				return nil
 			})
 
-			argv, err := shlex.Split(tc.cli)
-			assert.NoError(t, err)
+			argv := strings.Split(tc.cli, " ")
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
-			_, err = cmd.ExecuteC()
+			_, err := cmd.ExecuteC()
 			if tc.wantsErr {
 				assert.Error(t, err)
 				return
