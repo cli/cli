@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHTTPClientSanitizeJSONControlCharactersC0_v1_21(t *testing.T) {
+func TestHTTPClientSanitizeJSONControlCharactersC0_go1_21(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		issue := Issue{
 			Title: "\u001B[31mRed Title\u001B[0m",
