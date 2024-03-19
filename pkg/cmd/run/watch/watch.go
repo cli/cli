@@ -45,6 +45,12 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "watch <run-id>",
 		Short: "Watch a run until it completes, showing its progress",
+		Long: heredoc.Docf(`
+			Watch a run until it completes, showing its progress.
+
+			This command does not support authenticating via fine grained PATs
+			as it is not currently possible to create a PAT with the %[1]schecks:read%[1]s permission.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Watch a run until it's done
 			gh run watch
