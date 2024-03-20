@@ -140,7 +140,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "status",
 		Args:  cobra.ExactArgs(0),
-		Short: "View authentication status",
+		Short: "View all accounts and authentication status",
 		Long: heredoc.Doc(`Verifies and displays information about your authentication state.
 
 			This command will test your authentication state for each GitHub host that gh knows about and
