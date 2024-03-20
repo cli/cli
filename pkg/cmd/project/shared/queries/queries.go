@@ -336,7 +336,7 @@ func (v FieldValueNodes) ID() string {
 }
 
 type DraftIssue struct {
-	Id    string
+	ID    string
 	Body  string
 	Title string
 }
@@ -348,8 +348,8 @@ func (i DraftIssue) ExportData(_ []string) map[string]interface{} {
 		"type":  "DraftIssue",
 	}
 	// Emulate omitempty.
-	if i.Id != "" {
-		v["id"] = i.Id
+	if i.ID != "" {
+		v["id"] = i.ID
 	}
 	return v
 }
@@ -400,7 +400,7 @@ func (p ProjectItem) DetailedItem() exportable {
 	switch p.Type() {
 	case "DraftIssue":
 		return DraftIssue{
-			Id:    p.Content.DraftIssue.Id,
+			ID:    p.Content.DraftIssue.ID,
 			Body:  p.Body(),
 			Title: p.Title(),
 		}
