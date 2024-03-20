@@ -3,7 +3,9 @@ package verification
 import (
 	_ "embed"
 	"os"
+	"path/filepath"
 
+	"github.com/cli/go-gh/v2/pkg/config"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
 )
 
@@ -22,6 +24,9 @@ func DefaultOptionsWithCacheSetting() *tuf.Options {
 		// from writing the Sigstore cache to the home directory
 		opts.DisableLocalCache = true
 	}
+
+	// Set the cache path to a directory owned by the CLI
+	opts.CachePath = filepath.Join(config.CacheDir(), ".sigstore", "root")
 
 	return opts
 }
