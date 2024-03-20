@@ -400,6 +400,7 @@ func (p ProjectItem) DetailedItem() exportable {
 	switch p.Type() {
 	case "DraftIssue":
 		return DraftIssue{
+			ID:    p.Content.DraftIssue.ID,
 			Body:  p.Body(),
 			Title: p.Title(),
 		}
