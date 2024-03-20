@@ -164,6 +164,7 @@ func TestRunList_User_tty(t *testing.T) {
 								{
 									"id": "draft issue ID",
 									"content": map[string]interface{}{
+										"id":         "draft issue ID",
 										"title":      "draft issue",
 										"__typename": "DraftIssue",
 									},
@@ -273,6 +274,7 @@ func TestRunList_User(t *testing.T) {
 								{
 									"id": "draft issue ID",
 									"content": map[string]interface{}{
+										"id":         "draft issue ID",
 										"title":      "draft issue",
 										"__typename": "DraftIssue",
 									},
@@ -379,6 +381,7 @@ func TestRunList_Org(t *testing.T) {
 								{
 									"id": "draft issue ID",
 									"content": map[string]interface{}{
+										"id":         "draft issue ID",
 										"title":      "draft issue",
 										"__typename": "DraftIssue",
 									},
@@ -475,6 +478,7 @@ func TestRunList_Me(t *testing.T) {
 								{
 									"id": "draft issue ID",
 									"content": map[string]interface{}{
+										"id":         "draft issue ID",
 										"title":      "draft issue",
 										"__typename": "DraftIssue",
 									},
@@ -581,6 +585,7 @@ func TestRunList_JSON(t *testing.T) {
 								{
 									"id": "draft issue ID",
 									"content": map[string]interface{}{
+										"id":         "draft issue ID",
 										"title":      "draft issue",
 										"__typename": "DraftIssue",
 									},
@@ -610,6 +615,6 @@ func TestRunList_JSON(t *testing.T) {
 	assert.NoError(t, err)
 	assert.JSONEq(
 		t,
-		`{"items":[{"content":{"type":"Issue","body":"","title":"an issue","number":1,"repository":"cli/go-gh","url":""},"id":"issue ID"},{"content":{"type":"PullRequest","body":"","title":"a pull request","number":2,"repository":"cli/go-gh","url":""},"id":"pull request ID"},{"content":{"type":"DraftIssue","body":"","title":"draft issue"},"id":"draft issue ID"}],"totalCount":3}`,
+		`{"items":[{"content":{"type":"Issue","body":"","title":"an issue","number":1,"repository":"cli/go-gh","url":""},"id":"issue ID"},{"content":{"type":"PullRequest","body":"","title":"a pull request","number":2,"repository":"cli/go-gh","url":""},"id":"pull request ID"},{"content":{"type":"DraftIssue","body":"","title":"draft issue","id":"draft issue ID"},"id":"draft issue ID"}],"totalCount":3}`,
 		stdout.String())
 }
