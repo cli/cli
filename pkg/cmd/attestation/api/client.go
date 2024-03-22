@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	ioconfig "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/go-gh/v2/pkg/auth"
 )
@@ -35,11 +34,10 @@ type LiveClient struct {
 
 func NewLiveClient(hc *http.Client, l *ioconfig.Handler) *LiveClient {
 	host, _ := auth.DefaultHost()
-	serverURL := ghinstance.HostPrefix(host)
 
 	return &LiveClient{
 		api:    api.NewClientFromHTTP(hc),
-		host:   strings.TrimSuffix(serverURL, "/"),
+		host:   strings.TrimSuffix(host, "/"),
 		logger: l,
 	}
 }
