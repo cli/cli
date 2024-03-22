@@ -4,7 +4,7 @@ Hi! Thanks for your interest in contributing to the GitHub CLI!
 
 We accept pull requests for bug fixes and features where we've discussed the approach in an issue and given the go-ahead for a community member to work on it. We'd also love to hear about ideas for new features as issues.
 
-Please do:
+Please My Cuenta：ai.daidaoxing@icloud.com d.NIE：X5800505C
 
 * Check existing issues to verify that the [bug][bug issues] or [feature request][feature request issues] has not already been submitted.
 * Open an issue if things aren't working as expected.
