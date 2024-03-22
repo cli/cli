@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdMarkTemplate(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       markTemplateOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         markTemplateOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "not-a-number",
@@ -48,11 +49,9 @@ func TestNewCmdMarkTemplate(t *testing.T) {
 		},
 
 		{
-			name: "json",
-			cli:  "--format json",
-			wants: markTemplateOpts{
-				format: "json",
-			},
+			name:          "json",
+			cli:           "--format json",
+			wantsExporter: true,
 		},
 	}
 
@@ -85,10 +84,11 @@ func TestNewCmdMarkTemplate(t *testing.T) {
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
 			assert.Equal(t, tt.wants.owner, gotOpts.owner)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }
+
 func TestRunMarkTemplate_Org(t *testing.T) {
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
@@ -271,5 +271,101 @@ func TestRunUnmarkTemplate_Org(t *testing.T) {
 	assert.Equal(
 		t,
 		"Unmarked project 1 as a template.\n",
+		stdout.String())
+}
+
+func TestRunMarkTemplate_JSON(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get org ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "github",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"organization": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"user"},
+				},
+			},
+		})
+
+	// get project ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query OrgProject.*",
+			"variables": map[string]interface{}{
+				"login":       "github",
+				"number":      1,
+				"firstItems":  0,
+				"afterItems":  nil,
+				"firstFields": 0,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"organization": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "an ID",
+					},
+				},
+			},
+		})
+
+	// template project
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation MarkProjectTemplate.*","variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"an ID"}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"markProjectV2AsTemplate": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id":     "project ID",
+						"number": 1,
+						"owner": map[string]interface{}{
+							"__typename": "Organization",
+							"login":      "github",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := markTemplateConfig{
+		opts: markTemplateOpts{
+			owner:    "github",
+			number:   1,
+			exporter: cmdutil.NewJSONExporter(),
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runMarkTemplate(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"number":1,"url":"","shortDescription":"","public":false,"closed":false,"title":"","id":"project ID","readme":"","items":{"totalCount":0},"fields":{"totalCount":0},"owner":{"type":"Organization","login":"github"}}`,
 		stdout.String())
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -15,10 +14,10 @@ import (
 )
 
 type listOpts struct {
-	limit  int
-	owner  string
-	number int32
-	format string
+	limit    int
+	owner    string
+	number   int32
+	exporter cmdutil.Exporter
 }
 
 type listConfig struct {
@@ -66,7 +65,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	}
 
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
-	cmdutil.StringEnumFlag(listCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(listCmd, &opts.exporter)
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of fields to fetch")
 
 	return listCmd
@@ -94,8 +93,8 @@ func runList(config listConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, project)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, project.Fields)
 	}
 
 	return printResults(config, project.Fields.Nodes, owner.Login)
@@ -116,14 +115,4 @@ func printResults(config listConfig, fields []queries.ProjectField, login string
 	}
 
 	return tp.Render()
-}
-
-func printJSON(config listConfig, project *queries.Project) error {
-	b, err := format.JSONProjectFields(project)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
-	return err
 }

@@ -5,7 +5,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -14,10 +13,10 @@ import (
 )
 
 type createOpts struct {
-	title   string
-	owner   string
-	ownerID string
-	format  string
+	title    string
+	owner    string
+	ownerID  string
+	exporter cmdutil.Exporter
 }
 
 type createConfig struct {
@@ -63,7 +62,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 
 	createCmd.Flags().StringVar(&opts.title, "title", "", "Title for the project")
 	createCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
-	cmdutil.StringEnumFlag(createCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(createCmd, &opts.exporter)
 
 	_ = createCmd.MarkFlagRequired("title")
 
@@ -85,8 +84,8 @@ func runCreate(config createConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, query.CreateProjectV2.ProjectV2)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.CreateProjectV2.ProjectV2)
 	}
 
 	return printResults(config, query.CreateProjectV2.ProjectV2)
@@ -111,15 +110,5 @@ func printResults(config createConfig, project queries.Project) error {
 	}
 
 	_, err := fmt.Fprintf(config.io.Out, "%s\n", project.URL)
-	return err
-}
-
-func printJSON(config createConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
 	return err
 }

@@ -1,0 +1,33 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 12,
+        "title": "Blueberries are from a fork",
+        "state": "MERGED",
+        "body": "**blueberries taste good**",
+        "url": "https://github.com/OWNER/REPO/pull/12",
+        "author": {
+          "login": "nobody"
+        },
+        "commits": {
+          "totalCount": 12
+        },
+        "additions": 100,
+        "deletions": 10,
+        "baseRefName": "master",
+        "headRefName": "blueberries",
+        "headRepositoryOwner": {
+          "login": "hubot"
+        },
+        "projectCards": {
+          "nodes": [
+            null
+          ],
+          "totalCount": 1
+        },
+        "isCrossRepository": true
+      }
+    }
+  }
+}

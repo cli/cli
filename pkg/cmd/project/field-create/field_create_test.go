@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdCreateField(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       createFieldOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         createFieldOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "missing-name-and-data-type",
@@ -70,11 +71,11 @@ func TestNewCmdCreateField(t *testing.T) {
 			name: "json",
 			cli:  "--format json --name n --data-type TEXT ",
 			wants: createFieldOpts{
-				format:              "json",
 				name:                "n",
 				dataType:            "TEXT",
 				singleSelectOptions: []string{},
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -110,7 +111,7 @@ func TestNewCmdCreateField(t *testing.T) {
 			assert.Equal(t, tt.wants.name, gotOpts.name)
 			assert.Equal(t, tt.wants.dataType, gotOpts.dataType)
 			assert.Equal(t, tt.wants.singleSelectOptions, gotOpts.singleSelectOptions)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }
@@ -626,5 +627,100 @@ func TestRunCreateField_NUMBER(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created field\n",
+		stdout.String())
+}
+
+func TestRunCreateField_JSON(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// get project ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  0,
+				"afterItems":  nil,
+				"firstFields": 0,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "an ID",
+					},
+				},
+			},
+		})
+
+	// create Field
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation CreateField.*","variables":{"input":{"projectId":"an ID","dataType":"TEXT","name":"a name"}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"createProjectV2Field": map[string]interface{}{
+					"projectV2Field": map[string]interface{}{
+						"__typename": "ProjectV2Field",
+						"id":         "Field ID",
+						"name":       "a name",
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := createFieldConfig{
+		opts: createFieldOpts{
+			name:     "a name",
+			owner:    "monalisa",
+			number:   1,
+			dataType: "TEXT",
+			exporter: cmdutil.NewJSONExporter(),
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runCreateField(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"id":"Field ID","name":"a name","type":"ProjectV2Field"}`,
 		stdout.String())
 }

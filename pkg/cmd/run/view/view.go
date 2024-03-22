@@ -96,7 +96,13 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "view [<run-id>]",
 		Short: "View a summary of a workflow run",
-		Args:  cobra.MaximumNArgs(1),
+		Long: heredoc.Docf(`
+			View a summary of a workflow run.
+
+			This command does not support authenticating via fine grained PATs
+			as it is not currently possible to create a PAT with the %[1]schecks:read%[1]s permission.
+		`, "`"),
+		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
 			# Interactively select a run to view, optionally selecting a single job
 			$ gh run view
@@ -294,7 +300,7 @@ func runView(opts *ViewOptions) error {
 	prNumber := ""
 	number, err := shared.PullRequestForRun(client, repo, *run)
 	if err == nil {
-		prNumber = fmt.Sprintf(" #%d", number)
+		prNumber = fmt.Sprintf(" %s#%d", ghrepo.FullName(repo), number)
 	}
 
 	var artifacts []shared.Artifact

@@ -83,7 +83,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().StringVarP(&opts.SrcArg, "source", "s", "", "Source repository")
-	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Branch to sync (default: default branch)")
+	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Branch to sync (default [default branch])")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "", false, "Hard reset the branch of the destination repository to match the source repository")
 	return cmd
 }

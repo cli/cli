@@ -2,12 +2,12 @@ package shared
 
 import (
 	"fmt"
-	"reflect"
-	"strings"
+	"net/url"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
 var CacheFields = []string{
@@ -39,6 +39,8 @@ type GetCachesOptions struct {
 	Limit int
 	Order string
 	Sort  string
+	Key   string
+	Ref   string
 }
 
 // Return a list of caches for a repository. Pass a negative limit to request
@@ -57,6 +59,12 @@ func GetCaches(client *api.Client, repo ghrepo.Interface, opts GetCachesOptions)
 	}
 	if opts.Order != "" {
 		path += fmt.Sprintf("&direction=%s", opts.Order)
+	}
+	if opts.Key != "" {
+		path += fmt.Sprintf("&key=%s", url.QueryEscape(opts.Key))
+	}
+	if opts.Ref != "" {
+		path += fmt.Sprintf("&ref=%s", url.QueryEscape(opts.Ref))
 	}
 
 	var result *CachePayload
@@ -85,17 +93,5 @@ pagination:
 }
 
 func (c *Cache) ExportData(fields []string) map[string]interface{} {
-	v := reflect.ValueOf(c).Elem()
-	fieldByName := func(v reflect.Value, field string) reflect.Value {
-		return v.FieldByNameFunc(func(s string) bool {
-			return strings.EqualFold(field, s)
-		})
-	}
-	data := map[string]interface{}{}
-
-	for _, f := range fields {
-		data[f] = fieldByName(v, f).Interface()
-	}
-
-	return data
+	return cmdutil.StructExportData(c, fields)
 }

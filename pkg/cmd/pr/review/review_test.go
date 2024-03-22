@@ -286,7 +286,7 @@ func TestPRReview_interactive(t *testing.T) {
 		  cool story                                                                  
 		
 	`), output.String())
-	assert.Equal(t, "✓ Approved pull request #123\n", output.Stderr())
+	assert.Equal(t, "✓ Approved pull request OWNER/REPO#123\n", output.Stderr())
 }
 
 func TestPRReview_interactive_no_body(t *testing.T) {
@@ -328,5 +328,5 @@ func TestPRReview_interactive_blank_approve(t *testing.T) {
 	output, err := runCommand(http, pm, nil, true, "")
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Approved pull request #123\n", output.Stderr())
+	assert.Equal(t, "✓ Approved pull request OWNER/REPO#123\n", output.Stderr())
 }

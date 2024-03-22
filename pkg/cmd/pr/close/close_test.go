@@ -123,7 +123,7 @@ func TestPrClose(t *testing.T) {
 	output, err := runCommand(http, true, "96")
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Closed pull request #96 (The title of the PR)\n", output.Stderr())
+	assert.Equal(t, "✓ Closed pull request OWNER/REPO#96 (The title of the PR)\n", output.Stderr())
 }
 
 func TestPrClose_alreadyClosed(t *testing.T) {
@@ -138,7 +138,7 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 	output, err := runCommand(http, true, "96")
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "! Pull request #96 (The title of the PR) is already closed\n", output.Stderr())
+	assert.Equal(t, "! Pull request OWNER/REPO#96 (The title of the PR) is already closed\n", output.Stderr())
 }
 
 func TestPrClose_deleteBranch_sameRepo(t *testing.T) {
@@ -170,7 +170,7 @@ func TestPrClose_deleteBranch_sameRepo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		✓ Closed pull request #96 (The title of the PR)
+		✓ Closed pull request OWNER/REPO#96 (The title of the PR)
 		✓ Deleted branch blueberries
 	`), output.Stderr())
 }
@@ -201,7 +201,7 @@ func TestPrClose_deleteBranch_crossRepo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		✓ Closed pull request #96 (The title of the PR)
+		✓ Closed pull request OWNER/REPO#96 (The title of the PR)
 		! Skipped deleting the remote branch of a pull request from fork
 		✓ Deleted branch blueberries
 	`), output.Stderr())
@@ -237,7 +237,7 @@ func TestPrClose_deleteBranch_sameBranch(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		✓ Closed pull request #96 (The title of the PR)
+		✓ Closed pull request OWNER/REPO#96 (The title of the PR)
 		✓ Deleted branch trunk and switched to branch main
 	`), output.Stderr())
 }
@@ -270,7 +270,7 @@ func TestPrClose_deleteBranch_notInGitRepo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		✓ Closed pull request #96 (The title of the PR)
+		✓ Closed pull request OWNER/REPO#96 (The title of the PR)
 		! Skipped deleting the local branch since current directory is not a git repository 
 		✓ Deleted branch trunk
 	`), output.Stderr())
@@ -306,5 +306,5 @@ func TestPrClose_withComment(t *testing.T) {
 	output, err := runCommand(http, true, "96 --comment 'closing comment'")
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Closed pull request #96 (The title of the PR)\n", output.Stderr())
+	assert.Equal(t, "✓ Closed pull request OWNER/REPO#96 (The title of the PR)\n", output.Stderr())
 }

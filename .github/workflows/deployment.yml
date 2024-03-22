@@ -53,7 +53,7 @@ jobs:
         run: |
           go run ./cmd/gen-docs --website --doc-path dist/manual
           tar -czvf dist/manual.tar.gz -C dist -- manual
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: linux
           if-no-files-found: error
@@ -111,7 +111,7 @@ jobs:
         run: |
           shopt -s failglob
           script/sign dist/gh_*_macOS_*.zip
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: macos
           if-no-files-found: error
@@ -171,7 +171,7 @@ jobs:
         run: script/release --local "$TAG_NAME" --platform windows
       - name: Set up MSBuild
         id: setupmsbuild
-        uses: microsoft/setup-msbuild@v1.3.1
+        uses: microsoft/setup-msbuild@v2.0.0
       - name: Build MSI
         shell: bash
         env:
@@ -215,10 +215,7 @@ jobs:
           Get-ChildItem -Path .\dist -Filter *.msi | ForEach-Object {
             .\script\sign.ps1 $_.FullName
           }
-        env:
-          CERT_FILE: ${{ steps.obtain_cert.outputs.cert-file }}
-          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: windows
           if-no-files-found: error
@@ -236,7 +233,7 @@ jobs:
       - name: Checkout cli/cli
         uses: actions/checkout@v4
       - name: Merge built artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Checkout documentation site
         uses: actions/checkout@v4
         with:

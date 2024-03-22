@@ -137,8 +137,7 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions
 		return err
 	}
 	requestBody := bytes.NewReader(requestByte)
-	result := label{}
-	err = apiClient.REST(repo.RepoHost(), "POST", path, requestBody, &result)
+	err = apiClient.REST(repo.RepoHost(), "POST", path, requestBody, nil)
 
 	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
 		err = errLabelAlreadyExists
@@ -173,8 +172,7 @@ func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *editOptions
 		return err
 	}
 	requestBody := bytes.NewReader(requestByte)
-	result := label{}
-	err = apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, &result)
+	err = apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, nil)
 
 	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
 		err = errLabelAlreadyExists

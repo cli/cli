@@ -53,6 +53,10 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 
 			# search issues without label "bug"
 			$ gh search issues -- -label:bug
+
+			# search issues only from un-archived repositories (default is all repositories)
+			$ gh search issues --owner github --archived=false
+
     `),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
@@ -134,7 +138,7 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 	// Query qualifier flags
 	cmd.Flags().BoolVar(&includePrs, "include-prs", false, "Include pull requests in results")
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
-	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Restrict search to archived repositories")
+	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Filter based on the repository archived state {true|false}")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Assignee, "assignee", "", "Filter by assignee")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Author, "author", "", "Filter by author")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Closed, "closed", "", "Filter on closed at `date`")
