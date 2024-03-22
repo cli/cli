@@ -19,42 +19,42 @@ import (
 func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	downloadCmd := &cobra.Command{
-		Use:   "download [<file path> | oci://<OCI image URI>]",
+		Use:   "download [<file-path> | oci://<image-uri>] [--owner | --repo]",
 		Args:  cobra.ExactArgs(1),
 		Short: "Download an artifact's Sigstore bundle(s) for offline use",
 		Long: heredoc.Docf(`
-			Download an artifact's Sigstore bundle(s) for offline use.
-			
+			Download an artifact's attestations, aka Sigstore bundle(s), for offline use.
+
 			The command requires either:
-			* a relative path to a local artifact, or
-			* a container image URI (e.g. %[1]soci://<my-OCI-image-URI>%[1]s)
+			* a file path to an artifact, or
+			* a container image URI (e.g. %[1]soci://<image-uri>%[1]s)
 
-			Note that if you provide an OCI URI for the artifact you must already
-			be authenticated with a container registry.
+			(Note that if you provide an OCI URL, you must already be authenticated with
+			its container registry.)
 
-			In addition, the command also requires either:
-			* the %[1]s--owner%[1]s flag (e.g. github), or
-			* the %[1]s--repo%[1]s flag (e.g. github/example).
+			In addition, the command requires either:
+			* the %[1]s--owner%[1]s flag (e.g. --owner github), or
+			* the %[1]s--repo%[1]s flag (e.g. --repo github/example).
 
-			The value of the %[1]s--owner%[1]s flag must match the name of the GitHub
-			organization that the artifact is associated with.
+			The %[1]s--owner%[1]s flag value must match the name of the GitHub organization
+			that the artifact is associated with.
 
-			The value of the %[1]s--repo%[1]s flag must match the name of the GitHub
-			repository that the artifact is associated with.
+			The %[1]s--repo%[1]s flag value must match the name of the GitHub repository
+			that the artifact is associated with.
 
-			The corresponding Sigstore bundle(s) will be written to a file in the
+			Any associated Sigstore bundle(s) will be written to a file in the
 			current directory named after the artifact's digest. For example, if the
-			artifact's digest is "sha256:1234", the file will be named "sha256:1234.jsonl".
+			digest is "sha256:1234", the file will be named "sha256:1234.jsonl".
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Download Sigstore bundle(s) for a local artifact associated with a GitHub organization
-			$ gh attestation download <my-artifact> -o <GitHub organization>
+			$ gh attestation download example.bin -o github
 
 			# Download Sigstore bundle(s) for a local artifact associated with a GitHub repository
-			$ gh attestation download <my-artifact> -R <GitHub repo>
+			$ gh attestation download example.bin -R github/example
 
 			# Download Sigstore bundle(s) for an OCI image associated with a GitHub organization
-			$ gh attestation download oci://<my-OCI-image> -o <GitHub organization>
+			$ gh attestation download oci://example.com/foo/bar:latest -o github
 		`),
 		// PreRunE is used to validate flags before the command is run
 		// If an error is returned, its message will be printed to the terminal
