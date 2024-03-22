@@ -21,42 +21,7 @@ If you are a hubber and are interested in shipping new commands for the CLI, che
 
 ### macOS
 
-`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], [Webi][], and as a downloadable binary from the [releases page][].
-
-#### Homebrew
-
-| Install:          | Upgrade:          |
-| ----------------- | ----------------- |
-| `brew install gh` | `brew upgrade gh` |
-
-#### MacPorts
-
-| Install:               | Upgrade:                                       |
-| ---------------------- | ---------------------------------------------- |
-| `sudo port install gh` | `sudo port selfupdate && sudo port upgrade gh` |
-
-#### Conda
-
-| Install:                                 | Upgrade:                                |
-|------------------------------------------|-----------------------------------------|
-| `conda install gh --channel conda-forge` | `conda update gh --channel conda-forge` |
-
-Additional Conda installation options available on the [gh-feedstock page](https://github.com/conda-forge/gh-feedstock#installing-gh).
-
-#### Spack
-
-| Install:           | Upgrade:                                 |
-| ------------------ | ---------------------------------------- |
-| `spack install gh` | `spack uninstall gh && spack install gh` |
-
-#### Webi
-
-| Install:                            | Upgrade:         |
-| ----------------------------------- | ---------------- |
-| `curl -sS https://webi.sh/gh \| sh` | `webi gh@stable` |
-
-For more information about the Webi installer see [its homepage](https://webinstall.dev/).
-
+`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], [Webi][], 
 ### Linux & BSD
 
 `gh` is available via:
@@ -65,46 +30,11 @@ For more information about the Webi installer see [its homepage](https://webinst
 - OS-agnostic package managers such as [Homebrew](#homebrew), [Conda](#conda), [Spack](#spack), [Webi](#webi); and
 - our [releases page][] as precompiled binaries.
 
-For more information, see [Linux & BSD installation](./docs/install_linux.md).
-
-### Windows
-
-`gh` is available via [WinGet][], [scoop][], [Chocolatey][], [Conda](#conda), [Webi](#webi), and as downloadable MSI.
-
-#### WinGet
-
-| Install:            | Upgrade:            |
-| ------------------- | --------------------|
-| `winget install --id GitHub.cli` | `winget upgrade --id GitHub.cli` |
-
-> **Note**  
-> The Windows installer modifies your PATH. When using Windows Terminal, you will need to **open a new window** for the changes to take effect. (Simply opening a new tab will _not_ be sufficient.)
-
-#### scoop
-
-| Install:           | Upgrade:           |
-| ------------------ | ------------------ |
-| `scoop install gh` | `scoop update gh`  |
-
-#### Chocolatey
-
-| Install:           | Upgrade:           |
-| ------------------ | ------------------ |
-| `choco install gh` | `choco upgrade gh` |
-
-#### Signed MSI
-
-MSI installers are available for download on the [releases page][].
 
 ### Codespaces
 
 To add GitHub CLI to your codespace, add the following to your [devcontainer file](https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/adding-features-to-a-devcontainer-file):
 
-```json
-"features": {
-  "ghcr.io/devcontainers/features/github-cli:1": {}
-}
-```
 
 ### GitHub Actions
 
