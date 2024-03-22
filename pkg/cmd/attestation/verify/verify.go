@@ -22,48 +22,49 @@ var ErrNoMatchingSLSAPredicate = fmt.Errorf("the attestation does not have the e
 func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	verifyCmd := &cobra.Command{
-		Use:   "verify <artifact-path-or-url>",
+		Use:   "verify [<file-path> | oci://<image-uri>] [--owner | --repo]",
 		Args:  cobra.ExactArgs(1),
-		Short: "Cryptographically verify an artifact",
+		Short: "Verify",
 		Long: heredoc.Docf(`
-			Cryptographically verify the authenticity of an artifact using the 
-			associated trusted metadata.
+			Verify the integrity and provenance of an artifact using its associated
+			cryptographically signed attestations.
 
-			The command accepts either:
-			* a relative path to a local artifact
-			* a container image URI (e.g. oci://<my-OCI-image-URI>) 
+			The command requires either:
+			* a file path to an artifact, or
+			* a container image URI (e.g. %[1]soci://<image-uri>%[1]s)
 
-			Note that you must already be authenticated with a container registry 
-			if you provide an OCI image URI as the artifact.
+			(Note that if you provide an OCI URL, you must already be authenticated with
+			its container registry.)
 
-			The command also requires you provide either the %[1]s--owner%[1]s 
-			or %[1]s--repo%[1]s flag.
-			The value of the %[1]s--owner%[1]s flag should be the name of the GitHub organization 
+			In addition, the command requires either:
+			* the %[1]s--owner%[1]s flag (e.g. --owner github), or
+			* the %[1]s--repo%[1]s flag (e.g. --repo github/example).
+
+			The %[1]s--owner%[1]s flag value must match the name of the GitHub organization
 			that the artifact is associated with.
-			The value of the %[1]s--repo%[1]s flag should be the name of the GitHub repository that 
-			the artifact is associated with.
 
-			By default, the command will verify the artifact against trusted metadata stored remotely.
-			If you would like to verify the artifact against local metadata, 
-			you can provide a path to the local trusted metadata bundle file with the 
-			%[1]s--bundle%[1]s flag.
+			The %[1]s--repo%[1]s flag value must match the name of the GitHub repository
+			that the artifact is associated with.
 
-			By default, the command will use the SHA-256 hash algorithm to create the artifact digest 
-			used for verification.
-			You can specify the SHA-512 algorithm instead using the %[1]s--digest-alg%[1]s flag.
+			By default, the verify command will attempt to fetch attestations associated
+			with the provided artifact from the GitHub API. If you would prefer to verify
+			the artifact using attestations stored on disk (i.e. from the download command),
+			provide a path to the %[1]s--bundle%[1]s flag.
 
-			If the %[1]s--json-result%[1]s flag is provided, the command will print the verification 
-			results as JSON.
+			To see the full results that are generated upon successful verification, i.e.
+			for use with a policy engine, provide the %[1]s--json-result%[1]s flag.
+
+			For more policy verification options, see the other available flags.
 			`, "`"),
 		Example: heredoc.Doc(`
-			# Verify a local artifact with the repository name
-			$ gh attestation verify <my-artifact> --repo <repo-name>
+			# Verify a local artifact associated with a repository
+			$ gh attestation verify example.bin --repo github/example
 
-			# Verify a local artifact with the organization name
-			$ gh attestation verify <my-artifact> --owner <owner>
-			
-			# Verify an OCI image using a local trusted metadata bundle
-			$ gh attestation verify oci://<my-OCI-image> --owner <owner> --bundle <path-to-bundle>
+			# Verify a local artifact associated with an organization
+			$ gh attestation verify example.bin --owner github
+
+			# Verify an OCI image using locally stored attestations
+			$ gh attestation verify oci://<image-uri> --owner github --bundle sha256:foo.jsonl
 		`),
 		// PreRunE is used to validate flags before the command is run
 		// If an error is returned, its message will be printed to the terminal
