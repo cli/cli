@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -135,6 +136,8 @@ func addParamsSlice(m map[string]interface{}, prevkey, newkey string) (map[strin
 				lastItem := existSlice[len(existSlice)-1]
 				if lastMap, ok := lastItem.(map[string]interface{}); ok {
 					if _, keyExists := lastMap[newkey]; !keyExists {
+						return lastMap, nil
+					} else if reflect.TypeOf(lastMap[newkey]).Kind() == reflect.Slice {
 						return lastMap, nil
 					}
 				}

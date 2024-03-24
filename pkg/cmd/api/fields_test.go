@@ -61,8 +61,14 @@ func Test_parseFields_nested(t *testing.T) {
 			"robots[]=Dependabot",
 			"labels[][name]=bug",
 			"labels[][color]=red",
+			"labels[][colorOptions][]=red",
+			"labels[][colorOptions][]=blue",
 			"labels[][name]=feature",
 			"labels[][color]=green",
+			"labels[][colorOptions][]=red",
+			"labels[][colorOptions][]=green",
+			"labels[][colorOptions][]=yellow",
+			"nested[][key1][key2][key3]=value",
 			"empty[]",
 		},
 		MagicFields: []string{
@@ -96,11 +102,29 @@ func Test_parseFields_nested(t *testing.T) {
 			"labels": [
 				{
 					"color": "red",
+					"colorOptions": [
+						"red",
+						"blue"
+					],
 					"name": "bug"
 				},
 				{
 					"color": "green",
+					"colorOptions": [
+						"red",
+						"green",
+						"yellow"
+					],
 					"name": "feature"
+				}
+			],
+			"nested": [
+				{
+					"key1": {
+						"key2": {
+							"key3": "value"
+						}
+					}
 				}
 			],
 			"robots": [
