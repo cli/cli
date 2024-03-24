@@ -100,7 +100,7 @@ func IssuesFromArgsWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo
 	return issues, issuesRepo, nil
 }
 
-var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/issues/(\d+)`)
+var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/(?:issues|pull)/(\d+)`)
 
 func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
 	u, err := url.Parse(s)
