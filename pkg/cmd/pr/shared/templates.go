@@ -16,8 +16,9 @@ import (
 )
 
 type issueTemplate struct {
-	Gname string `graphql:"name"`
-	Gbody string `graphql:"body"`
+	Gname  string `graphql:"name"`
+	Gbody  string `graphql:"body"`
+	Gtitle string `graphql:"title"`
 }
 
 type pullRequestTemplate struct {
@@ -37,6 +38,10 @@ func (t *issueTemplate) Body() []byte {
 	return []byte(t.Gbody)
 }
 
+func (t *issueTemplate) Title() string {
+	return t.Gtitle
+}
+
 func (t *pullRequestTemplate) Name() string {
 	return t.Gname
 }
@@ -47,6 +52,10 @@ func (t *pullRequestTemplate) NameForSubmit() string {
 
 func (t *pullRequestTemplate) Body() []byte {
 	return []byte(t.Gbody)
+}
+
+func (t *pullRequestTemplate) Title() string {
+	return ""
 }
 
 func listIssueTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]Template, error) {
@@ -109,6 +118,7 @@ type Template interface {
 	Name() string
 	NameForSubmit() string
 	Body() []byte
+	Title() string
 }
 
 type iprompter interface {
@@ -293,4 +303,8 @@ func (t *filesystemTemplate) NameForSubmit() string {
 
 func (t *filesystemTemplate) Body() []byte {
 	return githubtemplate.ExtractContents(t.path)
+}
+
+func (t *filesystemTemplate) Title() string {
+	return githubtemplate.ExtractTitle(t.path)
 }

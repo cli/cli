@@ -27,8 +27,8 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 		httpmock.GraphQL(`query IssueTemplates\b`),
 		httpmock.StringResponse(`{"data":{"repository":{
 			"issueTemplates": [
-				{"name": "Bug report", "body": "I found a problem"},
-				{"name": "Feature request", "body": "I need a feature"}
+				{"name": "Bug report", "body": "I found a problem", "title": "bug: "},
+				{"name": "Feature request", "body": "I need a feature", "title": "request: "}
 			]
 		}}}`))
 
@@ -62,6 +62,7 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "Feature request", tpl.NameForSubmit())
 	assert.Equal(t, "I need a feature", string(tpl.Body()))
+	assert.Equal(t, "request: ", tpl.Title())
 }
 
 func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
@@ -112,6 +113,7 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "", tpl.NameForSubmit())
 	assert.Equal(t, "I fixed a problem", string(tpl.Body()))
+	assert.Equal(t, "", tpl.Title())
 }
 
 func TestTemplateManagerSelect(t *testing.T) {
