@@ -387,6 +387,29 @@ func TestNewCmdExtension(t *testing.T) {
 			wantStdout: "✓ Successfully upgraded extension\n",
 		},
 		{
+			name: "upgrade an up-to-date extension dry run",
+			args: []string{"upgrade", "hello", "--dry-run"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.EnableDryRunModeFunc = func() {}
+				em.UpgradeFunc = func(name string, force bool) error {
+					return upToDateError
+				}
+				return func(t *testing.T) {
+					dryRunCalls := em.EnableDryRunModeCalls()
+					assert.Equal(t, 1, len(dryRunCalls))
+					upgradeCalls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(upgradeCalls))
+					assert.Equal(t, "hello", upgradeCalls[0].Name)
+					assert.False(t, upgradeCalls[0].Force)
+				}
+			},
+			isTTY:      false,
+			wantErr:    true,
+			errMsg:     "SilentError",
+			wantStdout: "",
+			wantStderr: "✓ Already up to date\n",
+		},
+		{
 			name: "upgrade extension error",
 			args: []string{"upgrade", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {

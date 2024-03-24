@@ -418,6 +418,8 @@ func (m *Manager) Upgrade(name string, force bool) error {
 
 func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
 	var failed bool
+	var isUpToDate bool
+
 	for _, f := range exts {
 		fmt.Fprintf(m.io.Out, "[%s]: ", f.Name())
 		currentVersion := displayExtensionVersion(f, f.CurrentVersion())
@@ -427,6 +429,8 @@ func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
 				!errors.Is(err, upToDateError) &&
 				!errors.Is(err, pinnedExtensionUpgradeError) {
 				failed = true
+			} else if errors.Is(err, upToDateError) {
+				isUpToDate = true
 			}
 			fmt.Fprintf(m.io.Out, "%s\n", err)
 			continue
@@ -440,6 +444,9 @@ func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
 	}
 	if failed {
 		return errors.New("some extensions failed to upgrade")
+	}
+	if isUpToDate {
+		return upToDateError
 	}
 	return nil
 }

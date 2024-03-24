@@ -54,7 +54,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		cs := io.ColorScheme()
 		err := m.Upgrade(name, flagForce)
 		if err != nil {
-			if name != "" {
+			if errors.Is(err, upToDateError) {
+				fmt.Fprintf(io.ErrOut, "%s Already up to date\n", cs.SuccessIcon())
+			} else if name != "" {
 				fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
 			} else if errors.Is(err, noExtensionsInstalledError) {
 				return cmdutil.NewNoResultsError("no installed extensions found")
