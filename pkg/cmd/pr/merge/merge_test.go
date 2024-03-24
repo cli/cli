@@ -644,6 +644,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git branch -d -r origin/blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
 	output, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
@@ -695,6 +696,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 	cs.Register(`git checkout fruit`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git branch -d -r origin/blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
 	output, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
@@ -744,6 +746,7 @@ func TestPrMerge_deleteBranch_onlyLocally(t *testing.T) {
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git branch -d -r origin/blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
 	output, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
@@ -794,6 +797,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 	cs.Register(`git checkout -b fruit --track origin/fruit`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git branch -d -r origin/blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
 	output, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
@@ -842,6 +846,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git branch -d -r origin/blueberries`, 0, "")
 
 	output, err := runCommand(http, nil, "main", true, `pr merge --merge --delete-branch blueberries`)
 	if err != nil {
@@ -1081,6 +1086,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git branch -d -r origin/blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
 	pm := &prompter.PrompterMock{
@@ -1153,6 +1159,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 	cs.Register(`git branch -D `, 0, "")
+	cs.Register(`git branch -d -r origin/`, 0, "")
 
 	pm := &prompter.PrompterMock{
 		ConfirmFunc: func(p string, d bool) (bool, error) {
@@ -1324,6 +1331,7 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git branch -d -r origin/blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
 	pm := &prompter.PrompterMock{
