@@ -296,7 +296,7 @@ func TestListRun(t *testing.T) {
 			name:       "web mode",
 			tty:        true,
 			opts:       &listOptions{WebMode: true},
-			wantStderr: "Opening github.com/OWNER/REPO/labels in your browser.\n",
+			wantStderr: "Opening https://github.com/OWNER/REPO/labels in your browser.\n",
 		},
 		{
 			name: "order by name ascending",

@@ -234,7 +234,7 @@ func Test_commentRun(t *testing.T) {
 
 				OpenInBrowser: func(string) error { return nil },
 			},
-			stderr: "Opening github.com/OWNER/REPO/issues/123 in your browser.\n",
+			stderr: "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
 		},
 		{
 			name: "non-interactive web with edit last",
@@ -246,7 +246,7 @@ func Test_commentRun(t *testing.T) {
 
 				OpenInBrowser: func(string) error { return nil },
 			},
-			stderr: "Opening github.com/OWNER/REPO/issues/123 in your browser.\n",
+			stderr: "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
 		},
 		{
 			name: "non-interactive editor",

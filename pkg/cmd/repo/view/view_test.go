@@ -107,7 +107,7 @@ func Test_RepoView_Web(t *testing.T) {
 		{
 			name:       "tty",
 			stdoutTTY:  true,
-			wantStderr: "Opening github.com/OWNER/REPO in your browser.\n",
+			wantStderr: "Opening https://github.com/OWNER/REPO in your browser.\n",
 			wantBrowse: "https://github.com/OWNER/REPO",
 		},
 		{

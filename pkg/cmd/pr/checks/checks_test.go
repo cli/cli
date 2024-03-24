@@ -622,7 +622,7 @@ func TestChecksRun_web(t *testing.T) {
 		{
 			name:       "tty",
 			isTTY:      true,
-			wantStderr: "Opening github.com/OWNER/REPO/pull/123/checks in your browser.\n",
+			wantStderr: "Opening https://github.com/OWNER/REPO/pull/123/checks in your browser.\n",
 			wantStdout: "",
 			wantBrowse: "https://github.com/OWNER/REPO/pull/123/checks",
 		},

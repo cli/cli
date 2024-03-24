@@ -222,7 +222,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(aWorkflow),
 				)
 			},
-			wantOut: "Opening github.com/OWNER/REPO/actions/workflows/flow.yml in your browser.\n",
+			wantOut: "Opening https://github.com/OWNER/REPO/actions/workflows/flow.yml in your browser.\n",
 		},
 		{
 			name: "web notty",
@@ -257,7 +257,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.StringResponse(`{ "data": { "repository": { "defaultBranchRef": { "name": "trunk" } } } }`),
 				)
 			},
-			wantOut: "Opening github.com/OWNER/REPO/blob/trunk/.github/workflows/flow.yml in your browser.\n",
+			wantOut: "Opening https://github.com/OWNER/REPO/blob/trunk/.github/workflows/flow.yml in your browser.\n",
 		},
 		{
 			name: "web with yaml and ref",
@@ -274,7 +274,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(aWorkflow),
 				)
 			},
-			wantOut: "Opening github.com/OWNER/REPO/blob/base/.github/workflows/flow.yml in your browser.\n",
+			wantOut: "Opening https://github.com/OWNER/REPO/blob/base/.github/workflows/flow.yml in your browser.\n",
 		},
 		{
 			name: "workflow with yaml",

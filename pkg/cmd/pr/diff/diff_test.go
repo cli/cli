@@ -218,7 +218,7 @@ func Test_diffRun(t *testing.T) {
 				BrowserMode: true,
 			},
 			wantFields:     []string{"url"},
-			wantStderr:     "Opening github.com/OWNER/REPO/pull/123/files in your browser.\n",
+			wantStderr:     "Opening https://github.com/OWNER/REPO/pull/123/files in your browser.\n",
 			wantBrowsedURL: "https://github.com/OWNER/REPO/pull/123/files",
 		},
 	}

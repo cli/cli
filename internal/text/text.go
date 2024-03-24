@@ -70,7 +70,7 @@ func DisplayURL(urlStr string) string {
 	if err != nil {
 		return urlStr
 	}
-	return u.Hostname() + u.Path
+	return fmt.Sprintf("https://%s%s", u.Hostname(), u.Path)
 }
 
 // RemoveDiacritics returns the input value without "diacritics", or accent marks

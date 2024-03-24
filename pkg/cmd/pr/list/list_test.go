@@ -318,7 +318,7 @@ func TestPRList_web(t *testing.T) {
 			}
 
 			assert.Equal(t, "", output.String())
-			assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
+			assert.Equal(t, "Opening https://github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
 			assert.Equal(t, test.expectedBrowserURL, output.BrowsedURL)
 		})
 	}
