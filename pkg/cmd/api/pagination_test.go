@@ -5,6 +5,9 @@ import (
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_findNextPage(t *testing.T) {
@@ -166,4 +169,108 @@ func Test_addPerPage(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestJsonArrayWriter(t *testing.T) {
+	tests := []struct {
+		name  string
+		pages []string
+		want  string
+	}{
+		{
+			name:  "empty",
+			pages: nil,
+			want:  "[]",
+		},
+		{
+			name:  "single array",
+			pages: []string{`[1,2]`},
+			want:  `[[1,2]]`,
+		},
+		{
+			name:  "multiple arrays",
+			pages: []string{`[1,2]`, `[3]`},
+			want:  `[[1,2],[3]]`,
+		},
+		{
+			name:  "single object",
+			pages: []string{`{"foo":1,"bar":"a"}`},
+			want:  `[{"foo":1,"bar":"a"}]`,
+		},
+		{
+			name:  "multiple pages",
+			pages: []string{`{"foo":1,"bar":"a"}`, `{"foo":2,"bar":"b"}`},
+			want:  `[{"foo":1,"bar":"a"},{"foo":2,"bar":"b"}]`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			w := &jsonArrayWriter{
+				Writer: buf,
+			}
+
+			for _, page := range tt.pages {
+				require.NoError(t, startPage(w))
+
+				n, err := w.Write([]byte(page))
+				require.NoError(t, err)
+				assert.Equal(t, len(page), n)
+			}
+
+			require.NoError(t, w.Close())
+			assert.Equal(t, tt.want, buf.String())
+		})
+	}
+}
+
+func TestJsonArrayWriter_Copy(t *testing.T) {
+	tests := []struct {
+		name  string
+		limit int
+	}{
+		{
+			name: "unlimited",
+		},
+		{
+			name:  "limited",
+			limit: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			w := &jsonArrayWriter{
+				Writer: buf,
+			}
+
+			r := &noWriteToReader{
+				Reader: bytes.NewBufferString(`[1,2]`),
+				limit:  tt.limit,
+			}
+
+			require.NoError(t, startPage(w))
+
+			n, err := io.Copy(w, r)
+			require.NoError(t, err)
+			assert.Equal(t, int64(5), n)
+
+			require.NoError(t, w.Close())
+			assert.Equal(t, `[[1,2]]`, buf.String())
+		})
+	}
+}
+
+type noWriteToReader struct {
+	io.Reader
+	limit int
+}
+
+func (r *noWriteToReader) Read(p []byte) (int, error) {
+	if r.limit > 0 {
+		p = p[:r.limit]
+	}
+	return r.Reader.Read(p)
 }
