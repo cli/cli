@@ -1,7 +1,7 @@
 package verify
 
 import (
-	"encoding/json"
+	// "encoding/json"
 	"errors"
 	"fmt"
 
@@ -193,20 +193,8 @@ func runVerify(opts *Options) error {
 	opts.Logger.Println(opts.Logger.ColorScheme.Green("All attestations have been successfully verified!"))
 
 	if opts.exporter != nil {
-		verificationResults := sigstoreRes.VerifyResults
-		// print each result as JSON line
-
-		jsonResults := make([]verification.AttestationProcessingResult, len(verificationResults))
-		for i, res := range verificationResults {
-			jsonResults[i] = *res
-		}
-
-		jsonBytes, err := json.Marshal(jsonResults)
-		if err != nil {
-			return fmt.Errorf("failed to create JSON output")
-		}
-
-		if err = opts.exporter.Write(opts.Logger.IO, string(jsonBytes)); err != nil {
+		// print the results to the terminal as an array of JSON objects
+		if err = opts.exporter.Write(opts.Logger.IO, sigstoreRes.VerifyResults); err != nil {
 			return fmt.Errorf("failed to write JSON output")
 		}
 	}

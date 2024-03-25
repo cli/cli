@@ -1,7 +1,6 @@
 package inspect
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
@@ -132,17 +131,8 @@ func runInspect(opts *Options) error {
 			return fmt.Errorf("failed to get attestation detail: %v", err)
 		}
 
-		jsonResults := make([]string, len(details))
-		for i, detail := range details {
-			jsonBytes, err := json.Marshal(detail)
-			if err != nil {
-				return fmt.Errorf("failed to create JSON output")
-			}
-
-			jsonResults[i] = string(jsonBytes)
-		}
-
-		if err = opts.exporter.Write(opts.Logger.IO, jsonResults); err != nil {
+		// print the results to the terminal as an array of JSON objects
+		if err = opts.exporter.Write(opts.Logger.IO, details); err != nil {
 			return fmt.Errorf("failed to write JSON output")
 		}
 		return nil
