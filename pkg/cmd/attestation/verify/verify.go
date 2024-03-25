@@ -24,7 +24,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd := &cobra.Command{
 		Use:   "verify [<file-path> | oci://<image-uri>] [--owner | --repo]",
 		Args:  cobra.ExactArgs(1),
-		Short: "Verify",
+		Short: "Verify an artifact's integrity using attestations",
 		Long: heredoc.Docf(`
 			Verify the integrity and provenance of an artifact using its associated
 			cryptographically signed attestations.
