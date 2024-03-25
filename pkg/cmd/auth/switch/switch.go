@@ -49,7 +49,7 @@ func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Co
 			$ gh auth switch
 
 			# Switch to a specific host and specific account
-			$ gh auth logout --hostname enterprise.internal --user monalisa
+			$ gh auth switch --hostname enterprise.internal --user monalisa
 		`),
 		RunE: func(c *cobra.Command, args []string) error {
 			if runF != nil {
