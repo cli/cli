@@ -19,8 +19,8 @@ const (
 
 // AttestationProcessingResult captures processing a given attestation's signature verification and policy evaluation
 type AttestationProcessingResult struct {
-	Attestation        *api.Attestation
-	VerificationResult *verify.VerificationResult
+	Attestation        *api.Attestation           `json:"attestation"`
+	VerificationResult *verify.VerificationResult `json:"verificationResult"`
 }
 
 type SigstoreResults struct {
