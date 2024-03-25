@@ -2,6 +2,7 @@ package verify
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -227,6 +228,27 @@ func TestNewVerifyCmd(t *testing.T) {
 			assert.Equal(t, tc.wantsExporter, opts.exporter != nil)
 		})
 	}
+}
+
+func TestJSONOutput(t *testing.T) {
+	testIO, _, out, _ := iostreams.Test()
+	opts := Options{
+		ArtifactPath:    artifactPath,
+		BundlePath:      bundlePath,
+		DigestAlgorithm: "sha512",
+		APIClient:       api.NewTestClient(),
+		Logger:          io.NewHandler(testIO),
+		OCIClient:       oci.MockClient{},
+		OIDCIssuer:      GitHubOIDCIssuer,
+		Owner:           "sigstore",
+		SANRegex:        "^https://github.com/sigstore/",
+		exporter:        cmdutil.NewJSONExporter(),
+	}
+	require.Nil(t, runVerify(&opts))
+
+	var target []*verification.AttestationProcessingResult
+	err := json.Unmarshal(out.Bytes(), &target)
+	require.NoError(t, err)
 }
 
 func TestRunVerify(t *testing.T) {

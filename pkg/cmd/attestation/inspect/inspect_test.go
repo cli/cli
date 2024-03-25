@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -158,4 +159,21 @@ func TestRunInspect(t *testing.T) {
 		customOpts.BundlePath = test.NormalizeRelativePath("../test/data/non-existent-sigstoreBundle.json")
 		require.Error(t, runInspect(&customOpts))
 	})
+}
+
+func TestJSONOutput(t *testing.T) {
+	testIO, _, out, _ := iostreams.Test()
+	opts := Options{
+		ArtifactPath:    artifactPath,
+		BundlePath:      bundlePath,
+		DigestAlgorithm: "sha512",
+		Logger:          io.NewHandler(testIO),
+		OCIClient:       oci.MockClient{},
+		exporter:        cmdutil.NewJSONExporter(),
+	}
+	require.Nil(t, runInspect(&opts))
+
+	var target []AttestationDetail
+	err := json.Unmarshal(out.Bytes(), &target)
+	require.NoError(t, err)
 }
