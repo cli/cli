@@ -59,8 +59,5 @@ jobs:
       - name: Build executable
         run: make
 
-      - name: Run 'download and verify' integration test
+      - name: Run attestation command integration Tests
         run: ./test/integration/attestation-cmd/download-and-verify-package-attestation.sh
-
-      - name: Run 'verify remote attestation' integration test
-        run: ./test/integration/attestation-cmd/verify-remote-attestation.sh
