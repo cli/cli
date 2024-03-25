@@ -196,16 +196,17 @@ func runVerify(opts *Options) error {
 		verificationResults := sigstoreRes.VerifyResults
 		// print each result as JSON line
 
-		jsonResults := make([]string, len(verificationResults))
-		for i, verificationResult := range verificationResults {
-			jsonBytes, err := json.Marshal(verificationResult)
-			if err != nil {
-				return fmt.Errorf("failed to create JSON output")
-			}
-
-			jsonResults[i] = string(jsonBytes)
+		jsonResults := make([]verification.AttestationProcessingResult, len(verificationResults))
+		for i, res := range verificationResults {
+			jsonResults[i] = *res
 		}
-		if err = opts.exporter.Write(opts.Logger.IO, jsonResults); err != nil {
+
+		jsonBytes, err := json.Marshal(jsonResults)
+		if err != nil {
+			return fmt.Errorf("failed to create JSON output")
+		}
+
+		if err = opts.exporter.Write(opts.Logger.IO, string(jsonBytes)); err != nil {
 			return fmt.Errorf("failed to write JSON output")
 		}
 	}
