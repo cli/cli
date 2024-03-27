@@ -1,8 +1,13 @@
 {
 	"image": "mcr.microsoft.com/devcontainers/go:1.21",
 	"features": {
-		"ghcr.io/devcontainers/features/sshd:1": {}
-	},
+     // ...
+     "ghcr.io/devcontainers/features/terraform:1": {
+         "version": "1.1",
+         "tflint": "latest"
+     },
+     // ...
+ 
 	"remoteUser": "vscode",
 	"customizations": {
 		"vscode": {
