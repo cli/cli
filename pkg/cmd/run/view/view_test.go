@@ -1374,9 +1374,11 @@ func TestViewRun(t *testing.T) {
 //	├── cool job/
 //	│   ├── 1_fob the barz.txt
 //	│   └── 2_barz the fob.txt
-//	└── sad job/
-//	    ├── 1_barf the quux.txt
-//	    └── 2_quux the barf.txt
+//	├── sad job/
+//	│   ├── 1_barf the quux.txt
+//	│   └── 2_quux the barf.txt
+//	└── ad job/
+//	    └── 1_barf the quux.txt
 func Test_attachRunLog(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -1430,6 +1432,18 @@ func Test_attachRunLog(t *testing.T) {
 				}},
 			},
 			wantMatch: false,
+		},
+		{
+			name: "one job name is a suffix of another",
+			job: shared.Job{
+				Name: "ad job",
+				Steps: []shared.Step{{
+					Name:   "barf the quux",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "ad job/1_barf the quux.txt",
 		},
 		{
 			name: "escape metacharacters in job name",

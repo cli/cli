@@ -503,7 +503,7 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	// constructs a job name by constructing a job name of `<JOB_NAME`> / <ACTION_NAME>`. This means that logs will
 	// never be found for jobs that use composite actions.
 	sanitizedJobName := strings.ReplaceAll(job.Name, "/", "")
-	re := fmt.Sprintf(`%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
+	re := fmt.Sprintf(`^%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
 }
 
