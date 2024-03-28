@@ -2,3 +2,6 @@
 
 pkg/cmd/codespace/ @cli/codespaces
 internal/codespaces/ @cli/codespaces
+
+# Limit Package Security team ownership to the attestation command package
+pkg/cmd/attestation/ @cli/package-security

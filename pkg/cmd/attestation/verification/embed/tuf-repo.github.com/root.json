@@ -1,0 +1,163 @@
+{
+    "signatures": [
+        {
+            "keyid": "a10513a5ab61acd0c6b6fbe0504856ead18f3b17c4fabbe3fa848c79a5a187cf",
+            "sig": "304402203c8f5f7443f7052923e82f9ca0b1bb61a33498444076a2f43e1285a47f6e562d022014de99a7e5413440896b6804944e3c49390cfe6e617211b8dc42a8e67675bc13"
+        },
+        {
+            "keyid": "d6a89e23fb22801a0d1186bf1bdd007e228f65a8aa9964d24d06cb5fbb0ce91c",
+            "sig": "3044022009a20307f974af7e05cc9564eea497f45062e3b21272d1062713b3d22c868298022059d032ad973a28bdbd03959cf96b21398b6b6e2ca618c17ce6c13712246343a2"
+        },
+        {
+            "keyid": "539dde44014c850fe6eeb8b299eb7dae2e1f4bf83454b949e98aa73542cdc65a",
+            "sig": "3045022100edd270d36d0c8468b9a1f2ef1c81a270c72ffd50c65bca0ed1ebd424df09f64b022002b27ffafd7bc5bdfc25281b5b9b597cf2d67d4eeb4af2ff45eb3e666b860c21"
+        },
+        {
+            "keyid": "88737ccdac7b49cc237e9aaead81be2a40278b886a693d8149a19cf543f093d3",
+            "sig": "30460221008d7d95434e576d5876b2db30fd645505ca546618bbc7a8e4b39f64e6a36df9ad022100c00a5294e4ddd02d48d28918b87a06bdfdeccd0618ecdcec29bb2597a05fe474"
+        },
+        {
+            "keyid": "5e01c9a0b2641a8965a4a74e7df0bc7b2d8278a2c3ca0cf7a3f2f783d3c69800",
+            "sig": "30450220215fb3d19d94560a3a2a6067a71c92daf867d13700c9500c4c32d8009a48a634022100df9fb6cee786313bf6c363daac4de39b3dd531f211f81d2391c41bd2d0f91a80"
+        },
+        {
+            "keyid": "4f4d1dd75f2d7f3860e3a068d7bed90dec5f0faafcbe1ace7fb7d95d29e07228",
+            "sig": "304502204091ac5e61b6462d262ecc8442781dd09843bed39942a95a4884c8c6a2c212ef022100dcee86392748f48950d04d539ac1a6643ed1f0b4bd6856f8aeb5a135826c846f"
+        },
+        {
+            "keyid": "eb8eff37f93af2faaba519f341decec3cecd3eeafcace32966db9723842c8a62",
+            "sig": "30460221009188548601a43b501223caeefca4876ae892e18a85c885004b4c8aeeb05a4421022100abdcc72d94597f8297d6297897ff96f285168dbe6b3d57f846dbc7a2948d2935"
+        },
+        {
+            "keyid": "8b498a80a1b7af188c10c9abdf6aade81d14faaffcde2abcd6063baa673ebd12",
+            "sig": "3046022100b440561545d48759dc4140cda9f8af7c9405a101d6136dd0a26edd6562b7064f022100cafa917ed90350494e47d226b64a8ec63ef5ceebb8ba4d2dec2ce018e4ad402a"
+        }
+    ],
+    "signed": {
+        "_type": "root",
+        "consistent_snapshot": true,
+        "expires": "2024-06-23T08:29:18Z",
+        "keys": {
+            "4f4d1dd75f2d7f3860e3a068d7bed90dec5f0faafcbe1ace7fb7d95d29e07228": {
+                "keytype": "ecdsa",
+                "keyval": {
+                    "public": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAENki7aZVips5SgRzCd/Om0CGzQKY/\nnv84giqVDmdwb2ys82Z6soFLasvYYEEQcwqaC170n9gr93wHUgPc796uJA==\n-----END PUBLIC KEY-----\n"
+                },
+                "scheme": "ecdsa-sha2-nistp256",
+                "x-tuf-on-ci-keyowner": "@ashtom"
+            },
+            "539dde44014c850fe6eeb8b299eb7dae2e1f4bf83454b949e98aa73542cdc65a": {
+                "keytype": "ecdsa",
+                "keyval": {
+                    "public": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAElD0o2sOZN9n3RKQ7PtMLAoXj+2Ai\nn4PKT/pfnzDlNLrD3VTQwCc4sR4t+OLu4KQ+qk+kXkR9YuBsu3bdJZ1OWw==\n-----END PUBLIC KEY-----\n"
+                },
+                "scheme": "ecdsa-sha2-nistp256",
+                "x-tuf-on-ci-keyowner": "@nerdneha"
+            },
+            "5e01c9a0b2641a8965a4a74e7df0bc7b2d8278a2c3ca0cf7a3f2f783d3c69800": {
+                "keytype": "ecdsa",
+                "keyval": {
+                    "public": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEC9RNAsuDCNO6T7qA7Y5F8orw2tIW\nr7rUr4ffxvzTMrbkVtjR/trtE0q0+T0zQ8TWLyI6EYMwb947ej2ItfkOyA==\n-----END PUBLIC KEY-----\n"
+                },
+                "scheme": "ecdsa-sha2-nistp256",
+                "x-tuf-on-ci-keyowner": "@jacobdepriest"
+            },
+            "88737ccdac7b49cc237e9aaead81be2a40278b886a693d8149a19cf543f093d3": {
+                "keytype": "ecdsa",
+                "keyval": {
+                    "public": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEBagkskNOpOTbetTX5CdnvMy+LiWn\nonRrNrqAHL4WgiebH7Uig7GLhC3bkeA/qgb926/vr9qhOPG9Buj2HatrPw==\n-----END PUBLIC KEY-----\n"
+                },
+                "scheme": "ecdsa-sha2-nistp256",
+                "x-tuf-on-ci-keyowner": "@gregose"
+            },
+            "8b498a80a1b7af188c10c9abdf6aade81d14faaffcde2abcd6063baa673ebd12": {
+                "keytype": "ecdsa",
+                "keyval": {
+                    "public": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7IEoVNwrprchXGhT5sAhSax7SOd3\n8duuISghCzfmHdKJWSbV2wJRamRiUVRtmA83K/qm5cT20WXMCT5QeM/D3A==\n-----END PUBLIC KEY-----\n"
+                },
+                "scheme": "ecdsa-sha2-nistp256",
+                "x-tuf-on-ci-keyowner": "@trevrosen"
+            },
+            "a10513a5ab61acd0c6b6fbe0504856ead18f3b17c4fabbe3fa848c79a5a187cf": {
+                "keytype": "ecdsa",
+                "keyval": {
+                    "public": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEC2wJ3xscyXxBLybJ9FVjwkyQMe53\nRHUz77AjMO8MzVaT8xw6ZvJqdNZiytYtigWULlINxw6frNsWJKb/f7lC8A==\n-----END PUBLIC KEY-----\n"
+                },
+                "scheme": "ecdsa-sha2-nistp256",
+                "x-tuf-on-ci-keyowner": "@kommendorkapten"
+            },
+            "d6a89e23fb22801a0d1186bf1bdd007e228f65a8aa9964d24d06cb5fbb0ce91c": {
+                "keytype": "ecdsa",
+                "keyval": {
+                    "public": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDdORwcruW3gqAgaLjH/nNdGMB4kQ\nAvA+wD6DyO4P/wR8ee2ce83NZHq1ZADKhve0rlYKaKy3CqyQ5SmlZ36Zhw==\n-----END PUBLIC KEY-----\n"
+                },
+                "scheme": "ecdsa-sha2-nistp256",
+                "x-tuf-on-ci-keyowner": "@krukow"
+            },
+            "eb8eff37f93af2faaba519f341decec3cecd3eeafcace32966db9723842c8a62": {
+                "keytype": "ecdsa",
+                "keyval": {
+                    "public": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAENynVdQnM9h7xU71G7PiJpQaDemub\nkbjsjYwLlPJTQVuxQO8WeIpJf8MEh5rf01t2dDIuCsZ5gRx+QvDv0UzfsA==\n-----END PUBLIC KEY-----\n"
+                },
+                "scheme": "ecdsa-sha2-nistp256",
+                "x-tuf-on-ci-keyowner": "@mph4"
+            },
+            "eb9799b483affac9da87ef4c9ea467928415c961349e607e5e6e485679b07f8f": {
+                "keytype": "ecdsa",
+                "keyval": {
+                    "public": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAENKNcNcX+d73lS1TRFb9Vnp8JvOoh\nzYQ+in43iGenbG8RGo9L/6FJ2hoRbVU6xskvyuErcdPbCdI4GxrQ5i8hkw==\n-----END PUBLIC KEY-----\n"
+                },
+                "scheme": "ecdsa-sha2-nistp256",
+                "x-tuf-on-ci-online-uri": "azurekms://production-tuf-root.vault.azure.net/keys/Online-Key/aaf375fd8ed24acb949a5cc173700b05"
+            }
+        },
+        "roles": {
+            "root": {
+                "keyids": [
+                    "a10513a5ab61acd0c6b6fbe0504856ead18f3b17c4fabbe3fa848c79a5a187cf",
+                    "4f4d1dd75f2d7f3860e3a068d7bed90dec5f0faafcbe1ace7fb7d95d29e07228",
+                    "88737ccdac7b49cc237e9aaead81be2a40278b886a693d8149a19cf543f093d3",
+                    "5e01c9a0b2641a8965a4a74e7df0bc7b2d8278a2c3ca0cf7a3f2f783d3c69800",
+                    "d6a89e23fb22801a0d1186bf1bdd007e228f65a8aa9964d24d06cb5fbb0ce91c",
+                    "eb8eff37f93af2faaba519f341decec3cecd3eeafcace32966db9723842c8a62",
+                    "8b498a80a1b7af188c10c9abdf6aade81d14faaffcde2abcd6063baa673ebd12",
+                    "539dde44014c850fe6eeb8b299eb7dae2e1f4bf83454b949e98aa73542cdc65a"
+                ],
+                "threshold": 3
+            },
+            "snapshot": {
+                "keyids": [
+                    "eb9799b483affac9da87ef4c9ea467928415c961349e607e5e6e485679b07f8f"
+                ],
+                "threshold": 1,
+                "x-tuf-on-ci-expiry-period": 21,
+                "x-tuf-on-ci-signing-period": 7
+            },
+            "targets": {
+                "keyids": [
+                    "a10513a5ab61acd0c6b6fbe0504856ead18f3b17c4fabbe3fa848c79a5a187cf",
+                    "4f4d1dd75f2d7f3860e3a068d7bed90dec5f0faafcbe1ace7fb7d95d29e07228",
+                    "88737ccdac7b49cc237e9aaead81be2a40278b886a693d8149a19cf543f093d3",
+                    "5e01c9a0b2641a8965a4a74e7df0bc7b2d8278a2c3ca0cf7a3f2f783d3c69800",
+                    "d6a89e23fb22801a0d1186bf1bdd007e228f65a8aa9964d24d06cb5fbb0ce91c",
+                    "eb8eff37f93af2faaba519f341decec3cecd3eeafcace32966db9723842c8a62",
+                    "8b498a80a1b7af188c10c9abdf6aade81d14faaffcde2abcd6063baa673ebd12",
+                    "539dde44014c850fe6eeb8b299eb7dae2e1f4bf83454b949e98aa73542cdc65a"
+                ],
+                "threshold": 3
+            },
+            "timestamp": {
+                "keyids": [
+                    "eb9799b483affac9da87ef4c9ea467928415c961349e607e5e6e485679b07f8f"
+                ],
+                "threshold": 1,
+                "x-tuf-on-ci-expiry-period": 7,
+                "x-tuf-on-ci-signing-period": 6
+            }
+        },
+        "spec_version": "1.0.31",
+        "version": 1,
+        "x-tuf-on-ci-expiry-period": 240,
+        "x-tuf-on-ci-signing-period": 60
+    }
+}
