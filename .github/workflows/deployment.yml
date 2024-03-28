@@ -18,7 +18,7 @@ on:
         default: production
         type: environment
       go_version:
-        default: "1.21"
+        default: "1.22"
         type: string
       platforms:
         default: "linux,macos,windows"

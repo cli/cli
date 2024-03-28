@@ -222,7 +222,7 @@ func TestHTTPClientSanitizeJSONControlCharactersC0(t *testing.T) {
 	err = json.Unmarshal(body, &issue)
 	require.NoError(t, err)
 	assert.Equal(t, "^[[31mRed Title^[[0m", issue.Title)
-	assert.Equal(t, "1^A 2^B 3^C 4^D 5^E 6^F 7^G 8^H 9\t A\r\n B\v C^L D\r\n E^N F^O", issue.Body)
+	assert.Equal(t, "1^A 2^B 3^C 4^D 5^E 6^F 7^G 8\b 9\t A\r\n B\v C\f D\r\n E^N F^O", issue.Body)
 	assert.Equal(t, "10^P 11^Q 12^R 13^S 14^T 15^U 16^V 17^W 18^X 19^Y 1A^Z 1B^[ 1C^\\ 1D^] 1E^^ 1F^_", issue.Author.Name)
 	assert.Equal(t, "monalisa \\u00^[", issue.Author.Login)
 	assert.Equal(t, "Escaped ^[ \\^[ \\^[ \\\\^[", issue.ActiveLockReason)
