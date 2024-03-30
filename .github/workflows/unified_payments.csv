@@ -1,0 +1,3 @@
+id,Created date (UTC),Amount,Amount Refunded,Currency,Captured,Converted Amount,Converted Amount Refunded,Converted Currency,Description,Fee,Statement Descriptor,Status,Seller Message,Taxes On Fee,Card ID,Customer ID,Customer Description,Customer Email,Invoice ID,Transfer
+,2024-03-03 02:11:11,500.00,,usd,,,,,sk_test_51OoxyDI27u1RNHetO9yUFokoRWa4O1U58RBDuarruQfEEyDsS3gMUC6E6bML5DQsnZFmDozUAvo3zh8UySuveGVn004JRL1ixj',,,canceled,,,,cus_PeKZrHI8ha6IsV,,,,
+,2024-03-03 02:10:49,500.00,,usd,,,,,sk_test_51OoxyDI27u1RNHetO9yUFokoRWa4O1U58RBDuarruQfEEyDsS3gMUC6E6bML5DQsnZFmDozUAvo3zh8UySuveGVn004JRL1ixj',,,canceled,,,,cus_PeKZrHI8ha6IsV,,,,
