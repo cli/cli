@@ -56,9 +56,7 @@ func ParseURL(rawURL string) (u *url.URL, err error) {
 		u.Path = strings.TrimPrefix(u.Path, "/")
 	}
 
-	if idx := strings.Index(u.Host, ":"); idx >= 0 {
-		u.Host = u.Host[0:idx]
-	}
+	u.Host = strings.TrimSuffix(u.Host, ":"+u.Port())
 
 	return
 }
