@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -38,6 +39,8 @@ var secretFields = []string{
 	"updatedAt",
 	"numSelectedRepos",
 }
+
+const secretFieldNumSelectedRepos = "numSelectedRepos"
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
@@ -114,9 +117,12 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("%s secrets are not supported for %s", secretEntity, secretApp)
 	}
 
-	var secrets []Secret
 	showSelectedRepoInfo := opts.IO.IsStdoutTTY()
+	if !showSelectedRepoInfo && opts.Exporter != nil {
+		showSelectedRepoInfo = slices.Contains(opts.Exporter.Fields(), secretFieldNumSelectedRepos)
+	}
 
+	var secrets []Secret
 	switch secretEntity {
 	case shared.Repository:
 		secrets, err = getRepoSecrets(client, baseRepo, secretApp)
