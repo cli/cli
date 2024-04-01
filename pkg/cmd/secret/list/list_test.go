@@ -104,6 +104,7 @@ func Test_listRun(t *testing.T) {
 	tests := []struct {
 		name    string
 		tty     bool
+		json    bool
 		opts    *ListOptions
 		wantOut []string
 	}{
@@ -154,6 +155,30 @@ func Test_listRun(t *testing.T) {
 			},
 		},
 		{
+			name: "org tty, json",
+			tty:  true,
+			json: true,
+			opts: &ListOptions{
+				OrgName: "UmbrellaCorporation",
+			},
+			wantOut: []string{
+				// Note the `"numSelectedRepos":2` pair in the last entry.
+				`[{"name":"SECRET_ONE","numSelectedRepos":0,"selectedReposURL":"","updatedAt":"1988-10-11T00:00:00Z","visibility":"all"},{"name":"SECRET_TWO","numSelectedRepos":0,"selectedReposURL":"","updatedAt":"2020-12-04T00:00:00Z","visibility":"private"},{"name":"SECRET_THREE","numSelectedRepos":2,"selectedReposURL":"https://api.github.com/orgs/UmbrellaCorporation/actions/secrets/SECRET_THREE/repositories","updatedAt":"1975-11-30T00:00:00Z","visibility":"selected"}]`,
+			},
+		},
+		{
+			name: "org not tty, json",
+			tty:  false,
+			json: true,
+			opts: &ListOptions{
+				OrgName: "UmbrellaCorporation",
+			},
+			wantOut: []string{
+				// Note the `"numSelectedRepos":2` pair in the last entry.
+				`[{"name":"SECRET_ONE","numSelectedRepos":0,"selectedReposURL":"","updatedAt":"1988-10-11T00:00:00Z","visibility":"all"},{"name":"SECRET_TWO","numSelectedRepos":0,"selectedReposURL":"","updatedAt":"2020-12-04T00:00:00Z","visibility":"private"},{"name":"SECRET_THREE","numSelectedRepos":2,"selectedReposURL":"https://api.github.com/orgs/UmbrellaCorporation/actions/secrets/SECRET_THREE/repositories","updatedAt":"1975-11-30T00:00:00Z","visibility":"selected"}]`,
+			},
+		},
+		{
 			name: "env tty",
 			tty:  true,
 			opts: &ListOptions{
@@ -201,6 +226,30 @@ func Test_listRun(t *testing.T) {
 				"SECRET_ONE\t1988-10-11T00:00:00Z\tSELECTED",
 				"SECRET_TWO\t2020-12-04T00:00:00Z\tSELECTED",
 				"SECRET_THREE\t1975-11-30T00:00:00Z\tSELECTED",
+			},
+		},
+		{
+			name: "user tty, json",
+			tty:  true,
+			json: true,
+			opts: &ListOptions{
+				UserSecrets: true,
+			},
+			wantOut: []string{
+				// Note that `numSelectedRepos` fields are not set to default (zero).
+				`[{"name":"SECRET_ONE","numSelectedRepos":1,"selectedReposURL":"https://api.github.com/user/codespaces/secrets/SECRET_ONE/repositories","updatedAt":"1988-10-11T00:00:00Z","visibility":"selected"},{"name":"SECRET_TWO","numSelectedRepos":2,"selectedReposURL":"https://api.github.com/user/codespaces/secrets/SECRET_TWO/repositories","updatedAt":"2020-12-04T00:00:00Z","visibility":"selected"},{"name":"SECRET_THREE","numSelectedRepos":3,"selectedReposURL":"https://api.github.com/user/codespaces/secrets/SECRET_THREE/repositories","updatedAt":"1975-11-30T00:00:00Z","visibility":"selected"}]`,
+			},
+		},
+		{
+			name: "user not tty, json",
+			tty:  false,
+			json: true,
+			opts: &ListOptions{
+				UserSecrets: true,
+			},
+			wantOut: []string{
+				// Note that `numSelectedRepos` fields are not set to default (zero).
+				`[{"name":"SECRET_ONE","numSelectedRepos":1,"selectedReposURL":"https://api.github.com/user/codespaces/secrets/SECRET_ONE/repositories","updatedAt":"1988-10-11T00:00:00Z","visibility":"selected"},{"name":"SECRET_TWO","numSelectedRepos":2,"selectedReposURL":"https://api.github.com/user/codespaces/secrets/SECRET_TWO/repositories","updatedAt":"2020-12-04T00:00:00Z","visibility":"selected"},{"name":"SECRET_THREE","numSelectedRepos":3,"selectedReposURL":"https://api.github.com/user/codespaces/secrets/SECRET_THREE/repositories","updatedAt":"1975-11-30T00:00:00Z","visibility":"selected"}]`,
 			},
 		},
 		{
@@ -310,13 +359,11 @@ func Test_listRun(t *testing.T) {
 					},
 				}
 
-				if tt.tty {
-					reg.Register(
-						httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
-						httpmock.JSONResponse(struct {
-							TotalCount int `json:"total_count"`
-						}{2}))
-				}
+				reg.Register(
+					httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
+					httpmock.JSONResponse(struct {
+						TotalCount int `json:"total_count"`
+					}{2}))
 			}
 
 			if tt.opts.UserSecrets {
@@ -342,17 +389,15 @@ func Test_listRun(t *testing.T) {
 				}
 
 				path = "user/codespaces/secrets"
-				if tt.tty {
-					for i, secret := range payload.Secrets {
-						hostLen := len("https://api.github.com/")
-						path := secret.SelectedReposURL[hostLen:len(secret.SelectedReposURL)]
-						repositoryCount := i + 1
-						reg.Register(
-							httpmock.REST("GET", path),
-							httpmock.JSONResponse(struct {
-								TotalCount int `json:"total_count"`
-							}{repositoryCount}))
-					}
+				for i, secret := range payload.Secrets {
+					hostLen := len("https://api.github.com/")
+					path := secret.SelectedReposURL[hostLen:len(secret.SelectedReposURL)]
+					repositoryCount := i + 1
+					reg.Register(
+						httpmock.REST("GET", path),
+						httpmock.JSONResponse(struct {
+							TotalCount int `json:"total_count"`
+						}{repositoryCount}))
 				}
 			}
 
@@ -379,6 +424,12 @@ func Test_listRun(t *testing.T) {
 			tt.opts.Now = func() time.Time {
 				t, _ := time.Parse(time.RFC822, "15 Mar 23 00:00 UTC")
 				return t
+			}
+
+			if tt.json {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(secretFields)
+				tt.opts.Exporter = exporter
 			}
 
 			err := listRun(tt.opts)
