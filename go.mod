@@ -160,7 +160,7 @@ require (
 	google.golang.org/genproto v0.0.0-20240116215550-a9fa1716bcac // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240125205218-1f4bbc51befe // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240116215550-a9fa1716bcac // indirect
-	gopkg.in/go-jose/go-jose.v2 v2.6.1 // indirect
+	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	k8s.io/klog/v2 v2.120.0 // indirect
 )
