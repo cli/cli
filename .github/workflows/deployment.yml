@@ -1,5 +1,5 @@
 name: Deployment
-run-name: ${{ inputs.tag_name }} / go / ${{ inputs.environment }}
+run-name: ${{ inputs.tag_name }} / ${{ inputs.environment }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
