@@ -1,5 +1,5 @@
 name: Deployment
-run-name: ${{ inputs.tag_name }} / go ${{ inputs.go_version }} / ${{ inputs.environment }}
+run-name: ${{ inputs.tag_name }} / ${{ inputs.environment }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -17,9 +17,6 @@ on:
       environment:
         default: production
         type: environment
-      go_version:
-        default: "1.22"
-        type: string
       platforms:
         default: "linux,macos,windows"
         type: string
@@ -39,7 +36,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go_version }}
+          go-version-file: 'go.mod'
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -73,7 +70,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go_version }}
+          go-version-file: 'go.mod'
       - name: Configure macOS signing
         if: inputs.environment == 'production'
         env:
@@ -130,7 +127,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go_version }}
+          go-version-file: 'go.mod'
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
