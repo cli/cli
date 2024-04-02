@@ -5,3 +5,5 @@ internal/codespaces/ @cli/codespaces
 
 # Limit Package Security team ownership to the attestation command package
 pkg/cmd/attestation/ @cli/package-security
+
+pkg/cmd/attestation/verification/embed/tuf-repo.github.com/ @trevrosen @kommendorkapten
