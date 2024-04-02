@@ -135,7 +135,11 @@ func renameRun(opts *RenameOptions) error {
 
 	remote, err := updateRemote(currRepo, newRepo, opts)
 	if err != nil {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Warning: unable to update remote %q: %v\n", cs.WarningIcon(), remote.Name, err)
+		if remote != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Warning: unable to update remote %q: %v\n", cs.WarningIcon(), remote.Name, err)
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Warning: unable to update remote: %v\n", cs.WarningIcon(), err)
+		}
 	} else if opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.Out, "%s Updated the %q remote\n", cs.SuccessIcon(), remote.Name)
 	}
