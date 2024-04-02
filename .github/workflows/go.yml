@@ -1,4 +1,4 @@
-name: Tests
+name: Unit and Integration Tests
 on: [push, pull_request]
 
 permissions:
@@ -37,3 +37,27 @@ jobs:
 
       - name: Build
         run: go build -v ./cmd/gh
+
+  integration-tests:
+    env:
+      GH_TOKEN: ${{ github.token }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Set up Go 1.21
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.21
+
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build executable
+        run: make
+
+      - name: Run attestation command integration Tests
+        run: ./test/integration/attestation-cmd/download-and-verify-package-attestation.sh
