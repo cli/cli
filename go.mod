@@ -35,7 +35,7 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/rivo/tview v0.0.0-20221029100920-c4a7e501810d
 	github.com/shurcooL/githubv4 v0.0.0-20230704064427-599ae7bbf278
-	github.com/sigstore/protobuf-specs v0.3.0
+	github.com/sigstore/protobuf-specs v0.3.1
 	github.com/sigstore/sigstore-go v0.2.1-0.20240222221148-8bd2a8139edc
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
