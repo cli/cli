@@ -93,8 +93,8 @@ github.com/charmbracelet/lipgloss v0.5.0/go.mod h1:EZLha/HbzEt7cYqdFPovlqy5FZPj0
 github.com/cli/browser v1.0.0/go.mod h1:IEWkHYbLjkhtjwwWlwTHW2lGxeS5gezEQBMLTwDHf5Q=
 github.com/cli/browser v1.3.0 h1:LejqCrpWr+1pRqmEPDGnTZOjsMe7sehifLynZJuqJpo=
 github.com/cli/browser v1.3.0/go.mod h1:HH8s+fOAxjhQoBUAsKuPCbqUuxZDhQ2/aD+SzsEfBTk=
-github.com/cli/go-gh/v2 v2.7.0 h1:7PfL5uBQ1e3TOj3V1qU4U/kmTSondi8Q1uyvH72ARiM=
-github.com/cli/go-gh/v2 v2.7.0/go.mod h1:h3salfqqooVpzKmHp6aUdeNx62UmxQRpLbagFSHTJGQ=
+github.com/cli/go-gh/v2 v2.8.0 h1:xFDgnhRiVMFanqACszdyRduUaFkoMOiasOrox0sKpKo=
+github.com/cli/go-gh/v2 v2.8.0/go.mod h1:U6GukjNwSqD6coCKP6FTp/yrPk5ttNYjAe+ZYSOFCVc=
 github.com/cli/oauth v1.0.1 h1:pXnTFl/qUegXHK531Dv0LNjW4mLx626eS42gnzfXJPA=
 github.com/cli/oauth v1.0.1/go.mod h1:qd/FX8ZBD6n1sVNQO3aIdRxeu5LGw9WhKnYhIIoC2A4=
 github.com/cli/safeexec v1.0.0/go.mod h1:Z/D4tTN8Vs5gXYHDCbaM1S/anmEDnJb1iW0+EJ5zx3Q=
@@ -262,8 +262,8 @@ github.com/in-toto/in-toto-golang v0.9.0 h1:tHny7ac4KgtsfrG6ybU8gVOZux2H8jN05AXJ
 github.com/in-toto/in-toto-golang v0.9.0/go.mod h1:xsBVrVsHNsB61++S6Dy2vWosKhuA3lUTQd+eF9HdeMo=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
-github.com/itchyny/gojq v0.12.13 h1:IxyYlHYIlspQHHTE0f3cJF0NKDMfajxViuhBLnHd/QU=
-github.com/itchyny/gojq v0.12.13/go.mod h1:JzwzAqenfhrPUuwbmEz3nu3JQmFLlQTQMUcOdnu/Sf4=
+github.com/itchyny/gojq v0.12.15 h1:WC1Nxbx4Ifw5U2oQWACYz32JK8G9qxNtHzrvW4KEcqI=
+github.com/itchyny/gojq v0.12.15/go.mod h1:uWAHCbCIla1jiNxmeT5/B5mOjSdfkCq6p8vxWg+BM10=
 github.com/itchyny/timefmt-go v0.1.5 h1:G0INE2la8S6ru/ZI5JecgyzbbJNs5lG1RcBqa7Jm6GE=
 github.com/itchyny/timefmt-go v0.1.5/go.mod h1:nEP7L+2YmAbT2kZ2HfSs1d8Xtw9LY8D2stDBckWakZ8=
 github.com/jedisct1/go-minisign v0.0.0-20211028175153-1c139d1cc84b h1:ZGiXF8sz7PDk6RgkP+A/SFfUD0ZR/AgG6SpRNEDKZy8=
@@ -309,8 +309,9 @@ github.com/mattn/go-runewidth v0.0.9/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m
 github.com/mattn/go-runewidth v0.0.10/go.mod h1:RAqKPSqVFrSLVXbA8x7dzmKdmGzieGRCM46jaSJTDAk=
 github.com/mattn/go-runewidth v0.0.12/go.mod h1:RAqKPSqVFrSLVXbA8x7dzmKdmGzieGRCM46jaSJTDAk=
 github.com/mattn/go-runewidth v0.0.13/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
-github.com/mattn/go-runewidth v0.0.14 h1:+xnbZSEeDbOIg5/mE6JF0w6n9duR1l3/WmbinWVwUuU=
 github.com/mattn/go-runewidth v0.0.14/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
+github.com/mattn/go-runewidth v0.0.15 h1:UNAjwbU9l54TA3KzvqLGxwWjHmMgBUVhBiTjelZgg3U=
+github.com/mattn/go-runewidth v0.0.15/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
 github.com/matttproud/golang_protobuf_extensions v1.0.4 h1:mmDVorXM7PCGKw94cs5zkfA9PSy5pEvNWRP0ET0TIVo=
 github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 h1:jWpvCLoY8Z/e3VKvlsiIGKtc+UG6U5vzxaoagmhXfyg=
 github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0/go.mod h1:QUyp042oQthUoa9bqDv0ER0wrtXnBruoNd7aNjkbP+k=
@@ -367,8 +368,8 @@ github.com/rivo/tview v0.0.0-20221029100920-c4a7e501810d h1:jKIUJdMcIVGOSHi6LSqJ
 github.com/rivo/tview v0.0.0-20221029100920-c4a7e501810d/go.mod h1:YX2wUZOcJGOIycErz2s9KvDaP0jnWwRCirQMPLPpQ+Y=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
-github.com/rivo/uniseg v0.4.4 h1:8TfxU8dW6PdqD27gjM8MVNuicgxIjxpm4K7x4jp8sis=
-github.com/rivo/uniseg v0.4.4/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
+github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
+github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 github.com/rodaine/table v1.0.1 h1:U/VwCnUxlVYxw8+NJiLIuCxA/xa6jL38MY3FYysVWWQ=
 github.com/rodaine/table v1.0.1/go.mod h1:UVEtfBsflpeEcD56nF4F5AocNFta0ZuolpSVdPtlmP4=
 github.com/rogpeppe/go-internal v1.11.0 h1:cWPaGQEPrBb5/AsnsZesgZZ9yb1OQ+GOISoDNXVBh4M=

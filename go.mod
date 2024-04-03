@@ -9,7 +9,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/charmbracelet/glamour v0.7.0
 	github.com/charmbracelet/lipgloss v0.5.0
-	github.com/cli/go-gh/v2 v2.7.0
+	github.com/cli/go-gh/v2 v2.8.0
 	github.com/cli/oauth v1.0.1
 	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.4
@@ -98,7 +98,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.5 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/itchyny/gojq v0.12.13 // indirect
+	github.com/itchyny/gojq v0.12.15 // indirect
 	github.com/itchyny/timefmt-go v0.1.5 // indirect
 	github.com/jedisct1/go-minisign v0.0.0-20211028175153-1c139d1cc84b // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -107,7 +107,7 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.26 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
@@ -120,7 +120,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/rivo/uniseg v0.4.4 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rodaine/table v1.0.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
