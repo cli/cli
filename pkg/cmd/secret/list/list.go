@@ -40,7 +40,7 @@ var secretFields = []string{
 	"numSelectedRepos",
 }
 
-const secretFieldNumSelectedRepos = "numSelectedRepos"
+const fieldNumSelectedRepos = "numSelectedRepos"
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
@@ -121,7 +121,7 @@ func listRun(opts *ListOptions) error {
 	if opts.Exporter != nil {
 		// Note that if there's an exporter set, then we don't mind the TTY mode
 		// because we just have to populate the requested fields.
-		showSelectedRepoInfo = slices.Contains(opts.Exporter.Fields(), secretFieldNumSelectedRepos)
+		showSelectedRepoInfo = slices.Contains(opts.Exporter.Fields(), fieldNumSelectedRepos)
 	}
 
 	var secrets []Secret
