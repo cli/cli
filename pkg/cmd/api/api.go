@@ -318,13 +318,19 @@ func apiRun(opts *ApiOptions) error {
 		requestPath = addPerPage(requestPath, 100, params)
 	}
 
+	// Execute defers in FIFO order.
+	deferQueue := queue{}
+	defer deferQueue.Close()
+
 	// Similar to `jq --slurp`, write all pages JSON arrays or objects into a JSON array.
 	if opts.Paginate && opts.Slurp {
 		w := &jsonArrayWriter{
 			Writer: bodyWriter,
 			color:  opts.IO.ColorEnabled(),
 		}
-		defer w.Close()
+		deferQueue.Enqueue(func() {
+			_ = w.Close()
+		})
 
 		bodyWriter = w
 	}
@@ -376,7 +382,7 @@ func apiRun(opts *ApiOptions) error {
 
 	if !opts.Silent {
 		if err := opts.IO.StartPager(); err == nil {
-			defer opts.IO.StopPager()
+			deferQueue.Enqueue(opts.IO.StopPager)
 		} else {
 			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 		}
@@ -680,4 +686,16 @@ func previewNamesToMIMETypes(names []string) string {
 		types = append(types, fmt.Sprintf("application/vnd.github.%s-preview", p))
 	}
 	return strings.Join(types, ", ")
+}
+
+type queue []func()
+
+func (q *queue) Enqueue(f func()) {
+	*q = append(*q, f)
+}
+
+func (q *queue) Close() {
+	for _, f := range *q {
+		f()
+	}
 }
