@@ -118,7 +118,9 @@ func listRun(opts *ListOptions) error {
 	}
 
 	showSelectedRepoInfo := opts.IO.IsStdoutTTY()
-	if !showSelectedRepoInfo && opts.Exporter != nil {
+	if opts.Exporter != nil {
+		// Note that if there's an exporter set, then we don't mind the TTY mode
+		// because we just have to populate the requested fields.
 		showSelectedRepoInfo = slices.Contains(opts.Exporter.Fields(), secretFieldNumSelectedRepos)
 	}
 
