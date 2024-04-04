@@ -6,7 +6,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  id-token: write
+  contents: write # TODO: replace with attestations:write
 
 on:
   workflow_dispatch:
@@ -46,6 +47,11 @@ jobs:
         env:
           TAG_NAME: ${{ inputs.tag_name }}
         run: script/release --local "$TAG_NAME" --platform linux
+      - name: Attest release binaries
+        if: inputs.environment == 'production'
+        uses: actions/attest-build-provenance@9439b15e226937610a02f2e68c996c130470306f
+        with:
+          subject-path: "bin/gh*"
       - name: Generate web manual pages
         run: |
           go run ./cmd/gen-docs --website --doc-path dist/manual
