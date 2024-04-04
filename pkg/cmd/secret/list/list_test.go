@@ -441,6 +441,199 @@ func Test_listRun(t *testing.T) {
 	}
 }
 
+// Test_listRun_populatesNumSelectedReposIfRequired asserts that NumSelectedRepos
+// field is populated **only** when it's going to be presented in the output. Since
+// populating this field costs further API requests (one per secret), it's important
+// to avoid extra calls when the output will not present the field's value. Note
+// that NumSelectedRepos is only meant for user or organization secrets.
+//
+// We should only populate the NumSelectedRepos field in these cases:
+//  1. The command is run in the TTY mode without the `--json <fields>` option.
+//  2. The command is run with `--json <fields>` option, and `numSelectedRepos`
+//     is among the selected fields. In this case, TTY mode is irrelevant.
+func Test_listRun_populatesNumSelectedReposIfRequired(t *testing.T) {
+	type secretKind string
+	const secretKindUser secretKind = "user"
+	const secretKindOrg secretKind = "org"
+
+	tests := []struct {
+		name          string
+		kind          secretKind
+		tty           bool
+		jsonFields    []string
+		wantPopulated bool
+	}{
+		{
+			name:          "org tty",
+			kind:          secretKindOrg,
+			tty:           true,
+			wantPopulated: true,
+		},
+		{
+			name:          "org tty, json with numSelectedRepos",
+			kind:          secretKindOrg,
+			tty:           true,
+			jsonFields:    []string{"numSelectedRepos"},
+			wantPopulated: true,
+		},
+		{
+			name:          "org tty, json without numSelectedRepos",
+			kind:          secretKindOrg,
+			tty:           true,
+			jsonFields:    []string{"name"},
+			wantPopulated: false,
+		},
+		{
+			name:          "org not tty",
+			kind:          secretKindOrg,
+			tty:           false,
+			wantPopulated: false,
+		},
+		{
+			name:          "org not tty, json with numSelectedRepos",
+			kind:          secretKindOrg,
+			tty:           false,
+			jsonFields:    []string{"numSelectedRepos"},
+			wantPopulated: true,
+		},
+		{
+			name:          "org not tty, json without numSelectedRepos",
+			kind:          secretKindOrg,
+			tty:           false,
+			jsonFields:    []string{"name"},
+			wantPopulated: false,
+		},
+		{
+			name:          "user tty",
+			kind:          secretKindUser,
+			tty:           true,
+			wantPopulated: true,
+		},
+		{
+			name:          "user tty, json with numSelectedRepos",
+			kind:          secretKindUser,
+			tty:           true,
+			jsonFields:    []string{"numSelectedRepos"},
+			wantPopulated: true,
+		},
+		{
+			name:          "user tty, json without numSelectedRepos",
+			kind:          secretKindUser,
+			tty:           true,
+			jsonFields:    []string{"name"},
+			wantPopulated: false,
+		},
+		{
+			name:          "user not tty",
+			kind:          secretKindUser,
+			tty:           false,
+			wantPopulated: false,
+		},
+		{
+			name:          "user not tty, json with numSelectedRepos",
+			kind:          secretKindUser,
+			tty:           false,
+			jsonFields:    []string{"numSelectedRepos"},
+			wantPopulated: true,
+		},
+		{
+			name:          "user not tty, json without numSelectedRepos",
+			kind:          secretKindUser,
+			tty:           false,
+			jsonFields:    []string{"name"},
+			wantPopulated: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			reg.Verify(t)
+
+			t0, _ := time.Parse("2006-01-02", "1988-10-11")
+			opts := &ListOptions{}
+
+			if tt.kind == secretKindOrg {
+				opts.OrgName = "umbrellaOrganization"
+				reg.Register(
+					httpmock.REST("GET", "orgs/umbrellaOrganization/actions/secrets"),
+					httpmock.JSONResponse(struct{ Secrets []Secret }{
+						[]Secret{
+							{
+								Name:             "SECRET",
+								UpdatedAt:        t0,
+								Visibility:       shared.Selected,
+								SelectedReposURL: "https://api.github.com/orgs/umbrellaOrganization/actions/secrets/SECRET/repositories",
+							},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "orgs/umbrellaOrganization/actions/secrets/SECRET/repositories"),
+					httpmock.JSONResponse(struct {
+						TotalCount int `json:"total_count"`
+					}{999}))
+			}
+
+			if tt.kind == secretKindUser {
+				opts.UserSecrets = true
+				reg.Register(
+					httpmock.REST("GET", "user/codespaces/secrets"),
+					httpmock.JSONResponse(struct{ Secrets []Secret }{
+						[]Secret{
+							{
+								Name:             "SECRET",
+								UpdatedAt:        t0,
+								Visibility:       shared.Selected,
+								SelectedReposURL: "https://api.github.com/user/codespaces/secrets/SECRET/repositories",
+							},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "user/codespaces/secrets/SECRET/repositories"),
+					httpmock.JSONResponse(struct {
+						TotalCount int `json:"total_count"`
+					}{999}))
+			}
+
+			if tt.jsonFields != nil {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(tt.jsonFields)
+				opts.Exporter = exporter
+			}
+
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
+			opts.IO = ios
+
+			opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.FromFullName("owner/repo")
+			}
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			opts.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			opts.Now = func() time.Time {
+				t, _ := time.Parse(time.RFC822, "4 Apr 24 00:00 UTC")
+				return t
+			}
+
+			err := listRun(opts)
+			assert.NoError(t, err)
+
+			if tt.wantPopulated {
+				// There should be 2 requests; one to get the secrets list and
+				// another to populate the numSelectedRepos field.
+				assert.Len(t, reg.Requests, 2)
+			} else {
+				// Only one requests to get the secrets list.
+				assert.Len(t, reg.Requests, 1)
+			}
+		})
+	}
+}
+
 func Test_getSecrets_pagination(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
