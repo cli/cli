@@ -1346,7 +1346,9 @@ func TestViewRun(t *testing.T) {
 
 		browser := &browser.Stub{}
 		tt.opts.Browser = browser
-		rlc := testRunLogCache{}
+		rlc := rlc{
+			cacheDir: t.TempDir(),
+		}
 		tt.opts.RunLogCache = rlc
 
 		t.Run(tt.name, func(t *testing.T) {
@@ -1491,18 +1493,6 @@ func Test_attachRunLog(t *testing.T) {
 			}
 		})
 	}
-}
-
-type testRunLogCache struct{}
-
-func (testRunLogCache) Exists(path string) (bool, error) {
-	return false, nil
-}
-func (testRunLogCache) Create(path string, content io.Reader) error {
-	return nil
-}
-func (testRunLogCache) Open(path string) (*zip.ReadCloser, error) {
-	return zip.OpenReader("./fixtures/run_log.zip")
 }
 
 var barfTheFobLogOutput = heredoc.Doc(`
