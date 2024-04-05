@@ -36,6 +36,8 @@ type Config interface {
 	Write() error
 	Migrate(Migration) error
 
+	CacheDir() string
+
 	Aliases() *AliasConfig
 	Authentication() *AuthConfig
 	Browser(string) string
@@ -189,6 +191,10 @@ func (c *cfg) Migrate(m Migration) error {
 	}
 
 	return nil
+}
+
+func (c *cfg) CacheDir() string {
+	return ghConfig.CacheDir()
 }
 
 func defaultFor(key string) (string, bool) {
