@@ -168,7 +168,7 @@ func runVerify(opts *Options) error {
 		NoPublicGood:      opts.NoPublicGood,
 	}
 
-	sv, err := verification.NewSigstoreVerifier(config, policy)
+	sv, err := verification.NewSigstoreVerifier(config)
 	if err != nil {
 		return err
 	}

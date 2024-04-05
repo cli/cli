@@ -31,7 +31,6 @@ type SigstoreResults struct {
 type SigstoreConfig struct {
 	CustomTrustedRoot string
 	Logger            *io.Handler
-	MockVerifier      bool
 	NoPublicGood      bool
 }
 
@@ -39,7 +38,6 @@ type SigstoreVerifier struct {
 	ghVerifier           *verify.SignedEntityVerifier
 	publicGoodVerifier   *verify.SignedEntityVerifier
 	customVerifier       *verify.SignedEntityVerifier
-	policy               verify.PolicyBuilder
 	onlyVerifyWithGithub bool
 	Logger               *io.Handler
 }
@@ -47,7 +45,7 @@ type SigstoreVerifier struct {
 // NewSigstoreVerifier creates a new SigstoreVerifier struct
 // that is used to verify artifacts and attestations against the
 // Public Good, GitHub, or a custom trusted root.
-func NewSigstoreVerifier(config SigstoreConfig, policy verify.PolicyBuilder) (*SigstoreVerifier, error) {
+func NewSigstoreVerifier(config SigstoreConfig) (*SigstoreVerifier, error) {
 	customVerifier, err := newCustomVerifier(config.CustomTrustedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create custom verifier: %v", err)
@@ -68,7 +66,6 @@ func NewSigstoreVerifier(config SigstoreConfig, policy verify.PolicyBuilder) (*S
 		publicGoodVerifier:   publicGoodVerifier,
 		customVerifier:       customVerifier,
 		Logger:               config.Logger,
-		policy:               policy,
 		onlyVerifyWithGithub: config.NoPublicGood,
 	}, nil
 }

@@ -110,7 +110,7 @@ func runInspect(opts *Options) error {
 		return fmt.Errorf("failed to build policy: %v", err)
 	}
 
-	sigstore, err := verification.NewSigstoreVerifier(config, policy)
+	sigstore, err := verification.NewSigstoreVerifier(config)
 	if err != nil {
 		return err
 	}
