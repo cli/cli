@@ -46,10 +46,10 @@ type LiveSigstoreVerifier struct {
 	Logger               *io.Handler
 }
 
-// NewSigstoreVerifier creates a new LiveSigstoreVerifier struct
+// NewLiveSigstoreVerifier creates a new LiveSigstoreVerifier struct
 // that is used to verify artifacts and attestations against the
 // Public Good, GitHub, or a custom trusted root.
-func NewSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, error) {
+func NewLiveSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, error) {
 	customVerifier, err := newCustomVerifier(config.CustomTrustedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create custom verifier: %v", err)

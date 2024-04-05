@@ -21,7 +21,7 @@ func buildPolicy(a artifact.DigestedArtifact) (verify.PolicyBuilder, error) {
 	return policy, nil
 }
 
-func TestNewSigstoreVerifier(t *testing.T) {
+func TestNewLiveSigstoreVerifier(t *testing.T) {
 	artifactPath := test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz")
 	artifact, err := artifact.NewDigestedArtifact(nil, artifactPath, "sha512")
 	require.NoError(t, err)
@@ -32,7 +32,7 @@ func TestNewSigstoreVerifier(t *testing.T) {
 	c := SigstoreConfig{
 		Logger: io.NewTestHandler(),
 	}
-	verifier, err := NewSigstoreVerifier(c)
+	verifier, err := NewLiveSigstoreVerifier(c)
 	require.NoError(t, err)
 
 	t.Run("with invalid signature", func(t *testing.T) {
