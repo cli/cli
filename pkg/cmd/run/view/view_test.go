@@ -1495,8 +1495,8 @@ func Test_attachRunLog(t *testing.T) {
 
 type testRunLogCache struct{}
 
-func (testRunLogCache) Exists(path string) bool {
-	return false
+func (testRunLogCache) Exists(path string) (bool, error) {
+	return false, nil
 }
 func (testRunLogCache) Create(path string, content io.Reader) error {
 	return nil

@@ -29,7 +29,7 @@ import (
 )
 
 type runLogCache interface {
-	Exists(key string) bool
+	Exists(key string) (bool, error)
 	Create(key string, r io.Reader) error
 	Open(key string) (*zip.ReadCloser, error)
 }
@@ -38,11 +38,17 @@ type rlc struct {
 	cacheDir string
 }
 
-func (c rlc) Exists(key string) bool {
-	if _, err := os.Stat(c.filepath(key)); err != nil {
-		return false
+func (c rlc) Exists(key string) (bool, error) {
+	_, err := os.Stat(c.filepath(key))
+	if err == nil {
+		return true, nil
 	}
-	return true
+
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("checking cache entry: %v", err)
 }
 
 func (c rlc) Create(key string, content io.Reader) error {
@@ -453,7 +459,12 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 
 func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run, attempt uint64) (*zip.ReadCloser, error) {
 	cacheKey := fmt.Sprintf("%d-%d", run.ID, run.StartedTime().Unix())
-	if !cache.Exists(cacheKey) {
+	isCached, err := cache.Exists(cacheKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isCached {
 		// Run log does not exist in cache so retrieve and store it
 		logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
 			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID)
