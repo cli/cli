@@ -26,6 +26,9 @@ var _ Config = &ConfigMock{}
 //			BrowserFunc: func(s string) string {
 //				panic("mock out the Browser method")
 //			},
+//			CacheDirFunc: func() string {
+//				panic("mock out the CacheDir method")
+//			},
 //			EditorFunc: func(s string) string {
 //				panic("mock out the Editor method")
 //			},
@@ -72,6 +75,9 @@ type ConfigMock struct {
 	// BrowserFunc mocks the Browser method.
 	BrowserFunc func(s string) string
 
+	// CacheDirFunc mocks the CacheDir method.
+	CacheDirFunc func() string
+
 	// EditorFunc mocks the Editor method.
 	EditorFunc func(s string) string
 
@@ -114,6 +120,9 @@ type ConfigMock struct {
 		Browser []struct {
 			// S is the s argument value.
 			S string
+		}
+		// CacheDir holds details about calls to the CacheDir method.
+		CacheDir []struct {
 		}
 		// Editor holds details about calls to the Editor method.
 		Editor []struct {
@@ -171,6 +180,7 @@ type ConfigMock struct {
 	lockAliases        sync.RWMutex
 	lockAuthentication sync.RWMutex
 	lockBrowser        sync.RWMutex
+	lockCacheDir       sync.RWMutex
 	lockEditor         sync.RWMutex
 	lockGetOrDefault   sync.RWMutex
 	lockGitProtocol    sync.RWMutex
@@ -266,6 +276,33 @@ func (mock *ConfigMock) BrowserCalls() []struct {
 	mock.lockBrowser.RLock()
 	calls = mock.calls.Browser
 	mock.lockBrowser.RUnlock()
+	return calls
+}
+
+// CacheDir calls CacheDirFunc.
+func (mock *ConfigMock) CacheDir() string {
+	if mock.CacheDirFunc == nil {
+		panic("ConfigMock.CacheDirFunc: method is nil but Config.CacheDir was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockCacheDir.Lock()
+	mock.calls.CacheDir = append(mock.calls.CacheDir, callInfo)
+	mock.lockCacheDir.Unlock()
+	return mock.CacheDirFunc()
+}
+
+// CacheDirCalls gets all the calls that were made to CacheDir.
+// Check the length with:
+//
+//	len(mockedConfig.CacheDirCalls())
+func (mock *ConfigMock) CacheDirCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockCacheDir.RLock()
+	calls = mock.calls.CacheDir
+	mock.lockCacheDir.RUnlock()
 	return calls
 }
 

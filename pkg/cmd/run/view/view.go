@@ -28,36 +28,53 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type runLogCache interface {
-	Exists(string) bool
-	Create(string, io.Reader) error
-	Open(string) (*zip.ReadCloser, error)
+type RunLogCache struct {
+	cacheDir string
 }
 
-type rlc struct{}
-
-func (rlc) Exists(path string) bool {
-	if _, err := os.Stat(path); err != nil {
-		return false
+func (c RunLogCache) Exists(key string) (bool, error) {
+	_, err := os.Stat(c.filepath(key))
+	if err == nil {
+		return true, nil
 	}
-	return true
+
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("checking cache entry: %v", err)
 }
-func (rlc) Create(path string, content io.Reader) error {
-	err := os.MkdirAll(filepath.Dir(path), 0755)
-	if err != nil {
-		return fmt.Errorf("could not create cache: %w", err)
+
+func (c RunLogCache) Create(key string, content io.Reader) error {
+	if err := os.MkdirAll(filepath.Dir(c.cacheDir), 0755); err != nil {
+		return fmt.Errorf("creating cache directory: %v", err)
 	}
 
-	out, err := os.Create(path)
+	out, err := os.Create(c.filepath(key))
 	if err != nil {
-		return err
+		return fmt.Errorf("creating cache entry: %v", err)
 	}
 	defer out.Close()
-	_, err = io.Copy(out, content)
-	return err
+
+	if _, err := io.Copy(out, content); err != nil {
+		return fmt.Errorf("writing cache entry: %v", err)
+
+	}
+
+	return nil
 }
-func (rlc) Open(path string) (*zip.ReadCloser, error) {
-	return zip.OpenReader(path)
+
+func (c RunLogCache) Open(key string) (*zip.ReadCloser, error) {
+	r, err := zip.OpenReader(c.filepath(key))
+	if err != nil {
+		return nil, fmt.Errorf("opening cache entry: %v", err)
+	}
+
+	return r, nil
+}
+
+func (c RunLogCache) filepath(key string) string {
+	return filepath.Join(c.cacheDir, fmt.Sprintf("run-log-%s.zip", key))
 }
 
 type ViewOptions struct {
@@ -66,7 +83,7 @@ type ViewOptions struct {
 	BaseRepo    func() (ghrepo.Interface, error)
 	Browser     browser.Browser
 	Prompter    shared.Prompter
-	RunLogCache runLogCache
+	RunLogCache RunLogCache
 
 	RunID      string
 	JobID      string
@@ -85,12 +102,11 @@ type ViewOptions struct {
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
-		IO:          f.IOStreams,
-		HttpClient:  f.HttpClient,
-		Prompter:    f.Prompter,
-		Now:         time.Now,
-		Browser:     f.Browser,
-		RunLogCache: rlc{},
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
+		Now:        time.Now,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -125,6 +141,15 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+
+			config, err := f.Config()
+			if err != nil {
+				return err
+			}
+
+			opts.RunLogCache = RunLogCache{
+				cacheDir: config.CacheDir(),
+			}
 
 			if len(args) == 0 && opts.JobID == "" {
 				if !opts.IO.CanPrompt() {
@@ -430,10 +455,14 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run, attempt uint64) (*zip.ReadCloser, error) {
-	filename := fmt.Sprintf("run-log-%d-%d.zip", run.ID, run.StartedTime().Unix())
-	filepath := filepath.Join(os.TempDir(), "gh-cli-cache", filename)
-	if !cache.Exists(filepath) {
+func getRunLog(cache RunLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run, attempt uint64) (*zip.ReadCloser, error) {
+	cacheKey := fmt.Sprintf("%d-%d", run.ID, run.StartedTime().Unix())
+	isCached, err := cache.Exists(cacheKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isCached {
 		// Run log does not exist in cache so retrieve and store it
 		logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
 			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID)
@@ -461,13 +490,13 @@ func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface
 			return nil, err
 		}
 
-		err = cache.Create(filepath, respReader)
+		err = cache.Create(cacheKey, respReader)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return cache.Open(filepath)
+	return cache.Open(cacheKey)
 }
 
 func promptForJob(prompter shared.Prompter, cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, error) {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -137,6 +138,9 @@ func TestNewCmdView(t *testing.T) {
 
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				Config: func() (config.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -1342,8 +1346,9 @@ func TestViewRun(t *testing.T) {
 
 		browser := &browser.Stub{}
 		tt.opts.Browser = browser
-		rlc := testRunLogCache{}
-		tt.opts.RunLogCache = rlc
+		tt.opts.RunLogCache = RunLogCache{
+			cacheDir: t.TempDir(),
+		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := runView(tt.opts)
@@ -1501,18 +1506,6 @@ func Test_attachRunLog(t *testing.T) {
 			}
 		})
 	}
-}
-
-type testRunLogCache struct{}
-
-func (testRunLogCache) Exists(path string) bool {
-	return false
-}
-func (testRunLogCache) Create(path string, content io.Reader) error {
-	return nil
-}
-func (testRunLogCache) Open(path string) (*zip.ReadCloser, error) {
-	return zip.OpenReader("./fixtures/run_log.zip")
 }
 
 var barfTheFobLogOutput = heredoc.Doc(`

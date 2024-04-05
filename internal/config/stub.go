@@ -77,6 +77,9 @@ func NewFromString(cfgStr string) *ConfigMock {
 		val, _ := cfg.GetOrDefault("", versionKey)
 		return val
 	}
+	mock.CacheDirFunc = func() string {
+		return cfg.CacheDir()
+	}
 	return mock
 }
 
