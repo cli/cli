@@ -73,6 +73,17 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 				return runF(opts)
 			}
 
+			config := verification.SigstoreConfig{
+				Logger: opts.Logger,
+			}
+		
+			sigstore, err := verification.NewSigstoreVerifier(config)
+			if err != nil {
+				return err
+			}
+
+			opts.SigstoreVerifier = sigstore
+
 			if err := runInspect(opts); err != nil {
 				return fmt.Errorf("Failed to inspect the artifact and bundle: %w", err)
 			}
@@ -101,21 +112,12 @@ func runInspect(opts *Options) error {
 		return fmt.Errorf("failed to read attestations for subject: %s", artifact.DigestWithAlg())
 	}
 
-	config := verification.SigstoreConfig{
-		Logger: opts.Logger,
-	}
-
 	policy, err := buildPolicy(*artifact)
 	if err != nil {
 		return fmt.Errorf("failed to build policy: %v", err)
 	}
 
-	sigstore, err := verification.NewSigstoreVerifier(config)
-	if err != nil {
-		return err
-	}
-
-	res := sigstore.Verify(attestations, policy)
+	res := opts.SigstoreVerifier.Verify(attestations, policy)
 	if res.Error != nil {
 		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", res.Error)
 	}

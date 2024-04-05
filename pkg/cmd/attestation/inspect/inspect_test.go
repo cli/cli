@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -57,6 +58,7 @@ func TestNewInspectCmd(t *testing.T) {
 				BundlePath:      bundlePath,
 				DigestAlgorithm: "sha384",
 				OCIClient:       oci.MockClient{},
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: true,
 		},
@@ -68,6 +70,7 @@ func TestNewInspectCmd(t *testing.T) {
 				BundlePath:      bundlePath,
 				DigestAlgorithm: "sha256",
 				OCIClient:       oci.MockClient{},
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: false,
 		},
@@ -79,6 +82,7 @@ func TestNewInspectCmd(t *testing.T) {
 				BundlePath:      bundlePath,
 				DigestAlgorithm: "sha512",
 				OCIClient:       oci.MockClient{},
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: false,
 		},
@@ -89,6 +93,7 @@ func TestNewInspectCmd(t *testing.T) {
 				ArtifactPath:    artifactPath,
 				DigestAlgorithm: "sha256",
 				OCIClient:       oci.MockClient{},
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: true,
 		},
@@ -100,6 +105,7 @@ func TestNewInspectCmd(t *testing.T) {
 				BundlePath:      bundlePath,
 				DigestAlgorithm: "sha256",
 				OCIClient:       oci.MockClient{},
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsExporter: true,
 		},
@@ -128,8 +134,8 @@ func TestNewInspectCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.ArtifactPath, opts.ArtifactPath)
 			assert.Equal(t, tc.wants.BundlePath, opts.BundlePath)
 			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
-			assert.NotNil(t, opts.OCIClient)
 			assert.NotNil(t, opts.Logger)
+			assert.NotNil(t, opts.OCIClient)
 			assert.Equal(t, tc.wantsExporter, opts.exporter != nil)
 		})
 	}
@@ -142,6 +148,7 @@ func TestRunInspect(t *testing.T) {
 		DigestAlgorithm: "sha512",
 		Logger:          io.NewTestHandler(),
 		OCIClient:       oci.MockClient{},
+		SigstoreVerifier: &verification.MockSigstoreVerifier{},
 	}
 
 	t.Run("with valid artifact and bundle", func(t *testing.T) {
@@ -169,6 +176,7 @@ func TestJSONOutput(t *testing.T) {
 		DigestAlgorithm: "sha512",
 		Logger:          io.NewHandler(testIO),
 		OCIClient:       oci.MockClient{},
+		SigstoreVerifier: &verification.MockSigstoreVerifier{},
 		exporter:        cmdutil.NewJSONExporter(),
 	}
 	require.Nil(t, runInspect(&opts))

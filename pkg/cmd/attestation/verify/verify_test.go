@@ -64,6 +64,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				Limit:           30,
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: true,
 		},
@@ -78,6 +79,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
 				SANRegex:        "^https://github.com/sigstore/",
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: false,
 		},
@@ -92,6 +94,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
 				SANRegex:        "^https://github.com/sigstore/",
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: false,
 		},
@@ -105,6 +108,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				Owner:           "sigstore",
 				Limit:           30,
 				SANRegex:        "^https://github.com/sigstore/",
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: true,
 		},
@@ -118,6 +122,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				Owner:           "sigstore",
 				Repo:            "sigstore/sigstore-js",
 				Limit:           30,
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: true,
 		},
@@ -131,6 +136,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
 				SANRegex:        "^https://github.com/sigstore/",
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: false,
 		},
@@ -144,6 +150,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				Owner:           "sigstore",
 				Limit:           101,
 				SANRegex:        "^https://github.com/sigstore/",
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: false,
 		},
@@ -157,6 +164,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				Owner:           "sigstore",
 				Limit:           0,
 				SANRegex:        "^https://github.com/sigstore/",
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: true,
 		},
@@ -171,6 +179,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				Owner:           "sigstore",
 				SAN:             "https://github.com/sigstore/",
 				SANRegex:        "^https://github.com/sigstore/",
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsErr: true,
 		},
@@ -185,6 +194,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				OIDCIssuer:      GitHubOIDCIssuer,
 				Owner:           "sigstore",
 				SANRegex:        "^https://github.com/sigstore/",
+				SigstoreVerifier: &verification.MockSigstoreVerifier{},
 			},
 			wantsExporter: true,
 		},
@@ -242,6 +252,7 @@ func TestJSONOutput(t *testing.T) {
 		OIDCIssuer:      GitHubOIDCIssuer,
 		Owner:           "sigstore",
 		SANRegex:        "^https://github.com/sigstore/",
+		SigstoreVerifier: &verification.MockSigstoreVerifier{},
 		exporter:        cmdutil.NewJSONExporter(),
 	}
 	require.Nil(t, runVerify(&opts))
@@ -264,6 +275,7 @@ func TestRunVerify(t *testing.T) {
 		OIDCIssuer:      GitHubOIDCIssuer,
 		Owner:           "sigstore",
 		SANRegex:        "^https://github.com/sigstore/",
+		SigstoreVerifier: &verification.MockSigstoreVerifier{},
 	}
 
 	t.Run("with valid artifact and bundle", func(t *testing.T) {
@@ -333,6 +345,7 @@ func TestRunVerify(t *testing.T) {
 	t.Run("with invalid OIDC issuer", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.OIDCIssuer = "not-a-real-issuer"
+		opts.SigstoreVerifier = &verification.FailSigstoreVerifier{}
 		require.Error(t, runVerify(&opts))
 	})
 
@@ -346,6 +359,7 @@ func TestRunVerify(t *testing.T) {
 			OIDCIssuer:      GitHubOIDCIssuer,
 			Owner:           "sigstore",
 			SAN:             SigstoreSanValue,
+			SigstoreVerifier: &verification.MockSigstoreVerifier{},
 		}
 		require.Nil(t, runVerify(&opts))
 	})
@@ -353,6 +367,7 @@ func TestRunVerify(t *testing.T) {
 	t.Run("with invalid SAN", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.SAN = "fake san"
+		opts.SigstoreVerifier = &verification.FailSigstoreVerifier{}
 		require.Error(t, runVerify(&opts))
 	})
 
@@ -365,13 +380,14 @@ func TestRunVerify(t *testing.T) {
 	t.Run("with invalid SAN regex", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.SANRegex = "^https://github.com/sigstore/not-real/"
+		opts.SigstoreVerifier = &verification.FailSigstoreVerifier{}
 		require.Error(t, runVerify(&opts))
 	})
 
 	t.Run("with no matching OIDC issuer", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.OIDCIssuer = "some-other-issuer"
-
+		opts.SigstoreVerifier = &verification.FailSigstoreVerifier{}
 		require.Error(t, runVerify(&opts))
 	})
 

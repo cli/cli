@@ -5,6 +5,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
@@ -15,6 +16,7 @@ type Options struct {
 	DigestAlgorithm string
 	Logger          *io.Handler
 	OCIClient       oci.Client
+	SigstoreVerifier verification.SigstoreVerifier
 	exporter        cmdutil.Exporter
 }
 
