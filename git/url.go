@@ -40,12 +40,11 @@ func ParseURL(rawURL string) (*url.URL, error) {
 		return nil, err
 	}
 
-	if u.Scheme == "git+ssh" {
-		u.Scheme = "ssh"
-	}
-
-	if u.Scheme == "git+https" {
+	switch u.Scheme {
+	case "git+https":
 		u.Scheme = "https"
+	case "git+ssh":
+		u.Scheme = "ssh"
 	}
 
 	if u.Scheme != "ssh" {
