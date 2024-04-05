@@ -127,6 +127,26 @@ func TestParseURL(t *testing.T) {
 			},
 		},
 		{
+			name: "ssh, ipv6",
+			url:  "ssh://git@[::1]/owner/repo.git",
+			want: url{
+				Scheme: "ssh",
+				User:   "git",
+				Host:   "[::1]",
+				Path:   "/owner/repo.git",
+			},
+		},
+		{
+			name: "ssh with port, ipv6",
+			url:  "ssh://git@[::1]:22/owner/repo.git",
+			want: url{
+				Scheme: "ssh",
+				User:   "git",
+				Host:   "[::1]",
+				Path:   "/owner/repo.git",
+			},
+		},
+		{
 			name: "git+ssh",
 			url:  "git+ssh://example.com/owner/repo.git",
 			want: url{
