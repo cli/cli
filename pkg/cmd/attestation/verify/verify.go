@@ -110,7 +110,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 				Logger:            opts.Logger,
 				NoPublicGood:      opts.NoPublicGood,
 			}
-		
+
 			sv, err := verification.NewSigstoreVerifier(config)
 			if err != nil {
 				return err

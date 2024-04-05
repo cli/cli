@@ -76,7 +76,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 			config := verification.SigstoreConfig{
 				Logger: opts.Logger,
 			}
-		
+
 			sigstore, err := verification.NewSigstoreVerifier(config)
 			if err != nil {
 				return err

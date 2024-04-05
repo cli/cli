@@ -11,13 +11,13 @@ import (
 
 // Options captures the options for the inspect command
 type Options struct {
-	ArtifactPath    string
-	BundlePath      string
-	DigestAlgorithm string
-	Logger          *io.Handler
-	OCIClient       oci.Client
+	ArtifactPath     string
+	BundlePath       string
+	DigestAlgorithm  string
+	Logger           *io.Handler
+	OCIClient        oci.Client
 	SigstoreVerifier verification.SigstoreVerifier
-	exporter        cmdutil.Exporter
+	exporter         cmdutil.Exporter
 }
 
 // Clean cleans the file path option values
