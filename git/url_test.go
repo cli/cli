@@ -1,6 +1,11 @@
 package git
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestIsURL(t *testing.T) {
 	tests := []struct {
@@ -56,9 +61,7 @@ func TestIsURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsURL(tt.url); got != tt.want {
-				t.Errorf("IsURL() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, IsURL(tt.url))
 		})
 	}
 }
@@ -206,24 +209,14 @@ func TestParseURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			u, err := ParseURL(tt.url)
 			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
+				require.Error(t, err)
 				return
 			}
 
-			if u.Scheme != tt.want.Scheme {
-				t.Errorf("expected scheme %q, got %q", tt.want.Scheme, u.Scheme)
-			}
-			if u.User.Username() != tt.want.User {
-				t.Errorf("expected user %q, got %q", tt.want.User, u.User.Username())
-			}
-			if u.Host != tt.want.Host {
-				t.Errorf("expected host %q, got %q", tt.want.Host, u.Host)
-			}
-			if u.Path != tt.want.Path {
-				t.Errorf("expected path %q, got %q", tt.want.Path, u.Path)
-			}
+			assert.Equal(t, u.Scheme, tt.want.Scheme)
+			assert.Equal(t, u.User.Username(), tt.want.User)
+			assert.Equal(t, u.Host, tt.want.Host)
+			assert.Equal(t, u.Path, tt.want.Path)
 		})
 	}
 }
