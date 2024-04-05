@@ -99,6 +99,9 @@ func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 				}
 			}
 		} else {
+			if _, exists := destMap[subkey]; exists {
+				return fmt.Errorf("unexpected override existing field under %q", subkey)
+			}
 			destMap[subkey] = value
 		}
 		return nil
