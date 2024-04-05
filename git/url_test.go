@@ -196,13 +196,22 @@ func TestParseURL(t *testing.T) {
 				Path:   "",
 			},
 		},
+		{
+			name:    "fails to parse",
+			url:     "ssh://git@[/tmp/git-repo",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			u, err := ParseURL(tt.url)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("got error: %v", err)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
 			}
+
 			if u.Scheme != tt.want.Scheme {
 				t.Errorf("expected scheme %q, got %q", tt.want.Scheme, u.Scheme)
 			}
