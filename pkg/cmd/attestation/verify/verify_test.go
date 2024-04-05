@@ -342,14 +342,22 @@ func TestRunVerify(t *testing.T) {
 		require.ErrorContains(t, err, "failed to fetch attestations for subject")
 	})
 
+	// TODO: this test can only be tested with a live SigstoreVerifier
+	// add integration tests or HTTP mocked sigstore verifier tests
+	// to test this case
 	t.Run("with invalid OIDC issuer", func(t *testing.T) {
+		t.Skip()
 		opts := publicGoodOpts
 		opts.OIDCIssuer = "not-a-real-issuer"
 		opts.SigstoreVerifier = &verification.FailSigstoreVerifier{}
 		require.Error(t, runVerify(&opts))
 	})
 
+	// TODO: this test can only be tested with a live SigstoreVerifier
+	// add integration tests or HTTP mocked sigstore verifier tests
+	// to test this case
 	t.Run("with SAN enforcement", func(t *testing.T) {
+		t.Skip()
 		opts := Options{
 			ArtifactPath:     artifactPath,
 			BundlePath:       bundlePath,
