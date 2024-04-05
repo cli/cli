@@ -12,6 +12,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -137,6 +138,9 @@ func TestNewCmdView(t *testing.T) {
 
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				Config: func() (config.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
 			}
 
 			argv, err := shlex.Split(tt.cli)
