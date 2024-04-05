@@ -31,6 +31,7 @@ type SigstoreResults struct {
 type SigstoreConfig struct {
 	CustomTrustedRoot string
 	Logger            *io.Handler
+	MockVerifier      bool
 	NoPublicGood      bool
 }
 
@@ -103,7 +104,7 @@ func (v *SigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify.Sig
 	return nil, "", fmt.Errorf("leaf certificate issuer is not recognized")
 }
 
-func (v *SigstoreVerifier) Verify(attestations []*api.Attestation) *SigstoreResults {
+func (v *SigstoreVerifier) Verify(attestations []*api.Attestation, policy verify.PolicyBuilder) *SigstoreResults {
 	// initialize the processing results before attempting to verify
 	// with multiple verifiers
 	results := make([]*AttestationProcessingResult, len(attestations))
@@ -128,7 +129,7 @@ func (v *SigstoreVerifier) Verify(attestations []*api.Attestation) *SigstoreResu
 
 		v.Logger.VerbosePrintf("Attempting verification against issuer \"%s\"\n", issuer)
 		// attempt to verify the attestation
-		result, err := verifier.Verify(apr.Attestation.Bundle, v.policy)
+		result, err := verifier.Verify(apr.Attestation.Bundle, policy)
 		// if verification fails, create the error and exit verification early
 		if err != nil {
 			v.Logger.VerbosePrint(v.Logger.ColorScheme.Redf(

@@ -115,7 +115,7 @@ func runInspect(opts *Options) error {
 		return err
 	}
 
-	res := sigstore.Verify(attestations)
+	res := sigstore.Verify(attestations, policy)
 	if res.Error != nil {
 		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", res.Error)
 	}

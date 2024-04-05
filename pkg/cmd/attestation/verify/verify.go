@@ -1,7 +1,6 @@
 package verify
 
 import (
-	// "encoding/json"
 	"errors"
 	"fmt"
 
@@ -174,7 +173,7 @@ func runVerify(opts *Options) error {
 		return err
 	}
 
-	sigstoreRes := sv.Verify(attestations)
+	sigstoreRes := sv.Verify(attestations, policy)
 	if sigstoreRes.Error != nil {
 		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", sigstoreRes.Error)
 	}
