@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	// "testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
 )
