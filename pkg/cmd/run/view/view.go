@@ -28,17 +28,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type runLogCache interface {
-	Exists(key string) (bool, error)
-	Create(key string, r io.Reader) error
-	Open(key string) (*zip.ReadCloser, error)
-}
-
-type rlc struct {
+type RunLogCache struct {
 	cacheDir string
 }
 
-func (c rlc) Exists(key string) (bool, error) {
+func (c RunLogCache) Exists(key string) (bool, error) {
 	_, err := os.Stat(c.filepath(key))
 	if err == nil {
 		return true, nil
@@ -51,7 +45,7 @@ func (c rlc) Exists(key string) (bool, error) {
 	return false, fmt.Errorf("checking cache entry: %v", err)
 }
 
-func (c rlc) Create(key string, content io.Reader) error {
+func (c RunLogCache) Create(key string, content io.Reader) error {
 	out, err := os.Create(c.filepath(key))
 	if err != nil {
 		return fmt.Errorf("creating cache entry: %v", err)
@@ -66,7 +60,7 @@ func (c rlc) Create(key string, content io.Reader) error {
 	return nil
 }
 
-func (c rlc) Open(key string) (*zip.ReadCloser, error) {
+func (c RunLogCache) Open(key string) (*zip.ReadCloser, error) {
 	r, err := zip.OpenReader(c.filepath(key))
 	if err != nil {
 		return nil, fmt.Errorf("opening cache entry: %v", err)
@@ -75,7 +69,7 @@ func (c rlc) Open(key string) (*zip.ReadCloser, error) {
 	return r, nil
 }
 
-func (c rlc) filepath(key string) string {
+func (c RunLogCache) filepath(key string) string {
 	return filepath.Join(c.cacheDir, fmt.Sprintf("run-log-%s.zip", key))
 }
 
@@ -85,7 +79,7 @@ type ViewOptions struct {
 	BaseRepo    func() (ghrepo.Interface, error)
 	Browser     browser.Browser
 	Prompter    shared.Prompter
-	RunLogCache runLogCache
+	RunLogCache RunLogCache
 
 	RunID      string
 	JobID      string
@@ -149,7 +143,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 				return err
 			}
 
-			opts.RunLogCache = rlc{
+			opts.RunLogCache = RunLogCache{
 				cacheDir: config.CacheDir(),
 			}
 
@@ -457,7 +451,7 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run, attempt uint64) (*zip.ReadCloser, error) {
+func getRunLog(cache RunLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run, attempt uint64) (*zip.ReadCloser, error) {
 	cacheKey := fmt.Sprintf("%d-%d", run.ID, run.StartedTime().Unix())
 	isCached, err := cache.Exists(cacheKey)
 	if err != nil {

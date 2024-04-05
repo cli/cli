@@ -1346,10 +1346,9 @@ func TestViewRun(t *testing.T) {
 
 		browser := &browser.Stub{}
 		tt.opts.Browser = browser
-		rlc := rlc{
+		tt.opts.RunLogCache = RunLogCache{
 			cacheDir: t.TempDir(),
 		}
-		tt.opts.RunLogCache = rlc
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := runView(tt.opts)
