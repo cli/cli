@@ -204,6 +204,23 @@ func Test_NewCmdLogin(t *testing.T) {
 				InsecureStorage: true,
 			},
 		},
+		{
+			name:     "tty skip-ssh-key",
+			stdinTTY: true,
+			cli:      "--skip-ssh-key",
+			wants: LoginOptions{
+				SkipSSHKeyPrompt: true,
+				Interactive:      true,
+			},
+		},
+		{
+			name: "nontty skip-ssh-key",
+			cli:  "--skip-ssh-key",
+			wants: LoginOptions{
+				Hostname:         "github.com",
+				SkipSSHKeyPrompt: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
