@@ -119,6 +119,72 @@ func TestLogin_ssh(t *testing.T) {
 	assert.Equal(t, "ssh", cfg["example.com:git_protocol"])
 }
 
+func TestLogin_noSSHPrompt(t *testing.T) {
+	dir := t.TempDir()
+	ios, _, stdout, stderr := iostreams.Test()
+
+	tr := httpmock.Registry{}
+	defer tr.Verify(t)
+
+	tr.Register(
+		httpmock.REST("GET", "api/v3/"),
+		httpmock.ScopesResponder("repo,read:org"))
+	tr.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{ "login": "monalisa" }}}`))
+
+	pm := &prompter.PrompterMock{}
+	pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+		if prompt == "How would you like to authenticate GitHub CLI?" {
+			return prompter.IndexFor(opts, "Paste an authentication token")
+		}
+		return -1, prompter.NoSuchPromptErr(prompt)
+	}
+	pm.PasswordFunc = func(prompt string) (string, error) {
+		return "", prompter.NoSuchPromptErr(prompt)
+	}
+	pm.ConfirmFunc = func(prompt string, _ bool) (bool, error) {
+		return false, prompter.NoSuchPromptErr(prompt)
+	}
+	pm.AuthTokenFunc = func() (string, error) {
+		return "ATOKEN", nil
+	}
+	pm.InputFunc = func(prompt, _ string) (string, error) {
+		return "", prompter.NoSuchPromptErr(prompt)
+	}
+
+	cfg := tinyConfig{}
+
+	err := Login(&LoginOptions{
+		IO:               ios,
+		Config:           &cfg,
+		Prompter:         pm,
+		HTTPClient:       &http.Client{Transport: &tr},
+		Hostname:         "example.com",
+		Interactive:      true,
+		GitProtocol:      "SSH",
+		SkipSSHKeyPrompt: true,
+		sshContext: ssh.Context{
+			ConfigDir: dir,
+			KeygenExe: "ssh-keygen",
+		},
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, heredoc.Doc(`
+		Tip: you can generate a Personal Access Token here https://example.com/settings/tokens
+		The minimum required scopes are 'repo', 'read:org'.
+		- gh config set -h example.com git_protocol ssh
+		✓ Configured git protocol
+		✓ Logged in as monalisa
+	`), stderr.String())
+
+	assert.Equal(t, "monalisa", cfg["example.com:user"])
+	assert.Equal(t, "ATOKEN", cfg["example.com:oauth_token"])
+	assert.Equal(t, "ssh", cfg["example.com:git_protocol"])
+}
+
 func Test_scopesSentence(t *testing.T) {
 	type args struct {
 		scopes []string
