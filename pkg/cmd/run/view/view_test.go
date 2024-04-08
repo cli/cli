@@ -1585,6 +1585,7 @@ func TestRunLog(t *testing.T) {
 
 		f, err := os.Open("./fixtures/run_log.zip")
 		require.NoError(t, err)
+		defer f.Close()
 
 		require.NoError(t, rlc.Create("key", f))
 
