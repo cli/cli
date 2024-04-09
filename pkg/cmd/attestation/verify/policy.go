@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	GitHubOIDCIssuer  = "https://token.actions.githubusercontent.com"
+	GitHubOIDCIssuer = "https://token.actions.githubusercontent.com"
 	// represents the GitHub hosted runner in the certificate RunnerEnvironment extension
 	GitHubRunner = "github-hosted"
 )
