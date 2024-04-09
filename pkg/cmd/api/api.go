@@ -142,6 +142,13 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			$ gh api repos/{owner}/{repo}/issues --template \
 			  '{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " | color "yellow"}}){{"\n"}}{{end}}'
 
+			# update allowed values of the "environment" custom property in a deeply nested array 
+			gh api --PATCH /orgs/{org}/properties/schema \
+			   -F 'properties[][property_name]=environment' \
+			   -F 'properties[][default_value]=production' \
+			   -F 'properties[][allowed_values][]=staging' \
+			   -F 'properties[][allowed_values][]=production'
+
 			# list releases with GraphQL
 			$ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
 			  query($name: String!, $owner: String!) {
