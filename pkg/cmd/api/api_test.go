@@ -1331,7 +1331,54 @@ func Test_previewNamesToMIMETypes(t *testing.T) {
 	}
 }
 
-func Test_processResponse_template(t *testing.T) {
+func Test_processGraphQLResponse_template(t *testing.T) {
+	t.Skip()
+	ios, _, stdout, stderr := iostreams.Test()
+
+	resp := http.Response{
+		StatusCode: 200,
+		Header: map[string][]string{
+			"Content-Type": {"application/json"},
+		},
+		// TODO: Make this a GQL response
+		// But ideally, just create an actual template abstraction
+		Body: io.NopCloser(strings.NewReader(`[
+			{
+				"title": "First title",
+				"labels": [{"name":"bug"}, {"name":"help wanted"}]
+			},
+			{
+				"title": "Second but not last"
+			},
+			{
+				"title": "Alas, tis' the end",
+				"labels": [{}, {"name":"feature"}]
+			}
+		]`)),
+	}
+
+	opts := ApiOptions{
+		IO:       ios,
+		Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
+	}
+
+	tmpl := template.New(ios.Out, ios.TerminalWidth(), ios.ColorEnabled())
+	err := tmpl.Parse(opts.Template)
+	require.NoError(t, err)
+	_, err = processGraphQLResponse(&resp, &opts, ios.Out, io.Discard, tmpl)
+	require.NoError(t, err)
+	err = tmpl.Flush()
+	require.NoError(t, err)
+
+	assert.Equal(t, heredoc.Doc(`
+		First title (bug, help wanted)
+		Second but not last ()
+		Alas, tis' the end (, feature)
+	`), stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func Test_processRestResponse_template(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 
 	resp := http.Response{
@@ -1362,7 +1409,7 @@ func Test_processResponse_template(t *testing.T) {
 	tmpl := template.New(ios.Out, ios.TerminalWidth(), ios.ColorEnabled())
 	err := tmpl.Parse(opts.Template)
 	require.NoError(t, err)
-	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, tmpl, true, true)
+	_, err = processRestResponse(&resp, &opts, ios.Out, io.Discard, tmpl, true, true)
 	require.NoError(t, err)
 	err = tmpl.Flush()
 	require.NoError(t, err)

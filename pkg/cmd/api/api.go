@@ -243,13 +243,26 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	return cmd
 }
 
+type GraphQLRequest struct{}
+type GraphQLResponse struct{}
+
+type RestRequest struct{}
+type RestResponse struct{}
+
 func apiRun(opts *ApiOptions) error {
+	isGraphQL := opts.RequestPath == "graphql"
+	if isGraphQL {
+		return doGraphQL(opts)
+	}
+	return doRest(opts)
+}
+
+func doGraphQL(opts *ApiOptions) error {
 	params, err := parseFields(opts)
 	if err != nil {
 		return err
 	}
 
-	isGraphQL := opts.RequestPath == "graphql"
 	requestPath, err := fillPlaceholders(opts.RequestPath, opts)
 	if err != nil {
 		return fmt.Errorf("unable to expand placeholder in path: %w", err)
@@ -265,7 +278,133 @@ func apiRun(opts *ApiOptions) error {
 		method = "POST"
 	}
 
-	if opts.Paginate && !isGraphQL {
+	if opts.RequestInputFile != "" {
+		file, size, err := openUserFile(opts.RequestInputFile, opts.IO.In)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		requestPath = addQuery(requestPath, params)
+		requestBody = file
+		if size >= 0 {
+			requestHeaders = append([]string{fmt.Sprintf("Content-Length: %d", size)}, requestHeaders...)
+		}
+	}
+
+	if len(opts.Previews) > 0 {
+		requestHeaders = append(requestHeaders, "Accept: "+previewNamesToMIMETypes(opts.Previews))
+	}
+
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	if opts.HttpClient == nil {
+		opts.HttpClient = func() (*http.Client, error) {
+			log := opts.IO.ErrOut
+			if opts.Verbose {
+				log = opts.IO.Out
+			}
+			opts := api.HTTPClientOptions{
+				AppVersion:     opts.AppVersion,
+				CacheTTL:       opts.CacheTTL,
+				Config:         cfg.Authentication(),
+				EnableCache:    opts.CacheTTL > 0,
+				Log:            log,
+				LogColorize:    opts.IO.ColorEnabled(),
+				LogVerboseHTTP: opts.Verbose,
+			}
+			return api.NewHTTPClient(opts)
+		}
+	}
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	if !opts.Silent {
+		if err := opts.IO.StartPager(); err == nil {
+			defer opts.IO.StopPager()
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+		}
+	}
+
+	var bodyWriter io.Writer = opts.IO.Out
+	var headersWriter io.Writer = opts.IO.Out
+	if opts.Silent {
+		bodyWriter = io.Discard
+	}
+	if opts.Verbose {
+		// httpClient handles output when verbose flag is specified.
+		bodyWriter = io.Discard
+		headersWriter = io.Discard
+	}
+
+	host, _ := cfg.Authentication().DefaultHost()
+
+	if opts.Hostname != "" {
+		host = opts.Hostname
+	}
+
+	tmpl := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
+	err = tmpl.Parse(opts.Template)
+	if err != nil {
+		return err
+	}
+
+	hasNextPage := true
+	for hasNextPage {
+		resp, err := httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
+		if err != nil {
+			return err
+		}
+
+		endCursor, err := processGraphQLResponse(resp, opts, bodyWriter, headersWriter, tmpl)
+		if err != nil {
+			return err
+		}
+
+		if !opts.Paginate {
+			break
+		}
+
+		hasNextPage = endCursor != ""
+		if hasNextPage {
+			params["endCursor"] = endCursor
+		}
+
+		if hasNextPage && opts.ShowResponseHeaders {
+			fmt.Fprint(opts.IO.Out, "\n")
+		}
+	}
+
+	return tmpl.Flush()
+}
+
+func doRest(opts *ApiOptions) error {
+	params, err := parseFields(opts)
+	if err != nil {
+		return err
+	}
+
+	requestPath, err := fillPlaceholders(opts.RequestPath, opts)
+	if err != nil {
+		return fmt.Errorf("unable to expand placeholder in path: %w", err)
+	}
+	method := opts.RequestMethod
+	requestHeaders := opts.RequestHeaders
+	var requestBody interface{}
+	if len(params) > 0 {
+		requestBody = params
+	}
+
+	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
+		method = "POST"
+	}
+
+	if opts.Paginate {
 		requestPath = addPerPage(requestPath, 100, params)
 	}
 
@@ -353,12 +492,10 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		if !isGraphQL {
-			requestPath, hasNextPage = findNextPage(resp)
-			requestBody = nil // prevent repeating GET parameters
-		}
+		requestPath, hasNextPage = findNextPage(resp)
+		requestBody = nil // prevent repeating GET parameters
 
-		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, tmpl, isFirstPage, !hasNextPage)
+		_, err = processRestResponse(resp, opts, bodyWriter, headersWriter, tmpl, isFirstPage, !hasNextPage)
 		if err != nil {
 			return err
 		}
@@ -366,13 +503,6 @@ func apiRun(opts *ApiOptions) error {
 
 		if !opts.Paginate {
 			break
-		}
-
-		if isGraphQL {
-			hasNextPage = endCursor != ""
-			if hasNextPage {
-				params["endCursor"] = endCursor
-			}
 		}
 
 		if hasNextPage && opts.ShowResponseHeaders {
@@ -383,13 +513,14 @@ func apiRun(opts *ApiOptions) error {
 	return tmpl.Flush()
 }
 
-func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template, isFirstPage, isLastPage bool) (endCursor string, err error) {
+func processGraphQLResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
 		printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
 		fmt.Fprint(headersWriter, "\r\n")
 	}
 
+	// TODO: Can GQL ever return a 204?
 	if resp.StatusCode == 204 {
 		return
 	}
@@ -399,7 +530,8 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
 
 	var serverError string
-	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
+	// TODO: This JSON check is likely superfluous
+	if isJSON {
 		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
 		if err != nil {
 			return
@@ -407,7 +539,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	}
 
 	var bodyCopy *bytes.Buffer
-	isGraphQLPaginate := isJSON && resp.StatusCode == 200 && opts.Paginate && opts.RequestPath == "graphql"
+	isGraphQLPaginate := isJSON && resp.StatusCode == 200 && opts.Paginate
 	if isGraphQLPaginate {
 		bodyCopy = &bytes.Buffer{}
 		responseBody = io.TeeReader(responseBody, bodyCopy)
@@ -431,13 +563,6 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	} else if isJSON && opts.IO.ColorEnabled() {
 		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
 	} else {
-		if isJSON && opts.Paginate && !isGraphQLPaginate && !opts.ShowResponseHeaders {
-			responseBody = &paginatedArrayReader{
-				Reader:      responseBody,
-				isFirstPage: isFirstPage,
-				isLastPage:  isLastPage,
-			}
-		}
 		_, err = io.Copy(bodyWriter, responseBody)
 	}
 	if err != nil {
@@ -461,6 +586,79 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 
 	if isGraphQLPaginate {
 		endCursor = findEndCursor(bodyCopy)
+	}
+
+	return
+}
+
+func processRestResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template, isFirstPage, isLastPage bool) (endCursor string, err error) {
+	if opts.ShowResponseHeaders {
+		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
+		printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
+		fmt.Fprint(headersWriter, "\r\n")
+	}
+
+	if resp.StatusCode == 204 {
+		return
+	}
+	var responseBody io.Reader = resp.Body
+	defer resp.Body.Close()
+
+	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
+
+	var serverError string
+	if isJSON && resp.StatusCode >= 400 {
+		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
+		if err != nil {
+			return
+		}
+	}
+
+	if isJSON && opts.Paginate && !opts.ShowResponseHeaders {
+		responseBody = &paginatedArrayReader{
+			Reader:      responseBody,
+			isFirstPage: isFirstPage,
+			isLastPage:  isLastPage,
+		}
+	}
+
+	if opts.FilterOutput != "" && serverError == "" {
+		// TODO: reuse parsed query across pagination invocations
+		indent := ""
+		if opts.IO.IsStdoutTTY() {
+			indent = "  "
+		}
+		err = jq.EvaluateFormatted(responseBody, bodyWriter, opts.FilterOutput, indent, opts.IO.ColorEnabled())
+		if err != nil {
+			return
+		}
+	} else if opts.Template != "" && serverError == "" {
+		err = template.Execute(responseBody)
+		if err != nil {
+			return
+		}
+	} else if isJSON && opts.IO.ColorEnabled() {
+		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
+	} else {
+		_, err = io.Copy(bodyWriter, responseBody)
+	}
+	if err != nil {
+		return
+	}
+
+	if serverError == "" && resp.StatusCode > 299 {
+		serverError = fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
+	if serverError != "" {
+		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
+		if msg := api.ScopesSuggestion(resp); msg != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
+		}
+		if u := factory.SSOURL(); u != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "Authorize in your web browser: %s\n", u)
+		}
+		err = cmdutil.SilentError
+		return
 	}
 
 	return
