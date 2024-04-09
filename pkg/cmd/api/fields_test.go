@@ -146,7 +146,7 @@ func Test_parseFields_errors(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "cannot overwrite string to array",
+			name: "cannot override string to array",
 			opts: &ApiOptions{
 				IO: ios,
 				RawFields: []string{
@@ -157,7 +157,7 @@ func Test_parseFields_errors(t *testing.T) {
 			expected: `expected array type under "field", got string`,
 		},
 		{
-			name: "cannot overwrite string to object",
+			name: "cannot override string to object",
 			opts: &ApiOptions{
 				IO: ios,
 				RawFields: []string{
@@ -168,7 +168,7 @@ func Test_parseFields_errors(t *testing.T) {
 			expected: `expected map type under "field", got string`,
 		},
 		{
-			name: "cannot overwrite object to string",
+			name: "cannot override object to string",
 			opts: &ApiOptions{
 				IO: ios,
 				RawFields: []string{
@@ -179,7 +179,7 @@ func Test_parseFields_errors(t *testing.T) {
 			expected: `unexpected override existing field under "field"`,
 		},
 		{
-			name: "cannot overwrite object to array",
+			name: "cannot override object to array",
 			opts: &ApiOptions{
 				IO: ios,
 				RawFields: []string{
@@ -190,7 +190,7 @@ func Test_parseFields_errors(t *testing.T) {
 			expected: `expected array type under "field", got map[string]interface {}`,
 		},
 		{
-			name: "cannot overwrite array to string",
+			name: "cannot override array to string",
 			opts: &ApiOptions{
 				IO: ios,
 				RawFields: []string{
@@ -201,7 +201,7 @@ func Test_parseFields_errors(t *testing.T) {
 			expected: `unexpected override existing field under "field"`,
 		},
 		{
-			name: "cannot overwrite array to object",
+			name: "cannot override array to object",
 			opts: &ApiOptions{
 				IO: ios,
 				RawFields: []string{
