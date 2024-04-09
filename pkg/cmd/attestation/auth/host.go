@@ -10,8 +10,8 @@ import (
 var ErrGHESHost = errors.New("A GHES host was detected. gh attestation does not currently support GHES")
 
 const (
-	github                = "github.com"
-	localhost             = "github.localhost"
+	github    = "github.com"
+	localhost = "github.localhost"
 	// tenancyHost is the domain name of a tenancy GitHub instance
 	tenancyHost = "ghe.com"
 )
@@ -26,7 +26,7 @@ func isTenancy(host string) bool {
 
 func IsHostSupported() error {
 	host, _ := auth.DefaultHost()
-	
+
 	if isEnterprise(host) {
 		return ErrGHESHost
 	}
