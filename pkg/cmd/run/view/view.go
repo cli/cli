@@ -46,7 +46,7 @@ func (c RunLogCache) Exists(key string) (bool, error) {
 }
 
 func (c RunLogCache) Create(key string, content io.Reader) error {
-	if err := os.MkdirAll(filepath.Dir(c.cacheDir), 0755); err != nil {
+	if err := os.MkdirAll(c.cacheDir, 0755); err != nil {
 		return fmt.Errorf("creating cache directory: %v", err)
 	}
 
