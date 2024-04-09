@@ -12,7 +12,6 @@ import (
 
 const (
 	GitHubOIDCIssuer  = "https://token.actions.githubusercontent.com"
-	SLSAPredicateType = "https://slsa.dev/provenance/v1"
 	// represents the GitHub hosted runner in the certificate RunnerEnvironment extension
 	GitHubRunner = "github-hosted"
 )

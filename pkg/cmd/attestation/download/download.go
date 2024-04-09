@@ -102,6 +102,7 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 	downloadCmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Repository name in the format <owner>/<repo>")
 	downloadCmd.MarkFlagsMutuallyExclusive("owner", "repo")
 	downloadCmd.MarkFlagsOneRequired("owner", "repo")
+	downloadCmd.Flags().StringVarP(&opts.PredicateType, "predicate-type", "", "", "Filter attestations by provided predicate type")
 	cmdutil.StringEnumFlag(downloadCmd, &opts.DigestAlgorithm, "digest-alg", "d", "sha256", []string{"sha256", "sha512"}, "The algorithm used to compute a digest of the artifact")
 	downloadCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
 
@@ -130,6 +131,17 @@ func runDownload(opts *Options) error {
 			return nil
 		}
 		return fmt.Errorf("failed to fetch attestations: %v", err)
+	}
+
+	// Apply predicate type filter to returned attestations
+	if opts.PredicateType != "" {
+		filteredAttestations := verification.FilterAttestations(opts.PredicateType, attestations)
+
+		if len(filteredAttestations) == 0 {
+			return fmt.Errorf("no attestations found with predicate type: %s", opts.PredicateType)
+		}
+
+		attestations = filteredAttestations
 	}
 
 	metadataFilePath, err := opts.Store.createMetadataFile(artifact.DigestWithAlg(), attestations)
