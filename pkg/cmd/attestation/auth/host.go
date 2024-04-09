@@ -7,7 +7,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/auth"
 )
 
-var ErrGHESHost = errors.New("A GHES host was detected. gh attestation does not currently support GHES")
+var ErrUnsupportedHost = errors.New("An unsupported host was detected. Note that gh attestation does not currently support GHES")
 
 const (
 	github    = "github.com"
@@ -28,7 +28,7 @@ func IsHostSupported() error {
 	host, _ := auth.DefaultHost()
 
 	if isEnterprise(host) {
-		return ErrGHESHost
+		return ErrUnsupportedHost
 	}
 	return nil
 }
