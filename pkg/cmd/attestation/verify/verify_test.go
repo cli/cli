@@ -349,7 +349,6 @@ func TestRunVerify(t *testing.T) {
 		t.Skip()
 		opts := publicGoodOpts
 		opts.OIDCIssuer = "not-a-real-issuer"
-		opts.SigstoreVerifier = &verification.FailSigstoreVerifier{}
 		require.Error(t, runVerify(&opts))
 	})
 
