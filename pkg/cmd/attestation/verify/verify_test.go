@@ -19,9 +19,6 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/in-toto/in-toto-golang/in_toto"
-	"github.com/sigstore/sigstore-go/pkg/verify"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -417,21 +414,4 @@ func TestRunVerify(t *testing.T) {
 		customOpts.BundlePath = ""
 		require.Error(t, runVerify(&customOpts))
 	})
-}
-
-func TestVerifySLSAPredicateType_InvalidPredicate(t *testing.T) {
-	statement := &in_toto.Statement{}
-	statement.PredicateType = "some-other-predicate-type"
-
-	apr := []*verification.AttestationProcessingResult{
-		{
-			VerificationResult: &verify.VerificationResult{
-				Statement: statement,
-			},
-		},
-	}
-
-	err := verifySLSAPredicateType(io.NewTestHandler(), apr)
-	require.Error(t, err)
-	require.ErrorIs(t, err, ErrNoMatchingSLSAPredicate)
 }

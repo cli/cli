@@ -23,6 +23,7 @@ type Options struct {
 	NoPublicGood         bool
 	OIDCIssuer           string
 	Owner                string
+	PredicateType        string
 	Repo                 string
 	SAN                  string
 	SANRegex             string

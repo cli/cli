@@ -16,13 +16,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var ErrNoMatchingSLSAPredicate = fmt.Errorf("the attestation does not have the expected SLSA predicate type: %s", SLSAPredicateType)
-
 func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	verifyCmd := &cobra.Command{
 		Use:   "verify [<file-path> | oci://<image-uri>] [--owner | --repo]",
-		Args:  cobra.ExactArgs(1),
+		Args:  cmdutil.MinimumArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
 		Short: "Verify an artifact's integrity using attestations",
 		Long: heredoc.Docf(`
 			Verify the integrity and provenance of an artifact using its associated
@@ -132,6 +130,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Repository name in the format <owner>/<repo>")
 	verifyCmd.MarkFlagsMutuallyExclusive("owner", "repo")
 	verifyCmd.MarkFlagsOneRequired("owner", "repo")
+	verifyCmd.Flags().StringVarP(&opts.PredicateType, "predicate-type", "", "", "Filter attestations by provided predicate type")
 	verifyCmd.Flags().BoolVarP(&opts.NoPublicGood, "no-public-good", "", false, "Only verify attestations signed with GitHub's Sigstore instance")
 	verifyCmd.Flags().StringVarP(&opts.CustomTrustedRoot, "custom-trusted-root", "", "", "Path to a custom trustedroot.json file to use for verification")
 	verifyCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
@@ -170,6 +169,17 @@ func runVerify(opts *Options) error {
 		return fmt.Errorf("failed to fetch attestations for subject: %s", artifact.DigestWithAlg())
 	}
 
+	// Apply predicate type filter to returned attestations
+	if opts.PredicateType != "" {
+		filteredAttestations := verification.FilterAttestations(opts.PredicateType, attestations)
+
+		if len(filteredAttestations) == 0 {
+			return fmt.Errorf("no attestations found with predicate type: %s", opts.PredicateType)
+		}
+
+		attestations = filteredAttestations
+	}
+
 	policy, err := buildVerifyPolicy(opts, *artifact)
 	if err != nil {
 		return fmt.Errorf("failed to build policy: %v", err)
@@ -184,11 +194,6 @@ func runVerify(opts *Options) error {
 		"Successfully verified all attestations against Sigstore!\n",
 	))
 
-	// Try verifying the attestation's predicate type against the expect SLSA predicate type
-	if err = verifySLSAPredicateType(opts.Logger, sigstoreRes.VerifyResults); err != nil {
-		return fmt.Errorf("at least one attestation failed to verify predicate type verification: %v", err)
-	}
-
 	opts.Logger.VerbosePrint(opts.Logger.ColorScheme.Green("Successfully verified the SLSA predicate type of all attestations!\n"))
 
 	opts.Logger.Println(opts.Logger.ColorScheme.Green("All attestations have been successfully verified!"))
@@ -201,17 +206,5 @@ func runVerify(opts *Options) error {
 	}
 
 	// All attestations passed verification and policy evaluation
-	return nil
-}
-
-func verifySLSAPredicateType(logger *io.Handler, apr []*verification.AttestationProcessingResult) error {
-	logger.VerbosePrint("Evaluating attestations have valid SLSA predicate type")
-
-	for _, result := range apr {
-		if result.VerificationResult.Statement.PredicateType != SLSAPredicateType {
-			return ErrNoMatchingSLSAPredicate
-		}
-	}
-
 	return nil
 }
