@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
@@ -18,6 +19,7 @@ type Options struct {
 	CustomTrustedRoot    string
 	DenySelfHostedRunner bool
 	DigestAlgorithm      string
+	Limit                int
 	NoPublicGood         bool
 	OIDCIssuer           string
 	Owner                string
@@ -26,8 +28,8 @@ type Options struct {
 	SANRegex             string
 	APIClient            api.Client
 	Logger               *io.Handler
-	Limit                int
 	OCIClient            oci.Client
+	SigstoreVerifier     verification.SigstoreVerifier
 	exporter             cmdutil.Exporter
 }
 

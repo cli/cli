@@ -1,7 +1,6 @@
 package verify
 
 import (
-	// "encoding/json"
 	"errors"
 	"fmt"
 
@@ -106,6 +105,19 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 				return runF(opts)
 			}
 
+			config := verification.SigstoreConfig{
+				CustomTrustedRoot: opts.CustomTrustedRoot,
+				Logger:            opts.Logger,
+				NoPublicGood:      opts.NoPublicGood,
+			}
+
+			sv, err := verification.NewLiveSigstoreVerifier(config)
+			if err != nil {
+				return err
+			}
+
+			opts.SigstoreVerifier = sv
+
 			if err := runVerify(opts); err != nil {
 				return fmt.Errorf("Failed to verify the artifact: %v", err)
 			}
@@ -163,18 +175,7 @@ func runVerify(opts *Options) error {
 		return fmt.Errorf("failed to build policy: %v", err)
 	}
 
-	config := verification.SigstoreConfig{
-		CustomTrustedRoot: opts.CustomTrustedRoot,
-		Logger:            opts.Logger,
-		NoPublicGood:      opts.NoPublicGood,
-	}
-
-	sv, err := verification.NewSigstoreVerifier(config, policy)
-	if err != nil {
-		return err
-	}
-
-	sigstoreRes := sv.Verify(attestations)
+	sigstoreRes := opts.SigstoreVerifier.Verify(attestations, policy)
 	if sigstoreRes.Error != nil {
 		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", sigstoreRes.Error)
 	}
