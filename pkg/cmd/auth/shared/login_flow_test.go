@@ -115,9 +115,9 @@ func TestLogin(t *testing.T) {
 				The minimum required scopes are 'repo', 'read:org', 'admin:public_key'.
 				- gh config set -h example.com git_protocol ssh
 				✓ Configured git protocol
-				✓ Uploaded the SSH key to your GitHub account: %s/id_ed25519.pub
+				✓ Uploaded the SSH key to your GitHub account: %s
 				✓ Logged in as monalisa
-			`, opts.sshContext.ConfigDir), stderr)
+			`, filepath.Join(opts.sshContext.ConfigDir, "id_ed25519.pub")), stderr)
 			},
 		},
 		{
@@ -193,9 +193,9 @@ func TestLogin(t *testing.T) {
 				The minimum required scopes are 'repo', 'read:org', 'admin:public_key'.
 				- gh config set -h example.com git_protocol ssh
 				✓ Configured git protocol
-				✓ Uploaded the SSH key to your GitHub account: %s/id_ed25519.pub
+				✓ Uploaded the SSH key to your GitHub account: %s
 				✓ Logged in as monalisa
-			`, opts.sshContext.ConfigDir), stderr)
+			`, filepath.Join(opts.sshContext.ConfigDir, "id_ed25519.pub")), stderr)
 			},
 		},
 		{
