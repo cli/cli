@@ -34,19 +34,22 @@ type SigstoreConfig struct {
 	NoPublicGood      bool
 }
 
-type SigstoreVerifier struct {
+type SigstoreVerifier interface {
+	Verify(attestations []*api.Attestation, policy verify.PolicyBuilder) *SigstoreResults
+}
+
+type LiveSigstoreVerifier struct {
 	ghVerifier           *verify.SignedEntityVerifier
 	publicGoodVerifier   *verify.SignedEntityVerifier
 	customVerifier       *verify.SignedEntityVerifier
-	policy               verify.PolicyBuilder
 	onlyVerifyWithGithub bool
 	Logger               *io.Handler
 }
 
-// NewSigstoreVerifier creates a new SigstoreVerifier struct
+// NewLiveSigstoreVerifier creates a new LiveSigstoreVerifier struct
 // that is used to verify artifacts and attestations against the
 // Public Good, GitHub, or a custom trusted root.
-func NewSigstoreVerifier(config SigstoreConfig, policy verify.PolicyBuilder) (*SigstoreVerifier, error) {
+func NewLiveSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, error) {
 	customVerifier, err := newCustomVerifier(config.CustomTrustedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create custom verifier: %v", err)
@@ -62,17 +65,16 @@ func NewSigstoreVerifier(config SigstoreConfig, policy verify.PolicyBuilder) (*S
 		return nil, fmt.Errorf("failed to create GitHub Sigstore verifier: %v", err)
 	}
 
-	return &SigstoreVerifier{
+	return &LiveSigstoreVerifier{
 		ghVerifier:           ghVerifier,
 		publicGoodVerifier:   publicGoodVerifier,
 		customVerifier:       customVerifier,
 		Logger:               config.Logger,
-		policy:               policy,
 		onlyVerifyWithGithub: config.NoPublicGood,
 	}, nil
 }
 
-func (v *SigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify.SignedEntityVerifier, string, error) {
+func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify.SignedEntityVerifier, string, error) {
 	verifyContent, err := b.VerificationContent()
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get bundle verification content: %v", err)
@@ -103,7 +105,7 @@ func (v *SigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify.Sig
 	return nil, "", fmt.Errorf("leaf certificate issuer is not recognized")
 }
 
-func (v *SigstoreVerifier) Verify(attestations []*api.Attestation) *SigstoreResults {
+func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy verify.PolicyBuilder) *SigstoreResults {
 	// initialize the processing results before attempting to verify
 	// with multiple verifiers
 	results := make([]*AttestationProcessingResult, len(attestations))
@@ -128,7 +130,7 @@ func (v *SigstoreVerifier) Verify(attestations []*api.Attestation) *SigstoreResu
 
 		v.Logger.VerbosePrintf("Attempting verification against issuer \"%s\"\n", issuer)
 		// attempt to verify the attestation
-		result, err := verifier.Verify(apr.Attestation.Bundle, v.policy)
+		result, err := verifier.Verify(apr.Attestation.Bundle, policy)
 		// if verification fails, create the error and exit verification early
 		if err != nil {
 			v.Logger.VerbosePrint(v.Logger.ColorScheme.Redf(

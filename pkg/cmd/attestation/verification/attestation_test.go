@@ -3,7 +3,12 @@ package verification
 import (
 	"testing"
 
+	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	dsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
+	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/stretchr/testify/require"
+
+	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 )
 
 func TestLoadBundlesFromJSONLinesFile(t *testing.T) {
@@ -46,4 +51,52 @@ func TestGetLocalAttestations(t *testing.T) {
 		require.ErrorIs(t, err, ErrLocalAttestations)
 		require.Nil(t, attestations)
 	})
+}
+
+func TestFilterAttestations(t *testing.T) {
+	attestations := []*api.Attestation{
+		{
+			Bundle: &bundle.ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					Content: &protobundle.Bundle_DsseEnvelope{
+						DsseEnvelope: &dsse.Envelope{
+							PayloadType: "application/vnd.in-toto+json",
+							Payload:     []byte("{\"predicateType\": \"https://slsa.dev/provenance/v1\"}"),
+						},
+					},
+				},
+			},
+		},
+		{
+			Bundle: &bundle.ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					Content: &protobundle.Bundle_DsseEnvelope{
+						DsseEnvelope: &dsse.Envelope{
+							PayloadType: "application/vnd.something-other-than-in-toto+json",
+							Payload:     []byte("{\"predicateType\": \"https://slsa.dev/provenance/v1\"}"),
+						},
+					},
+				},
+			},
+		},
+		{
+			Bundle: &bundle.ProtobufBundle{
+				Bundle: &protobundle.Bundle{
+					Content: &protobundle.Bundle_DsseEnvelope{
+						DsseEnvelope: &dsse.Envelope{
+							PayloadType: "application/vnd.in-toto+json",
+							Payload:     []byte("{\"predicateType\": \"https://spdx.dev/Document/v2.3\"}"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	filtered := FilterAttestations("https://slsa.dev/provenance/v1", attestations)
+
+	require.Len(t, filtered, 1)
+
+	filtered = FilterAttestations("NonExistantPredicate", attestations)
+	require.Len(t, filtered, 0)
 }
