@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -1535,3 +1537,61 @@ sad job	quux the barf	log line 3
 var coolJobRunLogOutput = fmt.Sprintf("%s%s", fobTheBarzLogOutput, barfTheFobLogOutput)
 var sadJobRunLogOutput = fmt.Sprintf("%s%s", barfTheQuuxLogOutput, quuxTheBarfLogOutput)
 var expectedRunLogOutput = fmt.Sprintf("%s%s", coolJobRunLogOutput, sadJobRunLogOutput)
+
+func TestRunLog(t *testing.T) {
+	t.Run("when the cache dir doesn't exist, exists return false", func(t *testing.T) {
+		cacheDir := t.TempDir() + "/non-existent-dir"
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		exists, err := rlc.Exists("unimportant-key")
+		require.NoError(t, err)
+		require.False(t, exists)
+	})
+
+	t.Run("when no cache entry has been created, exists returns false", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		exists, err := rlc.Exists("unimportant-key")
+		require.NoError(t, err)
+		require.False(t, exists)
+	})
+
+	t.Run("when a cache entry has been created, exists returns true", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		contents := strings.NewReader("unimportant-content")
+		require.NoError(t, rlc.Create("key", contents))
+
+		exists, err := rlc.Exists("key")
+		require.NoError(t, err)
+		require.True(t, exists)
+	})
+
+	t.Run("when the cache dir doesn't exist, creating a cache entry creates it", func(t *testing.T) {
+		cacheDir := t.TempDir() + "/non-existent-dir"
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		contents := strings.NewReader("unimportant-content")
+		require.NoError(t, rlc.Create("key", contents))
+
+		require.DirExists(t, cacheDir)
+	})
+
+	t.Run("when a cache entry has been created, reading it returns its contents", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		f, err := os.Open("./fixtures/run_log.zip")
+		require.NoError(t, err)
+		defer f.Close()
+
+		require.NoError(t, rlc.Create("key", f))
+
+		zipReader, err := rlc.Open("key")
+		require.NoError(t, err)
+		defer zipReader.Close()
+		require.NotEmpty(t, zipReader.File)
+	})
+}

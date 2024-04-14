@@ -2,6 +2,7 @@ package verification
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -112,4 +113,32 @@ func GetRemoteAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error
 		return attestations, nil
 	}
 	return nil, fmt.Errorf("owner or repo must be provided")
+}
+
+type IntotoStatement struct {
+	PredicateType string `json:"predicateType"`
+}
+
+func FilterAttestations(predicateType string, attestations []*api.Attestation) []*api.Attestation {
+	filteredAttestations := []*api.Attestation{}
+
+	for _, each := range attestations {
+		dsseEnvelope := each.Bundle.GetDsseEnvelope()
+		if dsseEnvelope != nil {
+			if dsseEnvelope.PayloadType != "application/vnd.in-toto+json" {
+				// Don't fail just because an entry isn't intoto
+				continue
+			}
+			var intotoStatement IntotoStatement
+			if err := json.Unmarshal([]byte(dsseEnvelope.Payload), &intotoStatement); err != nil {
+				// Don't fail just because a single entry can't be unmarshalled
+				continue
+			}
+			if intotoStatement.PredicateType == predicateType {
+				filteredAttestations = append(filteredAttestations, each)
+			}
+		}
+	}
+
+	return filteredAttestations
 }

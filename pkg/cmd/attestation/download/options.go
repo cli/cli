@@ -22,6 +22,7 @@ type Options struct {
 	Store           MetadataStore
 	OCIClient       oci.Client
 	Owner           string
+	PredicateType   string
 	Repo            string
 }
 
