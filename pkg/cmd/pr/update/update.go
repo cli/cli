@@ -48,10 +48,15 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 		Example: heredoc.Doc(`
 			$ gh pr update 23
 			$ gh pr update 23 --rebase
+			$ gh pr update 23 --repo owner/repo
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
+
+			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
+			}
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
