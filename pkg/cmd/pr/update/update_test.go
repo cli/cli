@@ -50,6 +50,11 @@ func TestNewCmdUpdate(t *testing.T) {
 				Rebase:      true,
 			},
 		},
+		{
+			name:     "no argument, --repo",
+			input:    "--repo owner/repo",
+			wantsErr: "argument required when using the --repo flag",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -62,14 +67,16 @@ func TestNewCmdUpdate(t *testing.T) {
 				IOStreams: ios,
 			}
 
-			argv, err := shlex.Split(tt.input)
-			assert.NoError(t, err)
-
 			var gotOpts *UpdateOptions
 			cmd := NewCmdUpdate(f, func(opts *UpdateOptions) error {
 				gotOpts = opts
 				return nil
 			})
+
+			cmd.PersistentFlags().StringP("repo", "R", "", "")
+
+			argv, err := shlex.Split(tt.input)
+			assert.NoError(t, err)
 
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
