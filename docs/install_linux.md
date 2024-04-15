@@ -14,7 +14,7 @@ our release schedule.
 Install:
 
 ```bash
-(test -x /usr/bin/wget || which wget || sudo apt-get install wget -y) \
+(type -p wget || (sudo apt update && sudo apt-get install wget -y)) \
 && sudo mkdir -p -m 755 /etc/apt/keyrings \
 && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
 && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
