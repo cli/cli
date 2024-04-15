@@ -28,19 +28,20 @@ type iconfig interface {
 }
 
 type LoginOptions struct {
-	IO            *iostreams.IOStreams
-	Config        iconfig
-	HTTPClient    *http.Client
-	GitClient     *git.Client
-	Hostname      string
-	Interactive   bool
-	Web           bool
-	Scopes        []string
-	Executable    string
-	GitProtocol   string
-	Prompter      Prompt
-	Browser       browser.Browser
-	SecureStorage bool
+	IO               *iostreams.IOStreams
+	Config           iconfig
+	HTTPClient       *http.Client
+	GitClient        *git.Client
+	Hostname         string
+	Interactive      bool
+	Web              bool
+	Scopes           []string
+	Executable       string
+	GitProtocol      string
+	Prompter         Prompt
+	Browser          browser.Browser
+	SecureStorage    bool
+	SkipSSHKeyPrompt bool
 
 	sshContext ssh.Context
 }
@@ -84,7 +85,7 @@ func Login(opts *LoginOptions) error {
 
 	var keyToUpload string
 	keyTitle := defaultSSHKeyTitle
-	if opts.Interactive && gitProtocol == "ssh" {
+	if opts.Interactive && !opts.SkipSSHKeyPrompt && gitProtocol == "ssh" {
 		pubKeys, err := opts.sshContext.LocalPublicKeys()
 		if err != nil {
 			return err

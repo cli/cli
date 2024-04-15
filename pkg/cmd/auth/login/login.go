@@ -30,12 +30,13 @@ type LoginOptions struct {
 
 	Interactive bool
 
-	Hostname        string
-	Scopes          []string
-	Token           string
-	Web             bool
-	GitProtocol     string
-	InsecureStorage bool
+	Hostname         string
+	Scopes           []string
+	Token            string
+	Web              bool
+	GitProtocol      string
+	InsecureStorage  bool
+	SkipSSHKeyPrompt bool
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -75,6 +76,10 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			The git protocol to use for git operations on this host can be set with %[1]s--git-protocol%[1]s,
 			or during the interactive prompting. Although login is for a single account on a host, setting
 			the git protocol will take effect for all users on the host.
+
+			Specifying %[1]sssh%[1]s for the git protocol will detect existing SSH keys to upload,
+			prompting to create and upload a new key if one is not found. This can be skipped with
+			%[1]s--skip-ssh-key%[1]s flag.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Start interactive setup
@@ -138,6 +143,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	_ = cmd.Flags().MarkHidden("secure-storage")
 
 	cmd.Flags().BoolVar(&opts.InsecureStorage, "insecure-storage", false, "Save authentication credentials in plain text instead of credential store")
+	cmd.Flags().BoolVar(&opts.SkipSSHKeyPrompt, "skip-ssh-key", false, "Skip generate/upload SSH key prompt")
 
 	return cmd
 }
@@ -189,19 +195,20 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	return shared.Login(&shared.LoginOptions{
-		IO:            opts.IO,
-		Config:        authCfg,
-		HTTPClient:    httpClient,
-		Hostname:      hostname,
-		Interactive:   opts.Interactive,
-		Web:           opts.Web,
-		Scopes:        opts.Scopes,
-		Executable:    opts.MainExecutable,
-		GitProtocol:   opts.GitProtocol,
-		Prompter:      opts.Prompter,
-		GitClient:     opts.GitClient,
-		Browser:       opts.Browser,
-		SecureStorage: !opts.InsecureStorage,
+		IO:               opts.IO,
+		Config:           authCfg,
+		HTTPClient:       httpClient,
+		Hostname:         hostname,
+		Interactive:      opts.Interactive,
+		Web:              opts.Web,
+		Scopes:           opts.Scopes,
+		Executable:       opts.MainExecutable,
+		GitProtocol:      opts.GitProtocol,
+		Prompter:         opts.Prompter,
+		GitClient:        opts.GitClient,
+		Browser:          opts.Browser,
+		SecureStorage:    !opts.InsecureStorage,
+		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
 	})
 }
 
