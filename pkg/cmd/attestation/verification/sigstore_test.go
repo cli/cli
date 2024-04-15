@@ -21,7 +21,7 @@ func buildPolicy(a artifact.DigestedArtifact) (verify.PolicyBuilder, error) {
 	return policy, nil
 }
 
-func TestNewSigstoreVerifier(t *testing.T) {
+func TestNewLiveSigstoreVerifier(t *testing.T) {
 	artifactPath := test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz")
 	artifact, err := artifact.NewDigestedArtifact(nil, artifactPath, "sha512")
 	require.NoError(t, err)
@@ -32,7 +32,7 @@ func TestNewSigstoreVerifier(t *testing.T) {
 	c := SigstoreConfig{
 		Logger: io.NewTestHandler(),
 	}
-	verifier, err := NewSigstoreVerifier(c, policy)
+	verifier, err := NewLiveSigstoreVerifier(c)
 	require.NoError(t, err)
 
 	t.Run("with invalid signature", func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestNewSigstoreVerifier(t *testing.T) {
 		require.NotNil(t, attestations)
 		require.NoError(t, err)
 
-		res := verifier.Verify(attestations)
+		res := verifier.Verify(attestations, policy)
 		require.Error(t, res.Error)
 		require.ErrorContains(t, res.Error, "verifying with issuer \"sigstore.dev\"")
 		require.Nil(t, res.VerifyResults)
@@ -53,7 +53,7 @@ func TestNewSigstoreVerifier(t *testing.T) {
 		require.Len(t, attestations, 2)
 		require.NoError(t, err)
 
-		res := verifier.Verify(attestations)
+		res := verifier.Verify(attestations, policy)
 		require.Len(t, res.VerifyResults, 2)
 		require.NoError(t, res.Error)
 	})

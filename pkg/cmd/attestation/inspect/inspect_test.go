@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -53,10 +54,11 @@ func TestNewInspectCmd(t *testing.T) {
 			name: "Invalid digest-alg flag",
 			cli:  fmt.Sprintf("%s --bundle %s --digest-alg sha384", artifactPath, bundlePath),
 			wants: Options{
-				ArtifactPath:    artifactPath,
-				BundlePath:      bundlePath,
-				DigestAlgorithm: "sha384",
-				OCIClient:       oci.MockClient{},
+				ArtifactPath:     artifactPath,
+				BundlePath:       bundlePath,
+				DigestAlgorithm:  "sha384",
+				OCIClient:        oci.MockClient{},
+				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: true,
 		},
@@ -64,10 +66,11 @@ func TestNewInspectCmd(t *testing.T) {
 			name: "Use default digest-alg value",
 			cli:  fmt.Sprintf("%s --bundle %s", artifactPath, bundlePath),
 			wants: Options{
-				ArtifactPath:    artifactPath,
-				BundlePath:      bundlePath,
-				DigestAlgorithm: "sha256",
-				OCIClient:       oci.MockClient{},
+				ArtifactPath:     artifactPath,
+				BundlePath:       bundlePath,
+				DigestAlgorithm:  "sha256",
+				OCIClient:        oci.MockClient{},
+				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: false,
 		},
@@ -75,10 +78,11 @@ func TestNewInspectCmd(t *testing.T) {
 			name: "Use custom digest-alg value",
 			cli:  fmt.Sprintf("%s --bundle %s --digest-alg sha512", artifactPath, bundlePath),
 			wants: Options{
-				ArtifactPath:    artifactPath,
-				BundlePath:      bundlePath,
-				DigestAlgorithm: "sha512",
-				OCIClient:       oci.MockClient{},
+				ArtifactPath:     artifactPath,
+				BundlePath:       bundlePath,
+				DigestAlgorithm:  "sha512",
+				OCIClient:        oci.MockClient{},
+				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: false,
 		},
@@ -86,9 +90,10 @@ func TestNewInspectCmd(t *testing.T) {
 			name: "Missing bundle flag",
 			cli:  artifactPath,
 			wants: Options{
-				ArtifactPath:    artifactPath,
-				DigestAlgorithm: "sha256",
-				OCIClient:       oci.MockClient{},
+				ArtifactPath:     artifactPath,
+				DigestAlgorithm:  "sha256",
+				OCIClient:        oci.MockClient{},
+				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: true,
 		},
@@ -96,10 +101,11 @@ func TestNewInspectCmd(t *testing.T) {
 			name: "Prints output in JSON format",
 			cli:  fmt.Sprintf("%s --bundle %s --format json", artifactPath, bundlePath),
 			wants: Options{
-				ArtifactPath:    artifactPath,
-				BundlePath:      bundlePath,
-				DigestAlgorithm: "sha256",
-				OCIClient:       oci.MockClient{},
+				ArtifactPath:     artifactPath,
+				BundlePath:       bundlePath,
+				DigestAlgorithm:  "sha256",
+				OCIClient:        oci.MockClient{},
+				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsExporter: true,
 		},
@@ -128,8 +134,8 @@ func TestNewInspectCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.ArtifactPath, opts.ArtifactPath)
 			assert.Equal(t, tc.wants.BundlePath, opts.BundlePath)
 			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
-			assert.NotNil(t, opts.OCIClient)
 			assert.NotNil(t, opts.Logger)
+			assert.NotNil(t, opts.OCIClient)
 			assert.Equal(t, tc.wantsExporter, opts.exporter != nil)
 		})
 	}
@@ -137,11 +143,12 @@ func TestNewInspectCmd(t *testing.T) {
 
 func TestRunInspect(t *testing.T) {
 	opts := Options{
-		ArtifactPath:    artifactPath,
-		BundlePath:      bundlePath,
-		DigestAlgorithm: "sha512",
-		Logger:          io.NewTestHandler(),
-		OCIClient:       oci.MockClient{},
+		ArtifactPath:     artifactPath,
+		BundlePath:       bundlePath,
+		DigestAlgorithm:  "sha512",
+		Logger:           io.NewTestHandler(),
+		OCIClient:        oci.MockClient{},
+		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 	}
 
 	t.Run("with valid artifact and bundle", func(t *testing.T) {
@@ -164,12 +171,13 @@ func TestRunInspect(t *testing.T) {
 func TestJSONOutput(t *testing.T) {
 	testIO, _, out, _ := iostreams.Test()
 	opts := Options{
-		ArtifactPath:    artifactPath,
-		BundlePath:      bundlePath,
-		DigestAlgorithm: "sha512",
-		Logger:          io.NewHandler(testIO),
-		OCIClient:       oci.MockClient{},
-		exporter:        cmdutil.NewJSONExporter(),
+		ArtifactPath:     artifactPath,
+		BundlePath:       bundlePath,
+		DigestAlgorithm:  "sha512",
+		Logger:           io.NewHandler(testIO),
+		OCIClient:        oci.MockClient{},
+		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+		exporter:         cmdutil.NewJSONExporter(),
 	}
 	require.Nil(t, runInspect(&opts))
 
