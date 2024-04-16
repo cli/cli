@@ -265,7 +265,6 @@ func doGQL(opts *ApiOptions) error {
 		return err
 	}
 
-	isGraphQL := opts.RequestPath == "graphql"
 	requestPath, err := fillPlaceholders(opts.RequestPath, opts)
 	if err != nil {
 		return fmt.Errorf("unable to expand placeholder in path: %w", err)
@@ -279,10 +278,6 @@ func doGQL(opts *ApiOptions) error {
 
 	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
 		method = "POST"
-	}
-
-	if opts.Paginate && !isGraphQL {
-		requestPath = addPerPage(requestPath, 100, params)
 	}
 
 	if opts.RequestInputFile != "" {
@@ -364,14 +359,11 @@ func doGQL(opts *ApiOptions) error {
 	isFirstPage := true
 	hasNextPage := true
 	for hasNextPage {
-		isGraphQL := requestPath == "graphql"
 		var requestURL string
 		if strings.Contains(requestPath, "://") {
 			requestURL = requestPath
-		} else if isGraphQL {
-			requestURL = ghinstance.GraphQLEndpoint(host)
 		} else {
-			requestURL = ghinstance.RESTPrefix(host) + strings.TrimPrefix(requestPath, "/")
+			requestURL = ghinstance.GraphQLEndpoint(host)
 		}
 
 		var body io.Reader
@@ -382,9 +374,7 @@ func doGQL(opts *ApiOptions) error {
 			if strings.EqualFold(method, "GET") {
 				requestURL = addQuery(requestURL, pp)
 			} else {
-				if isGraphQL {
-					pp = groupGraphQLVariables(pp)
-				}
+				pp = groupGraphQLVariables(pp)
 				b, err := json.Marshal(pp)
 				if err != nil {
 					return fmt.Errorf("error serializing parameters: %w", err)
@@ -431,11 +421,6 @@ func doGQL(opts *ApiOptions) error {
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			return err
-		}
-
-		if !isGraphQL {
-			requestPath, hasNextPage = findNextPage(resp)
-			requestBody = nil // prevent repeating GET parameters
 		}
 
 		if opts.ShowResponseHeaders {
@@ -526,11 +511,9 @@ func doGQL(opts *ApiOptions) error {
 			break
 		}
 
-		if isGraphQL {
-			hasNextPage = endCursor != ""
-			if hasNextPage {
-				params["endCursor"] = endCursor
-			}
+		hasNextPage = endCursor != ""
+		if hasNextPage {
+			params["endCursor"] = endCursor
 		}
 
 		if hasNextPage && opts.ShowResponseHeaders {
