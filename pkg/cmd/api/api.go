@@ -176,7 +176,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			'
 
 			# get the percentage of forks for the current user
-			# without --slurp you will get a different percentage for each page
 			$ gh api graphql --paginate --slurp -f query='
 			  query($endCursor: String) {
 			    viewer {
