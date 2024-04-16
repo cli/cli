@@ -39,6 +39,7 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 			if err != nil {
 				return nil, fmt.Errorf("error serializing parameters: %w", err)
 			}
+			fmt.Println(string(b))
 			body = bytes.NewBuffer(b)
 			bodyIsJSON = true
 		}

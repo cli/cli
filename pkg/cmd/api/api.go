@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -243,20 +244,340 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	return cmd
 }
 
-type GraphQLRequest struct{}
-type GraphQLResponse struct{}
-
-type RestRequest struct{}
-type RestResponse struct{}
-
 func apiRun(opts *ApiOptions) error {
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	if opts.HttpClient == nil {
+		opts.HttpClient = func() (*http.Client, error) {
+			log := opts.IO.ErrOut
+			if opts.Verbose {
+				log = opts.IO.Out
+			}
+			opts := api.HTTPClientOptions{
+				AppVersion:     opts.AppVersion,
+				CacheTTL:       opts.CacheTTL,
+				Config:         cfg.Authentication(),
+				EnableCache:    opts.CacheTTL > 0,
+				Log:            log,
+				LogColorize:    opts.IO.ColorEnabled(),
+				LogVerboseHTTP: opts.Verbose,
+			}
+			return api.NewHTTPClient(opts)
+		}
+	}
+
+	host, _ := cfg.Authentication().DefaultHost()
+	if opts.Hostname == "" {
+		opts.Hostname = host
+	}
+
+	// WIP: this is intended to determine whether this is a GQL request or not
+	// however, it's not correct because the RequestPath could be of the form:
+	// https://api.github.com/graphql or https://github.com/api/v3/graphql
 	isGraphQL := opts.RequestPath == "graphql"
 	if isGraphQL {
-		return doGraphQL(opts)
+		return doGraphQL2(opts)
 	}
 	return doRest(opts)
 }
 
+func doGraphQL2(opts *ApiOptions) error {
+	params, err := parseFields(opts)
+	if err != nil {
+		return err
+	}
+
+	requestPath, err := fillPlaceholders(opts.RequestPath, opts)
+	if err != nil {
+		return fmt.Errorf("unable to expand placeholder in path: %w", err)
+	}
+	method := opts.RequestMethod
+	requestHeaders := opts.RequestHeaders
+
+	var requestBody interface{}
+	if len(params) > 0 {
+		requestBody = params
+	}
+
+	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
+		method = "POST"
+	}
+
+	if len(opts.Previews) > 0 {
+		requestHeaders = append(requestHeaders, "Accept: "+previewNamesToMIMETypes(opts.Previews))
+	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	var bodyWriter io.Writer = opts.IO.Out
+	// Do we write headers when silent?
+	var headersWriter io.Writer = opts.IO.Out
+	if opts.Silent {
+		bodyWriter = io.Discard
+	}
+	if opts.Verbose {
+		// httpClient handles output when verbose flag is specified.
+		bodyWriter = io.Discard
+		headersWriter = io.Discard
+	}
+
+	template := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
+	err = template.Parse(opts.Template)
+	if err != nil {
+		return err
+	}
+
+	hasNextPage := true
+	for hasNextPage {
+		// Inlined here is:
+		// resp, err := httpRequest(httpClient, opts.Hostname, method, requestPath, requestBody, requestHeaders)
+
+		var requestURL string
+		// WIP: Is this a good way to determine that request path is a full URL?
+		if strings.Contains(requestPath, "://") {
+			requestURL = requestPath
+		} else {
+			requestURL = ghinstance.GraphQLEndpoint(opts.Hostname)
+		}
+
+		var body io.Reader
+		var bodyIsJSON bool
+
+		switch paramsTyp := requestBody.(type) {
+		case map[string]interface{}:
+			paramsTyp = groupGraphQLVariables(paramsTyp)
+
+			b, err := json.Marshal(paramsTyp)
+			if err != nil {
+				return fmt.Errorf("error serializing parameters: %w", err)
+			}
+			fmt.Println(string(b))
+			body = bytes.NewBuffer(b)
+			bodyIsJSON = true
+
+		case io.Reader:
+			// WIP: paramsTyp?
+			body = paramsTyp
+		case nil:
+			body = nil
+		default:
+			return fmt.Errorf("unrecognized parameters type: %v", params)
+		}
+
+		req, err := http.NewRequest(strings.ToUpper(method), requestURL, body)
+		if err != nil {
+			return err
+		}
+
+		for _, h := range requestHeaders {
+			idx := strings.IndexRune(h, ':')
+			if idx == -1 {
+				return fmt.Errorf("header %q requires a value separated by ':'", h)
+			}
+			name, value := h[0:idx], strings.TrimSpace(h[idx+1:])
+			if strings.EqualFold(name, "Content-Length") {
+				length, err := strconv.ParseInt(value, 10, 0)
+				if err != nil {
+					return err
+				}
+				req.ContentLength = length
+			} else {
+				req.Header.Add(name, value)
+			}
+		}
+		if bodyIsJSON && req.Header.Get("Content-Type") == "" {
+			req.Header.Set("Content-Type", "application/json; charset=utf-8")
+		}
+		if req.Header.Get("Accept") == "" {
+			req.Header.Set("Accept", "*/*")
+		}
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+
+		var endCursor string
+
+		// Inlined here is:
+		// endCursor, err := processGraphQLResponse(resp, opts, bodyWriter, headersWriter, tmpl)
+
+		if opts.ShowResponseHeaders {
+			fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
+			printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
+			fmt.Fprint(headersWriter, "\r\n")
+		}
+
+		// TODO: Can GQL ever return a 204?
+		if resp.StatusCode == 204 {
+			return err
+		}
+		var responseBody io.Reader = resp.Body
+		defer resp.Body.Close()
+
+		isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
+
+		var serverError string
+		// TODO: This JSON check is likely superfluous
+		if isJSON {
+			bodyCopy := &bytes.Buffer{}
+			b, err := io.ReadAll(io.TeeReader(responseBody, bodyCopy))
+			if err != nil {
+				return err
+			}
+			responseBody = bodyCopy
+
+			var parsedBody struct {
+				Message string
+				Errors  json.RawMessage
+			}
+			err = json.Unmarshal(b, &parsedBody)
+			if err != nil {
+				return err
+			}
+
+			if len(parsedBody.Errors) > 0 && parsedBody.Errors[0] == '"' {
+				var stringError string
+				if err := json.Unmarshal(parsedBody.Errors, &stringError); err != nil {
+					return err
+				}
+				if stringError != "" {
+					if parsedBody.Message != "" {
+						serverError = fmt.Sprintf("%s (%s)", stringError, parsedBody.Message)
+					}
+				}
+			}
+
+			if parsedBody.Message != "" {
+				serverError = fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, resp.StatusCode)
+			}
+
+			if len(parsedBody.Errors) == 0 || parsedBody.Errors[0] != '[' {
+				// Do nothing
+			} else {
+				var errorObjects []json.RawMessage
+				if err := json.Unmarshal(parsedBody.Errors, &errorObjects); err != nil {
+					return err
+				}
+
+				var objectError struct {
+					Message string
+				}
+				var errors []string
+				for _, rawErr := range errorObjects {
+					if len(rawErr) == 0 {
+						continue
+					}
+					if rawErr[0] == '{' {
+						err := json.Unmarshal(rawErr, &objectError)
+						if err != nil {
+							return err
+						}
+						errors = append(errors, objectError.Message)
+					} else if rawErr[0] == '"' {
+						var stringError string
+						err := json.Unmarshal(rawErr, &stringError)
+						if err != nil {
+							return err
+						}
+						errors = append(errors, stringError)
+					}
+				}
+
+				if len(errors) > 0 {
+					serverError = strings.Join(errors, "\n")
+				}
+			}
+		}
+
+		var bodyCopy *bytes.Buffer
+		isGraphQLPaginate := isJSON && resp.StatusCode == 200 && opts.Paginate
+		if isGraphQLPaginate {
+			bodyCopy = &bytes.Buffer{}
+			responseBody = io.TeeReader(responseBody, bodyCopy)
+		}
+
+		if opts.FilterOutput != "" && serverError == "" {
+			// TODO: reuse parsed query across pagination invocations
+			indent := ""
+			if opts.IO.IsStdoutTTY() {
+				indent = "  "
+			}
+			err = jq.EvaluateFormatted(responseBody, bodyWriter, opts.FilterOutput, indent, opts.IO.ColorEnabled())
+			if err != nil {
+				return err
+			}
+		} else if opts.Template != "" && serverError == "" {
+			err = template.Execute(responseBody)
+			if err != nil {
+				return err
+			}
+		} else if isJSON && opts.IO.ColorEnabled() {
+			err = jsoncolor.Write(bodyWriter, responseBody, "  ")
+		} else {
+			_, err = io.Copy(bodyWriter, responseBody)
+		}
+		if err != nil {
+			return err
+		}
+
+		if serverError == "" && resp.StatusCode > 299 {
+			serverError = fmt.Sprintf("HTTP %d", resp.StatusCode)
+		}
+		if serverError != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
+			if msg := api.ScopesSuggestion(resp); msg != "" {
+				fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
+			}
+			if u := factory.SSOURL(); u != "" {
+				fmt.Fprintf(opts.IO.ErrOut, "Authorize in your web browser: %s\n", u)
+			}
+			err = cmdutil.SilentError
+			return err
+		}
+
+		if isGraphQLPaginate {
+			endCursor = findEndCursor(bodyCopy)
+		}
+
+		if !opts.Paginate {
+			break
+		}
+
+		hasNextPage = endCursor != ""
+		if hasNextPage {
+			params["endCursor"] = endCursor
+		}
+
+		if hasNextPage && opts.ShowResponseHeaders {
+			fmt.Fprint(opts.IO.Out, "\n")
+		}
+	}
+	return template.Flush()
+}
+
+// GQL
+// 1. Build the request we want to make
+//   - Parse the fields -f -F
+//   - Fill in placeholders
+//   - Choosing the HTTP METHOD
+//   - Getting the Host
+//   - Getting the Path
+//   - Determining the request body or the query string
+//   - Adding preview headers
+//   - Adding the rest of the headers
+//   - Intuiting the Content-Type
+//   - Setting a default Accept header
+//
+// 2. Make the request
+// 3. Write request/response to IO
+// 4. GraphQL cursor pagination
 func doGraphQL(opts *ApiOptions) error {
 	params, err := parseFields(opts)
 	if err != nil {
@@ -278,6 +599,7 @@ func doGraphQL(opts *ApiOptions) error {
 		method = "POST"
 	}
 
+	// Add a test for this
 	if opts.RequestInputFile != "" {
 		file, size, err := openUserFile(opts.RequestInputFile, opts.IO.In)
 		if err != nil {
@@ -323,6 +645,22 @@ func doGraphQL(opts *ApiOptions) error {
 		return err
 	}
 
+	host, _ := cfg.Authentication().DefaultHost()
+
+	if opts.Hostname != "" {
+		host = opts.Hostname
+	}
+
+	// Does anyone ever want to have --silent and --include?
+
+	// Response Body + Headers
+	//  - DiscardWriter
+	//  - OutWriter
+	//  - PagedWriter { OutWriter }
+	//  - TemplateWriter?
+
+	// - ResponseHandlingWriter { }
+
 	if !opts.Silent {
 		if err := opts.IO.StartPager(); err == nil {
 			defer opts.IO.StopPager()
@@ -332,6 +670,7 @@ func doGraphQL(opts *ApiOptions) error {
 	}
 
 	var bodyWriter io.Writer = opts.IO.Out
+	// Do we write headers when silent?
 	var headersWriter io.Writer = opts.IO.Out
 	if opts.Silent {
 		bodyWriter = io.Discard
@@ -340,12 +679,6 @@ func doGraphQL(opts *ApiOptions) error {
 		// httpClient handles output when verbose flag is specified.
 		bodyWriter = io.Discard
 		headersWriter = io.Discard
-	}
-
-	host, _ := cfg.Authentication().DefaultHost()
-
-	if opts.Hostname != "" {
-		host = opts.Hostname
 	}
 
 	tmpl := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
@@ -384,11 +717,14 @@ func doGraphQL(opts *ApiOptions) error {
 }
 
 func doRest(opts *ApiOptions) error {
+	// WIP: parsing fields is about taking the -f and -F flags and turning them into params
+	// that will be in the request
 	params, err := parseFields(opts)
 	if err != nil {
 		return err
 	}
 
+	// WIP: filling placeholder values like {owner} or {repo}
 	requestPath, err := fillPlaceholders(opts.RequestPath, opts)
 	if err != nil {
 		return fmt.Errorf("unable to expand placeholder in path: %w", err)
@@ -400,14 +736,17 @@ func doRest(opts *ApiOptions) error {
 		requestBody = params
 	}
 
+	// WIP: try to infer the method if the user hasn't provided one
 	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
 		method = "POST"
 	}
 
+	// WIP: if we're paginating, add a query parameter to the request path
 	if opts.Paginate {
 		requestPath = addPerPage(requestPath, 100, params)
 	}
 
+	// WIP: if an input file or stdin is used for the body, the params are added to the query string
 	if opts.RequestInputFile != "" {
 		file, size, err := openUserFile(opts.RequestInputFile, opts.IO.In)
 		if err != nil {
@@ -416,11 +755,13 @@ func doRest(opts *ApiOptions) error {
 		defer file.Close()
 		requestPath = addQuery(requestPath, params)
 		requestBody = file
+		// WIP: Why do we not need to set the content-length in the case of reading from stdin?
 		if size >= 0 {
 			requestHeaders = append([]string{fmt.Sprintf("Content-Length: %d", size)}, requestHeaders...)
 		}
 	}
 
+	// WIP: previews seem to be a way to get access to non GA features
 	if len(opts.Previews) > 0 {
 		requestHeaders = append(requestHeaders, "Accept: "+previewNamesToMIMETypes(opts.Previews))
 	}
