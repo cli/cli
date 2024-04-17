@@ -329,6 +329,21 @@ func Test_NewCmdApi(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name:     "--slurp without --paginate",
+			cli:      "user --slurp",
+			wantsErr: true,
+		},
+		{
+			name:     "slurp with --jq",
+			cli:      "user --paginate --slurp --jq .foo",
+			wantsErr: true,
+		},
+		{
+			name:     "slurp with --template",
+			cli:      "user --paginate --slurp --template '{{.foo}}'",
+			wantsErr: true,
+		},
+		{
 			name: "with verbose",
 			cli:  "user --verbose",
 			wants: ApiOptions{
@@ -552,6 +567,34 @@ func Test_apiRun(t *testing.T) {
 			isatty: false,
 		},
 		{
+			name: "output template with range",
+			options: ApiOptions{
+				Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body: io.NopCloser(bytes.NewBufferString(`[
+					{
+						"title": "First title",
+						"labels": [{"name":"bug"}, {"name":"help wanted"}]
+					},
+					{
+						"title": "Second but not last"
+					},
+					{
+						"title": "Alas, tis' the end",
+						"labels": [{}, {"name":"feature"}]
+					}
+				]`)),
+				Header: http.Header{"Content-Type": []string{"application/json"}},
+			},
+			stdout: heredoc.Doc(`
+			First title (bug, help wanted)
+			Second but not last ()
+			Alas, tis' the end (, feature)
+		`),
+		},
+		{
 			name: "output template when REST error",
 			options: ApiOptions{
 				Template: `{{.status}}`,
@@ -650,23 +693,36 @@ func Test_apiRun_paginationREST(t *testing.T) {
 	requestCount := 0
 	responses := []*http.Response{
 		{
+			Proto:      "HTTP/1.1",
+			Status:     "200 OK",
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewBufferString(`{"page":1}`)),
 			Header: http.Header{
-				"Link": []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"Content-Type":        []string{"application/json"},
+				"Link":                []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"X-Github-Request-Id": []string{"1"},
 			},
 		},
 		{
+			Proto:      "HTTP/1.1",
+			Status:     "200 OK",
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewBufferString(`{"page":2}`)),
 			Header: http.Header{
-				"Link": []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"Content-Type":        []string{"application/json"},
+				"Link":                []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"X-Github-Request-Id": []string{"2"},
 			},
 		},
 		{
+			Proto:      "HTTP/1.1",
+			Status:     "200 OK",
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewBufferString(`{"page":3}`)),
-			Header:     http.Header{},
+			Header: http.Header{
+				"Content-Type":        []string{"application/json"},
+				"X-Github-Request-Id": []string{"3"},
+			},
 		},
 	}
 
@@ -775,6 +831,79 @@ func Test_apiRun_arrayPaginationREST(t *testing.T) {
 	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=3", responses[2].Request.URL.String())
 }
 
+func Test_apiRun_arrayPaginationREST_with_headers(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+
+	requestCount := 0
+	responses := []*http.Response{
+		{
+			Proto:      "HTTP/1.1",
+			Status:     "200 OK",
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"page":1}]`)),
+			Header: http.Header{
+				"Content-Type":        []string{"application/json"},
+				"Link":                []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"X-Github-Request-Id": []string{"1"},
+			},
+		},
+		{
+			Proto:      "HTTP/1.1",
+			Status:     "200 OK",
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"page":2}]`)),
+			Header: http.Header{
+				"Content-Type":        []string{"application/json"},
+				"Link":                []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"X-Github-Request-Id": []string{"2"},
+			},
+		},
+		{
+			Proto:      "HTTP/1.1",
+			Status:     "200 OK",
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"page":3}]`)),
+			Header: http.Header{
+				"Content-Type":        []string{"application/json"},
+				"X-Github-Request-Id": []string{"3"},
+			},
+		},
+	}
+
+	options := ApiOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				resp := responses[requestCount]
+				resp.Request = req
+				requestCount++
+				return resp, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+
+		RequestMethod:       "GET",
+		RequestMethodPassed: true,
+		RequestPath:         "issues",
+		Paginate:            true,
+		RawFields:           []string{"per_page=50", "page=1"},
+		ShowResponseHeaders: true,
+	}
+
+	err := apiRun(&options)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "HTTP/1.1 200 OK\nContent-Type: application/json\r\nLink: <https://api.github.com/repositories/1227/issues?page=2>; rel=\"next\", <https://api.github.com/repositories/1227/issues?page=3>; rel=\"last\"\r\nX-Github-Request-Id: 1\r\n\r\n[{\"page\":1}]\nHTTP/1.1 200 OK\nContent-Type: application/json\r\nLink: <https://api.github.com/repositories/1227/issues?page=3>; rel=\"next\", <https://api.github.com/repositories/1227/issues?page=3>; rel=\"last\"\r\nX-Github-Request-Id: 2\r\n\r\n[{\"page\":2}]\nHTTP/1.1 200 OK\nContent-Type: application/json\r\nX-Github-Request-Id: 3\r\n\r\n[{\"page\":3}]", stdout.String(), "stdout")
+	assert.Equal(t, "", stderr.String(), "stderr")
+
+	assert.Equal(t, "https://api.github.com/issues?page=1&per_page=50", responses[0].Request.URL.String())
+	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=2", responses[1].Request.URL.String())
+	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=3", responses[2].Request.URL.String())
+}
+
 func Test_apiRun_paginationGraphQL(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 
@@ -783,7 +912,8 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 		{
 			StatusCode: 200,
 			Header:     http.Header{"Content-Type": []string{`application/json`}},
-			Body: io.NopCloser(bytes.NewBufferString(`{
+			Body: io.NopCloser(bytes.NewBufferString(heredoc.Doc(`
+			{
 				"data": {
 					"nodes": ["page one"],
 					"pageInfo": {
@@ -791,12 +921,13 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 						"hasNextPage": true
 					}
 				}
-			}`)),
+			}`))),
 		},
 		{
 			StatusCode: 200,
 			Header:     http.Header{"Content-Type": []string{`application/json`}},
-			Body: io.NopCloser(bytes.NewBufferString(`{
+			Body: io.NopCloser(bytes.NewBufferString(heredoc.Doc(`
+			{
 				"data": {
 					"nodes": ["page two"],
 					"pageInfo": {
@@ -804,7 +935,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 						"hasNextPage": false
 					}
 				}
-			}`)),
+			}`))),
 		},
 	}
 
@@ -832,8 +963,127 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 	err := apiRun(&options)
 	require.NoError(t, err)
 
-	assert.Contains(t, stdout.String(), `"page one"`)
-	assert.Contains(t, stdout.String(), `"page two"`)
+	assert.Equal(t, heredoc.Doc(`
+	{
+		"data": {
+			"nodes": ["page one"],
+			"pageInfo": {
+				"endCursor": "PAGE1_END",
+				"hasNextPage": true
+			}
+		}
+	}{
+		"data": {
+			"nodes": ["page two"],
+			"pageInfo": {
+				"endCursor": "PAGE2_END",
+				"hasNextPage": false
+			}
+		}
+	}`), stdout.String())
+	assert.Equal(t, "", stderr.String(), "stderr")
+
+	var requestData struct {
+		Variables map[string]interface{}
+	}
+
+	bb, err := io.ReadAll(responses[0].Request.Body)
+	require.NoError(t, err)
+	err = json.Unmarshal(bb, &requestData)
+	require.NoError(t, err)
+	_, hasCursor := requestData.Variables["endCursor"].(string)
+	assert.Equal(t, false, hasCursor)
+
+	bb, err = io.ReadAll(responses[1].Request.Body)
+	require.NoError(t, err)
+	err = json.Unmarshal(bb, &requestData)
+	require.NoError(t, err)
+	endCursor, hasCursor := requestData.Variables["endCursor"].(string)
+	assert.Equal(t, true, hasCursor)
+	assert.Equal(t, "PAGE1_END", endCursor)
+}
+
+func Test_apiRun_paginationGraphQL_slurp(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+
+	requestCount := 0
+	responses := []*http.Response{
+		{
+			StatusCode: 200,
+			Header:     http.Header{"Content-Type": []string{`application/json`}},
+			Body: io.NopCloser(bytes.NewBufferString(heredoc.Doc(`
+			{
+				"data": {
+					"nodes": ["page one"],
+					"pageInfo": {
+						"endCursor": "PAGE1_END",
+						"hasNextPage": true
+					}
+				}
+			}`))),
+		},
+		{
+			StatusCode: 200,
+			Header:     http.Header{"Content-Type": []string{`application/json`}},
+			Body: io.NopCloser(bytes.NewBufferString(heredoc.Doc(`
+			{
+				"data": {
+					"nodes": ["page two"],
+					"pageInfo": {
+						"endCursor": "PAGE2_END",
+						"hasNextPage": false
+					}
+				}
+			}`))),
+		},
+	}
+
+	options := ApiOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				resp := responses[requestCount]
+				resp.Request = req
+				requestCount++
+				return resp, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+
+		RawFields:     []string{"foo=bar"},
+		RequestMethod: "POST",
+		RequestPath:   "graphql",
+		Paginate:      true,
+		Slurp:         true,
+	}
+
+	err := apiRun(&options)
+	require.NoError(t, err)
+
+	assert.JSONEq(t, stdout.String(), `[
+		{
+			"data": {
+				"nodes": ["page one"],
+				"pageInfo": {
+					"endCursor": "PAGE1_END",
+					"hasNextPage": true
+				}
+			}
+		},
+		{
+
+			"data": {
+				"nodes": ["page two"],
+				"pageInfo": {
+					"endCursor": "PAGE2_END",
+					"hasNextPage": false
+				}
+			}
+		}
+	]`)
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	var requestData struct {
@@ -1510,4 +1760,21 @@ func Test_apiRun_acceptHeader(t *testing.T) {
 			assert.Equal(t, tt.wantAcceptHeader, gotReq.Header.Get("Accept"))
 		})
 	}
+}
+
+func TestQueue_Close(t *testing.T) {
+	sut := queue{}
+	actual := make([]int, 0, 2)
+
+	func() {
+		defer sut.Close()
+		sut.Enqueue(func() {
+			actual = append(actual, 0)
+		})
+		sut.Enqueue(func() {
+			actual = append(actual, 1)
+		})
+	}()
+
+	assert.Equal(t, []int{0, 1}, actual)
 }

@@ -29,6 +29,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	ttyIndent = "  "
+)
+
 type ApiOptions struct {
 	AppVersion string
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -48,6 +52,7 @@ type ApiOptions struct {
 	Previews            []string
 	ShowResponseHeaders bool
 	Paginate            bool
+	Slurp               bool
 	Silent              bool
 	Template            string
 	CacheTTL            time.Duration
@@ -114,7 +119,9 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			In %[1]s--paginate%[1]s mode, all pages of results will sequentially be requested until
 			there are no more pages of results. For GraphQL requests, this requires that the
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
-			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection.
+			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection. Each page is a separate
+			JSON array or object. Pass %[1]s--slurp%[1]s to wrap all pages of JSON arrays or objects
+			into an outer JSON array.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list releases in the current repository
@@ -174,6 +181,22 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			    }
 			  }
 			'
+
+			# get the percentage of forks for the current user
+			$ gh api graphql --paginate --slurp -f query='
+			  query($endCursor: String) {
+			    viewer {
+			      repositories(first: 100, after: $endCursor) {
+			        nodes { isFork }
+			        pageInfo {
+			          hasNextPage
+			          endCursor
+			        }
+			      }
+			    }
+			  }
+			' | jq 'def count(e): reduce e as $_ (0;.+1);
+			[.[].data.viewer.repositories.nodes[]] as $r | count(select($r[].isFork))/count($r[])'
 		`),
 		Annotations: map[string]string{
 			"help:environment": heredoc.Doc(`
@@ -216,6 +239,19 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return err
 			}
 
+			if opts.Slurp && !opts.Paginate {
+				return cmdutil.FlagErrorf("`--paginate` required when passing `--slurp`")
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"the `--slurp` option is not supported with `--jq` or `--template`",
+				opts.Slurp,
+				opts.FilterOutput != "",
+				opts.Template != "",
+			); err != nil {
+				return err
+			}
+
 			if err := cmdutil.MutuallyExclusive(
 				"only one of `--template`, `--jq`, `--silent`, or `--verbose` may be used",
 				opts.Verbose,
@@ -240,6 +276,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
 	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "GitHub API preview `names` to request (without the \"-preview\" suffix)")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
+	cmd.Flags().BoolVar(&opts.Slurp, "slurp", false, "Use with \"--paginate\" to return an array of all pages of either JSON arrays or objects")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
@@ -272,8 +309,36 @@ func apiRun(opts *ApiOptions) error {
 		method = "POST"
 	}
 
+	var bodyWriter io.Writer = opts.IO.Out
+	var headersWriter io.Writer = opts.IO.Out
+	if opts.Silent {
+		bodyWriter = io.Discard
+	}
+	if opts.Verbose {
+		// httpClient handles output when verbose flag is specified.
+		bodyWriter = io.Discard
+		headersWriter = io.Discard
+	}
+
 	if opts.Paginate && !isGraphQL {
 		requestPath = addPerPage(requestPath, 100, params)
+	}
+
+	// Execute defers in FIFO order.
+	deferQueue := queue{}
+	defer deferQueue.Close()
+
+	// Similar to `jq --slurp`, write all pages JSON arrays or objects into a JSON array.
+	if opts.Paginate && opts.Slurp {
+		w := &jsonArrayWriter{
+			Writer: bodyWriter,
+			color:  opts.IO.ColorEnabled(),
+		}
+		deferQueue.Enqueue(func() {
+			_ = w.Close()
+		})
+
+		bodyWriter = w
 	}
 
 	if opts.RequestInputFile != "" {
@@ -323,21 +388,10 @@ func apiRun(opts *ApiOptions) error {
 
 	if !opts.Silent {
 		if err := opts.IO.StartPager(); err == nil {
-			defer opts.IO.StopPager()
+			deferQueue.Enqueue(opts.IO.StopPager)
 		} else {
 			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 		}
-	}
-
-	var bodyWriter io.Writer = opts.IO.Out
-	var headersWriter io.Writer = opts.IO.Out
-	if opts.Silent {
-		bodyWriter = io.Discard
-	}
-	if opts.Verbose {
-		// httpClient handles output when verbose flag is specified.
-		bodyWriter = io.Discard
-		headersWriter = io.Discard
 	}
 
 	host, _ := cfg.Authentication().DefaultHost()
@@ -363,6 +417,12 @@ func apiRun(opts *ApiOptions) error {
 		if !isGraphQL {
 			requestPath, hasNextPage = findNextPage(resp)
 			requestBody = nil // prevent repeating GET parameters
+		}
+
+		// Tell optional jsonArrayWriter to start a new page.
+		err = startPage(bodyWriter)
+		if err != nil {
+			return err
 		}
 
 		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, tmpl, isFirstPage, !hasNextPage)
@@ -424,7 +484,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 		// TODO: reuse parsed query across pagination invocations
 		indent := ""
 		if opts.IO.IsStdoutTTY() {
-			indent = "  "
+			indent = ttyIndent
 		}
 		err = jq.EvaluateFormatted(responseBody, bodyWriter, opts.FilterOutput, indent, opts.IO.ColorEnabled())
 		if err != nil {
@@ -436,9 +496,9 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 			return
 		}
 	} else if isJSON && opts.IO.ColorEnabled() {
-		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
+		err = jsoncolor.Write(bodyWriter, responseBody, ttyIndent)
 	} else {
-		if isJSON && opts.Paginate && !isGraphQLPaginate && !opts.ShowResponseHeaders {
+		if isJSON && opts.Paginate && !opts.Slurp && !isGraphQLPaginate && !opts.ShowResponseHeaders {
 			responseBody = &paginatedArrayReader{
 				Reader:      responseBody,
 				isFirstPage: isFirstPage,
@@ -632,4 +692,16 @@ func previewNamesToMIMETypes(names []string) string {
 		types = append(types, fmt.Sprintf("application/vnd.github.%s-preview", p))
 	}
 	return strings.Join(types, ", ")
+}
+
+type queue []func()
+
+func (q *queue) Enqueue(f func()) {
+	*q = append(*q, f)
+}
+
+func (q *queue) Close() {
+	for _, f := range *q {
+		f()
+	}
 }
