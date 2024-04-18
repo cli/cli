@@ -64,11 +64,11 @@ func TestNewTUFRootVerifyCmd(t *testing.T) {
 	}
 }
 
-var makeNewTUFMock newTUFClient = func(o *tuf.Options) (*tuf.Client, error) {
+var makeTUFMock newTUFClient = func(o *tuf.Options) (*tuf.Client, error) {
 	return &tuf.Client{}, nil
 }
 
-var makeNewTUFMockErr newTUFClient = func(o *tuf.Options) (*tuf.Client, error) {
+var makeTUFMockErr newTUFClient = func(o *tuf.Options) (*tuf.Client, error) {
 	return nil, fmt.Errorf("failed to create TUF client")
 }
 
@@ -77,19 +77,19 @@ func TestTUFRootVerify(t *testing.T) {
 	root := test.NormalizeRelativePath("../verification/embed/tuf-repo.github.com/root.json")
 
 	t.Run("successfully verifies TUF root", func(t *testing.T) {
-		err := tufRootVerify(makeNewTUFMock, mirror, root)
+		err := tufRootVerify(makeTUFMock, mirror, root)
 		require.NoError(t, err)
 	})
 
 	t.Run("fails because the root cannot be found", func(t *testing.T) {
 		notFoundRoot := test.NormalizeRelativePath("./does/not/exist/root.json")
-		err := tufRootVerify(makeNewTUFMock, mirror, notFoundRoot)
+		err := tufRootVerify(makeTUFMock, mirror, notFoundRoot)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to read root file")
 	})
 
 	t.Run("failed to create TUF root", func(t *testing.T) {
-		err := tufRootVerify(makeNewTUFMockErr, mirror, root)
+		err := tufRootVerify(makeTUFMockErr, mirror, root)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to create TUF client")
 	})
