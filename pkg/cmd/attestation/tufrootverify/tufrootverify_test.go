@@ -64,11 +64,11 @@ func TestNewTUFRootVerifyCmd(t *testing.T) {
 	}
 }
 
-var makeNewTUFMock newTUF = func(o *tuf.Options) (*tuf.Client, error) {
+var makeNewTUFMock newTUFClient = func(o *tuf.Options) (*tuf.Client, error) {
 	return &tuf.Client{}, nil
 }
 
-var makeNewTUFMockErr newTUF = func(o *tuf.Options) (*tuf.Client, error) {
+var makeNewTUFMockErr newTUFClient = func(o *tuf.Options) (*tuf.Client, error) {
 	return nil, fmt.Errorf("failed to create TUF client")
 }
 
