@@ -32,8 +32,7 @@ if ! $ghBuildPath attestation verify "$sigstore02PackageFile" -b "$sigstore02Att
 fi
 
 # Verify the v0.3.0 sigstore bundle
-#sigstoreBundle03="$rootDir/pkg/cmd/attestation/test/data/sigstore.js-3.0.0.bundle.json"
-#echo "Testing with package $sigstore03PackageFile and attestation $sigstoreBundle03"
+echo "Testing with package $sigstore03PackageFile and attestation $sigstore03AttestationFile"
 if ! $ghBuildPath attestation verify "$sigstore03PackageFile" -b "$sigstore03AttestationFile" --digest-alg=sha512 --owner=sigstore; then
     echo "Failed to verify package with a Sigstore v0.3.0 bundle"
     # cleanup test data
