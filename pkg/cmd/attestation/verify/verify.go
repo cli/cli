@@ -151,7 +151,7 @@ func runVerify(opts *Options) error {
 		return fmt.Errorf("failed to digest artifact: %s", err)
 	}
 
-	opts.Logger.Printf("Verifying attestations for the artifact found at %s\n", artifact.URL)
+	opts.Logger.Printf("Loaded digest %s for %s\n", artifact.DigestWithAlg(), artifact.URL)
 
 	c := verification.FetchAttestationsConfig{
 		APIClient:  opts.APIClient,
@@ -168,6 +168,14 @@ func runVerify(opts *Options) error {
 		}
 		return fmt.Errorf("failed to fetch attestations for subject: %s", artifact.DigestWithAlg())
 	}
+
+	if c.IsBundleProvided() {
+		opts.Logger.Printf("Loaded attestations from %s\n", opts.BundlePath)
+	} else {
+		opts.Logger.Printf("Loaded attestations from GitHub API\n")
+	}
+
+	opts.Logger.Printf("Found %d attestations\n", len(attestations))
 
 	// Apply predicate type filter to returned attestations
 	if opts.PredicateType != "" {
@@ -190,13 +198,7 @@ func runVerify(opts *Options) error {
 		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", sigstoreRes.Error)
 	}
 
-	opts.Logger.VerbosePrint(opts.Logger.ColorScheme.Green(
-		"Successfully verified all attestations against Sigstore!\n",
-	))
-
-	opts.Logger.VerbosePrint(opts.Logger.ColorScheme.Green("Successfully verified the SLSA predicate type of all attestations!\n"))
-
-	opts.Logger.Println(opts.Logger.ColorScheme.Green("All attestations have been successfully verified!"))
+	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!\n"))
 
 	if opts.exporter != nil {
 		// print the results to the terminal as an array of JSON objects
