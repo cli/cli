@@ -3,6 +3,7 @@ package io
 import (
 	"fmt"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 )
@@ -58,4 +59,20 @@ func (h *Handler) VerbosePrintf(f string, v ...interface{}) (int, error) {
 	}
 
 	return fmt.Fprintf(h.IO.ErrOut, f, v...)
+}
+
+func (h *Handler) PrintTable(headers []string, rows [][]string) error {
+	t := tableprinter.New(h.IO, tableprinter.WithHeader(headers...))
+
+	for _, row := range rows {
+		for _, field := range row {
+			t.AddField(field, tableprinter.WithTruncate(nil))
+		}
+		t.EndRow()
+	}
+
+	if err := t.Render(); err != nil {
+		return fmt.Errorf("failed to print output: %v", err)
+	}
+	return nil
 }

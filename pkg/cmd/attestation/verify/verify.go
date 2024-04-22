@@ -3,6 +3,7 @@ package verify
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
@@ -198,15 +199,35 @@ func runVerify(opts *Options) error {
 		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", sigstoreRes.Error)
 	}
 
-	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!\n"))
+	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!"))
 
+	// If an exporter is provided with the --json flag, write the results to the terminal in JSON format
 	if opts.exporter != nil {
 		// print the results to the terminal as an array of JSON objects
 		if err = opts.exporter.Write(opts.Logger.IO, sigstoreRes.VerifyResults); err != nil {
 			return fmt.Errorf("failed to write JSON output")
 		}
+		return nil
 	}
+
+	// Otherwise print the results to the terminal in a table
+	tableContent := buildTableVerifyContent(sigstoreRes.VerifyResults)
+	headers := []string{"repo", "predicate_type", "workflow", "time"}
+	opts.Logger.PrintTable(headers, tableContent)
 
 	// All attestations passed verification and policy evaluation
 	return nil
+}
+
+func buildTableVerifyContent(results []*verification.AttestationProcessingResult) [][]string {
+	content := make([][]string, len(results))
+
+	for i, res := range results {
+		workflowRepo := res.VerificationResult.Signature.Certificate.Extensions.GithubWorkflowRepository
+		predicateType := res.VerificationResult.Statement.PredicateType
+		workflowName := res.VerificationResult.Signature.Certificate.Extensions.GithubWorkflowName
+		content[i] = []string{workflowRepo, predicateType, workflowName, time.Now().UTC().Format("2021-10-15 14:00:00 UTC")}
+	}
+
+	return content
 }
