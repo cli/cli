@@ -6,23 +6,32 @@ rootDir="$(git rev-parse --show-toplevel)"
 
 ghBuildPath="$rootDir/bin/gh"
 
-sigstore02packageFile="$rootDir/pkg/cmd/attestation/test/data/sigstore-js-2.2.0.tgz"
-sigstore03packageFile="$rootDir/pkg/cmd/attestation/test/data/sigstore-js-3.0.0.tgz"
-sigstoreBundle02="$rootDir/pkg/cmd/attestation/test/data/sigstore.js-2.2.0.bundle.json"
-sigstoreBundle03="$rootDir/pkg/cmd/attestation/test/data/sigstore.js-3.0.0.bundle.json"
+sigstore02PackageFile="sigstore-2.2.0.tgz"
+sigstore02PackageURL="https://registry.npmjs.org/sigstore/-/$sigstore02PackageFile"
+
+curl -s "$sigstore02PackageURL" -o "$sigstore02PackageFile"
+
+sigstore03PackageFile="sigstore-3.0.0.tgz"
+sigstore03PackageURL="https://registry.npmjs.org/sigstore/-/$sigstore03PackageFile"
+
+curl -s "$sigstore03PackageURL" -o "$sigstore03PackageFile"
 
 # Verify the v0.2.0 sigstore bundle
-if ! $ghBuildPath attestation verify "$sigstore02packageFile" -b "$sigstoreBundle02" --digest-alg=sha512 --owner=sigstore; then
+sigstoreBundle02="$rootDir/pkg/cmd/attestation/test/data/sigstore.js-2.2.0.bundle.json"
+echo "Testing with package $sigstore02PackageFile and attestation $sigstoreBundle02"
+if ! $ghBuildPath attestation verify "$sigstore02PackageFile" -b "$sigstoreBundle02" --digest-alg=sha512 --owner=sigstore; then
     echo "Failed to verify package with a Sigstore v0.2.0 bundle"
     # cleanup test data
-    rm "$packageFile" "$attestationFile"
+    rm "$sigstore02PackageFile"
     exit 1
 fi
 
 # Verify the v0.3.0 sigstore bundle
-if ! $ghBuildPath attestation verify "$sigstore03packageFile" -b "$sigstoreBundle03" --digest-alg=sha512 --owner=sigstore; then
+sigstoreBundle03="$rootDir/pkg/cmd/attestation/test/data/sigstore.js-3.0.0.bundle.json"
+echo "Testing with package $sigstore03PackageFile and attestation $sigstoreBundle03"
+if ! $ghBuildPath attestation verify "$sigstore03PackageFile" -b "$sigstoreBundle03" --digest-alg=sha512 --owner=sigstore; then
     echo "Failed to verify package with a Sigstore v0.3.0 bundle"
     # cleanup test data
-    rm "$packageFile" "$attestationFile"
+    rm "$sigstore03PackageFile"
     exit 1
 fi
