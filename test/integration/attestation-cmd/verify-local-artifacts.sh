@@ -20,12 +20,11 @@ sigstore03PackageURL="https://registry.npmjs.org/sigstore/-/$sigstore03PackageFi
 curl -s "$sigstore03PackageURL" -o "$sigstore03PackageFile"
 
 # Verify the v0.2.0 sigstore bundle
-# sigstoreBundle02="$rootDir/pkg/cmd/attestation/test/data/sigstore.js-2.2.0.bundle.json"
-#echo "Testing with package $sigstore02PackageFile and attestation $sigstoreBundle02"
+echo "Testing with package $sigstore02PackageFile and attestation $sigstore02AttestationFile"
 if ! $ghBuildPath attestation verify "$sigstore02PackageFile" -b "$sigstore02AttestationFile" --digest-alg=sha512 --owner=sigstore; then
     echo "Failed to verify package with a Sigstore v0.2.0 bundle"
     # cleanup test data
-    rm "$sigstore02PackageFile"
+    rm "$sigstore02PackageFile" "$sigstore02AttestationFile"
     exit 1
 fi
 
