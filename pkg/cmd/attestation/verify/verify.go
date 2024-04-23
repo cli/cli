@@ -119,7 +119,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			opts.SigstoreVerifier = sv
 
 			if err := runVerify(opts); err != nil {
-				return fmt.Errorf("Failed to verify the artifact: %v", err)
+				return fmt.Errorf("Error: %v", err)
 			}
 			return nil
 		},
@@ -150,7 +150,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 func runVerify(opts *Options) error {
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
-		return fmt.Errorf("failed to digest artifact: %s", err)
+		return fmt.Errorf("✗ Loading digest for %s failed", artifact.URL)
 	}
 
 	opts.Logger.Printf("Loaded digest %s for %s\n", artifact.DigestWithAlg(), artifact.URL)
@@ -166,9 +166,16 @@ func runVerify(opts *Options) error {
 	attestations, err := verification.GetAttestations(c)
 	if err != nil {
 		if ok := errors.Is(err, api.ErrNoAttestations{}); ok {
-			return fmt.Errorf("no attestations found for subject: %s", artifact.DigestWithAlg())
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s"), artifact.DigestWithAlg())
+			return err
 		}
-		return fmt.Errorf("failed to fetch attestations for subject: %s", artifact.DigestWithAlg())
+
+		if c.IsBundleProvided() {
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Loading attestations from %s failed\n"), artifact.URL)
+		} else {
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Loading attestations from GitHub API failed"))
+		}
+		return err
 	}
 
 	pluralAttestation := text.Pluralize(len(attestations), "attestation")
@@ -183,7 +190,8 @@ func runVerify(opts *Options) error {
 		filteredAttestations := verification.FilterAttestations(opts.PredicateType, attestations)
 
 		if len(filteredAttestations) == 0 {
-			return fmt.Errorf("no attestations found with predicate type: %s", opts.PredicateType)
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found with predicate type: %s\n"), opts.PredicateType)
+			return err
 		}
 
 		attestations = filteredAttestations
@@ -191,12 +199,14 @@ func runVerify(opts *Options) error {
 
 	policy, err := buildVerifyPolicy(opts, *artifact)
 	if err != nil {
-		return fmt.Errorf("failed to build policy: %v", err)
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build verification policy"))
+		return err
 	}
 
 	sigstoreRes := opts.SigstoreVerifier.Verify(attestations, policy)
 	if sigstoreRes.Error != nil {
-		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", sigstoreRes.Error)
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Verification failed"))
+		return sigstoreRes.Error
 	}
 
 	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!\n"))
@@ -205,7 +215,8 @@ func runVerify(opts *Options) error {
 	if opts.exporter != nil {
 		// print the results to the terminal as an array of JSON objects
 		if err = opts.exporter.Write(opts.Logger.IO, sigstoreRes.VerifyResults); err != nil {
-			return fmt.Errorf("failed to write JSON output")
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to write JSON output"))
+			return err
 		}
 		return nil
 	}
