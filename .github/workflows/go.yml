@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
 
       - name: Download dependencies
         run: go mod download
@@ -46,10 +46,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
 
       - name: Build executable
         run: make
 
       - name: Run attestation command integration Tests
-        run: ./test/integration/attestation-cmd/download-and-verify-package-attestation.sh
+        run: |
+          ./test/integration/attestation-cmd/download-and-verify-package-attestation.sh
+          ./test/integration/attestation-cmd/verify-sigstore-bundle-versions.sh
