@@ -199,7 +199,7 @@ func runVerify(opts *Options) error {
 		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", sigstoreRes.Error)
 	}
 
-	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!"))
+	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!\n"))
 
 	// If an exporter is provided with the --json flag, write the results to the terminal in JSON format
 	if opts.exporter != nil {
@@ -209,6 +209,8 @@ func runVerify(opts *Options) error {
 		}
 		return nil
 	}
+
+	opts.Logger.Printf("%s was attested by:\n", artifact.DigestWithAlg())
 
 	// Otherwise print the results to the terminal in a table
 	tableContent, err := buildTableVerifyContent(sigstoreRes.VerifyResults)
