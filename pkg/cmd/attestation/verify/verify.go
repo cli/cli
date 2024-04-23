@@ -119,7 +119,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			opts.SigstoreVerifier = sv
 
 			if err := runVerify(opts); err != nil {
-				return fmt.Errorf("Error: %v", err)
+				return fmt.Errorf("\nError: %v", err)
 			}
 			return nil
 		},
@@ -150,7 +150,8 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 func runVerify(opts *Options) error {
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
-		return fmt.Errorf("✗ Loading digest for %s failed", artifact.URL)
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Loading digest for %s failed\n"), artifact.URL)
+		return err
 	}
 
 	opts.Logger.Printf("Loaded digest %s for %s\n", artifact.DigestWithAlg(), artifact.URL)
@@ -166,7 +167,7 @@ func runVerify(opts *Options) error {
 	attestations, err := verification.GetAttestations(c)
 	if err != nil {
 		if ok := errors.Is(err, api.ErrNoAttestations{}); ok {
-			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s"), artifact.DigestWithAlg())
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), artifact.DigestWithAlg())
 			return err
 		}
 
@@ -226,7 +227,8 @@ func runVerify(opts *Options) error {
 	// Otherwise print the results to the terminal in a table
 	tableContent, err := buildTableVerifyContent(sigstoreRes.VerifyResults)
 	if err != nil {
-		return fmt.Errorf("failed to build table content: %v", err)
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to parse results"))
+		return err
 	}
 
 	headers := []string{"repo", "predicate_type", "workflow"}
