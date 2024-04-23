@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type newTUFClient func(o *tuf.Options) (*tuf.Client, error)
+type tufClientInstantiator func(o *tuf.Options) (*tuf.Client, error)
 
 func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 	var mirror string
@@ -66,7 +66,7 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 	return &cmd
 }
 
-func tufRootVerify(makeTUF newTUFClient, mirror, root string) error {
+func tufRootVerify(makeTUF tufClientInstantiator, mirror, root string) error {
 	rb, err := os.ReadFile(root)
 	if err != nil {
 		return fmt.Errorf("failed to read root file %s: %v", root, err)
