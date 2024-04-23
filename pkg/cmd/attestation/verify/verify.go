@@ -3,6 +3,7 @@ package verify
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
@@ -211,7 +212,11 @@ func runVerify(opts *Options) error {
 	}
 
 	// Otherwise print the results to the terminal in a table
-	tableContent := buildTableVerifyContent(sigstoreRes.VerifyResults)
+	tableContent, err := buildTableVerifyContent(sigstoreRes.VerifyResults)
+	if err != nil {
+		return fmt.Errorf("failed to build table content: %v", err)
+	}
+
 	headers := []string{"repo", "predicate_type", "workflow", "time"}
 	opts.Logger.PrintTable(headers, tableContent)
 
@@ -219,15 +224,41 @@ func runVerify(opts *Options) error {
 	return nil
 }
 
-func buildTableVerifyContent(results []*verification.AttestationProcessingResult) [][]string {
+func extractContent(builderSignerURI string) (string, string, error) {
+	// If given a build signer URI like
+	// https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main
+	// We want to extract:
+	// * sigstore/sigstore-js
+	// * .github/workflows/release.yml@refs/heads/main
+	orgAndRepoRegexp := regexp.MustCompile(`https://github\.com/([^/]+/[^/]+)/`)
+	match := orgAndRepoRegexp.FindStringSubmatch(builderSignerURI)
+	if len(match) < 2 {
+		return "", "", fmt.Errorf("no match found")
+	}
+	repoAndOrg := match[1]
+
+	workflowRegexp := regexp.MustCompile(`https://github\.com/[^/]+/[^/]+/(.+)`)
+	match = workflowRegexp.FindStringSubmatch(builderSignerURI)
+	if len(match) < 2 {
+		return "", "", fmt.Errorf("no match found")
+	}
+	workflow := match[1]
+
+	return repoAndOrg, workflow, nil
+}
+
+func buildTableVerifyContent(results []*verification.AttestationProcessingResult) ([][]string, error) {
 	content := make([][]string, len(results))
 
 	for i, res := range results {
-		workflowRepo := res.VerificationResult.Signature.Certificate.Extensions.GithubWorkflowRepository
+		builderSignerURI := res.VerificationResult.Signature.Certificate.Extensions.BuildSignerURI
+		repoAndOrg, workflow, err := extractContent(builderSignerURI)
+		if err != nil {
+			return nil, err
+		}
 		predicateType := res.VerificationResult.Statement.PredicateType
-		workflowName := res.VerificationResult.Signature.Certificate.Extensions.GithubWorkflowName
-		content[i] = []string{workflowRepo, predicateType, workflowName, time.Now().UTC().Format("2021-10-15 14:00:00 UTC")}
+		content[i] = []string{repoAndOrg, predicateType, workflow, time.Now().UTC().String()}
 	}
 
-	return content
+	return content, nil
 }
