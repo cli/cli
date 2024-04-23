@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"time"
 
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
@@ -171,13 +171,12 @@ func runVerify(opts *Options) error {
 		return fmt.Errorf("failed to fetch attestations for subject: %s", artifact.DigestWithAlg())
 	}
 
+	pluralAttestation := text.Pluralize(len(attestations), "attestation")
 	if c.IsBundleProvided() {
-		opts.Logger.Printf("Loaded attestations from %s\n", opts.BundlePath)
+		opts.Logger.Printf("Loaded %s from %s\n", pluralAttestation, opts.BundlePath)
 	} else {
-		opts.Logger.Printf("Loaded attestations from GitHub API\n")
+		opts.Logger.Printf("Loaded %s from GitHub API\n", pluralAttestation)
 	}
-
-	opts.Logger.Printf("Found %d attestations\n", len(attestations))
 
 	// Apply predicate type filter to returned attestations
 	if opts.PredicateType != "" {
@@ -217,30 +216,30 @@ func runVerify(opts *Options) error {
 		return fmt.Errorf("failed to build table content: %v", err)
 	}
 
-	headers := []string{"repo", "predicate_type", "workflow", "time"}
+	headers := []string{"repo", "predicate_type", "workflow"}
 	opts.Logger.PrintTable(headers, tableContent)
 
 	// All attestations passed verification and policy evaluation
 	return nil
 }
 
-func extractContent(builderSignerURI string) (string, string, error) {
+func extractAttestationDetail(builderSignerURI string) (string, string, error) {
 	// If given a build signer URI like
-	// https://github.com/sigstore/sigstore-js/.github/workflows/release.yml@refs/heads/main
+	// https://github.com/foo/bar/.github/workflows/release.yml@refs/heads/main
 	// We want to extract:
-	// * sigstore/sigstore-js
+	// * foo/bar
 	// * .github/workflows/release.yml@refs/heads/main
 	orgAndRepoRegexp := regexp.MustCompile(`https://github\.com/([^/]+/[^/]+)/`)
 	match := orgAndRepoRegexp.FindStringSubmatch(builderSignerURI)
 	if len(match) < 2 {
-		return "", "", fmt.Errorf("no match found")
+		return "", "", fmt.Errorf("no match found for org and repo")
 	}
 	repoAndOrg := match[1]
 
 	workflowRegexp := regexp.MustCompile(`https://github\.com/[^/]+/[^/]+/(.+)`)
 	match = workflowRegexp.FindStringSubmatch(builderSignerURI)
 	if len(match) < 2 {
-		return "", "", fmt.Errorf("no match found")
+		return "", "", fmt.Errorf("no match found for workflow")
 	}
 	workflow := match[1]
 
@@ -252,12 +251,12 @@ func buildTableVerifyContent(results []*verification.AttestationProcessingResult
 
 	for i, res := range results {
 		builderSignerURI := res.VerificationResult.Signature.Certificate.Extensions.BuildSignerURI
-		repoAndOrg, workflow, err := extractContent(builderSignerURI)
+		repoAndOrg, workflow, err := extractAttestationDetail(builderSignerURI)
 		if err != nil {
 			return nil, err
 		}
 		predicateType := res.VerificationResult.Statement.PredicateType
-		content[i] = []string{repoAndOrg, predicateType, workflow, time.Now().UTC().String()}
+		content[i] = []string{repoAndOrg, predicateType, workflow}
 	}
 
 	return content, nil
