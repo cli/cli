@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type tufClientInstantiator func(o *tuf.Options) (*tuf.Client, error)
+
 func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 	var mirror string
 	var root string
@@ -46,7 +48,7 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 				return runF()
 			}
 
-			if err := tufRootVerify(mirror, root); err != nil {
+			if err := tufRootVerify(tuf.New, mirror, root); err != nil {
 				return fmt.Errorf("Failed to verify the TUF repository: %w", err)
 			}
 
@@ -64,7 +66,7 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 	return &cmd
 }
 
-func tufRootVerify(mirror, root string) error {
+func tufRootVerify(makeTUF tufClientInstantiator, mirror, root string) error {
 	rb, err := os.ReadFile(root)
 	if err != nil {
 		return fmt.Errorf("failed to read root file %s: %v", root, err)
@@ -75,7 +77,7 @@ func tufRootVerify(mirror, root string) error {
 	// The purpose is the verify the TUF root and repository, make
 	// sure there is no caching enabled
 	opts.CacheValidity = 0
-	if _, err = tuf.New(opts); err != nil {
+	if _, err = makeTUF(opts); err != nil {
 		return fmt.Errorf("failed to create TUF client: %v", err)
 	}
 
