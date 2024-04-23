@@ -32,8 +32,7 @@ func TestNewLiveSigstoreVerifier(t *testing.T) {
 	c := SigstoreConfig{
 		Logger: io.NewTestHandler(),
 	}
-	verifier, err := NewLiveSigstoreVerifier(c)
-	require.NoError(t, err)
+	verifier := NewLiveSigstoreVerifier(c)
 
 	t.Run("with invalid signature", func(t *testing.T) {
 		bundlePath := test.NormalizeRelativePath("../test/data/sigstoreBundle-invalid-signature.json")

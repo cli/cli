@@ -109,12 +109,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 				NoPublicGood:      opts.NoPublicGood,
 			}
 
-			sv, err := verification.NewLiveSigstoreVerifier(config)
-			if err != nil {
-				return err
-			}
-
-			opts.SigstoreVerifier = sv
+			opts.SigstoreVerifier = verification.NewLiveSigstoreVerifier(config)
 
 			if err := runVerify(opts); err != nil {
 				return fmt.Errorf("Failed to verify the artifact: %v", err)
