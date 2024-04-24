@@ -3,7 +3,9 @@ package verify
 import (
 	"errors"
 	"fmt"
+	"regexp"
 
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
@@ -117,7 +119,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			opts.SigstoreVerifier = sv
 
 			if err := runVerify(opts); err != nil {
-				return fmt.Errorf("Failed to verify the artifact: %v", err)
+				return fmt.Errorf("\nError: %v", err)
 			}
 			return nil
 		},
@@ -148,10 +150,11 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 func runVerify(opts *Options) error {
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
-		return fmt.Errorf("failed to digest artifact: %s", err)
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Loading digest for %s failed\n"), opts.ArtifactPath)
+		return err
 	}
 
-	opts.Logger.Printf("Verifying attestations for the artifact found at %s\n", artifact.URL)
+	opts.Logger.Printf("Loaded digest %s for %s\n", artifact.DigestWithAlg(), artifact.URL)
 
 	c := verification.FetchAttestationsConfig{
 		APIClient:  opts.APIClient,
@@ -164,9 +167,23 @@ func runVerify(opts *Options) error {
 	attestations, err := verification.GetAttestations(c)
 	if err != nil {
 		if ok := errors.Is(err, api.ErrNoAttestations{}); ok {
-			return fmt.Errorf("no attestations found for subject: %s", artifact.DigestWithAlg())
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), artifact.DigestWithAlg())
+			return err
 		}
-		return fmt.Errorf("failed to fetch attestations for subject: %s", artifact.DigestWithAlg())
+
+		if c.IsBundleProvided() {
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Loading attestations from %s failed\n"), artifact.URL)
+		} else {
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Loading attestations from GitHub API failed"))
+		}
+		return err
+	}
+
+	pluralAttestation := text.Pluralize(len(attestations), "attestation")
+	if c.IsBundleProvided() {
+		opts.Logger.Printf("Loaded %s from %s\n", pluralAttestation, opts.BundlePath)
+	} else {
+		opts.Logger.Printf("Loaded %s from GitHub API\n", pluralAttestation)
 	}
 
 	// Apply predicate type filter to returned attestations
@@ -174,7 +191,8 @@ func runVerify(opts *Options) error {
 		filteredAttestations := verification.FilterAttestations(opts.PredicateType, attestations)
 
 		if len(filteredAttestations) == 0 {
-			return fmt.Errorf("no attestations found with predicate type: %s", opts.PredicateType)
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found with predicate type: %s\n"), opts.PredicateType)
+			return err
 		}
 
 		attestations = filteredAttestations
@@ -182,29 +200,82 @@ func runVerify(opts *Options) error {
 
 	policy, err := buildVerifyPolicy(opts, *artifact)
 	if err != nil {
-		return fmt.Errorf("failed to build policy: %v", err)
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build verification policy"))
+		return err
 	}
 
 	sigstoreRes := opts.SigstoreVerifier.Verify(attestations, policy)
 	if sigstoreRes.Error != nil {
-		return fmt.Errorf("at least one attestation failed to verify against Sigstore: %v", sigstoreRes.Error)
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Verification failed"))
+		return sigstoreRes.Error
 	}
 
-	opts.Logger.VerbosePrint(opts.Logger.ColorScheme.Green(
-		"Successfully verified all attestations against Sigstore!\n",
-	))
+	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!\n"))
 
-	opts.Logger.VerbosePrint(opts.Logger.ColorScheme.Green("Successfully verified the SLSA predicate type of all attestations!\n"))
-
-	opts.Logger.Println(opts.Logger.ColorScheme.Green("All attestations have been successfully verified!"))
-
+	// If an exporter is provided with the --json flag, write the results to the terminal in JSON format
 	if opts.exporter != nil {
 		// print the results to the terminal as an array of JSON objects
 		if err = opts.exporter.Write(opts.Logger.IO, sigstoreRes.VerifyResults); err != nil {
-			return fmt.Errorf("failed to write JSON output")
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to write JSON output"))
+			return err
 		}
+		return nil
+	}
+
+	opts.Logger.Printf("%s was attested by:\n", artifact.DigestWithAlg())
+
+	// Otherwise print the results to the terminal in a table
+	tableContent, err := buildTableVerifyContent(sigstoreRes.VerifyResults)
+	if err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to parse results"))
+		return err
+	}
+
+	headers := []string{"repo", "predicate_type", "workflow"}
+	if err = opts.Logger.PrintTable(headers, tableContent); err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to print attestation details to table"))
+		return err
 	}
 
 	// All attestations passed verification and policy evaluation
 	return nil
+}
+
+func extractAttestationDetail(builderSignerURI string) (string, string, error) {
+	// If given a build signer URI like
+	// https://github.com/foo/bar/.github/workflows/release.yml@refs/heads/main
+	// We want to extract:
+	// * foo/bar
+	// * .github/workflows/release.yml@refs/heads/main
+	orgAndRepoRegexp := regexp.MustCompile(`https://github\.com/([^/]+/[^/]+)/`)
+	match := orgAndRepoRegexp.FindStringSubmatch(builderSignerURI)
+	if len(match) < 2 {
+		return "", "", fmt.Errorf("no match found for org and repo")
+	}
+	repoAndOrg := match[1]
+
+	workflowRegexp := regexp.MustCompile(`https://github\.com/[^/]+/[^/]+/(.+)`)
+	match = workflowRegexp.FindStringSubmatch(builderSignerURI)
+	if len(match) < 2 {
+		return "", "", fmt.Errorf("no match found for workflow")
+	}
+	workflow := match[1]
+
+	return repoAndOrg, workflow, nil
+}
+
+func buildTableVerifyContent(results []*verification.AttestationProcessingResult) ([][]string, error) {
+	content := make([][]string, len(results))
+
+	for i, res := range results {
+		builderSignerURI := res.VerificationResult.Signature.Certificate.Extensions.BuildSignerURI
+		repoAndOrg, workflow, err := extractAttestationDetail(builderSignerURI)
+		if err != nil {
+			return nil, err
+		}
+		predicateType := res.VerificationResult.Statement.PredicateType
+		content[i] = []string{repoAndOrg, predicateType, workflow}
+	}
+
+	return content, nil
 }

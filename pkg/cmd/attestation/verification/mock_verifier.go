@@ -6,6 +6,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 
 	"github.com/in-toto/in-toto-golang/in_toto"
 	"github.com/sigstore/sigstore-go/pkg/verify"
@@ -27,6 +28,13 @@ func (v *MockSigstoreVerifier) Verify(attestations []*api.Attestation, policy ve
 		},
 		VerificationResult: &verify.VerificationResult{
 			Statement: statement,
+			Signature: &verify.SignatureVerificationResult{
+				Certificate: &certificate.Summary{
+					Extensions: certificate.Extensions{
+						BuildSignerURI: "https://github.com/github/example/.github/workflows/release.yml@refs/heads/main",
+					},
+				},
+			},
 		},
 	}
 

@@ -286,7 +286,7 @@ func TestRunVerify(t *testing.T) {
 
 		err := runVerify(&opts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to digest artifact")
+		require.ErrorContains(t, err, "failed to parse reference")
 	})
 
 	t.Run("with missing artifact path", func(t *testing.T) {
@@ -325,7 +325,7 @@ func TestRunVerify(t *testing.T) {
 
 		err := runVerify(&opts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to fetch attestations for subject")
+		require.ErrorContains(t, err, "failed to fetch attestations from wrong/example")
 	})
 
 	t.Run("with invalid owner", func(t *testing.T) {
@@ -336,7 +336,7 @@ func TestRunVerify(t *testing.T) {
 
 		err := runVerify(&opts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to fetch attestations for subject")
+		require.ErrorContains(t, err, "failed to fetch attestations from wrong-owner")
 	})
 
 	// TODO: this test can only be tested with a live SigstoreVerifier
