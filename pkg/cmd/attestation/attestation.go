@@ -15,7 +15,6 @@ func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 		Use:     "attestation [subcommand]",
 		Short:   "Work with artifact attestations",
 		Aliases: []string{"at"},
-		Hidden:  true,
 		Long:    "Download and verify artifact attestations.",
 	}
 
