@@ -67,7 +67,7 @@ func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify
 
 	// if user provided a custom trusted root file path, use the custom verifier
 	if v.config.CustomTrustedRoot != "" {
-		customVerifier, err := newCustomVerifier(v.config.CustomTrustedRoot, b)
+		customVerifier, err := newCustomVerifier(v.config.CustomTrustedRoot)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to create custom verifier: %v", err)
 		}
@@ -143,7 +143,7 @@ func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy ve
 	}
 }
 
-func newCustomVerifier(trustedRootFilePath string, b *bundle.ProtobufBundle) (*verify.SignedEntityVerifier, error) {
+func newCustomVerifier(trustedRootFilePath string) (*verify.SignedEntityVerifier, error) {
 	if trustedRootFilePath == "" {
 		return nil, nil
 	}
@@ -157,13 +157,8 @@ func newCustomVerifier(trustedRootFilePath string, b *bundle.ProtobufBundle) (*v
 	verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
 	verifierConfig = append(verifierConfig, verify.WithObserverTimestamps(1))
 
-	// Infer verification options from contents of bundle and trusted root
-	bundleTimestamps, err := b.Timestamps()
-	if err != nil {
-		return nil, fmt.Errorf("unable to query bundle for timestamps")
-	}
-
-	if len(trustedRoot.TimestampingAuthorities()) > 0 && len(bundleTimestamps) > 0 {
+	// Infer verification options from contents of trusted root
+	if len(trustedRoot.TimestampingAuthorities()) > 0 {
 		verifierConfig = append(verifierConfig, verify.WithSignedTimestamps(1))
 	}
 
