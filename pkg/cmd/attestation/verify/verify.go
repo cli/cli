@@ -232,7 +232,10 @@ func runVerify(opts *Options) error {
 	}
 
 	headers := []string{"repo", "predicate_type", "workflow"}
-	opts.Logger.PrintTable(headers, tableContent)
+	if err = opts.Logger.PrintTable(headers, tableContent); err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to print attestation details to table"))
+		return err
+	}
 
 	// All attestations passed verification and policy evaluation
 	return nil
