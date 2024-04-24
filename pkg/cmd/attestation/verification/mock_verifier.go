@@ -31,7 +31,7 @@ func (v *MockSigstoreVerifier) Verify(attestations []*api.Attestation, policy ve
 			Signature: &verify.SignatureVerificationResult{
 				Certificate: &certificate.Summary{
 					Extensions: certificate.Extensions{
-						BuildSignerURI: "https://github.com/foo/bar/.github/workflows/release.yml@refs/heads/main",
+						BuildSignerURI: "https://github.com/github/example/.github/workflows/release.yml@refs/heads/main",
 					},
 				},
 			},
