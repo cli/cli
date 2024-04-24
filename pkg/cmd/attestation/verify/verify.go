@@ -84,6 +84,20 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			// set policy flags based on what has been provided
 			opts.SetPolicyFlags()
 
+			// check if we will be calling GitHub APIs
+			if opts.BundlePath == "" {
+				// If so, ensure user is authenticated
+				factoryConfig, err := f.Config()
+				if err != nil {
+					return err
+				}
+
+				authOk := cmdutil.CheckAuth(factoryConfig)
+				if !authOk {
+					return fmt.Errorf("Please supply a bundle or authenticate to gh")
+				}
+			}
+
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -122,6 +136,11 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			return nil
 		},
 	}
+
+	// This command supports offline verification if the bundle is provided.
+	// So we disable the auth check here and manually check auth in the command,
+	// if needed.
+	cmdutil.DisableAuthCheck(verifyCmd)
 
 	// general flags
 	verifyCmd.Flags().StringVarP(&opts.BundlePath, "bundle", "b", "", "Path to bundle on disk, either a single bundle in a JSON file or a JSON lines file with multiple bundles")

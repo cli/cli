@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
@@ -32,6 +33,12 @@ var (
 	bundlePath   = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json")
 )
 
+func MockAuthentication() *config.AuthConfig {
+	authConfig := config.AuthConfig{}
+	authConfig.SetActiveToken("asdf", "example.com")
+	return &authConfig
+}
+
 func TestNewVerifyCmd(t *testing.T) {
 	testIO, _, _, _ := iostreams.Test()
 	f := &cmdutil.Factory{
@@ -41,6 +48,12 @@ func TestNewVerifyCmd(t *testing.T) {
 			client := &http.Client{}
 			httpmock.ReplaceTripper(client, reg)
 			return client, nil
+		},
+		Config: func() (config.Config, error) {
+			configMock := config.ConfigMock{
+				AuthenticationFunc: MockAuthentication,
+			}
+			return &configMock, nil
 		},
 	}
 
