@@ -23,10 +23,10 @@ func buildPolicy(a artifact.DigestedArtifact) (verify.PolicyBuilder, error) {
 
 func TestNewLiveSigstoreVerifier(t *testing.T) {
 	artifactPath := test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz")
-	artifact, err := artifact.NewDigestedArtifact(nil, artifactPath, "sha512")
+	publicGoodArtifact, err := artifact.NewDigestedArtifact(nil, artifactPath, "sha512")
 	require.NoError(t, err)
 
-	policy, err := buildPolicy(*artifact)
+	policy, err := buildPolicy(*publicGoodArtifact)
 	require.NoError(t, err)
 
 	c := SigstoreConfig{
@@ -53,6 +53,37 @@ func TestNewLiveSigstoreVerifier(t *testing.T) {
 		require.NoError(t, err)
 
 		res := verifier.Verify(attestations, policy)
+		require.Len(t, res.VerifyResults, 2)
+		require.NoError(t, res.Error)
+	})
+
+	githubArtifactPath := test.NormalizeRelativePath("../test/data/github_provenance_demo-0.0.12-py3-none-any.whl")
+	githubArtifact, err := artifact.NewDigestedArtifact(nil, githubArtifactPath, "sha256")
+	require.NoError(t, err)
+
+	githubPolicy, err := buildPolicy(*githubArtifact)
+	require.NoError(t, err)
+
+	t.Run("with GitHub Sigstore artifact", func(t *testing.T) {
+		bundlePath := test.NormalizeRelativePath("../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle.jsonl")
+		attestations, err := GetLocalAttestations(bundlePath)
+		require.NoError(t, err)
+
+		res := verifier.Verify(attestations, githubPolicy)
+		require.Len(t, res.VerifyResults, 1)
+		require.NoError(t, res.Error)
+
+	})
+
+	c.CustomTrustedRoot = test.NormalizeRelativePath("../test/data/trusted_root.json")
+	customTrustedRootVerifier := NewLiveSigstoreVerifier(c)
+
+	t.Run("with custom trusted root", func(t *testing.T) {
+		bundlePath := test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl")
+		attestations, err := GetLocalAttestations(bundlePath)
+		require.NoError(t, err)
+
+		res := customTrustedRootVerifier.Verify(attestations, policy)
 		require.Len(t, res.VerifyResults, 2)
 		require.NoError(t, res.Error)
 	})
