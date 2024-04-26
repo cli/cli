@@ -596,7 +596,7 @@ func Test_getBodyPrompt(t *testing.T) {
 	ios.SetStdoutTTY(true)
 
 	pm := prompter.NewMockPrompter(t)
-	pm.RegisterPassword("Paste your secret", func(_ string) (string, error) {
+	pm.RegisterPassword("Paste your secret:", func(_ string) (string, error) {
 		return "cool secret", nil
 	})
 
