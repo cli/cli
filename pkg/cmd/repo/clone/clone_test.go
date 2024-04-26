@@ -2,6 +2,7 @@ package clone
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/cli/cli/v2/git"
@@ -330,4 +331,57 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
+}
+
+func TestSimplifyURL(t *testing.T) {
+	tests := []struct {
+		name        string
+		raw         string
+		expectedRaw string
+	}{
+		{
+			name:        "empty",
+			raw:         "",
+			expectedRaw: "",
+		},
+		{
+			name:        "no change, no path",
+			raw:         "https://github.com",
+			expectedRaw: "https://github.com",
+		},
+		{
+			name:        "no change, single part path",
+			raw:         "https://github.com/owner",
+			expectedRaw: "https://github.com/owner",
+		},
+		{
+			name:        "no change, two-part path",
+			raw:         "https://github.com/owner/repo",
+			expectedRaw: "https://github.com/owner/repo",
+		},
+		{
+			name:        "no change, three-part path",
+			raw:         "https://github.com/owner/repo/pulls",
+			expectedRaw: "https://github.com/owner/repo",
+		},
+		{
+			name:        "no change, two-part path, with query, with fragment",
+			raw:         "https://github.com/owner/repo?key=value#fragment",
+			expectedRaw: "https://github.com/owner/repo",
+		},
+		{
+			name:        "no change, single part path, with query, with fragment",
+			raw:         "https://github.com/owner?key=value#fragment",
+			expectedRaw: "https://github.com/owner",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u, err := url.Parse(tt.raw)
+			assert.Nil(t, err)
+			result := simplifyURL(u)
+			assert.Equal(t, tt.expectedRaw, result.String())
+		})
+	}
 }
