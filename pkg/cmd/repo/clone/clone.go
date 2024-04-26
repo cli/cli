@@ -100,10 +100,12 @@ func cloneRun(opts *CloneOptions) error {
 	var protocol string
 
 	if repositoryIsURL {
-		repoURL, err := git.ParseURL(opts.Repository)
+		initialURL, err := git.ParseURL(opts.Repository)
 		if err != nil {
 			return err
 		}
+
+		repoURL := simplifyURL(initialURL)
 		repo, err = ghrepo.FromURL(repoURL)
 		if err != nil {
 			return err
