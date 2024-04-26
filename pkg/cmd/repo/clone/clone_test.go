@@ -165,6 +165,11 @@ func Test_RepoClone(t *testing.T) {
 			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 		{
+			name: "HTTPS URL with extra path parts",
+			args: "https://github.com/OWNER/REPO/extra/part?key=value#fragment",
+			want: "git clone https://github.com/OWNER/REPO.git",
+		},
+		{
 			name: "SSH URL",
 			args: "git@github.com:OWNER/REPO.git",
 			want: "git clone git@github.com:OWNER/REPO.git",
@@ -182,6 +187,11 @@ func Test_RepoClone(t *testing.T) {
 		{
 			name: "wiki URL",
 			args: "https://github.com/owner/repo.wiki",
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
+		{
+			name: "wiki URL with extra path parts",
+			args: "https://github.com/owner/repo.wiki/extra/path?key=value#fragment",
 			want: "git clone https://github.com/OWNER/REPO.wiki.git",
 		},
 	}
