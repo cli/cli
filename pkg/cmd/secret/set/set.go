@@ -379,7 +379,7 @@ func getBody(opts *SetOptions) ([]byte, error) {
 	}
 
 	if opts.IO.CanPrompt() {
-		bodyInput, err := opts.Prompter.Password("Paste your secret")
+		bodyInput, err := opts.Prompter.Password("Paste your secret:")
 		if err != nil {
 			return nil, err
 		}

@@ -111,7 +111,7 @@ func Login(opts *LoginOptions) error {
 
 			if sshChoice {
 				passphrase, err := opts.Prompter.Password(
-					"Enter a passphrase for your new SSH key (Optional)")
+					"Enter a passphrase for your new SSH key (Optional):")
 				if err != nil {
 					return err
 				}
