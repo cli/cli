@@ -48,7 +48,7 @@ func TestGetLocalAttestations(t *testing.T) {
 		path := "../test/data/sigstore-js-2.1.0-bundles.tgz"
 		attestations, err := GetLocalAttestations(path)
 
-		require.ErrorIs(t, err, ErrLocalAttestations)
+		require.ErrorIs(t, err, ErrUnrecognisedBundleExtension)
 		require.Nil(t, attestations)
 	})
 }
