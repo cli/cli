@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -197,4 +198,23 @@ func cloneRun(opts *CloneOptions) error {
 		}
 	}
 	return nil
+}
+
+// simplifyURL strips given URL of extra parts like extra path segments (i.e.,
+// anything beyond `/owner/repo`) or query strings. This never returns an error.
+func simplifyURL(u *url.URL) *url.URL {
+	result := &url.URL{
+		Scheme: u.Scheme,
+		User:   u.User,
+		Host:   u.Host,
+		Path:   u.Path,
+	}
+
+	pathParts := strings.SplitN(strings.Trim(u.Path, "/"), "/", 3)
+	if len(pathParts) <= 2 {
+		return result
+	}
+
+	result.Path = strings.Join(pathParts[0:2], "/")
+	return result
 }
