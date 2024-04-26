@@ -144,10 +144,6 @@ func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy ve
 }
 
 func newCustomVerifier(trustedRootFilePath string) (*verify.SignedEntityVerifier, error) {
-	if trustedRootFilePath == "" {
-		return nil, nil
-	}
-
 	trustedRoot, err := root.NewTrustedRootFromPath(trustedRootFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create trusted root from file %s: %v", trustedRootFilePath, err)
