@@ -25,12 +25,13 @@ import (
 
 type StatusOptions struct {
 	HttpClient func() (*http.Client, error)
-	GitClient  *git.Client
-	Config     func() (config.Config, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (ghContext.Remotes, error)
-	Branch     func() (string, error)
+	// TODO switch to local interface
+	GitClient *git.Client
+	Config    func() (config.Config, error)
+	IO        *iostreams.IOStreams
+	BaseRepo  func() (ghrepo.Interface, error)
+	Remotes   func() (ghContext.Remotes, error)
+	Branch    func() (string, error)
 
 	HasRepoOverride bool
 	Exporter        cmdutil.Exporter
@@ -52,7 +53,8 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show status of relevant pull requests",
-		Args:  cmdutil.NoArgsQuoteReminder,
+		// TODO this seems pointless; we take no args and have no non-bool argument; why not cobra.NoArgs
+		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
