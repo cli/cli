@@ -124,6 +124,9 @@ type Repository struct {
 	Projects struct {
 		Nodes []RepoProject
 	}
+	ProjectsV2 struct {
+		Nodes []ProjectV2
+	}
 
 	// pseudo-field that keeps track of host name of this repo
 	hostname string
