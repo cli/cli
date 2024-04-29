@@ -22,7 +22,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	opts := &Options{}
 	verifyCmd := &cobra.Command{
 		Use:   "verify [<file-path> | oci://<image-uri>] [--owner | --repo]",
-		Args:  cmdutil.MinimumArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
+		Args:  cmdutil.ExactArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
 		Short: "Verify an artifact's integrity using attestations",
 		Long: heredoc.Docf(`
 			Verify the integrity and provenance of an artifact using its associated
@@ -111,12 +111,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 				NoPublicGood:      opts.NoPublicGood,
 			}
 
-			sv, err := verification.NewLiveSigstoreVerifier(config)
-			if err != nil {
-				return err
-			}
-
-			opts.SigstoreVerifier = sv
+			opts.SigstoreVerifier = verification.NewLiveSigstoreVerifier(config)
 
 			if err := runVerify(opts); err != nil {
 				return fmt.Errorf("\nError: %v", err)

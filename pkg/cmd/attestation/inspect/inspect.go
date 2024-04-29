@@ -19,7 +19,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 	opts := &Options{}
 	inspectCmd := &cobra.Command{
 		Use:    "inspect [<file path> | oci://<OCI image URI>] --bundle <path-to-bundle>",
-		Args:   cobra.ExactArgs(1),
+		Args:   cmdutil.ExactArgs(1, "must specify file path or container image URI, as well --bundle"),
 		Hidden: true,
 		Short:  "Inspect a sigstore bundle",
 		Long: heredoc.Docf(`
@@ -77,12 +77,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 				Logger: opts.Logger,
 			}
 
-			sigstore, err := verification.NewLiveSigstoreVerifier(config)
-			if err != nil {
-				return err
-			}
-
-			opts.SigstoreVerifier = sigstore
+			opts.SigstoreVerifier = verification.NewLiveSigstoreVerifier(config)
 
 			if err := runInspect(opts); err != nil {
 				return fmt.Errorf("Failed to inspect the artifact and bundle: %w", err)
