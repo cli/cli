@@ -489,7 +489,7 @@ func RepositoryGraphQL(fields []string) string {
 		case "projects":
 			q = append(q, "projects(first:100,states:OPEN){nodes{id,name,number,body,resourcePath}}")
 		case "projectsV2":
-			q = append(q, "projectsV2(first:100,query:\"is:open\"){nodes{id,number,resourcePath,closed,url}}")
+			q = append(q, "projectsV2(first:100,query:\"is:open\"){nodes{id,number,title,resourcePath,closed,url}}")
 		case "watchers":
 			q = append(q, "watchers{totalCount}")
 		case "issues":
