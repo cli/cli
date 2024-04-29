@@ -21,8 +21,10 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 	downloadCmd := &cobra.Command{
 		Use:   "download [<file-path> | oci://<image-uri>] [--owner | --repo]",
 		Args:  cmdutil.ExactArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
-		Short: "Download an artifact's Sigstore bundle(s) for offline use",
+		Short: "(BETA) Download an artifact's Sigstore bundle(s) for offline use",
 		Long: heredoc.Docf(`
+			# BETA: Feature subject to change
+
 			Download an artifact's attestations, aka Sigstore bundle(s), for offline use.
 
 			The command requires either:
