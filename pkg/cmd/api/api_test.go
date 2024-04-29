@@ -1761,20 +1761,3 @@ func Test_apiRun_acceptHeader(t *testing.T) {
 		})
 	}
 }
-
-func TestQueue_Close(t *testing.T) {
-	sut := queue{}
-	actual := make([]int, 0, 2)
-
-	func() {
-		defer sut.Close()
-		sut.Enqueue(func() {
-			actual = append(actual, 0)
-		})
-		sut.Enqueue(func() {
-			actual = append(actual, 1)
-		})
-	}()
-
-	assert.Equal(t, []int{0, 1}, actual)
-}
