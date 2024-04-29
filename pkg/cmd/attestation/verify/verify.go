@@ -25,6 +25,8 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 		Args:  cmdutil.ExactArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
 		Short: "Verify an artifact's integrity using attestations",
 		Long: heredoc.Docf(`
+			# NOTE: This feature is currently in beta, and subject to change.
+
 			Verify the integrity and provenance of an artifact using its associated
 			cryptographically signed attestations.
 
