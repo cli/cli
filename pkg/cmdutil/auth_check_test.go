@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,6 +51,69 @@ func Test_CheckAuth(t *testing.T) {
 			}
 
 			require.Equal(t, tt.expected, CheckAuth(cfg))
+		})
+	}
+}
+
+func Test_IsAuthCheckEnabled(t *testing.T) {
+	tests := []struct {
+		name               string
+		init               func() (*cobra.Command, error)
+		isAuthCheckEnabled bool
+	}{
+		{
+			name: "no annotations",
+			init: func() (*cobra.Command, error) {
+				cmd := &cobra.Command{}
+				cmd.Flags().Bool("flag", false, "")
+				return cmd, nil
+			},
+			isAuthCheckEnabled: true,
+		},
+		{
+			name: "command-level disable",
+			init: func() (*cobra.Command, error) {
+				cmd := &cobra.Command{}
+				DisableAuthCheck(cmd)
+				return cmd, nil
+			},
+			isAuthCheckEnabled: false,
+		},
+		{
+			name: "command with flag-level disable, flag not set",
+			init: func() (*cobra.Command, error) {
+				cmd := &cobra.Command{}
+				cmd.Flags().Bool("flag", false, "")
+				DisableAuthCheckFlag(cmd.Flag("flag"))
+				return cmd, nil
+			},
+			isAuthCheckEnabled: true,
+		},
+		{
+			name: "command with flag-level disable, flag set",
+			init: func() (*cobra.Command, error) {
+				cmd := &cobra.Command{}
+				cmd.Flags().Bool("flag", false, "")
+				if err := cmd.Flags().Set("flag", "true"); err != nil {
+					return nil, err
+				}
+
+				DisableAuthCheckFlag(cmd.Flag("flag"))
+				return cmd, nil
+			},
+			isAuthCheckEnabled: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd, err := tt.init()
+			require.NoError(t, err)
+
+			// IsAuthCheckEnabled assumes commands under test are subcommands
+			parent := &cobra.Command{Use: "root"}
+			parent.AddCommand(cmd)
+			require.Equal(t, tt.isAuthCheckEnabled, IsAuthCheckEnabled(cmd))
 		})
 	}
 }
