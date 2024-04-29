@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -99,10 +100,12 @@ func cloneRun(opts *CloneOptions) error {
 	var protocol string
 
 	if repositoryIsURL {
-		repoURL, err := git.ParseURL(opts.Repository)
+		initialURL, err := git.ParseURL(opts.Repository)
 		if err != nil {
 			return err
 		}
+
+		repoURL := simplifyURL(initialURL)
 		repo, err = ghrepo.FromURL(repoURL)
 		if err != nil {
 			return err
@@ -197,4 +200,31 @@ func cloneRun(opts *CloneOptions) error {
 		}
 	}
 	return nil
+}
+
+// simplifyURL strips given URL of extra parts like extra path segments (i.e.,
+// anything beyond `/owner/repo`), query strings, or fragments. This function
+// never returns an error.
+//
+// The rationale behind this function is to let users clone a repo with any
+// URL related to the repo; like:
+//   - (Tree)              github.com/owner/repo/blob/main/foo/bar
+//   - (Deep-link to line) github.com/owner/repo/blob/main/foo/bar#L168
+//   - (Issue/PR comment)  github.com/owner/repo/pull/999#issue-9999999999
+//   - (Commit history)    github.com/owner/repo/commits/main/?author=foo
+func simplifyURL(u *url.URL) *url.URL {
+	result := &url.URL{
+		Scheme: u.Scheme,
+		User:   u.User,
+		Host:   u.Host,
+		Path:   u.Path,
+	}
+
+	pathParts := strings.SplitN(strings.Trim(u.Path, "/"), "/", 3)
+	if len(pathParts) <= 2 {
+		return result
+	}
+
+	result.Path = strings.Join(pathParts[0:2], "/")
+	return result
 }
