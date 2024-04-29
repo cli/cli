@@ -25,7 +25,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 		Args:  cmdutil.ExactArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
 		Short: "Verify an artifact's integrity using attestations",
 		Long: heredoc.Docf(`
-			# NOTE: This feature is currently in beta, and subject to change.
+			### NOTE: This feature is currently in beta, and subject to change.
 
 			Verify the integrity and provenance of an artifact using its associated
 			cryptographically signed attestations.
@@ -33,23 +33,22 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			The command requires either:
 			* a file path to an artifact, or
 			* a container image URI (e.g. %[1]soci://<image-uri>%[1]s)
-
-			(Note that if you provide an OCI URL, you must already be authenticated with
-			its container registry.)
+			  * (note that if you provide an OCI URL, you must already be authenticated with
+			its container registry)
 
 			In addition, the command requires either:
-			* the %[1]s--owner%[1]s flag (e.g. --owner github), or
 			* the %[1]s--repo%[1]s flag (e.g. --repo github/example).
-
-			The %[1]s--owner%[1]s flag value must match the name of the GitHub organization
-			that the artifact is associated with.
+			* the %[1]s--owner%[1]s flag (e.g. --owner github), or
 
 			The %[1]s--repo%[1]s flag value must match the name of the GitHub repository
-			that the artifact is associated with.
+			that the artifact is linked with.
+
+			The %[1]s--owner%[1]s flag value must match the name of the GitHub organization
+			that the artifact's linked repository belongs to.
 
 			By default, the verify command will attempt to fetch attestations associated
 			with the provided artifact from the GitHub API. If you would prefer to verify
-			the artifact using attestations stored on disk (i.e. from the download command),
+			the artifact using attestations stored on disk (c.f. the %[1]sdownload%[1]s command),
 			provide a path to the %[1]s--bundle%[1]s flag.
 
 			To see the full results that are generated upon successful verification, i.e.
@@ -58,10 +57,10 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			For more policy verification options, see the other available flags.
 			`, "`"),
 		Example: heredoc.Doc(`
-			# Verify a local artifact associated with a repository
+			# Verify a local artifact linked with a repository
 			$ gh attestation verify example.bin --repo github/example
 
-			# Verify a local artifact associated with an organization
+			# Verify a local artifact linked with an organization
 			$ gh attestation verify example.bin --owner github
 
 			# Verify an OCI image using locally stored attestations
@@ -136,7 +135,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
 	cmdutil.AddFormatFlags(verifyCmd, &opts.exporter)
 	// policy enforcement flags
-	verifyCmd.Flags().BoolVarP(&opts.DenySelfHostedRunner, "deny-self-hosted-runners", "", false, "Fail verification for attestations generated on self-hosted runners.")
+	verifyCmd.Flags().BoolVarP(&opts.DenySelfHostedRunner, "deny-self-hosted-runners", "", false, "Fail verification for attestations generated on self-hosted runners")
 	verifyCmd.Flags().StringVarP(&opts.SAN, "cert-identity", "", "", "Enforce that the certificate's subject alternative name matches the provided value exactly")
 	verifyCmd.Flags().StringVarP(&opts.SANRegex, "cert-identity-regex", "i", "", "Enforce that the certificate's subject alternative name matches the provided regex")
 	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex")
