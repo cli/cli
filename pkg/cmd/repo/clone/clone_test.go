@@ -389,7 +389,7 @@ func TestSimplifyURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			u, err := url.Parse(tt.raw)
-                        require.NoError(t, err)
+			require.NoError(t, err)
 			result := simplifyURL(u)
 			assert.Equal(t, tt.expectedRaw, result.String())
 		})
