@@ -24,7 +24,7 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 		Short:  "Verify the TUF repository from a provided TUF root",
 		Hidden: true,
 		Long: heredoc.Docf(`
-			# NOTE: This feature is currently in beta, and subject to change.
+			### NOTE: This feature is currently in beta, and subject to change.
 
 			Verify a TUF repository with a local TUF root.
 
