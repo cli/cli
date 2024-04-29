@@ -203,7 +203,15 @@ func cloneRun(opts *CloneOptions) error {
 }
 
 // simplifyURL strips given URL of extra parts like extra path segments (i.e.,
-// anything beyond `/owner/repo`) or query strings. This never returns an error.
+// anything beyond `/owner/repo`), query strings, or fragments. This function
+// never returns an error.
+//
+// The rationale behind this function is to let users clone a repo with any
+// URL related to the repo; like:
+//   - (Tree)              github.com/owner/repo/blob/main/foo/bar
+//   - (Deep-link to line) github.com/owner/repo/blob/main/foo/bar#L168
+//   - (Issue/PR comment)  github.com/owner/repo/pull/999#issue-9999999999
+//   - (Commit history)    github.com/owner/repo/commits/main/?author=foo
 func simplifyURL(u *url.URL) *url.URL {
 	result := &url.URL{
 		Scheme: u.Scheme,
