@@ -14,10 +14,10 @@ import (
 func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 	root := &cobra.Command{
 		Use:     "attestation [subcommand]",
-		Short:   "(BETA) Work with artifact attestations",
+		Short:   "Work with artifact attestations",
 		Aliases: []string{"at"},
 		Long: heredoc.Doc(`
-			# BETA: Feature subject to change
+			# NOTE: This feature is currently in beta, and subject to change.
 
 			Download and verify artifact attestations.
 			`),

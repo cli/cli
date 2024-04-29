@@ -21,9 +21,9 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 		Use:    "inspect [<file path> | oci://<OCI image URI>] --bundle <path-to-bundle>",
 		Args:   cmdutil.ExactArgs(1, "must specify file path or container image URI, as well --bundle"),
 		Hidden: true,
-		Short:  "(BETA) Inspect a sigstore bundle",
+		Short:  "Inspect a sigstore bundle",
 		Long: heredoc.Docf(`
-			# BETA: Feature subject to change
+			# NOTE: This feature is currently in beta, and subject to change.
 
 			Inspect a downloaded Sigstore bundle for a given artifact.
 
