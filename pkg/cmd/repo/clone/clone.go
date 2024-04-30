@@ -50,6 +50,10 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 			If the %[1]sOWNER/%[1]s portion of the %[1]sOWNER/REPO%[1]s repository argument is omitted, it
 			defaults to the name of the authenticating user.
 
+			When a protocol scheme is not provided in the repository argument, the %[1]sgit_protocol%[1]s will be
+			chosen from your configuration, which can be checked via %[1]sgh config get git_protocol%[1]s. If the protocol
+			scheme is provided, the repository will be cloned using the specified protocol.
+
 			If the repository is a fork, its parent repository will be added as an additional
 			git remote called %[1]supstream%[1]s. The remote name can be configured using %[1]s--upstream-remote-name%[1]s.
 			The %[1]s--upstream-remote-name%[1]s option supports an %[1]s@owner%[1]s value which will name
@@ -57,6 +61,23 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 
 			If the repository is a fork, its parent repository will be set as the default remote repository.
 		`, "`"),
+		Example: heredoc.Doc(`
+			# Clone a repository from a specific org
+			$ gh repo clone cli/cli
+
+			# Clone a repository from your own account
+			$ gh repo clone myrepo
+
+			# Clone a repo, overriding git protocol configuration
+			$ gh repo clone https://github.com/cli/cli
+			$ gh repo clone git@github.com:cli/cli.git
+
+			# Clone a repository to a custom directory
+			$ gh repo clone cli/cli workspace/cli
+
+			# Clone a repository with additional git clone flags
+			$ gh repo clone cli/cli -- --depth=1
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Repository = args[0]
 			opts.GitArgs = args[1:]
