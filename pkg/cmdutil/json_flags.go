@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/cli/cli/v2/pkg/set"
@@ -28,6 +29,7 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	f.StringSlice("json", nil, "Output JSON with the specified `fields`")
 	f.StringP("jq", "q", "", "Filter JSON output using a jq `expression`")
 	f.StringP("template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
+	f.StringSlice("columns", nil, "Table columns")
 
 	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
@@ -91,21 +93,29 @@ func checkJSONFlags(cmd *cobra.Command) (*jsonExporter, error) {
 	jqFlag := f.Lookup("jq")
 	tplFlag := f.Lookup("template")
 	webFlag := f.Lookup("web")
+	columnsFlag := f.Lookup("columns")
 
-	if jsonFlag.Changed {
+	if jsonFlag.Changed || (!jsonFlag.Changed && columnsFlag.Changed) {
 		if webFlag != nil && webFlag.Changed {
 			return nil, errors.New("cannot use `--web` with `--json`")
 		}
-		jv := jsonFlag.Value.(pflag.SliceValue)
+		jv := jsonFlag.Value.(pflag.SliceValue).GetSlice()
+		cv := columnsFlag.Value.(pflag.SliceValue).GetSlice()
+		if len(jv) == 0 {
+			jv = cv
+		}
 		return &jsonExporter{
-			fields:   jv.GetSlice(),
+			fields:   cv,
 			filter:   jqFlag.Value.String(),
 			template: tplFlag.Value.String(),
+			columns:  cv,
 		}, nil
 	} else if jqFlag.Changed {
 		return nil, errors.New("cannot use `--jq` without specifying `--json`")
 	} else if tplFlag.Changed {
 		return nil, errors.New("cannot use `--template` without specifying `--json`")
+	} else if columnsFlag.Changed {
+		return nil, errors.New("cannot use `--columns` without specifying `--json`")
 	}
 	return nil, nil
 }
@@ -171,6 +181,7 @@ type jsonExporter struct {
 	fields   []string
 	filter   string
 	template string
+	columns  []string
 }
 
 // NewJSONExporter returns an Exporter to emit JSON.
@@ -193,7 +204,8 @@ func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
 	buf := bytes.Buffer{}
 	encoder := json.NewEncoder(&buf)
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(e.exportData(reflect.ValueOf(data))); err != nil {
+	exportedData := e.exportData(reflect.ValueOf(data))
+	if err := encoder.Encode(exportedData); err != nil {
 		return err
 	}
 
@@ -215,6 +227,31 @@ func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
 			return err
 		}
 		return t.Flush()
+	} else if e.columns != nil {
+		// Only works for lists...
+		var o []map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &o); err != nil {
+			return fmt.Errorf("cannot use --columns with this data type: %v", err)
+		}
+
+		// Tableprinter seems to upper case these in place?!?!
+		headers := make([]string, len(e.columns))
+		for i, col := range e.columns {
+			headers[i] = col
+		}
+
+		tp := tableprinter.New(ios, tableprinter.WithHeader(headers...))
+		// This needs to work with non string types
+		for _, datum := range o {
+			for _, col := range e.columns {
+				tp.AddField(fmt.Sprintf("%v", datum[col]))
+			}
+			tp.EndRow()
+		}
+
+		return tp.Render()
+		// fmt.Printf("%+v", data)
+		// return nil
 	} else if ios.ColorEnabled() {
 		return jsoncolor.Write(w, &buf, "  ")
 	}
