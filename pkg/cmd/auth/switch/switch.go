@@ -48,7 +48,7 @@ func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Co
 			# Select what host and account to switch to via a prompt
 			$ gh auth switch
 
-			# Switch to a specific host and specific account
+			# Switch the active account on a specific host to a specific user
 			$ gh auth switch --hostname enterprise.internal --user monalisa
 		`),
 		RunE: func(c *cobra.Command, args []string) error {
