@@ -140,9 +140,9 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "status",
 		Args:  cobra.ExactArgs(0),
-		Short: "View all accounts and authentication status",
+		Short: "Display active account and authentication state on each known GitHub host",
 		Long: heredoc.Docf(`
-			Displays information about your authentication state on each known GitHub host.
+			Display active account and authentication state on each known GitHub host.
 
 			For each host, the authentication state of each known account is tested and any issues are included in
 			the output. Each host section will indicate the active account, which will be used when targeting that host.
