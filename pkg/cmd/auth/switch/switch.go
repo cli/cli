@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -17,15 +18,21 @@ type SwitchOptions struct {
 	IO       *iostreams.IOStreams
 	Config   func() (config.Config, error)
 	Prompter shared.Prompt
+
+	GitClient      *git.Client
+	MainExecutable string
+
 	Hostname string
 	Username string
 }
 
 func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Command {
 	opts := SwitchOptions{
-		IO:       f.IOStreams,
-		Config:   f.Config,
-		Prompter: f.Prompter,
+		IO:             f.IOStreams,
+		Config:         f.Config,
+		Prompter:       f.Prompter,
+		GitClient:      f.GitClient,
+		MainExecutable: f.Executable(),
 	}
 
 	cmd := &cobra.Command{
@@ -168,6 +175,34 @@ func switchRun(opts *SwitchOptions) error {
 			cs.FailureIcon(), hostname, cs.Bold(username))
 
 		return err
+	}
+
+	// TODO:
+	// 1. Ensure that prompting is allowed.
+	// 2. How do we only show this prompt if the protocol was https?
+	//   Check config: if https -> prompt, if ssh or empty -> no prompt
+
+	// Setup the git credentials for the switched user\
+	// TODO: GitProtocol provides a default value, which is not what we want
+	// 	ideally we'd `get` and handle the absence to cover the todo above
+
+	// Something to note is that git protocol is host level and will reflect the last login
+	if protocol := cfg.GitProtocol(hostname); protocol == "https" && opts.IO.CanPrompt() {
+		credentialFlow := &shared.GitCredentialFlow{
+			Executable: opts.MainExecutable,
+			Prompter:   opts.Prompter,
+			GitClient:  opts.GitClient,
+		}
+		if err := credentialFlow.Prompt(hostname); err != nil {
+			return err
+		}
+
+		if credentialFlow.ShouldSetup() {
+			authToken, _ := authCfg.ActiveToken(hostname)
+			if err := credentialFlow.Setup(hostname, username, authToken); err != nil {
+				return err
+			}
+		}
 	}
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Switched active account for %s to %s\n",

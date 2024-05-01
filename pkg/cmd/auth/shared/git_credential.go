@@ -27,6 +27,8 @@ type GitCredentialFlow struct {
 func (flow *GitCredentialFlow) Prompt(hostname string) error {
 	var gitErr error
 	flow.helper, gitErr = gitCredentialHelper(flow.GitClient, hostname)
+
+	// Well, if the credential is gh then their git operations ARE going to use this token, so request worklfow scope
 	if isOurCredentialHelper(flow.helper) {
 		flow.scopes = append(flow.scopes, "workflow")
 		return nil
@@ -38,6 +40,7 @@ func (flow *GitCredentialFlow) Prompt(hostname string) error {
 	}
 	flow.shouldSetup = result
 
+	// Are we https and does the user expect to use this token for git operations?
 	if flow.shouldSetup {
 		if isGitMissing(gitErr) {
 			return gitErr
