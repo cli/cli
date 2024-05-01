@@ -63,9 +63,10 @@ func NewWithWriter(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorSch
 	}
 
 	if isTTY && len(headers.columns) > 0 {
-		// Make sure all headers are uppercase.
+		// Make sure all headers are uppercase, taking a copy of the headers to avoid modifying the original slice.
+		upperCasedHeaders := make([]string, len(headers.columns))
 		for i := range headers.columns {
-			headers.columns[i] = strings.ToUpper(headers.columns[i])
+			upperCasedHeaders[i] = strings.ToUpper(headers.columns[i])
 		}
 
 		// Make sure all header columns are padded - even the last one. Previously, the last header column
@@ -77,7 +78,7 @@ func NewWithWriter(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorSch
 		}
 
 		tp.AddHeader(
-			headers.columns,
+			upperCasedHeaders,
 			WithPadding(paddingFunc),
 			WithColor(cs.LightGrayUnderline),
 		)
