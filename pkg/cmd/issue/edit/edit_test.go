@@ -336,6 +336,7 @@ func Test_editRun(t *testing.T) {
 				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
+				mockIssueUpdateAssignee(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockProjectV2ItemUpdate(t, reg)
 			},
@@ -381,6 +382,8 @@ func Test_editRun(t *testing.T) {
 				mockIssueProjectItemsGet(t, reg)
 				mockIssueUpdate(t, reg)
 				mockIssueUpdate(t, reg)
+				mockIssueUpdateAssignee(t, reg)
+				mockIssueUpdateAssignee(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockProjectV2ItemUpdate(t, reg)
@@ -462,6 +465,7 @@ func Test_editRun(t *testing.T) {
 					{ "data": { "repository": { "assignableUsers": {
 						"nodes": [
 							{ "login": "hubot", "id": "HUBOTID" },
+							{ "login": "octocat", "id": "OCTOCATID" },
 							{ "login": "MonaLisa", "id": "MONAID" }
 						],
 						"pageInfo": { "hasNextPage": false }
@@ -499,6 +503,9 @@ func Test_editRun(t *testing.T) {
 							{ "errors": [ { "message": "test error" } ] }`,
 						func(inputs map[string]interface{}) {}),
 				)
+
+				mockIssueUpdateAssignee(t, reg)
+				mockIssueUpdateAssignee(t, reg)
 			},
 			stdout: heredoc.Doc(`
 				https://github.com/OWNER/REPO/issue/123
@@ -623,6 +630,7 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 		{ "data": { "repository": { "assignableUsers": {
 			"nodes": [
 				{ "login": "hubot", "id": "HUBOTID" },
+				{ "login": "octocat", "id": "OCTOCATID" },
 				{ "login": "MonaLisa", "id": "MONAID" }
 			],
 			"pageInfo": { "hasNextPage": false }
@@ -728,6 +736,15 @@ func mockIssueUpdateLabels(t *testing.T, reg *httpmock.Registry) {
 		{ "data": { "removeLabelsFromLabelable": { "__typename": "" } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
+}
+
+func mockIssueUpdateAssignee(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation AssigneeAdd\b`),
+		httpmock.StringResponse(`{}`))
+	reg.Register(
+		httpmock.GraphQL(`mutation AssigneeRemove\b`),
+		httpmock.StringResponse(`{}`))
 }
 
 func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
