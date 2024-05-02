@@ -24,8 +24,8 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Run tests
-        run: go test -race ./...
+      - name: Run unit and integration tests
+        run: go test -race -tags=integration ./...
 
       - name: Build
         run: go build -v ./cmd/gh
