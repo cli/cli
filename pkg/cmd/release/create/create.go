@@ -115,6 +115,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Use release notes from a file
 			$ gh release create v1.2.3 -F changelog.md
+   
+   			Don't mark the release as latest
+			$ gh release create v1.2.3 --latest=false 
 
 			Upload all tarballs in a directory as release assets
 			$ gh release create v1.2.3 ./dist/*.tgz
