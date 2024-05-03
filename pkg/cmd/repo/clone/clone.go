@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	org "github.com/cli/cli/v2/pkg/cmd/org/list"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -165,6 +166,12 @@ func cloneRun(opts *CloneOptions) error {
 	// Load the repo from the API to get the username/repo name in its
 	// canonical capitalization
 	canonicalRepo, err := api.GitHubRepo(apiClient, repo)
+	if err != nil && repositoryIsFullName {
+		return err
+	}
+	// Try to find the repo in the user's organizations, since the user did not
+	// specify the owner.
+	canonicalRepo, err = repoFromUserOrgs(apiClient, repo)
 	if err != nil {
 		return err
 	}
@@ -221,6 +228,25 @@ func cloneRun(opts *CloneOptions) error {
 		}
 	}
 	return nil
+}
+
+const orgsQueryLimit = 5
+
+func repoFromUserOrgs(apiClient *api.Client, repo ghrepo.Interface) (*api.Repository, error) {
+	orgs, err := org.ListOrgs(apiClient.HTTP(), repo.RepoHost(), orgsQueryLimit)
+	if err != nil || orgs.TotalCount == 0 {
+		// Return the original error in the event that the fallback query fails.
+		return nil, err
+	}
+	var canonicalRepo *api.Repository
+	for _, org := range orgs.Organizations {
+		repo = ghrepo.NewWithHost(org.Login, repo.RepoName(), repo.RepoHost())
+		canonicalRepo, err = api.GitHubRepo(apiClient, repo)
+		if err == nil {
+			return canonicalRepo, nil
+		}
+	}
+	return nil, fmt.Errorf("'%s' repository not found", repo.RepoName())
 }
 
 // simplifyURL strips given URL of extra parts like extra path segments (i.e.,

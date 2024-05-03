@@ -16,7 +16,7 @@ type Organization struct {
 	Login string
 }
 
-func listOrgs(httpClient *http.Client, hostname string, limit int) (*OrganizationList, error) {
+func ListOrgs(httpClient *http.Client, hostname string, limit int) (*OrganizationList, error) {
 	type response struct {
 		User struct {
 			Login         string
