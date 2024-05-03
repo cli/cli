@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/charmbracelet/huh"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
@@ -169,12 +170,18 @@ func cloneRun(opts *CloneOptions) error {
 	if err != nil && repositoryIsFullName {
 		return err
 	}
-	// Try to find the repo in the user's organizations, since the user did not
-	// specify the owner.
-	canonicalRepo, err = repoFromUserOrgs(apiClient, repo)
+
+	org, err := promptForOrg(apiClient, repo)
 	if err != nil {
 		return err
 	}
+
+	repo = ghrepo.NewWithHost(org, repo.RepoName(), repo.RepoHost())
+	canonicalRepo, err = api.GitHubRepo(apiClient, repo)
+	if err != nil {
+		return err
+	}
+
 	canonicalCloneURL := ghrepo.FormatRemoteURL(canonicalRepo, protocol)
 
 	// If repo HasWikiEnabled and wantsWiki is true then create a new clone URL
@@ -232,21 +239,30 @@ func cloneRun(opts *CloneOptions) error {
 
 const orgsQueryLimit = 5
 
-func repoFromUserOrgs(apiClient *api.Client, repo ghrepo.Interface) (*api.Repository, error) {
+func promptForOrg(apiClient *api.Client, repo ghrepo.Interface) (string, error) {
 	orgs, err := org.ListOrgs(apiClient.HTTP(), repo.RepoHost(), orgsQueryLimit)
 	if err != nil || orgs.TotalCount == 0 {
-		// Return the original error in the event that the fallback query fails.
-		return nil, err
+		return "", err
 	}
-	var canonicalRepo *api.Repository
+
+	var org string
+	var orgOptions []huh.Option[string]
+
 	for _, org := range orgs.Organizations {
-		repo = ghrepo.NewWithHost(org.Login, repo.RepoName(), repo.RepoHost())
-		canonicalRepo, err = api.GitHubRepo(apiClient, repo)
-		if err == nil {
-			return canonicalRepo, nil
-		}
+		orgOptions = append(orgOptions, huh.NewOption(org.Login, org.Login))
 	}
-	return nil, fmt.Errorf("'%s' repository not found", repo.RepoName())
+
+	err = huh.NewSelect[string]().
+		Value(&org).
+		Title("Repository owner").
+		Description(fmt.Sprintf("'%s/%s' not found. Clone from organization?", repo.RepoOwner(), repo.RepoName())).
+		Options(orgOptions...).
+		Run()
+
+	if err != nil {
+		return "", err
+	}
+	return org, nil
 }
 
 // simplifyURL strips given URL of extra parts like extra path segments (i.e.,
