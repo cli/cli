@@ -181,7 +181,7 @@ func editRun(opts *EditOptions) error {
 		lookupFields = append(lookupFields, "assignees", "labels")
 	}
 
-	if opts.Interactive || editable.Reviewers.Edited {
+	if opts.Interactive || editable.Reviewers.Edited && len(editable.Reviewers.Remove) != 0 {
 		lookupFields = append(lookupFields, "reviewRequests")
 	}
 
@@ -285,6 +285,11 @@ func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, id
 		return nil
 	}
 	union := githubv4.Boolean(false)
+
+	if editable.Reviewers.Edited && len(editable.Reviewers.Add) != 0 && len(editable.Reviewers.Remove) == 0 {
+		union = true
+	}
+
 	reviewsRequestParams := githubv4.RequestReviewsInput{
 		PullRequestID: id,
 		Union:         &union,
