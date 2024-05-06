@@ -708,3 +708,44 @@ func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) er
 	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(branch))
 	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
 }
+
+type RefComparison struct {
+	AheadBy  int
+	BehindBy int
+	Status   string
+}
+
+func ComparePullRequestBaseBranchWith(client *Client, repo ghrepo.Interface, prNumber int, headRef string) (*RefComparison, error) {
+	query := `query ComparePullRequestBaseBranchWith($owner: String!, $repo: String!, $pr_number: Int!, $head_ref: String!) {
+		repository(owner: $owner, name: $repo) {
+			pullRequest(number: $pr_number) {
+				baseRef {
+					compare (headRef: $head_ref) {
+						aheadBy, behindBy, status
+					}
+				}
+			}
+		}
+	}`
+
+	var result struct {
+		Repository struct {
+			PullRequest struct {
+				BaseRef struct {
+					Compare RefComparison
+				}
+			}
+		}
+	}
+	variables := map[string]interface{}{
+		"owner":     repo.RepoOwner(),
+		"repo":      repo.RepoName(),
+		"pr_number": prNumber,
+		"head_ref":  headRef,
+	}
+
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
+		return nil, err
+	}
+	return &result.Repository.PullRequest.BaseRef.Compare, nil
+}
