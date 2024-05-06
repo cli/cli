@@ -80,7 +80,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 func updateRun(opts *UpdateOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "headRefOid"},
+		Fields:   []string{"id", "number", "headRefName", "headRefOid", "headRepositoryOwner"},
 	}
 
 	pr, repo, err := opts.Finder.Find(findOptions)
@@ -94,15 +94,34 @@ func updateRun(opts *UpdateOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	opts.IO.StartProgressIndicator()
-	err = updatePullRequestBranch(apiClient, repo, pr.ID, pr.HeadRefOid, opts.Rebase)
-	opts.IO.StopProgressIndicator()
+	headRef := pr.HeadRefName
+	if pr.HeadRepositoryOwner.Login != repo.RepoOwner() {
+		// Only prepend the `owner:` to comparison head ref if the PR head
+		// branch is on another repo (e.g., a fork).
+		headRef = pr.HeadRepositoryOwner.Login + ":" + headRef
+	}
 
+	opts.IO.StartProgressIndicator()
+	comparison, err := api.ComparePullRequestBaseBranchWith(apiClient, repo, pr.Number, headRef)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
 	cs := opts.IO.ColorScheme()
+	if comparison.BehindBy == 0 {
+		// The PR branch is not behind the base branch, so it'a already up-to-date.
+		fmt.Fprintf(opts.IO.ErrOut, "%s PR branch already up-to-date\n", cs.SuccessIcon())
+		return nil
+	}
+
+	opts.IO.StartProgressIndicator()
+	err = updatePullRequestBranch(apiClient, repo, pr.ID, pr.HeadRefOid, opts.Rebase)
+	opts.IO.StopProgressIndicator()
+	if err != nil {
+		return err
+	}
+
 	fmt.Fprintf(opts.IO.ErrOut, "%s PR branch updated\n", cs.SuccessIcon())
 	return nil
 }
