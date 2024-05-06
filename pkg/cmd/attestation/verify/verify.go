@@ -54,6 +54,10 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			To see the full results that are generated upon successful verification, i.e.
 			for use with a policy engine, provide the %[1]s--json-result%[1]s flag.
 
+			To specify a certificate identity that differs from the artifact's source
+			owner or repository, provide either the %[1]s--cert-identity%[1]s 
+			or %[1]s--cert-identity-regex%[1]s flag.
+
 			For more policy verification options, see the other available flags.
 			`, "`"),
 		Example: heredoc.Doc(`
