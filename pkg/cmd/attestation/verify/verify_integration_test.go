@@ -40,7 +40,20 @@ func TestVerifyIntegration(t *testing.T) {
 		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
 	}
 
-	t.Run("with valid org and invalid repo", func(t *testing.T) {
+	t.Run("with valid owner", func(t *testing.T) {
+		err := runVerify(&publicGoodOpts)
+		require.NoError(t, err)
+	})
+
+	t.Run("with valid repo", func(t *testing.T) {
+		opts := publicGoodOpts
+		opts.Repo = "sigstore/sigstore-js"
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
+	t.Run("with valid owner and invalid repo", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.Repo = "sigstore/fakerepo"
 
@@ -49,12 +62,7 @@ func TestVerifyIntegration(t *testing.T) {
 		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\": failed to verify certificate identity: no matching certificate identity found")
 	})
 
-	t.Run("with only a valid owner", func(t *testing.T) {
-		err := runVerify(&publicGoodOpts)
-		require.NoError(t, err)
-	})
-
-	t.Run("with only an invalid owner", func(t *testing.T) {
+	t.Run("with invalid owner", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.Owner = "fakeowner"
 
@@ -63,7 +71,7 @@ func TestVerifyIntegration(t *testing.T) {
 		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\": failed to verify certificate identity: no matching certificate identity found")
 	})
 
-	t.Run("with an invalid owner and invalid repo", func(t *testing.T) {
+	t.Run("with invalid owner and invalid repo", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.Repo = "fakeowner/fakerepo"
 
