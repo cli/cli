@@ -716,11 +716,11 @@ type RefComparison struct {
 }
 
 func ComparePullRequestBaseBranchWith(client *Client, repo ghrepo.Interface, prNumber int, headRef string) (*RefComparison, error) {
-	query := `query ComparePullRequestBaseBranchWith($owner: String!, $repo: String!, $pr_number: Int!, $head_ref: String!) {
+	query := `query ComparePullRequestBaseBranchWith($owner: String!, $repo: String!, $pr_number: Int!, $headRef: String!) {
 		repository(owner: $owner, name: $repo) {
-			pullRequest(number: $pr_number) {
+			pullRequest(number: $pullRequestNumber) {
 				baseRef {
-					compare (headRef: $head_ref) {
+					compare (headRef: $headRef) {
 						aheadBy, behindBy, status
 					}
 				}
@@ -738,10 +738,10 @@ func ComparePullRequestBaseBranchWith(client *Client, repo ghrepo.Interface, prN
 		}
 	}
 	variables := map[string]interface{}{
-		"owner":     repo.RepoOwner(),
-		"repo":      repo.RepoName(),
-		"pr_number": prNumber,
-		"head_ref":  headRef,
+		"owner":             repo.RepoOwner(),
+		"repo":              repo.RepoName(),
+		"pullRequestNumber": prNumber,
+		"headRef":           headRef,
 	}
 
 	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
