@@ -55,7 +55,7 @@ func TestFuzzyAgoAbbr(t *testing.T) {
 	}
 }
 
-func TestFormatSliceDoc(t *testing.T) {
+func TestFormatSlice(t *testing.T) {
 	tests := []struct {
 		name        string
 		values      []string
