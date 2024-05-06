@@ -28,6 +28,9 @@ func DefaultOptionsWithCacheSetting() *tuf.Options {
 	// Set the cache path to a directory owned by the CLI
 	opts.CachePath = filepath.Join(config.CacheDir(), ".sigstore", "root")
 
+	// Allow TUF cache for 1 day
+	opts.CacheValidity = 1
+
 	return opts
 }
 

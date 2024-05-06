@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/spf13/cobra"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -237,6 +238,36 @@ func TestNewVerifyCmd(t *testing.T) {
 	}
 }
 
+func TestVerifyCmdAuthChecks(t *testing.T) {
+	f := &cmdutil.Factory{}
+
+	t.Run("by default auth check is required", func(t *testing.T) {
+		cmd := NewVerifyCmd(f, func(o *Options) error {
+			return nil
+		})
+
+		// IsAuthCheckEnabled assumes commands under test are subcommands
+		parent := &cobra.Command{Use: "root"}
+		parent.AddCommand(cmd)
+
+		require.NoError(t, cmd.ParseFlags([]string{}))
+		require.True(t, cmdutil.IsAuthCheckEnabled(cmd), "expected auth check to be required")
+	})
+
+	t.Run("when --bundle flag is provided, auth check is not required", func(t *testing.T) {
+		cmd := NewVerifyCmd(f, func(o *Options) error {
+			return nil
+		})
+
+		// IsAuthCheckEnabled assumes commands under test are subcommands
+		parent := &cobra.Command{Use: "root"}
+		parent.AddCommand(cmd)
+
+		require.NoError(t, cmd.ParseFlags([]string{"--bundle", "not-important"}))
+		require.False(t, cmdutil.IsAuthCheckEnabled(cmd), "expected auth check not to be required due to --bundle flag")
+	})
+}
+
 func TestJSONOutput(t *testing.T) {
 	testIO, _, out, _ := iostreams.Test()
 	opts := Options{
@@ -286,7 +317,7 @@ func TestRunVerify(t *testing.T) {
 
 		err := runVerify(&opts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to digest artifact")
+		require.ErrorContains(t, err, "failed to parse reference")
 	})
 
 	t.Run("with missing artifact path", func(t *testing.T) {
@@ -325,7 +356,7 @@ func TestRunVerify(t *testing.T) {
 
 		err := runVerify(&opts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to fetch attestations for subject")
+		require.ErrorContains(t, err, "failed to fetch attestations from wrong/example")
 	})
 
 	t.Run("with invalid owner", func(t *testing.T) {
@@ -336,7 +367,7 @@ func TestRunVerify(t *testing.T) {
 
 		err := runVerify(&opts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to fetch attestations for subject")
+		require.ErrorContains(t, err, "failed to fetch attestations from wrong-owner")
 	})
 
 	// TODO: this test can only be tested with a live SigstoreVerifier
