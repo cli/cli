@@ -100,8 +100,11 @@ func Test_updateRun(t *testing.T) {
 	defaultInput := func() UpdateOptions {
 		return UpdateOptions{
 			Finder: shared.NewMockFinder("123", &api.PullRequest{
-				ID:         "123",
-				HeadRefOid: "head-ref-oid",
+				ID:                  "123",
+				Number:              123,
+				HeadRefOid:          "head-ref-oid",
+				HeadRefName:         "head-ref-name",
+				HeadRepositoryOwner: api.Owner{Login: "head-repository-owner"},
 			}, ghrepo.New("OWNER", "REPO")),
 		}
 	}
@@ -115,11 +118,106 @@ func Test_updateRun(t *testing.T) {
 		wantsErr  string
 	}{
 		{
+			name: "failure, pr not found",
+			input: &UpdateOptions{
+				Finder:      shared.NewMockFinder("", nil, nil),
+				SelectorArg: "123",
+			},
+			wantsErr: "no pull requests found",
+		},
+		{
+			name: "success, already up-to-date",
+			input: &UpdateOptions{
+				SelectorArg: "123",
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query ComparePullRequestBaseBranchWith\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"pullRequest": {
+									"baseRef": {
+										"compare": {
+											"aheadBy": 999,
+											"behindBy": 0,
+											"Status": "AHEAD"
+										}
+									}
+								}
+							}
+						}
+					}`, func(_ string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
+						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
+					}))
+			},
+			stdout: "",
+			stderr: "✓ PR branch already up-to-date\n",
+		},
+		{
+			name: "success, already up-to-date, PR branch on the same repo as base",
+			input: &UpdateOptions{
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					ID:                  "123",
+					Number:              123,
+					HeadRefOid:          "head-ref-oid",
+					HeadRefName:         "head-ref-name",
+					HeadRepositoryOwner: api.Owner{Login: "OWNER"},
+				}, ghrepo.New("OWNER", "REPO")),
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query ComparePullRequestBaseBranchWith\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"pullRequest": {
+									"baseRef": {
+										"compare": {
+											"aheadBy": 999,
+											"behindBy": 0,
+											"Status": "AHEAD"
+										}
+									}
+								}
+							}
+						}
+					}`, func(_ string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
+						assert.Equal(t, "head-ref-name", inputs["headRef"])
+					}))
+			},
+			stdout: "",
+			stderr: "✓ PR branch already up-to-date\n",
+		},
+		{
 			name: "success, merge",
 			input: &UpdateOptions{
 				SelectorArg: "123",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query ComparePullRequestBaseBranchWith\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"pullRequest": {
+									"baseRef": {
+										"compare": {
+											"aheadBy": 0,
+											"behindBy": 999,
+											"Status": "BEHIND"
+										}
+									}
+								}
+							}
+						}
+					}`, func(_ string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
+						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
+					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestUpdateBranch\b`),
 					httpmock.GraphQLMutation(`{
@@ -145,6 +243,26 @@ func Test_updateRun(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query ComparePullRequestBaseBranchWith\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"pullRequest": {
+									"baseRef": {
+										"compare": {
+											"aheadBy": 0,
+											"behindBy": 999,
+											"Status": "BEHIND"
+										}
+									}
+								}
+							}
+						}
+					}`, func(_ string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
+						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
+					}))
+				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestUpdateBranch\b`),
 					httpmock.GraphQLMutation(`{
 						"data": {
@@ -162,19 +280,53 @@ func Test_updateRun(t *testing.T) {
 			stderr: "✓ PR branch updated\n",
 		},
 		{
-			name: "failure, pr not found",
-			input: &UpdateOptions{
-				Finder:      shared.NewMockFinder("", nil, nil),
-				SelectorArg: "123",
-			},
-			wantsErr: "no pull requests found",
-		},
-		{
-			name: "failure, API error",
+			name: "failure, API error on ref comparison request",
 			input: &UpdateOptions{
 				SelectorArg: "123",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query ComparePullRequestBaseBranchWith\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {},
+						"errors": [
+							{
+								"message": "some error"
+							}
+						]
+					}`, func(_ string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
+						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
+					}))
+			},
+			wantsErr: "GraphQL: some error",
+		},
+		{
+			name: "failure, API error on update request",
+			input: &UpdateOptions{
+				SelectorArg: "123",
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query ComparePullRequestBaseBranchWith\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"pullRequest": {
+									"baseRef": {
+										"compare": {
+											"aheadBy": 0,
+											"behindBy": 999,
+											"Status": "BEHIND"
+										}
+									}
+								}
+							}
+						}
+					}`, func(_ string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
+						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
+					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestUpdateBranch\b`),
 					httpmock.GraphQLMutation(`{
