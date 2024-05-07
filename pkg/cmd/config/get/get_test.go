@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
@@ -41,7 +42,7 @@ func TestNewCmdConfigGet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &cmdutil.Factory{
-				Config: func() (config.Config, error) {
+				Config: func() (gh.Config, error) {
 					return config.NewBlankConfig(), nil
 				},
 			}
@@ -86,7 +87,7 @@ func Test_getRun(t *testing.T) {
 			name: "get key",
 			input: &GetOptions{
 				Key: "editor",
-				Config: func() config.Config {
+				Config: func() gh.Config {
 					cfg := config.NewBlankConfig()
 					cfg.Set("", "editor", "ed")
 					return cfg
@@ -99,7 +100,7 @@ func Test_getRun(t *testing.T) {
 			input: &GetOptions{
 				Hostname: "github.com",
 				Key:      "editor",
-				Config: func() config.Config {
+				Config: func() gh.Config {
 					cfg := config.NewBlankConfig()
 					cfg.Set("", "editor", "ed")
 					cfg.Set("github.com", "editor", "vim")

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
@@ -27,49 +28,7 @@ const (
 	versionKey        = "version"
 )
 
-// This interface describes interacting with some persistent configuration for gh.
-//
-//go:generate moq -rm -out config_mock.go . Config
-type Config interface {
-	GetOrDefault(string, string) (string, error)
-	Set(string, string, string)
-	Write() error
-	Migrate(Migration) error
-
-	CacheDir() string
-
-	Aliases() *AliasConfig
-	Authentication() *AuthConfig
-	Browser(string) string
-	Editor(string) string
-	GitProtocol(string) string
-	HTTPUnixSocket(string) string
-	Pager(string) string
-	Prompt(string) string
-	Version() string
-}
-
-// Migration is the interface that config migrations must implement.
-//
-// Migrations will receive a copy of the config, and should modify that copy
-// as necessary. After migration has completed, the modified config contents
-// will be used.
-//
-// The calling code is expected to verify that the current version of the config
-// matches the PreVersion of the migration before calling Do, and will set the
-// config version to the PostVersion after the migration has completed successfully.
-//
-//go:generate moq -rm -out migration_mock.go . Migration
-type Migration interface {
-	// PreVersion is the required config version for this to be applied
-	PreVersion() string
-	// PostVersion is the config version that must be applied after migration
-	PostVersion() string
-	// Do is expected to apply any necessary changes to the config in place
-	Do(*ghConfig.Config) error
-}
-
-func NewConfig() (Config, error) {
+func NewConfig() (gh.Config, error) {
 	c, err := ghConfig.Read(fallbackConfig())
 	if err != nil {
 		return nil, err
@@ -123,11 +82,11 @@ func (c *cfg) Write() error {
 	return ghConfig.Write(c.cfg)
 }
 
-func (c *cfg) Aliases() *AliasConfig {
+func (c *cfg) Aliases() gh.AliasConfig {
 	return &AliasConfig{cfg: c.cfg}
 }
 
-func (c *cfg) Authentication() *AuthConfig {
+func (c *cfg) Authentication() gh.AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
 }
 
@@ -166,7 +125,7 @@ func (c *cfg) Version() string {
 	return val
 }
 
-func (c *cfg) Migrate(m Migration) error {
+func (c *cfg) Migrate(m gh.Migration) error {
 	version := c.Version()
 
 	// If migration has already occurred then do not attempt to migrate again.

@@ -6,18 +6,20 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/gh"
+	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/keyring"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
-func NewBlankConfig() *ConfigMock {
+func NewBlankConfig() *ghmock.ConfigMock {
 	return NewFromString(defaultConfigStr)
 }
 
-func NewFromString(cfgStr string) *ConfigMock {
+func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	c := ghConfig.ReadFromString(cfgStr)
 	cfg := cfg{c}
-	mock := &ConfigMock{}
+	mock := &ghmock.ConfigMock{}
 	mock.GetOrDefaultFunc = func(host, key string) (string, error) {
 		return cfg.GetOrDefault(host, key)
 	}
@@ -27,13 +29,13 @@ func NewFromString(cfgStr string) *ConfigMock {
 	mock.WriteFunc = func() error {
 		return cfg.Write()
 	}
-	mock.MigrateFunc = func(m Migration) error {
+	mock.MigrateFunc = func(m gh.Migration) error {
 		return cfg.Migrate(m)
 	}
-	mock.AliasesFunc = func() *AliasConfig {
+	mock.AliasesFunc = func() gh.AliasConfig {
 		return &AliasConfig{cfg: c}
 	}
-	mock.AuthenticationFunc = func() *AuthConfig {
+	mock.AuthenticationFunc = func() gh.AuthConfig {
 		return &AuthConfig{
 			cfg: c,
 			defaultHostOverride: func() (string, string) {
@@ -88,7 +90,7 @@ func NewFromString(cfgStr string) *ConfigMock {
 // in the real implementation, sets the GH_CONFIG_DIR env var so that
 // any call to Write goes to a different location on disk, and then returns
 // the blank config and a function that reads any data written to disk.
-func NewIsolatedTestConfig(t *testing.T) (Config, func(io.Writer, io.Writer)) {
+func NewIsolatedTestConfig(t *testing.T) (*cfg, func(io.Writer, io.Writer)) {
 	keyring.MockInit()
 
 	c := ghConfig.ReadFromString("")

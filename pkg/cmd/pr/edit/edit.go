@@ -6,7 +6,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -309,7 +309,7 @@ type EditorRetriever interface {
 }
 
 type editorRetriever struct {
-	config func() (config.Config, error)
+	config func() (gh.Config, error)
 }
 
 func (e editorRetriever) Retrieve() (string, error) {

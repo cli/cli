@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
+	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
@@ -137,13 +139,13 @@ func createHttpClient() (*http.Client, error) {
 func TestNew_APIURL_dotcomConfig(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "")
 	t.Setenv("GITHUB_SERVER_URL", "https://github.com")
-	cfg := &config.ConfigMock{
-		AuthenticationFunc: func() *config.AuthConfig {
+	cfg := &ghmock.ConfigMock{
+		AuthenticationFunc: func() gh.AuthConfig {
 			return &config.AuthConfig{}
 		},
 	}
 	f := &cmdutil.Factory{
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
 	}
@@ -160,15 +162,15 @@ func TestNew_APIURL_dotcomConfig(t *testing.T) {
 func TestNew_APIURL_customConfig(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "")
 	t.Setenv("GITHUB_SERVER_URL", "https://github.mycompany.com")
-	cfg := &config.ConfigMock{
-		AuthenticationFunc: func() *config.AuthConfig {
+	cfg := &ghmock.ConfigMock{
+		AuthenticationFunc: func() gh.AuthConfig {
 			authCfg := &config.AuthConfig{}
 			authCfg.SetDefaultHost("github.mycompany.com", "GH_HOST")
 			return authCfg
 		},
 	}
 	f := &cmdutil.Factory{
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
 	}
@@ -185,13 +187,13 @@ func TestNew_APIURL_customConfig(t *testing.T) {
 func TestNew_APIURL_env(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "https://api.mycompany.com")
 	t.Setenv("GITHUB_SERVER_URL", "https://mycompany.com")
-	cfg := &config.ConfigMock{
-		AuthenticationFunc: func() *config.AuthConfig {
+	cfg := &ghmock.ConfigMock{
+		AuthenticationFunc: func() gh.AuthConfig {
 			return &config.AuthConfig{}
 		},
 	}
 	f := &cmdutil.Factory{
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
 	}
@@ -208,7 +210,7 @@ func TestNew_APIURL_env(t *testing.T) {
 func TestNew_APIURL_dotcomFallback(t *testing.T) {
 	t.Setenv("GITHUB_API_URL", "")
 	f := &cmdutil.Factory{
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return nil, errors.New("Failed to load")
 		},
 	}
@@ -222,13 +224,13 @@ func TestNew_APIURL_dotcomFallback(t *testing.T) {
 func TestNew_ServerURL_dotcomConfig(t *testing.T) {
 	t.Setenv("GITHUB_SERVER_URL", "")
 	t.Setenv("GITHUB_API_URL", "https://api.github.com")
-	cfg := &config.ConfigMock{
-		AuthenticationFunc: func() *config.AuthConfig {
+	cfg := &ghmock.ConfigMock{
+		AuthenticationFunc: func() gh.AuthConfig {
 			return &config.AuthConfig{}
 		},
 	}
 	f := &cmdutil.Factory{
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
 	}
@@ -245,15 +247,15 @@ func TestNew_ServerURL_dotcomConfig(t *testing.T) {
 func TestNew_ServerURL_customConfig(t *testing.T) {
 	t.Setenv("GITHUB_SERVER_URL", "")
 	t.Setenv("GITHUB_API_URL", "https://github.mycompany.com/api/v3")
-	cfg := &config.ConfigMock{
-		AuthenticationFunc: func() *config.AuthConfig {
+	cfg := &ghmock.ConfigMock{
+		AuthenticationFunc: func() gh.AuthConfig {
 			authCfg := &config.AuthConfig{}
 			authCfg.SetDefaultHost("github.mycompany.com", "GH_HOST")
 			return authCfg
 		},
 	}
 	f := &cmdutil.Factory{
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
 	}
@@ -270,13 +272,13 @@ func TestNew_ServerURL_customConfig(t *testing.T) {
 func TestNew_ServerURL_env(t *testing.T) {
 	t.Setenv("GITHUB_SERVER_URL", "https://mycompany.com")
 	t.Setenv("GITHUB_API_URL", "https://api.mycompany.com")
-	cfg := &config.ConfigMock{
-		AuthenticationFunc: func() *config.AuthConfig {
+	cfg := &ghmock.ConfigMock{
+		AuthenticationFunc: func() gh.AuthConfig {
 			return &config.AuthConfig{}
 		},
 	}
 	f := &cmdutil.Factory{
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return cfg, nil
 		},
 	}
@@ -293,7 +295,7 @@ func TestNew_ServerURL_env(t *testing.T) {
 func TestNew_ServerURL_dotcomFallback(t *testing.T) {
 	t.Setenv("GITHUB_SERVER_URL", "")
 	f := &cmdutil.Factory{
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return nil, errors.New("Failed to load")
 		},
 	}

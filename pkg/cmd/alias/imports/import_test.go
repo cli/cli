@@ -11,6 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -309,7 +310,7 @@ func TestImportRun(t *testing.T) {
 
 			readConfigs := config.StubWriteConfig(t)
 			cfg := config.NewFromString(tt.initConfig)
-			tt.opts.Config = func() (config.Config, error) {
+			tt.opts.Config = func() (gh.Config, error) {
 				return cfg, nil
 			}
 

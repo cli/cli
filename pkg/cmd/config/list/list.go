@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -11,7 +12,7 @@ import (
 
 type ListOptions struct {
 	IO     *iostreams.IOStreams
-	Config func() (config.Config, error)
+	Config func() (gh.Config, error)
 
 	Hostname string
 }

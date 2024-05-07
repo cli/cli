@@ -1,7 +1,11 @@
 package link
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -9,8 +13,6 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
-	"net/http"
-	"testing"
 )
 
 func TestNewCmdLink(t *testing.T) {
@@ -277,7 +279,7 @@ func TestRunLink_Repo(t *testing.T) {
 		httpClient: func() (*http.Client, error) {
 			return http.DefaultClient, nil
 		},
-		config: func() (config.Config, error) {
+		config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		io: ios,
@@ -389,7 +391,7 @@ func TestRunLink_Team(t *testing.T) {
 		httpClient: func() (*http.Client, error) {
 			return http.DefaultClient, nil
 		},
-		config: func() (config.Config, error) {
+		config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		io: ios,

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 )
 
 // TODO: consider passing via Factory
 // TODO: support per-hostname settings
-func DetermineEditor(cf func() (config.Config, error)) (string, error) {
+func DetermineEditor(cf func() (gh.Config, error)) (string, error) {
 	editorCommand := os.Getenv("GH_EDITOR")
 	if editorCommand == "" {
 		cfg, err := cf()
