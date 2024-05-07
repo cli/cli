@@ -24,7 +24,17 @@ func Stub() (*CommandStubber, func(T)) {
 	teardown := setPrepareCmd(func(cmd *exec.Cmd) Runnable {
 		s := cs.find(cmd.Args)
 		if s == nil {
-			panic(fmt.Sprintf("no exec stub for `%s`", strings.Join(cmd.Args, " ")))
+			var sb strings.Builder
+			for _, s := range cs.stubs {
+				if !s.matched {
+					sb.WriteString(fmt.Sprintf("`%s`\n", s.pattern.String()))
+				}
+			}
+
+			panic(fmt.Sprintf("no exec stub matched `%s`, was expecting one of:\n%s",
+				strings.Join(cmd.Args, " "),
+				sb.String(),
+			))
 		}
 		for _, c := range s.callbacks {
 			c(cmd.Args)
