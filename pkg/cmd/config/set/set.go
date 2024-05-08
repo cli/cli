@@ -88,7 +88,7 @@ func setRun(opts *SetOptions) error {
 }
 
 func ValidateKey(key string) error {
-	for _, configKey := range config.ConfigOptions() {
+	for _, configKey := range config.Options {
 		if key == configKey.Key {
 			return nil
 		}
@@ -108,7 +108,7 @@ func (e InvalidValueError) Error() string {
 func ValidateValue(key, value string) error {
 	var validValues []string
 
-	for _, v := range config.ConfigOptions() {
+	for _, v := range config.Options {
 		if v.Key == key {
 			validValues = v.AllowedValues
 			break

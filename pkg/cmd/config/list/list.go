@@ -55,7 +55,7 @@ func listRun(opts *ListOptions) error {
 		host, _ = cfg.Authentication().DefaultHost()
 	}
 
-	configOptions := config.ConfigOptions()
+	configOptions := config.Options
 
 	for _, option := range configOptions {
 		fmt.Fprintf(opts.IO.Out, "%s=%s\n", option.Key, option.CurrentValue(cfg, host))

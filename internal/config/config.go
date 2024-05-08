@@ -163,7 +163,7 @@ func (c *cfg) CacheDir() string {
 }
 
 func defaultFor(key string) o.Option[string] {
-	for _, co := range ConfigOptions() {
+	for _, co := range Options {
 		if co.Key == key {
 			return o.Some(co.DefaultValue)
 		}
@@ -516,59 +516,57 @@ type ConfigOption struct {
 	CurrentValue  func(c gh.Config, hostname string) string
 }
 
-func ConfigOptions() []ConfigOption {
-	return []ConfigOption{
-		{
-			Key:           gitProtocolKey,
-			Description:   "the protocol to use for git clone and push operations",
-			DefaultValue:  "https",
-			AllowedValues: []string{"https", "ssh"},
-			CurrentValue: func(c gh.Config, hostname string) string {
-				return c.GitProtocol(hostname)
-			},
+var Options = []ConfigOption{
+	{
+		Key:           gitProtocolKey,
+		Description:   "the protocol to use for git clone and push operations",
+		DefaultValue:  "https",
+		AllowedValues: []string{"https", "ssh"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.GitProtocol(hostname)
 		},
-		{
-			Key:          editorKey,
-			Description:  "the text editor program to use for authoring text",
-			DefaultValue: "",
-			CurrentValue: func(c gh.Config, hostname string) string {
-				return c.Editor(hostname)
-			},
+	},
+	{
+		Key:          editorKey,
+		Description:  "the text editor program to use for authoring text",
+		DefaultValue: "",
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Editor(hostname)
 		},
-		{
-			Key:           promptKey,
-			Description:   "toggle interactive prompting in the terminal",
-			DefaultValue:  "enabled",
-			AllowedValues: []string{"enabled", "disabled"},
-			CurrentValue: func(c gh.Config, hostname string) string {
-				return c.Prompt(hostname)
-			},
+	},
+	{
+		Key:           promptKey,
+		Description:   "toggle interactive prompting in the terminal",
+		DefaultValue:  "enabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Prompt(hostname)
 		},
-		{
-			Key:          pagerKey,
-			Description:  "the terminal pager program to send standard output to",
-			DefaultValue: "",
-			CurrentValue: func(c gh.Config, hostname string) string {
-				return c.Pager(hostname)
-			},
+	},
+	{
+		Key:          pagerKey,
+		Description:  "the terminal pager program to send standard output to",
+		DefaultValue: "",
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Pager(hostname)
 		},
-		{
-			Key:          httpUnixSocketKey,
-			Description:  "the path to a Unix socket through which to make an HTTP connection",
-			DefaultValue: "",
-			CurrentValue: func(c gh.Config, hostname string) string {
-				return c.HTTPUnixSocket(hostname)
-			},
+	},
+	{
+		Key:          httpUnixSocketKey,
+		Description:  "the path to a Unix socket through which to make an HTTP connection",
+		DefaultValue: "",
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.HTTPUnixSocket(hostname)
 		},
-		{
-			Key:          browserKey,
-			Description:  "the web browser to use for opening URLs",
-			DefaultValue: "",
-			CurrentValue: func(c gh.Config, hostname string) string {
-				return c.Browser(hostname)
-			},
+	},
+	{
+		Key:          browserKey,
+		Description:  "the web browser to use for opening URLs",
+		DefaultValue: "",
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Browser(hostname)
 		},
-	}
+	},
 }
 
 func HomeDirPath(subdir string) (string, error) {
