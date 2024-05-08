@@ -54,6 +54,16 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			To see the full results that are generated upon successful verification, i.e.
 			for use with a policy engine, provide the %[1]s--json-result%[1]s flag.
 
+			The attestation's certificate's Subject Alternative Name (SAN) identifies the entity
+			responsible for creating the attestation, which most of the time will be a GitHub
+			Actions workflow file located inside your repository. By default, this command uses
+			either the %[1]s--repo%[1]s or the %[1]s--owner%[1]s flag value to validate the SAN.
+
+			However, if you generate attestations with a reusable workflow then the SAN will
+			identify the reusable workflow – which may or may not be located inside your %[1]s--repo%[1]s
+			or %[1]s--owner%[1]s. In these situations, you can use the %[1]s--cert-identity%[1]s or
+			%[1]s--cert-identity-regex%[1]s flags to specify the reusable workflow's URI.
+
 			For more policy verification options, see the other available flags.
 			`, "`"),
 		Example: heredoc.Doc(`
