@@ -1,29 +1,57 @@
+// Package gh provides types that represent the domain of the CLI application.
+//
+// For example, the CLI expects to be able to get and set user configuration in order to perform its functionality,
+// so the Config interface is defined here, though the concrete implementation lives elsewhere. Though the current
+// implementation of config writes to certain files on disk, that is an implementation detail compared to the contract
+// laid out in the interface here.
+//
+// Currently this package is in an early state but we could imagine other domain concepts living here for interacting
+// with git or GitHub.
 package gh
 
 import (
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
-// This interface describes interacting with some persistent configuration for gh.
+// A Config implements persistent storage and modification of application configuration.
 //
 //go:generate moq -rm -pkg ghmock -out mock/config.go . Config
 type Config interface {
-	GetOrDefault(string, string) (string, error)
-	Set(string, string, string)
-	Write() error
-	Migrate(Migration) error
+	// GetOrDefault provides primitive access for fetching configuration values, optionally scoped by host.
+	GetOrDefault(hostname string, key string) (string, error)
+	// Set provides primitive access for setting configuration values, optionally scoped by host.
+	Set(hostname string, key string, value string)
 
+	// Browser returns the configured browser, optionally scoped by host.
+	Browser(hostname string) string
+	// Editor returns the configured editor, optionally scoped by host.
+	Editor(hostname string) string
+	// GitProtocol returns the configured git protocol, optionally scoped by host.
+	GitProtocol(hostname string) string
+	// HTTPUnixSocket returns the configured HTTP unix socket, optionally scoped by host.
+	HTTPUnixSocket(hostname string) string
+	// Pager returns the configured Pager, optionally scoped by host.
+	Pager(hostname string) string
+	// Prompt returns the configured prompt, optionally scoped by host.
+	Prompt(hostname string) string
+
+	// Aliases provides persistent storage and modification of command aliases.
+	Aliases() AliasConfig
+
+	// Authentication provides persistent storage and modification of authentication configuration.
+	Authentication() AuthConfig
+
+	// CacheDir returns the directory where the cacheable artifacts can be persisted.
 	CacheDir() string
 
-	Aliases() AliasConfig
-	Authentication() AuthConfig
-	Browser(string) string
-	Editor(string) string
-	GitProtocol(string) string
-	HTTPUnixSocket(string) string
-	Pager(string) string
-	Prompt(string) string
+	// Migrate applies a migration to the configuration.
+	Migrate(Migration) error
+
+	// Version returns the current schema version of the configuration.
 	Version() string
+
+	// Write persists modifications to the configuration.
+	Write() error
 }
 
 // Migration is the interface that config migrations must implement.
@@ -50,43 +78,45 @@ type Migration interface {
 // with knowledge on how to access encrypted storage when neccesarry.
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig interface {
-	// ActiveToken retrieves the active authentication token for a specified hostname.
+	// ActiveToken will retrieve the active auth token for the given hostname, searching environment variables,
+	// general configuration, and finally encrypted storage.
 	ActiveToken(hostname string) (token string, source string)
 
-	// HasEnvToken checks if an authentication token has been specified in the environment variables.
+	// HasEnvToken returns true when a token has been specified in an environment variable, else returns false.
 	HasEnvToken() bool
 
-	// SetActiveToken sets a static token and source that overrides any other token resolution method.
-	SetActiveToken(token, source string)
-
-	// TokenFromKeyring retrieves the authentication token for a specified hostname from encrypted storage.
+	// TokenFromKeyring will retrieve the auth token for the given hostname, only searching in encrypted storage.
 	TokenFromKeyring(hostname string) (token string, err error)
 
-	// TokenFromKeyringForUser retrieves the authentication token for a specified hostname and user from encrypted storage.
+	// TokenFromKeyringForUser will retrieve the auth token for the given hostname and username, only searching
+	// in encrypted storage.
+	//
+	// An empty username will return an error because the potential to return the currently active token under
+	// surprising cases is just too high to risk compared to the utility of having the function being smart.
 	TokenFromKeyringForUser(hostname, username string) (token string, err error)
 
-	// ActiveUser retrieves the username for the active user at the given hostname.
+	// ActiveUser will retrieve the username for the active user at the given hostname.
+	//
+	// This will not be accurate if the oauth token is set from an environment variable.
 	ActiveUser(hostname string) (username string, err error)
 
 	// Hosts retrieves a list of known hosts.
 	Hosts() []string
 
-	// SetHosts sets a static list of hosts that overrides any other hosts resolution method.
-	SetHosts(hosts []string)
-
-	// DefaultHost retrieves the default host configuration.
+	// DefaultHost retrieves the default host.
 	DefaultHost() (host string, source string)
 
-	// SetDefaultHost sets a static host and source that overrides any other default host resolution method.
-	SetDefaultHost(host, source string)
-
-	// Login sets user, git protocol, and auth token configurations for a given hostname.
+	// Login will set user, git protocol, and auth token for the given hostname.
+	//
+	// If the encrypt option is specified it will first try to store the auth token
+	// in encrypted storage and will fall back to the general insecure configuration.
 	Login(hostname, username, token, gitProtocol string, secureStorage bool) (insecureStorageUsed bool, err error)
 
 	// SwitchUser switches the active user for a given hostname.
 	SwitchUser(hostname, user string) error
 
-	// Logout removes user and authentication token configurations for a given hostname.
+	// Logout will remove user, git protocol, and auth token for the given hostname.
+	// It will remove the auth token from the encrypted storage if it exists there.
 	Logout(hostname, username string) error
 
 	// UsersForHost retrieves a list of users configured for a specific host.
@@ -94,6 +124,22 @@ type AuthConfig interface {
 
 	// TokenForUser retrieves the authentication token and its source for a specified user and hostname.
 	TokenForUser(hostname, user string) (token string, source string, err error)
+
+	// The following methods are only for testing and that is a design smell we should consider fixing.
+
+	// SetActiveToken will override any token resolution and return the given token and source for all calls to
+	// ActiveToken.
+	// Use for testing purposes only.
+	SetActiveToken(token, source string)
+
+	// SetHosts will override any hosts resolution and return the given hosts for all calls to Hosts.
+	// Use for testing purposes only.
+	SetHosts(hosts []string)
+
+	// SetDefaultHost will override any host resolution and return the given host and source for all calls to
+	// DefaultHost.
+	// Use for testing purposes only.
+	SetDefaultHost(host, source string)
 }
 
 // AliasConfig defines an interface for managing command aliases.
