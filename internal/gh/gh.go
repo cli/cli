@@ -10,6 +10,7 @@
 package gh
 
 import (
+	o "github.com/cli/cli/v2/pkg/option"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
@@ -18,7 +19,7 @@ import (
 //go:generate moq -rm -pkg ghmock -out mock/config.go . Config
 type Config interface {
 	// GetOrDefault provides primitive access for fetching configuration values, optionally scoped by host.
-	GetOrDefault(hostname string, key string) (string, error)
+	GetOrDefault(hostname string, key string) o.Option[string]
 	// Set provides primitive access for setting configuration values, optionally scoped by host.
 	Set(hostname string, key string, value string)
 
@@ -48,7 +49,7 @@ type Config interface {
 	Migrate(Migration) error
 
 	// Version returns the current schema version of the configuration.
-	Version() string
+	Version() o.Option[string]
 
 	// Write persists modifications to the configuration.
 	Write() error

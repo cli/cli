@@ -37,12 +37,10 @@ func TestGetNonExistentKey(t *testing.T) {
 	cfg := newTestConfig()
 
 	// When we get a key that has no value
-	val, err := cfg.Get("", "non-existent-key")
+	optionalVal := cfg.Get("", "non-existent-key")
 
-	// Then it returns an error and the value is empty
-	var keyNotFoundError *ghConfig.KeyNotFoundError
-	require.ErrorAs(t, err, &keyNotFoundError)
-	require.Empty(t, val)
+	// Then it returns a None variant
+	require.True(t, optionalVal.IsNone(), "expected there to be no value")
 }
 
 func TestGetNonExistentHostSpecificKey(t *testing.T) {
@@ -50,12 +48,10 @@ func TestGetNonExistentHostSpecificKey(t *testing.T) {
 	cfg := newTestConfig()
 
 	// When we get a key for a host that has no value
-	val, err := cfg.Get("non-existent-host", "non-existent-key")
+	optionalVal := cfg.Get("non-existent-host", "non-existent-key")
 
-	// Then it returns an error and the value is empty
-	var keyNotFoundError *ghConfig.KeyNotFoundError
-	require.ErrorAs(t, err, &keyNotFoundError)
-	require.Empty(t, val)
+	// Then it returns a None variant
+	require.True(t, optionalVal.IsNone(), "expected there to be no value")
 }
 
 func TestGetExistingTopLevelKey(t *testing.T) {
@@ -64,11 +60,11 @@ func TestGetExistingTopLevelKey(t *testing.T) {
 	cfg.Set("", "top-level-key", "top-level-value")
 
 	// When we get that key
-	val, err := cfg.Get("non-existent-host", "top-level-key")
+	optionalVal := cfg.Get("non-existent-host", "top-level-key")
 
-	// Then it returns successfully with the correct value
-	require.NoError(t, err)
-	require.Equal(t, "top-level-value", val)
+	// Then it returns a Some variant containing the correct value
+	require.True(t, optionalVal.IsSome(), "expected there to be a value")
+	require.Equal(t, "top-level-value", optionalVal.Unwrap())
 }
 
 func TestGetExistingHostSpecificKey(t *testing.T) {
@@ -77,11 +73,11 @@ func TestGetExistingHostSpecificKey(t *testing.T) {
 	cfg.Set("github.com", "host-specific-key", "host-specific-value")
 
 	// When we get that key
-	val, err := cfg.Get("github.com", "host-specific-key")
+	optionalVal := cfg.Get("github.com", "host-specific-key")
 
-	// Then it returns successfully with the correct value
-	require.NoError(t, err)
-	require.Equal(t, "host-specific-value", val)
+	// Then it returns a Some variant containing the correct value
+	require.True(t, optionalVal.IsSome(), "expected there to be a value")
+	require.Equal(t, "host-specific-value", optionalVal.Unwrap())
 }
 
 func TestGetHostnameSpecificKeyFallsBackToTopLevel(t *testing.T) {
@@ -90,11 +86,11 @@ func TestGetHostnameSpecificKeyFallsBackToTopLevel(t *testing.T) {
 	cfg.Set("", "key", "value")
 
 	// When we get that key on a specific host
-	val, err := cfg.Get("github.com", "key")
+	optionalVal := cfg.Get("github.com", "key")
 
-	// Then it returns successfully, falling back to the top level config
-	require.NoError(t, err)
-	require.Equal(t, "value", val)
+	// Then it returns a Some variant containing the correct value by falling back to the top level config
+	require.True(t, optionalVal.IsSome(), "expected there to be a value")
+	require.Equal(t, "value", optionalVal.Unwrap())
 }
 
 func TestGetOrDefaultApplicationDefaults(t *testing.T) {
@@ -116,11 +112,11 @@ func TestGetOrDefaultApplicationDefaults(t *testing.T) {
 			cfg := newTestConfig()
 
 			// When we get a key that has no value, but has a default
-			val, err := cfg.GetOrDefault("", tt.key)
+			optionalVal := cfg.GetOrDefault("", tt.key)
 
-			// Then it returns the default value
-			require.NoError(t, err)
-			require.Equal(t, tt.expectedDefault, val)
+			// Then there is an entry with the default value, and source set as default
+			require.True(t, optionalVal.IsSome(), "expected there to be a value")
+			require.Equal(t, tt.expectedDefault, optionalVal.Unwrap())
 		})
 	}
 }
@@ -131,12 +127,12 @@ func TestGetOrDefaultExistingKey(t *testing.T) {
 	cfg.Set("", gitProtocolKey, "ssh")
 
 	// When we get that key
-	val, err := cfg.GetOrDefault("", gitProtocolKey)
+	optionalVal := cfg.GetOrDefault("", gitProtocolKey)
 
 	// Then it returns successfully with the correct value, and doesn't fall back
 	// to the default
-	require.NoError(t, err)
-	require.Equal(t, "ssh", val)
+	require.True(t, optionalVal.IsSome(), "expected there to be a value")
+	require.Equal(t, "ssh", optionalVal.Unwrap())
 }
 
 func TestGetOrDefaultNotFoundAndNoDefault(t *testing.T) {
@@ -144,12 +140,10 @@ func TestGetOrDefaultNotFoundAndNoDefault(t *testing.T) {
 	cfg := newTestConfig()
 
 	// When we get a non-existent-key that has no default
-	val, err := cfg.GetOrDefault("", "non-existent-key")
+	optionalEntry := cfg.GetOrDefault("", "non-existent-key")
 
-	// Then it returns an error and the value is empty
-	var keyNotFoundError *ghConfig.KeyNotFoundError
-	require.ErrorAs(t, err, &keyNotFoundError)
-	require.Empty(t, val)
+	// Then it returns with no entry
+	require.False(t, optionalEntry.IsSome(), "expected the config to not contain a value")
 }
 
 func TestFallbackConfig(t *testing.T) {

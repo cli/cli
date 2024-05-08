@@ -64,13 +64,22 @@ func getRun(opts *GetOptions) error {
 		return nil
 	}
 
-	val, err := opts.Config.GetOrDefault(opts.Hostname, opts.Key)
-	if err != nil {
-		return err
+	optionalValue := opts.Config.GetOrDefault(opts.Hostname, opts.Key)
+	if optionalValue.IsNone() {
+		return nonExistentKeyError{key: opts.Key}
 	}
 
+	val := optionalValue.Unwrap()
 	if val != "" {
 		fmt.Fprintf(opts.IO.Out, "%s\n", val)
 	}
 	return nil
+}
+
+type nonExistentKeyError struct {
+	key string
+}
+
+func (e nonExistentKeyError) Error() string {
+	return fmt.Sprintf("could not find key \"%s\"", e.key)
 }

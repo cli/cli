@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
+	o "github.com/cli/cli/v2/pkg/option"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
@@ -41,28 +42,32 @@ type cfg struct {
 	cfg *ghConfig.Config
 }
 
-func (c *cfg) Get(hostname, key string) (string, error) {
+func (c *cfg) Get(hostname, key string) o.Option[string] {
 	if hostname != "" {
 		val, err := c.cfg.Get([]string{hostsKey, hostname, key})
 		if err == nil {
-			return val, err
+			return o.Some(val)
 		}
 	}
 
-	return c.cfg.Get([]string{key})
+	val, err := c.cfg.Get([]string{key})
+	if err == nil {
+		return o.Some(val)
+	}
+
+	return o.None[string]()
 }
 
-func (c *cfg) GetOrDefault(hostname, key string) (string, error) {
-	val, err := c.Get(hostname, key)
-	if err == nil {
-		return val, err
+func (c *cfg) GetOrDefault(hostname, key string) o.Option[string] {
+	if val := c.Get(hostname, key); val.IsSome() {
+		return val
 	}
 
-	if val, ok := defaultFor(key); ok {
-		return val, nil
+	if defaultVal := defaultFor(key); defaultVal.IsSome() {
+		return defaultVal
 	}
 
-	return val, err
+	return o.None[string]()
 }
 
 func (c *cfg) Set(hostname, key, value string) {
@@ -91,42 +96,43 @@ func (c *cfg) Authentication() gh.AuthConfig {
 }
 
 func (c *cfg) Browser(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, browserKey)
-	return val
+	// Intentionally panic as this is a programmer error
+	return c.GetOrDefault(hostname, browserKey).Unwrap()
 }
 
 func (c *cfg) Editor(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, editorKey)
-	return val
+	// Intentionally panic as this is a programmer error
+	return c.GetOrDefault(hostname, editorKey).Unwrap()
 }
 
 func (c *cfg) GitProtocol(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, gitProtocolKey)
-	return val
+	// Intentionally panic as this is a programmer error
+	return c.GetOrDefault(hostname, gitProtocolKey).Unwrap()
 }
 
 func (c *cfg) HTTPUnixSocket(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, httpUnixSocketKey)
-	return val
+	// Intentionally panic as this is a programmer error
+	return c.GetOrDefault(hostname, httpUnixSocketKey).Unwrap()
 }
 
 func (c *cfg) Pager(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, pagerKey)
-	return val
+	// Intentionally panic as this is a programmer error
+	return c.GetOrDefault(hostname, pagerKey).Unwrap()
 }
 
 func (c *cfg) Prompt(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, promptKey)
-	return val
+	// Intentionally panic as this is a programmer error
+	return c.GetOrDefault(hostname, promptKey).Unwrap()
 }
 
-func (c *cfg) Version() string {
-	val, _ := c.GetOrDefault("", versionKey)
-	return val
+func (c *cfg) Version() o.Option[string] {
+	return c.Get("", versionKey)
 }
 
 func (c *cfg) Migrate(m gh.Migration) error {
-	version := c.Version()
+	// If there is no version entry we must never have applied a migration, and the following conditional logic
+	// handles the version as an empty string correctly.
+	version := c.Version().UnwrapOrZero()
 
 	// If migration has already occurred then do not attempt to migrate again.
 	if m.PostVersion() == version {
@@ -156,16 +162,16 @@ func (c *cfg) CacheDir() string {
 	return ghConfig.CacheDir()
 }
 
-func defaultFor(key string) (string, bool) {
+func defaultFor(key string) o.Option[string] {
 	for _, co := range ConfigOptions() {
 		if co.Key == key {
-			return co.DefaultValue, true
+			return o.Some(co.DefaultValue)
 		}
 	}
-	return "", false
+	return o.None[string]()
 }
 
-// AuthConfig is used for interacting with some persistent configuration for gh,
+// AuthConfig is used for interacting with o.Some persistent configuration for gh,
 // with knowledge on how to access encrypted storage when neccesarry.
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig struct {
@@ -332,7 +338,7 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 	if err != nil {
 		// Given that activateUser can only fail before the config is written, or when writing the config
 		// we know for sure that the config has not been written. However, we still should restore it back
-		// to its previous clean state just in case something else tries to make use of the config, or tries
+		// to its previous clean state just in case o.Something else tries to make use of the config, or tries
 		// to write it again.
 		if previousSource == "keyring" {
 			if setErr := keyring.Set(keyringServiceName(hostname), "", previouslyActiveToken); setErr != nil {

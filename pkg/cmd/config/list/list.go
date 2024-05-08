@@ -58,11 +58,12 @@ func listRun(opts *ListOptions) error {
 	configOptions := config.ConfigOptions()
 
 	for _, key := range configOptions {
-		val, err := cfg.GetOrDefault(host, key.Key)
-		if err != nil {
-			return err
+		optionalValue := cfg.GetOrDefault(host, key.Key)
+		if optionalValue.IsNone() {
+			return fmt.Errorf("invalid key: %s", key.Key)
 		}
-		fmt.Fprintf(opts.IO.Out, "%s=%s\n", key.Key, val)
+
+		fmt.Fprintf(opts.IO.Out, "%s=%s\n", key.Key, optionalValue.Unwrap())
 	}
 
 	return nil
