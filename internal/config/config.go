@@ -177,7 +177,7 @@ func defaultFor(key string) o.Option[string] {
 	return o.None[string]()
 }
 
-// AuthConfig is used for interacting with o.Some persistent configuration for gh,
+// AuthConfig is used for interacting with some persistent configuration for gh,
 // with knowledge on how to access encrypted storage when neccesarry.
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig struct {
@@ -344,7 +344,7 @@ func (c *AuthConfig) SwitchUser(hostname, user string) error {
 	if err != nil {
 		// Given that activateUser can only fail before the config is written, or when writing the config
 		// we know for sure that the config has not been written. However, we still should restore it back
-		// to its previous clean state just in case o.Something else tries to make use of the config, or tries
+		// to its previous clean state just in case something else tries to make use of the config, or tries
 		// to write it again.
 		if previousSource == "keyring" {
 			if setErr := keyring.Set(keyringServiceName(hostname), "", previouslyActiveToken); setErr != nil {
