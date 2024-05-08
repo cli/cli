@@ -305,7 +305,7 @@ func Test_editRun(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     *EditOptions
-		httpStubs func(*testing.T, *httpmock.Registry)
+		httpStubs func(*httpmock.Registry)
 		stdout    string
 		stderr    string
 	}{
@@ -359,13 +359,13 @@ func Test_editRun(t *testing.T) {
 				},
 				Fetcher: testFetcher{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(t, reg, false)
-				mockPullRequestUpdate(t, reg)
-				mockPullRequestUpdateAssignee(t, reg)
-				mockPullRequestUpdateLabels(t, reg)
-				mockPullRequestReviewersUpdate(t, reg)
-				mockProjectV2ItemUpdate(t, reg)
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, false)
+				mockPullRequestUpdate(reg)
+				mockPullRequestUpdateAssignee(reg)
+				mockPullRequestUpdateLabels(reg)
+				mockPullRequestReviewersUpdate(reg)
+				mockProjectV2ItemUpdate(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -414,12 +414,12 @@ func Test_editRun(t *testing.T) {
 				},
 				Fetcher: testFetcher{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(t, reg, true)
-				mockPullRequestUpdate(t, reg)
-				mockPullRequestUpdateAssignee(t, reg)
-				mockPullRequestUpdateLabels(t, reg)
-				mockProjectV2ItemUpdate(t, reg)
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, true)
+				mockPullRequestUpdate(reg)
+				mockPullRequestUpdateAssignee(reg)
+				mockPullRequestUpdateLabels(reg)
+				mockProjectV2ItemUpdate(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -435,12 +435,12 @@ func Test_editRun(t *testing.T) {
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(t, reg, false)
-				mockPullRequestUpdate(t, reg)
-				mockPullRequestReviewersUpdate(t, reg)
-				mockPullRequestUpdateLabels(t, reg)
-				mockProjectV2ItemUpdate(t, reg)
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, false)
+				mockPullRequestUpdate(reg)
+				mockPullRequestReviewersUpdate(reg)
+				mockPullRequestUpdateLabels(reg)
+				mockProjectV2ItemUpdate(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -456,11 +456,11 @@ func Test_editRun(t *testing.T) {
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(t, reg, true)
-				mockPullRequestUpdate(t, reg)
-				mockPullRequestUpdateLabels(t, reg)
-				mockProjectV2ItemUpdate(t, reg)
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, true)
+				mockPullRequestUpdate(reg)
+				mockPullRequestUpdateLabels(reg)
+				mockProjectV2ItemUpdate(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -474,7 +474,7 @@ func Test_editRun(t *testing.T) {
 
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
-			tt.httpStubs(t, reg)
+			tt.httpStubs(reg)
 
 			httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 
@@ -489,7 +489,7 @@ func Test_editRun(t *testing.T) {
 	}
 }
 
-func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) {
+func mockRepoMetadata(reg *httpmock.Registry, skipReviewers bool) {
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 		httpmock.StringResponse(`
@@ -598,19 +598,19 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) 
 	}
 }
 
-func mockPullRequestUpdate(t *testing.T, reg *httpmock.Registry) {
+func mockPullRequestUpdate(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation PullRequestUpdate\b`),
 		httpmock.StringResponse(`{}`))
 }
 
-func mockPullRequestReviewersUpdate(t *testing.T, reg *httpmock.Registry) {
+func mockPullRequestReviewersUpdate(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation PullRequestUpdateRequestReviews\b`),
 		httpmock.StringResponse(`{}`))
 }
 
-func mockPullRequestUpdateLabels(t *testing.T, reg *httpmock.Registry) {
+func mockPullRequestUpdateLabels(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation LabelAdd\b`),
 		httpmock.GraphQLMutation(`
@@ -625,7 +625,7 @@ func mockPullRequestUpdateLabels(t *testing.T, reg *httpmock.Registry) {
 	)
 }
 
-func mockPullRequestUpdateAssignee(t *testing.T, reg *httpmock.Registry) {
+func mockPullRequestUpdateAssignee(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation AssigneeAdd\b`),
 		httpmock.StringResponse(`{}`))
@@ -634,7 +634,7 @@ func mockPullRequestUpdateAssignee(t *testing.T, reg *httpmock.Registry) {
 		httpmock.StringResponse(`{}`))
 }
 
-func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
+func mockProjectV2ItemUpdate(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
 		httpmock.GraphQLMutation(`

@@ -28,17 +28,28 @@ func buildSANMatcher(san, sanRegex string) (verify.SubjectAlternativeNameMatcher
 	return sanMatcher, nil
 }
 
+func buildCertExtensions(opts *Options, runnerEnv string) certificate.Extensions {
+	extensions := certificate.Extensions{
+		Issuer:                   opts.OIDCIssuer,
+		SourceRepositoryOwnerURI: fmt.Sprintf("https://github.com/%s", opts.Owner),
+		RunnerEnvironment:        runnerEnv,
+	}
+
+	// if opts.Repo is set, set the SourceRepositoryURI field before returning the extensions
+	if opts.Repo != "" {
+		extensions.SourceRepositoryURI = fmt.Sprintf("https://github.com/%s", opts.Repo)
+	}
+	return extensions
+}
+
 func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.PolicyOption, error) {
 	sanMatcher, err := buildSANMatcher(opts.SAN, opts.SANRegex)
 	if err != nil {
 		return nil, err
 	}
 
-	extensions := certificate.Extensions{
-		Issuer:                   opts.OIDCIssuer,
-		SourceRepositoryOwnerURI: fmt.Sprintf("https://github.com/%s", opts.Owner),
-		RunnerEnvironment:        runnerEnv,
-	}
+	extensions := buildCertExtensions(opts, runnerEnv)
+
 	certId, err := verify.NewCertificateIdentity(sanMatcher, extensions)
 	if err != nil {
 		return nil, err

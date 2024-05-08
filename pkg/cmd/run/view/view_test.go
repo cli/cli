@@ -1376,6 +1376,8 @@ func TestViewRun(t *testing.T) {
 }
 
 // Structure of fixture zip file
+// To see the structure of fixture zip file, run:
+// `❯ unzip -lv pkg/cmd/run/view/fixtures/run_log.zip`
 //
 //	run log/
 //	├── cool job/
@@ -1487,23 +1489,49 @@ func Test_attachRunLog(t *testing.T) {
 			// not the double space in the dir name, as the slash has been removed
 			wantFilename: "cool job  with slash/1_fob the barz.txt",
 		},
+		{
+			name: "Job name with really long name (over the ZIP limit)",
+			job: shared.Job{
+				Name: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_",
+				Steps: []shared.Step{{
+					Name:   "Long Name Job",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnine/1_Long Name Job.txt",
+		},
+		{
+			name: "Job name that would be truncated by the C# server to split a grapheme",
+			job: shared.Job{
+				Name: "Emoji Test 😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅",
+				Steps: []shared.Step{{
+					Name:   "Emoji Job",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "Emoji Test 😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅�/1_Emoji Job.txt",
+		},
 	}
 
-	rlz, err := zip.OpenReader("./fixtures/run_log.zip")
+	run_log_zip_reader, err := zip.OpenReader("./fixtures/run_log.zip")
 	require.NoError(t, err)
-	defer rlz.Close()
+	defer run_log_zip_reader.Close()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			attachRunLog(&rlz.Reader, []shared.Job{tt.job})
+			attachRunLog(&run_log_zip_reader.Reader, []shared.Job{tt.job})
+
+			t.Logf("Job details: ")
 
 			for _, step := range tt.job.Steps {
 				log := step.Log
 				logPresent := log != nil
-				require.Equal(t, tt.wantMatch, logPresent)
+				require.Equal(t, tt.wantMatch, logPresent, "log not present")
 				if logPresent {
-					require.Equal(t, tt.wantFilename, log.Name)
+					require.Equal(t, tt.wantFilename, log.Name, "Filename mismatch")
 				}
 			}
 		})
