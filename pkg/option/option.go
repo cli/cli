@@ -1,3 +1,24 @@
+// MIT License
+
+// Copyright (c) 2022 Tom Godkin
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 package o
 
 import "fmt"
@@ -76,15 +97,6 @@ func (o Option[T]) IsSome() bool {
 	return o.present
 }
 
-// IsSome returns true if the [Option] is a [Some] variant and the value inside of it equals the provided value.
-// func (o Option[T]) Is(t T) bool {
-// 	return o.present && o.value == t
-// }
-
-func (o Option[T]) IsSomeAnd(f func(T) bool) bool {
-	return o.present && f(o.value)
-}
-
 // IsNone returns true if the [Option] is a [None] variant.
 func (o Option[T]) IsNone() bool {
 	return !o.present
@@ -104,12 +116,4 @@ func (o Option[T]) Expect(message string) T {
 	}
 
 	panic(message)
-}
-
-func Map[T any, U any](f func(T) U, o Option[T]) Option[U] {
-	if o.present {
-		return Some(f(o.value))
-	}
-
-	return None[U]()
 }

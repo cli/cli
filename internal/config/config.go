@@ -42,7 +42,7 @@ type cfg struct {
 	cfg *ghConfig.Config
 }
 
-func (c *cfg) Get(hostname, key string) o.Option[string] {
+func (c *cfg) get(hostname, key string) o.Option[string] {
 	if hostname != "" {
 		val, err := c.cfg.Get([]string{hostsKey, hostname, key})
 		if err == nil {
@@ -59,7 +59,7 @@ func (c *cfg) Get(hostname, key string) o.Option[string] {
 }
 
 func (c *cfg) GetOrDefault(hostname, key string) o.Option[string] {
-	if val := c.Get(hostname, key); val.IsSome() {
+	if val := c.get(hostname, key); val.IsSome() {
 		return val
 	}
 
@@ -126,7 +126,7 @@ func (c *cfg) Prompt(hostname string) string {
 }
 
 func (c *cfg) Version() o.Option[string] {
-	return c.Get("", versionKey)
+	return c.get("", versionKey)
 }
 
 func (c *cfg) Migrate(m gh.Migration) error {
@@ -513,6 +513,7 @@ type ConfigOption struct {
 	Description   string
 	DefaultValue  string
 	AllowedValues []string
+	CurrentValue  func(c gh.Config, hostname string) string
 }
 
 func ConfigOptions() []ConfigOption {
@@ -522,32 +523,50 @@ func ConfigOptions() []ConfigOption {
 			Description:   "the protocol to use for git clone and push operations",
 			DefaultValue:  "https",
 			AllowedValues: []string{"https", "ssh"},
+			CurrentValue: func(c gh.Config, hostname string) string {
+				return c.GitProtocol(hostname)
+			},
 		},
 		{
 			Key:          editorKey,
 			Description:  "the text editor program to use for authoring text",
 			DefaultValue: "",
+			CurrentValue: func(c gh.Config, hostname string) string {
+				return c.Editor(hostname)
+			},
 		},
 		{
 			Key:           promptKey,
 			Description:   "toggle interactive prompting in the terminal",
 			DefaultValue:  "enabled",
 			AllowedValues: []string{"enabled", "disabled"},
+			CurrentValue: func(c gh.Config, hostname string) string {
+				return c.Prompt(hostname)
+			},
 		},
 		{
 			Key:          pagerKey,
 			Description:  "the terminal pager program to send standard output to",
 			DefaultValue: "",
+			CurrentValue: func(c gh.Config, hostname string) string {
+				return c.Pager(hostname)
+			},
 		},
 		{
 			Key:          httpUnixSocketKey,
 			Description:  "the path to a Unix socket through which to make an HTTP connection",
 			DefaultValue: "",
+			CurrentValue: func(c gh.Config, hostname string) string {
+				return c.HTTPUnixSocket(hostname)
+			},
 		},
 		{
 			Key:          browserKey,
 			Description:  "the web browser to use for opening URLs",
 			DefaultValue: "",
+			CurrentValue: func(c gh.Config, hostname string) string {
+				return c.Browser(hostname)
+			},
 		},
 	}
 }
