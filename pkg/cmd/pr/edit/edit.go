@@ -186,7 +186,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	if opts.Interactive || editable.Projects.Edited {
-		lookupFields = append(lookupFields, "projectCards")
+		lookupFields = append(lookupFields, "projectCards", "projectItems")
 	}
 
 	if opts.Interactive || editable.Milestone.Edited {
