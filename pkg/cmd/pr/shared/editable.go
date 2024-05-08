@@ -47,8 +47,10 @@ type EditableProjects struct {
 
 func (s *EditableSlice) ReplaceValue(v []string) {
 	s.Value = v
-	s.Add = set.NewFromSlice(v).Difference(set.NewFromSlice(s.Default)).ToSlice()
-	s.Remove = set.NewFromSlice(s.Default).Difference(set.NewFromSlice(v)).ToSlice()
+	vSet := set.NewFromSlice(v)
+	defaultSet := set.NewFromSlice(s.Default)
+	s.Add = vSet.Difference(defaultSet).ToSlice()
+	s.Remove = defaultSet.Difference(vSet).ToSlice()
 }
 
 func (e Editable) Dirty() bool {
