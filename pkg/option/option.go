@@ -117,3 +117,11 @@ func (o Option[T]) Expect(message string) T {
 
 	panic(message)
 }
+
+func Map[T, U any](o Option[T], f func(T) U) Option[U] {
+	if o.present {
+		return Some(f(o.value))
+	}
+
+	return None[U]()
+}

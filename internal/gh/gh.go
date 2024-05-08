@@ -14,27 +14,39 @@ import (
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
+type ConfigSource string
+
+const (
+	ConfigDefaultProvided ConfigSource = "default"
+	ConfigUserProvided    ConfigSource = "user"
+)
+
+type ConfigEntry struct {
+	Value  string
+	Source ConfigSource
+}
+
 // A Config implements persistent storage and modification of application configuration.
 //
 //go:generate moq -rm -pkg ghmock -out mock/config.go . Config
 type Config interface {
 	// GetOrDefault provides primitive access for fetching configuration values, optionally scoped by host.
-	GetOrDefault(hostname string, key string) o.Option[string]
+	GetOrDefault(hostname string, key string) o.Option[ConfigEntry]
 	// Set provides primitive access for setting configuration values, optionally scoped by host.
 	Set(hostname string, key string, value string)
 
 	// Browser returns the configured browser, optionally scoped by host.
-	Browser(hostname string) string
+	Browser(hostname string) ConfigEntry
 	// Editor returns the configured editor, optionally scoped by host.
-	Editor(hostname string) string
+	Editor(hostname string) ConfigEntry
 	// GitProtocol returns the configured git protocol, optionally scoped by host.
-	GitProtocol(hostname string) string
+	GitProtocol(hostname string) ConfigEntry
 	// HTTPUnixSocket returns the configured HTTP unix socket, optionally scoped by host.
-	HTTPUnixSocket(hostname string) string
+	HTTPUnixSocket(hostname string) ConfigEntry
 	// Pager returns the configured Pager, optionally scoped by host.
-	Pager(hostname string) string
+	Pager(hostname string) ConfigEntry
 	// Prompt returns the configured prompt, optionally scoped by host.
-	Prompt(hostname string) string
+	Prompt(hostname string) ConfigEntry
 
 	// Aliases provides persistent storage and modification of command aliases.
 	Aliases() AliasConfig

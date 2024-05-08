@@ -58,16 +58,22 @@ func (c *cfg) get(hostname, key string) o.Option[string] {
 	return o.None[string]()
 }
 
-func (c *cfg) GetOrDefault(hostname, key string) o.Option[string] {
+func (c *cfg) GetOrDefault(hostname, key string) o.Option[gh.ConfigEntry] {
 	if val := c.get(hostname, key); val.IsSome() {
-		return val
+		return o.Map(val, toConfigEntry(gh.ConfigUserProvided))
 	}
 
 	if defaultVal := defaultFor(key); defaultVal.IsSome() {
-		return defaultVal
+		return o.Map(defaultVal, toConfigEntry(gh.ConfigDefaultProvided))
 	}
 
-	return o.None[string]()
+	return o.None[gh.ConfigEntry]()
+}
+
+func toConfigEntry(source gh.ConfigSource) func(val string) gh.ConfigEntry {
+	return func(val string) gh.ConfigEntry {
+		return gh.ConfigEntry{Value: val, Source: source}
+	}
 }
 
 func (c *cfg) Set(hostname, key, value string) {
@@ -95,32 +101,32 @@ func (c *cfg) Authentication() gh.AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
 }
 
-func (c *cfg) Browser(hostname string) string {
+func (c *cfg) Browser(hostname string) gh.ConfigEntry {
 	// Intentionally panic as this is a programmer error
 	return c.GetOrDefault(hostname, browserKey).Unwrap()
 }
 
-func (c *cfg) Editor(hostname string) string {
+func (c *cfg) Editor(hostname string) gh.ConfigEntry {
 	// Intentionally panic as this is a programmer error
 	return c.GetOrDefault(hostname, editorKey).Unwrap()
 }
 
-func (c *cfg) GitProtocol(hostname string) string {
+func (c *cfg) GitProtocol(hostname string) gh.ConfigEntry {
 	// Intentionally panic as this is a programmer error
 	return c.GetOrDefault(hostname, gitProtocolKey).Unwrap()
 }
 
-func (c *cfg) HTTPUnixSocket(hostname string) string {
+func (c *cfg) HTTPUnixSocket(hostname string) gh.ConfigEntry {
 	// Intentionally panic as this is a programmer error
 	return c.GetOrDefault(hostname, httpUnixSocketKey).Unwrap()
 }
 
-func (c *cfg) Pager(hostname string) string {
+func (c *cfg) Pager(hostname string) gh.ConfigEntry {
 	// Intentionally panic as this is a programmer error
 	return c.GetOrDefault(hostname, pagerKey).Unwrap()
 }
 
-func (c *cfg) Prompt(hostname string) string {
+func (c *cfg) Prompt(hostname string) gh.ConfigEntry {
 	// Intentionally panic as this is a programmer error
 	return c.GetOrDefault(hostname, promptKey).Unwrap()
 }
@@ -523,7 +529,7 @@ var Options = []ConfigOption{
 		DefaultValue:  "https",
 		AllowedValues: []string{"https", "ssh"},
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.GitProtocol(hostname)
+			return c.GitProtocol(hostname).Value
 		},
 	},
 	{
@@ -531,7 +537,7 @@ var Options = []ConfigOption{
 		Description:  "the text editor program to use for authoring text",
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.Editor(hostname)
+			return c.Editor(hostname).Value
 		},
 	},
 	{
@@ -540,7 +546,7 @@ var Options = []ConfigOption{
 		DefaultValue:  "enabled",
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.Prompt(hostname)
+			return c.Prompt(hostname).Value
 		},
 	},
 	{
@@ -548,7 +554,7 @@ var Options = []ConfigOption{
 		Description:  "the terminal pager program to send standard output to",
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.Pager(hostname)
+			return c.Pager(hostname).Value
 		},
 	},
 	{
@@ -556,7 +562,7 @@ var Options = []ConfigOption{
 		Description:  "the path to a Unix socket through which to make an HTTP connection",
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.HTTPUnixSocket(hostname)
+			return c.HTTPUnixSocket(hostname).Value
 		},
 	},
 	{
@@ -564,7 +570,7 @@ var Options = []ConfigOption{
 		Description:  "the web browser to use for opening URLs",
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.Browser(hostname)
+			return c.Browser(hostname).Value
 		},
 	},
 }

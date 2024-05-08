@@ -16,7 +16,7 @@ func DetermineEditor(cf func() (gh.Config, error)) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("could not read config: %w", err)
 		}
-		editorCommand = cfg.Editor("")
+		editorCommand = cfg.Editor("").Value
 	}
 
 	return editorCommand, nil

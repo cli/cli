@@ -64,12 +64,12 @@ func getRun(opts *GetOptions) error {
 		return nil
 	}
 
-	optionalValue := opts.Config.GetOrDefault(opts.Hostname, opts.Key)
-	if optionalValue.IsNone() {
+	optionalEntry := opts.Config.GetOrDefault(opts.Hostname, opts.Key)
+	if optionalEntry.IsNone() {
 		return nonExistentKeyError{key: opts.Key}
 	}
 
-	val := optionalValue.Unwrap()
+	val := optionalEntry.Unwrap().Value
 	if val != "" {
 		fmt.Fprintf(opts.IO.Out, "%s\n", val)
 	}

@@ -234,6 +234,9 @@ func TestRepoFork(t *testing.T) {
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
 			},
+			cfgStubs: func(_ *testing.T, c gh.Config) {
+				c.Set("", "git_protocol", "https")
+			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote add fork https://github\.com/someone/REPO\.git`, 0, "")
@@ -254,9 +257,6 @@ func TestRepoFork(t *testing.T) {
 					}},
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
-			},
-			cfgStubs: func(_ *testing.T, c gh.Config) {
-				c.Set("", "git_protocol", "")
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {

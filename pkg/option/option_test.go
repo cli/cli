@@ -99,6 +99,19 @@ func ExampleOption_Expect() {
 	// Output: 4
 }
 
+func ExampleMap() {
+	fmt.Println(o.Map(o.Some(2), double))
+	fmt.Println(o.Map(o.None[int](), double))
+
+	// Output:
+	// Some(4)
+	// None
+}
+
+func double(i int) int {
+	return i * 2
+}
+
 func TestSomeStringer(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("%s", o.Some("foo")), "Some(foo)") //nolint:gosimple
 	require.Equal(t, fmt.Sprintf("%s", o.Some(42)), "Some(42)")     //nolint:gosimple
@@ -178,4 +191,9 @@ func TestNoneExpect(t *testing.T) {
 
 	o.None[int]().Expect("oops")
 	t.Error("did not panic")
+}
+
+func TestMap(t *testing.T) {
+	require.Equal(t, o.Map(o.Some(2), double), o.Some(4))
+	require.True(t, o.Map(o.None[int](), double).IsNone())
 }

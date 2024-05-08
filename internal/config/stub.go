@@ -21,7 +21,7 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	c := ghConfig.ReadFromString(cfgStr)
 	cfg := cfg{c}
 	mock := &ghmock.ConfigMock{}
-	mock.GetOrDefaultFunc = func(host, key string) o.Option[string] {
+	mock.GetOrDefaultFunc = func(host, key string) o.Option[gh.ConfigEntry] {
 		return cfg.GetOrDefault(host, key)
 	}
 	mock.SetFunc = func(host, key, value string) {
@@ -52,22 +52,22 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 			},
 		}
 	}
-	mock.BrowserFunc = func(hostname string) string {
+	mock.BrowserFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Browser(hostname)
 	}
-	mock.EditorFunc = func(hostname string) string {
+	mock.EditorFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Editor(hostname)
 	}
-	mock.GitProtocolFunc = func(hostname string) string {
+	mock.GitProtocolFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.GitProtocol(hostname)
 	}
-	mock.HTTPUnixSocketFunc = func(hostname string) string {
+	mock.HTTPUnixSocketFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.HTTPUnixSocket(hostname)
 	}
-	mock.PagerFunc = func(hostname string) string {
+	mock.PagerFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Pager(hostname)
 	}
-	mock.PromptFunc = func(hostname string) string {
+	mock.PromptFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Prompt(hostname)
 	}
 	mock.VersionFunc = func() o.Option[string] {
