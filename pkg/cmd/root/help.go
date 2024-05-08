@@ -166,6 +166,10 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	if inheritedFlagUsages != "" {
 		helpEntries = append(helpEntries, helpEntry{"INHERITED FLAGS", dedent(inheritedFlagUsages)})
 	}
+	if _, ok := command.Annotations["help:json-fields"]; ok {
+		fields := strings.Split(command.Annotations["help:json-fields"], ",")
+		helpEntries = append(helpEntries, helpEntry{"JSON FIELDS", text.FormatSlice(fields, 80, 0, "", "", true)})
+	}
 	if _, ok := command.Annotations["help:arguments"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"ARGUMENTS", command.Annotations["help:arguments"]})
 	}

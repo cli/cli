@@ -8,11 +8,23 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 	"github.com/spf13/pflag"
 )
+
+func printJSONFields(w io.Writer, cmd *cobra.Command) {
+	raw, ok := cmd.Annotations["help:json-fields"]
+	if !ok {
+		return
+	}
+
+	fmt.Fprint(w, "### JSON Fields\n\n")
+	fmt.Fprint(w, text.FormatSlice(strings.Split(raw, ","), 0, 0, "`", "`", true))
+	fmt.Fprint(w, "\n\n")
+}
 
 func printOptions(w io.Writer, cmd *cobra.Command) error {
 	flags := cmd.NonInheritedFlags()
@@ -135,6 +147,7 @@ func genMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 	if err := printOptions(w, cmd); err != nil {
 		return err
 	}
+	printJSONFields(w, cmd)
 	fmt.Fprint(w, "{% endraw %}\n")
 
 	if len(cmd.Example) > 0 {

@@ -83,6 +83,15 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 		}
 		return e
 	})
+
+	if len(fields) == 0 {
+		return
+	}
+
+	if cmd.Annotations == nil {
+		cmd.Annotations = map[string]string{}
+	}
+	cmd.Annotations["help:json-fields"] = strings.Join(fields, ",")
 }
 
 func checkJSONFlags(cmd *cobra.Command) (*jsonExporter, error) {
