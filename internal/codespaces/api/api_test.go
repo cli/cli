@@ -565,7 +565,7 @@ func TestRetries(t *testing.T) {
 		t.Fatalf("expected codespace name to be %q but got %q", csName, cs.Name)
 	}
 	callCount = 0
-	handler = func(w http.ResponseWriter, r *http.Request) {
+	handler = func(w http.ResponseWriter, _ *http.Request) {
 		callCount++
 		err := json.NewEncoder(w).Encode(Codespace{
 			Name: csName,
@@ -755,7 +755,7 @@ func TestAPI_EditCodespace(t *testing.T) {
 	}
 }
 
-func createFakeEditPendingOpServer(t *testing.T) *httptest.Server {
+func createFakeEditPendingOpServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPatch {
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -776,7 +776,7 @@ func createFakeEditPendingOpServer(t *testing.T) *httptest.Server {
 }
 
 func TestAPI_EditCodespacePendingOperation(t *testing.T) {
-	svr := createFakeEditPendingOpServer(t)
+	svr := createFakeEditPendingOpServer()
 	defer svr.Close()
 
 	a := &API{

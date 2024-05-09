@@ -274,6 +274,6 @@ func TestTokenRunSecureStorage(t *testing.T) {
 
 func login(t *testing.T, c config.Config, hostname, username, token, gitProtocol string, secureStorage bool) {
 	t.Helper()
-	_, err := c.Authentication().Login(hostname, username, token, "https", secureStorage)
+	_, err := c.Authentication().Login(hostname, username, token, gitProtocol, secureStorage)
 	require.NoError(t, err)
 }

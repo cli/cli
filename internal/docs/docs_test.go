@@ -26,6 +26,8 @@ func init() {
 	printCmd.Flags().IntP("intthree", "i", 345, "help message for flag intthree")
 	printCmd.Flags().BoolP("boolthree", "b", true, "help message for flag boolthree")
 
+	jsonCmd.Flags().StringSlice("json", nil, "help message for flag json")
+
 	echoCmd.AddCommand(timesCmd, echoSubCmd, deprecatedCmd)
 	rootCmd.AddCommand(printCmd, echoCmd, dummyCmd)
 }
@@ -71,6 +73,14 @@ var printCmd = &cobra.Command{
 	Use:   "print [string to print]",
 	Short: "Print anything to the screen",
 	Long:  `an absolutely utterly useless command for testing.`,
+}
+
+var jsonCmd = &cobra.Command{
+	Use:   "blah --json <fields>",
+	Short: "View details in JSON",
+	Annotations: map[string]string{
+		"help:json-fields": "foo,bar,baz",
+	},
 }
 
 var dummyCmd = &cobra.Command{
