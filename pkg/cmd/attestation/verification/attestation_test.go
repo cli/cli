@@ -97,6 +97,6 @@ func TestFilterAttestations(t *testing.T) {
 
 	require.Len(t, filtered, 1)
 
-	filtered = FilterAttestations("NonExistantPredicate", attestations)
+	filtered = FilterAttestations("NonExistentPredicate", attestations)
 	require.Len(t, filtered, 0)
 }
