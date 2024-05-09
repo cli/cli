@@ -716,7 +716,7 @@ type RefComparison struct {
 }
 
 func ComparePullRequestBaseBranchWith(client *Client, repo ghrepo.Interface, prNumber int, headRef string) (*RefComparison, error) {
-	query := `query ComparePullRequestBaseBranchWith($owner: String!, $repo: String!, $pr_number: Int!, $headRef: String!) {
+	query := `query ComparePullRequestBaseBranchWith($owner: String!, $repo: String!, $pullRequestNumber: Int!, $headRef: String!) {
 		repository(owner: $owner, name: $repo) {
 			pullRequest(number: $pullRequestNumber) {
 				baseRef {
