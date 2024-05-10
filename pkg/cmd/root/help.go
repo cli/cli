@@ -311,10 +311,6 @@ func buildAliases(cmd *cobra.Command, aliasList []string) string {
 		return strings.Join(aliasList, " ")
 	}
 
-	if cmd.Parent().HasParent() {
-		// prepend cmd.Name so unaliased is first
-		aliasList = append([]string{cmd.Name()}, aliasList...)
-	}
 	list := append(cmd.Parent().Aliases, cmd.Parent().Name())
 	sort.Strings(list)
 	sep := ","
