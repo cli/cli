@@ -19,6 +19,12 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
+// o provides an Option type to represent values that may or may not be present.
+//
+// This code was copies from https://github.com/BooleanCat/go-functional@ae5a155c0e997d1c5de53ea8b49109aca9c53d9f
+// and we've added the Map function and associated tests. It was pulled into the project because I believe if we're
+// using Option, it should be a core domain type rather than a dependency.
 package o
 
 import "fmt"
@@ -119,6 +125,9 @@ func (o Option[T]) Expect(message string) T {
 }
 
 // Map applies a function to the contained value of (if [Some]), or returns [None].
+//
+// Use this function very sparingly as it can lead to very unidiomatic and surprising Go code. However,
+// there are times when used judiciiously, it is significantly more ergonomic than unwrapping the Option.
 func Map[T, U any](o Option[T], f func(T) U) Option[U] {
 	if o.present {
 		return Some(f(o.value))
