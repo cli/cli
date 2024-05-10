@@ -118,6 +118,7 @@ func (o Option[T]) Expect(message string) T {
 	panic(message)
 }
 
+// Map applies a function to the contained value of (if [Some]), or returns [None].
 func Map[T, U any](o Option[T], f func(T) U) Option[U] {
 	if o.present {
 		return Some(f(o.value))

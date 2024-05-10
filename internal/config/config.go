@@ -60,16 +60,22 @@ func (c *cfg) get(hostname, key string) o.Option[string] {
 
 func (c *cfg) GetOrDefault(hostname, key string) o.Option[gh.ConfigEntry] {
 	if val := c.get(hostname, key); val.IsSome() {
+		// Map the Option[string] to Option[gh.ConfigEntry] with a source of ConfigUserProvided
 		return o.Map(val, toConfigEntry(gh.ConfigUserProvided))
 	}
 
 	if defaultVal := defaultFor(key); defaultVal.IsSome() {
+		// Map the Option[string] to Option[gh.ConfigEntry] with a source of ConfigDefaultProvided
 		return o.Map(defaultVal, toConfigEntry(gh.ConfigDefaultProvided))
 	}
 
 	return o.None[gh.ConfigEntry]()
 }
 
+// toConfigEntry is a helper function to convert a string value to a ConfigEntry with a given source.
+//
+// It's a bit of FP style but it allows us to map an Option[string] to Option[gh.ConfigEntry] without
+// unwrapping the it and rewrapping it.
 func toConfigEntry(source gh.ConfigSource) func(val string) gh.ConfigEntry {
 	return func(val string) gh.ConfigEntry {
 		return gh.ConfigEntry{Value: val, Source: source}
@@ -102,32 +108,32 @@ func (c *cfg) Authentication() gh.AuthConfig {
 }
 
 func (c *cfg) Browser(hostname string) gh.ConfigEntry {
-	// Intentionally panic as this is a programmer error
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, browserKey).Unwrap()
 }
 
 func (c *cfg) Editor(hostname string) gh.ConfigEntry {
-	// Intentionally panic as this is a programmer error
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, editorKey).Unwrap()
 }
 
 func (c *cfg) GitProtocol(hostname string) gh.ConfigEntry {
-	// Intentionally panic as this is a programmer error
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, gitProtocolKey).Unwrap()
 }
 
 func (c *cfg) HTTPUnixSocket(hostname string) gh.ConfigEntry {
-	// Intentionally panic as this is a programmer error
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, httpUnixSocketKey).Unwrap()
 }
 
 func (c *cfg) Pager(hostname string) gh.ConfigEntry {
-	// Intentionally panic as this is a programmer error
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, pagerKey).Unwrap()
 }
 
 func (c *cfg) Prompt(hostname string) gh.ConfigEntry {
-	// Intentionally panic as this is a programmer error
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, promptKey).Unwrap()
 }
 
