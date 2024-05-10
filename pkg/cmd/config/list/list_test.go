@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdConfigList(t *testing.T) {
@@ -108,9 +109,8 @@ browser=brave
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := listRun(tt.input)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.stdout, stdout.String())
-			//assert.Equal(t, tt.stderr, stderr.String())
+			require.NoError(t, err)
+			require.Equal(t, tt.stdout, stdout.String())
 		})
 	}
 }

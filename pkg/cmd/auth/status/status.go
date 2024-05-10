@@ -201,7 +201,7 @@ func statusRun(opts *StatusOptions) error {
 		}
 
 		var activeUser string
-		gitProtocol := cfg.GitProtocol(hostname)
+		gitProtocol := cfg.GitProtocol(hostname).Value
 		activeUserToken, activeUserTokenSource := authCfg.ActiveToken(hostname)
 		if authTokenWriteable(activeUserTokenSource) {
 			activeUser, _ = authCfg.ActiveUser(hostname)

@@ -347,7 +347,7 @@ func writeManifest(dir, name string, data []byte) (writeErr error) {
 }
 
 func (m *Manager) installGit(repo ghrepo.Interface, target string) error {
-	protocol := m.config.GitProtocol(repo.RepoHost())
+	protocol := m.config.GitProtocol(repo.RepoHost()).Value
 	cloneURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 	var commitSHA string

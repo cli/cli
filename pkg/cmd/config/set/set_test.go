@@ -150,9 +150,10 @@ func Test_setRun(t *testing.T) {
 			assert.Equal(t, tt.stdout, stdout.String())
 			assert.Equal(t, tt.stderr, stderr.String())
 
-			val, err := tt.input.Config.GetOrDefault(tt.input.Hostname, tt.input.Key)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedValue, val)
+			optionalEntry := tt.input.Config.GetOrDefault(tt.input.Hostname, tt.input.Key)
+			entry := optionalEntry.Expect("expected a value to be set")
+			assert.Equal(t, tt.expectedValue, entry.Value)
+			assert.Equal(t, gh.ConfigUserProvided, entry.Source)
 		})
 	}
 }

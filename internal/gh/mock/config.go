@@ -5,6 +5,7 @@ package ghmock
 
 import (
 	"github.com/cli/cli/v2/internal/gh"
+	o "github.com/cli/cli/v2/pkg/option"
 	"sync"
 )
 
@@ -24,37 +25,37 @@ var _ gh.Config = &ConfigMock{}
 //			AuthenticationFunc: func() gh.AuthConfig {
 //				panic("mock out the Authentication method")
 //			},
-//			BrowserFunc: func(s string) string {
+//			BrowserFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Browser method")
 //			},
 //			CacheDirFunc: func() string {
 //				panic("mock out the CacheDir method")
 //			},
-//			EditorFunc: func(s string) string {
+//			EditorFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Editor method")
 //			},
-//			GetOrDefaultFunc: func(s1 string, s2 string) (string, error) {
+//			GetOrDefaultFunc: func(hostname string, key string) o.Option[gh.ConfigEntry] {
 //				panic("mock out the GetOrDefault method")
 //			},
-//			GitProtocolFunc: func(s string) string {
+//			GitProtocolFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the GitProtocol method")
 //			},
-//			HTTPUnixSocketFunc: func(s string) string {
+//			HTTPUnixSocketFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the HTTPUnixSocket method")
 //			},
 //			MigrateFunc: func(migration gh.Migration) error {
 //				panic("mock out the Migrate method")
 //			},
-//			PagerFunc: func(s string) string {
+//			PagerFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Pager method")
 //			},
-//			PromptFunc: func(s string) string {
+//			PromptFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Prompt method")
 //			},
-//			SetFunc: func(s1 string, s2 string, s3 string)  {
+//			SetFunc: func(hostname string, key string, value string)  {
 //				panic("mock out the Set method")
 //			},
-//			VersionFunc: func() string {
+//			VersionFunc: func() o.Option[string] {
 //				panic("mock out the Version method")
 //			},
 //			WriteFunc: func() error {
@@ -74,37 +75,37 @@ type ConfigMock struct {
 	AuthenticationFunc func() gh.AuthConfig
 
 	// BrowserFunc mocks the Browser method.
-	BrowserFunc func(s string) string
+	BrowserFunc func(hostname string) gh.ConfigEntry
 
 	// CacheDirFunc mocks the CacheDir method.
 	CacheDirFunc func() string
 
 	// EditorFunc mocks the Editor method.
-	EditorFunc func(s string) string
+	EditorFunc func(hostname string) gh.ConfigEntry
 
 	// GetOrDefaultFunc mocks the GetOrDefault method.
-	GetOrDefaultFunc func(s1 string, s2 string) (string, error)
+	GetOrDefaultFunc func(hostname string, key string) o.Option[gh.ConfigEntry]
 
 	// GitProtocolFunc mocks the GitProtocol method.
-	GitProtocolFunc func(s string) string
+	GitProtocolFunc func(hostname string) gh.ConfigEntry
 
 	// HTTPUnixSocketFunc mocks the HTTPUnixSocket method.
-	HTTPUnixSocketFunc func(s string) string
+	HTTPUnixSocketFunc func(hostname string) gh.ConfigEntry
 
 	// MigrateFunc mocks the Migrate method.
 	MigrateFunc func(migration gh.Migration) error
 
 	// PagerFunc mocks the Pager method.
-	PagerFunc func(s string) string
+	PagerFunc func(hostname string) gh.ConfigEntry
 
 	// PromptFunc mocks the Prompt method.
-	PromptFunc func(s string) string
+	PromptFunc func(hostname string) gh.ConfigEntry
 
 	// SetFunc mocks the Set method.
-	SetFunc func(s1 string, s2 string, s3 string)
+	SetFunc func(hostname string, key string, value string)
 
 	// VersionFunc mocks the Version method.
-	VersionFunc func() string
+	VersionFunc func() o.Option[string]
 
 	// WriteFunc mocks the Write method.
 	WriteFunc func() error
@@ -119,33 +120,33 @@ type ConfigMock struct {
 		}
 		// Browser holds details about calls to the Browser method.
 		Browser []struct {
-			// S is the s argument value.
-			S string
+			// Hostname is the hostname argument value.
+			Hostname string
 		}
 		// CacheDir holds details about calls to the CacheDir method.
 		CacheDir []struct {
 		}
 		// Editor holds details about calls to the Editor method.
 		Editor []struct {
-			// S is the s argument value.
-			S string
+			// Hostname is the hostname argument value.
+			Hostname string
 		}
 		// GetOrDefault holds details about calls to the GetOrDefault method.
 		GetOrDefault []struct {
-			// S1 is the s1 argument value.
-			S1 string
-			// S2 is the s2 argument value.
-			S2 string
+			// Hostname is the hostname argument value.
+			Hostname string
+			// Key is the key argument value.
+			Key string
 		}
 		// GitProtocol holds details about calls to the GitProtocol method.
 		GitProtocol []struct {
-			// S is the s argument value.
-			S string
+			// Hostname is the hostname argument value.
+			Hostname string
 		}
 		// HTTPUnixSocket holds details about calls to the HTTPUnixSocket method.
 		HTTPUnixSocket []struct {
-			// S is the s argument value.
-			S string
+			// Hostname is the hostname argument value.
+			Hostname string
 		}
 		// Migrate holds details about calls to the Migrate method.
 		Migrate []struct {
@@ -154,22 +155,22 @@ type ConfigMock struct {
 		}
 		// Pager holds details about calls to the Pager method.
 		Pager []struct {
-			// S is the s argument value.
-			S string
+			// Hostname is the hostname argument value.
+			Hostname string
 		}
 		// Prompt holds details about calls to the Prompt method.
 		Prompt []struct {
-			// S is the s argument value.
-			S string
+			// Hostname is the hostname argument value.
+			Hostname string
 		}
 		// Set holds details about calls to the Set method.
 		Set []struct {
-			// S1 is the s1 argument value.
-			S1 string
-			// S2 is the s2 argument value.
-			S2 string
-			// S3 is the s3 argument value.
-			S3 string
+			// Hostname is the hostname argument value.
+			Hostname string
+			// Key is the key argument value.
+			Key string
+			// Value is the value argument value.
+			Value string
 		}
 		// Version holds details about calls to the Version method.
 		Version []struct {
@@ -249,19 +250,19 @@ func (mock *ConfigMock) AuthenticationCalls() []struct {
 }
 
 // Browser calls BrowserFunc.
-func (mock *ConfigMock) Browser(s string) string {
+func (mock *ConfigMock) Browser(hostname string) gh.ConfigEntry {
 	if mock.BrowserFunc == nil {
 		panic("ConfigMock.BrowserFunc: method is nil but Config.Browser was just called")
 	}
 	callInfo := struct {
-		S string
+		Hostname string
 	}{
-		S: s,
+		Hostname: hostname,
 	}
 	mock.lockBrowser.Lock()
 	mock.calls.Browser = append(mock.calls.Browser, callInfo)
 	mock.lockBrowser.Unlock()
-	return mock.BrowserFunc(s)
+	return mock.BrowserFunc(hostname)
 }
 
 // BrowserCalls gets all the calls that were made to Browser.
@@ -269,10 +270,10 @@ func (mock *ConfigMock) Browser(s string) string {
 //
 //	len(mockedConfig.BrowserCalls())
 func (mock *ConfigMock) BrowserCalls() []struct {
-	S string
+	Hostname string
 } {
 	var calls []struct {
-		S string
+		Hostname string
 	}
 	mock.lockBrowser.RLock()
 	calls = mock.calls.Browser
@@ -308,19 +309,19 @@ func (mock *ConfigMock) CacheDirCalls() []struct {
 }
 
 // Editor calls EditorFunc.
-func (mock *ConfigMock) Editor(s string) string {
+func (mock *ConfigMock) Editor(hostname string) gh.ConfigEntry {
 	if mock.EditorFunc == nil {
 		panic("ConfigMock.EditorFunc: method is nil but Config.Editor was just called")
 	}
 	callInfo := struct {
-		S string
+		Hostname string
 	}{
-		S: s,
+		Hostname: hostname,
 	}
 	mock.lockEditor.Lock()
 	mock.calls.Editor = append(mock.calls.Editor, callInfo)
 	mock.lockEditor.Unlock()
-	return mock.EditorFunc(s)
+	return mock.EditorFunc(hostname)
 }
 
 // EditorCalls gets all the calls that were made to Editor.
@@ -328,10 +329,10 @@ func (mock *ConfigMock) Editor(s string) string {
 //
 //	len(mockedConfig.EditorCalls())
 func (mock *ConfigMock) EditorCalls() []struct {
-	S string
+	Hostname string
 } {
 	var calls []struct {
-		S string
+		Hostname string
 	}
 	mock.lockEditor.RLock()
 	calls = mock.calls.Editor
@@ -340,21 +341,21 @@ func (mock *ConfigMock) EditorCalls() []struct {
 }
 
 // GetOrDefault calls GetOrDefaultFunc.
-func (mock *ConfigMock) GetOrDefault(s1 string, s2 string) (string, error) {
+func (mock *ConfigMock) GetOrDefault(hostname string, key string) o.Option[gh.ConfigEntry] {
 	if mock.GetOrDefaultFunc == nil {
 		panic("ConfigMock.GetOrDefaultFunc: method is nil but Config.GetOrDefault was just called")
 	}
 	callInfo := struct {
-		S1 string
-		S2 string
+		Hostname string
+		Key      string
 	}{
-		S1: s1,
-		S2: s2,
+		Hostname: hostname,
+		Key:      key,
 	}
 	mock.lockGetOrDefault.Lock()
 	mock.calls.GetOrDefault = append(mock.calls.GetOrDefault, callInfo)
 	mock.lockGetOrDefault.Unlock()
-	return mock.GetOrDefaultFunc(s1, s2)
+	return mock.GetOrDefaultFunc(hostname, key)
 }
 
 // GetOrDefaultCalls gets all the calls that were made to GetOrDefault.
@@ -362,12 +363,12 @@ func (mock *ConfigMock) GetOrDefault(s1 string, s2 string) (string, error) {
 //
 //	len(mockedConfig.GetOrDefaultCalls())
 func (mock *ConfigMock) GetOrDefaultCalls() []struct {
-	S1 string
-	S2 string
+	Hostname string
+	Key      string
 } {
 	var calls []struct {
-		S1 string
-		S2 string
+		Hostname string
+		Key      string
 	}
 	mock.lockGetOrDefault.RLock()
 	calls = mock.calls.GetOrDefault
@@ -376,19 +377,19 @@ func (mock *ConfigMock) GetOrDefaultCalls() []struct {
 }
 
 // GitProtocol calls GitProtocolFunc.
-func (mock *ConfigMock) GitProtocol(s string) string {
+func (mock *ConfigMock) GitProtocol(hostname string) gh.ConfigEntry {
 	if mock.GitProtocolFunc == nil {
 		panic("ConfigMock.GitProtocolFunc: method is nil but Config.GitProtocol was just called")
 	}
 	callInfo := struct {
-		S string
+		Hostname string
 	}{
-		S: s,
+		Hostname: hostname,
 	}
 	mock.lockGitProtocol.Lock()
 	mock.calls.GitProtocol = append(mock.calls.GitProtocol, callInfo)
 	mock.lockGitProtocol.Unlock()
-	return mock.GitProtocolFunc(s)
+	return mock.GitProtocolFunc(hostname)
 }
 
 // GitProtocolCalls gets all the calls that were made to GitProtocol.
@@ -396,10 +397,10 @@ func (mock *ConfigMock) GitProtocol(s string) string {
 //
 //	len(mockedConfig.GitProtocolCalls())
 func (mock *ConfigMock) GitProtocolCalls() []struct {
-	S string
+	Hostname string
 } {
 	var calls []struct {
-		S string
+		Hostname string
 	}
 	mock.lockGitProtocol.RLock()
 	calls = mock.calls.GitProtocol
@@ -408,19 +409,19 @@ func (mock *ConfigMock) GitProtocolCalls() []struct {
 }
 
 // HTTPUnixSocket calls HTTPUnixSocketFunc.
-func (mock *ConfigMock) HTTPUnixSocket(s string) string {
+func (mock *ConfigMock) HTTPUnixSocket(hostname string) gh.ConfigEntry {
 	if mock.HTTPUnixSocketFunc == nil {
 		panic("ConfigMock.HTTPUnixSocketFunc: method is nil but Config.HTTPUnixSocket was just called")
 	}
 	callInfo := struct {
-		S string
+		Hostname string
 	}{
-		S: s,
+		Hostname: hostname,
 	}
 	mock.lockHTTPUnixSocket.Lock()
 	mock.calls.HTTPUnixSocket = append(mock.calls.HTTPUnixSocket, callInfo)
 	mock.lockHTTPUnixSocket.Unlock()
-	return mock.HTTPUnixSocketFunc(s)
+	return mock.HTTPUnixSocketFunc(hostname)
 }
 
 // HTTPUnixSocketCalls gets all the calls that were made to HTTPUnixSocket.
@@ -428,10 +429,10 @@ func (mock *ConfigMock) HTTPUnixSocket(s string) string {
 //
 //	len(mockedConfig.HTTPUnixSocketCalls())
 func (mock *ConfigMock) HTTPUnixSocketCalls() []struct {
-	S string
+	Hostname string
 } {
 	var calls []struct {
-		S string
+		Hostname string
 	}
 	mock.lockHTTPUnixSocket.RLock()
 	calls = mock.calls.HTTPUnixSocket
@@ -472,19 +473,19 @@ func (mock *ConfigMock) MigrateCalls() []struct {
 }
 
 // Pager calls PagerFunc.
-func (mock *ConfigMock) Pager(s string) string {
+func (mock *ConfigMock) Pager(hostname string) gh.ConfigEntry {
 	if mock.PagerFunc == nil {
 		panic("ConfigMock.PagerFunc: method is nil but Config.Pager was just called")
 	}
 	callInfo := struct {
-		S string
+		Hostname string
 	}{
-		S: s,
+		Hostname: hostname,
 	}
 	mock.lockPager.Lock()
 	mock.calls.Pager = append(mock.calls.Pager, callInfo)
 	mock.lockPager.Unlock()
-	return mock.PagerFunc(s)
+	return mock.PagerFunc(hostname)
 }
 
 // PagerCalls gets all the calls that were made to Pager.
@@ -492,10 +493,10 @@ func (mock *ConfigMock) Pager(s string) string {
 //
 //	len(mockedConfig.PagerCalls())
 func (mock *ConfigMock) PagerCalls() []struct {
-	S string
+	Hostname string
 } {
 	var calls []struct {
-		S string
+		Hostname string
 	}
 	mock.lockPager.RLock()
 	calls = mock.calls.Pager
@@ -504,19 +505,19 @@ func (mock *ConfigMock) PagerCalls() []struct {
 }
 
 // Prompt calls PromptFunc.
-func (mock *ConfigMock) Prompt(s string) string {
+func (mock *ConfigMock) Prompt(hostname string) gh.ConfigEntry {
 	if mock.PromptFunc == nil {
 		panic("ConfigMock.PromptFunc: method is nil but Config.Prompt was just called")
 	}
 	callInfo := struct {
-		S string
+		Hostname string
 	}{
-		S: s,
+		Hostname: hostname,
 	}
 	mock.lockPrompt.Lock()
 	mock.calls.Prompt = append(mock.calls.Prompt, callInfo)
 	mock.lockPrompt.Unlock()
-	return mock.PromptFunc(s)
+	return mock.PromptFunc(hostname)
 }
 
 // PromptCalls gets all the calls that were made to Prompt.
@@ -524,10 +525,10 @@ func (mock *ConfigMock) Prompt(s string) string {
 //
 //	len(mockedConfig.PromptCalls())
 func (mock *ConfigMock) PromptCalls() []struct {
-	S string
+	Hostname string
 } {
 	var calls []struct {
-		S string
+		Hostname string
 	}
 	mock.lockPrompt.RLock()
 	calls = mock.calls.Prompt
@@ -536,23 +537,23 @@ func (mock *ConfigMock) PromptCalls() []struct {
 }
 
 // Set calls SetFunc.
-func (mock *ConfigMock) Set(s1 string, s2 string, s3 string) {
+func (mock *ConfigMock) Set(hostname string, key string, value string) {
 	if mock.SetFunc == nil {
 		panic("ConfigMock.SetFunc: method is nil but Config.Set was just called")
 	}
 	callInfo := struct {
-		S1 string
-		S2 string
-		S3 string
+		Hostname string
+		Key      string
+		Value    string
 	}{
-		S1: s1,
-		S2: s2,
-		S3: s3,
+		Hostname: hostname,
+		Key:      key,
+		Value:    value,
 	}
 	mock.lockSet.Lock()
 	mock.calls.Set = append(mock.calls.Set, callInfo)
 	mock.lockSet.Unlock()
-	mock.SetFunc(s1, s2, s3)
+	mock.SetFunc(hostname, key, value)
 }
 
 // SetCalls gets all the calls that were made to Set.
@@ -560,14 +561,14 @@ func (mock *ConfigMock) Set(s1 string, s2 string, s3 string) {
 //
 //	len(mockedConfig.SetCalls())
 func (mock *ConfigMock) SetCalls() []struct {
-	S1 string
-	S2 string
-	S3 string
+	Hostname string
+	Key      string
+	Value    string
 } {
 	var calls []struct {
-		S1 string
-		S2 string
-		S3 string
+		Hostname string
+		Key      string
+		Value    string
 	}
 	mock.lockSet.RLock()
 	calls = mock.calls.Set
@@ -576,7 +577,7 @@ func (mock *ConfigMock) SetCalls() []struct {
 }
 
 // Version calls VersionFunc.
-func (mock *ConfigMock) Version() string {
+func (mock *ConfigMock) Version() o.Option[string] {
 	if mock.VersionFunc == nil {
 		panic("ConfigMock.VersionFunc: method is nil but Config.Version was just called")
 	}

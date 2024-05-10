@@ -243,7 +243,9 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol := cfg.GitProtocol(repoToFork.RepoHost())
+	protocolConfig := cfg.GitProtocol(repoToFork.RepoHost())
+	protocolIsConfiguredByUser := protocolConfig.Source == gh.ConfigUserProvided
+	protocol := protocolConfig.Value
 
 	gitClient := opts.GitClient
 	ctx := context.Background()
@@ -254,7 +256,7 @@ func forkRun(opts *ForkOptions) error {
 			return err
 		}
 
-		if protocol == "" { // user has no set preference
+		if !protocolIsConfiguredByUser {
 			if remote, err := remotes.FindByRepo(repoToFork.RepoOwner(), repoToFork.RepoName()); err == nil {
 				scheme := ""
 				if remote.FetchURL != nil {

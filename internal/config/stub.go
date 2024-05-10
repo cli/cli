@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/keyring"
+	o "github.com/cli/cli/v2/pkg/option"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
@@ -20,7 +21,7 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	c := ghConfig.ReadFromString(cfgStr)
 	cfg := cfg{c}
 	mock := &ghmock.ConfigMock{}
-	mock.GetOrDefaultFunc = func(host, key string) (string, error) {
+	mock.GetOrDefaultFunc = func(host, key string) o.Option[gh.ConfigEntry] {
 		return cfg.GetOrDefault(host, key)
 	}
 	mock.SetFunc = func(host, key, value string) {
@@ -51,33 +52,26 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 			},
 		}
 	}
-	mock.BrowserFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, browserKey)
-		return val
+	mock.BrowserFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.Browser(hostname)
 	}
-	mock.EditorFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, editorKey)
-		return val
+	mock.EditorFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.Editor(hostname)
 	}
-	mock.GitProtocolFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, gitProtocolKey)
-		return val
+	mock.GitProtocolFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.GitProtocol(hostname)
 	}
-	mock.HTTPUnixSocketFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, httpUnixSocketKey)
-		return val
+	mock.HTTPUnixSocketFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.HTTPUnixSocket(hostname)
 	}
-	mock.PagerFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, pagerKey)
-		return val
+	mock.PagerFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.Pager(hostname)
 	}
-	mock.PromptFunc = func(hostname string) string {
-		val, _ := cfg.GetOrDefault(hostname, promptKey)
-		return val
+	mock.PromptFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.Prompt(hostname)
 	}
-	mock.VersionFunc = func() string {
-		val, _ := cfg.GetOrDefault("", versionKey)
-		return val
+	mock.VersionFunc = func() o.Option[string] {
+		return cfg.Version()
 	}
 	mock.CacheDirFunc = func() string {
 		return cfg.CacheDir()

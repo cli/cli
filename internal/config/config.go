@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
+	o "github.com/cli/cli/v2/pkg/option"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
@@ -41,28 +42,44 @@ type cfg struct {
 	cfg *ghConfig.Config
 }
 
-func (c *cfg) Get(hostname, key string) (string, error) {
+func (c *cfg) get(hostname, key string) o.Option[string] {
 	if hostname != "" {
 		val, err := c.cfg.Get([]string{hostsKey, hostname, key})
 		if err == nil {
-			return val, err
+			return o.Some(val)
 		}
 	}
 
-	return c.cfg.Get([]string{key})
+	val, err := c.cfg.Get([]string{key})
+	if err == nil {
+		return o.Some(val)
+	}
+
+	return o.None[string]()
 }
 
-func (c *cfg) GetOrDefault(hostname, key string) (string, error) {
-	val, err := c.Get(hostname, key)
-	if err == nil {
-		return val, err
+func (c *cfg) GetOrDefault(hostname, key string) o.Option[gh.ConfigEntry] {
+	if val := c.get(hostname, key); val.IsSome() {
+		// Map the Option[string] to Option[gh.ConfigEntry] with a source of ConfigUserProvided
+		return o.Map(val, toConfigEntry(gh.ConfigUserProvided))
 	}
 
-	if val, ok := defaultFor(key); ok {
-		return val, nil
+	if defaultVal := defaultFor(key); defaultVal.IsSome() {
+		// Map the Option[string] to Option[gh.ConfigEntry] with a source of ConfigDefaultProvided
+		return o.Map(defaultVal, toConfigEntry(gh.ConfigDefaultProvided))
 	}
 
-	return val, err
+	return o.None[gh.ConfigEntry]()
+}
+
+// toConfigEntry is a helper function to convert a string value to a ConfigEntry with a given source.
+//
+// It's a bit of FP style but it allows us to map an Option[string] to Option[gh.ConfigEntry] without
+// unwrapping the it and rewrapping it.
+func toConfigEntry(source gh.ConfigSource) func(val string) gh.ConfigEntry {
+	return func(val string) gh.ConfigEntry {
+		return gh.ConfigEntry{Value: val, Source: source}
+	}
 }
 
 func (c *cfg) Set(hostname, key, value string) {
@@ -90,43 +107,44 @@ func (c *cfg) Authentication() gh.AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
 }
 
-func (c *cfg) Browser(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, browserKey)
-	return val
+func (c *cfg) Browser(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, browserKey).Unwrap()
 }
 
-func (c *cfg) Editor(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, editorKey)
-	return val
+func (c *cfg) Editor(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, editorKey).Unwrap()
 }
 
-func (c *cfg) GitProtocol(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, gitProtocolKey)
-	return val
+func (c *cfg) GitProtocol(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, gitProtocolKey).Unwrap()
 }
 
-func (c *cfg) HTTPUnixSocket(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, httpUnixSocketKey)
-	return val
+func (c *cfg) HTTPUnixSocket(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, httpUnixSocketKey).Unwrap()
 }
 
-func (c *cfg) Pager(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, pagerKey)
-	return val
+func (c *cfg) Pager(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, pagerKey).Unwrap()
 }
 
-func (c *cfg) Prompt(hostname string) string {
-	val, _ := c.GetOrDefault(hostname, promptKey)
-	return val
+func (c *cfg) Prompt(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, promptKey).Unwrap()
 }
 
-func (c *cfg) Version() string {
-	val, _ := c.GetOrDefault("", versionKey)
-	return val
+func (c *cfg) Version() o.Option[string] {
+	return c.get("", versionKey)
 }
 
 func (c *cfg) Migrate(m gh.Migration) error {
-	version := c.Version()
+	// If there is no version entry we must never have applied a migration, and the following conditional logic
+	// handles the version as an empty string correctly.
+	version := c.Version().UnwrapOrZero()
 
 	// If migration has already occurred then do not attempt to migrate again.
 	if m.PostVersion() == version {
@@ -156,13 +174,13 @@ func (c *cfg) CacheDir() string {
 	return ghConfig.CacheDir()
 }
 
-func defaultFor(key string) (string, bool) {
-	for _, co := range ConfigOptions() {
+func defaultFor(key string) o.Option[string] {
+	for _, co := range Options {
 		if co.Key == key {
-			return co.DefaultValue, true
+			return o.Some(co.DefaultValue)
 		}
 	}
-	return "", false
+	return o.None[string]()
 }
 
 // AuthConfig is used for interacting with some persistent configuration for gh,
@@ -507,43 +525,60 @@ type ConfigOption struct {
 	Description   string
 	DefaultValue  string
 	AllowedValues []string
+	CurrentValue  func(c gh.Config, hostname string) string
 }
 
-func ConfigOptions() []ConfigOption {
-	return []ConfigOption{
-		{
-			Key:           gitProtocolKey,
-			Description:   "the protocol to use for git clone and push operations",
-			DefaultValue:  "https",
-			AllowedValues: []string{"https", "ssh"},
+var Options = []ConfigOption{
+	{
+		Key:           gitProtocolKey,
+		Description:   "the protocol to use for git clone and push operations",
+		DefaultValue:  "https",
+		AllowedValues: []string{"https", "ssh"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.GitProtocol(hostname).Value
 		},
-		{
-			Key:          editorKey,
-			Description:  "the text editor program to use for authoring text",
-			DefaultValue: "",
+	},
+	{
+		Key:          editorKey,
+		Description:  "the text editor program to use for authoring text",
+		DefaultValue: "",
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Editor(hostname).Value
 		},
-		{
-			Key:           promptKey,
-			Description:   "toggle interactive prompting in the terminal",
-			DefaultValue:  "enabled",
-			AllowedValues: []string{"enabled", "disabled"},
+	},
+	{
+		Key:           promptKey,
+		Description:   "toggle interactive prompting in the terminal",
+		DefaultValue:  "enabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Prompt(hostname).Value
 		},
-		{
-			Key:          pagerKey,
-			Description:  "the terminal pager program to send standard output to",
-			DefaultValue: "",
+	},
+	{
+		Key:          pagerKey,
+		Description:  "the terminal pager program to send standard output to",
+		DefaultValue: "",
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Pager(hostname).Value
 		},
-		{
-			Key:          httpUnixSocketKey,
-			Description:  "the path to a Unix socket through which to make an HTTP connection",
-			DefaultValue: "",
+	},
+	{
+		Key:          httpUnixSocketKey,
+		Description:  "the path to a Unix socket through which to make an HTTP connection",
+		DefaultValue: "",
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.HTTPUnixSocket(hostname).Value
 		},
-		{
-			Key:          browserKey,
-			Description:  "the web browser to use for opening URLs",
-			DefaultValue: "",
+	},
+	{
+		Key:          browserKey,
+		Description:  "the web browser to use for opening URLs",
+		DefaultValue: "",
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Browser(hostname).Value
 		},
-	}
+	},
 }
 
 func HomeDirPath(subdir string) (string, error) {

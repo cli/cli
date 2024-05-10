@@ -185,7 +185,7 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 
 	if _, ghPromptDisabled := os.LookupEnv("GH_PROMPT_DISABLED"); ghPromptDisabled {
 		io.SetNeverPrompt(true)
-	} else if prompt := cfg.Prompt(""); prompt == "disabled" {
+	} else if prompt := cfg.Prompt(""); prompt.Value == "disabled" {
 		io.SetNeverPrompt(true)
 	}
 
@@ -195,8 +195,8 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 	// 3. PAGER
 	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
 		io.SetPager(ghPager)
-	} else if pager := cfg.Pager(""); pager != "" {
-		io.SetPager(pager)
+	} else if pager := cfg.Pager(""); pager.Value != "" {
+		io.SetPager(pager.Value)
 	}
 
 	return io
