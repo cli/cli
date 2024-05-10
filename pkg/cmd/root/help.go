@@ -304,9 +304,6 @@ func dedent(s string) string {
 }
 
 func buildAliases(cmd *cobra.Command, aliasList []string) string {
-	if len(aliasList) == 0 {
-		return "No Aliases"
-	}
 	if !cmd.HasParent() {
 		return strings.Join(aliasList, " ")
 	}
