@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 	"github.com/stretchr/testify/require"
 )
@@ -60,7 +61,7 @@ func TestMigrationAppliedBumpsVersion(t *testing.T) {
 	c.Set([]string{versionKey}, "expected-pre-version")
 	topLevelKey := []string{"toplevelkey"}
 
-	migration := &MigrationMock{
+	migration := &ghmock.MigrationMock{
 		DoFunc: func(config *ghConfig.Config) error {
 			config.Set(topLevelKey, "toplevelvalue")
 			return nil
@@ -96,7 +97,7 @@ func TestMigrationIsNoopWhenAlreadyApplied(t *testing.T) {
 	c := ghConfig.ReadFromString(testFullConfig())
 	c.Set([]string{versionKey}, "expected-post-version")
 
-	migration := &MigrationMock{
+	migration := &ghmock.MigrationMock{
 		DoFunc: func(config *ghConfig.Config) error {
 			return errors.New("is not called")
 		},
@@ -126,7 +127,7 @@ func TestMigrationErrorsWhenPreVersionMismatch(t *testing.T) {
 	c.Set([]string{versionKey}, "not-expected-pre-version")
 	topLevelKey := []string{"toplevelkey"}
 
-	migration := &MigrationMock{
+	migration := &ghmock.MigrationMock{
 		DoFunc: func(config *ghConfig.Config) error {
 			config.Set(topLevelKey, "toplevelvalue")
 			return nil
@@ -228,8 +229,8 @@ func makeFileUnwriteable(t *testing.T, file string) {
 	require.NoError(t, os.Chmod(file, 0000))
 }
 
-func mockMigration(doFunc func(config *ghConfig.Config) error) *MigrationMock {
-	return &MigrationMock{
+func mockMigration(doFunc func(config *ghConfig.Config) error) *ghmock.MigrationMock {
+	return &ghmock.MigrationMock{
 		DoFunc: doFunc,
 		PreVersionFunc: func() string {
 			return ""

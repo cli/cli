@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
@@ -76,7 +77,7 @@ func Test_getExtensionRepos(t *testing.T) {
 	}
 	cfg := config.NewBlankConfig()
 
-	cfg.AuthenticationFunc = func() *config.AuthConfig {
+	cfg.AuthenticationFunc = func() gh.AuthConfig {
 		authCfg := &config.AuthConfig{}
 		authCfg.SetDefaultHost("github.com", "")
 		return authCfg

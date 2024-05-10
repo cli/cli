@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -18,7 +18,7 @@ type gitConfigurator interface {
 
 type SetupGitOptions struct {
 	IO           *iostreams.IOStreams
-	Config       func() (config.Config, error)
+	Config       func() (gh.Config, error)
 	Hostname     string
 	Force        bool
 	gitConfigure gitConfigurator

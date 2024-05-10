@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/findsh"
@@ -36,7 +37,7 @@ type Manager struct {
 	platform   func() (string, string)
 	client     *http.Client
 	gitClient  gitClient
-	config     config.Config
+	config     gh.Config
 	io         *iostreams.IOStreams
 	dryRunMode bool
 }
@@ -59,7 +60,7 @@ func NewManager(ios *iostreams.IOStreams, gc *git.Client) *Manager {
 	}
 }
 
-func (m *Manager) SetConfig(cfg config.Config) {
+func (m *Manager) SetConfig(cfg gh.Config) {
 	m.config = cfg
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -14,7 +15,7 @@ import (
 
 type SetOptions struct {
 	IO     *iostreams.IOStreams
-	Config config.Config
+	Config gh.Config
 
 	Key      string
 	Value    string
