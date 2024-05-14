@@ -20,7 +20,7 @@ import (
 
 const defaultInterval time.Duration = 10 * time.Second
 
-var prChecksFields = []string{
+var prCheckFields = []string{
 	"name",
 	"state",
 	"startedAt",
@@ -110,7 +110,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds when using `--watch` flag")
 	cmd.Flags().BoolVar(&opts.Required, "required", false, "Only show checks that are required")
 
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, prChecksFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, prCheckFields)
 
 	return cmd
 }
