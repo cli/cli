@@ -10,6 +10,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
@@ -29,6 +30,7 @@ type SetOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Remotes    func() (ghContext.Remotes, error)
 	Prompter   iprompter
 
 	VariableName    string
@@ -38,6 +40,8 @@ type SetOptions struct {
 	Visibility      string
 	RepositoryNames []string
 	EnvFile         string
+
+	HasRepoOverride bool
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -45,6 +49,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Remotes:    f.Remotes,
 		Prompter:   f.Prompter,
 	}
 
@@ -121,6 +126,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				}
 			}
 
+			opts.HasRepoOverride = cmd.Flags().Changed("repo")
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -161,6 +168,12 @@ func setRun(opts *SetOptions) error {
 		if err != nil {
 			return err
 		}
+
+		err = cmdutil.ValidateHasOnlyOneRemote(opts.HasRepoOverride, opts.Remotes)
+		if err != nil {
+			return err
+		}
+
 		host = baseRepo.RepoHost()
 	} else {
 		cfg, err := opts.Config()

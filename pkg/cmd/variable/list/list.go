@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
@@ -22,12 +23,15 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Remotes    func() (ghContext.Remotes, error)
 	Now        func() time.Time
 
 	Exporter cmdutil.Exporter
 
 	OrgName string
 	EnvName string
+
+	HasRepoOverride bool
 }
 
 var variableFields = []string{
@@ -44,6 +48,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Remotes:    f.Remotes,
 		Now:        time.Now,
 	}
 
@@ -65,6 +70,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
 				return err
 			}
+
+			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
 			if runF != nil {
 				return runF(opts)
@@ -93,6 +100,11 @@ func listRun(opts *ListOptions) error {
 	var baseRepo ghrepo.Interface
 	if orgName == "" {
 		baseRepo, err = opts.BaseRepo()
+		if err != nil {
+			return err
+		}
+
+		err = cmdutil.ValidateHasOnlyOneRemote(opts.HasRepoOverride, opts.Remotes)
 		if err != nil {
 			return err
 		}
