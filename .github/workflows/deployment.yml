@@ -6,7 +6,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  attestations: write
+  id-token: write
 
 on:
   workflow_dispatch:
@@ -36,7 +37,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -46,6 +47,11 @@ jobs:
         env:
           TAG_NAME: ${{ inputs.tag_name }}
         run: script/release --local "$TAG_NAME" --platform linux
+      - name: Attest release binaries
+        if: inputs.environment == 'production'
+        uses: actions/attest-build-provenance@951c0c5f8e375ad4efad33405ab77f7ded2358e4 # v1.1.1
+        with:
+          subject-path: "bin/gh*"
       - name: Generate web manual pages
         run: |
           go run ./cmd/gen-docs --website --doc-path dist/manual
@@ -70,7 +76,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
       - name: Configure macOS signing
         if: inputs.environment == 'production'
         env:
@@ -99,6 +105,11 @@ jobs:
           TAG_NAME: ${{ inputs.tag_name }}
           APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
         run: script/release --local "$TAG_NAME" --platform macos
+      - name: Attest release binaries
+        if: inputs.environment == 'production'
+        uses: actions/attest-build-provenance@951c0c5f8e375ad4efad33405ab77f7ded2358e4 # v1.1.1
+        with:
+          subject-path: "bin/gh*"
       - name: Notarize macOS archives
         if: inputs.environment == 'production'
         env:
@@ -127,7 +138,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -166,6 +177,11 @@ jobs:
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
           TAG_NAME: ${{ inputs.tag_name }}
         run: script/release --local "$TAG_NAME" --platform windows
+      - name: Attest release binaries
+        if: inputs.environment == 'production'
+        uses: actions/attest-build-provenance@951c0c5f8e375ad4efad33405ab77f7ded2358e4 # v1.1.1
+        with:
+          subject-path: "bin/gh*"
       - name: Set up MSBuild
         id: setupmsbuild
         uses: microsoft/setup-msbuild@v2.0.0
