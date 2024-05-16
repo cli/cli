@@ -64,6 +64,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			return cmdutil.SilentError
 		}
 
+		if io.IsStdoutTTY() {
+			fmt.Fprintf(io.Out, "%s Successfully checked extension upgrades\n", cs.SuccessIcon())
+		}
+
 		return nil
 	}
 
