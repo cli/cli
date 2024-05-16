@@ -18,7 +18,7 @@ type HelperConfig struct {
 	GitClient          *git.Client
 }
 
-func (hc *HelperConfig) Configure(hostname string) error {
+func (hc *HelperConfig) ConfigureOurs(hostname string) error {
 	ctx := context.TODO()
 
 	credHelperKeys := []string{

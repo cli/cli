@@ -60,7 +60,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 	// If there is no credential helper configured then we will set ourselves up as
 	// the credential helper for this host.
 	if !flow.helper.IsConfigured() {
-		return flow.HelperConfig.Configure(hostname)
+		return flow.HelperConfig.ConfigureOurs(hostname)
 	}
 
 	// Otherwise, we'll tell git to inform the existing credential helper of the new credentials.
