@@ -52,7 +52,7 @@ func (flow *GitCredentialFlow) Prompt(hostname string) error {
 		//  * https://git-scm.com/docs/git-config#_description
 		//  * https://github.com/cli/cli/pull/4109
 		var errNotInstalled *git.NotInstalled
-		if errors.As(err, &errNotInstalled) {
+		if errors.As(configuredHelperErr, &errNotInstalled) {
 			return configuredHelperErr
 		}
 
