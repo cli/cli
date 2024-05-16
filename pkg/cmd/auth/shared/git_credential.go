@@ -1,14 +1,11 @@
 package shared
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/google/shlex"
 )
@@ -17,8 +14,8 @@ type GitCredentialFlow struct {
 	Prompter  Prompt
 	GitClient *git.Client
 
-	HelperConfigurer *gitcredentials.HelperConfigurer
-	Updater          *gitcredentials.Updater
+	HelperConfig *gitcredentials.HelperConfig
+	Updater      *gitcredentials.Updater
 
 	shouldSetup bool
 	helper      string
@@ -27,7 +24,7 @@ type GitCredentialFlow struct {
 
 func (flow *GitCredentialFlow) Prompt(hostname string) error {
 	var gitErr error
-	flow.helper, gitErr = gitCredentialHelper(flow.GitClient, hostname)
+	flow.helper, gitErr = flow.HelperConfig.ConfiguredHelper(hostname)
 	if isOurCredentialHelper(flow.helper) {
 		flow.scopes = append(flow.scopes, "workflow")
 		return nil
@@ -65,7 +62,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 	// If there is no credential helper configured then we will set ourselves up as
 	// the credential helper for this host.
 	if flow.helper == "" {
-		return flow.HelperConfigurer.Configure(hostname)
+		return flow.HelperConfig.Configure(hostname)
 	}
 
 	// Otherwise, we'll tell git to inform the existing credential helper of the new credentials.
@@ -91,20 +88,4 @@ func isGitMissing(err error) bool {
 	}
 	var errNotInstalled *git.NotInstalled
 	return errors.As(err, &errNotInstalled)
-}
-
-func gitCredentialHelperKey(hostname string) string {
-	host := strings.TrimSuffix(ghinstance.HostPrefix(hostname), "/")
-	return fmt.Sprintf("credential.%s.helper", host)
-}
-
-func gitCredentialHelper(gitClient *git.Client, hostname string) (helper string, err error) {
-	ctx := context.TODO()
-
-	helper, err = gitClient.Config(ctx, gitCredentialHelperKey(hostname))
-	if helper != "" {
-		return
-	}
-	helper, err = gitClient.Config(ctx, "credential.helper")
-	return
 }

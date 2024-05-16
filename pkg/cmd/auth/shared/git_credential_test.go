@@ -66,7 +66,7 @@ func TestGitCredentialsSetup_setOurs_GH(t *testing.T) {
 	f := GitCredentialFlow{
 		helper:    "",
 		GitClient: &git.Client{GitPath: "some/path/git"},
-		HelperConfigurer: &gitcredentials.HelperConfigurer{
+		HelperConfig: &gitcredentials.HelperConfig{
 			SelfExecutablePath: "/path/to/gh",
 			GitClient:          &git.Client{GitPath: "some/path/git"},
 		},
@@ -101,7 +101,7 @@ func TestGitCredentialSetup_setOurs_nonGH(t *testing.T) {
 	f := GitCredentialFlow{
 		helper:    "",
 		GitClient: &git.Client{GitPath: "some/path/git"},
-		HelperConfigurer: &gitcredentials.HelperConfigurer{
+		HelperConfig: &gitcredentials.HelperConfig{
 			SelfExecutablePath: "/path/to/gh",
 			GitClient:          &git.Client{GitPath: "some/path/git"},
 		},

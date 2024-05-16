@@ -55,7 +55,7 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.gitConfigure = &shared.GitCredentialFlow{
 				GitClient: f.GitClient,
-				HelperConfigurer: &gitcredentials.HelperConfigurer{
+				HelperConfig: &gitcredentials.HelperConfig{
 					SelfExecutablePath: f.Executable(),
 					GitClient:          f.GitClient,
 				},

@@ -11,21 +11,21 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
-type HelperConfigurer struct {
+type HelperConfig struct {
 	SelfExecutablePath string
 	GitClient          *git.Client
 }
 
-func (hc *HelperConfigurer) Configure(hostname string) error {
+func (hc *HelperConfig) Configure(hostname string) error {
 	ctx := context.TODO()
 
 	credHelperKeys := []string{
-		gitCredentialHelperKey(hostname),
+		keyFor(hostname),
 	}
 
 	gistHost := strings.TrimSuffix(ghinstance.GistHost(hostname), "/")
 	if strings.HasPrefix(gistHost, "gist.") {
-		credHelperKeys = append(credHelperKeys, gitCredentialHelperKey(gistHost))
+		credHelperKeys = append(credHelperKeys, keyFor(gistHost))
 	}
 
 	var configErr error
@@ -61,7 +61,20 @@ func (hc *HelperConfigurer) Configure(hostname string) error {
 	return configErr
 }
 
-func gitCredentialHelperKey(hostname string) string {
+func (hc *HelperConfig) ConfiguredHelper(hostname string) (string, error) {
+	ctx := context.TODO()
+
+	helper, err := hc.GitClient.Config(ctx, keyFor(hostname))
+	if helper != "" {
+		// TODO: This is a direct refactoring removing named and naked returns
+		// but we should probably look closer at the error handling here
+		return helper, err
+	}
+
+	return hc.GitClient.Config(ctx, "credential.helper")
+}
+
+func keyFor(hostname string) string {
 	host := strings.TrimSuffix(ghinstance.HostPrefix(hostname), "/")
 	return fmt.Sprintf("credential.%s.helper", host)
 }

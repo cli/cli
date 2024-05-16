@@ -176,7 +176,7 @@ func refreshRun(opts *RefreshOptions) error {
 	credentialFlow := &shared.GitCredentialFlow{
 		Prompter:  opts.Prompter,
 		GitClient: opts.GitClient,
-		HelperConfigurer: &gitcredentials.HelperConfigurer{
+		HelperConfig: &gitcredentials.HelperConfig{
 			SelfExecutablePath: opts.MainExecutable,
 			GitClient:          opts.GitClient,
 		},
