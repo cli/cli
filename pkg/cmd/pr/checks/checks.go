@@ -20,10 +20,23 @@ import (
 
 const defaultInterval time.Duration = 10 * time.Second
 
+var prCheckFields = []string{
+	"name",
+	"state",
+	"startedAt",
+	"completedAt",
+	"link",
+	"bucket",
+	"event",
+	"workflow",
+	"description",
+}
+
 type ChecksOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Browser    browser.Browser
+	Exporter   cmdutil.Exporter
 
 	Finder   shared.PRFinder
 	Detector fd.Detector
@@ -97,6 +110,8 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds when using `--watch` flag")
 	cmd.Flags().BoolVar(&opts.Required, "required", false, "Only show checks that are required")
 
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, prCheckFields)
+
 	return cmd
 }
 
@@ -159,6 +174,10 @@ func checksRun(opts *ChecksOptions) error {
 	checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required, includeEvent)
 	if err != nil {
 		return err
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, checks)
 	}
 
 	if opts.Watch {
