@@ -5,6 +5,7 @@ import (
 
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 )
 
 func TestGitCredentialSetup_configureExisting(t *testing.T) {
@@ -14,9 +15,11 @@ func TestGitCredentialSetup_configureExisting(t *testing.T) {
 	cs.Register(`git credential approve`, 0, "")
 
 	f := GitCredentialFlow{
-		Executable: "gh",
-		helper:     "osxkeychain",
-		GitClient:  &git.Client{GitPath: "some/path/git"},
+		helper:    "osxkeychain",
+		GitClient: &git.Client{GitPath: "some/path/git"},
+		Updater: &gitcredentials.Updater{
+			GitClient: &git.Client{GitPath: "some/path/git"},
+		},
 	}
 
 	if err := f.gitCredentialSetup("example.com", "monalisa", "PASSWD"); err != nil {
@@ -61,9 +64,12 @@ func TestGitCredentialsSetup_setOurs_GH(t *testing.T) {
 	})
 
 	f := GitCredentialFlow{
-		Executable: "/path/to/gh",
-		helper:     "",
-		GitClient:  &git.Client{GitPath: "some/path/git"},
+		helper:    "",
+		GitClient: &git.Client{GitPath: "some/path/git"},
+		HelperConfigurer: &gitcredentials.HelperConfigurer{
+			SelfExecutablePath: "/path/to/gh",
+			GitClient:          &git.Client{GitPath: "some/path/git"},
+		},
 	}
 
 	if err := f.gitCredentialSetup("github.com", "monalisa", "PASSWD"); err != nil {
@@ -93,9 +99,12 @@ func TestGitCredentialSetup_setOurs_nonGH(t *testing.T) {
 	})
 
 	f := GitCredentialFlow{
-		Executable: "/path/to/gh",
-		helper:     "",
-		GitClient:  &git.Client{GitPath: "some/path/git"},
+		helper:    "",
+		GitClient: &git.Client{GitPath: "some/path/git"},
+		HelperConfigurer: &gitcredentials.HelperConfigurer{
+			SelfExecutablePath: "/path/to/gh",
+			GitClient:          &git.Client{GitPath: "some/path/git"},
+		},
 	}
 
 	if err := f.gitCredentialSetup("example.com", "monalisa", "PASSWD"); err != nil {

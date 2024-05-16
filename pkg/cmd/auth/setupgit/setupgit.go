@@ -7,6 +7,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -53,8 +54,14 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.gitConfigure = &shared.GitCredentialFlow{
-				Executable: f.Executable(),
-				GitClient:  f.GitClient,
+				GitClient: f.GitClient,
+				HelperConfigurer: &gitcredentials.HelperConfigurer{
+					SelfExecutablePath: f.Executable(),
+					GitClient:          f.GitClient,
+				},
+				Updater: &gitcredentials.Updater{
+					GitClient: f.GitClient,
+				},
 			}
 			if opts.Hostname == "" && opts.Force {
 				return cmdutil.FlagErrorf("`--force` must be used in conjunction with `--hostname`")
@@ -111,6 +118,7 @@ func setupGitRun(opts *SetupGitOptions) error {
 	}
 
 	for _, hostname := range hostnames {
+		// TODO: Use gitcredentials.HelperConfigurer here
 		if err := opts.gitConfigure.Setup(hostname, "", ""); err != nil {
 			return fmt.Errorf("failed to set up git credential helper: %s", err)
 		}
