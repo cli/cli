@@ -13,11 +13,14 @@ import (
 	"github.com/google/shlex"
 )
 
+// A HelperConfig is used to configure and inspect the state of git credential helpers.
 type HelperConfig struct {
 	SelfExecutablePath string
 	GitClient          *git.Client
 }
 
+// ConfigureOurs sets up the git credential helper chain to use the GitHub CLI credential helper for git repositories
+// including gists.
 func (hc *HelperConfig) ConfigureOurs(hostname string) error {
 	ctx := context.TODO()
 
@@ -63,14 +66,17 @@ func (hc *HelperConfig) ConfigureOurs(hostname string) error {
 	return configErr
 }
 
+// A Helper represents a git credential helper configuration.
 type Helper struct {
 	Cmd string
 }
 
+// IsConfigured returns true if the helper has a non-empty command, i.e. the git config had an entry
 func (h Helper) IsConfigured() bool {
 	return h.Cmd != ""
 }
 
+// IsOurs returns true if the helper command is the GitHub CLI credential helper
 func (h Helper) IsOurs() bool {
 	if !strings.HasPrefix(h.Cmd, "!") {
 		return false
@@ -84,6 +90,7 @@ func (h Helper) IsOurs() bool {
 	return strings.TrimSuffix(filepath.Base(args[0]), ".exe") == "gh"
 }
 
+// ConfiguredHelper returns the configured git credential helper for a given hostname.
 func (hc *HelperConfig) ConfiguredHelper(hostname string) (Helper, error) {
 	ctx := context.TODO()
 
@@ -118,10 +125,13 @@ func shellQuote(s string) string {
 	return s
 }
 
+// An Updater is used to update the git credentials for a given hostname.
 type Updater struct {
 	GitClient *git.Client
 }
 
+// Update updates the git credentials for a given hostname, first by rejecting any existing credentials and then
+// approving the new credentials.
 func (u *Updater) Update(hostname, username, password string) error {
 	ctx := context.TODO()
 
