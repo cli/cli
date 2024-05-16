@@ -15,19 +15,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockGitConfigurer struct {
+type gitCredentialsConfigurerSpy struct {
 	hosts    []string
 	setupErr error
 }
 
-func (gf *mockGitConfigurer) SetupFor(hostname string) []string {
-	return gf.hosts
-}
-
-func (gf *mockGitConfigurer) Setup(hostname, username, authToken string) error {
+func (gf *gitCredentialsConfigurerSpy) ConfigureOurs(hostname string) error {
 	gf.hosts = append(gf.hosts, hostname)
 	return gf.setupErr
 }
+
 func TestNewCmdSetupGit(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -183,8 +180,8 @@ func Test_setupGitRun(t *testing.T) {
 				}
 			}
 
-			gcSpy := &mockGitConfigurer{setupErr: tt.setupErr}
-			tt.opts.gitConfigure = gcSpy
+			credentialsConfigurerSpy := &gitCredentialsConfigurerSpy{setupErr: tt.setupErr}
+			tt.opts.CredentialsHelperConfig = credentialsConfigurerSpy
 
 			err := setupGitRun(tt.opts)
 			if tt.expectedErr != nil {
@@ -194,7 +191,7 @@ func Test_setupGitRun(t *testing.T) {
 			}
 
 			if tt.expectedHostsSetup != nil {
-				require.Equal(t, tt.expectedHostsSetup, gcSpy.hosts)
+				require.Equal(t, tt.expectedHostsSetup, credentialsConfigurerSpy.hosts)
 			}
 
 			require.Equal(t, tt.expectedErrOut, stderr.String())
