@@ -53,10 +53,6 @@ func (flow *GitCredentialFlow) ShouldSetup() bool {
 }
 
 func (flow *GitCredentialFlow) Setup(hostname, username, authToken string) error {
-	return flow.gitCredentialSetup(hostname, username, authToken)
-}
-
-func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password string) error {
 	// If there is no credential helper configured then we will set ourselves up as
 	// the credential helper for this host.
 	if !flow.helper.IsConfigured() {
@@ -64,5 +60,5 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 	}
 
 	// Otherwise, we'll tell git to inform the existing credential helper of the new credentials.
-	return flow.Updater.Update(hostname, username, password)
+	return flow.Updater.Update(hostname, username, authToken)
 }

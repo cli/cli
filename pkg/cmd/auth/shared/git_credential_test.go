@@ -8,7 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 )
 
-func TestGitCredentialSetup_configureExisting(t *testing.T) {
+func TestSetup_configureExisting(t *testing.T) {
 	cs, restoreRun := run.Stub()
 	defer restoreRun(t)
 	cs.Register(`git credential reject`, 0, "")
@@ -21,8 +21,8 @@ func TestGitCredentialSetup_configureExisting(t *testing.T) {
 		},
 	}
 
-	if err := f.gitCredentialSetup("example.com", "monalisa", "PASSWD"); err != nil {
-		t.Errorf("GitCredentialSetup() error = %v", err)
+	if err := f.Setup("example.com", "monalisa", "PASSWD"); err != nil {
+		t.Errorf("Setup() error = %v", err)
 	}
 }
 
@@ -70,13 +70,13 @@ func TestGitCredentialsSetup_setOurs_GH(t *testing.T) {
 		},
 	}
 
-	if err := f.gitCredentialSetup("github.com", "monalisa", "PASSWD"); err != nil {
-		t.Errorf("GitCredentialSetup() error = %v", err)
+	if err := f.Setup("github.com", "monalisa", "PASSWD"); err != nil {
+		t.Errorf("Setup() error = %v", err)
 	}
 
 }
 
-func TestGitCredentialSetup_setOurs_nonGH(t *testing.T) {
+func TestSetup_setOurs_nonGH(t *testing.T) {
 	cs, restoreRun := run.Stub()
 	defer restoreRun(t)
 	cs.Register(`git config --global --replace-all credential\.`, 0, "", func(args []string) {
@@ -104,7 +104,7 @@ func TestGitCredentialSetup_setOurs_nonGH(t *testing.T) {
 		},
 	}
 
-	if err := f.gitCredentialSetup("example.com", "monalisa", "PASSWD"); err != nil {
-		t.Errorf("GitCredentialSetup() error = %v", err)
+	if err := f.Setup("example.com", "monalisa", "PASSWD"); err != nil {
+		t.Errorf("Setup() error = %v", err)
 	}
 }
