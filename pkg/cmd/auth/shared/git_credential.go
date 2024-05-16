@@ -2,30 +2,26 @@ package shared
 
 import (
 	"errors"
-	"path/filepath"
-	"strings"
 
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
-	"github.com/google/shlex"
 )
 
 type GitCredentialFlow struct {
-	Prompter  Prompt
-	GitClient *git.Client
+	Prompter Prompt
 
 	HelperConfig *gitcredentials.HelperConfig
 	Updater      *gitcredentials.Updater
 
 	shouldSetup bool
-	helper      string
+	helper      gitcredentials.Helper
 	scopes      []string
 }
 
 func (flow *GitCredentialFlow) Prompt(hostname string) error {
-	var gitErr error
-	flow.helper, gitErr = flow.HelperConfig.ConfiguredHelper(hostname)
-	if isOurCredentialHelper(flow.helper) {
+	var configuredHelperErr error
+	flow.helper, configuredHelperErr = flow.HelperConfig.ConfiguredHelper(hostname)
+	if flow.helper.IsOurs() {
 		flow.scopes = append(flow.scopes, "workflow")
 		return nil
 	}
@@ -37,9 +33,11 @@ func (flow *GitCredentialFlow) Prompt(hostname string) error {
 	flow.shouldSetup = result
 
 	if flow.shouldSetup {
-		if isGitMissing(gitErr) {
-			return gitErr
+		var errNotInstalled *git.NotInstalled
+		if errors.As(err, &errNotInstalled) {
+			return configuredHelperErr
 		}
+
 		flow.scopes = append(flow.scopes, "workflow")
 	}
 
@@ -61,31 +59,10 @@ func (flow *GitCredentialFlow) Setup(hostname, username, authToken string) error
 func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password string) error {
 	// If there is no credential helper configured then we will set ourselves up as
 	// the credential helper for this host.
-	if flow.helper == "" {
+	if !flow.helper.IsConfigured() {
 		return flow.HelperConfig.Configure(hostname)
 	}
 
 	// Otherwise, we'll tell git to inform the existing credential helper of the new credentials.
 	return flow.Updater.Update(hostname, username, password)
-}
-
-func isOurCredentialHelper(cmd string) bool {
-	if !strings.HasPrefix(cmd, "!") {
-		return false
-	}
-
-	args, err := shlex.Split(cmd[1:])
-	if err != nil || len(args) == 0 {
-		return false
-	}
-
-	return strings.TrimSuffix(filepath.Base(args[0]), ".exe") == "gh"
-}
-
-func isGitMissing(err error) bool {
-	if err == nil {
-		return false
-	}
-	var errNotInstalled *git.NotInstalled
-	return errors.As(err, &errNotInstalled)
 }

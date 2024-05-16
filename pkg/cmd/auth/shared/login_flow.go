@@ -73,8 +73,7 @@ func Login(opts *LoginOptions) error {
 	var additionalScopes []string
 
 	credentialFlow := &GitCredentialFlow{
-		Prompter:  opts.Prompter,
-		GitClient: opts.GitClient,
+		Prompter: opts.Prompter,
 		HelperConfig: &gitcredentials.HelperConfig{
 			SelfExecutablePath: opts.Executable,
 			GitClient:          opts.GitClient,

@@ -15,8 +15,7 @@ func TestGitCredentialSetup_configureExisting(t *testing.T) {
 	cs.Register(`git credential approve`, 0, "")
 
 	f := GitCredentialFlow{
-		helper:    "osxkeychain",
-		GitClient: &git.Client{GitPath: "some/path/git"},
+		helper: gitcredentials.Helper{Cmd: "osxkeychain"},
 		Updater: &gitcredentials.Updater{
 			GitClient: &git.Client{GitPath: "some/path/git"},
 		},
@@ -64,8 +63,7 @@ func TestGitCredentialsSetup_setOurs_GH(t *testing.T) {
 	})
 
 	f := GitCredentialFlow{
-		helper:    "",
-		GitClient: &git.Client{GitPath: "some/path/git"},
+		helper: gitcredentials.Helper{},
 		HelperConfig: &gitcredentials.HelperConfig{
 			SelfExecutablePath: "/path/to/gh",
 			GitClient:          &git.Client{GitPath: "some/path/git"},
@@ -99,8 +97,7 @@ func TestGitCredentialSetup_setOurs_nonGH(t *testing.T) {
 	})
 
 	f := GitCredentialFlow{
-		helper:    "",
-		GitClient: &git.Client{GitPath: "some/path/git"},
+		helper: gitcredentials.Helper{},
 		HelperConfig: &gitcredentials.HelperConfig{
 			SelfExecutablePath: "/path/to/gh",
 			GitClient:          &git.Client{GitPath: "some/path/git"},
@@ -109,46 +106,5 @@ func TestGitCredentialSetup_setOurs_nonGH(t *testing.T) {
 
 	if err := f.gitCredentialSetup("example.com", "monalisa", "PASSWD"); err != nil {
 		t.Errorf("GitCredentialSetup() error = %v", err)
-	}
-}
-
-func Test_isOurCredentialHelper(t *testing.T) {
-	tests := []struct {
-		name string
-		arg  string
-		want bool
-	}{
-		{
-			name: "blank",
-			arg:  "",
-			want: false,
-		},
-		{
-			name: "invalid",
-			arg:  "!",
-			want: false,
-		},
-		{
-			name: "osxkeychain",
-			arg:  "osxkeychain",
-			want: false,
-		},
-		{
-			name: "looks like gh but isn't",
-			arg:  "gh auth",
-			want: false,
-		},
-		{
-			name: "ours",
-			arg:  "!/path/to/gh auth",
-			want: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isOurCredentialHelper(tt.arg); got != tt.want {
-				t.Errorf("isOurCredentialHelper() = %v, want %v", got, tt.want)
-			}
-		})
 	}
 }

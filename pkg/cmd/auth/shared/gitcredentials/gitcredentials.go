@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/google/shlex"
 )
 
 type HelperConfig struct {
@@ -61,17 +63,47 @@ func (hc *HelperConfig) Configure(hostname string) error {
 	return configErr
 }
 
-func (hc *HelperConfig) ConfiguredHelper(hostname string) (string, error) {
-	ctx := context.TODO()
+type Helper struct {
+	Cmd string
+}
 
-	helper, err := hc.GitClient.Config(ctx, keyFor(hostname))
-	if helper != "" {
-		// TODO: This is a direct refactoring removing named and naked returns
-		// but we should probably look closer at the error handling here
-		return helper, err
+func (h Helper) IsConfigured() bool {
+	return h.Cmd != ""
+}
+
+func (h Helper) IsOurs() bool {
+	if !strings.HasPrefix(h.Cmd, "!") {
+		return false
 	}
 
-	return hc.GitClient.Config(ctx, "credential.helper")
+	args, err := shlex.Split(h.Cmd[1:])
+	if err != nil || len(args) == 0 {
+		return false
+	}
+
+	return strings.TrimSuffix(filepath.Base(args[0]), ".exe") == "gh"
+}
+
+func (hc *HelperConfig) ConfiguredHelper(hostname string) (Helper, error) {
+	ctx := context.TODO()
+
+	hostHelperCmd, err := hc.GitClient.Config(ctx, keyFor(hostname))
+	if hostHelperCmd != "" {
+		// TODO: This is a direct refactoring removing named and naked returns
+		// but we should probably look closer at the error handling here
+		return Helper{
+			Cmd: hostHelperCmd,
+		}, err
+	}
+
+	globalHelperCmd, err := hc.GitClient.Config(ctx, "credential.helper")
+	if globalHelperCmd != "" {
+		return Helper{
+			Cmd: globalHelperCmd,
+		}, err
+	}
+
+	return Helper{}, nil
 }
 
 func keyFor(hostname string) string {
