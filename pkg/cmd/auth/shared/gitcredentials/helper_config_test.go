@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/contract"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/stretchr/testify/require"
 )
@@ -33,105 +35,40 @@ func configureTestCredentialHelper(t *testing.T, key string) {
 	require.NoError(t, cmd.Run())
 }
 
-func TestConfigureOursNoPreexistingHelpersConfigured(t *testing.T) {
-	// Given there are no credential helpers configured
+func TestHelperConfigContract(t *testing.T) {
+	contract.HelperConfig{
+		NewHelperConfig: func(t *testing.T) shared.HelperConfig {
+			withIsolatedGitConfig(t)
+
+			return &gitcredentials.HelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				GitClient:          &git.Client{},
+			}
+		},
+		ConfigureHelper: func(t *testing.T, hostname string) {
+			configureTestCredentialHelper(t, hostname)
+		},
+	}.Test(t)
+}
+
+// This is a whitebox test unlike the contract because although we don't use the exact configured command, it's
+// important that it is exactly right since git uses it.
+func TestSetsCorrectCommandInGitConfig(t *testing.T) {
 	withIsolatedGitConfig(t)
 
-	// When we configure ourselves as the git credential helper
-	hc := gitcredentials.HelperConfig{
+	gc := &git.Client{}
+	hc := &gitcredentials.HelperConfig{
 		SelfExecutablePath: "/path/to/gh",
-		GitClient:          &git.Client{},
+		GitClient:          gc,
 	}
 	require.NoError(t, hc.ConfigureOurs("github.com"))
 
-	// Then the git config should be updated to use our credential helper for both repos and gists
-	repoHelper, err := hc.ConfiguredHelper("github.com")
+	// Check that the correct command was set in the git config
+	cmd, err := gc.Command(context.Background(), "config", "--get", "credential.https://github.com.helper")
 	require.NoError(t, err)
-	require.True(t, repoHelper.IsConfigured(), "expected our helper to be configured")
-	require.True(t, repoHelper.IsOurs(), "expected the helper to be ours but was %q", repoHelper.Cmd)
-
-	gistHelper, err := hc.ConfiguredHelper("gist.github.com")
+	output, err := cmd.Output()
 	require.NoError(t, err)
-	require.True(t, gistHelper.IsConfigured(), "expected our helper to be configured")
-	require.True(t, gistHelper.IsOurs(), "expected the helper to be ours but was %q", gistHelper.Cmd)
-}
-
-func TestConfigureOursWithPreexistingHelpersConfigured(t *testing.T) {
-	// Given there are other credential helpers configured
-	withIsolatedGitConfig(t)
-	configureTestCredentialHelper(t, "credential.helper")
-	configureTestCredentialHelper(t, "credential.https://github.com.helper")
-
-	// When we configure ourselves as the git credential helper
-	hc := gitcredentials.HelperConfig{
-		SelfExecutablePath: "/path/to/gh",
-		GitClient:          &git.Client{},
-	}
-	require.NoError(t, hc.ConfigureOurs("github.com"))
-
-	// Then the git config should be updated to use our credential repoHelper for both repos and gists
-	repoHelper, err := hc.ConfiguredHelper("github.com")
-	require.NoError(t, err)
-	require.True(t, repoHelper.IsConfigured(), "expected our helper to be configured")
-	require.True(t, repoHelper.IsOurs(), "expected the helper to be ours but was %q", repoHelper.Cmd)
-
-	gistHelper, err := hc.ConfiguredHelper("gist.github.com")
-	require.NoError(t, err)
-	require.True(t, gistHelper.IsConfigured(), "expected our helper to be configured")
-	require.True(t, gistHelper.IsOurs(), "expected the helper to be ours but was %q", gistHelper.Cmd)
-}
-
-func TestConfiguredHelperNoPreexistingHelpersConfigured(t *testing.T) {
-	// Given there are no credential helpers configured
-	withIsolatedGitConfig(t)
-
-	// When we check the configured helper for a hostname
-	hc := gitcredentials.HelperConfig{
-		SelfExecutablePath: "/path/to/gh",
-		GitClient:          &git.Client{},
-	}
-	helper, err := hc.ConfiguredHelper("github.com")
-
-	// Then the helper should not be configured and not ours
-	require.NoError(t, err)
-	require.False(t, helper.IsConfigured(), "expected no helper to be configured")
-	require.False(t, helper.IsOurs(), "expected the helper not to be ours but was %q", helper.Cmd)
-}
-
-func TestConfiguredHelperWithPreexistingGlobalHelperConfigured(t *testing.T) {
-	// Given there is a global credential helper configured
-	withIsolatedGitConfig(t)
-	configureTestCredentialHelper(t, "credential.helper")
-
-	// When we check the configured helper for a hostname
-	hc := gitcredentials.HelperConfig{
-		SelfExecutablePath: "/path/to/gh",
-		GitClient:          &git.Client{},
-	}
-	helper, err := hc.ConfiguredHelper("github.com")
-
-	// Then the helper should be configured, but not ours
-	require.NoError(t, err)
-	require.True(t, helper.IsConfigured(), "expected no helper to be configured")
-	require.False(t, helper.IsOurs(), "expected the helper not to be ours but was %q", helper.Cmd)
-}
-
-func TestConfiguredHelperWithPreexistingHostHelperConfigured(t *testing.T) {
-	// Given there is a credential helper configured for a hostname
-	withIsolatedGitConfig(t)
-	configureTestCredentialHelper(t, "credential.https://github.com.helper")
-
-	// When we check the configured helper for a hostname
-	hc := gitcredentials.HelperConfig{
-		SelfExecutablePath: "/path/to/gh",
-		GitClient:          &git.Client{},
-	}
-	helper, err := hc.ConfiguredHelper("github.com")
-
-	// Then the helper should be configured, but not ours
-	require.NoError(t, err)
-	require.True(t, helper.IsConfigured(), "expected no helper to be configured")
-	require.False(t, helper.IsOurs(), "expected the helper not to be ours but was %q", helper.Cmd)
+	require.Equal(t, "!/path/to/gh auth git-credential\n", string(output))
 }
 
 func TestHelperIsOurs(t *testing.T) {

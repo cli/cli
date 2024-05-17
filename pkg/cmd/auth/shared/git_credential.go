@@ -7,10 +7,15 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 )
 
+type HelperConfig interface {
+	ConfigureOurs(hostname string) error
+	ConfiguredHelper(hostname string) (gitcredentials.Helper, error)
+}
+
 type GitCredentialFlow struct {
 	Prompter Prompt
 
-	HelperConfig *gitcredentials.HelperConfig
+	HelperConfig HelperConfig
 	Updater      *gitcredentials.Updater
 
 	shouldSetup bool
