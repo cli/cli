@@ -7,6 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// This HelperConfig contract exist to ensure that any HelperConfig implementation conforms to this behaviour.
+// This is useful because we can swap in fake implementations for testing, rather than requiring our tests to be
+// isolated from git.
+//
+// See for example, TestAuthenticatingGitCredentials for LoginFlow.
 type HelperConfig struct {
 	NewHelperConfig func(t *testing.T) shared.HelperConfig
 	ConfigureHelper func(t *testing.T, hostname string)
