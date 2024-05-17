@@ -179,6 +179,14 @@ func manPrintOptions(buf *bytes.Buffer, command *cobra.Command) {
 	}
 }
 
+func manPrintAliases(buf *bytes.Buffer, command *cobra.Command) {
+	if len(command.Aliases) > 0 {
+		buf.WriteString("# ALIASES\n")
+		buf.WriteString(strings.Join(root.BuildAliasList(command, command.Aliases), ", "))
+		buf.WriteString("\n")
+	}
+}
+
 func manPrintJSONFields(buf *bytes.Buffer, command *cobra.Command) {
 	raw, ok := command.Annotations["help:json-fields"]
 	if !ok {
@@ -207,6 +215,7 @@ func genMan(cmd *cobra.Command, header *GenManHeader) []byte {
 		}
 	}
 	manPrintOptions(buf, cmd)
+	manPrintAliases(buf, cmd)
 	manPrintJSONFields(buf, cmd)
 	if len(cmd.Example) > 0 {
 		buf.WriteString("# EXAMPLE\n")

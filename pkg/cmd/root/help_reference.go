@@ -65,7 +65,7 @@ func cmdRef(w io.Writer, cmd *cobra.Command, depth int) {
 	// Aliases
 	if len(cmd.Aliases) > 0 {
 		fmt.Fprintf(w, "%s\n\n", "Aliases")
-		fmt.Fprintf(w, "\n%s\n\n", dedent(strings.Join(buildAliasList(cmd, cmd.Aliases), ", ")))
+		fmt.Fprintf(w, "\n%s\n\n", dedent(strings.Join(BuildAliasList(cmd, cmd.Aliases), ", ")))
 	}
 
 	// Subcommands

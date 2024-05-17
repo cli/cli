@@ -132,7 +132,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
 
 	if len(command.Aliases) > 0 {
-		helpEntries = append(helpEntries, helpEntry{"ALIASES", strings.Join(buildAliasList(command, command.Aliases), ", ") + "\n"})
+		helpEntries = append(helpEntries, helpEntry{"ALIASES", strings.Join(BuildAliasList(command, command.Aliases), ", ") + "\n"})
 	}
 
 	for _, g := range GroupedCommands(command) {
@@ -303,7 +303,7 @@ func dedent(s string) string {
 	return strings.TrimSuffix(buf.String(), "\n")
 }
 
-func buildAliasList(cmd *cobra.Command, aliases []string) []string {
+func BuildAliasList(cmd *cobra.Command, aliases []string) []string {
 	if !cmd.HasParent() {
 		return aliases
 	}
@@ -321,5 +321,5 @@ func buildAliasList(cmd *cobra.Command, aliases []string) []string {
 		}
 	}
 
-	return buildAliasList(cmd.Parent(), aliasesWithParentAliases)
+	return BuildAliasList(cmd.Parent(), aliasesWithParentAliases)
 }
