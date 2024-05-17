@@ -257,10 +257,10 @@ func TestLogin(t *testing.T) {
 			tt.opts.IO = ios
 			tt.opts.Config = &cfg
 			tt.opts.HTTPClient = &http.Client{Transport: reg}
-			// TODO: test the usage of the credential flow, which is currently untested.
 			tt.opts.CredentialFlow = &GitCredentialFlow{
-				HelperConfig: &gitcredentials.HelperConfig{},
-				Updater:      &gitcredentials.Updater{},
+				// Intentionally not instantiating anything in here because the tests do not hit this code path.
+				// Right now it's better to panic if we write a test that hits the code than say, start calling
+				// out to git unintentionally.
 			}
 
 			if tt.runStubs != nil {
