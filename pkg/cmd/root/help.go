@@ -132,7 +132,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
 
 	if len(command.Aliases) > 0 {
-		helpEntries = append(helpEntries, helpEntry{"ALIASES", buildAliases(command, command.Aliases) + "\n"})
+		helpEntries = append(helpEntries, helpEntry{"ALIASES", strings.Join(buildAliasList(command, command.Aliases), ", ") + "\n"})
 	}
 
 	for _, g := range GroupedCommands(command) {
@@ -303,27 +303,23 @@ func dedent(s string) string {
 	return strings.TrimSuffix(buf.String(), "\n")
 }
 
-func buildAliases(cmd *cobra.Command, aliasList []string) string {
+func buildAliasList(cmd *cobra.Command, aliases []string) []string {
 	if !cmd.HasParent() {
-		return strings.Join(aliasList, " ")
+		return aliases
 	}
 
-	list := append(cmd.Parent().Aliases, cmd.Parent().Name())
-	sort.Strings(list)
-	sep := ","
-	newAliasList := []string{}
-	if !cmd.Parent().HasParent() {
-		// trim last comma
-		idx := len(aliasList) - 1
-		last := aliasList[idx]
-		last = strings.TrimSuffix(last, ",")
-		aliasList[idx] = last
-		sep = ""
-	}
-	for _, c := range list {
-		for _, a := range aliasList {
-			newAliasList = append(newAliasList, fmt.Sprintf("%s %s%s", c, a, sep))
+	parentAliases := append(cmd.Parent().Aliases, cmd.Parent().Name())
+	sort.Strings(parentAliases)
+
+	var aliasesWithParentAliases []string
+	// e.g aliases = [ls]
+	for _, alias := range aliases {
+		// e.g parentAliases = [codespaces, cs]
+		for _, parentAlias := range parentAliases {
+			// e.g. aliasesWithParentAliases = [codespaces list, codespaces ls, cs list, cs ls]
+			aliasesWithParentAliases = append(aliasesWithParentAliases, fmt.Sprintf("%s %s", parentAlias, alias))
 		}
 	}
-	return buildAliases(cmd.Parent(), newAliasList)
+
+	return buildAliasList(cmd.Parent(), aliasesWithParentAliases)
 }
