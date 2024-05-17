@@ -10,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
@@ -255,6 +256,11 @@ func TestLogin(t *testing.T) {
 			tt.opts.IO = ios
 			tt.opts.Config = &cfg
 			tt.opts.HTTPClient = &http.Client{Transport: reg}
+			// TODO: test the usage of the credential flow, which is currently untested.
+			tt.opts.CredentialFlow = &GitCredentialFlow{
+				HelperConfig: &gitcredentials.HelperConfig{},
+				Updater:      &gitcredentials.Updater{},
+			}
 
 			if tt.runStubs != nil {
 				rs, runRestore := run.Stub()
