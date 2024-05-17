@@ -15,7 +15,7 @@ type HelperConfig interface {
 type GitCredentialFlow struct {
 	Prompter Prompt
 
-	HelperConfig *gitcredentials.HelperConfig
+	HelperConfig HelperConfig
 	Updater      *gitcredentials.Updater
 
 	shouldSetup bool
