@@ -132,7 +132,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
 
 	if len(command.Aliases) > 0 {
-		helpEntries = append(helpEntries, helpEntry{"ALIASES", strings.Join(command.Aliases, "\n")})
+		helpEntries = append(helpEntries, helpEntry{"ALIASES", strings.Join(BuildAliasList(command, command.Aliases), ", ") + "\n"})
 	}
 
 	for _, g := range GroupedCommands(command) {
@@ -165,6 +165,10 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	inheritedFlagUsages := command.InheritedFlags().FlagUsages()
 	if inheritedFlagUsages != "" {
 		helpEntries = append(helpEntries, helpEntry{"INHERITED FLAGS", dedent(inheritedFlagUsages)})
+	}
+	if _, ok := command.Annotations["help:json-fields"]; ok {
+		fields := strings.Split(command.Annotations["help:json-fields"], ",")
+		helpEntries = append(helpEntries, helpEntry{"JSON FIELDS", text.FormatSlice(fields, 80, 0, "", "", true)})
 	}
 	if _, ok := command.Annotations["help:arguments"]; ok {
 		helpEntries = append(helpEntries, helpEntry{"ARGUMENTS", command.Annotations["help:arguments"]})
@@ -297,4 +301,25 @@ func dedent(s string) string {
 		fmt.Fprintln(&buf, strings.TrimPrefix(l, strings.Repeat(" ", minIndent)))
 	}
 	return strings.TrimSuffix(buf.String(), "\n")
+}
+
+func BuildAliasList(cmd *cobra.Command, aliases []string) []string {
+	if !cmd.HasParent() {
+		return aliases
+	}
+
+	parentAliases := append(cmd.Parent().Aliases, cmd.Parent().Name())
+	sort.Strings(parentAliases)
+
+	var aliasesWithParentAliases []string
+	// e.g aliases = [ls]
+	for _, alias := range aliases {
+		// e.g parentAliases = [codespaces, cs]
+		for _, parentAlias := range parentAliases {
+			// e.g. aliasesWithParentAliases = [codespaces list, codespaces ls, cs list, cs ls]
+			aliasesWithParentAliases = append(aliasesWithParentAliases, fmt.Sprintf("%s %s", parentAlias, alias))
+		}
+	}
+
+	return BuildAliasList(cmd.Parent(), aliasesWithParentAliases)
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	cliContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -20,7 +20,7 @@ import (
 type CheckoutOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	Remotes    func() (cliContext.Remotes, error)
 	Branch     func() (string, error)
@@ -84,7 +84,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol := cfg.GitProtocol(baseRepo.RepoHost())
+	protocol := cfg.GitProtocol(baseRepo.RepoHost()).Value
 
 	remotes, err := opts.Remotes()
 	if err != nil {

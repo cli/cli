@@ -9,7 +9,7 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/extensions"
@@ -28,7 +28,7 @@ type Factory struct {
 
 	BaseRepo   func() (ghrepo.Interface, error)
 	Branch     func() (string, error)
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 	Remotes    func() (context.Remotes, error)
 }

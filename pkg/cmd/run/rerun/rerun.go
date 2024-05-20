@@ -52,6 +52,8 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			API returning %[1]s404 NOT FOUND%[1]s. Instead, you can get the correct job IDs using the following command:
 			
 				gh run view <run-id> --json jobs --jq '.jobs[] | {name, databaseId}'
+
+			You will need to use databaseId field for triggering job re-runs.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -69,7 +71,11 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			}
 
 			if opts.RunID != "" && opts.JobID != "" {
-				return cmdutil.FlagErrorf("specify only one of `<run-id>` or `--job`")
+				opts.RunID = ""
+				if opts.IO.CanPrompt() {
+					cs := opts.IO.ColorScheme()
+					fmt.Fprintf(opts.IO.ErrOut, "%s both run and job IDs specified; ignoring run ID\n", cs.WarningIcon())
+				}
 			}
 
 			if runF != nil {
@@ -80,7 +86,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().BoolVar(&opts.OnlyFailed, "failed", false, "Rerun only failed jobs, including dependencies")
-	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "Rerun a specific job from a run, including dependencies")
+	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "Rerun a specific job ID from a run, including dependencies")
 	cmd.Flags().BoolVarP(&opts.Debug, "debug", "d", false, "Rerun with debug logging")
 
 	return cmd

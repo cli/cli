@@ -2,18 +2,19 @@ package link
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
-	"net/http"
-	"strconv"
-	"strings"
 )
 
 type linkOpts struct {
@@ -30,7 +31,7 @@ type linkOpts struct {
 
 type linkConfig struct {
 	httpClient func() (*http.Client, error)
-	config     func() (config.Config, error)
+	config     func() (gh.Config, error)
 	client     *queries.Client
 	opts       linkOpts
 	io         *iostreams.IOStreams

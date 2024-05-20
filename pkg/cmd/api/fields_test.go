@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_parseFields(t *testing.T) {
@@ -61,8 +62,14 @@ func Test_parseFields_nested(t *testing.T) {
 			"robots[]=Dependabot",
 			"labels[][name]=bug",
 			"labels[][color]=red",
+			"labels[][colorOptions][]=red",
+			"labels[][colorOptions][]=blue",
 			"labels[][name]=feature",
 			"labels[][color]=green",
+			"labels[][colorOptions][]=red",
+			"labels[][colorOptions][]=green",
+			"labels[][colorOptions][]=yellow",
+			"nested[][key1][key2][key3]=value",
 			"empty[]",
 		},
 		MagicFields: []string{
@@ -96,11 +103,29 @@ func Test_parseFields_nested(t *testing.T) {
 			"labels": [
 				{
 					"color": "red",
+					"colorOptions": [
+						"red",
+						"blue"
+					],
 					"name": "bug"
 				},
 				{
 					"color": "green",
+					"colorOptions": [
+						"red",
+						"green",
+						"yellow"
+					],
 					"name": "feature"
+				}
+			],
+			"nested": [
+				{
+					"key1": {
+						"key2": {
+							"key3": "value"
+						}
+					}
 				}
 			],
 			"robots": [
@@ -109,6 +134,91 @@ func Test_parseFields_nested(t *testing.T) {
 			]
 		}
 	`), "\n"), string(jsonData))
+}
+
+func Test_parseFields_errors(t *testing.T) {
+	ios, stdin, _, _ := iostreams.Test()
+	fmt.Fprint(stdin, "pasted contents")
+
+	tests := []struct {
+		name     string
+		opts     *ApiOptions
+		expected string
+	}{
+		{
+			name: "cannot overwrite string to array",
+			opts: &ApiOptions{
+				IO: ios,
+				RawFields: []string{
+					"object[field]=A",
+					"object[field][]=this should be an error",
+				},
+			},
+			expected: `expected array type under "field", got string`,
+		},
+		{
+			name: "cannot overwrite string to object",
+			opts: &ApiOptions{
+				IO: ios,
+				RawFields: []string{
+					"object[field]=B",
+					"object[field][field2]=this should be an error",
+				},
+			},
+			expected: `expected map type under "field", got string`,
+		},
+		{
+			name: "cannot overwrite object to string",
+			opts: &ApiOptions{
+				IO: ios,
+				RawFields: []string{
+					"object[field][field2]=C",
+					"object[field]=this should be an error",
+				},
+			},
+			expected: `unexpected override existing field under "field"`,
+		},
+		{
+			name: "cannot overwrite object to array",
+			opts: &ApiOptions{
+				IO: ios,
+				RawFields: []string{
+					"object[field][field2]=D",
+					"object[field][]=this should be an error",
+				},
+			},
+			expected: `expected array type under "field", got map[string]interface {}`,
+		},
+		{
+			name: "cannot overwrite array to string",
+			opts: &ApiOptions{
+				IO: ios,
+				RawFields: []string{
+					"object[field][]=E",
+					"object[field]=this should be an error",
+				},
+			},
+			expected: `unexpected override existing field under "field"`,
+		},
+		{
+			name: "cannot overwrite array to object",
+			opts: &ApiOptions{
+				IO: ios,
+				RawFields: []string{
+					"object[field][]=F",
+					"object[field][field2]=this should be an error",
+				},
+			},
+			expected: `expected map type under "field", got []interface {}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseFields(tt.opts)
+			require.EqualError(t, err, tt.expected)
+		})
+	}
 }
 
 func Test_magicFieldValue(t *testing.T) {

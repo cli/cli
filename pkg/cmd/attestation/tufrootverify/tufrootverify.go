@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type tufClientInstantiator func(o *tuf.Options) (*tuf.Client, error)
+
 func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 	var mirror string
 	var root string
@@ -22,12 +24,14 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 		Short:  "Verify the TUF repository from a provided TUF root",
 		Hidden: true,
 		Long: heredoc.Docf(`
+			### NOTE: This feature is currently in beta, and subject to change.
+
 			Verify a TUF repository with a local TUF root.
 
-			The command requires you provide the %[1]s--mirror%[1]s flag, which should be the URL 
+			The command requires you provide the %[1]s--mirror%[1]s flag, which should be the URL
 			of the TUF repository mirror.
-			
-			The command also requires you provide the %[1]s--root%[1]s flag, which should be the 
+
+			The command also requires you provide the %[1]s--root%[1]s flag, which should be the
 			path to the TUF root file.
 
 			GitHub relies on TUF to securely deliver the trust root for our signing authority.
@@ -46,7 +50,7 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 				return runF()
 			}
 
-			if err := tufRootVerify(mirror, root); err != nil {
+			if err := tufRootVerify(tuf.New, mirror, root); err != nil {
 				return fmt.Errorf("Failed to verify the TUF repository: %w", err)
 			}
 
@@ -64,7 +68,7 @@ func NewTUFRootVerifyCmd(f *cmdutil.Factory, runF func() error) *cobra.Command {
 	return &cmd
 }
 
-func tufRootVerify(mirror, root string) error {
+func tufRootVerify(makeTUF tufClientInstantiator, mirror, root string) error {
 	rb, err := os.ReadFile(root)
 	if err != nil {
 		return fmt.Errorf("failed to read root file %s: %v", root, err)
@@ -75,7 +79,7 @@ func tufRootVerify(mirror, root string) error {
 	// The purpose is the verify the TUF root and repository, make
 	// sure there is no caching enabled
 	opts.CacheValidity = 0
-	if _, err = tuf.New(opts); err != nil {
+	if _, err = makeTUF(opts); err != nil {
 		return fmt.Errorf("failed to create TUF client: %v", err)
 	}
 

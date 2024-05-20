@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
@@ -17,7 +17,7 @@ import (
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 
 	Limit      int

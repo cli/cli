@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -14,7 +14,7 @@ import (
 )
 
 type SetOptions struct {
-	Config func() (config.Config, error)
+	Config func() (gh.Config, error)
 	IO     *iostreams.IOStreams
 
 	Name              string

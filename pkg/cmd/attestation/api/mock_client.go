@@ -1,11 +1,9 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 
-	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
 )
 
 type MockClient struct {
@@ -22,18 +20,7 @@ func (m MockClient) GetByOwnerAndDigest(owner, digest string, limit int) ([]*Att
 }
 
 func makeTestAttestation() Attestation {
-	bundleBytes, err := os.ReadFile("../test/data/sigstore-js-2.1.0-bundle.json")
-	if err != nil {
-		panic(err)
-	}
-
-	var b *bundle.ProtobufBundle
-	err = json.Unmarshal(bundleBytes, &b)
-	if err != nil {
-		panic(err)
-	}
-
-	return Attestation{Bundle: b}
+	return Attestation{Bundle: data.SigstoreBundle(nil)}
 }
 
 func OnGetByRepoAndDigestSuccess(repo, digest string, limit int) ([]*Attestation, error) {

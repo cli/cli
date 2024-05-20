@@ -2,6 +2,7 @@ package verification
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,7 +13,7 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 )
 
-var ErrLocalAttestations = errors.New("failed to load local attestations")
+var ErrUnrecognisedBundleExtension = errors.New("bundle file extension not supported, must be json or jsonl")
 
 type FetchAttestationsConfig struct {
 	APIClient  api.Client
@@ -51,7 +52,7 @@ func GetLocalAttestations(path string) ([]*api.Attestation, error) {
 		}
 		return attestations, nil
 	}
-	return nil, ErrLocalAttestations
+	return nil, ErrUnrecognisedBundleExtension
 }
 
 func loadBundleFromJSONFile(path string) ([]*api.Attestation, error) {
@@ -112,4 +113,32 @@ func GetRemoteAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error
 		return attestations, nil
 	}
 	return nil, fmt.Errorf("owner or repo must be provided")
+}
+
+type IntotoStatement struct {
+	PredicateType string `json:"predicateType"`
+}
+
+func FilterAttestations(predicateType string, attestations []*api.Attestation) []*api.Attestation {
+	filteredAttestations := []*api.Attestation{}
+
+	for _, each := range attestations {
+		dsseEnvelope := each.Bundle.GetDsseEnvelope()
+		if dsseEnvelope != nil {
+			if dsseEnvelope.PayloadType != "application/vnd.in-toto+json" {
+				// Don't fail just because an entry isn't intoto
+				continue
+			}
+			var intotoStatement IntotoStatement
+			if err := json.Unmarshal([]byte(dsseEnvelope.Payload), &intotoStatement); err != nil {
+				// Don't fail just because a single entry can't be unmarshalled
+				continue
+			}
+			if intotoStatement.PredicateType == predicateType {
+				filteredAttestations = append(filteredAttestations, each)
+			}
+		}
+	}
+
+	return filteredAttestations
 }

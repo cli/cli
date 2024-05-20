@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
@@ -1411,7 +1412,7 @@ func Test_createRun(t *testing.T) {
 			opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
-			opts.Config = func() (config.Config, error) {
+			opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
 			opts.Remotes = func() (context.Remotes, error) {

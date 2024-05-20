@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -37,7 +38,7 @@ func runCommandWithDetector(rt http.RoundTripper, branch string, isTTY bool, cli
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {

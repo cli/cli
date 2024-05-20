@@ -23,6 +23,7 @@ type ProjectV2 struct {
 	Number       int    `json:"number"`
 	ResourcePath string `json:"resourcePath"`
 	Closed       bool   `json:"closed"`
+	URL          string `json:"url"`
 }
 
 // UpdateProjectV2Items uses the addProjectV2ItemById and the deleteProjectV2Item mutations

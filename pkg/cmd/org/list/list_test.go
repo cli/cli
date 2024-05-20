@@ -7,6 +7,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -95,7 +96,7 @@ func TestListRun(t *testing.T) {
 				r.Register(
 					httpmock.GraphQL(`query OrganizationList\b`),
 					httpmock.StringResponse(`
-						{ "data": { "user": {	
+						{ "data": { "user": {
 							"organizations": { "nodes": [], "totalCount": 0 }
 						} } }`,
 					),
@@ -224,7 +225,7 @@ cli
 			ios.SetStderrTTY(tt.isTTY)
 
 			tt.opts.IO = ios
-			tt.opts.Config = func() (config.Config, error) {
+			tt.opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
 

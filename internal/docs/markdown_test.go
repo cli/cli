@@ -70,6 +70,35 @@ func TestGenMdNoHiddenParents(t *testing.T) {
 	checkStringOmits(t, output, "Options inherited from parent commands")
 }
 
+func TestGenMdAliases(t *testing.T) {
+	buf := new(bytes.Buffer)
+	if err := genMarkdownCustom(aliasCmd, buf, nil); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	checkStringContains(t, output, aliasCmd.Long)
+	checkStringContains(t, output, jsonCmd.Example)
+	checkStringContains(t, output, "ALIASES")
+	checkStringContains(t, output, "yoo")
+	checkStringContains(t, output, "foo")
+}
+
+func TestGenMdJSONFields(t *testing.T) {
+	buf := new(bytes.Buffer)
+	if err := genMarkdownCustom(jsonCmd, buf, nil); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	checkStringContains(t, output, jsonCmd.Long)
+	checkStringContains(t, output, jsonCmd.Example)
+	checkStringContains(t, output, "JSON Fields")
+	checkStringContains(t, output, "`foo`")
+	checkStringContains(t, output, "`bar`")
+	checkStringContains(t, output, "`baz`")
+}
+
 func TestGenMdTree(t *testing.T) {
 	c := &cobra.Command{Use: "do [OPTIONS] arg1 arg2"}
 	tmpdir, err := os.MkdirTemp("", "test-gen-md-tree")

@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -15,7 +15,7 @@ import (
 
 type SwitchOptions struct {
 	IO       *iostreams.IOStreams
-	Config   func() (config.Config, error)
+	Config   func() (gh.Config, error)
 	Prompter shared.Prompt
 	Hostname string
 	Username string
@@ -48,7 +48,7 @@ func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Co
 			# Select what host and account to switch to via a prompt
 			$ gh auth switch
 
-			# Switch to a specific host and specific account
+			# Switch the active account on a specific host to a specific user
 			$ gh auth switch --hostname enterprise.internal --user monalisa
 		`),
 		RunE: func(c *cobra.Command, args []string) error {

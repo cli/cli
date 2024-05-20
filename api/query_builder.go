@@ -442,6 +442,7 @@ var RepositoryFields = []string{
 	"assignableUsers",
 	"mentionableUsers",
 	"projects",
+	"projectsV2",
 
 	// "branchProtectionRules", // too complex to expose
 	// "collaborators", // does it make sense to expose without affiliation filter?
@@ -487,6 +488,8 @@ func RepositoryGraphQL(fields []string) string {
 			q = append(q, "mentionableUsers(first:100){nodes{id,login,name}}")
 		case "projects":
 			q = append(q, "projects(first:100,states:OPEN){nodes{id,name,number,body,resourcePath}}")
+		case "projectsV2":
+			q = append(q, "projectsV2(first:100,query:\"is:open\"){nodes{id,number,title,resourcePath,closed,url}}")
 		case "watchers":
 			q = append(q, "watchers{totalCount}")
 		case "issues":

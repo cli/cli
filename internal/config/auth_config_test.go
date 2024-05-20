@@ -13,7 +13,7 @@ import (
 // Note that NewIsolatedTestConfig sets up a Mock keyring as well
 func newTestAuthConfig(t *testing.T) *AuthConfig {
 	cfg, _ := NewIsolatedTestConfig(t)
-	return cfg.Authentication()
+	return &AuthConfig{cfg: cfg.cfg}
 }
 
 func TestTokenFromKeyring(t *testing.T) {

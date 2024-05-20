@@ -7,11 +7,15 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -137,6 +141,9 @@ func TestNewCmdView(t *testing.T) {
 
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -1342,8 +1349,9 @@ func TestViewRun(t *testing.T) {
 
 		browser := &browser.Stub{}
 		tt.opts.Browser = browser
-		rlc := testRunLogCache{}
-		tt.opts.RunLogCache = rlc
+		tt.opts.RunLogCache = RunLogCache{
+			cacheDir: t.TempDir(),
+		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := runView(tt.opts)
@@ -1369,14 +1377,18 @@ func TestViewRun(t *testing.T) {
 }
 
 // Structure of fixture zip file
+// To see the structure of fixture zip file, run:
+// `❯ unzip -lv pkg/cmd/run/view/fixtures/run_log.zip`
 //
 //	run log/
 //	├── cool job/
 //	│   ├── 1_fob the barz.txt
 //	│   └── 2_barz the fob.txt
-//	└── sad job/
-//	    ├── 1_barf the quux.txt
-//	    └── 2_quux the barf.txt
+//	├── sad job/
+//	│   ├── 1_barf the quux.txt
+//	│   └── 2_quux the barf.txt
+//	└── ad job/
+//	    └── 1_barf the quux.txt
 func Test_attachRunLog(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -1432,6 +1444,18 @@ func Test_attachRunLog(t *testing.T) {
 			wantMatch: false,
 		},
 		{
+			name: "one job name is a suffix of another",
+			job: shared.Job{
+				Name: "ad job",
+				Steps: []shared.Step{{
+					Name:   "barf the quux",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "ad job/1_barf the quux.txt",
+		},
+		{
 			name: "escape metacharacters in job name",
 			job: shared.Job{
 				Name: "metacharacters .+*?()|[]{}^$ job",
@@ -1466,39 +1490,53 @@ func Test_attachRunLog(t *testing.T) {
 			// not the double space in the dir name, as the slash has been removed
 			wantFilename: "cool job  with slash/1_fob the barz.txt",
 		},
+		{
+			name: "Job name with really long name (over the ZIP limit)",
+			job: shared.Job{
+				Name: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_",
+				Steps: []shared.Step{{
+					Name:   "Long Name Job",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnine/1_Long Name Job.txt",
+		},
+		{
+			name: "Job name that would be truncated by the C# server to split a grapheme",
+			job: shared.Job{
+				Name: "Emoji Test 😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅",
+				Steps: []shared.Step{{
+					Name:   "Emoji Job",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "Emoji Test 😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅�/1_Emoji Job.txt",
+		},
 	}
 
-	rlz, err := zip.OpenReader("./fixtures/run_log.zip")
+	run_log_zip_reader, err := zip.OpenReader("./fixtures/run_log.zip")
 	require.NoError(t, err)
-	defer rlz.Close()
+	defer run_log_zip_reader.Close()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			attachRunLog(&rlz.Reader, []shared.Job{tt.job})
+			attachRunLog(&run_log_zip_reader.Reader, []shared.Job{tt.job})
+
+			t.Logf("Job details: ")
 
 			for _, step := range tt.job.Steps {
 				log := step.Log
 				logPresent := log != nil
-				require.Equal(t, tt.wantMatch, logPresent)
+				require.Equal(t, tt.wantMatch, logPresent, "log not present")
 				if logPresent {
-					require.Equal(t, tt.wantFilename, log.Name)
+					require.Equal(t, tt.wantFilename, log.Name, "Filename mismatch")
 				}
 			}
 		})
 	}
-}
-
-type testRunLogCache struct{}
-
-func (testRunLogCache) Exists(path string) bool {
-	return false
-}
-func (testRunLogCache) Create(path string, content io.Reader) error {
-	return nil
-}
-func (testRunLogCache) Open(path string) (*zip.ReadCloser, error) {
-	return zip.OpenReader("./fixtures/run_log.zip")
 }
 
 var barfTheFobLogOutput = heredoc.Doc(`
@@ -1528,3 +1566,61 @@ sad job	quux the barf	log line 3
 var coolJobRunLogOutput = fmt.Sprintf("%s%s", fobTheBarzLogOutput, barfTheFobLogOutput)
 var sadJobRunLogOutput = fmt.Sprintf("%s%s", barfTheQuuxLogOutput, quuxTheBarfLogOutput)
 var expectedRunLogOutput = fmt.Sprintf("%s%s", coolJobRunLogOutput, sadJobRunLogOutput)
+
+func TestRunLog(t *testing.T) {
+	t.Run("when the cache dir doesn't exist, exists return false", func(t *testing.T) {
+		cacheDir := t.TempDir() + "/non-existent-dir"
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		exists, err := rlc.Exists("unimportant-key")
+		require.NoError(t, err)
+		require.False(t, exists)
+	})
+
+	t.Run("when no cache entry has been created, exists returns false", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		exists, err := rlc.Exists("unimportant-key")
+		require.NoError(t, err)
+		require.False(t, exists)
+	})
+
+	t.Run("when a cache entry has been created, exists returns true", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		contents := strings.NewReader("unimportant-content")
+		require.NoError(t, rlc.Create("key", contents))
+
+		exists, err := rlc.Exists("key")
+		require.NoError(t, err)
+		require.True(t, exists)
+	})
+
+	t.Run("when the cache dir doesn't exist, creating a cache entry creates it", func(t *testing.T) {
+		cacheDir := t.TempDir() + "/non-existent-dir"
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		contents := strings.NewReader("unimportant-content")
+		require.NoError(t, rlc.Create("key", contents))
+
+		require.DirExists(t, cacheDir)
+	})
+
+	t.Run("when a cache entry has been created, reading it returns its contents", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		f, err := os.Open("./fixtures/run_log.zip")
+		require.NoError(t, err)
+		defer f.Close()
+
+		require.NoError(t, rlc.Create("key", f))
+
+		zipReader, err := rlc.Open("key")
+		require.NoError(t, err)
+		defer zipReader.Close()
+		require.NotEmpty(t, zipReader.File)
+	})
+}

@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -206,7 +206,7 @@ func CommentableConfirmSubmitSurvey(p Prompt) func() (bool, error) {
 	}
 }
 
-func CommentableInteractiveEditSurvey(cf func() (config.Config, error), io *iostreams.IOStreams) func(string) (string, error) {
+func CommentableInteractiveEditSurvey(cf func() (gh.Config, error), io *iostreams.IOStreams) func(string) (string, error) {
 	return func(initialValue string) (string, error) {
 		editorCommand, err := cmdutil.DetermineEditor(cf)
 		if err != nil {
@@ -219,7 +219,7 @@ func CommentableInteractiveEditSurvey(cf func() (config.Config, error), io *iost
 	}
 }
 
-func CommentableEditSurvey(cf func() (config.Config, error), io *iostreams.IOStreams) func(string) (string, error) {
+func CommentableEditSurvey(cf func() (gh.Config, error), io *iostreams.IOStreams) func(string) (string, error) {
 	return func(initialValue string) (string, error) {
 		editorCommand, err := cmdutil.DetermineEditor(cf)
 		if err != nil {

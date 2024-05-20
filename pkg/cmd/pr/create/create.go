@@ -18,7 +18,7 @@ import (
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -32,7 +32,7 @@ type CreateOptions struct {
 	// This struct stores user input and factory functions
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	Remotes    func() (ghContext.Remotes, error)
 	Branch     func() (string, error)
@@ -870,7 +870,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			return err
 		}
 
-		cloneProtocol := cfg.GitProtocol(headRepo.RepoHost())
+		cloneProtocol := cfg.GitProtocol(headRepo.RepoHost()).Value
 		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
 		gitClient := ctx.GitClient
 		origin, _ := remotes.FindByName("origin")
