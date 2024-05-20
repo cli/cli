@@ -34,6 +34,7 @@ func Test_NewCmdList(t *testing.T) {
 				LimitResults:       30,
 				ExcludeDrafts:      false,
 				ExcludePreReleases: false,
+				Order:              "desc",
 			},
 		},
 		{
@@ -43,6 +44,7 @@ func Test_NewCmdList(t *testing.T) {
 				LimitResults:       30,
 				ExcludeDrafts:      true,
 				ExcludePreReleases: false,
+				Order:              "desc",
 			},
 		},
 		{
@@ -52,6 +54,17 @@ func Test_NewCmdList(t *testing.T) {
 				LimitResults:       30,
 				ExcludeDrafts:      false,
 				ExcludePreReleases: true,
+				Order:              "desc",
+			},
+		},
+		{
+			name: "with order",
+			args: "--order asc",
+			want: ListOptions{
+				LimitResults:       30,
+				ExcludeDrafts:      false,
+				ExcludePreReleases: false,
+				Order:              "asc",
 			},
 		},
 	}
@@ -92,6 +105,7 @@ func Test_NewCmdList(t *testing.T) {
 			assert.Equal(t, tt.want.LimitResults, opts.LimitResults)
 			assert.Equal(t, tt.want.ExcludeDrafts, opts.ExcludeDrafts)
 			assert.Equal(t, tt.want.ExcludePreReleases, opts.ExcludePreReleases)
+			assert.Equal(t, tt.want.Order, opts.Order)
 		})
 	}
 }
@@ -213,4 +227,25 @@ func Test_listRun(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
+}
+
+func TestExportReleases(t *testing.T) {
+	ios, _, stdout, _ := iostreams.Test()
+	createdAt, _ := time.Parse(time.RFC3339, "2024-01-01T00:00:00Z")
+	publishedAt, _ := time.Parse(time.RFC3339, "2024-02-01T00:00:00Z")
+	rs := []Release{{
+		Name:         "v1",
+		TagName:      "tag",
+		IsDraft:      true,
+		IsLatest:     false,
+		IsPrerelease: true,
+		CreatedAt:    createdAt,
+		PublishedAt:  publishedAt,
+	}}
+	exporter := cmdutil.NewJSONExporter()
+	exporter.SetFields(releaseFields)
+	require.NoError(t, exporter.Write(ios, rs))
+	require.JSONEq(t,
+		`[{"createdAt":"2024-01-01T00:00:00Z","isDraft":true,"isLatest":false,"isPrerelease":true,"name":"v1","publishedAt":"2024-02-01T00:00:00Z","tagName":"tag"}]`,
+		stdout.String())
 }

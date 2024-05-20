@@ -6,13 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
 	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/internal/text"
-	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
 // PostCreateStateStatus is a string value representing the different statuses a state can have.
@@ -39,17 +38,16 @@ type PostCreateState struct {
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
 func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
-	noopLogger := log.New(io.Discard, "", 0)
-
-	session, err := ConnectToLiveshare(ctx, progress, noopLogger, apiClient, codespace)
+	codespaceConnection, err := GetCodespaceConnection(ctx, progress, apiClient, codespace)
 	if err != nil {
-		return fmt.Errorf("connect to codespace: %w", err)
+		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
-	defer func() {
-		if closeErr := session.Close(); err == nil {
-			err = closeErr
-		}
-	}()
+
+	fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+	if err != nil {
+		return fmt.Errorf("failed to create port forwarder: %w", err)
+	}
+	defer safeClose(fwd, &err)
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, localPort, err := ListenTCP(0, false)
@@ -58,7 +56,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	}
 
 	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	invoker, err := rpc.CreateInvoker(ctx, session)
+	invoker, err := rpc.CreateInvoker(ctx, fwd)
 	if err != nil {
 		return err
 	}
@@ -73,8 +71,11 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	progress.StartProgressIndicatorWithLabel("Fetching status")
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, false)
-		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
+		opts := portforwarder.ForwardPortOpts{
+			Port:     remoteSSHServerPort,
+			Internal: true,
+		}
+		tunnelClosed <- fwd.ForwardPortToListener(ctx, opts, listen)
 	}()
 
 	t := time.NewTicker(1 * time.Second)

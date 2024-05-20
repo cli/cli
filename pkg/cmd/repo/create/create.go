@@ -17,7 +17,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -38,7 +38,7 @@ type iprompter interface {
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	Prompter   iprompter
 	BackOff    backoff.BackOff
@@ -164,8 +164,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if cmd.Flags().Changed("enable-wiki") {
 				opts.DisableWiki = !enableWiki
 			}
-			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || opts.DisableIssues) {
-				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, or `--disable-issues`")
+			if opts.Template != "" && opts.Team != "" {
+				return cmdutil.FlagErrorf("the `--template` option is not supported with `--team`")
 			}
 
 			if opts.Template == "" && opts.IncludeAllBranches {
@@ -248,20 +248,26 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	fromScratch := opts.Source == ""
-
 	if opts.Interactive {
-		selected, err := opts.Prompter.Select("What would you like to do?", "", []string{
+		answer, err := opts.Prompter.Select("What would you like to do?", "", []string{
 			"Create a new repository on GitHub from scratch",
+			"Create a new repository on GitHub from a template repository",
 			"Push an existing local repository to GitHub",
 		})
 		if err != nil {
 			return err
 		}
-		fromScratch = selected == 0
+		switch answer {
+		case 0:
+			return createFromScratch(opts)
+		case 1:
+			return createFromTemplate(opts)
+		case 2:
+			return createFromLocal(opts)
+		}
 	}
 
-	if fromScratch {
+	if opts.Source == "" {
 		return createFromScratch(opts)
 	}
 	return createFromLocal(opts)
@@ -373,9 +379,10 @@ func createFromScratch(opts *CreateOptions) error {
 	isTTY := opts.IO.IsStdoutTTY()
 	if isTTY {
 		fmt.Fprintf(opts.IO.Out,
-			"%s Created repository %s on GitHub\n",
+			"%s Created repository %s on GitHub\n  %s\n",
 			cs.SuccessIconWithColor(cs.Green),
-			ghrepo.FullName(repo))
+			ghrepo.FullName(repo),
+			repo.URL)
 	} else {
 		fmt.Fprintln(opts.IO.Out, repo.URL)
 	}
@@ -389,11 +396,7 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
-		if err != nil {
-			return err
-		}
-
+		protocol := cfg.GitProtocol(repo.RepoHost()).Value
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 		if !opts.AddReadme && opts.LicenseTemplate == "" && opts.GitIgnoreTemplate == "" && opts.Template == "" {
@@ -402,6 +405,99 @@ func createFromScratch(opts *CreateOptions) error {
 				return err
 			}
 		} else if err := cloneWithRetry(opts, remoteURL, templateRepoMainBranch); err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+// create new repo on remote host from template repo
+func createFromTemplate(opts *CreateOptions) error {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	host, _ := cfg.Authentication().DefaultHost()
+
+	opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, "")
+	if err != nil {
+		return err
+	}
+
+	if !strings.Contains(opts.Name, "/") {
+		username, _, err := userAndOrgs(httpClient, host)
+		if err != nil {
+			return err
+		}
+		opts.Name = fmt.Sprintf("%s/%s", username, opts.Name)
+	}
+	repoToCreate, err := ghrepo.FromFullName(opts.Name)
+	if err != nil {
+		return fmt.Errorf("argument error: %w", err)
+	}
+
+	templateRepo, err := interactiveRepoTemplate(httpClient, host, repoToCreate.RepoOwner(), opts.Prompter)
+	if err != nil {
+		return err
+	}
+	input := repoCreateInput{
+		Name:                 repoToCreate.RepoName(),
+		Visibility:           opts.Visibility,
+		OwnerLogin:           repoToCreate.RepoOwner(),
+		TeamSlug:             opts.Team,
+		Description:          opts.Description,
+		HomepageURL:          opts.Homepage,
+		HasIssuesEnabled:     !opts.DisableIssues,
+		HasWikiEnabled:       !opts.DisableWiki,
+		GitIgnoreTemplate:    opts.GitIgnoreTemplate,
+		LicenseTemplate:      opts.LicenseTemplate,
+		IncludeAllBranches:   opts.IncludeAllBranches,
+		InitReadme:           opts.AddReadme,
+		TemplateRepositoryID: templateRepo.ID,
+	}
+	templateRepoMainBranch := templateRepo.DefaultBranchRef.Name
+
+	targetRepo := shared.NormalizeRepoName(opts.Name)
+	if idx := strings.IndexRune(opts.Name, '/'); idx > 0 {
+		targetRepo = opts.Name[0:idx+1] + shared.NormalizeRepoName(opts.Name[idx+1:])
+	}
+	confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(opts.Visibility)), true)
+	if err != nil {
+		return err
+	} else if !confirmed {
+		return cmdutil.CancelError
+	}
+
+	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
+	if err != nil {
+		return err
+	}
+
+	cs := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.Out,
+		"%s Created repository %s on GitHub\n  %s\n",
+		cs.SuccessIconWithColor(cs.Green),
+		ghrepo.FullName(repo),
+		repo.URL)
+
+	opts.Clone, err = opts.Prompter.Confirm("Clone the new repository locally?", true)
+	if err != nil {
+		return err
+	}
+
+	if opts.Clone {
+		protocol := cfg.GitProtocol(repo.RepoHost()).Value
+		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
+
+		if err := cloneWithRetry(opts, remoteURL, templateRepoMainBranch); err != nil {
 			return err
 		}
 	}
@@ -513,18 +609,15 @@ func createFromLocal(opts *CreateOptions) error {
 
 	if isTTY {
 		fmt.Fprintf(stdout,
-			"%s Created repository %s on GitHub\n",
+			"%s Created repository %s on GitHub\n  %s\n",
 			cs.SuccessIconWithColor(cs.Green),
-			ghrepo.FullName(repo))
+			ghrepo.FullName(repo),
+			repo.URL)
 	} else {
 		fmt.Fprintln(stdout, repo.URL)
 	}
 
-	protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
-	if err != nil {
-		return err
-	}
-
+	protocol := cfg.GitProtocol(repo.RepoHost()).Value
 	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 	if opts.Interactive {
@@ -676,6 +769,27 @@ func localInit(gitClient *git.Client, remoteURL, path string) error {
 	}
 
 	return nil
+}
+
+func interactiveRepoTemplate(client *http.Client, hostname, owner string, prompter iprompter) (*api.Repository, error) {
+	templateRepos, err := listTemplateRepositories(client, hostname, owner)
+	if err != nil {
+		return nil, err
+	}
+	if len(templateRepos) == 0 {
+		return nil, fmt.Errorf("%s has no template repositories", owner)
+	}
+
+	var templates []string
+	for _, repo := range templateRepos {
+		templates = append(templates, repo.Name)
+	}
+
+	selected, err := prompter.Select("Choose a template repository", "", templates)
+	if err != nil {
+		return nil, err
+	}
+	return &templateRepos[selected], nil
 }
 
 func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompter) (string, error) {

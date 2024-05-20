@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -56,9 +57,9 @@ func Test_listRun(t *testing.T) {
 			}},
 			isTTY: true,
 			wantStdout: heredoc.Doc(`
-				EMAIL                KEY ID            PUBLIC KEY      ADDED  EXPIRES
-				johnny@test.com      ABCDEF1234567890  xJMEWfoofoofoo  1d     2099-01-01
-				monalisa@github.com  1234567890ABCDEF  xJMEWbarbarbar  1d     Never
+				EMAIL               KEY ID           PUBLIC KEY      ADDED            EXPIRES
+				johnny@test.com     ABCDEF123456...  xJMEWfoofoofoo  about 1 day ago  2099-01-01
+				monalisa@github...  1234567890AB...  xJMEWbarbarbar  about 1 day ago  Never
 			`),
 			wantStderr: "",
 		},
@@ -130,7 +131,7 @@ func Test_listRun(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 			opts := tt.opts
 			opts.IO = ios
-			opts.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
+			opts.Config = func() (gh.Config, error) { return config.NewBlankConfig(), nil }
 			err := listRun(&opts)
 			if tt.wantErr {
 				assert.Error(t, err)

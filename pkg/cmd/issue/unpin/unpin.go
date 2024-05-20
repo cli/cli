@@ -6,7 +6,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -17,7 +17,7 @@ import (
 
 type UnpinOptions struct {
 	HttpClient  func() (*http.Client, error)
-	Config      func() (config.Config, error)
+	Config      func() (gh.Config, error)
 	IO          *iostreams.IOStreams
 	BaseRepo    func() (ghrepo.Interface, error)
 	SelectorArg string
@@ -79,7 +79,7 @@ func unpinRun(opts *UnpinOptions) error {
 	}
 
 	if !issue.IsPinned {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is not pinned to %s\n", cs.Yellow("!"), issue.Number, issue.Title, ghrepo.FullName(baseRepo))
+		fmt.Fprintf(opts.IO.ErrOut, "%s Issue %s#%d (%s) is not pinned\n", cs.Yellow("!"), ghrepo.FullName(baseRepo), issue.Number, issue.Title)
 		return nil
 	}
 
@@ -88,7 +88,7 @@ func unpinRun(opts *UnpinOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Unpinned issue #%d (%s) from %s\n", cs.SuccessIconWithColor(cs.Red), issue.Number, issue.Title, ghrepo.FullName(baseRepo))
+	fmt.Fprintf(opts.IO.ErrOut, "%s Unpinned issue %s#%d (%s)\n", cs.SuccessIconWithColor(cs.Red), ghrepo.FullName(baseRepo), issue.Number, issue.Title)
 
 	return nil
 }

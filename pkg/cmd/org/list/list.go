@@ -5,8 +5,7 @@ import (
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -15,7 +14,7 @@ import (
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 
 	Limit int
@@ -85,16 +84,8 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", header)
 	}
 
-	table := tableprinter.New(opts.IO)
-
 	for _, org := range listResult.Organizations {
-		table.AddField(org.Login)
-		table.EndRow()
-	}
-
-	err = table.Render()
-	if err != nil {
-		return err
+		fmt.Fprintln(opts.IO.Out, org.Login)
 	}
 
 	return nil

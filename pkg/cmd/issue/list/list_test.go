@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -19,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
@@ -32,7 +35,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
@@ -104,9 +107,10 @@ func TestIssueList_tty(t *testing.T) {
 
 		Showing 3 of 3 open issues in OWNER/REPO
 
-		#1  number won   label  about 1 day ago
-		#2  number too   label  about 1 month ago
-		#4  number fore  label  about 2 years ago
+		ID  TITLE        LABELS  UPDATED
+		#1  number won   label   about 1 day ago
+		#2  number too   label   about 1 month ago
+		#4  number fore  label   about 2 years ago
 	`), output.String())
 	assert.Equal(t, ``, output.Stderr())
 }
@@ -454,4 +458,152 @@ func Test_issueList(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIssueList_withProjectItems(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.GraphQLQuery(`{
+			"data": {
+			  "repository": {
+				"hasIssuesEnabled": true,
+				"issues": {
+				  "totalCount": 1,
+				  "nodes": [
+					{
+					  "projectItems": {
+						"nodes": [
+						  {
+							"id": "PVTI_lAHOAA3WC84AW6WNzgJ8rnQ",
+							"project": {
+							  "id": "PVT_kwHOAA3WC84AW6WN",
+							  "title": "Test Public Project"
+							},
+							"status": {
+							  "optionId": "47fc9ee4",
+							  "name": "In Progress"
+							}
+						  }
+						],
+						"totalCount": 1
+					  }
+					}
+				  ]
+				}
+			  }
+			}
+		  }`, func(_ string, params map[string]interface{}) {
+			require.Equal(t, map[string]interface{}{
+				"owner":  "OWNER",
+				"repo":   "REPO",
+				"limit":  float64(30),
+				"states": []interface{}{"OPEN"},
+			}, params)
+		}))
+
+	client := &http.Client{Transport: reg}
+	issuesAndTotalCount, err := issueList(
+		client,
+		ghrepo.New("OWNER", "REPO"),
+		prShared.FilterOptions{
+			Entity: "issue",
+		},
+		30,
+	)
+
+	require.NoError(t, err)
+	require.Len(t, issuesAndTotalCount.Issues, 1)
+	require.Len(t, issuesAndTotalCount.Issues[0].ProjectItems.Nodes, 1)
+
+	require.Equal(t, issuesAndTotalCount.Issues[0].ProjectItems.Nodes[0].ID, "PVTI_lAHOAA3WC84AW6WNzgJ8rnQ")
+
+	expectedProject := api.ProjectV2ItemProject{
+		ID:    "PVT_kwHOAA3WC84AW6WN",
+		Title: "Test Public Project",
+	}
+	require.Equal(t, issuesAndTotalCount.Issues[0].ProjectItems.Nodes[0].Project, expectedProject)
+
+	expectedStatus := api.ProjectV2ItemStatus{
+		OptionID: "47fc9ee4",
+		Name:     "In Progress",
+	}
+	require.Equal(t, issuesAndTotalCount.Issues[0].ProjectItems.Nodes[0].Status, expectedStatus)
+}
+
+func TestIssueList_Search_withProjectItems(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.GraphQL(`query IssueSearch\b`),
+		httpmock.GraphQLQuery(`{
+			"data": {
+			  "repository": {
+				"hasIssuesEnabled": true
+			  },
+			  "search": {
+				"issueCount": 1,
+				"nodes": [
+				  {
+					"projectItems": {
+					  "nodes": [
+						{
+						  "id": "PVTI_lAHOAA3WC84AW6WNzgJ8rl0",
+						  "project": {
+							"id": "PVT_kwHOAA3WC84AW6WN",
+							"title": "Test Public Project"
+						  },
+						  "status": {
+							"optionId": "47fc9ee4",
+							"name": "In Progress"
+						  }
+						}
+					  ],
+					  "totalCount": 1
+					}
+				  }
+				]
+			  }
+			}
+		  }`, func(_ string, params map[string]interface{}) {
+			require.Equal(t, map[string]interface{}{
+				"owner": "OWNER",
+				"repo":  "REPO",
+				"type":  "ISSUE",
+				"limit": float64(30),
+				"query": "just used to force the search API branch repo:OWNER/REPO type:issue",
+			}, params)
+		}))
+
+	client := &http.Client{Transport: reg}
+	issuesAndTotalCount, err := issueList(
+		client,
+		ghrepo.New("OWNER", "REPO"),
+		prShared.FilterOptions{
+			Entity: "issue",
+			Search: "just used to force the search API branch",
+		},
+		30,
+	)
+
+	require.NoError(t, err)
+	require.Len(t, issuesAndTotalCount.Issues, 1)
+	require.Len(t, issuesAndTotalCount.Issues[0].ProjectItems.Nodes, 1)
+
+	require.Equal(t, issuesAndTotalCount.Issues[0].ProjectItems.Nodes[0].ID, "PVTI_lAHOAA3WC84AW6WNzgJ8rl0")
+
+	expectedProject := api.ProjectV2ItemProject{
+		ID:    "PVT_kwHOAA3WC84AW6WN",
+		Title: "Test Public Project",
+	}
+	require.Equal(t, issuesAndTotalCount.Issues[0].ProjectItems.Nodes[0].Project, expectedProject)
+
+	expectedStatus := api.ProjectV2ItemStatus{
+		OptionID: "47fc9ee4",
+		Name:     "In Progress",
+	}
+	require.Equal(t, issuesAndTotalCount.Issues[0].ProjectItems.Nodes[0].Status, expectedStatus)
 }

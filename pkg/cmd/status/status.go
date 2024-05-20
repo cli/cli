@@ -15,11 +15,11 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/set"
-	"github.com/cli/cli/v2/utils"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -286,7 +286,28 @@ func (s *StatusGetter) LoadNotifications() error {
 					if !ok {
 						return nil
 					}
-					if actual, err := s.ActualMention(n.Subject.LatestCommentURL); actual != "" && err == nil {
+					actual, err := s.ActualMention(n.Subject.LatestCommentURL)
+
+					if err != nil {
+						var httpErr api.HTTPError
+						httpStatusCode := -1
+
+						if errors.As(err, &httpErr) {
+							httpStatusCode = httpErr.StatusCode
+						}
+
+						switch httpStatusCode {
+						case 403:
+							s.addAuthError(httpErr.Message, factory.SSOURL())
+						case 404:
+							return nil
+						default:
+							abortFetching()
+							return fmt.Errorf("could not fetch comment: %w", err)
+						}
+					}
+
+					if actual != "" {
 						// I'm so sorry
 						split := strings.Split(n.Subject.URL, "/")
 						fetched <- StatusItem{
@@ -294,14 +315,6 @@ func (s *StatusGetter) LoadNotifications() error {
 							Identifier: fmt.Sprintf("%s#%s", n.Repository.FullName, split[len(split)-1]),
 							preview:    actual,
 							index:      n.index,
-						}
-					} else if err != nil {
-						var httpErr api.HTTPError
-						if errors.As(err, &httpErr) && httpErr.StatusCode == 403 {
-							s.addAuthError(httpErr.Message, factory.SSOURL())
-						} else {
-							abortFetching()
-							return fmt.Errorf("could not fetch comment: %w", err)
 						}
 					}
 				}
@@ -664,32 +677,27 @@ func statusRun(opts *StatusOptions) error {
 	section := func(header string, items []StatusItem, width, rowLimit int) (string, error) {
 		tableOut := &bytes.Buffer{}
 		fmt.Fprintln(tableOut, cs.Bold(header))
-		//nolint:staticcheck // SA1019: utils.NewTablePrinterWithOptions is deprecated: use internal/tableprinter
-		tp := utils.NewTablePrinterWithOptions(opts.IO, utils.TablePrinterOptions{
-			IsTTY:    opts.IO.IsStdoutTTY(),
-			MaxWidth: width,
-			Out:      tableOut,
-		})
 		if len(items) == 0 {
-			tp.AddField("Nothing here ^_^", nil, nil)
-			tp.EndRow()
+			fmt.Fprintln(tableOut, "Nothing here ^_^")
 		} else {
+			//nolint:staticcheck // SA1019: Headers distract from numerous nested tables.
+			tp := tableprinter.NewWithWriter(tableOut, opts.IO.IsStdoutTTY(), width, cs, tableprinter.NoHeader)
 			for i, si := range items {
 				if i == rowLimit {
 					break
 				}
-				tp.AddField(si.Identifier, nil, idStyle)
+				tp.AddField(si.Identifier, tableprinter.WithColor(idStyle), tableprinter.WithTruncate(nil))
 				if si.Reason != "" {
-					tp.AddField(si.Reason, nil, nil)
+					tp.AddField(si.Reason)
 				}
-				tp.AddField(si.Preview(), nil, nil)
+				tp.AddField(si.Preview())
 				tp.EndRow()
 			}
-		}
 
-		err := tp.Render()
-		if err != nil {
-			return "", err
+			err := tp.Render()
+			if err != nil {
+				return "", err
+			}
 		}
 
 		return tableOut.String(), nil

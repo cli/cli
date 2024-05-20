@@ -9,15 +9,18 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
@@ -84,6 +87,7 @@ func TestPRList(t *testing.T) {
 
 		Showing 3 of 3 open pull requests in OWNER/REPO
 
+		ID   TITLE                  BRANCH         CREATED AT
 		#32  New feature            feature        about 3 hours ago
 		#29  Fixed bad bug          hubot:bug-fix  about 1 month ago
 		#28  Improve documentation  docs           about 2 years ago
@@ -104,9 +108,9 @@ func TestPRList_nontty(t *testing.T) {
 
 	assert.Equal(t, "", output.Stderr())
 
-	assert.Equal(t, `32	New feature	feature	DRAFT	2022-08-24 20:01:12 +0000 UTC
-29	Fixed bad bug	hubot:bug-fix	OPEN	2022-07-20 19:01:12 +0000 UTC
-28	Improve documentation	docs	MERGED	2020-01-26 19:01:12 +0000 UTC
+	assert.Equal(t, `32	New feature	feature	DRAFT	2022-08-24T20:01:12Z
+29	Fixed bad bug	hubot:bug-fix	OPEN	2022-07-20T19:01:12Z
+28	Improve documentation	docs	MERGED	2020-01-26T19:01:12Z
 `, output.String())
 }
 
@@ -318,4 +322,147 @@ func TestPRList_web(t *testing.T) {
 			assert.Equal(t, test.expectedBrowserURL, output.BrowsedURL)
 		})
 	}
+}
+
+func TestPRList_withProjectItems(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.GraphQL(`query PullRequestList\b`),
+		httpmock.GraphQLQuery(`{
+			"data": {
+			  "repository": {
+				"pullRequests": {
+				  "totalCount": 1,
+				  "nodes": [
+					{
+					  "projectItems": {
+						"nodes": [
+						  {
+							"id": "PVTI_lAHOAA3WC84AW6WNzgJ8rnQ",
+							"project": {
+							  "id": "PVT_kwHOAA3WC84AW6WN",
+							  "title": "Test Public Project"
+							},
+							"status": {
+							  "optionId": "47fc9ee4",
+							  "name": "In Progress"
+							}
+						  }
+						],
+						"totalCount": 1
+					  }
+					}
+				  ]
+				}
+			  }
+			}
+		  }`, func(_ string, params map[string]interface{}) {
+			require.Equal(t, map[string]interface{}{
+				"owner": "OWNER",
+				"repo":  "REPO",
+				"limit": float64(30),
+				"state": []interface{}{"OPEN"},
+			}, params)
+		}))
+
+	client := &http.Client{Transport: reg}
+	prsAndTotalCount, err := listPullRequests(
+		client,
+		ghrepo.New("OWNER", "REPO"),
+		prShared.FilterOptions{
+			Entity: "pr",
+			State:  "open",
+		},
+		30,
+	)
+
+	require.NoError(t, err)
+	require.Len(t, prsAndTotalCount.PullRequests, 1)
+	require.Len(t, prsAndTotalCount.PullRequests[0].ProjectItems.Nodes, 1)
+
+	require.Equal(t, prsAndTotalCount.PullRequests[0].ProjectItems.Nodes[0].ID, "PVTI_lAHOAA3WC84AW6WNzgJ8rnQ")
+
+	expectedProject := api.ProjectV2ItemProject{
+		ID:    "PVT_kwHOAA3WC84AW6WN",
+		Title: "Test Public Project",
+	}
+	require.Equal(t, prsAndTotalCount.PullRequests[0].ProjectItems.Nodes[0].Project, expectedProject)
+
+	expectedStatus := api.ProjectV2ItemStatus{
+		OptionID: "47fc9ee4",
+		Name:     "In Progress",
+	}
+	require.Equal(t, prsAndTotalCount.PullRequests[0].ProjectItems.Nodes[0].Status, expectedStatus)
+}
+
+func TestPRList_Search_withProjectItems(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.GraphQL(`query PullRequestSearch\b`),
+		httpmock.GraphQLQuery(`{
+			"data": {
+			  "search": {
+				"issueCount": 1,
+				"nodes": [
+				  {
+					"projectItems": {
+					  "nodes": [
+						{
+						  "id": "PVTI_lAHOAA3WC84AW6WNzgJ8rl0",
+						  "project": {
+							"id": "PVT_kwHOAA3WC84AW6WN",
+							"title": "Test Public Project"
+						  },
+						  "status": {
+							"optionId": "47fc9ee4",
+							"name": "In Progress"
+						  }
+						}
+					  ],
+					  "totalCount": 1
+					}
+				  }
+				]
+			  }
+			}
+		  }`, func(_ string, params map[string]interface{}) {
+			require.Equal(t, map[string]interface{}{
+				"limit": float64(30),
+				"q":     "just used to force the search API branch repo:OWNER/REPO state:open type:pr",
+			}, params)
+		}))
+
+	client := &http.Client{Transport: reg}
+	prsAndTotalCount, err := listPullRequests(
+		client,
+		ghrepo.New("OWNER", "REPO"),
+		prShared.FilterOptions{
+			Entity: "pr",
+			State:  "open",
+			Search: "just used to force the search API branch",
+		},
+		30,
+	)
+
+	require.NoError(t, err)
+	require.Len(t, prsAndTotalCount.PullRequests, 1)
+	require.Len(t, prsAndTotalCount.PullRequests[0].ProjectItems.Nodes, 1)
+
+	require.Equal(t, prsAndTotalCount.PullRequests[0].ProjectItems.Nodes[0].ID, "PVTI_lAHOAA3WC84AW6WNzgJ8rl0")
+
+	expectedProject := api.ProjectV2ItemProject{
+		ID:    "PVT_kwHOAA3WC84AW6WN",
+		Title: "Test Public Project",
+	}
+	require.Equal(t, prsAndTotalCount.PullRequests[0].ProjectItems.Nodes[0].Project, expectedProject)
+
+	expectedStatus := api.ProjectV2ItemStatus{
+		OptionID: "47fc9ee4",
+		Name:     "In Progress",
+	}
+	require.Equal(t, prsAndTotalCount.PullRequests[0].ProjectItems.Nodes[0].Status, expectedStatus)
 }

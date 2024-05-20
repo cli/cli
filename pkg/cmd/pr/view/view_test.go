@@ -333,6 +333,16 @@ func TestPRView_Preview_nontty(t *testing.T) {
 				`auto-merge:\tenabled\thubot\tsquash\n`,
 			},
 		},
+		"PR with nil project": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithNilProject.json",
+			},
+			expectedOutputs: []string{
+				`projects:\t\n`,
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -371,7 +381,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreview.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10`,
 				`blueberries taste good`,
@@ -385,7 +395,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreviewWithMetadataByNumber.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10`,
 				`Reviewers:.*1 \(.*Requested.*\)\n`,
@@ -405,7 +415,7 @@ func TestPRView_Preview(t *testing.T) {
 				"ReviewsForPullRequest": "./fixtures/prViewPreviewManyReviews.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Reviewers: DEF \(Commented\), def \(Changes requested\), ghost \(Approved\), hubot \(Commented\), xyz \(Approved\), 123 \(Requested\), abc \(Requested\), my-org\/team-1 \(Requested\)`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
@@ -418,7 +428,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreviewClosedState.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Closed.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10`,
 				`blueberries taste good`,
@@ -432,7 +442,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreviewMergedState.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Merged.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10`,
 				`blueberries taste good`,
@@ -446,7 +456,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreviewDraftState.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Draft.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10`,
 				`blueberries taste good`,
@@ -460,7 +470,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreviewWithAllChecksPassing.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10 • ✓ Checks passing`,
 				`blueberries taste good`,
@@ -474,7 +484,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreviewWithAllChecksFailing.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10 • × All checks failing`,
 				`blueberries taste good`,
@@ -488,7 +498,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreviewWithSomeChecksFailing.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10 • × 1/2 checks failing`,
 				`blueberries taste good`,
@@ -502,7 +512,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreviewWithSomeChecksPending.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10 • - Checks pending`,
 				`blueberries taste good`,
@@ -516,7 +526,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreviewWithNoChecks.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12`,
+				`Blueberries are from a fork OWNER/REPO#12`,
 				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`.+100.-10 • No checks`,
 				`blueberries taste good`,
@@ -530,7 +540,7 @@ func TestPRView_Preview(t *testing.T) {
 				"PullRequestByNumber": "./fixtures/prViewPreviewWithAutoMergeEnabled.json",
 			},
 			expectedOutputs: []string{
-				`Blueberries are from a fork #12\n`,
+				`Blueberries are from a fork OWNER/REPO#12\n`,
 				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
 				`Auto-merge:.*enabled.* by hubot, using squash and merge`,
 				`blueberries taste good`,
@@ -615,7 +625,7 @@ func TestPRView_tty_Comments(t *testing.T) {
 				"ReviewsForPullRequest": "./fixtures/prViewPreviewReviews.json",
 			},
 			expectedOutputs: []string{
-				`some title #12`,
+				`some title OWNER/REPO#12`,
 				`1 \x{1f615} • 2 \x{1f440} • 3 \x{2764}\x{fe0f}`,
 				`some body`,
 				`———————— Not showing 9 comments ————————`,
@@ -635,7 +645,7 @@ func TestPRView_tty_Comments(t *testing.T) {
 				"CommentsForPullRequest": "./fixtures/prViewPreviewFullComments.json",
 			},
 			expectedOutputs: []string{
-				`some title #12`,
+				`some title OWNER/REPO#12`,
 				`some body`,
 				`monalisa • Jan  1, 2020 • Edited`,
 				`1 \x{1f615} • 2 \x{1f440} • 3 \x{2764}\x{fe0f} • 4 \x{1f389} • 5 \x{1f604} • 6 \x{1f680} • 7 \x{1f44e} • 8 \x{1f44d}`,

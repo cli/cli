@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,12 +18,13 @@ import (
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +32,7 @@ type CreateOptions struct {
 	// This struct stores user input and factory functions
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	Remotes    func() (ghContext.Remotes, error)
 	Branch     func() (string, error)
@@ -45,6 +47,7 @@ type CreateOptions struct {
 	RepoOverride    string
 
 	Autofill    bool
+	FillVerbose bool
 	FillFirst   bool
 	WebMode     bool
 	RecoverFile string
@@ -63,6 +66,8 @@ type CreateOptions struct {
 
 	MaintainerCanModify bool
 	Template            string
+
+	DryRun bool
 }
 
 type CreateContext struct {
@@ -105,8 +110,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			to push the branch and offer an option to fork the base repository. Use %[1]s--head%[1]s to
 			explicitly skip any forking or pushing behavior.
 
-			A prompt will also ask for the title and the body of the pull request. Use %[1]s--title%[1]s
-			and %[1]s--body%[1]s to skip this, or use %[1]s--fill%[1]s to autofill these values from git commits.
+			A prompt will also ask for the title and the body of the pull request. Use %[1]s--title%[1]s and
+			%[1]s--body%[1]s to skip this, or use %[1]s--fill%[1]s to autofill these values from git commits.
+			It's important to notice that if the %[1]s--title%[1]s and/or %[1]s--body%[1]s are also provided
+			alongside %[1]s--fill%[1]s, the values specified by %[1]s--title%[1]s and/or %[1]s--body%[1]s will
+			take precedence and overwrite any autofilled content.
 
 			Link an issue to the pull request by referencing the issue in the body of the pull
 			request. If the body text mentions %[1]sFixes #123%[1]s or %[1]sCloses #123%[1]s, the referenced issue
@@ -115,8 +123,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			By default, users with write access to the base repository can push new commits to the
 			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
 
-			Adding a pull request to projects requires authorization with the "project" scope.
-			To authorize, run "gh auth refresh -s project".
+			Adding a pull request to projects requires authorization with the %[1]sproject%[1]s scope.
+			To authorize, run %[1]sgh auth refresh -s project%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
@@ -160,6 +168,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--fill` is not supported with `--fill-first`")
 			}
 
+			if opts.FillVerbose && opts.FillFirst {
+				return cmdutil.FlagErrorf("`--fill-verbose` is not supported with `--fill-first`")
+			}
+
+			if opts.FillVerbose && opts.Autofill {
+				return cmdutil.FlagErrorf("`--fill-verbose` is not supported with `--fill`")
+			}
+
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			if bodyFile != "" {
 				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
@@ -174,8 +190,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--template` is not supported when using `--body` or `--body-file`")
 			}
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !(opts.Autofill || opts.FillFirst) && (!opts.TitleProvided || !opts.BodyProvided) {
-				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `fill-first`) when not running interactively")
+			if !opts.IO.CanPrompt() && !opts.WebMode && !(opts.FillVerbose || opts.Autofill || opts.FillFirst) && (!opts.TitleProvided || !opts.BodyProvided) {
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `fill-first` or `--fillverbose`) when not running interactively")
+			}
+
+			if opts.DryRun && opts.WebMode {
+				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
 			}
 
 			if runF != nil {
@@ -191,10 +211,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.Body, "body", "b", "", "Body for the pull request")
 	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
-	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
+	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default [current branch])")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
-	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
-	fl.BoolVar(&opts.FillFirst, "fill-first", false, "Do not prompt for title/body and just use first commit info")
+	fl.BoolVarP(&opts.FillVerbose, "fill-verbose", "", false, "Use commits msg+body for description")
+	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Use commit info for title and body")
+	fl.BoolVar(&opts.FillFirst, "fill-first", false, "Use first commit info for title and body")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
 	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
@@ -203,6 +224,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
+	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -279,6 +301,9 @@ func createRun(opts *CreateOptions) (err error) {
 	if state.Draft {
 		message = "\nCreating draft pull request for %s into %s in %s\n\n"
 	}
+	if opts.DryRun {
+		message = "\nDry Running pull request for %s into %s in %s\n\n"
+	}
 
 	cs := opts.IO.ColorScheme()
 
@@ -289,7 +314,7 @@ func createRun(opts *CreateOptions) (err error) {
 			ghrepo.FullName(ctx.BaseRepo))
 	}
 
-	if opts.Autofill || opts.FillFirst || (opts.TitleProvided && opts.BodyProvided) {
+	if opts.FillVerbose || opts.Autofill || opts.FillFirst || (opts.TitleProvided && opts.BodyProvided) {
 		err = handlePush(*opts, *ctx)
 		if err != nil {
 			return
@@ -347,7 +372,7 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
-	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL)
+	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL) && !opts.DryRun
 	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
 	action, err := shared.ConfirmPRSubmission(opts.Prompter, allowPreview, allowMetadata, state.Draft)
 	if err != nil {
@@ -366,7 +391,7 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata(), false, state.Draft)
+		action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata() && !opts.DryRun, false, state.Draft)
 		if err != nil {
 			return
 		}
@@ -400,7 +425,9 @@ func createRun(opts *CreateOptions) (err error) {
 	return
 }
 
-func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool) error {
+var regexPattern = regexp.MustCompile(`(?m)^`)
+
+func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool, addBody bool) error {
 	baseRef := ctx.BaseTrackingBranch
 	headRef := ctx.HeadBranch
 	gitClient := ctx.GitClient
@@ -409,19 +436,24 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 	if err != nil {
 		return err
 	}
+
 	if len(commits) == 1 || useFirstCommit {
-		commitIndex := len(commits) - 1
-		state.Title = commits[commitIndex].Title
-		body, err := gitClient.CommitBody(context.Background(), commits[commitIndex].Sha)
-		if err != nil {
-			return err
-		}
-		state.Body = body
+		state.Title = commits[len(commits)-1].Title
+		state.Body = commits[len(commits)-1].Body
 	} else {
 		state.Title = humanize(headRef)
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
-			fmt.Fprintf(&body, "- %s\n", commits[i].Title)
+			fmt.Fprintf(&body, "- **%s**\n", commits[i].Title)
+			if addBody {
+				x := regexPattern.ReplaceAllString(commits[i].Body, "  ")
+				fmt.Fprintf(&body, "%s", x)
+
+				if i > 0 {
+					fmt.Fprintln(&body)
+					fmt.Fprintln(&body)
+				}
+			}
 		}
 		state.Body = body.String()
 	}
@@ -492,9 +524,9 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 		Draft:      opts.IsDraft,
 	}
 
-	if opts.Autofill || opts.FillFirst || !opts.TitleProvided || !opts.BodyProvided {
-		err := initDefaultTitleBody(ctx, state, opts.FillFirst)
-		if err != nil && (opts.Autofill || opts.FillFirst) {
+	if opts.FillVerbose || opts.Autofill || opts.FillFirst || !opts.TitleProvided || !opts.BodyProvided {
+		err := initDefaultTitleBody(ctx, state, opts.FillFirst, opts.FillVerbose)
+		if err != nil && (opts.FillVerbose || opts.Autofill || opts.FillFirst) {
 			return nil, fmt.Errorf("could not compute title or body defaults: %w", err)
 		}
 	}
@@ -656,7 +688,6 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		Client:             client,
 		GitClient:          gitClient,
 	}, nil
-
 }
 
 func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
@@ -693,6 +724,14 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		return err
 	}
 
+	if opts.DryRun {
+		if opts.IO.IsStdoutTTY() {
+			return renderPullRequestTTY(opts.IO, params, &state)
+		} else {
+			return renderPullRequestPlain(opts.IO.Out, params, &state)
+		}
+	}
+
 	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.BaseRepo, params)
 	opts.IO.StopProgressIndicator()
@@ -708,12 +747,85 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	return nil
 }
 
+func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *shared.IssueMetadataState) error {
+	fmt.Fprint(w, "Would have created a Pull Request with:\n")
+	fmt.Fprintf(w, "title:\t%s\n", params["title"])
+	fmt.Fprintf(w, "draft:\t%t\n", params["draft"])
+	fmt.Fprintf(w, "base:\t%s\n", params["baseRefName"])
+	fmt.Fprintf(w, "head:\t%s\n", params["headRefName"])
+	if len(state.Labels) != 0 {
+		fmt.Fprintf(w, "labels:\t%v\n", strings.Join(state.Labels, ", "))
+	}
+	if len(state.Reviewers) != 0 {
+		fmt.Fprintf(w, "reviewers:\t%v\n", strings.Join(state.Reviewers, ", "))
+	}
+	if len(state.Assignees) != 0 {
+		fmt.Fprintf(w, "assignees:\t%v\n", strings.Join(state.Assignees, ", "))
+	}
+	if len(state.Milestones) != 0 {
+		fmt.Fprintf(w, "milestones:\t%v\n", strings.Join(state.Milestones, ", "))
+	}
+	if len(state.Projects) != 0 {
+		fmt.Fprintf(w, "projects:\t%v\n", strings.Join(state.Projects, ", "))
+	}
+	fmt.Fprintf(w, "maintainerCanModify:\t%t\n", params["maintainerCanModify"])
+	fmt.Fprint(w, "body:\n")
+	if len(params["body"].(string)) != 0 {
+		fmt.Fprintln(w, params["body"])
+	}
+	return nil
+}
+
+func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}, state *shared.IssueMetadataState) error {
+	iofmt := io.ColorScheme()
+	out := io.Out
+
+	fmt.Fprint(out, "Would have created a Pull Request with:\n")
+	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Title"), params["title"].(string))
+	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("Draft"), params["draft"])
+	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Base"), params["baseRefName"])
+	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Head"), params["headRefName"])
+	if len(state.Labels) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Labels"), strings.Join(state.Labels, ", "))
+	}
+	if len(state.Reviewers) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Reviewers"), strings.Join(state.Reviewers, ", "))
+	}
+	if len(state.Assignees) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Assignees"), strings.Join(state.Assignees, ", "))
+	}
+	if len(state.Milestones) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Milestones"), strings.Join(state.Milestones, ", "))
+	}
+	if len(state.Projects) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Projects"), strings.Join(state.Projects, ", "))
+	}
+	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("MaintainerCanModify"), params["maintainerCanModify"])
+
+	fmt.Fprintf(out, "%s\n", iofmt.Bold("Body:"))
+	// Body
+	var md string
+	var err error
+	if len(params["body"].(string)) == 0 {
+		md = fmt.Sprintf("%s\n", iofmt.Gray("No description provided"))
+	} else {
+		md, err = markdown.Render(params["body"].(string),
+			markdown.WithTheme(io.TerminalTheme()),
+			markdown.WithWrap(io.TerminalWidth()))
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(out, "%s", md)
+
+	return nil
+}
+
 func previewPR(opts CreateOptions, openURL string) error {
 	if opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 	}
 	return opts.Browser.Browse(openURL)
-
 }
 
 func handlePush(opts CreateOptions, ctx CreateContext) error {
@@ -758,7 +870,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			return err
 		}
 
-		cloneProtocol, _ := cfg.GetOrDefault(headRepo.RepoHost(), "git_protocol")
+		cloneProtocol := cfg.GitProtocol(headRepo.RepoHost()).Value
 		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
 		gitClient := ctx.GitClient
 		origin, _ := remotes.FindByName("origin")
@@ -800,7 +912,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
 			defer w.Flush()
 			gitClient := ctx.GitClient
-			ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
+			ref := fmt.Sprintf("HEAD:refs/heads/%s", ctx.HeadBranch)
 			bo := backoff.NewConstantBackOff(2 * time.Second)
 			ctx := context.Background()
 			return backoff.Retry(func() error {

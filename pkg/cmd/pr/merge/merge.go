@@ -10,7 +10,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -78,17 +78,17 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "merge [<number> | <url> | <branch>]",
 		Short: "Merge a pull request",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Merge a pull request on GitHub.
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
 
 			When targeting a branch that requires a merge queue, no merge strategy is required.
-			If required checks have not yet passed, AutoMerge will be enabled.
+			If required checks have not yet passed, auto-merge will be enabled.
 			If required checks have passed, the pull request will be added to the merge queue.
-			To bypass a merge queue and merge directly, pass the '--admin' flag.
-    	`),
+			To bypass a merge queue and merge directly, pass the %[1]s--admin%[1]s flag.
+    	`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
@@ -207,14 +207,14 @@ func (m *mergeContext) disableAutoMerge() error {
 	if err := disableAutoMerge(m.httpClient, m.baseRepo, m.pr.ID); err != nil {
 		return err
 	}
-	return m.infof("%s Auto-merge disabled for pull request #%d\n", m.cs.SuccessIconWithColor(m.cs.Green), m.pr.Number)
+	return m.infof("%s Auto-merge disabled for pull request %s#%d\n", m.cs.SuccessIconWithColor(m.cs.Green), ghrepo.FullName(m.baseRepo), m.pr.Number)
 }
 
 // Check if this pull request is in a merge queue
 func (m *mergeContext) inMergeQueue() error {
 	// if the pull request is in a merge queue no further action is possible
 	if m.pr.IsInMergeQueue {
-		_ = m.warnf("%s Pull request #%d is already queued to merge\n", m.cs.WarningIcon(), m.pr.Number)
+		_ = m.warnf("%s Pull request %s#%d is already queued to merge\n", m.cs.WarningIcon(), ghrepo.FullName(m.baseRepo), m.pr.Number)
 		return ErrAlreadyInMergeQueue
 	}
 	return nil
@@ -235,7 +235,7 @@ func (m *mergeContext) warnIfDiverged() {
 		return
 	}
 
-	_ = m.warnf("%s Pull request #%d (%s) has diverged from local branch\n", m.cs.Yellow("!"), m.pr.Number, m.pr.Title)
+	_ = m.warnf("%s Pull request %s#%d (%s) has diverged from local branch\n", m.cs.Yellow("!"), ghrepo.FullName(m.baseRepo), m.pr.Number, m.pr.Title)
 }
 
 // Check if the current state of the pull request allows for merging
@@ -251,7 +251,7 @@ func (m *mergeContext) canMerge() error {
 		return nil
 	}
 
-	_ = m.warnf("%s Pull request #%d is not mergeable: %s.\n", m.cs.FailureIcon(), m.pr.Number, reason)
+	_ = m.warnf("%s Pull request %s#%d is not mergeable: %s.\n", m.cs.FailureIcon(), ghrepo.FullName(m.baseRepo), m.pr.Number, reason)
 	_ = m.warnf("To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
 	if remote := remoteForMergeConflictResolution(m.baseRepo, m.pr, m.opts); remote != nil {
 		mergeOrRebase := "merge"
@@ -302,6 +302,8 @@ func (m *mergeContext) merge() error {
 				return cmdutil.FlagErrorf("--merge, --rebase, or --squash required when not running interactively")
 			}
 
+			_ = m.infof("Merging pull request %s#%d (%s)\n", ghrepo.FullName(m.baseRepo), m.pr.Number, m.pr.Title)
+
 			apiClient := api.NewClientFromHTTP(m.httpClient)
 			r, err := api.GitHubRepo(apiClient, m.baseRepo)
 			if err != nil {
@@ -342,7 +344,7 @@ func (m *mergeContext) merge() error {
 	}
 
 	if m.shouldAddToMergeQueue() {
-		_ = m.infof("%s Pull request #%d will be added to the merge queue for %s when ready\n", m.cs.SuccessIconWithColor(m.cs.Green), m.pr.Number, m.pr.BaseRefName)
+		_ = m.infof("%s Pull request %s#%d will be added to the merge queue for %s when ready\n", m.cs.SuccessIconWithColor(m.cs.Green), ghrepo.FullName(m.baseRepo), m.pr.Number, m.pr.BaseRefName)
 		return nil
 	}
 
@@ -354,7 +356,7 @@ func (m *mergeContext) merge() error {
 		case PullRequestMergeMethodSquash:
 			method = " via squash"
 		}
-		return m.infof("%s Pull request #%d will be automatically merged%s when all requirements are met\n", m.cs.SuccessIconWithColor(m.cs.Green), m.pr.Number, method)
+		return m.infof("%s Pull request %s#%d will be automatically merged%s when all requirements are met\n", m.cs.SuccessIconWithColor(m.cs.Green), ghrepo.FullName(m.baseRepo), m.pr.Number, method)
 	}
 
 	action := "Merged"
@@ -364,7 +366,7 @@ func (m *mergeContext) merge() error {
 	case PullRequestMergeMethodSquash:
 		action = "Squashed and merged"
 	}
-	return m.infof("%s %s pull request #%d (%s)\n", m.cs.SuccessIconWithColor(m.cs.Magenta), action, m.pr.Number, m.pr.Title)
+	return m.infof("%s %s pull request %s#%d (%s)\n", m.cs.SuccessIconWithColor(m.cs.Magenta), action, ghrepo.FullName(m.baseRepo), m.pr.Number, m.pr.Title)
 }
 
 // Delete local branch if requested and if allowed.
@@ -375,13 +377,13 @@ func (m *mergeContext) deleteLocalBranch() error {
 
 	if m.merged {
 		if m.opts.IO.CanPrompt() && !m.opts.IsDeleteBranchIndicated {
-			confirmed, err := m.opts.Prompter.Confirm(fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", m.pr.Number), false)
+			confirmed, err := m.opts.Prompter.Confirm(fmt.Sprintf("Pull request %s#%d was already merged. Delete the branch locally?", ghrepo.FullName(m.baseRepo), m.pr.Number), false)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
 			m.deleteBranch = confirmed
 		} else {
-			_ = m.warnf(fmt.Sprintf("%s Pull request #%d was already merged\n", m.cs.WarningIcon(), m.pr.Number))
+			_ = m.warnf(fmt.Sprintf("%s Pull request %s#%d was already merged\n", m.cs.WarningIcon(), ghrepo.FullName(m.baseRepo), m.pr.Number))
 		}
 	}
 
@@ -678,7 +680,7 @@ func confirmSubmission(client *http.Client, opts *MergeOptions, action shared.Ac
 
 type userEditor struct {
 	io     *iostreams.IOStreams
-	config func() (config.Config, error)
+	config func() (gh.Config, error)
 }
 
 func (e *userEditor) Edit(filename, startingText string) (string, error) {

@@ -10,7 +10,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
@@ -22,7 +22,7 @@ import (
 type CheckOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Git        *git.Client
 	Browser    browser.Browser
@@ -43,7 +43,7 @@ func NewCmdCheck(f *cmdutil.Factory, runF func(*CheckOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "check [<branch>]",
 		Short: "View rules that would apply to a given branch",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			View information about GitHub rules that apply to a given branch.
 
 			The provided branch name does not need to exist; rules will be displayed that would apply
@@ -51,9 +51,9 @@ func NewCmdCheck(f *cmdutil.Factory, runF func(*CheckOptions) error) *cobra.Comm
 
 			If no branch name is provided, then the current branch will be used.
 
-			The --default flag can be used to view rules that apply to the default branch of the
+			The %[1]s--default%[1]s flag can be used to view rules that apply to the default branch of the
 			repository.
-		`),
+		`, "`"),
 		Example: heredoc.Doc(`
 			# View all rules that apply to the current branch
 			$ gh ruleset check

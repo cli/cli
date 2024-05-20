@@ -85,6 +85,10 @@ func TestIssue_ExportData(t *testing.T) {
 						"project": {
 							"id": "PVT_id",
 							"title": "Some Project"
+						},
+						"status": {
+							"name": "Todo",
+							"optionId": "abc123"
 						}
 					}
 				] } }
@@ -93,6 +97,10 @@ func TestIssue_ExportData(t *testing.T) {
 				{
 					"projectItems": [
 						{
+							"status": {
+								"optionId": "abc123",
+								"name": "Todo"
+							},
 							"title": "Some Project"
 						}
 					]
@@ -200,6 +208,38 @@ func TestPullRequest_ExportData(t *testing.T) {
 							"state": "SUCCESS",
 							"startedAt": "2020-08-31T15:44:24+02:00",
 							"targetUrl": "http://example.com/details"
+						}
+					]
+				}
+			`),
+		},
+		{
+			name:   "project items",
+			fields: []string{"projectItems"},
+			inputJSON: heredoc.Doc(`
+				{ "projectItems": { "nodes": [
+					{
+						"id": "PVTPR_id",
+						"project": {
+							"id": "PVT_id",
+							"title": "Some Project"
+						},
+						"status": {
+							"name": "Todo",
+							"optionId": "abc123"
+						}
+					}
+				] } }
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"projectItems": [
+						{
+							"status": {
+								"optionId": "abc123",
+								"name": "Todo"
+							},
+							"title": "Some Project"
 						}
 					]
 				}

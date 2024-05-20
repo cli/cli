@@ -11,7 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -29,7 +29,7 @@ type iprompter interface {
 
 type CreateOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -59,6 +59,7 @@ type CreateOptions struct {
 	GenerateNotes      bool
 	NotesStartTag      string
 	VerifyTag          bool
+	NotesFromTag       bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -92,10 +93,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a release from an annotated git tag, first create one locally with
 			git, push the tag to GitHub, then run this command.
+			Use %[1]s--notes-from-tag%[1]s to automatically generate the release notes
+			from the annotated git tag.
 
 			When using automatically generated release notes, a release title will also be automatically
 			generated unless a title was explicitly passed. Additional release notes can be prepended to
-			automatically generated notes by using the notes parameter.
+			automatically generated notes by using the %[1]s--notes%[1]s flag.
 		`, "`"),
 		Example: heredoc.Doc(`
 			Interactively create a release
@@ -112,6 +115,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Use release notes from a file
 			$ gh release create v1.2.3 -F changelog.md
+   
+   			Don't mark the release as latest
+			$ gh release create v1.2.3 --latest=false 
 
 			Upload all tarballs in a directory as release assets
 			$ gh release create v1.2.3 ./dist/*.tgz
@@ -146,9 +152,17 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("tag required when not running interactively")
 			}
 
+			if opts.NotesFromTag && (opts.GenerateNotes || opts.NotesStartTag != "") {
+				return cmdutil.FlagErrorf("using `--notes-from-tag` with `--generate-notes` or `--notes-start-tag` is not supported")
+			}
+
+			if opts.NotesFromTag && opts.RepoOverride != "" {
+				return cmdutil.FlagErrorf("using `--notes-from-tag` with `--repo` is not supported")
+			}
+
 			opts.Concurrency = 5
 
-			opts.BodyProvided = cmd.Flags().Changed("notes") || opts.GenerateNotes
+			opts.BodyProvided = cmd.Flags().Changed("notes") || opts.GenerateNotes || opts.NotesFromTag
 			if notesFile != "" {
 				b, err := cmdutil.ReadFile(notesFile, opts.IO.In)
 				if err != nil {
@@ -167,15 +181,16 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVarP(&opts.Draft, "draft", "d", false, "Save the release as a draft instead of publishing it")
 	cmd.Flags().BoolVarP(&opts.Prerelease, "prerelease", "p", false, "Mark the release as a prerelease")
-	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
+	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default [main branch])")
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
-	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
+	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default [automatic based on date and version]). --latest=false to explicitly NOT set as latest")
 	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
+	cmd.Flags().BoolVarP(&opts.NotesFromTag, "notes-from-tag", "", false, "Automatically generate notes from annotated tag")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
 
@@ -241,6 +256,12 @@ func createRun(opts *CreateOptions) error {
 	var tagDescription string
 	if opts.RepoOverride == "" {
 		tagDescription, _ = gitTagInfo(opts.GitClient, opts.TagName)
+
+		if opts.NotesFromTag && tagDescription == "" {
+			return fmt.Errorf("cannot generate release notes from tag %s as it does not exist locally",
+				opts.TagName)
+		}
+
 		// If there is a local tag with the same name as specified
 		// the user may not want to create a new tag on the remote
 		// as the local one might be annotated or signed.
@@ -427,6 +448,13 @@ func createRun(opts *CreateOptions) error {
 			params["generate_release_notes"] = true
 		}
 	}
+	if opts.NotesFromTag {
+		if opts.Body == "" {
+			params["body"] = tagDescription
+		} else {
+			params["body"] = fmt.Sprintf("%s\n%s", opts.Body, tagDescription)
+		}
+	}
 
 	hasAssets := len(opts.Assets) > 0
 	draftWhileUploading := false
@@ -474,7 +502,7 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if draftWhileUploading {
-			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory)
+			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory, opts.IsLatest)
 			if err != nil {
 				return cleanupDraftRelease(err)
 			}

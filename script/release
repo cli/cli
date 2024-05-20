@@ -102,7 +102,7 @@ if [ -n "$is_local" ]; then
 else
   if [ -n "$do_push" ]; then
     if ! git diff --quiet || ! git diff --cached --quiet; then
-      echo "refusing to continue due to uncomitted local changes" >&2
+      echo "refusing to continue due to uncommitted local changes" >&2
       exit 1
     fi
     announce git push

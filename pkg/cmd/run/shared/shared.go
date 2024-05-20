@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
@@ -185,9 +186,9 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 						"number":     s.Number,
 					})
 				}
-				var completedAt *time.Time
+				var completedAt time.Time
 				if !j.CompletedAt.IsZero() {
-					completedAt = &j.CompletedAt
+					completedAt = j.CompletedAt
 				}
 				jobs = append(jobs, map[string]interface{}{
 					"databaseId":  j.ID,
@@ -199,8 +200,8 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 					"completedAt": completedAt,
 					"url":         j.URL,
 				})
-				data[f] = jobs
 			}
+			data[f] = jobs
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
@@ -306,6 +307,7 @@ type FilterOptions struct {
 	Status       string
 	Event        string
 	Created      string
+	Commit       string
 }
 
 // GetRunsWithFilter fetches 50 runs from the API and filters them in-memory
@@ -356,6 +358,9 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 		}
 		if opts.Created != "" {
 			path += fmt.Sprintf("&created=%s", url.QueryEscape(opts.Created))
+		}
+		if opts.Commit != "" {
+			path += fmt.Sprintf("&head_sha=%s", url.QueryEscape(opts.Commit))
 		}
 	}
 
@@ -424,19 +429,35 @@ func preloadWorkflowNames(client *api.Client, repo ghrepo.Interface, runs []Run)
 }
 
 type JobsPayload struct {
-	Jobs []Job
+	TotalCount int `json:"total_count"`
+	Jobs       []Job
 }
 
-func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error) {
+func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run, attempt uint64) ([]Job, error) {
 	if run.Jobs != nil {
 		return run.Jobs, nil
 	}
-	var result JobsPayload
-	if err := client.REST(repo.RepoHost(), "GET", run.JobsURL, nil, &result); err != nil {
-		return nil, err
+
+	query := url.Values{}
+	query.Set("per_page", "100")
+	jobsPath := fmt.Sprintf("%s?%s", run.JobsURL, query.Encode())
+
+	if attempt > 0 {
+		jobsPath = fmt.Sprintf("repos/%s/actions/runs/%d/attempts/%d/jobs?%s", ghrepo.FullName(repo), run.ID, attempt, query.Encode())
 	}
-	run.Jobs = result.Jobs
-	return result.Jobs, nil
+
+	for jobsPath != "" {
+		var resp JobsPayload
+		var err error
+		jobsPath, err = client.RESTWithNext(repo.RepoHost(), http.MethodGet, jobsPath, nil, &resp)
+		if err != nil {
+			run.Jobs = nil
+			return nil, err
+		}
+
+		run.Jobs = append(run.Jobs, resp.Jobs...)
+	}
+	return run.Jobs, nil
 }
 
 func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, error) {

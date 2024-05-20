@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -107,7 +108,7 @@ func TestPinRun(t *testing.T) {
 				)
 			},
 			wantStdout: "",
-			wantStderr: "✓ Pinned issue #20 (Issue Title) to OWNER/REPO\n",
+			wantStderr: "✓ Pinned issue OWNER/REPO#20 (Issue Title)\n",
 		},
 		{
 			name: "issue already pinned",
@@ -122,7 +123,7 @@ func TestPinRun(t *testing.T) {
             } } }`),
 				)
 			},
-			wantStderr: "! Issue #20 (Issue Title) is already pinned to OWNER/REPO\n",
+			wantStderr: "! Issue OWNER/REPO#20 (Issue Title) is already pinned\n",
 		},
 	}
 	for _, tt := range tests {
@@ -139,7 +140,7 @@ func TestPinRun(t *testing.T) {
 		ios.SetStdoutTTY(tt.tty)
 		tt.opts.IO = ios
 
-		tt.opts.Config = func() (config.Config, error) {
+		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
 

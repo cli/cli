@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/MakeNowJust/heredoc"
@@ -33,9 +34,9 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 
 	cmd := &cobra.Command{
 		Use:   "delete [<cache-id>| <cache-key> | --all]",
-		Short: "Delete Github Actions caches",
+		Short: "Delete GitHub Actions caches",
 		Long: `
-		Delete Github Actions caches.
+		Delete GitHub Actions caches.
 
 		Deletion requires authorization with the "repo" scope.
 `,
@@ -127,7 +128,7 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 		if id, err := strconv.Atoi(cache); err == nil {
 			path = fmt.Sprintf("%s/%d", base, id)
 		} else {
-			path = fmt.Sprintf("%s?key=%s", base, cache)
+			path = fmt.Sprintf("%s?key=%s", base, url.QueryEscape(cache))
 		}
 
 		err := client.REST(repo.RepoHost(), "DELETE", path, nil, nil)

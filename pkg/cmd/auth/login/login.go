@@ -9,9 +9,10 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
@@ -20,7 +21,7 @@ import (
 
 type LoginOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
 	Prompter   shared.Prompt
@@ -30,12 +31,13 @@ type LoginOptions struct {
 
 	Interactive bool
 
-	Hostname        string
-	Scopes          []string
-	Token           string
-	Web             bool
-	GitProtocol     string
-	InsecureStorage bool
+	Hostname         string
+	Scopes           []string
+	Token            string
+	Web              bool
+	GitProtocol      string
+	InsecureStorage  bool
+	SkipSSHKeyPrompt bool
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -53,30 +55,41 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "login",
 		Args:  cobra.ExactArgs(0),
-		Short: "Authenticate with a GitHub host",
+		Short: "Log in to a GitHub account",
 		Long: heredoc.Docf(`
 			Authenticate with a GitHub host.
 
 			The default authentication mode is a web-based browser flow. After completion, an
-			authentication token will be stored internally.
+			authentication token will be stored securely in the system credential store.
+			If a credential store is not found or there is an issue using it gh will fallback
+			to writing the token to a plain text file. See %[1]sgh auth status%[1]s for its
+			stored location.
 
 			Alternatively, use %[1]s--with-token%[1]s to pass in a token on standard input.
-			The minimum required scopes for the token are: "repo", "read:org".
+			The minimum required scopes for the token are: %[1]srepo%[1]s, %[1]sread:org%[1]s, and %[1]sgist%[1]s.
 
 			Alternatively, gh will use the authentication token found in environment variables.
 			This method is most suitable for "headless" use of gh such as in automation. See
 			%[1]sgh help environment%[1]s for more info.
 
-			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to "env".
+			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to %[1]senv%[1]s.
+
+			The git protocol to use for git operations on this host can be set with %[1]s--git-protocol%[1]s,
+			or during the interactive prompting. Although login is for a single account on a host, setting
+			the git protocol will take effect for all users on the host.
+
+			Specifying %[1]sssh%[1]s for the git protocol will detect existing SSH keys to upload,
+			prompting to create and upload a new key if one is not found. This can be skipped with
+			%[1]s--skip-ssh-key%[1]s flag.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# start interactive setup
+			# Start interactive setup
 			$ gh auth login
 
-			# authenticate against github.com by reading the token from a file
+			# Authenticate against github.com by reading the token from a file
 			$ gh auth login --with-token < mytoken.txt
 
-			# authenticate with a specific GitHub instance
+			# Authenticate with specific host
 			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -123,7 +136,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes to request")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
-	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
+	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations on this host")
 
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
@@ -131,6 +144,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	_ = cmd.Flags().MarkHidden("secure-storage")
 
 	cmd.Flags().BoolVar(&opts.InsecureStorage, "insecure-storage", false, "Save authentication credentials in plain text instead of credential store")
+	cmd.Flags().BoolVar(&opts.SkipSSHKeyPrompt, "skip-ssh-key", false, "Skip generate/upload SSH key prompt")
 
 	return cmd
 }
@@ -171,37 +185,39 @@ func loginRun(opts *LoginOptions) error {
 		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
-		// Adding a user key ensures that a nonempty host section gets written to the config file.
-		return authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
-	}
-
-	existingToken, _ := authCfg.Token(hostname)
-	if existingToken != "" && opts.Interactive {
-		if err := shared.HasMinimumScopes(httpClient, hostname, existingToken); err == nil {
-			keepGoing, err := opts.Prompter.Confirm(fmt.Sprintf("You're already logged into %s. Do you want to re-authenticate?", hostname), false)
-			if err != nil {
-				return err
-			}
-			if !keepGoing {
-				return nil
-			}
+		username, err := shared.GetCurrentLogin(httpClient, hostname, opts.Token)
+		if err != nil {
+			return fmt.Errorf("error retrieving current user: %w", err)
 		}
+
+		// Adding a user key ensures that a nonempty host section gets written to the config file.
+		_, loginErr := authCfg.Login(hostname, username, opts.Token, opts.GitProtocol, !opts.InsecureStorage)
+		return loginErr
 	}
 
 	return shared.Login(&shared.LoginOptions{
-		IO:            opts.IO,
-		Config:        authCfg,
-		HTTPClient:    httpClient,
-		Hostname:      hostname,
-		Interactive:   opts.Interactive,
-		Web:           opts.Web,
-		Scopes:        opts.Scopes,
-		Executable:    opts.MainExecutable,
-		GitProtocol:   opts.GitProtocol,
-		Prompter:      opts.Prompter,
-		GitClient:     opts.GitClient,
-		Browser:       opts.Browser,
-		SecureStorage: !opts.InsecureStorage,
+		IO:          opts.IO,
+		Config:      authCfg,
+		HTTPClient:  httpClient,
+		Hostname:    hostname,
+		Interactive: opts.Interactive,
+		Web:         opts.Web,
+		Scopes:      opts.Scopes,
+		GitProtocol: opts.GitProtocol,
+		Prompter:    opts.Prompter,
+		Browser:     opts.Browser,
+		CredentialFlow: &shared.GitCredentialFlow{
+			Prompter: opts.Prompter,
+			HelperConfig: &gitcredentials.HelperConfig{
+				SelfExecutablePath: opts.MainExecutable,
+				GitClient:          opts.GitClient,
+			},
+			Updater: &gitcredentials.Updater{
+				GitClient: opts.GitClient,
+			},
+		},
+		SecureStorage:    !opts.InsecureStorage,
+		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
 	})
 }
 

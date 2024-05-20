@@ -41,7 +41,7 @@ builds:
     hooks:
       post:
         - cmd: >-
-            {{ if eq .Runtime.Goos "windows" }}.\script\sign{{ else }}./script/sign{{ end }} '{{ .Path }}'
+            {{ if eq .Runtime.Goos "windows" }}pwsh .\script\sign.ps1{{ else }}./script/sign{{ end }} '{{ .Path }}'
           output: true
     binary: bin/gh
     main: ./cmd/gh

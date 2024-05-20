@@ -7,7 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/cli/go-gh/v2/pkg/ssh"
@@ -19,7 +19,7 @@ const (
 
 type remoteResolver struct {
 	readRemotes   func() (git.RemoteSet, error)
-	getConfig     func() (config.Config, error)
+	getConfig     func() (gh.Config, error)
 	urlTranslator context.Translator
 }
 

@@ -102,10 +102,18 @@ type ProjectInfo struct {
 
 type ProjectV2Item struct {
 	ID      string `json:"id"`
-	Project struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
-	}
+	Project ProjectV2ItemProject
+	Status  ProjectV2ItemStatus
+}
+
+type ProjectV2ItemProject struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+type ProjectV2ItemStatus struct {
+	OptionID string `json:"optionId"`
+	Name     string `json:"name"`
 }
 
 func (p ProjectCards) ProjectNames() []string {

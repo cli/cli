@@ -48,11 +48,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "view {<number> | <url>}",
 		Short: "View an issue",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Display the title, body, and other information about an issue.
 
-			With '--web', open the issue in a web browser instead.
-		`),
+			With %[1]s--web%[1]s flag, open the issue in a web browser instead.
+		`, "`"),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -103,7 +103,7 @@ func viewRun(opts *ViewOptions) error {
 	opts.IO.DetectTerminalTheme()
 
 	opts.IO.StartProgressIndicator()
-	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice())
+	issue, baseRepo, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice())
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		var loadErr *issueShared.PartialLoadError
@@ -132,7 +132,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		return printHumanIssuePreview(opts, issue)
+		return printHumanIssuePreview(opts, baseRepo, issue)
 	}
 
 	if opts.Comments {
@@ -143,14 +143,14 @@ func viewRun(opts *ViewOptions) error {
 	return printRawIssuePreview(opts.IO.Out, issue)
 }
 
-func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string) (*api.Issue, error) {
+func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string) (*api.Issue, ghrepo.Interface, error) {
 	fieldSet := set.NewStringSet()
 	fieldSet.AddValues(fields)
 	fieldSet.Add("id")
 
 	issue, repo, err := issueShared.IssueFromArgWithFields(client, baseRepoFn, selector, fieldSet.ToSlice())
 	if err != nil {
-		return issue, err
+		return issue, repo, err
 	}
 
 	if fieldSet.Contains("comments") {
@@ -158,7 +158,7 @@ func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error),
 		// fetched in the previous request.
 		err = preloadIssueComments(client, repo, issue)
 	}
-	return issue, err
+	return issue, repo, err
 }
 
 func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
@@ -186,12 +186,12 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	return nil
 }
 
-func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
+func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue *api.Issue) error {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintf(out, "%s #%d\n", cs.Bold(issue.Title), issue.Number)
+	fmt.Fprintf(out, "%s %s#%d\n", cs.Bold(issue.Title), ghrepo.FullName(baseRepo), issue.Number)
 	fmt.Fprintf(out,
 		"%s • %s opened %s • %s\n",
 		issueStateTitleWithColor(cs, issue),

@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -19,7 +18,7 @@ type closeOpts struct {
 	owner     string
 	reopen    bool
 	projectID string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type closeConfig struct {
@@ -78,7 +77,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 
 	closeCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	closeCmd.Flags().BoolVar(&opts.reopen, "undo", false, "Reopen a closed project")
-	closeCmd.Flags().StringVar(&opts.format, "format", "", "Output format, must be 'json'")
+	cmdutil.AddFormatFlags(closeCmd, &opts.exporter)
 
 	return closeCmd
 }
@@ -103,8 +102,8 @@ func runClose(config closeConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, *project)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.UpdateProjectV2.ProjectV2)
 	}
 
 	return printResults(config, query.UpdateProjectV2.ProjectV2)
@@ -130,14 +129,5 @@ func printResults(config closeConfig, project queries.Project) error {
 	}
 
 	_, err := fmt.Fprintf(config.io.Out, "%s\n", project.URL)
-	return err
-}
-
-func printJSON(config closeConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-	_, err = config.io.Out.Write(b)
 	return err
 }

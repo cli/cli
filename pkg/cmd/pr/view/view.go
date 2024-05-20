@@ -10,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -42,14 +43,14 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "view [<number> | <url> | <branch>]",
 		Short: "View a pull request",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Display the title, body, and other information about a pull request.
 
 			Without an argument, the pull request that belongs to the current branch
 			is displayed.
 
-			With '--web', open the pull request in a web browser instead.
-		`),
+			With %[1]s--web%[1]s flag, open the pull request in a web browser instead.
+		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
@@ -94,7 +95,7 @@ func viewRun(opts *ViewOptions) error {
 	} else if opts.Exporter != nil {
 		findOptions.Fields = opts.Exporter.Fields()
 	}
-	pr, _, err := opts.Finder.Find(findOptions)
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
@@ -121,7 +122,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if connectedToTerminal {
-		return printHumanPrPreview(opts, pr)
+		return printHumanPrPreview(opts, baseRepo, pr)
 	}
 
 	if opts.Comments {
@@ -173,12 +174,12 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	return nil
 }
 
-func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
+func printHumanPrPreview(opts *ViewOptions, baseRepo ghrepo.Interface, pr *api.PullRequest) error {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintf(out, "%s #%d\n", cs.Bold(pr.Title), pr.Number)
+	fmt.Fprintf(out, "%s %s#%d\n", cs.Bold(pr.Title), ghrepo.FullName(baseRepo), pr.Number)
 	fmt.Fprintf(out,
 		"%s • %s wants to merge %s into %s from %s • %s\n",
 		shared.StateTitleWithColor(cs, *pr),
@@ -439,6 +440,9 @@ func prProjectList(pr api.PullRequest) string {
 
 	projectNames := make([]string, 0, len(pr.ProjectCards.Nodes))
 	for _, project := range pr.ProjectCards.Nodes {
+		if project == nil {
+			continue
+		}
 		colName := project.Column.Name
 		if colName == "" {
 			colName = "Awaiting triage"

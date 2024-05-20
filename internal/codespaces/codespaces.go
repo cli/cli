@@ -5,34 +5,37 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/liveshare"
+	"github.com/cli/cli/v2/internal/codespaces/connection"
 )
 
 func connectionReady(codespace *api.Codespace) bool {
-	return codespace.Connection.SessionID != "" &&
-		codespace.Connection.SessionToken != "" &&
-		codespace.Connection.RelayEndpoint != "" &&
-		codespace.Connection.RelaySAS != "" &&
-		codespace.State == api.CodespaceStateAvailable
+	// If the codespace is not available, it is not ready
+	if codespace.State != api.CodespaceStateAvailable {
+		return false
+	}
+
+	return codespace.Connection.TunnelProperties.ConnectAccessToken != "" &&
+		codespace.Connection.TunnelProperties.ManagePortsAccessToken != "" &&
+		codespace.Connection.TunnelProperties.ServiceUri != "" &&
+		codespace.Connection.TunnelProperties.TunnelId != "" &&
+		codespace.Connection.TunnelProperties.ClusterId != "" &&
+		codespace.Connection.TunnelProperties.Domain != ""
 }
 
 type apiClient interface {
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	StartCodespace(ctx context.Context, name string) error
+	HTTPClient() (*http.Client, error)
 }
 
 type progressIndicator interface {
 	StartProgressIndicatorWithLabel(s string)
 	StopProgressIndicator()
-}
-
-type logger interface {
-	Println(v ...interface{})
-	Printf(f string, v ...interface{})
 }
 
 type TimeoutError struct {
@@ -43,9 +46,27 @@ func (e *TimeoutError) Error() string {
 	return e.message
 }
 
-// ConnectToLiveshare waits for a Codespace to become running,
-// and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
+// GetCodespaceConnection waits until a codespace is able
+// to be connected to and initializes a connection to it.
+func GetCodespaceConnection(ctx context.Context, progress progressIndicator, apiClient apiClient, codespace *api.Codespace) (*connection.CodespaceConnection, error) {
+	codespace, err := waitUntilCodespaceConnectionReady(ctx, progress, apiClient, codespace)
+	if err != nil {
+		return nil, err
+	}
+
+	progress.StartProgressIndicatorWithLabel("Connecting to codespace")
+	defer progress.StopProgressIndicator()
+
+	httpClient, err := apiClient.HTTPClient()
+	if err != nil {
+		return nil, fmt.Errorf("error getting http client: %w", err)
+	}
+
+	return connection.NewCodespaceConnection(ctx, codespace, httpClient)
+}
+
+// waitUntilCodespaceConnectionReady waits for a Codespace to be running and is able to be connected to.
+func waitUntilCodespaceConnectionReady(ctx context.Context, progress progressIndicator, apiClient apiClient, codespace *api.Codespace) (*api.Codespace, error) {
 	if codespace.State != api.CodespaceStateAvailable {
 		progress.StartProgressIndicatorWithLabel("Starting codespace")
 		defer progress.StopProgressIndicator()
@@ -83,17 +104,7 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 		}
 	}
 
-	progress.StartProgressIndicatorWithLabel("Connecting to codespace")
-	defer progress.StopProgressIndicator()
-
-	return liveshare.Connect(ctx, liveshare.Options{
-		SessionID:      codespace.Connection.SessionID,
-		SessionToken:   codespace.Connection.SessionToken,
-		RelaySAS:       codespace.Connection.RelaySAS,
-		RelayEndpoint:  codespace.Connection.RelayEndpoint,
-		HostPublicKeys: codespace.Connection.HostPublicKeys,
-		Logger:         sessionLogger,
-	})
+	return codespace, nil
 }
 
 // ListenTCP starts a localhost tcp listener on 127.0.0.1 (unless allInterfaces is true) and returns the listener and bound port

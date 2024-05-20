@@ -1,5 +1,5 @@
 {
-	"image": "mcr.microsoft.com/devcontainers/go:1.19",
+	"image": "mcr.microsoft.com/devcontainers/go:1.22",
 	"features": {
 		"ghcr.io/devcontainers/features/sshd:1": {}
 	},

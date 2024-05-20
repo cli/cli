@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -20,7 +19,7 @@ type archiveItemOpts struct {
 	undo      bool
 	itemID    string
 	projectID string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type archiveItemConfig struct {
@@ -82,7 +81,7 @@ func NewCmdArchiveItem(f *cmdutil.Factory, runF func(config archiveItemConfig) e
 	archiveItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	archiveItemCmd.Flags().StringVar(&opts.itemID, "id", "", "ID of the item to archive")
 	archiveItemCmd.Flags().BoolVar(&opts.undo, "undo", false, "Unarchive an item")
-	cmdutil.StringEnumFlag(archiveItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(archiveItemCmd, &opts.exporter)
 
 	_ = archiveItemCmd.MarkFlagRequired("id")
 
@@ -109,8 +108,8 @@ func runArchiveItem(config archiveItemConfig) error {
 			return err
 		}
 
-		if config.opts.format == "json" {
-			return printJSON(config, query.UnarchiveProjectItem.ProjectV2Item)
+		if config.opts.exporter != nil {
+			return config.opts.exporter.Write(config.io, query.UnarchiveProjectItem.ProjectV2Item)
 		}
 
 		return printResults(config, query.UnarchiveProjectItem.ProjectV2Item)
@@ -121,8 +120,8 @@ func runArchiveItem(config archiveItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, query.ArchiveProjectItem.ProjectV2Item)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.ArchiveProjectItem.ProjectV2Item)
 	}
 
 	return printResults(config, query.ArchiveProjectItem.ProjectV2Item)
@@ -157,15 +156,5 @@ func printResults(config archiveItemConfig, item queries.ProjectItem) error {
 	}
 
 	_, err := fmt.Fprintf(config.io.Out, "Archived item\n")
-	return err
-}
-
-func printJSON(config archiveItemConfig, item queries.ProjectItem) error {
-	b, err := format.JSONProjectItem(item)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
 	return err
 }

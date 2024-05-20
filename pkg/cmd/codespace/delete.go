@@ -220,6 +220,7 @@ func confirmDeletion(p prompter, apiCodespace *api.Codespace, isInteractive bool
 type surveyPrompter struct{}
 
 func (p *surveyPrompter) Confirm(message string) (bool, error) {
+	prompter := &Prompter{}
 	var confirmed struct {
 		Confirmed bool
 	}
@@ -231,7 +232,7 @@ func (p *surveyPrompter) Confirm(message string) (bool, error) {
 			},
 		},
 	}
-	if err := ask(q, &confirmed); err != nil {
+	if err := prompter.Ask(q, &confirmed); err != nil {
 		return false, fmt.Errorf("failed to prompt: %w", err)
 	}
 

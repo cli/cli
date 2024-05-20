@@ -8,7 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
@@ -20,12 +20,23 @@ import (
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Now        func() time.Time
 
+	Exporter cmdutil.Exporter
+
 	OrgName string
 	EnvName string
+}
+
+var variableFields = []string{
+	"name",
+	"value",
+	"visibility",
+	"updatedAt",
+	"numSelectedRepos",
+	"selectedReposURL",
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -41,9 +52,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Short: "List variables",
 		Long: heredoc.Doc(`
 			List variables on one of the following levels:
-			- repository (default): available to Actions runs or Dependabot in a repository
-			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs or Dependabot within an organization
+			- repository (default): available to GitHub Actions runs or Dependabot in a repository
+			- environment: available to GitHub Actions runs for a deployment environment in a repository
+			- organization: available to GitHub Actions runs or Dependabot within an organization
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -65,6 +76,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List variables for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "List variables for an environment")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, variableFields)
 
 	return cmd
 }
@@ -100,7 +112,7 @@ func listRun(opts *ListOptions) error {
 	case shared.Environment:
 		variables, err = getEnvVariables(client, baseRepo, envName)
 	case shared.Organization:
-		var cfg config.Config
+		var cfg gh.Config
 		var host string
 		cfg, err = opts.Config()
 		if err != nil {
@@ -114,7 +126,7 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("failed to get variables: %w", err)
 	}
 
-	if len(variables) == 0 {
+	if len(variables) == 0 && opts.Exporter == nil {
 		return cmdutil.NewNoResultsError("no variables found")
 	}
 
@@ -124,12 +136,18 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
-	table := tableprinter.New(opts.IO)
-	if variableEntity == shared.Organization {
-		table.HeaderRow("Name", "Value", "Updated", "Visibility")
-	} else {
-		table.HeaderRow("Name", "Value", "Updated")
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, variables)
 	}
+
+	var headers []string
+	if variableEntity == shared.Organization {
+		headers = []string{"Name", "Value", "Updated", "Visibility"}
+	} else {
+		headers = []string{"Name", "Value", "Updated"}
+	}
+
+	table := tableprinter.New(opts.IO, tableprinter.WithHeader(headers...))
 	for _, variable := range variables {
 		table.AddField(variable.Name)
 		table.AddField(variable.Value)
@@ -153,12 +171,16 @@ func listRun(opts *ListOptions) error {
 }
 
 type Variable struct {
-	Name             string
-	Value            string
-	UpdatedAt        time.Time `json:"updated_at"`
-	Visibility       shared.Visibility
-	SelectedReposURL string `json:"selected_repositories_url"`
-	NumSelectedRepos int
+	Name             string            `json:"name"`
+	Value            string            `json:"value"`
+	UpdatedAt        time.Time         `json:"updated_at"`
+	Visibility       shared.Visibility `json:"visibility"`
+	SelectedReposURL string            `json:"selected_repositories_url"`
+	NumSelectedRepos int               `json:"num_selected_repos"`
+}
+
+func (v *Variable) ExportData(fields []string) map[string]interface{} {
+	return cmdutil.StructExportData(v, fields)
 }
 
 func fmtVisibility(s Variable) string {

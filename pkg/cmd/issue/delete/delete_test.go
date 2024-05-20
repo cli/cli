@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -31,7 +32,7 @@ func runCommand(rt http.RoundTripper, pm *prompter.MockPrompter, isTTY bool, cli
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
@@ -86,7 +87,7 @@ func TestIssueDelete(t *testing.T) {
 		t.Fatalf("error running command `issue delete`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Deleted issue #13 \(The title of the issue\)`)
+	r := regexp.MustCompile(`Deleted issue OWNER/REPO#13 \(The title of the issue\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -118,7 +119,7 @@ func TestIssueDelete_confirm(t *testing.T) {
 		t.Fatalf("error running command `issue delete`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Deleted issue #13 \(The title of the issue\)`)
+	r := regexp.MustCompile(`Deleted issue OWNER/REPO#13 \(The title of the issue\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())

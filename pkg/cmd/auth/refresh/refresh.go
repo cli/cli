@@ -8,17 +8,21 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/authflow"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 )
 
+type token string
+type username string
+
 type RefreshOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HttpClient *http.Client
 	GitClient  *git.Client
 	Prompter   shared.Prompt
@@ -29,7 +33,7 @@ type RefreshOptions struct {
 	Scopes       []string
 	RemoveScopes []string
 	ResetScopes  bool
-	AuthFlow     func(*config.AuthConfig, *iostreams.IOStreams, string, []string, bool, bool) error
+	AuthFlow     func(*iostreams.IOStreams, string, []string, bool) (token, username, error)
 
 	Interactive     bool
 	InsecureStorage bool
@@ -39,16 +43,9 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(authCfg *config.AuthConfig, io *iostreams.IOStreams, hostname string, scopes []string, interactive, secureStorage bool) error {
-			if secureStorage {
-				cs := io.ColorScheme()
-				fmt.Fprintf(io.ErrOut, "%s Using secure storage could break installed extensions", cs.WarningIcon())
-			}
-			token, username, err := authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser)
-			if err != nil {
-				return err
-			}
-			return authCfg.Login(hostname, username, token, "", secureStorage)
+		AuthFlow: func(io *iostreams.IOStreams, hostname string, scopes []string, interactive bool) (token, username, error) {
+			t, u, err := authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser)
+			return token(t), username(u), err
 		},
 		HttpClient: &http.Client{},
 		GitClient:  f.GitClient,
@@ -59,19 +56,23 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 		Use:   "refresh",
 		Args:  cobra.ExactArgs(0),
 		Short: "Refresh stored authentication credentials",
-		Long: heredoc.Doc(`Expand or fix the permission scopes for stored credentials.
+		Long: heredoc.Docf(`Expand or fix the permission scopes for stored credentials for active account.
 
-			The --scopes flag accepts a comma separated list of scopes you want
+			The %[1]s--scopes%[1]s flag accepts a comma separated list of scopes you want
 			your gh credentials to have. If no scopes are provided, the command
 			maintains previously added scopes.
 
-			The --remove-scopes flag accepts a comma separated list of scopes you
+			The %[1]s--remove-scopes%[1]s flag accepts a comma separated list of scopes you
 			want to remove from your gh credentials. Scope removal is idempotent.
-			The minimum set of scopes ("repo", "read:org" and "gist") cannot be removed.
+			The minimum set of scopes (%[1]srepo%[1]s, %[1]sread:org%[1]s, and %[1]sgist%[1]s) cannot be removed.
 
-			The --reset-scopes flag resets the scopes for your gh credentials to
+			The %[1]s--reset-scopes%[1]s flag resets the scopes for your gh credentials to
 			the default set of scopes for your auth flow.
-		`),
+
+			If you have multiple accounts in %[1]sgh auth status%[1]s and want to refresh the credentials for an
+			inactive account, you will have to use %[1]sgh auth switch%[1]s to that account first before using
+			this command, and then switch back when you are done.
+		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh auth refresh --scopes write:org,read:public_key
 			# => open a browser to add write:org and read:public_key scopes
@@ -160,7 +161,7 @@ func refreshRun(opts *RefreshOptions) error {
 	additionalScopes := set.NewStringSet()
 
 	if !opts.ResetScopes {
-		if oldToken, _ := authCfg.Token(hostname); oldToken != "" {
+		if oldToken, _ := authCfg.ActiveToken(hostname); oldToken != "" {
 			if oldScopes, err := shared.GetScopes(opts.HttpClient, hostname, oldToken); err == nil {
 				for _, s := range strings.Split(oldScopes, ",") {
 					s = strings.TrimSpace(s)
@@ -173,11 +174,16 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 
 	credentialFlow := &shared.GitCredentialFlow{
-		Executable: opts.MainExecutable,
-		Prompter:   opts.Prompter,
-		GitClient:  opts.GitClient,
+		Prompter: opts.Prompter,
+		HelperConfig: &gitcredentials.HelperConfig{
+			SelfExecutablePath: opts.MainExecutable,
+			GitClient:          opts.GitClient,
+		},
+		Updater: &gitcredentials.Updater{
+			GitClient: opts.GitClient,
+		},
 	}
-	gitProtocol, _ := authCfg.GitProtocol(hostname)
+	gitProtocol := cfg.GitProtocol(hostname).Value
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
@@ -189,7 +195,15 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	if err := opts.AuthFlow(authCfg, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, !opts.InsecureStorage); err != nil {
+	authedToken, authedUser, err := opts.AuthFlow(opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive)
+	if err != nil {
+		return err
+	}
+	activeUser, _ := authCfg.ActiveUser(hostname)
+	if activeUser != "" && username(activeUser) != authedUser {
+		return fmt.Errorf("error refreshing credentials for %s, received credentials for %s, did you use the correct account in the browser?", activeUser, authedUser)
+	}
+	if _, err := authCfg.Login(hostname, string(authedUser), string(authedToken), "", !opts.InsecureStorage); err != nil {
 		return err
 	}
 
@@ -197,8 +211,8 @@ func refreshRun(opts *RefreshOptions) error {
 	fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 
 	if credentialFlow.ShouldSetup() {
-		username, _ := authCfg.User(hostname)
-		password, _ := authCfg.Token(hostname)
+		username, _ := authCfg.ActiveUser(hostname)
+		password, _ := authCfg.ActiveToken(hostname)
 		if err := credentialFlow.Setup(hostname, username, password); err != nil {
 			return err
 		}

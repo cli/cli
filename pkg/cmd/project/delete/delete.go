@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -18,7 +17,7 @@ type deleteOpts struct {
 	owner     string
 	number    int32
 	projectID string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type deleteConfig struct {
@@ -72,7 +71,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 	}
 
 	deleteCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
-	cmdutil.StringEnumFlag(deleteCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(deleteCmd, &opts.exporter)
 
 	return deleteCmd
 }
@@ -96,8 +95,8 @@ func runDelete(config deleteConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, *project)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.DeleteProject.Project)
 	}
 
 	return printResults(config, query.DeleteProject.Project)
@@ -122,15 +121,5 @@ func printResults(config deleteConfig, project queries.Project) error {
 	}
 
 	_, err := fmt.Fprintf(config.io.Out, "Deleted project %d\n", project.Number)
-	return err
-}
-
-func printJSON(config deleteConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
 	return err
 }

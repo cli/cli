@@ -6,20 +6,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 )
 
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	Exporter   cmdutil.Exporter
 	Detector   fd.Detector
@@ -52,9 +53,16 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	)
 
 	cmd := &cobra.Command{
-		Use:     "list [<owner>]",
-		Args:    cobra.MaximumNArgs(1),
-		Short:   "List repositories owned by user or organization",
+		Use:   "list [<owner>]",
+		Args:  cobra.MaximumNArgs(1),
+		Short: "List repositories owned by user or organization",
+		Long: heredoc.Docf(`
+			List repositories owned by a user or organization.
+
+			Note that the list will only include repositories owned by the provided argument,
+			and the %[1]s--fork%[1]s or %[1]s--source%[1]s flags will not traverse ownership boundaries. For example,
+			when listing the forks in an organization, the output would not include those owned by individual users.
+		`, "`"),
 		Aliases: []string{"ls"},
 		RunE: func(c *cobra.Command, args []string) error {
 			if opts.Limit < 1 {
@@ -168,9 +176,9 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(opts.IO)
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("NAME", "DESCRIPTION", "INFO", "UPDATED"))
 
+	totalMatchCount := len(listResult.Repositories)
 	for _, repo := range listResult.Repositories {
 		info := repoInfo(repo)
 		infoColor := cs.Gray
@@ -184,14 +192,10 @@ func listRun(opts *ListOptions) error {
 			t = &repo.CreatedAt
 		}
 
-		tp.AddField(repo.NameWithOwner, nil, cs.Bold)
-		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description), nil, nil)
-		tp.AddField(info, nil, infoColor)
-		if tp.IsTTY() {
-			tp.AddField(text.FuzzyAgoAbbr(opts.Now(), *t), nil, cs.Gray)
-		} else {
-			tp.AddField(t.Format(time.RFC3339), nil, nil)
-		}
+		tp.AddField(repo.NameWithOwner, tableprinter.WithColor(cs.Bold))
+		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description))
+		tp.AddField(info, tableprinter.WithColor(infoColor))
+		tp.AddTimeField(opts.Now(), *t, cs.Gray)
 		tp.EndRow()
 	}
 
@@ -200,11 +204,15 @@ func listRun(opts *ListOptions) error {
 	}
 	if opts.IO.IsStdoutTTY() {
 		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || len(filter.Topic) > 0
-		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
+		title := listHeader(listResult.Owner, totalMatchCount, listResult.TotalCount, hasFilters)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
-	return tp.Render()
+	if totalMatchCount > 0 {
+		return tp.Render()
+	}
+
+	return nil
 }
 
 func listHeader(owner string, matchCount, totalMatchCount int, hasFilters bool) string {

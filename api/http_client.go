@@ -13,18 +13,17 @@ import (
 )
 
 type tokenGetter interface {
-	Token(string) (string, string)
+	ActiveToken(string) (string, string)
 }
 
 type HTTPClientOptions struct {
-	AppVersion        string
-	CacheTTL          time.Duration
-	Config            tokenGetter
-	EnableCache       bool
-	Log               io.Writer
-	LogColorize       bool
-	LogVerboseHTTP    bool
-	SkipAcceptHeaders bool
+	AppVersion     string
+	CacheTTL       time.Duration
+	Config         tokenGetter
+	EnableCache    bool
+	Log            io.Writer
+	LogColorize    bool
+	LogVerboseHTTP bool
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
@@ -49,9 +48,6 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 
 	headers := map[string]string{
 		userAgent: fmt.Sprintf("GitHub CLI %s", opts.AppVersion),
-	}
-	if opts.SkipAcceptHeaders {
-		headers[accept] = ""
 	}
 	clientOpts.Headers = headers
 
@@ -103,7 +99,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 			// If the host has changed during a redirect do not add the authentication token header.
 			if !redirectHostnameChange {
 				hostname := ghinstance.NormalizeHostname(getHost(req))
-				if token, _ := cfg.Token(hostname); token != "" {
+				if token, _ := cfg.ActiveToken(hostname); token != "" {
 					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
 				}
 			}

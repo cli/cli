@@ -4,7 +4,7 @@
 
 ![screenshot of gh pr status](https://user-images.githubusercontent.com/98482/84171218-327e7a80-aa40-11ea-8cd1-5177fc2d0e72.png)
 
-GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterprise Server 2.20+, and to install on macOS, Windows, and Linux.
+GitHub CLI is supported for users on GitHub.com and GitHub Enterprise Server 2.20+ with support for macOS, Windows, and Linux.
 
 ## Documentation
 
@@ -21,7 +21,7 @@ If you are a hubber and are interested in shipping new commands for the CLI, che
 
 ### macOS
 
-`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], and as a downloadable binary from the [releases page][].
+`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], [Webi][], and as a downloadable binary from the [releases page][].
 
 #### Homebrew
 
@@ -49,19 +49,27 @@ Additional Conda installation options available on the [gh-feedstock page](https
 | ------------------ | ---------------------------------------- |
 | `spack install gh` | `spack uninstall gh && spack install gh` |
 
+#### Webi
+
+| Install:                            | Upgrade:         |
+| ----------------------------------- | ---------------- |
+| `curl -sS https://webi.sh/gh \| sh` | `webi gh@stable` |
+
+For more information about the Webi installer see [its homepage](https://webinstall.dev/).
+
 ### Linux & BSD
 
 `gh` is available via:
 - [our Debian and RPM repositories](./docs/install_linux.md);
 - community-maintained repositories in various Linux distros;
-- OS-agnostic package managers such as [Homebrew](#homebrew), [Conda](#conda), and [Spack](#spack); and
+- OS-agnostic package managers such as [Homebrew](#homebrew), [Conda](#conda), [Spack](#spack), [Webi](#webi); and
 - our [releases page][] as precompiled binaries.
 
 For more information, see [Linux & BSD installation](./docs/install_linux.md).
 
 ### Windows
 
-`gh` is available via [WinGet][], [scoop][], [Chocolatey][], [Conda](#conda), and as downloadable MSI.
+`gh` is available via [WinGet][], [scoop][], [Chocolatey][], [Conda](#conda), [Webi](#webi), and as downloadable MSI.
 
 #### WinGet
 
@@ -125,6 +133,7 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [Chocolatey]: https://chocolatey.org
 [Conda]: https://docs.conda.io/en/latest/
 [Spack]: https://spack.io
+[Webi]: https://webinstall.dev
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing]: ./.github/CONTRIBUTING.md

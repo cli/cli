@@ -7,7 +7,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -18,7 +18,7 @@ import (
 type CloneOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 
 	GitArgs   []string
@@ -40,15 +40,15 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		Use:   "clone <gist> [<directory>] [-- <gitflags>...]",
 		Args:  cmdutil.MinimumArgs(1, "cannot clone: gist argument required"),
 		Short: "Clone a gist locally",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Clone a GitHub gist locally.
 
 			A gist can be supplied as argument in either of the following formats:
-			- by ID, e.g. 5b0e0062eb8e9654adad7bb1d81cc75f
-			- by URL, e.g. "https://gist.github.com/OWNER/5b0e0062eb8e9654adad7bb1d81cc75f"
+			- by ID, e.g. %[1]s5b0e0062eb8e9654adad7bb1d81cc75f%[1]s
+			- by URL, e.g. %[1]shttps://gist.github.com/OWNER/5b0e0062eb8e9654adad7bb1d81cc75f%[1]s
 
-			Pass additional 'git clone' flags by listing them after '--'.
-		`),
+			Pass additional %[1]sgit clone%[1]s flags by listing them after %[1]s--%[1]s.
+		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Gist = args[0]
 			opts.GitArgs = args[1:]
@@ -80,10 +80,7 @@ func cloneRun(opts *CloneOptions) error {
 			return err
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		protocol, err := cfg.GetOrDefault(hostname, "git_protocol")
-		if err != nil {
-			return err
-		}
+		protocol := cfg.GitProtocol(hostname).Value
 		gistURL = formatRemoteURL(hostname, gistURL, protocol)
 	}
 

@@ -33,6 +33,11 @@ func TestPullRequestGraphQL(t *testing.T) {
 			fields: []string{"isPinned", "stateReason", "number"},
 			want:   "number",
 		},
+		{
+			name:   "projectItems",
+			fields: []string{"projectItems"},
+			want:   `projectItems(first:100){nodes{id, project{id,title}, status:fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue{optionId,name}}},totalCount}`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -68,6 +73,11 @@ func TestIssueGraphQL(t *testing.T) {
 			name:   "compressed query",
 			fields: []string{"files"},
 			want:   "files(first: 100) {nodes {additions,deletions,path}}",
+		},
+		{
+			name:   "projectItems",
+			fields: []string{"projectItems"},
+			want:   `projectItems(first:100){nodes{id, project{id,title}, status:fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue{optionId,name}}},totalCount}`,
 		},
 	}
 	for _, tt := range tests {

@@ -189,10 +189,14 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	return &newRelease, err
 }
 
-func publishRelease(httpClient *http.Client, releaseURL string, discussionCategory string) (*shared.Release, error) {
+func publishRelease(httpClient *http.Client, releaseURL string, discussionCategory string, isLatest *bool) (*shared.Release, error) {
 	params := map[string]interface{}{"draft": false}
 	if discussionCategory != "" {
 		params["discussion_category_name"] = discussionCategory
+	}
+
+	if isLatest != nil {
+		params["make_latest"] = fmt.Sprintf("%v", *isLatest)
 	}
 
 	bodyBytes, err := json.Marshal(params)

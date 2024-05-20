@@ -1,4 +1,5 @@
 name: Deployment
+run-name: ${{ inputs.tag_name }} / ${{ inputs.environment }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -16,9 +17,6 @@ on:
       environment:
         default: production
         type: environment
-      go_version:
-        default: "1.21"
-        type: string
       platforms:
         default: "linux,macos,windows"
         type: string
@@ -34,13 +32,13 @@ jobs:
     if: contains(inputs.platforms, 'linux')
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go_version }}
+          go-version-file: 'go.mod'
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           version: "~1.17.1"
           install-only: true
@@ -52,7 +50,7 @@ jobs:
         run: |
           go run ./cmd/gen-docs --website --doc-path dist/manual
           tar -czvf dist/manual.tar.gz -C dist -- manual
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: linux
           if-no-files-found: error
@@ -68,11 +66,11 @@ jobs:
     if: contains(inputs.platforms, 'macos')
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go_version }}
+          go-version-file: 'go.mod'
       - name: Configure macOS signing
         if: inputs.environment == 'production'
         env:
@@ -92,7 +90,7 @@ jobs:
           security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
           rm "$RUNNER_TEMP/cert.p12"
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           version: "~1.17.1"
           install-only: true
@@ -123,7 +121,7 @@ jobs:
         run: |
           shopt -s failglob
           script/pkgmacos "$TAG_NAME"
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: macos
           if-no-files-found: error
@@ -139,35 +137,52 @@ jobs:
     if: contains(inputs.platforms, 'windows')
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go_version }}
-      - name: Obtain signing certificate
-        id: obtain_cert
-        if: inputs.environment == 'production'
-        shell: bash
-        run: |
-          base64 -d <<<"$CERT_CONTENTS" > ./cert.pfx
-          printf "cert-file=%s\n" ".\\cert.pfx" >> $GITHUB_OUTPUT
-        env:
-          CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
+          go-version-file: 'go.mod'
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           version: "~1.17.1"
           install-only: true
+      - name: Install Azure Code Signing Client
+        shell: pwsh
+        env:
+          ACS_DIR: ${{ runner.temp }}\acs
+          ACS_ZIP: ${{ runner.temp }}\acs.zip
+          CORRELATION_ID: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
+        run: |
+          # Download Azure Code Signing client containing the DLL needed for signtool in script/sign
+          Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Azure.CodeSigning.Client/1.0.43 -OutFile $Env:ACS_ZIP -Verbose
+          Expand-Archive $Env:ACS_ZIP -Destination $Env:ACS_DIR -Force -Verbose
+
+          # Generate metadata file for signtool, used in signing box .exe and .msi
+          @{
+            CertificateProfileName = "GitHubInc"
+            CodeSigningAccountName = "GitHubInc"
+            CorrelationId = $Env:CORRELATION_ID
+            Endpoint =  "https://wus.codesigning.azure.net/"
+          } | ConvertTo-Json | Out-File -FilePath $Env:METADATA_PATH
+
+      # Azure Code Signing leverages the environment variables for secrets that complement the metadata.json
+      # file generated above (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
+      # For more information, see https://learn.microsoft.com/en-us/dotnet/api/azure.identity.defaultazurecredential?view=azure-dotnet
       - name: Build release binaries
         shell: bash
         env:
+          AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
+          AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
+          DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
+          METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
           TAG_NAME: ${{ inputs.tag_name }}
-          CERT_FILE: ${{ steps.obtain_cert.outputs.cert-file }}
-          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: script/release --local "$TAG_NAME" --platform windows
       - name: Set up MSBuild
         id: setupmsbuild
-        uses: microsoft/setup-msbuild@v1.3.1
+        uses: microsoft/setup-msbuild@v2.0.0
       - name: Build MSI
         shell: bash
         env:
@@ -198,17 +213,20 @@ jobs:
             esac
             "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$source_dir" -p:OutputPath="$PWD/dist" -p:OutputName="$MSI_NAME" -p:ProductVersion="${MSI_VERSION#v}" -p:Platform="$platform"
           done
-      - name: Sign MSI
+      - name: Sign .msi release binaries
         if: inputs.environment == 'production'
         shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
+          AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
+          DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
+          METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
         run: |
           Get-ChildItem -Path .\dist -Filter *.msi | ForEach-Object {
-              .\script\sign $_.FullName
+            .\script\sign.ps1 $_.FullName
           }
-        env:
-          CERT_FILE: ${{ steps.obtain_cert.outputs.cert-file }}
-          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: windows
           if-no-files-found: error
@@ -220,14 +238,15 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: [linux, macos, windows]
+    environment: ${{ inputs.environment }}
     if: inputs.release
     steps:
       - name: Checkout cli/cli
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Merge built artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Checkout documentation site
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: github/cli.github.com
           path: site
@@ -350,12 +369,12 @@ jobs:
             git diff --name-status @{upstream}..
           fi
       - name: Bump homebrew-core formula
-        uses: mislav/bump-homebrew-formula-action@v2
+        uses: mislav/bump-homebrew-formula-action@v3
         if: inputs.environment == 'production' && !contains(inputs.tag_name, '-')
         with:
           formula-name: gh
           formula-path: Formula/g/gh.rb
           tag-name: ${{ inputs.tag_name }}
-          push-to: cli/homebrew-core
+          push-to: williammartin/homebrew-core
         env:
           COMMITTER_TOKEN: ${{ secrets.HOMEBREW_PR_PAT }}

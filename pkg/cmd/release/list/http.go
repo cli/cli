@@ -2,12 +2,24 @@ package list
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/shurcooL/githubv4"
 )
+
+var releaseFields = []string{
+	"name",
+	"tagName",
+	"isDraft",
+	"isLatest",
+	"isPrerelease",
+	"createdAt",
+	"publishedAt",
+}
 
 type Release struct {
 	Name         string
@@ -19,7 +31,11 @@ type Release struct {
 	PublishedAt  time.Time
 }
 
-func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, excludeDrafts bool, excludePreReleases bool) ([]Release, error) {
+func (r *Release) ExportData(fields []string) map[string]interface{} {
+	return cmdutil.StructExportData(r, fields)
+}
+
+func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, excludeDrafts bool, excludePreReleases bool, order string) ([]Release, error) {
 	type responseData struct {
 		Repository struct {
 			Releases struct {
@@ -28,7 +44,7 @@ func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, ex
 					HasNextPage bool
 					EndCursor   string
 				}
-			} `graphql:"releases(first: $perPage, orderBy: {field: CREATED_AT, direction: DESC}, after: $endCursor)"`
+			} `graphql:"releases(first: $perPage, orderBy: {field: CREATED_AT, direction: $direction}, after: $endCursor)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
@@ -42,6 +58,7 @@ func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, ex
 		"name":      githubv4.String(repo.RepoName()),
 		"perPage":   githubv4.Int(perPage),
 		"endCursor": (*githubv4.String)(nil),
+		"direction": githubv4.OrderDirection(strings.ToUpper(order)),
 	}
 
 	gql := api.NewClientFromHTTP(httpClient)

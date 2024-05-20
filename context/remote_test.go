@@ -28,6 +28,71 @@ func Test_Remotes_FindByName(t *testing.T) {
 	assert.Error(t, err, "no GitHub remotes found")
 }
 
+func Test_Remotes_FindByRepo(t *testing.T) {
+	list := Remotes{
+		&Remote{Remote: &git.Remote{Name: "remote-0"}, Repo: ghrepo.New("owner", "repo")},
+		&Remote{Remote: &git.Remote{Name: "remote-1"}, Repo: ghrepo.New("another-owner", "another-repo")},
+	}
+
+	tests := []struct {
+		name        string
+		owner       string
+		repo        string
+		wantsRemote *Remote
+		wantsError  string
+	}{
+		{
+			name:        "exact match (owner/repo)",
+			owner:       "owner",
+			repo:        "repo",
+			wantsRemote: list[0],
+		},
+		{
+			name:        "exact match (another-owner/another-repo)",
+			owner:       "another-owner",
+			repo:        "another-repo",
+			wantsRemote: list[1],
+		},
+		{
+			name:        "case-insensitive match",
+			owner:       "OWNER",
+			repo:        "REPO",
+			wantsRemote: list[0],
+		},
+		{
+			name:       "non-match (owner)",
+			owner:      "unknown-owner",
+			repo:       "repo",
+			wantsError: "no matching remote found; looking for unknown-owner/repo",
+		},
+		{
+			name:       "non-match (repo)",
+			owner:      "owner",
+			repo:       "unknown-repo",
+			wantsError: "no matching remote found; looking for owner/unknown-repo",
+		},
+		{
+			name:       "non-match (owner, repo)",
+			owner:      "unknown-owner",
+			repo:       "unknown-repo",
+			wantsError: "no matching remote found; looking for unknown-owner/unknown-repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := list.FindByRepo(tt.owner, tt.repo)
+			if tt.wantsError != "" {
+				assert.Error(t, err, tt.wantsError)
+				assert.Nil(t, r)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, r, tt.wantsRemote)
+			}
+		})
+	}
+}
+
 type identityTranslator struct{}
 
 func (it identityTranslator) Translate(u *url.URL) *url.URL {

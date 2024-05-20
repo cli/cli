@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdDeleteItem(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       deleteItemOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         deleteItemOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "missing-id",
@@ -58,9 +59,9 @@ func TestNewCmdDeleteItem(t *testing.T) {
 			name: "json",
 			cli:  "--format json --id 123",
 			wants: deleteItemOpts{
-				format: "json",
 				itemID: "123",
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -94,7 +95,7 @@ func TestNewCmdDeleteItem(t *testing.T) {
 			assert.Equal(t, tt.wants.number, gotOpts.number)
 			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.itemID, gotOpts.itemID)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }
@@ -353,5 +354,94 @@ func TestRunDelete_Me(t *testing.T) {
 	assert.Equal(
 		t,
 		"Deleted item\n",
+		stdout.String())
+}
+
+func TestRunDelete_JSON(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// get project ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  0,
+				"afterItems":  nil,
+				"firstFields": 0,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "an ID",
+					},
+				},
+			},
+		})
+
+	// delete item
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation DeleteProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"deleteProjectV2Item": map[string]interface{}{
+					"deletedItemId": "item ID",
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := deleteItemConfig{
+		opts: deleteItemOpts{
+			owner:    "monalisa",
+			number:   1,
+			itemID:   "item ID",
+			exporter: cmdutil.NewJSONExporter(),
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runDeleteItem(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"id":"item ID"}`,
 		stdout.String())
 }

@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -22,7 +21,7 @@ type editOpts struct {
 	visibility       string
 	shortDescription string
 	projectID        string
-	format           string
+	exporter         cmdutil.Exporter
 }
 
 type editConfig struct {
@@ -86,7 +85,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(config editConfig) error) *cobra.C
 	editCmd.Flags().StringVar(&opts.title, "title", "", "New title for the project")
 	editCmd.Flags().StringVar(&opts.readme, "readme", "", "New readme for the project")
 	editCmd.Flags().StringVarP(&opts.shortDescription, "description", "d", "", "New description of the project")
-	cmdutil.StringEnumFlag(editCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(editCmd, &opts.exporter)
 
 	return editCmd
 }
@@ -110,8 +109,8 @@ func runEdit(config editConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, *project)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.UpdateProjectV2.ProjectV2)
 	}
 
 	return printResults(config, query.UpdateProjectV2.ProjectV2)
@@ -151,15 +150,5 @@ func printResults(config editConfig, project queries.Project) error {
 	}
 
 	_, err := fmt.Fprintf(config.io.Out, "%s\n", project.URL)
-	return err
-}
-
-func printJSON(config editConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
 	return err
 }

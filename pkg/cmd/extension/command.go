@@ -18,9 +18,10 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/search"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
+
+var alreadyInstalledError = errors.New("alreadyInstalledError")
 
 func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
@@ -37,19 +38,19 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		Long: heredoc.Docf(`
 			GitHub CLI extensions are repositories that provide additional gh commands.
 
-			The name of the extension repository must start with "gh-" and it must contain an
+			The name of the extension repository must start with %[1]sgh-%[1]s and it must contain an
 			executable of the same name. All arguments passed to the %[1]sgh <extname>%[1]s invocation
 			will be forwarded to the %[1]sgh-<extname>%[1]s executable of the extension.
 
 			An extension cannot override any of the core gh commands. If an extension name conflicts
-			with a core gh command you can use %[1]sgh extension exec <extname>%[1]s.
+			with a core gh command, you can use %[1]sgh extension exec <extname>%[1]s.
 
-			See the list of available extensions at <https://github.com/topics/gh-extension>.
+			For the list of available extensions, see <https://github.com/topics/gh-extension>.
 		`, "`"),
 		Aliases: []string{"extensions", "ext"},
 	}
 
-	upgradeFunc := func(name string, flagForce, flagDryRun bool) error {
+	upgradeFunc := func(name string, flagForce bool) error {
 		cs := io.ColorScheme()
 		err := m.Upgrade(name, flagForce)
 		if err != nil {
@@ -62,17 +63,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			}
 			return cmdutil.SilentError
 		}
+
 		if io.IsStdoutTTY() {
-			successStr := "Successfully"
-			if flagDryRun {
-				successStr = "Would have"
-			}
-			extensionStr := "extension"
-			if name == "" {
-				extensionStr = "extensions"
-			}
-			fmt.Fprintf(io.Out, "%s %s upgraded %s\n", cs.SuccessIcon(), successStr, extensionStr)
+			fmt.Fprintf(io.Out, "%s Successfully checked extension upgrades\n", cs.SuccessIcon())
 		}
+
 		return nil
 	}
 
@@ -92,36 +87,36 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			cmd := &cobra.Command{
 				Use:   "search [<query>]",
 				Short: "Search extensions to the GitHub CLI",
-				Long: heredoc.Doc(`
+				Long: heredoc.Docf(`
 					Search for gh extensions.
 
 					With no arguments, this command prints out the first 30 extensions
 					available to install sorted by number of stars. More extensions can
-					be fetched by specifying a higher limit with the --limit flag.
+					be fetched by specifying a higher limit with the %[1]s--limit%[1]s flag.
 
 					When connected to a terminal, this command prints out three columns.
 					The first has a ✓ if the extension is already installed locally. The
-					second is the full name of the extension repository in NAME/OWNER
+					second is the full name of the extension repository in %[1]sOWNER/REPO%[1]s
 					format. The third is the extension's description.
 
 					When not connected to a terminal, the ✓ character is rendered as the
 					word "installed" but otherwise the order and content of the columns
-					is the same.
+					are the same.
 
-					This command behaves similarly to 'gh search repos' but does not
+					This command behaves similarly to %[1]sgh search repos%[1]s but does not
 					support as many search qualifiers. For a finer grained search of
 					extensions, try using:
 
 						gh search repos --topic "gh-extension"
 
-					and adding qualifiers as needed. See 'gh help search repos' to learn
+					and adding qualifiers as needed. See %[1]sgh help search repos%[1]s to learn
 					more about repository search.
 
 					For listing just the extensions that are already installed locally,
 					see:
 
 						gh ext list
-				`),
+				`, "`"),
 				Example: heredoc.Doc(`
 					# List the first 30 extensions sorted by star count, descending
 					$ gh ext search
@@ -215,9 +210,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return false
 					}
 
-					tp := tableprinter.New(io)
-					tp.HeaderRow("", "REPO", "DESCRIPTION")
-
+					tp := tableprinter.New(io, tableprinter.WithHeader("", "REPO", "DESCRIPTION"))
 					for _, repo := range result.Items {
 						if !strings.HasPrefix(repo.Name, "gh-") {
 							continue
@@ -268,8 +261,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return cmdutil.NewNoResultsError("no installed extensions found")
 				}
 				cs := io.ColorScheme()
-				//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-				t := utils.NewTablePrinter(io)
+				t := tableprinter.New(io, tableprinter.WithHeader("NAME", "REPO", "VERSION"))
 				for _, c := range cmds {
 					// TODO consider a Repo() on Extension interface
 					var repo string
@@ -279,13 +271,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						}
 					}
 
-					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
-					t.AddField(repo, nil, nil)
+					t.AddField(fmt.Sprintf("gh %s", c.Name()))
+					t.AddField(repo)
 					version := displayExtensionVersion(c, c.CurrentVersion())
 					if c.IsPinned() {
-						t.AddField(version, nil, cs.Cyan)
+						t.AddField(version, tableprinter.WithColor(cs.Cyan))
 					} else {
-						t.AddField(version, nil, nil)
+						t.AddField(version)
 					}
 
 					t.EndRow()
@@ -299,17 +291,17 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			cmd := &cobra.Command{
 				Use:   "install <repository>",
 				Short: "Install a gh extension from a repository",
-				Long: heredoc.Doc(`
+				Long: heredoc.Docf(`
 					Install a GitHub repository locally as a GitHub CLI extension.
 
-					The repository argument can be specified in "owner/repo" format as well as a full URL.
+					The repository argument can be specified in %[1]sOWNER/REPO%[1]s format as well as a full URL.
 					The URL format is useful when the repository is not hosted on github.com.
 
-					To install an extension in development from the current directory, use "." as the
+					To install an extension in development from the current directory, use %[1]s.%[1]s as the
 					value of the repository argument.
 
-					See the list of available extensions at <https://github.com/topics/gh-extension>.
-				`),
+					For the list of available extensions, see <https://github.com/topics/gh-extension>.
+				`, "`"),
 				Example: heredoc.Doc(`
 					$ gh extension install owner/gh-extension
 					$ gh extension install https://git.example.com/owner/gh-extension
@@ -333,17 +325,27 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return err
 					}
 
-					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
+					cs := io.ColorScheme()
+
+					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName(), repo.RepoOwner()); err != nil {
 						// If an existing extension was found and --force was specified, attempt to upgrade.
 						if forceFlag && ext != nil {
-							return upgradeFunc(ext.Name(), forceFlag, false)
+							return upgradeFunc(ext.Name(), forceFlag)
+						}
+
+						if errors.Is(err, alreadyInstalledError) {
+							fmt.Fprintf(io.ErrOut, "%s Extension %s is already installed\n", cs.WarningIcon(), ghrepo.FullName(repo))
+							return nil
 						}
 
 						return err
 					}
 
-					cs := io.ColorScheme()
-					if err := m.Install(repo, pinFlag); err != nil {
+					io.StartProgressIndicator()
+					err = m.Install(repo, pinFlag)
+					io.StopProgressIndicator()
+
+					if err != nil {
 						if errors.Is(err, releaseNotFoundErr) {
 							return fmt.Errorf("%s Could not find a release of %s for %s",
 								cs.FailureIcon(), args[0], cs.Cyan(pinFlag))
@@ -397,7 +399,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if flagDryRun {
 						m.EnableDryRunMode()
 					}
-					return upgradeFunc(name, flagForce, flagDryRun)
+					return upgradeFunc(name, flagForce)
 				},
 			}
 			cmd.Flags().BoolVar(&flagAll, "all", false, "Upgrade all extensions")
@@ -427,17 +429,17 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			cmd := &cobra.Command{
 				Use:   "browse",
 				Short: "Enter a UI for browsing, adding, and removing extensions",
-				Long: heredoc.Doc(`
+				Long: heredoc.Docf(`
 					This command will take over your terminal and run a fully interactive
 					interface for browsing, adding, and removing gh extensions. A terminal
 					width greater than 100 columns is recommended.
 
-					To learn how to control this interface, press ? after running to see
+					To learn how to control this interface, press %[1]s?%[1]s after running to see
 					the help text.
 
-					Press q to quit.
+					Press %[1]sq%[1]s to quit.
 
-					Running this command with --single-column should make this command
+					Running this command with %[1]s--single-column%[1]s should make this command
 					more intelligible for users who rely on assistive technology like screen
 					readers or high zoom.
 
@@ -445,8 +447,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 						gh ext search
 
-					along with gh ext install, gh ext remove, and gh repo view.
-				`),
+					along with %[1]sgh ext install%[1]s, %[1]sgh ext remove%[1]s, and %[1]sgh repo view%[1]s.
+				`, "`"),
 				Args: cobra.NoArgs,
 				RunE: func(cmd *cobra.Command, args []string) error {
 					if !io.CanPrompt() {
@@ -488,14 +490,14 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		&cobra.Command{
 			Use:   "exec <name> [args]",
 			Short: "Execute an installed extension",
-			Long: heredoc.Doc(`
+			Long: heredoc.Docf(`
 				Execute an extension using the short name. For example, if the extension repository is
-				"owner/gh-extension", you should pass "extension". You can use this command when
+				%[1]sowner/gh-extension%[1]s, you should pass %[1]sextension%[1]s. You can use this command when
 				the short name conflicts with a core gh command.
 
 				All arguments after the extension name will be forwarded to the executable
 				of the extension.
-			`),
+			`, "`"),
 			Example: heredoc.Doc(`
 				# execute a label extension instead of the core gh label command
 				$ gh extension exec label
@@ -637,7 +639,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	return &extCmd
 }
 
-func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName string) (extensions.Extension, error) {
+func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName, extOwner string) (extensions.Extension, error) {
 	if !strings.HasPrefix(extName, "gh-") {
 		return nil, errors.New("extension repository name must start with `gh-`")
 	}
@@ -649,6 +651,9 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 
 	for _, ext := range m.List() {
 		if ext.Name() == commandName {
+			if ext.Owner() == extOwner {
+				return ext, alreadyInstalledError
+			}
 			return ext, fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
 		}
 	}

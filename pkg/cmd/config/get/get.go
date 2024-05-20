@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -13,7 +13,7 @@ import (
 
 type GetOptions struct {
 	IO     *iostreams.IOStreams
-	Config config.Config
+	Config gh.Config
 
 	Hostname string
 	Key      string
@@ -56,7 +56,7 @@ func NewCmdConfigGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Co
 func getRun(opts *GetOptions) error {
 	// search keyring storage when fetching the `oauth_token` value
 	if opts.Hostname != "" && opts.Key == "oauth_token" {
-		token, _ := opts.Config.Authentication().Token(opts.Hostname)
+		token, _ := opts.Config.Authentication().ActiveToken(opts.Hostname)
 		if token == "" {
 			return errors.New(`could not find key "oauth_token"`)
 		}
@@ -64,13 +64,22 @@ func getRun(opts *GetOptions) error {
 		return nil
 	}
 
-	val, err := opts.Config.GetOrDefault(opts.Hostname, opts.Key)
-	if err != nil {
-		return err
+	optionalEntry := opts.Config.GetOrDefault(opts.Hostname, opts.Key)
+	if optionalEntry.IsNone() {
+		return nonExistentKeyError{key: opts.Key}
 	}
 
+	val := optionalEntry.Unwrap().Value
 	if val != "" {
 		fmt.Fprintf(opts.IO.Out, "%s\n", val)
 	}
 	return nil
+}
+
+type nonExistentKeyError struct {
+	key string
+}
+
+func (e nonExistentKeyError) Error() string {
+	return fmt.Sprintf("could not find key \"%s\"", e.key)
 }

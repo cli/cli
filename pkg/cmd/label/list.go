@@ -7,10 +7,10 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -134,13 +134,12 @@ func listRun(opts *listOptions) error {
 
 func printLabels(io *iostreams.IOStreams, labels []label) error {
 	cs := io.ColorScheme()
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	table := utils.NewTablePrinter(io)
+	table := tableprinter.New(io, tableprinter.WithHeader("NAME", "DESCRIPTION", "COLOR"))
 
 	for _, label := range labels {
-		table.AddField(label.Name, nil, cs.ColorFromRGB(label.Color))
-		table.AddField(label.Description, text.Truncate, nil)
-		table.AddField("#"+label.Color, nil, nil)
+		table.AddField(label.Name, tableprinter.WithColor(cs.ColorFromRGB(label.Color)))
+		table.AddField(label.Description)
+		table.AddField("#" + label.Color)
 
 		table.EndRow()
 	}
