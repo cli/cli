@@ -51,58 +51,58 @@ merge_binaries() {
 }
 
 build_pkg() {
-    # setup payload
-    mkdir -p "${payload_local_bin}"
-    mkdir -p "${payload_man1}"
-    mkdir -p "${payload_zsh_site_functions}"
+  # setup payload
+  mkdir -p "${payload_local_bin}"
+  mkdir -p "${payload_man1}"
+  mkdir -p "${payload_zsh_site_functions}"
 
-    # copy man pages
-    for file in ./share/man/man1/gh*.1; do
-        cp "$file" "${payload_man1}"
-    done
-    # Include only Zsh completions,
-    # the recommended/only option on macOS since Catalina for default shell.
-    cp "./share/zsh/site-functions/_gh" "${payload_zsh_site_functions}"
+  # copy man pages
+  for file in ./share/man/man1/gh*.1; do
+    cp "$file" "${payload_man1}"
+  done
+  # Include only Zsh completions,
+  # the recommended/only option on macOS since Catalina for default shell.
+  cp "./share/zsh/site-functions/_gh" "${payload_zsh_site_functions}"
 
-    # merge binaries
-    merge_binaries
+  # merge binaries
+  merge_binaries
 
-    # build pkg
-    pkgbuild \
-        --root "$payload_root" \
-        --identifier "com.github.cli" \
-        --version "$tag_name" \
-        --install-location "/" \
-        "dist/com.github.cli.pkg"
+  # build pkg
+  pkgbuild \
+    --root "$payload_root" \
+    --identifier "com.github.cli" \
+    --version "$tag_name" \
+    --install-location "/" \
+    "dist/com.github.cli.pkg"
 
-    # setup resources
-    mkdir "build/macOS/resources"
-    cp "LICENSE" "build/macOS/resources"
-    touch .gi
+  # setup resources
+  mkdir "build/macOS/resources"
+  cp "LICENSE" "build/macOS/resources"
+  touch .gi
 
-    # build distribution
-    if [ -n "$APPLE_DEVELOPER_INSTALLER_ID" ]; then
-        # build and sign production package with license
-        productbuild \
-            --distribution "./build/macOS/distribution.xml" \
-            --resources "./build/macOS/resources" \
-            --package-path "./dist" \
-            --timestamp \
-            --sign "${APPLE_DEVELOPER_INSTALLER_ID?}" \
-            "./dist/gh_${tag_name}_macOS_universal.pkg"
-    else
-        echo "skipping macOS pkg code-signing; APPLE_DEVELOPER_INSTALLER_ID not set" >&2
+  # build distribution
+  if [ -n "$APPLE_DEVELOPER_INSTALLER_ID" ]; then
+    # build and sign production package with license
+    productbuild \
+      --distribution "./build/macOS/distribution.xml" \
+      --resources "./build/macOS/resources" \
+      --package-path "./dist" \
+      --timestamp \
+      --sign "${APPLE_DEVELOPER_INSTALLER_ID?}" \
+      "./dist/gh_${tag_name}_macOS_universal.pkg"
+  else
+    echo "skipping macOS pkg code-signing; APPLE_DEVELOPER_INSTALLER_ID not set" >&2
 
-        # build production package with license without signing
-        productbuild \
-            --distribution "./build/macOS/distribution.xml" \
-            --resources "./build/macOS/resources" \
-            --package-path "./dist" \
-            "./dist/gh_${tag_name}_macOS_universal.pkg"
-    fi
+    # build production package with license without signing
+    productbuild \
+      --distribution "./build/macOS/distribution.xml" \
+      --resources "./build/macOS/resources" \
+      --package-path "./dist" \
+      "./dist/gh_${tag_name}_macOS_universal.pkg"
+  fi
 
-    # remove temp installer so it does not get uploaded
-    rm "dist/com.github.cli.pkg"
+  # remove temp installer so it does not get uploaded
+  rm "dist/com.github.cli.pkg"
 }
 
 build_pkg
