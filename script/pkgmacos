@@ -36,12 +36,12 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# check os requirements: is running macOS 13+ and pkgbuild + productbuild are available
+# check os requirements: is running macOS 12+ and pkgbuild + productbuild are available
 os_version=$(sw_vers -productVersion)
 major_version=${os_version%%.*}
 
-if (( major_version < 13 )); then
-  echo "This script requires macOS 13 or later. You are running macOS ${os_version}." >&2
+if (( major_version < 12 )); then
+  echo "This script requires macOS 12 or later. You are running macOS ${os_version}." >&2
   exit 1
 fi
 
