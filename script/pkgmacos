@@ -36,6 +36,26 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# check os requirements: is running macOS 13+ and pkgbuild + productbuild are available
+os_version=$(sw_vers -productVersion)
+major_version=${os_version%%.*}
+
+if (( major_version < 13 )); then
+  echo "This script requires macOS 13 or later. You are running macOS ${os_version}." >&2
+  exit 1
+fi
+
+if ! command -v pkgbuild &> /dev/null; then
+  echo "pkgbuild could not be found. Please install Xcode Command Line Tools." >&2
+  exit 1
+fi
+
+if ! command -v productbuild &> /dev/null; then
+  echo "productbuild could not be found. Please install Xcode Command Line Tools." >&2
+  exit 1
+fi
+# end of os requirements check
+
 # gh-binary paths
 bin_path="/bin/gh"
 arm64_bin="dist/macos_darwin_arm64$bin_path"
@@ -78,7 +98,6 @@ build_pkg() {
   # setup resources
   mkdir "build/macOS/resources"
   cp "LICENSE" "build/macOS/resources"
-  touch .gi
 
   # build distribution
   if [ -n "$APPLE_DEVELOPER_INSTALLER_ID" ]; then
@@ -100,9 +119,13 @@ build_pkg() {
       --package-path "./dist" \
       "./dist/gh_${tag_name}_macOS_universal.pkg"
   fi
-
-  # remove temp installer so it does not get uploaded
-  rm "dist/com.github.cli.pkg"
 }
+
+cleanup() {
+  # remove temp installer so it does not get uploaded
+  rm -f "dist/com.github.cli.pkg"
+}
+
+trap cleanup EXIT
 
 build_pkg
