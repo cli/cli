@@ -4,7 +4,7 @@
     <license file="LICENSE" mime-type="text/plain"/>
     <options hostArchitectures="arm64,x86_64" customize="never" require-scripts="false" allow-external-scripts="false"/>
     <domains enable_localSystem="true"/>
-    
+
     <choices-outline>
         <line choice="gh-cli"/>
     </choices-outline>
@@ -12,8 +12,5 @@
         <pkg-ref id="com.github.cli.pkg"/>
     </choice>
 
-    <pkg-ref id="com.github.cli.pkg" auth="Root" packageIdentifier="com.github.cli">#com.github.cli.pkg</pkg-ref>
-    <pkg-ref id="com.github.cli.pkg" auth="Root" packageIdentifier="com.github.cli">
-        <bundle-version/>
-    </pkg-ref>
+    <pkg-ref id="com.github.cli.pkg" auth="root">#com.github.cli.pkg</pkg-ref>
 </installer-gui-script>
