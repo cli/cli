@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <installer-gui-script minSpecVersion="1">
-    <title>Github Cli</title>
+    <title>GitHub CLI</title>
     <license file="LICENSE" mime-type="text/plain"/>
     <options hostArchitectures="arm64,x86_64" customize="never" require-scripts="false" allow-external-scripts="false"/>
     <domains enable_localSystem="true"/>
