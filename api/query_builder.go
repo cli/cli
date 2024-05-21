@@ -300,7 +300,7 @@ var PullRequestFields = append(IssueFields,
 )
 
 // Some fields are only valid in the context of issues.
-var IssueOnlyFields = []string{
+var issueOnlyFields = []string{
 	"isPinned",
 	"stateReason",
 }
@@ -372,7 +372,7 @@ func IssueGraphQL(fields []string) string {
 func PullRequestGraphQL(fields []string) string {
 	s := set.NewStringSet()
 	s.AddValues(fields)
-	s.RemoveValues(IssueOnlyFields)
+	s.RemoveValues(issueOnlyFields)
 	return IssueGraphQL(s.ToSlice())
 }
 
