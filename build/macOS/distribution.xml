@@ -8,7 +8,7 @@
     <choices-outline>
         <line choice="gh-cli"/>
     </choices-outline>
-    <choice id="gh-cli" title="Github Cli (universal)">
+    <choice id="gh-cli" title="GitHub CLI (universal)">
         <pkg-ref id="com.github.cli.pkg"/>
     </choice>
 
