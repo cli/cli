@@ -69,11 +69,11 @@ build_pkg() {
 
     # build pkg
     pkgbuild \
-    --root "$payload_root" \
-    --identifier "com.github.cli" \
-    --version "$tag_name" \
-    --install-location "/" \
-    "dist/com.github.cli.pkg"
+        --root "$payload_root" \
+        --identifier "com.github.cli" \
+        --version "$tag_name" \
+        --install-location "/" \
+        "dist/com.github.cli.pkg"
 
     # setup resources
     mkdir "build/macOS/resources"
