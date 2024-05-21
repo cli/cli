@@ -95,10 +95,10 @@ build_pkg() {
 
         # build production package with license without signing
         productbuild \
-        --distribution "./build/macOS/distribution.xml" \
-        --resources "./build/macOS/resources" \
-        --package-path "./dist" \
-        "./dist/gh_${tag_name}_macOS_universal.pkg"
+            --distribution "./build/macOS/distribution.xml" \
+            --resources "./build/macOS/resources" \
+            --package-path "./dist" \
+            "./dist/gh_${tag_name}_macOS_universal.pkg"
     fi
 
     # remove temp installer so it does not get uploaded
