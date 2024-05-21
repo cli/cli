@@ -28,6 +28,8 @@ func init() {
 
 	jsonCmd.Flags().StringSlice("json", nil, "help message for flag json")
 
+	aliasCmd.Flags().StringSlice("yang", nil, "help message for flag yang")
+
 	echoCmd.AddCommand(timesCmd, echoSubCmd, deprecatedCmd)
 	rootCmd.AddCommand(printCmd, echoCmd, dummyCmd)
 }
@@ -73,6 +75,13 @@ var printCmd = &cobra.Command{
 	Use:   "print [string to print]",
 	Short: "Print anything to the screen",
 	Long:  `an absolutely utterly useless command for testing.`,
+}
+
+var aliasCmd = &cobra.Command{
+	Use:     "ying [yang]",
+	Short:   "The ying and yang of it all",
+	Long:    "an absolutely utterly useless command for testing aliases!.",
+	Aliases: []string{"yoo", "foo"},
 }
 
 var jsonCmd = &cobra.Command{

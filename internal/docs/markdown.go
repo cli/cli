@@ -26,6 +26,15 @@ func printJSONFields(w io.Writer, cmd *cobra.Command) {
 	fmt.Fprint(w, "\n\n")
 }
 
+func printAliases(w io.Writer, cmd *cobra.Command) {
+	if len(cmd.Aliases) > 0 {
+		fmt.Fprintf(w, "### ALIASES\n\n")
+		fmt.Fprint(w, text.FormatSlice(strings.Split(strings.Join(root.BuildAliasList(cmd, cmd.Aliases), ", "), ","), 0, 0, "", "", true))
+		fmt.Fprint(w, "\n\n")
+	}
+
+}
+
 func printOptions(w io.Writer, cmd *cobra.Command) error {
 	flags := cmd.NonInheritedFlags()
 	flags.SetOutput(w)
@@ -147,6 +156,7 @@ func genMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 	if err := printOptions(w, cmd); err != nil {
 		return err
 	}
+	printAliases(w, cmd)
 	printJSONFields(w, cmd)
 	fmt.Fprint(w, "{% endraw %}\n")
 
