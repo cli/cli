@@ -84,12 +84,12 @@ build_pkg() {
     if [ -n "$APPLE_DEVELOPER_INSTALLER_ID" ]; then
         # build and sign production package with license
         productbuild \
-        --distribution "./build/macOS/distribution.xml" \
-        --resources "./build/macOS/resources" \
-        --package-path "./dist" \
-        --timestamp \
-        --sign "${APPLE_DEVELOPER_INSTALLER_ID?}" \
-        "./dist/gh_${tag_name}_macOS_universal.pkg"
+            --distribution "./build/macOS/distribution.xml" \
+            --resources "./build/macOS/resources" \
+            --package-path "./dist" \
+            --timestamp \
+            --sign "${APPLE_DEVELOPER_INSTALLER_ID?}" \
+            "./dist/gh_${tag_name}_macOS_universal.pkg"
     else
         echo "skipping macOS pkg code-signing; APPLE_DEVELOPER_INSTALLER_ID not set" >&2
 
