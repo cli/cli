@@ -102,6 +102,50 @@ func TestVerifyIntegration(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("with repo and valid cert-identity-regex", func(t *testing.T) {
+		artifactPath := test.NormalizeRelativePath("../test/data/shared-workflow-artifact")
+		bundlePath := test.NormalizeRelativePath("../test/data/shared-workflow-attestation.sigstore.json")
+
+		opts := Options{
+			APIClient:        api.NewLiveClient(hc, logger),
+			ArtifactPath:     artifactPath,
+			BundlePath:       bundlePath,
+			DigestAlgorithm:  "sha256",
+			Logger:           logger,
+			OCIClient:        oci.NewLiveClient(),
+			OIDCIssuer:       GitHubOIDCIssuer,
+			Owner:            "malancas",
+			Repo:             "malancas/attest-demo",
+			SANRegex:         "^https://github.com/bdehamer/workflows/",
+			SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
+		}
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
+	t.Run("with repo and valid cert-identity", func(t *testing.T) {
+		artifactPath := test.NormalizeRelativePath("../test/data/shared-workflow-artifact")
+		bundlePath := test.NormalizeRelativePath("../test/data/shared-workflow-attestation.sigstore.json")
+
+		opts := Options{
+			APIClient:        api.NewLiveClient(hc, logger),
+			ArtifactPath:     artifactPath,
+			BundlePath:       bundlePath,
+			DigestAlgorithm:  "sha256",
+			Logger:           logger,
+			OCIClient:        oci.NewLiveClient(),
+			OIDCIssuer:       GitHubOIDCIssuer,
+			Owner:            "malancas",
+			Repo:             "malancas/attest-demo",
+			SAN:              "https://github.com/bdehamer/workflows/.github/workflows/attest.yml@refs/heads/main",
+			SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
+		}
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
 	t.Run("with owner and valid cert-identity", func(t *testing.T) {
 		artifactPath := test.NormalizeRelativePath("../test/data/shared-workflow-artifact")
 		bundlePath := test.NormalizeRelativePath("../test/data/shared-workflow-attestation.sigstore.json")
@@ -115,7 +159,28 @@ func TestVerifyIntegration(t *testing.T) {
 			OCIClient:        oci.NewLiveClient(),
 			OIDCIssuer:       GitHubOIDCIssuer,
 			Owner:            "malancas",
-			SANRegex:         "https://github.com/bdehamer/workflows/",
+			SAN:              "https://github.com/bdehamer/workflows/.github/workflows/attest.yml@refs/heads/main",
+			SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
+		}
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
+	t.Run("with owner and valid cert-identity-regex", func(t *testing.T) {
+		artifactPath := test.NormalizeRelativePath("../test/data/shared-workflow-artifact")
+		bundlePath := test.NormalizeRelativePath("../test/data/shared-workflow-attestation.sigstore.json")
+
+		opts := Options{
+			APIClient:        api.NewLiveClient(hc, logger),
+			ArtifactPath:     artifactPath,
+			BundlePath:       bundlePath,
+			DigestAlgorithm:  "sha256",
+			Logger:           logger,
+			OCIClient:        oci.NewLiveClient(),
+			OIDCIssuer:       GitHubOIDCIssuer,
+			Owner:            "malancas",
+			SANRegex:         "^https://github.com/bdehamer/workflows/",
 			SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
 		}
 
