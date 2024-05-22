@@ -82,9 +82,9 @@ func TestVerifyIntegration(t *testing.T) {
 	})
 }
 
-func TestVerifyIntegrationSharedWorkflow(t *testing.T) {
-	artifactPath := test.NormalizeRelativePath("../test/data/shared-workflow-artifact")
-	bundlePath := test.NormalizeRelativePath("../test/data/shared-workflow-attestation.sigstore.json")
+func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
+	artifactPath := test.NormalizeRelativePath("../test/data/reusable-workflow-artifact")
+	bundlePath := test.NormalizeRelativePath("../test/data/reusable-workflow-attestation.sigstore.json")
 
 	logger := io.NewTestHandler()
 
@@ -110,7 +110,7 @@ func TestVerifyIntegrationSharedWorkflow(t *testing.T) {
 		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
 	}
 
-	t.Run("with owner and valid shared workflow SAN", func(t *testing.T) {
+	t.Run("with owner and valid reusable workflow SAN", func(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
 		opts.SAN = "https://github.com/bdehamer/workflows/.github/workflows/attest.yml@refs/heads/main"
@@ -119,7 +119,7 @@ func TestVerifyIntegrationSharedWorkflow(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("with owner and valid shared workflow SAN regex", func(t *testing.T) {
+	t.Run("with owner and valid reusable workflow SAN regex", func(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
 		opts.SANRegex = "^https://github.com/bdehamer/workflows/"
@@ -128,7 +128,7 @@ func TestVerifyIntegrationSharedWorkflow(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("with repo and valid shared workflow SAN", func(t *testing.T) {
+	t.Run("with repo and valid reusable workflow SAN", func(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
 		opts.Repo = "malancas/attest-demo"
@@ -138,7 +138,7 @@ func TestVerifyIntegrationSharedWorkflow(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("with repo and valid shared workflow SAN regex", func(t *testing.T) {
+	t.Run("with repo and valid reusable workflow SAN regex", func(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
 		opts.Repo = "malancas/attest-demo"
