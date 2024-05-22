@@ -50,7 +50,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		Aliases: []string{"extensions", "ext"},
 	}
 
-	upgradeFunc := func(name string, flagForce, flagDryRun bool) error {
+	upgradeFunc := func(name string, flagForce bool) error {
 		cs := io.ColorScheme()
 		err := m.Upgrade(name, flagForce)
 		if err != nil {
@@ -63,17 +63,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			}
 			return cmdutil.SilentError
 		}
+
 		if io.IsStdoutTTY() {
-			successStr := "Successfully"
-			if flagDryRun {
-				successStr = "Would have"
-			}
-			extensionStr := "extension"
-			if name == "" {
-				extensionStr = "extensions"
-			}
-			fmt.Fprintf(io.Out, "%s %s upgraded %s\n", cs.SuccessIcon(), successStr, extensionStr)
+			fmt.Fprintf(io.Out, "%s Successfully checked extension upgrades\n", cs.SuccessIcon())
 		}
+
 		return nil
 	}
 
@@ -336,7 +330,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName(), repo.RepoOwner()); err != nil {
 						// If an existing extension was found and --force was specified, attempt to upgrade.
 						if forceFlag && ext != nil {
-							return upgradeFunc(ext.Name(), forceFlag, false)
+							return upgradeFunc(ext.Name(), forceFlag)
 						}
 
 						if errors.Is(err, alreadyInstalledError) {
@@ -405,7 +399,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if flagDryRun {
 						m.EnableDryRunMode()
 					}
-					return upgradeFunc(name, flagForce, flagDryRun)
+					return upgradeFunc(name, flagForce)
 				},
 			}
 			cmd.Flags().BoolVar(&flagAll, "all", false, "Upgrade all extensions")

@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/set"
@@ -173,9 +174,14 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 
 	credentialFlow := &shared.GitCredentialFlow{
-		Executable: opts.MainExecutable,
-		Prompter:   opts.Prompter,
-		GitClient:  opts.GitClient,
+		Prompter: opts.Prompter,
+		HelperConfig: &gitcredentials.HelperConfig{
+			SelfExecutablePath: opts.MainExecutable,
+			GitClient:          opts.GitClient,
+		},
+		Updater: &gitcredentials.Updater{
+			GitClient: opts.GitClient,
+		},
 	}
 	gitProtocol := cfg.GitProtocol(hostname).Value
 	if opts.Interactive && gitProtocol == "https" {
