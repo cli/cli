@@ -358,7 +358,7 @@ func TestWatchRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
-			wantOut: "\x1b[?1049h\x1b[?1049l✓ trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run CI (2) completed with 'success'\n",
+			wantOut: "\x1b[?1049h\x1b[?1049l! failed to get annotations: HTTP 403 (https://api.github.com/repos/OWNER/REPO/check-runs/10/annotations)\n✓ trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run CI (2) completed with 'success'\n",
 		},
 	}
 

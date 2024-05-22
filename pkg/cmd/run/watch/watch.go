@@ -240,7 +240,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 	}
 
 	if annotationErr != nil {
-		fmt.Printf("%s failed to get annotations: %s", cs.WarningIcon(), annotationErr)
+		fmt.Fprintln(out, fmt.Sprintf("%s failed to get annotations: %s", cs.WarningIcon(), annotationErr))
 	}
 
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber, 0))
