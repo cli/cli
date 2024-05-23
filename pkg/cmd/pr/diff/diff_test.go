@@ -358,6 +358,10 @@ func Test_changedFileNames(t *testing.T) {
 			input:  fmt.Sprintf("diff --git a/baz.go b/baz.go\n--- a/baz.go\n+++ b/baz.go\n+foo\n-b%sr", strings.Repeat("a", 2*lineBufferSize)),
 			output: "baz.go\n",
 		},
+		{
+			input:  "diff --git \"a/\343\202\212\343\203\274\343\201\251\343\201\277\343\203\274.md\" \"b/\343\202\212\343\203\274\343\201\251\343\201\277\343\203\274.md\"",
+			output: "\"\343\202\212\343\203\274\343\201\251\343\201\277\343\203\274.md\"\n",
+		},
 	}
 	for _, tt := range inputs {
 		buf := bytes.Buffer{}

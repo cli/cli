@@ -274,11 +274,11 @@ func changedFilesNames(w io.Writer, r io.Reader) error {
 		return err
 	}
 
-	pattern := regexp.MustCompile(`(?:^|\n)diff\s--git.*\sb/(.*)`)
+	pattern := regexp.MustCompile(`(?:^|\n)diff\s--git.*\s(["]?)b/(.*)`)
 	matches := pattern.FindAllStringSubmatch(string(diff), -1)
 
 	for _, val := range matches {
-		name := strings.TrimSpace(val[1])
+		name := strings.TrimSpace(val[1] + val[2])
 		if _, err := w.Write([]byte(name + "\n")); err != nil {
 			return err
 		}
