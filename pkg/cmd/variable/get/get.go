@@ -1,9 +1,9 @@
 package get
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -26,13 +26,14 @@ type GetOptions struct {
 	EnvName      string
 }
 
-type Variable struct {
-	Name             string            `json:"name"`
-	Value            string            `json:"value"`
-	UpdatedAt        time.Time         `json:"updated_at"`
-	Visibility       shared.Visibility `json:"visibility"`
-	SelectedReposURL string            `json:"selected_repositories_url"`
-	NumSelectedRepos int               `json:"num_selected_repos"`
+type getVariableResponse struct {
+	Value string `json:"value"`
+	// Other available but unused fields
+	// Name             string            `json:"name"`
+	// UpdatedAt        time.Time         `json:"updated_at"`
+	// Visibility       shared.Visibility `json:"visibility"`
+	// SelectedReposURL string            `json:"selected_repositories_url"`
+	// NumSelectedRepos int               `json:"num_selected_repos"`
 }
 
 func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command {
@@ -115,14 +116,17 @@ func getRun(opts *GetOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
-	response := &Variable{}
+	var response getVariableResponse
+	if err = client.REST(host, "GET", path, nil, &response); err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return fmt.Errorf("variable %s was not found", opts.VariableName)
+		}
 
-	err = client.REST(host, "GET", path, nil, &response)
-	if err != nil {
 		return fmt.Errorf("failed to get variable %s: %w", opts.VariableName, err)
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s", response.Value)
+	fmt.Fprintf(opts.IO.Out, "%s\n", response.Value)
 
 	return nil
 }

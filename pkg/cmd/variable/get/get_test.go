@@ -14,13 +14,15 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestNewCmdList(t *testing.T) {
+func TestNewCmdGet(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants GetOptions
+		name    string
+		cli     string
+		wants   GetOptions
+		wantErr error
 	}{
 		{
 			name: "repo",
@@ -32,19 +34,24 @@ func TestNewCmdList(t *testing.T) {
 		},
 		{
 			name: "org",
-			cli:  "-oUmbrellaCorporation BAR",
+			cli:  "-o TestOrg BAR",
 			wants: GetOptions{
-				OrgName:      "UmbrellaCorporation",
+				OrgName:      "TestOrg",
 				VariableName: "BAR",
 			},
 		},
 		{
 			name: "env",
-			cli:  "-eDevelopment BAZ",
+			cli:  "-e Development BAZ",
 			wants: GetOptions{
 				EnvName:      "Development",
 				VariableName: "BAZ",
 			},
+		},
+		{
+			name:    "org and env",
+			cli:     "-o TestOrg -e Development QUX",
+			wantErr: cmdutil.FlagErrorf("%s", "specify only one of `--org` or `--env`"),
 		},
 	}
 
@@ -69,120 +76,127 @@ func TestNewCmdList(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
-			assert.NoError(t, err)
+			if tt.wantErr != nil {
+				require.Equal(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
 
-			assert.Equal(t, tt.wants.OrgName, gotOpts.OrgName)
-			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
-			assert.Equal(t, tt.wants.VariableName, gotOpts.VariableName)
+			require.Equal(t, tt.wants.OrgName, gotOpts.OrgName)
+			require.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
+			require.Equal(t, tt.wants.VariableName, gotOpts.VariableName)
 		})
 	}
 }
 
 func Test_getRun(t *testing.T) {
 	tests := []struct {
-		name    string
-		tty     bool
-		opts    *GetOptions
-		wantOut string
+		name      string
+		opts      *GetOptions
+		httpStubs func(*httpmock.Registry)
+		wantOut   string
+		wantErr   error
 	}{
 		{
-			name: "repo tty",
-			tty:  true,
+			name: "getting repo variable",
 			opts: &GetOptions{
 				VariableName: "VARIABLE_ONE",
 			},
-			wantOut: "one",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/VARIABLE_ONE"),
+					httpmock.JSONResponse(getVariableResponse{
+						Value: "repo_var",
+					}))
+			},
+			wantOut: "repo_var\n",
 		},
 		{
-			name: "repo not tty",
-			tty:  false,
+			name: "getting org variable",
 			opts: &GetOptions{
+				OrgName:      "TestOrg",
 				VariableName: "VARIABLE_ONE",
 			},
-			wantOut: "one",
-		},
-		{
-			name: "org tty",
-			tty:  true,
-			opts: &GetOptions{
-				OrgName:      "UmbrellaCorporation",
-				VariableName: "VARIABLE_ONE",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "orgs/TestOrg/actions/variables/VARIABLE_ONE"),
+					httpmock.JSONResponse(getVariableResponse{
+						Value: "org_var",
+					}))
 			},
-			wantOut: "org_one",
+			wantOut: "org_var\n",
 		},
 		{
-			name: "org not tty",
-			tty:  false,
-			opts: &GetOptions{
-				OrgName:      "UmbrellaCorporation",
-				VariableName: "VARIABLE_ONE",
-			},
-			wantOut: "org_one",
-		},
-		{
-			name: "env tty",
-			tty:  true,
+			name: "getting env variable",
 			opts: &GetOptions{
 				EnvName:      "Development",
 				VariableName: "VARIABLE_ONE",
 			},
-			wantOut: "one",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/owner/repo/environments/Development/variables/VARIABLE_ONE"),
+					httpmock.JSONResponse(getVariableResponse{
+						Value: "env_var",
+					}))
+			},
+			wantOut: "env_var\n",
 		},
 		{
-			name: "env not tty",
-			tty:  false,
+			name: "when the variable is not found, an error is returned",
 			opts: &GetOptions{
-				EnvName:      "Development",
 				VariableName: "VARIABLE_ONE",
 			},
-			wantOut: "one",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/VARIABLE_ONE"),
+					httpmock.StatusStringResponse(404, "not found"),
+				)
+			},
+			wantErr: fmt.Errorf("variable VARIABLE_ONE was not found"),
+		},
+		{
+			name: "when getting any variable from API fails, the error is bubbled with context",
+			opts: &GetOptions{
+				VariableName: "VARIABLE_ONE",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/VARIABLE_ONE"),
+					httpmock.StatusStringResponse(400, "not found"),
+				)
+			},
+			wantErr: fmt.Errorf("failed to get variable VARIABLE_ONE: HTTP 400 (https://api.github.com/repos/owner/repo/actions/variables/VARIABLE_ONE)"),
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			reg := &httpmock.Registry{}
-			defer reg.Verify(t)
+		var runTest = func(tty bool) func(t *testing.T) {
+			return func(t *testing.T) {
+				reg := &httpmock.Registry{}
+				tt.httpStubs(reg)
+				defer reg.Verify(t)
 
-			path := fmt.Sprintf("repos/owner/repo/actions/variables/%s", tt.opts.VariableName)
-			if tt.opts.EnvName != "" {
-				path = fmt.Sprintf("repos/owner/repo/environments/%s/variables/%s", tt.opts.EnvName, tt.opts.VariableName)
-			} else if tt.opts.OrgName != "" {
-				path = fmt.Sprintf("orgs/%s/actions/variables/%s", tt.opts.OrgName, tt.opts.VariableName)
-			}
+				ios, _, stdout, _ := iostreams.Test()
+				ios.SetStdoutTTY(tty)
 
-			payload := Variable{
-				Name:  "VARIABLE_ONE",
-				Value: "one",
-			}
-			if tt.opts.OrgName != "" {
-				payload = Variable{
-					Name:  "VARIABLE_ONE",
-					Value: "org_one",
+				tt.opts.IO = ios
+				tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("owner/repo")
 				}
+				tt.opts.HttpClient = func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				}
+				tt.opts.Config = func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				}
+
+				err := getRun(tt.opts)
+				if err != nil {
+					require.EqualError(t, tt.wantErr, err.Error())
+					return
+				}
+
+				require.NoError(t, err)
+				require.Equal(t, tt.wantOut, stdout.String())
 			}
+		}
 
-			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))
-
-			ios, _, stdout, _ := iostreams.Test()
-
-			ios.SetStdoutTTY(tt.tty)
-
-			tt.opts.IO = ios
-			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-				return ghrepo.FromFullName("owner/repo")
-			}
-			tt.opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
-			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
-			}
-
-			err := getRun(tt.opts)
-			assert.NoError(t, err)
-
-			assert.Equal(t, tt.wantOut, stdout.String())
-		})
+		t.Run(tt.name+" tty", runTest(true))
+		t.Run(tt.name+" no-tty", runTest(false))
 	}
 }
