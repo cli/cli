@@ -51,11 +51,11 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 		Use:   "diff [<number> | <url> | <branch>]",
 		Short: "View changes in a pull request",
 		Long: heredoc.Docf(`
-			View changes in a pull request. 
+			View changes in a pull request.
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
-			
+
 			With %[1]s--web%[1]s flag, open the pull request diff in a web browser instead.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
@@ -274,6 +274,24 @@ func changedFilesNames(w io.Writer, r io.Reader) error {
 		return err
 	}
 
+	// This is kind of a gnarly regex. We're looking lines of the format:
+	// diff --git a/9114-triage b/9114-triage
+	// diff --git "a/hello-\360\237\230\200-world" "b/hello-\360\237\230\200-world"
+	//
+	// From these lines we would look to extract:
+	// 9114-triage
+	// "hello-\360\237\230\200-world"
+	//
+	// Note that the b/ is removed but in the second case the preceeding quote remains.
+	// This is important for how git handles filenames that would be quoted with core.quotePath.
+	// https://git-scm.com/docs/git-config#Documentation/git-config.txt-corequotePath
+	//
+	// Thus we capture the quote if it exists, and everything that follows the b/
+	// We then concatenate those two capture groups together which for the examples above would be:
+	// `` + 9114-triage
+	// `"`` + hello-\360\237\230\200-world"
+	//
+	// Where I'm using the `` to indicate a string to avoid confusion with the " character.
 	pattern := regexp.MustCompile(`(?:^|\n)diff\s--git.*\s(["]?)b/(.*)`)
 	matches := pattern.FindAllStringSubmatch(string(diff), -1)
 
