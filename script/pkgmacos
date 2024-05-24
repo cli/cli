@@ -58,8 +58,8 @@ fi
 
 # gh-binary paths
 bin_path="/bin/gh"
-arm64_bin="dist/macos_darwin_arm64$bin_path"
-amd64_bin="dist/macos_darwin_amd64_v1$bin_path"
+arm64_bin="./dist/macos_darwin_arm64$bin_path"
+amd64_bin="./dist/macos_darwin_amd64_v1$bin_path"
 # payload paths
 payload_root="pkg_payload"
 payload_local_bin="${payload_root}/usr/local/bin"
@@ -93,37 +93,35 @@ build_pkg() {
     --identifier "com.github.cli" \
     --version "$tag_name" \
     --install-location "/" \
-    "dist/com.github.cli.pkg"
+    "./dist/com.github.cli.pkg"
 
   # setup resources
-  mkdir -p "build/macOS/resources"
-  cp "LICENSE" "build/macOS/resources"
+  mkdir -p "./build/macOS/resources"
+  cp "LICENSE" "./build/macOS/resources"
 
-  # build distribution
+  PRODUCTBUILD_ARGS=()
+
+  # include signing if developer id is set
   if [ -n "$APPLE_DEVELOPER_INSTALLER_ID" ]; then
-    # build and sign production package with license
-    productbuild \
-      --distribution "./build/macOS/distribution.xml" \
-      --resources "./build/macOS/resources" \
-      --package-path "./dist" \
-      --timestamp \
-      --sign "${APPLE_DEVELOPER_INSTALLER_ID?}" \
-      "./dist/gh_${tag_name}_macOS_universal.pkg"
+    PRODUCTBUILD_ARGS+=("--timestamp")
+    PRODUCTBUILD_ARGS+=("--sign")
+    PRODUCTBUILD_ARGS+=("${APPLE_DEVELOPER_INSTALLER_ID}")
   else
     echo "skipping macOS pkg code-signing; APPLE_DEVELOPER_INSTALLER_ID not set" >&2
-
-    # build production package with license without signing
-    productbuild \
-      --distribution "./build/macOS/distribution.xml" \
-      --resources "./build/macOS/resources" \
-      --package-path "./dist" \
-      "./dist/gh_${tag_name}_macOS_universal.pkg"
   fi
+
+  # build distribution
+  productbuild \
+    --distribution "./build/macOS/distribution.xml" \
+    --resources "./build/macOS/resources" \
+    --package-path "./dist" \
+    "${PRODUCTBUILD_ARGS[@]}" \
+    "./dist/gh_${tag_name}_macOS_universal.pkg"
 }
 
 cleanup() {
   # remove temp installer so it does not get uploaded
-  rm -f "dist/com.github.cli.pkg"
+  rm -f "./dist/com.github.cli.pkg"
 }
 
 trap cleanup EXIT
