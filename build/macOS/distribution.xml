@@ -7,15 +7,20 @@
     <installation-check script="installCheck();"/>
     <script>
     function installCheck() {
-      if (!(system.compareVersions(system.version.ProductVersion, '12') &gt;= 0)) {
-        my.result.title = 'Unable to install';
-        my.result.message = 'GitHub CLI requires macOS 12 or later.';
-        my.result.type = 'Fatal';
-        return false;
-      }
-      return true;
+        // this check is redundant, but it produces a user friendly error message
+        // compared to a disabled install button caused by allowed-os-versions
+        if (!(system.compareVersions(system.version.ProductVersion, '12') &gt;= 0)) {
+            my.result.title = 'Unable to install';
+            my.result.message = 'GitHub CLI requires macOS 12 or later.';
+            my.result.type = 'Fatal';
+            return false;
+        }
+        return true;
     }
     </script>
+    <allowed-os-versions>
+        <os-version min="12.0" />
+    </allowed-os-versions>
 
     <choices-outline>
         <line choice="gh-cli"/>
