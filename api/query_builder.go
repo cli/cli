@@ -268,6 +268,7 @@ var IssueFields = []string{
 	"title",
 	"updatedAt",
 	"url",
+	"stateReason",
 }
 
 var PullRequestFields = append(IssueFields,
@@ -297,6 +298,12 @@ var PullRequestFields = append(IssueFields,
 	"reviews",
 	"statusCheckRollup",
 )
+
+// Some fields are only valid in the context of issues.
+var issueOnlyFields = []string{
+	"isPinned",
+	"stateReason",
+}
 
 // IssueGraphQL constructs a GraphQL query fragment for a set of issue fields.
 func IssueGraphQL(fields []string) string {
@@ -363,10 +370,9 @@ func IssueGraphQL(fields []string) string {
 // PullRequestGraphQL constructs a GraphQL query fragment for a set of pull request fields.
 // It will try to sanitize the fields to just those available on pull request.
 func PullRequestGraphQL(fields []string) string {
-	invalidFields := []string{"isPinned", "stateReason"}
 	s := set.NewStringSet()
 	s.AddValues(fields)
-	s.RemoveValues(invalidFields)
+	s.RemoveValues(issueOnlyFields)
 	return IssueGraphQL(s.ToSlice())
 }
 
