@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/tableprinter"
+	"github.com/cli/go-gh/v2/pkg/term"
 )
 
 type TablePrinter struct {
@@ -57,9 +58,16 @@ func New(ios *iostreams.IOStreams, headers headerOption) *TablePrinter {
 // NewWithWriter creates a TablePrinter from a Writer, whether the output is a terminal, the terminal width, and more.
 func NewWithWriter(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorScheme, headers headerOption) *TablePrinter {
 	tp := &TablePrinter{
-		TablePrinter: tableprinter.New(w, isTTY, maxWidth),
-		isTTY:        isTTY,
-		cs:           cs,
+		// TODO: Should pass in `--interactive` instead of equating to TTY.
+		TablePrinter: tableprinter.FromTerm(
+			term.FromEnv(),
+			tableprinter.WithTableWriter(w),
+			tableprinter.WithTableTTY(isTTY),
+			tableprinter.WithTableWidth(maxWidth),
+			tableprinter.WithTableInteractive(isTTY),
+		),
+		isTTY: isTTY,
+		cs:    cs,
 	}
 
 	if isTTY && len(headers.columns) > 0 {
