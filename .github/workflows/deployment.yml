@@ -38,7 +38,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: "go.mod"
+          go-version-file: 'go.mod'
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -50,7 +50,7 @@ jobs:
         run: script/release --local "$TAG_NAME" --platform linux
       - name: Attest release binaries
         if: inputs.environment == 'production'
-        uses: actions/attest-build-provenance@951c0c5f8e375ad4efad33405ab77f7ded2358e4 # v1.1.1
+        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
         with:
           subject-path: "dist/gh*"
       - name: Generate web manual pages
@@ -77,7 +77,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: "go.mod"
+          go-version-file: 'go.mod'
       - name: Configure macOS signing
         if: inputs.environment == 'production'
         env:
@@ -108,7 +108,7 @@ jobs:
         run: script/release --local "$TAG_NAME" --platform macos
       - name: Attest release binaries
         if: inputs.environment == 'production'
-        uses: actions/attest-build-provenance@951c0c5f8e375ad4efad33405ab77f7ded2358e4 # v1.1.1
+        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
         with:
           subject-path: "dist/gh*"
       - name: Notarize macOS archives
@@ -139,7 +139,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: "go.mod"
+          go-version-file: 'go.mod'
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
@@ -180,7 +180,7 @@ jobs:
         run: script/release --local "$TAG_NAME" --platform windows
       - name: Attest release binaries
         if: inputs.environment == 'production'
-        uses: actions/attest-build-provenance@951c0c5f8e375ad4efad33405ab77f7ded2358e4 # v1.1.1
+        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
         with:
           subject-path: "dist/gh*"
       - name: Set up MSBuild
