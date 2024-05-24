@@ -113,7 +113,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 	t.Run("with owner and valid reusable workflow SAN", func(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
-		opts.SAN = "https://github.com/bdehamer/workflows/.github/workflows/attest.yml@refs/heads/main"
+		opts.SAN = "https://github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml@09b495c3f12c7881b3cc17209a327792065c1a1d"
 
 		err := runVerify(&opts)
 		require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 	t.Run("with owner and valid reusable workflow SAN regex", func(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
-		opts.SANRegex = "^https://github.com/bdehamer/workflows/"
+		opts.SANRegex = "^https://github.com/github/artifact-attestations-workflows/"
 
 		err := runVerify(&opts)
 		require.NoError(t, err)
@@ -132,7 +132,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
 		opts.Repo = "malancas/attest-demo"
-		opts.SAN = "https://github.com/bdehamer/workflows/.github/workflows/attest.yml@refs/heads/main"
+		opts.SAN = "https://github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml@09b495c3f12c7881b3cc17209a327792065c1a1d"
 
 		err := runVerify(&opts)
 		require.NoError(t, err)
@@ -142,7 +142,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
 		opts.Repo = "malancas/attest-demo"
-		opts.SANRegex = "^https://github.com/bdehamer/workflows/"
+		opts.SANRegex = "^https://github.com/github/artifact-attestations-workflows/"
 
 		err := runVerify(&opts)
 		require.NoError(t, err)
