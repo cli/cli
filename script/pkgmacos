@@ -96,7 +96,7 @@ build_pkg() {
     "dist/com.github.cli.pkg"
 
   # setup resources
-  mkdir "build/macOS/resources"
+  mkdir -p "build/macOS/resources"
   cp "LICENSE" "build/macOS/resources"
 
   # build distribution
