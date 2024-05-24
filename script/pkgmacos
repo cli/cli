@@ -30,7 +30,7 @@ while [ $# -gt 0 ]; do
     exit 1
     ;;
   * )
-    tag_name="$1"
+    tag_name="${1#v}"
     shift 1
     ;;
   esac
