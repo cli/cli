@@ -21,7 +21,7 @@ If you are a hubber and are interested in shipping new commands for the CLI, che
 
 ### macOS
 
-`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], [Webi][], and as a downloadable binary from the [releases page][].
+`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], [Webi][], and as a downloadable binary including Mac OS installer `.pkg` from the [releases page][].
 
 #### Homebrew
 
