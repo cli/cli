@@ -29,6 +29,7 @@ type Variable struct {
 	Name             string     `json:"name"`
 	Value            string     `json:"value"`
 	UpdatedAt        time.Time  `json:"updated_at"`
+	CreatedAt        time.Time  `json:"created_at"`
 	Visibility       Visibility `json:"visibility"`
 	SelectedReposURL string     `json:"selected_repositories_url"`
 	NumSelectedRepos int        `json:"num_selected_repos"`
@@ -39,6 +40,7 @@ var VariableJSONFields = []string{
 	"value",
 	"visibility",
 	"updatedAt",
+	"createdAt",
 	"numSelectedRepos",
 	"selectedReposURL",
 }
