@@ -81,10 +81,11 @@ func TestNewCmdList(t *testing.T) {
 
 func Test_listRun(t *testing.T) {
 	tests := []struct {
-		name    string
-		tty     bool
-		opts    *ListOptions
-		wantOut []string
+		name       string
+		tty        bool
+		opts       *ListOptions
+		jsonFields []string
+		wantOut    []string
 	}{
 		{
 			name: "repo tty",
@@ -106,6 +107,17 @@ func Test_listRun(t *testing.T) {
 				"VARIABLE_TWO\ttwo\t2020-12-04T00:00:00Z",
 				"VARIABLE_THREE\tthree\t1975-11-30T00:00:00Z",
 			},
+		},
+		{
+			name:       "repo not tty, json",
+			tty:        false,
+			opts:       &ListOptions{},
+			jsonFields: []string{"name", "value"},
+			wantOut: []string{`[
+				{"name":"VARIABLE_ONE","value":"one"},
+				{"name":"VARIABLE_TWO","value":"two"},
+				{"name":"VARIABLE_THREE","value":"three"}
+			]`},
 		},
 		{
 			name: "org tty",
@@ -133,6 +145,19 @@ func Test_listRun(t *testing.T) {
 			},
 		},
 		{
+			name: "org not tty, json",
+			tty:  false,
+			opts: &ListOptions{
+				OrgName: "UmbrellaCorporation",
+			},
+			jsonFields: []string{"name", "value"},
+			wantOut: []string{`[
+				{"name":"VARIABLE_ONE","value":"org_one"},
+				{"name":"VARIABLE_TWO","value":"org_two"},
+				{"name":"VARIABLE_THREE","value":"org_three"}
+			]`},
+		},
+		{
 			name: "env tty",
 			tty:  true,
 			opts: &ListOptions{
@@ -156,6 +181,19 @@ func Test_listRun(t *testing.T) {
 				"VARIABLE_TWO\ttwo\t2020-12-04T00:00:00Z",
 				"VARIABLE_THREE\tthree\t1975-11-30T00:00:00Z",
 			},
+		},
+		{
+			name: "env not tty, json",
+			tty:  false,
+			opts: &ListOptions{
+				EnvName: "Development",
+			},
+			jsonFields: []string{"name", "value"},
+			wantOut: []string{`[
+				{"name":"VARIABLE_ONE","value":"one"},
+				{"name":"VARIABLE_TWO","value":"two"},
+				{"name":"VARIABLE_THREE","value":"three"}
+			]`},
 		},
 	}
 
@@ -247,11 +285,21 @@ func Test_listRun(t *testing.T) {
 				return t
 			}
 
+			if tt.jsonFields != nil {
+				jsonExporter := cmdutil.NewJSONExporter()
+				jsonExporter.SetFields(tt.jsonFields)
+				tt.opts.Exporter = jsonExporter
+			}
+
 			err := listRun(tt.opts)
 			assert.NoError(t, err)
 
 			expected := fmt.Sprintf("%s\n", strings.Join(tt.wantOut, "\n"))
-			assert.Equal(t, expected, stdout.String())
+			if tt.jsonFields != nil {
+				assert.JSONEq(t, expected, stdout.String())
+			} else {
+				assert.Equal(t, expected, stdout.String())
+			}
 		})
 	}
 }
