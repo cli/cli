@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -104,7 +105,7 @@ func Test_getRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/VARIABLE_ONE"),
-					httpmock.JSONResponse(getVariableResponse{
+					httpmock.JSONResponse(shared.Variable{
 						Value: "repo_var",
 					}))
 			},
@@ -118,7 +119,7 @@ func Test_getRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "orgs/TestOrg/actions/variables/VARIABLE_ONE"),
-					httpmock.JSONResponse(getVariableResponse{
+					httpmock.JSONResponse(shared.Variable{
 						Value: "org_var",
 					}))
 			},
@@ -132,7 +133,7 @@ func Test_getRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/owner/repo/environments/Development/variables/VARIABLE_ONE"),
-					httpmock.JSONResponse(getVariableResponse{
+					httpmock.JSONResponse(shared.Variable{
 						Value: "env_var",
 					}))
 			},
