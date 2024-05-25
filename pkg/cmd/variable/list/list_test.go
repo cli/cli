@@ -331,6 +331,7 @@ func TestExportVariables(t *testing.T) {
 		Name:             "v1",
 		Value:            "test1",
 		UpdatedAt:        tf,
+		CreatedAt:        tf,
 		Visibility:       shared.All,
 		SelectedReposURL: "https://someurl.com",
 		NumSelectedRepos: 1,
@@ -339,6 +340,6 @@ func TestExportVariables(t *testing.T) {
 	exporter.SetFields(shared.VariableJSONFields)
 	require.NoError(t, exporter.Write(ios, vs))
 	require.JSONEq(t,
-		`[{"name":"v1","numSelectedRepos":1,"selectedReposURL":"https://someurl.com","updatedAt":"2024-01-01T00:00:00Z","value":"test1","visibility":"all"}]`,
+		`[{"name":"v1","numSelectedRepos":1,"selectedReposURL":"https://someurl.com","updatedAt":"2024-01-01T00:00:00Z","createdAt":"2024-01-01T00:00:00Z","value":"test1","visibility":"all"}]`,
 		stdout.String())
 }

@@ -161,13 +161,14 @@ func Test_getRun(t *testing.T) {
 			opts: &GetOptions{
 				VariableName: "VARIABLE_ONE",
 			},
-			jsonFields: []string{"name", "value", "visibility", "updatedAt", "numSelectedRepos", "selectedReposURL"},
+			jsonFields: []string{"name", "value", "visibility", "updatedAt", "createdAt", "numSelectedRepos", "selectedReposURL"},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/VARIABLE_ONE"),
 					httpmock.JSONResponse(shared.Variable{
 						Name:             "VARIABLE_ONE",
 						Value:            "repo_var",
 						UpdatedAt:        tf,
+						CreatedAt:        tf,
 						Visibility:       shared.Organization,
 						SelectedReposURL: "path/to/fetch/selected/repos",
 						NumSelectedRepos: 0, // This should be populated in a second API call.
@@ -181,6 +182,7 @@ func Test_getRun(t *testing.T) {
 				"name": "VARIABLE_ONE",
 				"value": "repo_var",
 				"updatedAt": "2024-01-01T00:00:00Z",
+				"createdAt": "2024-01-01T00:00:00Z",
 				"visibility": "organization",
 				"selectedReposURL": "path/to/fetch/selected/repos",
 				"numSelectedRepos": 99
@@ -266,6 +268,7 @@ func TestExportVariables(t *testing.T) {
 		Name:             "v1",
 		Value:            "test1",
 		UpdatedAt:        tf,
+		CreatedAt:        tf,
 		Visibility:       shared.All,
 		SelectedReposURL: "https://someurl.com",
 		NumSelectedRepos: 1,
@@ -274,6 +277,6 @@ func TestExportVariables(t *testing.T) {
 	exporter.SetFields(shared.VariableJSONFields)
 	require.NoError(t, exporter.Write(ios, vs))
 	require.JSONEq(t,
-		`{"name":"v1","numSelectedRepos":1,"selectedReposURL":"https://someurl.com","updatedAt":"2024-01-01T00:00:00Z","value":"test1","visibility":"all"}`,
+		`{"name":"v1","numSelectedRepos":1,"selectedReposURL":"https://someurl.com","updatedAt":"2024-01-01T00:00:00Z","createdAt":"2024-01-01T00:00:00Z","value":"test1","visibility":"all"}`,
 		stdout.String())
 }
