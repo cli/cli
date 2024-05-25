@@ -64,6 +64,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 	}
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Get a variable for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Get a variable for an environment")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.VariableJSONFields)
 
 	return cmd
 }
@@ -116,6 +117,14 @@ func getRun(opts *GetOptions) error {
 		}
 
 		return fmt.Errorf("failed to get variable %s: %w", opts.VariableName, err)
+	}
+
+	if err := shared.PopulateSelectedRepositoryInformation(client, host, &variable); err != nil {
+		return err
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, &variable)
 	}
 
 	fmt.Fprintf(opts.IO.Out, "%s\n", variable.Value)
