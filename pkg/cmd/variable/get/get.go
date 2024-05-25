@@ -119,15 +119,13 @@ func getRun(opts *GetOptions) error {
 		return fmt.Errorf("failed to get variable %s: %w", opts.VariableName, err)
 	}
 
-	if err := shared.PopulateSelectedRepositoryInformation(client, host, &variable); err != nil {
-		return err
-	}
-
 	if opts.Exporter != nil {
+		if err := shared.PopulateSelectedRepositoryInformation(client, host, &variable); err != nil {
+			return err
+		}
 		return opts.Exporter.Write(opts.IO, &variable)
 	}
 
 	fmt.Fprintf(opts.IO.Out, "%s\n", variable.Value)
-
 	return nil
 }
