@@ -16,6 +16,8 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
+	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -662,7 +664,7 @@ func Test_apiRun(t *testing.T) {
 			ios.SetStdoutTTY(tt.isatty)
 
 			tt.options.IO = ios
-			tt.options.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
+			tt.options.Config = func() (gh.Config, error) { return config.NewBlankConfig(), nil }
 			tt.options.HttpClient = func() (*http.Client, error) {
 				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 					resp := tt.httpResponse
@@ -737,7 +739,7 @@ func Test_apiRun_paginationREST(t *testing.T) {
 			}
 			return &http.Client{Transport: tr}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 
@@ -809,7 +811,7 @@ func Test_apiRun_arrayPaginationREST(t *testing.T) {
 			}
 			return &http.Client{Transport: tr}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 
@@ -881,7 +883,7 @@ func Test_apiRun_arrayPaginationREST_with_headers(t *testing.T) {
 			}
 			return &http.Client{Transport: tr}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 
@@ -950,7 +952,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 			}
 			return &http.Client{Transport: tr}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 
@@ -1049,7 +1051,7 @@ func Test_apiRun_paginationGraphQL_slurp(t *testing.T) {
 			}
 			return &http.Client{Transport: tr}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 
@@ -1161,7 +1163,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 			}
 			return &http.Client{Transport: tr}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 
@@ -1208,7 +1210,7 @@ func Test_apiRun_DELETE(t *testing.T) {
 	var gotRequest *http.Request
 	err := apiRun(&ApiOptions{
 		IO: ios,
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		HttpClient: func() (*http.Client, error) {
@@ -1293,7 +1295,7 @@ func Test_apiRun_inputFile(t *testing.T) {
 					}
 					return &http.Client{Transport: tr}, nil
 				},
-				Config: func() (config.Config, error) {
+				Config: func() (gh.Config, error) {
 					return config.NewBlankConfig(), nil
 				},
 			}
@@ -1324,9 +1326,9 @@ func Test_apiRun_cache(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 	options := ApiOptions{
 		IO: ios,
-		Config: func() (config.Config, error) {
-			return &config.ConfigMock{
-				AuthenticationFunc: func() *config.AuthConfig {
+		Config: func() (gh.Config, error) {
+			return &ghmock.ConfigMock{
+				AuthenticationFunc: func() gh.AuthConfig {
 					return &config.AuthConfig{}
 				},
 				// Cached responses are stored in a tempdir that gets automatically cleaned up
@@ -1738,7 +1740,7 @@ func Test_apiRun_acceptHeader(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 			tt.options.IO = ios
 
-			tt.options.Config = func() (config.Config, error) {
+			tt.options.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cpuguy83/go-md2man/v2/md2man"
 	"github.com/spf13/cobra"
@@ -178,6 +179,25 @@ func manPrintOptions(buf *bytes.Buffer, command *cobra.Command) {
 	}
 }
 
+func manPrintAliases(buf *bytes.Buffer, command *cobra.Command) {
+	if len(command.Aliases) > 0 {
+		buf.WriteString("# ALIASES\n")
+		buf.WriteString(strings.Join(root.BuildAliasList(command, command.Aliases), ", "))
+		buf.WriteString("\n")
+	}
+}
+
+func manPrintJSONFields(buf *bytes.Buffer, command *cobra.Command) {
+	raw, ok := command.Annotations["help:json-fields"]
+	if !ok {
+		return
+	}
+
+	buf.WriteString("# JSON FIELDS\n")
+	buf.WriteString(text.FormatSlice(strings.Split(raw, ","), 0, 0, "`", "`", true))
+	buf.WriteString("\n")
+}
+
 func genMan(cmd *cobra.Command, header *GenManHeader) []byte {
 	cmd.InitDefaultHelpCmd()
 	cmd.InitDefaultHelpFlag()
@@ -195,6 +215,8 @@ func genMan(cmd *cobra.Command, header *GenManHeader) []byte {
 		}
 	}
 	manPrintOptions(buf, cmd)
+	manPrintAliases(buf, cmd)
+	manPrintJSONFields(buf, cmd)
 	if len(cmd.Example) > 0 {
 		buf.WriteString("# EXAMPLE\n")
 		buf.WriteString(fmt.Sprintf("```\n%s\n```\n", cmd.Example))

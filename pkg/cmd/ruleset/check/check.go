@@ -10,7 +10,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
@@ -22,7 +22,7 @@ import (
 type CheckOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Git        *git.Client
 	Browser    browser.Browser

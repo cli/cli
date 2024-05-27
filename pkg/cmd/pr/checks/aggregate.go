@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
 type check struct {
@@ -26,6 +27,10 @@ type checkCounts struct {
 	Pending  int
 	Skipping int
 	Canceled int
+}
+
+func (ch *check) ExportData(fields []string) map[string]interface{} {
+	return cmdutil.StructExportData(ch, fields)
 }
 
 func aggregateChecks(checkContexts []api.CheckContext, requiredChecks bool) (checks []check, counts checkCounts) {

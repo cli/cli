@@ -10,10 +10,12 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type tinyConfig map[string]string
@@ -255,6 +257,11 @@ func TestLogin(t *testing.T) {
 			tt.opts.IO = ios
 			tt.opts.Config = &cfg
 			tt.opts.HTTPClient = &http.Client{Transport: reg}
+			tt.opts.CredentialFlow = &GitCredentialFlow{
+				// Intentionally not instantiating anything in here because the tests do not hit this code path.
+				// Right now it's better to panic if we write a test that hits the code than say, start calling
+				// out to git unintentionally.
+			}
 
 			if tt.runStubs != nil {
 				rs, runRestore := run.Stub()
@@ -280,6 +287,61 @@ func TestLogin(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAuthenticatingGitCredentials(t *testing.T) {
+	// Given we have no host or global credential helpers configured
+	// And given they have chosen https as their git protocol
+	// When they choose to authenticate git with their GitHub credentials
+	// Then gh is configured as their credential helper for that host
+	ios, _, _, _ := iostreams.Test()
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("GET", "api/v3/"),
+		httpmock.ScopesResponder("repo,read:org"))
+	reg.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{ "login": "monalisa" }}}`))
+
+	opts := &LoginOptions{
+		IO:          ios,
+		Config:      tinyConfig{},
+		HTTPClient:  &http.Client{Transport: reg},
+		Hostname:    "example.com",
+		Interactive: true,
+		GitProtocol: "https",
+		Prompter: &prompter.PrompterMock{
+			SelectFunc: func(prompt, _ string, opts []string) (int, error) {
+				if prompt == "How would you like to authenticate GitHub CLI?" {
+					return prompter.IndexFor(opts, "Paste an authentication token")
+				}
+				return -1, prompter.NoSuchPromptErr(prompt)
+			},
+			AuthTokenFunc: func() (string, error) {
+				return "ATOKEN", nil
+			},
+		},
+		CredentialFlow: &GitCredentialFlow{
+			Prompter: &prompter.PrompterMock{
+				ConfirmFunc: func(prompt string, _ bool) (bool, error) {
+					return true, nil
+				},
+			},
+			HelperConfig: &gitcredentials.FakeHelperConfig{
+				SelfExecutablePath: "/path/to/gh",
+				Helpers:            map[string]gitcredentials.Helper{},
+			},
+			// Updater not required for this test as we will be setting gh as the helper
+		},
+	}
+
+	require.NoError(t, Login(opts))
+
+	helper, err := opts.CredentialFlow.HelperConfig.ConfiguredHelper("example.com")
+	require.NoError(t, err)
+	require.True(t, helper.IsOurs(), "expected gh to be the configured helper")
 }
 
 func Test_scopesSentence(t *testing.T) {

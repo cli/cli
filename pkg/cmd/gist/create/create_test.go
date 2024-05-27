@@ -13,6 +13,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -331,7 +332,7 @@ func Test_createRun(t *testing.T) {
 		}
 		tt.opts.HttpClient = mockClient
 
-		tt.opts.Config = func() (config.Config, error) {
+		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
 

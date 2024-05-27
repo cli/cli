@@ -62,6 +62,12 @@ func cmdRef(w io.Writer, cmd *cobra.Command, depth int) {
 		fmt.Fprintf(w, "```\n%s````\n\n", dedent(flagUsages))
 	}
 
+	// Aliases
+	if len(cmd.Aliases) > 0 {
+		fmt.Fprintf(w, "%s\n\n", "Aliases")
+		fmt.Fprintf(w, "\n%s\n\n", dedent(strings.Join(BuildAliasList(cmd, cmd.Aliases), ", ")))
+	}
+
 	// Subcommands
 	for _, c := range cmd.Commands() {
 		if c.Hidden {

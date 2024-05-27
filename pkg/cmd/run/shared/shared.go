@@ -72,6 +72,7 @@ var RunFields = []string{
 	"createdAt",
 	"updatedAt",
 	"startedAt",
+	"attempt",
 	"status",
 	"conclusion",
 	"event",
@@ -97,7 +98,7 @@ type Run struct {
 	workflowName   string // cache column
 	WorkflowID     int64  `json:"workflow_id"`
 	Number         int64  `json:"run_number"`
-	Attempts       uint64 `json:"run_attempt"`
+	Attempt        uint64 `json:"run_attempt"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`

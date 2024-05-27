@@ -17,7 +17,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -92,7 +92,7 @@ func fields() []string {
 
 type LockOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   iprompter
@@ -103,7 +103,7 @@ type LockOptions struct {
 	Interactive bool
 }
 
-func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command, args []string) {
+func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, args []string) {
 	opts.IO = f.IOStreams
 	opts.HttpClient = f.HttpClient
 	opts.Config = f.Config
@@ -129,7 +129,7 @@ func NewCmdLock(f *cmdutil.Factory, parentName string, runF func(string, *LockOp
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.setCommonOptions(f, cmd, args)
+			opts.setCommonOptions(f, args)
 
 			reasonProvided := cmd.Flags().Changed("reason")
 			if reasonProvided {
@@ -172,7 +172,7 @@ func NewCmdUnlock(f *cmdutil.Factory, parentName string, runF func(string, *Lock
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.setCommonOptions(f, cmd, args)
+			opts.setCommonOptions(f, args)
 
 			if runF != nil {
 				return runF(Unlock, opts)
@@ -261,7 +261,7 @@ func lockRun(state string, opts *LockOptions) error {
 
 	case Unlock:
 		if issuePr.Locked {
-			err = unlockLockable(httpClient, baseRepo, issuePr, opts)
+			err = unlockLockable(httpClient, baseRepo, issuePr)
 		} else {
 			successMsg = fmt.Sprintf("%s %s#%d already unlocked.  Nothing changed.\n",
 				parent.FullName, ghrepo.FullName(baseRepo), issuePr.Number)
@@ -303,7 +303,7 @@ func lockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.
 }
 
 // unlockLockable will unlock an issue or pull request
-func unlockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue, opts *LockOptions) error {
+func unlockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue) error {
 
 	var mutation struct {
 		UnlockLockable struct {
@@ -344,7 +344,7 @@ func relockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *ap
 		return relocked, nil
 	}
 
-	err = unlockLockable(httpClient, repo, lockable, opts)
+	err = unlockLockable(httpClient, repo, lockable)
 	if err != nil {
 		return relocked, err
 	}
