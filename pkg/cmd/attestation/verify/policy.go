@@ -16,6 +16,10 @@ const (
 	GitHubRunner = "github-hosted"
 )
 
+func expandToGitHubURL(ownerOrRepo string) string {
+	return fmt.Sprintf("^https://github.com/%s/", ownerOrRepo)
+}
+
 func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error) {
 	if opts.SignerRepo != "" {
 		signedRepoRegex := expandToGitHubURL(opts.SignerRepo)

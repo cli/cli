@@ -94,7 +94,3 @@ func isProvidedRepoValid(repo string) bool {
 	splitRepo := strings.Split(repo, "/")
 	return len(splitRepo) == 2
 }
-
-func expandToGitHubURL(ownerOrRepo string) string {
-	return fmt.Sprintf("^https://github.com/%s/", ownerOrRepo)
-}
