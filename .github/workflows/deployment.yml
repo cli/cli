@@ -6,7 +6,9 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  attestations: write
   contents: write
+  id-token: write
 
 on:
   workflow_dispatch:
@@ -275,6 +277,11 @@ jobs:
           rm -rf dist
           mkdir dist
           mv -v {linux,macos,windows}/gh_* dist/
+      - name: Attest release artifacts
+        if: inputs.environment == 'production'
+        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
+        with:
+          subject-path: "dist/gh_*"
       - name: Install packaging dependencies
         run: sudo apt-get install -y rpm reprepro
       - name: Set up GPG
