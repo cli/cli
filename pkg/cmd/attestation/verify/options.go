@@ -73,7 +73,7 @@ func (opts *Options) AreFlagsValid() error {
 
 	// If provided, check that the SignerRepo option is in the expected format <OWNER>/<REPO>
 	if opts.SignerRepo != "" && !isProvidedRepoValid(opts.SignerRepo) {
-		return fmt.Errorf("invalid value provided for signer-repo: %s", opts.Repo)
+		return fmt.Errorf("invalid value provided for signer-repo: %s", opts.SignerRepo)
 	}
 
 	// Check that limit is between 1 and 1000
