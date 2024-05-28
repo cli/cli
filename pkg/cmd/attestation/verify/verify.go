@@ -149,7 +149,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.Flags().StringVarP(&opts.SAN, "cert-identity", "", "", "Enforce that the certificate's subject alternative name matches the provided value exactly")
 	verifyCmd.Flags().StringVarP(&opts.SANRegex, "cert-identity-regex", "i", "", "Enforce that the certificate's subject alternative name matches the provided regex")
 	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex")
-	verifyCmd.Flags().StringVarP(&opts.SignerRepo, "signer-repo", "", "", "Enforce that the attestation signing originated from a given repository")
+	verifyCmd.Flags().StringVarP(&opts.SignerRepo, "signer-repo", "", "", "Repository of reusable workflow that signed attestation in the format <owner>/<repo>")
 	verifyCmd.Flags().StringVarP(&opts.SignerWorkflow, "signer-workflow", "", "", "Enforce that the attestation signing originated from a given workflow")
 	verifyCmd.MarkFlagsMutuallyExclusive("signer-repo", "signer-workflow")
 	verifyCmd.MarkFlagsMutuallyExclusive("signer-repo", "cert-identity-regex")
