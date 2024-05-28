@@ -53,12 +53,12 @@ func (opts *Options) SetPolicyFlags() {
 		// to Owner
 		opts.Owner = splitRepo[0]
 
-		if opts.SAN == "" && opts.SANRegex == "" && opts.SignerRepo == "" && opts.SignerWorkflow == "" {
+		if !isSignerIdentityProvided(opts) {
 			opts.SANRegex = expandToGitHubURL(opts.Repo)
 		}
 		return
 	}
-	if opts.SAN == "" && opts.SANRegex == "" && opts.SignerRepo == "" && opts.SignerWorkflow == "" {
+	if !isSignerIdentityProvided(opts) {
 		opts.SANRegex = expandToGitHubURL(opts.Owner)
 	}
 }
@@ -82,6 +82,11 @@ func (opts *Options) AreFlagsValid() error {
 	}
 
 	return nil
+}
+
+// check if any of the signer identity flags have been provided
+func isSignerIdentityProvided(opts *Options) bool {
+	return opts.SAN != "" || opts.SANRegex != "" || opts.SignerRepo != "" || opts.SignerWorkflow != ""
 }
 
 func isProvidedRepoValid(repo string) bool {
