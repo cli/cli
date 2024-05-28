@@ -93,3 +93,11 @@ uninstall:
 	rm -f ${DESTDIR}${datadir}/bash-completion/completions/gh
 	rm -f ${DESTDIR}${datadir}/fish/vendor_completions.d/gh.fish
 	rm -f ${DESTDIR}${datadir}/zsh/site-functions/_gh
+
+.PHONY: macospkg
+macospkg: manpages completions
+ifndef VERSION
+	$(error VERSION is not set. Use `make macospkg VERSION=vX.Y.Z`)
+endif
+	./script/release --local "$(VERSION)" --platform macos
+	./script/pkgmacos $(VERSION)

@@ -120,6 +120,19 @@ jobs:
         run: |
           shopt -s failglob
           script/sign dist/gh_*_macOS_*.zip
+      - name: Build universal macOS pkg installer
+        if: inputs.environment != 'production'
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: script/pkgmacos "$TAG_NAME"
+      - name: Build & notarize universal macOS pkg installer
+        if: inputs.environment == 'production'
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+          APPLE_DEVELOPER_INSTALLER_ID: ${{ vars.APPLE_DEVELOPER_INSTALLER_ID }}
+        run: |
+          shopt -s failglob
+          script/pkgmacos "$TAG_NAME"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -128,7 +141,8 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.zip
-
+            dist/*.pkg
+ 
   windows:
     runs-on: windows-latest
     environment: ${{ inputs.environment }}
