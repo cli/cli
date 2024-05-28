@@ -48,11 +48,6 @@ jobs:
         env:
           TAG_NAME: ${{ inputs.tag_name }}
         run: script/release --local "$TAG_NAME" --platform linux
-      - name: Attest release binaries
-        if: inputs.environment == 'production'
-        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
-        with:
-          subject-path: "dist/gh*"
       - name: Generate web manual pages
         run: |
           go run ./cmd/gen-docs --website --doc-path dist/manual
@@ -106,11 +101,6 @@ jobs:
           TAG_NAME: ${{ inputs.tag_name }}
           APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
         run: script/release --local "$TAG_NAME" --platform macos
-      - name: Attest release binaries
-        if: inputs.environment == 'production'
-        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
-        with:
-          subject-path: "dist/gh*"
       - name: Notarize macOS archives
         if: inputs.environment == 'production'
         env:
@@ -178,11 +168,6 @@ jobs:
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
           TAG_NAME: ${{ inputs.tag_name }}
         run: script/release --local "$TAG_NAME" --platform windows
-      - name: Attest release binaries
-        if: inputs.environment == 'production'
-        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
-        with:
-          subject-path: "dist/gh*"
       - name: Set up MSBuild
         id: setupmsbuild
         uses: microsoft/setup-msbuild@v2.0.0
@@ -278,6 +263,11 @@ jobs:
           rm -rf dist
           mkdir dist
           mv -v {linux,macos,windows}/gh_* dist/
+      - name: Attest release artifacts
+        if: inputs.environment == 'production'
+        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
+        with:
+          subject-path: "dist/gh_*"
       - name: Install packaging dependencies
         run: sudo apt-get install -y rpm reprepro
       - name: Set up GPG
