@@ -66,13 +66,14 @@ func (opts *Options) SetPolicyFlags() {
 // AreFlagsValid checks that the provided flag combination is valid
 // and returns an error otherwise
 func (opts *Options) AreFlagsValid() error {
-	// check that Repo is in the expected format if provided
-	if opts.Repo != "" {
-		// we expect the repo argument to be in the format <OWNER>/<REPO>
-		splitRepo := strings.Split(opts.Repo, "/")
-		if len(splitRepo) != 2 {
-			return fmt.Errorf("invalid value provided for repo: %s", opts.Repo)
-		}
+	// If provided, check that the Repo option is in the expected format <OWNER>/<REPO>
+	if opts.Repo != "" && !isProvidedRepoValid(opts.Repo) {
+		return fmt.Errorf("invalid value provided for repo: %s", opts.Repo)
+	}
+
+	// If provided, check that the SignerRepo option is in the expected format <OWNER>/<REPO>
+	if opts.SignerRepo != "" && !isProvidedRepoValid(opts.SignerRepo) {
+		return fmt.Errorf("invalid value provided for signer-repo: %s", opts.Repo)
 	}
 
 	// Check that limit is between 1 and 1000
@@ -81,6 +82,12 @@ func (opts *Options) AreFlagsValid() error {
 	}
 
 	return nil
+}
+
+func isProvidedRepoValid(repo string) bool {
+	// we expect a provided repository argument be in the format <OWNER>/<REPO>
+	splitRepo := strings.Split(repo, "/")
+	return len(splitRepo) == 2
 }
 
 func expandToGitHubURL(ownerOrRepo string) string {
