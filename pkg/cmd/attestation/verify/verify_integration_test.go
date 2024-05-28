@@ -119,10 +119,28 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("with owner and valid reusable signer workflow", func(t *testing.T) {
+		opts := baseOpts
+		opts.Owner = "malancas"
+		opts.SignerWorkflow = "https://github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml@09b495c3f12c7881b3cc17209a327792065c1a1d"
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
 	t.Run("with owner and valid reusable workflow SAN regex", func(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
 		opts.SANRegex = "^https://github.com/github/artifact-attestations-workflows/"
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
+	t.Run("with owner and valid reusable signer repo", func(t *testing.T) {
+		opts := baseOpts
+		opts.Owner = "malancas"
+		opts.SignerRepo = "github/artifact-attestations-workflows"
 
 		err := runVerify(&opts)
 		require.NoError(t, err)
@@ -138,11 +156,31 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("with repo and valid reusable signer workflow", func(t *testing.T) {
+		opts := baseOpts
+		opts.Owner = "malancas"
+		opts.Repo = "malancas/attest-demo"
+		opts.SignerWorkflow = "https://github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml@09b495c3f12c7881b3cc17209a327792065c1a1d"
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
 	t.Run("with repo and valid reusable workflow SAN regex", func(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
 		opts.Repo = "malancas/attest-demo"
 		opts.SANRegex = "^https://github.com/github/artifact-attestations-workflows/"
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
+	t.Run("with repo and valid reusable signer repo", func(t *testing.T) {
+		opts := baseOpts
+		opts.Owner = "malancas"
+		opts.Repo = "malancas/attest-demo"
+		opts.SignerRepo = "github/artifact-attestations-workflows"
 
 		err := runVerify(&opts)
 		require.NoError(t, err)

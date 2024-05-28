@@ -27,6 +27,8 @@ type Options struct {
 	Repo                 string
 	SAN                  string
 	SANRegex             string
+	SignerRepo           string
+	SignerWorkflow       string
 	APIClient            api.Client
 	Logger               *io.Handler
 	OCIClient            oci.Client
@@ -51,12 +53,12 @@ func (opts *Options) SetPolicyFlags() {
 		// to Owner
 		opts.Owner = splitRepo[0]
 
-		if opts.SAN == "" && opts.SANRegex == "" {
+		if opts.SAN == "" && opts.SANRegex == "" && opts.SignerRepo == "" && opts.SignerWorkflow == "" {
 			opts.SANRegex = expandToGitHubURL(opts.Repo)
 		}
 		return
 	}
-	if opts.SAN == "" && opts.SANRegex == "" {
+	if opts.SAN == "" && opts.SANRegex == "" && opts.SignerRepo == "" && opts.SignerWorkflow == "" {
 		opts.SANRegex = expandToGitHubURL(opts.Owner)
 	}
 }

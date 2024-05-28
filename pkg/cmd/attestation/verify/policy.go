@@ -16,16 +16,17 @@ const (
 	GitHubRunner = "github-hosted"
 )
 
-func buildSANMatcher(san, sanRegex string) (verify.SubjectAlternativeNameMatcher, error) {
-	if san == "" && sanRegex == "" {
-		return verify.SubjectAlternativeNameMatcher{}, nil
+func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error) {
+	if opts.SignerRepo != "" {
+		signedRepoRegex := expandToGitHubURL(opts.SignerRepo)
+		return verify.NewSANMatcher(opts.SignerWorkflow, "", signedRepoRegex)
+	} else if opts.SignerWorkflow != "" {
+		return verify.NewSANMatcher(opts.SignerWorkflow, "", "")
+	} else if opts.SAN != "" || opts.SANRegex != "" {
+		return verify.NewSANMatcher(opts.SAN, "", opts.SANRegex)
 	}
 
-	sanMatcher, err := verify.NewSANMatcher(san, "", sanRegex)
-	if err != nil {
-		return verify.SubjectAlternativeNameMatcher{}, err
-	}
-	return sanMatcher, nil
+	return verify.SubjectAlternativeNameMatcher{}, nil
 }
 
 func buildCertExtensions(opts *Options, runnerEnv string) certificate.Extensions {
@@ -43,7 +44,7 @@ func buildCertExtensions(opts *Options, runnerEnv string) certificate.Extensions
 }
 
 func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.PolicyOption, error) {
-	sanMatcher, err := buildSANMatcher(opts.SAN, opts.SANRegex)
+	sanMatcher, err := buildSANMatcher(opts)
 	if err != nil {
 		return nil, err
 	}
