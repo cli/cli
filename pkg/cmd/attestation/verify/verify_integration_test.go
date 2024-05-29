@@ -189,6 +189,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 		APIClient:        api.NewLiveClient(hc, logger),
 		ArtifactPath:     artifactPath,
 		BundlePath:       bundlePath,
+		Config:           cmdFactory.Config,
 		DigestAlgorithm:  "sha256",
 		Logger:           logger,
 		OCIClient:        oci.NewLiveClient(),
@@ -212,7 +213,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 		},
 		{
 			name:           "valid signer workflow with host",
-			signerWorkflow: "https://github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
+			signerWorkflow: "github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
 			expectErr:      false,
 		},
 		{
@@ -228,9 +229,9 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 
 		err := runVerify(&opts)
 		if tc.expectErr {
-			require.Error(t, err)
+			require.Error(t, err, "expected error for '%s'", tc.name)
 		} else {
-			require.NoError(t, err)
+			require.NoError(t, err, "unexpected error for '%s'", tc.name)
 		}
 	}
 }
