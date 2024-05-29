@@ -119,15 +119,6 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("with owner and valid reusable signer workflow", func(t *testing.T) {
-		opts := baseOpts
-		opts.Owner = "malancas"
-		opts.SignerWorkflow = "https://github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml@09b495c3f12c7881b3cc17209a327792065c1a1d"
-
-		err := runVerify(&opts)
-		require.NoError(t, err)
-	})
-
 	t.Run("with owner and valid reusable workflow SAN regex", func(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
@@ -156,16 +147,6 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("with repo and valid reusable signer workflow", func(t *testing.T) {
-		opts := baseOpts
-		opts.Owner = "malancas"
-		opts.Repo = "malancas/attest-demo"
-		opts.SignerWorkflow = "https://github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml@09b495c3f12c7881b3cc17209a327792065c1a1d"
-
-		err := runVerify(&opts)
-		require.NoError(t, err)
-	})
-
 	t.Run("with repo and valid reusable workflow SAN regex", func(t *testing.T) {
 		opts := baseOpts
 		opts.Owner = "malancas"
@@ -185,4 +166,71 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		err := runVerify(&opts)
 		require.NoError(t, err)
 	})
+}
+
+func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
+	artifactPath := test.NormalizeRelativePath("../test/data/reusable-workflow-artifact")
+	bundlePath := test.NormalizeRelativePath("../test/data/reusable-workflow-attestation.sigstore.json")
+
+	logger := io.NewTestHandler()
+
+	sigstoreConfig := verification.SigstoreConfig{
+		Logger: logger,
+	}
+
+	cmdFactory := factory.New("test")
+
+	hc, err := cmdFactory.HttpClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	baseOpts := Options{
+		APIClient:        api.NewLiveClient(hc, logger),
+		ArtifactPath:     artifactPath,
+		BundlePath:       bundlePath,
+		DigestAlgorithm:  "sha256",
+		Logger:           logger,
+		OCIClient:        oci.NewLiveClient(),
+		OIDCIssuer:       GitHubOIDCIssuer,
+		Owner:            "malancas",
+		Repo:             "malancas/attest-demo",
+		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
+	}
+
+	type testcase struct {
+		name           string
+		signerWorkflow string
+		expectErr      bool
+	}
+
+	testcases := []testcase{
+		{
+			name:           "with invalid signer workflow",
+			signerWorkflow: "foo/bar/.github/workflows/attest.yml",
+			expectErr:      true,
+		},
+		{
+			name:           "valid signer workflow with host",
+			signerWorkflow: "https://github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
+			expectErr:      false,
+		},
+		{
+			name:           "valid signer workflow without host (defaults to github.com)",
+			signerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
+			expectErr:      false,
+		},
+	}
+
+	for _, tc := range testcases {
+		opts := baseOpts
+		opts.SignerWorkflow = tc.signerWorkflow
+
+		err := runVerify(&opts)
+		if tc.expectErr {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+		}
+	}
 }

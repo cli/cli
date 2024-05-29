@@ -23,9 +23,10 @@ func expandToGitHubURL(ownerOrRepo string) string {
 func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error) {
 	if opts.SignerRepo != "" {
 		signedRepoRegex := expandToGitHubURL(opts.SignerRepo)
-		return verify.NewSANMatcher(opts.SignerWorkflow, "", signedRepoRegex)
+		return verify.NewSANMatcher("", "", signedRepoRegex)
 	} else if opts.SignerWorkflow != "" {
-		return verify.NewSANMatcher(opts.SignerWorkflow, "", "")
+		workflowRegex := expandToGitHubURL(opts.SignerWorkflow)
+		return verify.NewSANMatcher("", "", workflowRegex)
 	} else if opts.SAN != "" || opts.SANRegex != "" {
 		return verify.NewSANMatcher(opts.SAN, "", opts.SANRegex)
 	}
