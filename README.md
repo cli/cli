@@ -23,6 +23,9 @@ If you are a hubber and are interested in shipping new commands for the CLI, che
 
 `gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], [Webi][], and as a downloadable binary including Mac OS installer `.pkg` from the [releases page][].
 
+> [!NOTE]
+> As of May 29th, Mac OS installer `.pkg` are unsigned with efforts prioritized in [`cli/cli#9139`](https://github.com/cli/cli/issues/9139) to support signing them.
+
 #### Homebrew
 
 | Install:          | Upgrade:          |
