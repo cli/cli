@@ -134,8 +134,8 @@ func validateSignerWorkflow(opts *Options) (string, error) {
 	return addSchemeToRegex(fmt.Sprintf("%s/%s", host, opts.SignerWorkflow)), nil
 }
 
-// if a host was not provided as part of a flag argument
-// choose a host based on the presence of GH_HOST and configuration
+// if a host was not provided as part of a flag argument choose a host based
+// on gh cli configuration
 func chooseHost(opts *Options) (string, error) {
 	// check if GH_HOST is set and use that host if it is
 	host := os.Getenv("GH_HOST")
