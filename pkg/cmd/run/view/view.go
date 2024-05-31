@@ -338,10 +338,11 @@ func runView(opts *ViewOptions) error {
 	}
 
 	var annotations []shared.Annotation
+	var annotationErrors []shared.AnnotationError
 	for _, job := range jobs {
-		as, err := shared.GetAnnotations(client, repo, job)
-		if err != nil {
-			return fmt.Errorf("failed to get annotations: %w", err)
+		as, annotationErr := shared.GetAnnotations(client, repo, job)
+		if annotationErr != nil {
+			annotationErrors = append(annotationErrors, shared.AnnotationError{Job: job.ID, JobName: job.Name, Error: annotationErr})
 		}
 		annotations = append(annotations, as...)
 	}
@@ -373,9 +374,18 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
 	}
 
-	if len(annotations) > 0 {
+	if len(annotationErrors) > 0 || len(annotations) > 0 {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
+	}
+
+	if len(annotationErrors) > 0 {
+		for _, err := range annotationErrors {
+			fmt.Fprintf(out, "%s failed to get annotations for job '%s' (%d): %s\n", cs.WarningIcon(), err.JobName, err.Job, err.Error)
+		}
+	}
+
+	if len(annotations) > 0 {
 		fmt.Fprintln(out, shared.RenderAnnotations(cs, annotations))
 	}
 
