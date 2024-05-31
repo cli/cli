@@ -6,7 +6,9 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  attestations: write
   contents: write
+  id-token: write
 
 on:
   workflow_dispatch:
@@ -295,6 +297,11 @@ jobs:
         run: |
           cp script/rpmmacros ~/.rpmmacros
           rpmsign --addsign dist/*.rpm
+      - name: Attest release artifacts
+        if: inputs.environment == 'production'
+        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
+        with:
+          subject-path: "dist/gh_*"
       - name: Run createrepo
         env:
           GPG_SIGN: ${{ inputs.environment == 'production' }}
