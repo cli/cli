@@ -246,6 +246,12 @@ type Annotation struct {
 	StartLine int   `json:"start_line"`
 }
 
+type AnnotationError struct {
+	Job     int64
+	JobName string
+	Error   error
+}
+
 func AnnotationSymbol(cs *iostreams.ColorScheme, a Annotation) string {
 	switch a.Level {
 	case AnnotationFailure:

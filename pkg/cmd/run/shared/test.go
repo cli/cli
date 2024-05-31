@@ -109,6 +109,16 @@ var FailedJob Job = Job{
 	},
 }
 
+var SuccessfulJobAnnotations []Annotation = []Annotation{
+	{
+		JobName:   "cool job",
+		Message:   "the job is happy",
+		Path:      "blaze.py",
+		Level:     "notice",
+		StartLine: 420,
+	},
+}
+
 var FailedJobAnnotations []Annotation = []Annotation{
 	{
 		JobName:   "sad job",

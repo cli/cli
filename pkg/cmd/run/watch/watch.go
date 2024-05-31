@@ -219,6 +219,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 	}
 
 	var annotations []shared.Annotation
+	var annotationErrors []shared.AnnotationError
 
 	var annotationErr error
 	var as []shared.Annotation
@@ -230,17 +231,13 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 
 		as, annotationErr = shared.GetAnnotations(client, repo, job)
 		if annotationErr != nil {
-			break
+			annotationErrors = append(annotationErrors, shared.AnnotationError{Job: job.ID, JobName: job.Name, Error: annotationErr})
 		}
 		annotations = append(annotations, as...)
 
 		if job.Status != shared.InProgress {
 			annotationCache[job.ID] = annotations
 		}
-	}
-
-	if annotationErr != nil {
-		fmt.Fprintf(out, "%s failed to get annotations: %s\n", cs.WarningIcon(), annotationErr)
 	}
 
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber, 0))
@@ -254,9 +251,18 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 
 	fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
 
-	if len(annotations) > 0 {
+	if len(annotationErrors) > 0 || len(annotations) > 0 {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
+	}
+
+	if len(annotationErrors) > 0 {
+		for _, err := range annotationErrors {
+			fmt.Fprintf(out, "%s failed to get annotations for job '%s' (%d): %s\n", cs.WarningIcon(), err.JobName, err.Job, err.Error)
+		}
+	}
+
+	if len(annotations) > 0 {
 		fmt.Fprintln(out, shared.RenderAnnotations(cs, annotations))
 	}
 
