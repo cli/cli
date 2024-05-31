@@ -1317,14 +1317,10 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/20/annotations"),
 					httpmock.StatusStringResponse(500, "internal server error"),
 				)
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
-					httpmock.JSONResponse(shared.SuccessfulJobAnnotations),
-				)
 			},
 			wantErr: true,
 			errMsg:  "SilentError",
-			wantOut: "\nX trunk CI · 1234\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n✓ cool job in 4m34s (ID 10)\n\nANNOTATIONS\n! failed to get annotations for job 'sad job' (20): HTTP 500 (https://api.github.com/repos/OWNER/REPO/check-runs/20/annotations)\n- the job is happy\n  cool job: blaze.py#420\n\n\nTo see what failed, try: gh run view 1234 --log-failed\nView this run on GitHub: https://github.com/runs/1234\n",
+			wantOut: "\nX trunk CI · 1234\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n✓ cool job in 4m34s (ID 10)\n\nANNOTATIONS\n! failed to get annotations for job 'sad job' (20): HTTP 500 (https://api.github.com/repos/OWNER/REPO/check-runs/20/annotations)\n\nTo see what failed, try: gh run view 1234 --log-failed\nView this run on GitHub: https://github.com/runs/1234\n",
 		},
 	}
 

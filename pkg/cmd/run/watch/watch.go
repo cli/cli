@@ -232,6 +232,8 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		as, annotationErr = shared.GetAnnotations(client, repo, job)
 		if annotationErr != nil {
 			annotationErrors = append(annotationErrors, shared.AnnotationError{Job: job.ID, JobName: job.Name, Error: annotationErr})
+
+			break
 		}
 		annotations = append(annotations, as...)
 
