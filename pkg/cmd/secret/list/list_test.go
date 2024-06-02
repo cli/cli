@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	ghContext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -438,6 +440,173 @@ func Test_listRun(t *testing.T) {
 
 			expected := fmt.Sprintf("%s\n", strings.Join(tt.wantOut, "\n"))
 			assert.Equal(t, expected, stdout.String())
+		})
+	}
+}
+
+func Test_listRunRemoteValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		tty     bool
+		json    bool
+		opts    *ListOptions
+		wantOut []string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "single repo detected",
+			tty:  false,
+			opts: &ListOptions{
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+					}, nil
+				},
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11T00:00:00Z",
+				"SECRET_TWO\t2020-12-04T00:00:00Z",
+				"SECRET_THREE\t1975-11-30T00:00:00Z",
+			},
+		},
+		{
+			name: "multi repo detected",
+			tty:  false,
+			opts: &ListOptions{
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+					remote2 := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "upstream",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+						remote2,
+					}, nil
+				},
+			},
+			wantOut: []string{},
+			wantErr: true,
+			errMsg:  "multiple remotes detected [origin upstream]. please specify which repo to use by providing the -R or --repo argument",
+		},
+		{
+			name: "multi repo detected - single repo given",
+			tty:  false,
+			opts: &ListOptions{
+				HasRepoOverride: true,
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+					remote2 := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "upstream",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+						remote2,
+					}, nil
+				},
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11T00:00:00Z",
+				"SECRET_TWO\t2020-12-04T00:00:00Z",
+				"SECRET_THREE\t1975-11-30T00:00:00Z",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			reg.Verify(t)
+
+			path := "repos/owner/repo/actions/secrets"
+
+			t0, _ := time.Parse("2006-01-02", "1988-10-11")
+			t1, _ := time.Parse("2006-01-02", "2020-12-04")
+			t2, _ := time.Parse("2006-01-02", "1975-11-30")
+			payload := struct {
+				Secrets []Secret
+			}{
+				Secrets: []Secret{
+					{
+						Name:      "SECRET_ONE",
+						UpdatedAt: t0,
+					},
+					{
+						Name:      "SECRET_TWO",
+						UpdatedAt: t1,
+					},
+					{
+						Name:      "SECRET_THREE",
+						UpdatedAt: t2,
+					},
+				},
+			}
+
+			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))
+
+			ios, _, stdout, _ := iostreams.Test()
+
+			ios.SetStdoutTTY(tt.tty)
+
+			tt.opts.IO = ios
+			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.FromFullName("owner/repo")
+			}
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			tt.opts.Config = func() (gh.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			tt.opts.Now = func() time.Time {
+				t, _ := time.Parse(time.RFC822, "15 Mar 23 00:00 UTC")
+				return t
+			}
+
+			if tt.json {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(secretFields)
+				tt.opts.Exporter = exporter
+			}
+
+			err := listRun(tt.opts)
+			if tt.wantErr {
+				assert.EqualError(t, err, tt.errMsg)
+
+				return
+			}
+
+			assert.NoError(t, err)
+
+			if len(tt.wantOut) > 1 {
+				expected := fmt.Sprintf("%s\n", strings.Join(tt.wantOut, "\n"))
+				assert.Equal(t, expected, stdout.String())
+			}
 		})
 	}
 }

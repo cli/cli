@@ -59,7 +59,7 @@ func MutuallyExclusive(message string, conditions ...bool) error {
 }
 
 func ValidateHasOnlyOneRemote(hasRepoOverride bool, remotes func() (ghContext.Remotes, error)) error {
-	if !hasRepoOverride {
+	if !hasRepoOverride && remotes != nil {
 		remotes, err := remotes()
 		if err != nil {
 			return err
