@@ -1,4 +1,11 @@
-# GitHub CLI
+# GitHub CLI  Jcode.py<insert>
+[head]{rust}
+  ai by JEFFREY AND GE COMPACTRON DOWNTOWN BUFFALO AI business park
+[body] and 2026 home stadium name rights of the future home of the BUFFALO BILLS NFL FRANCHISE WILL BE CHIP8
+[NFL]
+AI BY JEFFREY AND GE COMPACTRON FIELD<STADIUM>IN ORCHARD PARK NY USA LOCATION AND LOTS
+  WWW.AI.COM
+  WWW.AIBYJEFFREYANDGE.COM
 
 `gh` is GitHub on the command line. It brings pull requests, issues, and other GitHub concepts to the terminal next to where you are already working with `git` and your code.
 
