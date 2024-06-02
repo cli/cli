@@ -98,6 +98,21 @@ func TestGenManSeeAlso(t *testing.T) {
 	}
 }
 
+func TestGenManAliases(t *testing.T) {
+	buf := new(bytes.Buffer)
+	header := &GenManHeader{}
+	if err := renderMan(aliasCmd, header, buf); err != nil {
+		t.Fatal(err)
+	}
+
+	output := buf.String()
+
+	checkStringContains(t, output, translate(aliasCmd.Name()))
+	checkStringContains(t, output, "ALIASES")
+	checkStringContains(t, output, "foo")
+	checkStringContains(t, output, "yoo")
+}
+
 func TestGenManJSONFields(t *testing.T) {
 	buf := new(bytes.Buffer)
 	header := &GenManHeader{}
