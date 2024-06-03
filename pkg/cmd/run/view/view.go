@@ -338,12 +338,16 @@ func runView(opts *ViewOptions) error {
 	}
 
 	var annotations []shared.Annotation
-	var annotationErrors []shared.AnnotationError
-	for _, job := range jobs {
-		as, annotationErr := shared.GetAnnotations(client, repo, job)
-		if annotationErr != nil {
-			annotationErrors = append(annotationErrors, shared.AnnotationError{Job: job.ID, JobName: job.Name, Error: annotationErr})
+	var missingAnnotationsPermissions bool
 
+	for _, job := range jobs {
+		as, err := shared.GetAnnotations(client, repo, job)
+		if err != nil {
+			if err != shared.ErrMissingPermissions {
+				return fmt.Errorf("failed to get annotations: %w", err)
+			}
+
+			missingAnnotationsPermissions = true
 			break
 		}
 		annotations = append(annotations, as...)
@@ -376,18 +380,13 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
 	}
 
-	if len(annotationErrors) > 0 || len(annotations) > 0 {
+	if missingAnnotationsPermissions {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
-	}
-
-	if len(annotationErrors) > 0 {
-		for _, err := range annotationErrors {
-			fmt.Fprintf(out, "%s failed to get annotations for job '%s' (%d): %s\n", cs.WarningIcon(), err.JobName, err.Job, err.Error)
-		}
-	}
-
-	if len(annotations) > 0 {
+		fmt.Fprintln(out, "requesting annotations returned 403 Forbidden as the token does not have sufficient permissions. Note that it is not currently possible to create a fine-grained PAT with the `checks:read` permission.")
+	} else if len(annotations) > 0 {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
 		fmt.Fprintln(out, shared.RenderAnnotations(cs, annotations))
 	}
 

@@ -267,6 +267,13 @@ type CheckRun struct {
 	ID int64
 }
 
+var ErrMissingPermissions = errors.New("missing permissions error")
+
+// GetAnnotations fetches annotations from the REST API.
+//
+// If the job has no annotations, an empy slice is returned.
+// If the API returns a 403, a custom MissingPermissionError error is returned with extra information about the
+// inability for fine-grained PATs to fetch annotations.
 func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annotation, error) {
 	var result []*Annotation
 
@@ -275,9 +282,18 @@ func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annot
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
 		var httpError api.HTTPError
-		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
+		if !errors.As(err, &httpError) {
+			return nil, err
+		}
+
+		if httpError.StatusCode == http.StatusNotFound {
 			return []Annotation{}, nil
 		}
+
+		if httpError.StatusCode == http.StatusForbidden {
+			return nil, ErrMissingPermissions
+		}
+
 		return nil, err
 	}
 
