@@ -52,7 +52,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			provide a path to the %[1]s--bundle%[1]s flag.
 
 			To see the full results that are generated upon successful verification, i.e.
-			for use with a policy engine, provide the %[1]s--json-result%[1]s flag.
+			for use with a policy engine, provide the %[1]s--format=json%[1]s flag.
 
 			The attestation's certificate's Subject Alternative Name (SAN) identifies the entity
 			responsible for creating the attestation, which most of the time will be a GitHub
