@@ -128,7 +128,7 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options) error {
 		return err
 	}
 
-	opts.Logger.Printf(string(t))
+	fmt.Printf(string(t))
 
 	return nil
 }
