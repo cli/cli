@@ -4,7 +4,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/download"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/inspect"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/tufrootverify"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/trustedroot"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verify"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
@@ -26,7 +26,7 @@ func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 	root.AddCommand(download.NewDownloadCmd(f, nil))
 	root.AddCommand(inspect.NewInspectCmd(f, nil))
 	root.AddCommand(verify.NewVerifyCmd(f, nil))
-	root.AddCommand(tufrootverify.NewTUFRootVerifyCmd(f, nil))
+	root.AddCommand(trustedroot.NewTrustedRootCmd(f, nil))
 
 	return root
 }
