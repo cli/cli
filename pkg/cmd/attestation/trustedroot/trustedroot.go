@@ -67,10 +67,6 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 				return fmt.Errorf("Please specify one of:\n  --public to get a trusted_root.json to use with public repositories\n  --private for private repositories\n\nFor more information, use --help.")
 			}
 
-			if (opts.TufUrl == "" && opts.TufRootPath != "") || (opts.TufUrl != "" && opts.TufRootPath == "") {
-				return fmt.Errorf("--tuf-url and --tuf-root must be used together")
-			}
-
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -95,6 +91,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 	trustedRootCmd.MarkFlagsMutuallyExclusive("public", "private")
 	trustedRootCmd.Flags().StringVarP(&opts.TufUrl, "tuf-url", "", "", "URL to the TUF repository mirror")
 	trustedRootCmd.Flags().StringVarP(&opts.TufRootPath, "tuf-root", "", "", "Path to the TUF root.json file on disk")
+	trustedRootCmd.MarkFlagsRequiredTogether("tuf-url", "tuf-root")
 	trustedRootCmd.MarkFlagsMutuallyExclusive("public", "tuf-url")
 	trustedRootCmd.MarkFlagsMutuallyExclusive("public", "tuf-root")
 	trustedRootCmd.MarkFlagsMutuallyExclusive("private", "tuf-url")
