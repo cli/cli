@@ -149,7 +149,13 @@ func newCustomVerifier(trustedRootFilePath string) (*verify.SignedEntityVerifier
 		return nil, fmt.Errorf("failed to create trusted root from file %s: %v", trustedRootFilePath, err)
 	}
 
+	// All we know about this trust root is its configuration so make some
+	// educated guesses as to what the policy should be.
 	verifierConfig := []verify.VerifierOption{}
+	// This requires some independent corroboration of the signing certificate
+	// (e.g. from Sigstore Fulcio) time, one of:
+	// - a signed timestamp from a timestamp authority in the trusted root
+	// - a transparency log entry (e.g. from Sigstore Rekor)
 	verifierConfig = append(verifierConfig, verify.WithObserverTimestamps(1))
 
 	// Infer verification options from contents of trusted root
