@@ -150,14 +150,9 @@ func newCustomVerifier(trustedRootFilePath string) (*verify.SignedEntityVerifier
 	}
 
 	verifierConfig := []verify.VerifierOption{}
-	verifierConfig = append(verifierConfig, verify.WithSignedCertificateTimestamps(1))
 	verifierConfig = append(verifierConfig, verify.WithObserverTimestamps(1))
 
 	// Infer verification options from contents of trusted root
-	if len(trustedRoot.TimestampingAuthorities()) > 0 {
-		verifierConfig = append(verifierConfig, verify.WithSignedTimestamps(1))
-	}
-
 	if len(trustedRoot.RekorLogs()) > 0 {
 		verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1))
 	}
