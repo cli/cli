@@ -5,23 +5,23 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
-type gitConfigurator interface {
-	Setup(hostname, username, authToken string) error
+type gitCredentialsConfigurer interface {
+	ConfigureOurs(hostname string) error
 }
 
 type SetupGitOptions struct {
-	IO           *iostreams.IOStreams
-	Config       func() (config.Config, error)
-	Hostname     string
-	Force        bool
-	gitConfigure gitConfigurator
+	IO                      *iostreams.IOStreams
+	Config                  func() (gh.Config, error)
+	Hostname                string
+	Force                   bool
+	CredentialsHelperConfig gitCredentialsConfigurer
 }
 
 func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobra.Command {
@@ -52,9 +52,9 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 			$ gh auth setup-git --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.gitConfigure = &shared.GitCredentialFlow{
-				Executable: f.Executable(),
-				GitClient:  f.GitClient,
+			opts.CredentialsHelperConfig = &gitcredentials.HelperConfig{
+				SelfExecutablePath: f.Executable(),
+				GitClient:          f.GitClient,
 			}
 			if opts.Hostname == "" && opts.Force {
 				return cmdutil.FlagErrorf("`--force` must be used in conjunction with `--hostname`")
@@ -92,7 +92,7 @@ func setupGitRun(opts *SetupGitOptions) error {
 			)
 		}
 
-		if err := opts.gitConfigure.Setup(opts.Hostname, "", ""); err != nil {
+		if err := opts.CredentialsHelperConfig.ConfigureOurs(opts.Hostname); err != nil {
 			return fmt.Errorf("failed to set up git credential helper: %s", err)
 		}
 
@@ -111,7 +111,7 @@ func setupGitRun(opts *SetupGitOptions) error {
 	}
 
 	for _, hostname := range hostnames {
-		if err := opts.gitConfigure.Setup(hostname, "", ""); err != nil {
+		if err := opts.CredentialsHelperConfig.ConfigureOurs(hostname); err != nil {
 			return fmt.Errorf("failed to set up git credential helper: %s", err)
 		}
 	}

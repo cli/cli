@@ -17,7 +17,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -38,7 +38,7 @@ type iprompter interface {
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	Prompter   iprompter
 	BackOff    backoff.BackOff
@@ -396,7 +396,7 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol := cfg.GitProtocol(repo.RepoHost())
+		protocol := cfg.GitProtocol(repo.RepoHost()).Value
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 		if !opts.AddReadme && opts.LicenseTemplate == "" && opts.GitIgnoreTemplate == "" && opts.Template == "" {
@@ -494,7 +494,7 @@ func createFromTemplate(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol := cfg.GitProtocol(repo.RepoHost())
+		protocol := cfg.GitProtocol(repo.RepoHost()).Value
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 		if err := cloneWithRetry(opts, remoteURL, templateRepoMainBranch); err != nil {
@@ -617,7 +617,7 @@ func createFromLocal(opts *CreateOptions) error {
 		fmt.Fprintln(stdout, repo.URL)
 	}
 
-	protocol := cfg.GitProtocol(repo.RepoHost())
+	protocol := cfg.GitProtocol(repo.RepoHost()).Value
 	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 	if opts.Interactive {

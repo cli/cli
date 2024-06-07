@@ -10,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -281,7 +282,7 @@ func Test_loginRun_nontty(t *testing.T) {
 		opts            *LoginOptions
 		env             map[string]string
 		httpStubs       func(*httpmock.Registry)
-		cfgStubs        func(*testing.T, config.Config)
+		cfgStubs        func(*testing.T, gh.Config)
 		wantHosts       string
 		wantErr         string
 		wantStderr      string
@@ -417,7 +418,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Hostname: "github.com",
 				Token:    "newUserToken",
 			},
-			cfgStubs: func(t *testing.T, c config.Config) {
+			cfgStubs: func(t *testing.T, c gh.Config) {
 				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
 				require.NoError(t, err)
 			},
@@ -451,7 +452,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}
-			tt.opts.Config = func() (config.Config, error) {
+			tt.opts.Config = func() (gh.Config, error) {
 				return cfg, nil
 			}
 
@@ -500,7 +501,7 @@ func Test_loginRun_Survey(t *testing.T) {
 		httpStubs       func(*httpmock.Registry)
 		prompterStubs   func(*prompter.PrompterMock)
 		runStubs        func(*run.CommandStubber)
-		cfgStubs        func(*testing.T, config.Config)
+		cfgStubs        func(*testing.T, gh.Config)
 		wantHosts       string
 		wantErrOut      *regexp.Regexp
 		wantSecureToken string
@@ -700,7 +701,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 			},
-			cfgStubs: func(t *testing.T, c config.Config) {
+			cfgStubs: func(t *testing.T, c gh.Config) {
 				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
 				require.NoError(t, err)
 			},
@@ -744,7 +745,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}
-			tt.opts.Config = func() (config.Config, error) {
+			tt.opts.Config = func() (gh.Config, error) {
 				return cfg, nil
 			}
 

@@ -52,7 +52,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			provide a path to the %[1]s--bundle%[1]s flag.
 
 			To see the full results that are generated upon successful verification, i.e.
-			for use with a policy engine, provide the %[1]s--json-result%[1]s flag.
+			for use with a policy engine, provide the %[1]s--format=json%[1]s flag.
 
 			The attestation's certificate's Subject Alternative Name (SAN) identifies the entity
 			responsible for creating the attestation, which most of the time will be a GitHub
@@ -123,6 +123,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			}
 
 			opts.SigstoreVerifier = verification.NewLiveSigstoreVerifier(config)
+			opts.Config = f.Config
 
 			if err := runVerify(opts); err != nil {
 				return fmt.Errorf("\nError: %v", err)
@@ -148,7 +149,9 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.Flags().BoolVarP(&opts.DenySelfHostedRunner, "deny-self-hosted-runners", "", false, "Fail verification for attestations generated on self-hosted runners")
 	verifyCmd.Flags().StringVarP(&opts.SAN, "cert-identity", "", "", "Enforce that the certificate's subject alternative name matches the provided value exactly")
 	verifyCmd.Flags().StringVarP(&opts.SANRegex, "cert-identity-regex", "i", "", "Enforce that the certificate's subject alternative name matches the provided regex")
-	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex")
+	verifyCmd.Flags().StringVarP(&opts.SignerRepo, "signer-repo", "", "", "Repository of reusable workflow that signed attestation in the format <owner>/<repo>")
+	verifyCmd.Flags().StringVarP(&opts.SignerWorkflow, "signer-workflow", "", "", "Workflow that signed attestation in the format [host/]<owner>/<repo>/<path>/<to>/<workflow>")
+	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex", "signer-repo", "signer-workflow")
 	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", GitHubOIDCIssuer, "Issuer of the OIDC token")
 
 	return verifyCmd

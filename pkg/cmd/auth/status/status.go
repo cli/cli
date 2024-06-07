@@ -12,6 +12,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -124,7 +125,7 @@ func (e Entries) Strings(cs *iostreams.ColorScheme) []string {
 type StatusOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 
 	Hostname  string
 	ShowToken bool
@@ -200,7 +201,7 @@ func statusRun(opts *StatusOptions) error {
 		}
 
 		var activeUser string
-		gitProtocol := cfg.GitProtocol(hostname)
+		gitProtocol := cfg.GitProtocol(hostname).Value
 		activeUserToken, activeUserTokenSource := authCfg.ActiveToken(hostname)
 		if authTokenWriteable(activeUserTokenSource) {
 			activeUser, _ = authCfg.ActiveUser(hostname)

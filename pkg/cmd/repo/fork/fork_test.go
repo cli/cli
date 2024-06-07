@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
@@ -211,7 +212,7 @@ func TestRepoFork(t *testing.T) {
 		httpStubs   func(*httpmock.Registry)
 		execStubs   func(*run.CommandStubber)
 		promptStubs func(*prompter.MockPrompter)
-		cfgStubs    func(*testing.T, config.Config)
+		cfgStubs    func(*testing.T, gh.Config)
 		remotes     []*context.Remote
 		wantOut     string
 		wantErrOut  string
@@ -233,6 +234,9 @@ func TestRepoFork(t *testing.T) {
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
 			},
+			cfgStubs: func(_ *testing.T, c gh.Config) {
+				c.Set("", "git_protocol", "https")
+			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote add fork https://github\.com/someone/REPO\.git`, 0, "")
@@ -253,9 +257,6 @@ func TestRepoFork(t *testing.T) {
 					}},
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
-			},
-			cfgStubs: func(_ *testing.T, c config.Config) {
-				c.Set("", "git_protocol", "")
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
@@ -735,7 +736,7 @@ func TestRepoFork(t *testing.T) {
 			if tt.cfgStubs != nil {
 				tt.cfgStubs(t, cfg)
 			}
-			tt.opts.Config = func() (config.Config, error) {
+			tt.opts.Config = func() (gh.Config, error) {
 				return cfg, nil
 			}
 

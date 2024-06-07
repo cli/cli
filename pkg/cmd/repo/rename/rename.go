@@ -9,7 +9,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -26,7 +26,7 @@ type RenameOptions struct {
 	GitClient       *git.Client
 	IO              *iostreams.IOStreams
 	Prompter        iprompter
-	Config          func() (config.Config, error)
+	Config          func() (gh.Config, error)
 	BaseRepo        func() (ghrepo.Interface, error)
 	Remotes         func() (ghContext.Remotes, error)
 	DoConfirm       bool
@@ -153,7 +153,7 @@ func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameO
 		return nil, err
 	}
 
-	protocol := cfg.GitProtocol(repo.RepoHost())
+	protocol := cfg.GitProtocol(repo.RepoHost()).Value
 
 	remotes, err := opts.Remotes()
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/extension"
@@ -134,10 +135,10 @@ func newPrompter(f *cmdutil.Factory) prompter.Prompter {
 	return prompter.New(editor, io.In, io.Out, io.ErrOut)
 }
 
-func configFunc() func() (config.Config, error) {
-	var cachedConfig config.Config
+func configFunc() func() (gh.Config, error) {
+	var cachedConfig gh.Config
 	var configError error
-	return func() (config.Config, error) {
+	return func() (gh.Config, error) {
 		if cachedConfig != nil || configError != nil {
 			return cachedConfig, configError
 		}
@@ -184,7 +185,7 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 
 	if _, ghPromptDisabled := os.LookupEnv("GH_PROMPT_DISABLED"); ghPromptDisabled {
 		io.SetNeverPrompt(true)
-	} else if prompt := cfg.Prompt(""); prompt == "disabled" {
+	} else if prompt := cfg.Prompt(""); prompt.Value == "disabled" {
 		io.SetNeverPrompt(true)
 	}
 
@@ -194,8 +195,8 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 	// 3. PAGER
 	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
 		io.SetPager(ghPager)
-	} else if pager := cfg.Pager(""); pager != "" {
-		io.SetPager(pager)
+	} else if pager := cfg.Pager(""); pager.Value != "" {
+		io.SetPager(pager.Value)
 	}
 
 	return io

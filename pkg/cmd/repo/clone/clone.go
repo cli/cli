@@ -10,7 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -21,7 +21,7 @@ import (
 type CloneOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 
 	GitArgs      []string
@@ -153,7 +153,7 @@ func cloneRun(opts *CloneOptions) error {
 			return err
 		}
 
-		protocol = cfg.GitProtocol(repo.RepoHost())
+		protocol = cfg.GitProtocol(repo.RepoHost()).Value
 	}
 
 	wantsWiki := strings.HasSuffix(repo.RepoName(), ".wiki")
@@ -187,7 +187,7 @@ func cloneRun(opts *CloneOptions) error {
 
 	// If the repo is a fork, add the parent as an upstream remote and set the parent as the default repo.
 	if canonicalRepo.Parent != nil {
-		protocol := cfg.GitProtocol(canonicalRepo.Parent.RepoHost())
+		protocol := cfg.GitProtocol(canonicalRepo.Parent.RepoHost()).Value
 		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
 		upstreamName := opts.UpstreamName

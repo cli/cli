@@ -9,7 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
@@ -21,7 +21,7 @@ import (
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Now        func() time.Time
 	Exporter   cmdutil.Exporter
@@ -138,7 +138,7 @@ func listRun(opts *ListOptions) error {
 	case shared.Environment:
 		secrets, err = getEnvSecrets(client, baseRepo, envName)
 	case shared.Organization, shared.User:
-		var cfg config.Config
+		var cfg gh.Config
 		var host string
 
 		cfg, err = opts.Config()

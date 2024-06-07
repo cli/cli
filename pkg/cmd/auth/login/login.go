@@ -9,9 +9,10 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
@@ -20,7 +21,7 @@ import (
 
 type LoginOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
 	Prompter   shared.Prompt
@@ -195,18 +196,26 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	return shared.Login(&shared.LoginOptions{
-		IO:               opts.IO,
-		Config:           authCfg,
-		HTTPClient:       httpClient,
-		Hostname:         hostname,
-		Interactive:      opts.Interactive,
-		Web:              opts.Web,
-		Scopes:           opts.Scopes,
-		Executable:       opts.MainExecutable,
-		GitProtocol:      opts.GitProtocol,
-		Prompter:         opts.Prompter,
-		GitClient:        opts.GitClient,
-		Browser:          opts.Browser,
+		IO:          opts.IO,
+		Config:      authCfg,
+		HTTPClient:  httpClient,
+		Hostname:    hostname,
+		Interactive: opts.Interactive,
+		Web:         opts.Web,
+		Scopes:      opts.Scopes,
+		GitProtocol: opts.GitProtocol,
+		Prompter:    opts.Prompter,
+		Browser:     opts.Browser,
+		CredentialFlow: &shared.GitCredentialFlow{
+			Prompter: opts.Prompter,
+			HelperConfig: &gitcredentials.HelperConfig{
+				SelfExecutablePath: opts.MainExecutable,
+				GitClient:          opts.GitClient,
+			},
+			Updater: &gitcredentials.Updater{
+				GitClient: opts.GitClient,
+			},
+		},
 		SecureStorage:    !opts.InsecureStorage,
 		SkipSSHKeyPrompt: opts.SkipSSHKeyPrompt,
 	})

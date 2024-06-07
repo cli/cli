@@ -13,6 +13,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -331,7 +332,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension\n",
+			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
 		{
 			name: "upgrade an extension dry run",
@@ -351,7 +352,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Would have upgraded extension\n",
+			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
 		{
 			name: "upgrade an extension notty",
@@ -384,7 +385,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension\n",
+			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
 		{
 			name: "upgrade extension error",
@@ -419,7 +420,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension\n",
+			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
 		{
 			name: "upgrade an extension full name",
@@ -435,7 +436,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension\n",
+			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
 		{
 			name: "upgrade all",
@@ -451,7 +452,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extensions\n",
+			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
 		{
 			name: "upgrade all dry run",
@@ -471,7 +472,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Would have upgraded extensions\n",
+			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
 		{
 			name: "upgrade all none installed",
@@ -852,7 +853,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension\n",
+			wantStdout: "✓ Successfully checked extension upgrades\n",
 		},
 	}
 
@@ -888,7 +889,7 @@ func TestNewCmdExtension(t *testing.T) {
 			}
 
 			f := cmdutil.Factory{
-				Config: func() (config.Config, error) {
+				Config: func() (gh.Config, error) {
 					return config.NewBlankConfig(), nil
 				},
 				IOStreams:        ios,

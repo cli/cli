@@ -25,7 +25,7 @@ var allIssueFeatures = IssueFeatures{
 type PullRequestFeatures struct {
 	MergeQueue bool
 	// CheckRunAndStatusContextCounts indicates whether the API supports
-	// the checkRunCount, checkRunCountsByState, statusContextCount and stausContextCountsByState
+	// the checkRunCount, checkRunCountsByState, statusContextCount and statusContextCountsByState
 	// fields on the StatusCheckRollupContextConnection
 	CheckRunAndStatusContextCounts bool
 	CheckRunEvent                  bool

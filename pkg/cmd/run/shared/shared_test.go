@@ -189,6 +189,15 @@ func TestRunExportData(t *testing.T) {
 			},
 			output: `{"jobs":[{"completedAt":"2022-07-20T11:21:16Z","conclusion":"success","databaseId":123456,"name":"macos","startedAt":"2022-07-20T11:20:13Z","status":"completed","steps":[{"conclusion":"success","name":"Checkout","number":1,"status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/123456"},{"completedAt":"2022-07-20T11:23:16Z","conclusion":"error","databaseId":234567,"name":"windows","startedAt":"2022-07-20T11:20:55Z","status":"completed","steps":[{"conclusion":"error","name":"Checkout","number":2,"status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/234567"}]}`,
 		},
+		{
+			name:   "exports workflow run with attempt count",
+			fields: []string{"attempt"},
+			run: Run{
+				Attempt: 1,
+				Jobs:    []Job{},
+			},
+			output: `{"attempt":1}`,
+		},
 	}
 
 	for _, tt := range tests {
