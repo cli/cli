@@ -79,6 +79,7 @@ var IssueFields = []string{
 	"isPullRequest",
 	"labels",
 	"number",
+	"reactions",
 	"repository",
 	"state",
 	"title",
@@ -232,6 +233,7 @@ type Issue struct {
 	IsLocked      bool        `json:"locked"`
 	Number        int         `json:"number"`
 	PullRequest   PullRequest `json:"pull_request"`
+	Reactions     Reactions   `json:"reactions"`
 	RepositoryURL string      `json:"repository_url"`
 	// StateInternal should not be used directly. Use State() instead.
 	StateInternal string    `json:"state"`
@@ -239,6 +241,19 @@ type Issue struct {
 	Title         string    `json:"title"`
 	URL           string    `json:"html_url"`
 	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type Reactions struct {
+	Confused   int    `json:"confused"`
+	Eyes       int    `json:"eyes"`
+	Heart      int    `json:"heart"`
+	Hooray     int    `json:"hooray"`
+	Laugh      int    `json:"laugh"`
+	MinusOne   int    `json:"-1"`
+	PlusOne    int    `json:"+1"`
+	Rocket     int    `json:"rocket"`
+	TotalCount int    `json:"total_count"`
+	URL        string `json:"url"`
 }
 
 type PullRequest struct {
