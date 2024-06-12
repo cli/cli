@@ -73,24 +73,41 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 
 	attestations := []*api.Attestation{}
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		b := scanner.Bytes()
+	reader := bufio.NewReader(file)
+
+	var line []byte
+	line, err = readLine(reader)
+	for err == nil {
 		var bundle bundle.ProtobufBundle
 		bundle.Bundle = new(protobundle.Bundle)
-		err = bundle.UnmarshalJSON(b)
+		err = bundle.UnmarshalJSON(line)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal bundle from JSON: %v", err)
 		}
 		a := api.Attestation{Bundle: &bundle}
 		attestations = append(attestations, &a)
-	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
+		line, err = readLine(reader)
 	}
 
 	return attestations, nil
+}
+
+func readLine(reader *bufio.Reader) ([]byte, error) {
+	var line []byte
+	for {
+		b, isPrefix, err := reader.ReadLine()
+		if err != nil {
+			return nil, err
+		}
+		line = append(line, b...)
+
+		if !isPrefix {
+			break
+		}
+	}
+
+	return line, nil
 }
 
 func GetRemoteAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
