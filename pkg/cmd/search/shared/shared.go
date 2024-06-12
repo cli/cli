@@ -98,9 +98,9 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 
 	var headers []string
 	if et == Both {
-		headers = []string{"Kind", "Repo", "ID", "Title", "Labels", "Updated"}
+		headers = []string{"Kind", "Repo", "ID", "Title", "Labels", "Updated", "Comments", "Reactions"}
 	} else {
-		headers = []string{"Repo", "ID", "Title", "Labels", "Updated"}
+		headers = []string{"Repo", "ID", "Title", "Labels", "Updated", "Comments", "Reactions"}
 	}
 
 	cs := io.ColorScheme()
@@ -133,6 +133,8 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 		tp.AddField(text.RemoveExcessiveWhitespace(issue.Title))
 		tp.AddField(listIssueLabels(&issue, cs, tp.IsTTY()))
 		tp.AddTimeField(now, issue.UpdatedAt, cs.Gray)
+		tp.AddField(strconv.Itoa(issue.CommentsCount))
+		tp.AddField(strconv.Itoa(issue.Reactions.TotalCount))
 		tp.EndRow()
 	}
 
