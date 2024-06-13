@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -28,13 +27,8 @@ func TestNewTrustedRootCmd(t *testing.T) {
 		wantsErr bool
 	}{
 		{
-			name:     "Public happy path",
-			cli:      "--public",
-			wantsErr: false,
-		},
-		{
-			name:     "Private happy path",
-			cli:      "--private",
+			name:     "Happy path",
+			cli:      "",
 			wantsErr: false,
 		},
 		{
@@ -43,23 +37,8 @@ func TestNewTrustedRootCmd(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:     "Both public and private error",
-			cli:      "--public --private",
-			wantsErr: true,
-		},
-		{
 			name:     "Missing tuf-root flag",
 			cli:      "--tuf-url https://tuf-repo.github.com",
-			wantsErr: true,
-		},
-		{
-			name:     "Error missing basic flags with advanced setup",
-			cli:      "--public --tuf-url https://tuf-repo.github.com --tuf-root ../verification/embed/tuf-repo.github.com/root.json",
-			wantsErr: true,
-		},
-		{
-			name:     "Error on no flags",
-			cli:      "",
 			wantsErr: true,
 		},
 	}
@@ -70,7 +49,10 @@ func TestNewTrustedRootCmd(t *testing.T) {
 				return nil
 			})
 
-			argv := strings.Split(tc.cli, " ")
+			argv := []string{}
+			if tc.cli != "" {
+				argv = strings.Split(tc.cli, " ")
+			}
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
 			cmd.SetOut(&bytes.Buffer{})
@@ -96,7 +78,6 @@ func TestGetTrustedRoot(t *testing.T) {
 	opts := &Options{
 		TufUrl:      mirror,
 		TufRootPath: root,
-		Logger:      io.NewTestHandler(),
 	}
 
 	t.Run("successfully verifies TUF root", func(t *testing.T) {
