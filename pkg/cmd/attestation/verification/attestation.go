@@ -76,7 +76,7 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	reader := bufio.NewReader(file)
 
 	var line []byte
-	line, err = readLine(reader)
+	line, err = reader.ReadBytes('\n')
 	for err == nil {
 		var bundle bundle.ProtobufBundle
 		bundle.Bundle = new(protobundle.Bundle)
@@ -87,27 +87,10 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 		a := api.Attestation{Bundle: &bundle}
 		attestations = append(attestations, &a)
 
-		line, err = readLine(reader)
+		line, err = reader.ReadBytes('\n')
 	}
 
 	return attestations, nil
-}
-
-func readLine(reader *bufio.Reader) ([]byte, error) {
-	var line []byte
-	for {
-		b, isPrefix, err := reader.ReadLine()
-		if err != nil {
-			return nil, err
-		}
-		line = append(line, b...)
-
-		if !isPrefix {
-			break
-		}
-	}
-
-	return line, nil
 }
 
 func GetRemoteAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
