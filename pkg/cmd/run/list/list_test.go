@@ -2,6 +2,7 @@ package list
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -179,6 +180,156 @@ func TestListRun(t *testing.T) {
 				*       cool commit  CI        trunk   push   8     4m34s    about 4 minutes ago
 				*       cool commit  CI        trunk   push   9     4m34s    about 4 minutes ago
 				X       cool commit  CI        trunk   push   10    4m34s    about 4 minutes ago
+			`),
+		},
+		{
+			name: "inactive disabled workflow selected",
+			opts: &ListOptions{
+				Limit:            defaultLimit,
+				now:              shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+				WorkflowSelector: "d. inact",
+				All:              false,
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				// Uses abbreviated names and commit messages because of output column limit
+				workflow := workflowShared.Workflow{
+					Name:  "d. inact",
+					ID:    1206,
+					Path:  ".github/workflows/disabledInactivity.yml",
+					State: workflowShared.DisabledInactivity,
+				}
+
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							workflow,
+						},
+					}))
+			},
+			wantErr:    true,
+			wantErrMsg: "could not find any workflows named d. inact",
+		},
+		{
+			name: "inactive disabled workflow selected and all states applied",
+			opts: &ListOptions{
+				Limit:            defaultLimit,
+				now:              shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+				WorkflowSelector: "d. inact",
+				All:              true,
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				// Uses abbreviated names and commit messages because of output column limit
+				workflow := workflowShared.Workflow{
+					Name:  "d. inact",
+					ID:    1206,
+					Path:  ".github/workflows/disabledInactivity.yml",
+					State: workflowShared.DisabledInactivity,
+				}
+
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							workflow,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", fmt.Sprintf("repos/OWNER/REPO/actions/workflows/%d/runs", workflow.ID)),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: []shared.Run{
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 101, shared.Completed, shared.TimedOut, "dicto"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 102, shared.InProgress, shared.TimedOut, "diito"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 103, shared.Completed, shared.Success, "dics"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 104, shared.Completed, shared.Cancelled, "dicc"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 105, shared.Completed, shared.Failure, "dicf"),
+						},
+					}))
+			},
+			wantOut: heredoc.Doc(`
+				STATUS  TITLE  WORKFLOW  BRANCH  EVENT  ID   ELAPSED  AGE
+				X       dicto  d. inact  trunk   push   101  4m34s    about 4 minutes ago
+				*       diito  d. inact  trunk   push   102  4m34s    about 4 minutes ago
+				✓       dics   d. inact  trunk   push   103  4m34s    about 4 minutes ago
+				X       dicc   d. inact  trunk   push   104  4m34s    about 4 minutes ago
+				X       dicf   d. inact  trunk   push   105  4m34s    about 4 minutes ago
+			`),
+		},
+		{
+			name: "manually disabled workflow selected",
+			opts: &ListOptions{
+				Limit:            defaultLimit,
+				now:              shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+				WorkflowSelector: "d. man",
+				All:              false,
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				// Uses abbreviated names and commit messages because of output column limit
+				workflow := workflowShared.Workflow{
+					Name:  "d. man",
+					ID:    456,
+					Path:  ".github/workflows/disabled.yml",
+					State: workflowShared.DisabledManually,
+				}
+
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							workflow,
+						},
+					}))
+			},
+			wantErr:    true,
+			wantErrMsg: "could not find any workflows named d. man",
+		},
+		{
+			name: "manually disabled workflow selected and all states applied",
+			opts: &ListOptions{
+				Limit:            defaultLimit,
+				now:              shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+				WorkflowSelector: "d. man",
+				All:              true,
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				// Uses abbreviated names and commit messages because of output column limit
+				workflow := workflowShared.Workflow{
+					Name:  "d. man",
+					ID:    456,
+					Path:  ".github/workflows/disabled.yml",
+					State: workflowShared.DisabledManually,
+				}
+
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							workflow,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", fmt.Sprintf("repos/OWNER/REPO/actions/workflows/%d/runs", workflow.ID)),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: []shared.Run{
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 201, shared.Completed, shared.TimedOut, "dmcto"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 202, shared.InProgress, shared.TimedOut, "dmito"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 203, shared.Completed, shared.Success, "dmcs"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 204, shared.Completed, shared.Cancelled, "dmcc"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 205, shared.Completed, shared.Failure, "dmcf"),
+						},
+					}))
+			},
+			wantOut: heredoc.Doc(`
+				STATUS  TITLE  WORKFLOW  BRANCH  EVENT  ID   ELAPSED  AGE
+				X       dmcto  d. man    trunk   push   201  4m34s    about 4 minutes ago
+				*       dmito  d. man    trunk   push   202  4m34s    about 4 minutes ago
+				✓       dmcs   d. man    trunk   push   203  4m34s    about 4 minutes ago
+				X       dmcc   d. man    trunk   push   204  4m34s    about 4 minutes ago
+				X       dmcf   d. man    trunk   push   205  4m34s    about 4 minutes ago
 			`),
 		},
 		{

@@ -60,7 +60,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Long: heredoc.Docf(`
 		    List recent workflow runs.
 
-			Note that providing the %[1]sworkflow_name%[1]s to the %[1]s-w%[1]s flag will not fetch disabled workflows. 
+			Note that providing the %[1]sworkflow_name%[1]s to the %[1]s-w%[1]s flag will not fetch disabled workflows.
 			Also pass the %[1]s-a%[1]s flag to fetch disabled workflow runs using the %[1]sworkflow_name%[1]s and the %[1]s-w%[1]s flag.
 		`, "`"),
 		Aliases: []string{"ls"},
@@ -127,9 +127,7 @@ func listRun(opts *ListOptions) error {
 			// note: this will be incomplete if more workflow states are added to `workflowShared`
 			states = append(states, workflowShared.DisabledManually, workflowShared.DisabledInactivity)
 		}
-		if workflow, err := workflowShared.ResolveWorkflow(
-			opts.Prompter, opts.IO, client, baseRepo, false, opts.WorkflowSelector,
-			states); err == nil {
+		if workflow, err := workflowShared.ResolveWorkflow(opts.Prompter, opts.IO, client, baseRepo, false, opts.WorkflowSelector, states); err == nil {
 			filters.WorkflowID = workflow.ID
 			filters.WorkflowName = workflow.Name
 		} else {
