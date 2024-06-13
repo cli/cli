@@ -120,8 +120,11 @@ func listRun(opts *ListOptions) error {
 
 	opts.IO.StartProgressIndicator()
 	if opts.WorkflowSelector != "" {
+		// initially the workflow state is limited to 'active'
 		states := []workflowShared.WorkflowState{workflowShared.Active}
 		if opts.All {
+			// the all flag tells us to add the remaining workflow states
+			// note: this will be incomplete if more workflow states are added to `workflowShared`
 			states = append(states, workflowShared.DisabledManually, workflowShared.DisabledInactivity)
 		}
 		if workflow, err := workflowShared.ResolveWorkflow(
