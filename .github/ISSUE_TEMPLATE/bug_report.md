@@ -24,4 +24,6 @@ A clear and concise description of what you expected to happen and what actually
 ### Logs
 
 Paste the activity from your command line. Redact if needed.
-Tip: Set `GH_DEBUG=true` (verbose logs) or `GH_DEBUG=api` (verbose logs with HTTP traffic details)
+
+> [!NOTE]
+> Set `GH_DEBUG=true` for verbose logs or `GH_DEBUG=api` for verbose logs with HTTP traffic details.
