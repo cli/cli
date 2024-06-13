@@ -15,21 +15,25 @@ func TestRun(id int64, s Status, c Conclusion) Run {
 }
 
 func TestRunWithCommit(id int64, s Status, c Conclusion, commit string) Run {
+	return TestRunWithWorkflowAndCommit(123, id, s, c, commit)
+}
+
+func TestRunWithWorkflowAndCommit(workflowId, runId int64, s Status, c Conclusion, commit string) Run {
 	return Run{
-		WorkflowID: 123,
-		ID:         id,
+		WorkflowID: workflowId,
+		ID:         runId,
 		CreatedAt:  TestRunStartTime,
 		UpdatedAt:  TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 		Status:     s,
 		Conclusion: c,
 		Event:      "push",
 		HeadBranch: "trunk",
-		JobsURL:    fmt.Sprintf("https://api.github.com/runs/%d/jobs", id),
+		JobsURL:    fmt.Sprintf("https://api.github.com/runs/%d/jobs", runId),
 		HeadCommit: Commit{
 			Message: commit,
 		},
 		HeadSha: "1234567890",
-		URL:     fmt.Sprintf("https://github.com/runs/%d", id),
+		URL:     fmt.Sprintf("https://github.com/runs/%d", runId),
 		HeadRepository: Repo{
 			Owner: struct{ Login string }{Login: "OWNER"},
 			Name:  "REPO",
