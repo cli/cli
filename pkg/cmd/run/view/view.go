@@ -343,7 +343,7 @@ func runView(opts *ViewOptions) error {
 	for _, job := range jobs {
 		as, err := shared.GetAnnotations(client, repo, job)
 		if err != nil {
-			if err != shared.ErrMissingPermissions {
+			if err != shared.ErrMissingAnnotationsPermissions {
 				return fmt.Errorf("failed to get annotations: %w", err)
 			}
 
