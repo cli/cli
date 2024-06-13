@@ -219,28 +219,29 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 	}
 
 	var annotations []shared.Annotation
+	var missingAnnotationsPermissions bool
 
-	var annotationErr error
-	var as []shared.Annotation
 	for _, job := range jobs {
 		if as, ok := annotationCache[job.ID]; ok {
 			annotations = as
 			continue
 		}
 
-		as, annotationErr = shared.GetAnnotations(client, repo, job)
-		if annotationErr != nil {
+		as, err := shared.GetAnnotations(client, repo, job)
+		if err != nil {
+			if err != shared.ErrMissingAnnotationsPermissions {
+				return nil, fmt.Errorf("failed to get annotations: %w", err)
+			}
+
+			missingAnnotationsPermissions = true
 			break
 		}
+
 		annotations = append(annotations, as...)
 
 		if job.Status != shared.InProgress {
 			annotationCache[job.ID] = annotations
 		}
-	}
-
-	if annotationErr != nil {
-		return nil, fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber, 0))
@@ -254,7 +255,11 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 
 	fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
 
-	if len(annotations) > 0 {
+	if missingAnnotationsPermissions {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
+		fmt.Fprintf(out, "requesting annotations returned 403 Forbidden as the token does not have sufficient permissions. Note that it is not currently possible to create a fine-grained PAT with the `checks:read` permission.")
+	} else if len(annotations) > 0 {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
 		fmt.Fprintln(out, shared.RenderAnnotations(cs, annotations))
