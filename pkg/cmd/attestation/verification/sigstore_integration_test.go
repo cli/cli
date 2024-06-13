@@ -92,8 +92,8 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 		attestations := getAttestationsFor(t, "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl")
 
 		verifier := NewLiveSigstoreVerifier(SigstoreConfig{
-			Logger:            io.NewTestHandler(),
-			CustomTrustedRoot: test.NormalizeRelativePath("../test/data/trusted_root.json"),
+			Logger:      io.NewTestHandler(),
+			TrustedRoot: test.NormalizeRelativePath("../test/data/trusted_root.json"),
 		})
 
 		res := verifier.Verify(attestations, publicGoodPolicy(t))
