@@ -77,8 +77,9 @@ func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify
 
 		reader := bufio.NewReader(bytes.NewReader(customTrustRoots))
 		var line []byte
-		line, err = reader.ReadBytes('\n')
-		for err == nil {
+		var readError error
+		line, readError = reader.ReadBytes('\n')
+		for readError == nil {
 			// Load each trusted root
 			trustedRoot, err := root.NewTrustedRootFromJSON(line)
 			if err != nil {
@@ -127,8 +128,7 @@ func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify
 					}
 				}
 			}
-
-			line, err = reader.ReadBytes('\n')
+			line, readError = reader.ReadBytes('\n')
 		}
 		return nil, "", fmt.Errorf("unable to use provided trusted roots")
 	}
