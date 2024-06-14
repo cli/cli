@@ -383,6 +383,7 @@ func Test_prSelectorForCurrentBranchPushDefaultUpstream(t *testing.T) {
 		branch.Frederick888/main.remote git@github.com:Frederick888/playground.git
 		branch.Frederick888/main.merge refs/heads/main
 	`))
+	rs.Register(`git config remote.pushDefault`, 1, "")
 	rs.Register(`git rev-parse --verify --quiet --abbrev-ref Frederick888/main@\{push\}`, 1, "")
 	rs.Register(`git config push\.default`, 0, "upstream")
 
@@ -414,6 +415,7 @@ func Test_prSelectorForCurrentBranchPushDefaultTracking(t *testing.T) {
 		branch.Frederick888/main.remote git@github.com:Frederick888/playground.git
 		branch.Frederick888/main.merge refs/heads/main
 	`))
+	rs.Register(`git config remote.pushDefault`, 1, "")
 	rs.Register(`git rev-parse --verify --quiet --abbrev-ref Frederick888/main@\{push\}`, 1, "")
 	rs.Register(`git config push\.default`, 0, "tracking")
 

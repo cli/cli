@@ -326,7 +326,7 @@ func (c *Client) lookupCommit(ctx context.Context, sha, format string) ([]byte, 
 // ReadBranchConfig parses the `branch.BRANCH.(remote|merge)` part of git config.
 func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg BranchConfig) {
 	prefix := regexp.QuoteMeta(fmt.Sprintf("branch.%s.", branch))
-	args := []string{"config", "--get-regexp", fmt.Sprintf("^%s(remote|merge)$", prefix)}
+	args := []string{"config", "--get-regexp", fmt.Sprintf("^%s(remote|merge|pushremote)$", prefix)}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return
@@ -343,17 +343,18 @@ func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg Branc
 		keys := strings.Split(parts[0], ".")
 		switch keys[len(keys)-1] {
 		case "remote":
-			if strings.Contains(parts[1], ":") {
-				u, err := ParseURL(parts[1])
-				if err != nil {
-					continue
-				}
-				cfg.RemoteURL = u
-			} else if !isFilesystemPath(parts[1]) {
-				cfg.RemoteName = parts[1]
-			}
+			parseRemoteURLOrName(parts[1], &cfg.RemoteURL, &cfg.RemoteName)
+		case "pushremote":
+			parseRemoteURLOrName(parts[1], &cfg.PushRemoteURL, &cfg.PushRemoteName)
 		case "merge":
 			cfg.MergeRef = parts[1]
+		}
+	}
+	if cfg.PushRemoteURL == nil && cfg.PushRemoteName == "" {
+		if conf, err := c.Config(ctx, "remote.pushDefault"); err == nil && conf != "" {
+			parseRemoteURLOrName(conf, &cfg.PushRemoteURL, &cfg.PushRemoteName)
+		} else {
+			cfg.PushRemoteName = cfg.RemoteName
 		}
 	}
 	if out, err = c.revParse(ctx, "--verify", "--quiet", "--abbrev-ref", branch+"@{push}"); err == nil {
@@ -698,6 +699,16 @@ func parseRemotes(remotesStr []string) RemoteSet {
 		}
 	}
 	return remotes
+}
+
+func parseRemoteURLOrName(value string, remoteURL **url.URL, remoteName *string) {
+	if strings.Contains(value, ":") {
+		if u, err := ParseURL(value); err == nil {
+			*remoteURL = u
+		}
+	} else if !isFilesystemPath(value) {
+		*remoteName = value
+	}
 }
 
 func populateResolvedRemotes(remotes RemoteSet, resolved []string) {

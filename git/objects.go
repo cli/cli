@@ -71,8 +71,10 @@ type Commit struct {
 }
 
 type BranchConfig struct {
-	RemoteName string
-	RemoteURL  *url.URL
-	MergeRef   string
-	Push       string
+	RemoteName     string
+	RemoteURL      *url.URL
+	MergeRef       string
+	PushRemoteURL  *url.URL
+	PushRemoteName string
+	Push           string
 }

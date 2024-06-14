@@ -201,16 +201,16 @@ func prSelectorForCurrentBranch(gitClient *git.Client, baseRepo ghrepo.Interface
 		if r, err := ghrepo.FromURL(branchConfig.RemoteURL); err == nil {
 			branchOwner = r.RepoOwner()
 		}
-	} else if branchConfig.RemoteName != "" {
+	} else if branchConfig.PushRemoteName != "" {
 		// the branch merges from a remote specified by name
-		if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
+		if r, err := rem.FindByName(branchConfig.PushRemoteName); err == nil {
 			branchOwner = r.RepoOwner()
 		}
 	}
 
 	if branchOwner != "" {
 		if branchConfig.Push != "" {
-			selector = strings.TrimPrefix(branchConfig.Push, branchConfig.RemoteName+"/")
+			selector = strings.TrimPrefix(branchConfig.Push, branchConfig.PushRemoteName+"/")
 		} else if pushDefault, _ := gitClient.Config(context.Background(), "push.default"); (pushDefault == "upstream" || pushDefault == "tracking") &&
 			strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
 			selector = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")

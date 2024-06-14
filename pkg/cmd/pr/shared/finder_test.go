@@ -328,6 +328,7 @@ func TestFind(t *testing.T) {
 				branchConfig: func(branch string) (c git.BranchConfig) {
 					c.MergeRef = "refs/heads/blue-upstream-berries"
 					c.RemoteName = "origin"
+					c.PushRemoteName = "origin"
 					c.Push = "origin/blue-upstream-berries"
 					return
 				},
@@ -373,6 +374,7 @@ func TestFind(t *testing.T) {
 					u, _ := url.Parse("https://github.com/UPSTREAMOWNER/REPO")
 					c.MergeRef = "refs/heads/blue-upstream-berries"
 					c.RemoteURL = u
+					c.PushRemoteURL = u
 					return
 				},
 				pushDefault: func() (string, error) { return "upstream", nil },
@@ -411,6 +413,7 @@ func TestFind(t *testing.T) {
 				branchConfig: func(branch string) (c git.BranchConfig) {
 					c.MergeRef = "refs/heads/blue-upstream-berries"
 					c.RemoteName = "origin"
+					c.PushRemoteName = "origin"
 					c.Push = "origin/blue-upstream-berries"
 					return
 				},

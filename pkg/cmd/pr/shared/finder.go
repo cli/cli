@@ -251,22 +251,21 @@ func (f *finder) parseCurrentBranch() (string, int, error) {
 	}
 
 	var branchOwner string
-	if branchConfig.RemoteURL != nil {
+	if branchConfig.PushRemoteURL != nil {
 		// the branch merges from a remote specified by URL
 		if r, err := ghrepo.FromURL(branchConfig.RemoteURL); err == nil {
 			branchOwner = r.RepoOwner()
 		}
-	} else if branchConfig.RemoteName != "" {
-		// the branch merges from a remote specified by name
+	} else if branchConfig.PushRemoteName != "" {
 		rem, _ := f.remotesFn()
-		if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
+		if r, err := rem.FindByName(branchConfig.PushRemoteName); err == nil {
 			branchOwner = r.RepoOwner()
 		}
 	}
 
 	if branchOwner != "" {
 		if branchConfig.Push != "" {
-			prHeadRef = strings.TrimPrefix(branchConfig.Push, branchConfig.RemoteName+"/")
+			prHeadRef = strings.TrimPrefix(branchConfig.Push, branchConfig.PushRemoteName+"/")
 		} else if pushDefault, _ := f.pushDefault(); (pushDefault == "upstream" || pushDefault == "tracking") &&
 			strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
 			prHeadRef = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
