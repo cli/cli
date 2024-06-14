@@ -3,6 +3,7 @@ package verification
 import (
 	"bufio"
 	"bytes"
+	"crypto/x509"
 	"fmt"
 	"os"
 
@@ -85,14 +86,20 @@ func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify
 			// Compare bundle leafCert issuer with trusted root cert authority
 			certAuthorities := trustedRoot.FulcioCertificateAuthorities()
 			for _, certAuthority := range certAuthorities {
-				certAuthRoot := certAuthority.Root
+				lowestCert, err := getLowestCertInChain(&certAuthority)
+				if err != nil {
+					return nil, "", err
+				}
 
-				if len(certAuthRoot.Issuer.Organization) == 0 {
+				if len(lowestCert.Issuer.Organization) == 0 {
 					continue
 				}
 
-				if certAuthRoot.Issuer.Organization[0] == issuer {
-					// We have our trusted root, but now we need to determine the policy
+				if lowestCert.Issuer.Organization[0] == issuer {
+					// Determine what policy to use with this trusted root.
+					//
+					// Note that we are *only* inferring the policy with the
+					// issuer. We *must* use the trusted root provided.
 					if issuer == PublicGoodIssuerOrg {
 						if v.config.NoPublicGood {
 							return nil, "", fmt.Errorf("Detected public good instance but requested verification without public good instance")
@@ -138,6 +145,18 @@ func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify
 	}
 
 	return nil, "", fmt.Errorf("leaf certificate issuer is not recognized")
+}
+
+func getLowestCertInChain(ca *root.CertificateAuthority) (*x509.Certificate, error) {
+	if ca.Leaf != nil {
+		return ca.Leaf, nil
+	} else if len(ca.Intermediates) > 0 {
+		return ca.Intermediates[len(ca.Intermediates)-1], nil
+	} else if ca.Root != nil {
+		return ca.Root, nil
+	}
+
+	return nil, fmt.Errorf("certificate authority had no certificates")
 }
 
 func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy verify.PolicyBuilder) *SigstoreResults {

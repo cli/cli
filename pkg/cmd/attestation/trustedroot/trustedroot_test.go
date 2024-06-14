@@ -32,6 +32,11 @@ func TestNewTrustedRootCmd(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:     "Happy path",
+			cli:      "--verify-only",
+			wantsErr: false,
+		},
+		{
 			name:     "Custom TUF happy path",
 			cli:      "--tuf-url https://tuf-repo.github.com --tuf-root ../verification/embed/tuf-repo.github.com/root.json",
 			wantsErr: false,
