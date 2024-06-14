@@ -299,7 +299,7 @@ jobs:
           rpmsign --addsign dist/*.rpm
       - name: Attest release artifacts
         if: inputs.environment == 'production'
-        uses: actions/attest-build-provenance@49df96e17e918a15956db358890b08e61c704919 # v1.2.0
+        uses: actions/attest-build-provenance@534b352d658f90498fd148d231fdbf88f3886a3a # v1.3.1
         with:
           subject-path: "dist/gh_*"
       - name: Run createrepo
