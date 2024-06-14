@@ -209,7 +209,9 @@ func prSelectorForCurrentBranch(gitClient *git.Client, baseRepo ghrepo.Interface
 	}
 
 	if branchOwner != "" {
-		if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
+		if branchConfig.Push != "" {
+			selector = strings.TrimPrefix(branchConfig.Push, branchConfig.RemoteName+"/")
+		} else if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
 			selector = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
 		}
 		// prepend `OWNER:` if this branch is pushed to a fork

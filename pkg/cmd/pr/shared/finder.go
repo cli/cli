@@ -261,7 +261,9 @@ func (f *finder) parseCurrentBranch() (string, int, error) {
 	}
 
 	if branchOwner != "" {
-		if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
+		if branchConfig.Push != "" {
+			prHeadRef = strings.TrimPrefix(branchConfig.Push, branchConfig.RemoteName+"/")
+		} else if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
 			prHeadRef = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
 		}
 		// prepend `OWNER:` if this branch is pushed to a fork

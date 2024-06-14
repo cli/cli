@@ -709,28 +709,43 @@ func TestClientCommitBody(t *testing.T) {
 func TestClientReadBranchConfig(t *testing.T) {
 	tests := []struct {
 		name             string
-		cmdExitStatus    int
-		cmdStdout        string
-		cmdStderr        string
-		wantCmdArgs      string
+		cmdExitStatus    []int
+		cmdStdout        []string
+		cmdStderr        []string
+		wantCmdArgs      []string
 		wantBranchConfig BranchConfig
 	}{
 		{
 			name:             "read branch config",
-			cmdStdout:        "branch.trunk.remote origin\nbranch.trunk.merge refs/heads/trunk",
-			wantCmdArgs:      `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge)$`,
-			wantBranchConfig: BranchConfig{RemoteName: "origin", MergeRef: "refs/heads/trunk"},
+			cmdExitStatus:    []int{0, 0},
+			cmdStdout:        []string{"branch.trunk.remote origin\nbranch.trunk.merge refs/heads/trunk", "origin/trunk"},
+			cmdStderr:        []string{"", ""},
+			wantCmdArgs:      []string{`path/to/git config --get-regexp ^branch\.trunk\.(remote|merge)$`, `path/to/git rev-parse --verify --quiet --abbrev-ref trunk@{push}`},
+			wantBranchConfig: BranchConfig{RemoteName: "origin", MergeRef: "refs/heads/trunk", Push: "origin/trunk"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
+			var cmds []*exec.Cmd
+			var cmdCtxs []commandCtx
+			for i := 0; i < len(tt.cmdExitStatus); i++ {
+				cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus[i], tt.cmdStdout[i], tt.cmdStderr[i])
+				cmds = append(cmds, cmd)
+				cmdCtxs = append(cmdCtxs, cmdCtx)
+			}
+			i := -1
 			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
+				GitPath: "path/to/git",
+				commandContext: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+					i++
+					cmdCtxs[i](ctx, name, args...)
+					return cmds[i]
+				},
 			}
 			branchConfig := client.ReadBranchConfig(context.Background(), "trunk")
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			for i := 0; i < len(tt.cmdExitStatus); i++ {
+				assert.Equal(t, tt.wantCmdArgs[i], strings.Join(cmds[i].Args[3:], " "))
+			}
 			assert.Equal(t, tt.wantBranchConfig, branchConfig)
 		})
 	}

@@ -232,7 +232,16 @@ func TestFind(t *testing.T) {
 					return "blueberries", nil
 				},
 				branchConfig: func(branch string) (c git.BranchConfig) {
+					c.MergeRef = "refs/heads/blueberries"
+					c.RemoteName = "origin"
+					c.Push = "origin/blueberries"
 					return
+				},
+				remotesFn: func() (context.Remotes, error) {
+					return context.Remotes{{
+						Remote: &git.Remote{Name: "origin"},
+						Repo:   ghrepo.New("OWNER", "REPO"),
+					}}, nil
 				},
 			},
 			httpStub: func(r *httpmock.Registry) {
@@ -318,6 +327,7 @@ func TestFind(t *testing.T) {
 				branchConfig: func(branch string) (c git.BranchConfig) {
 					c.MergeRef = "refs/heads/blue-upstream-berries"
 					c.RemoteName = "origin"
+					c.Push = "origin/blue-upstream-berries"
 					return
 				},
 				remotesFn: func() (context.Remotes, error) {

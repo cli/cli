@@ -356,6 +356,9 @@ func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg Branc
 			cfg.MergeRef = parts[1]
 		}
 	}
+	if out, err = c.revParse(ctx, "--verify", "--quiet", "--abbrev-ref", branch+"@{push}"); err == nil {
+		cfg.Push = strings.TrimSuffix(string(out), "\n")
+	}
 	return
 }
 

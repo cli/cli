@@ -74,4 +74,5 @@ type BranchConfig struct {
 	RemoteName string
 	RemoteURL  *url.URL
 	MergeRef   string
+	Push       string
 }
