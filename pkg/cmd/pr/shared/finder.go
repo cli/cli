@@ -38,6 +38,7 @@ type finder struct {
 	remotesFn    func() (remotes.Remotes, error)
 	httpClient   func() (*http.Client, error)
 	branchConfig func(string) git.BranchConfig
+	pushDefault  func() (string, error)
 	progress     progressIndicator
 
 	repo       ghrepo.Interface
@@ -57,7 +58,10 @@ func NewFinder(factory *cmdutil.Factory) PRFinder {
 		branchFn:   factory.Branch,
 		remotesFn:  factory.Remotes,
 		httpClient: factory.HttpClient,
-		progress:   factory.IOStreams,
+		pushDefault: func() (string, error) {
+			return factory.GitClient.Config(context.Background(), "push.default")
+		},
+		progress: factory.IOStreams,
 		branchConfig: func(s string) git.BranchConfig {
 			return factory.GitClient.ReadBranchConfig(context.Background(), s)
 		},
@@ -263,7 +267,8 @@ func (f *finder) parseCurrentBranch() (string, int, error) {
 	if branchOwner != "" {
 		if branchConfig.Push != "" {
 			prHeadRef = strings.TrimPrefix(branchConfig.Push, branchConfig.RemoteName+"/")
-		} else if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
+		} else if pushDefault, _ := f.pushDefault(); (pushDefault == "upstream" || pushDefault == "tracking") &&
+			strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
 			prHeadRef = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
 		}
 		// prepend `OWNER:` if this branch is pushed to a fork

@@ -375,7 +375,7 @@ Requesting a code review from you
 	}
 }
 
-func Test_prSelectorForCurrentBranch(t *testing.T) {
+func Test_prSelectorForCurrentBranchPushDefaultUpstream(t *testing.T) {
 	rs, cleanup := run.Stub()
 	defer cleanup(t)
 
@@ -384,6 +384,38 @@ func Test_prSelectorForCurrentBranch(t *testing.T) {
 		branch.Frederick888/main.merge refs/heads/main
 	`))
 	rs.Register(`git rev-parse --verify --quiet --abbrev-ref Frederick888/main@\{push\}`, 1, "")
+	rs.Register(`git config push\.default`, 0, "upstream")
+
+	repo := ghrepo.NewWithHost("octocat", "playground", "github.com")
+	rem := context.Remotes{
+		&context.Remote{
+			Remote: &git.Remote{Name: "origin"},
+			Repo:   repo,
+		},
+	}
+	gitClient := &git.Client{GitPath: "some/path/git"}
+	prNum, headRef, err := prSelectorForCurrentBranch(gitClient, repo, "Frederick888/main", rem)
+	if err != nil {
+		t.Fatalf("prSelectorForCurrentBranch error: %v", err)
+	}
+	if prNum != 0 {
+		t.Errorf("expected prNum to be 0, got %q", prNum)
+	}
+	if headRef != "Frederick888:main" {
+		t.Errorf("expected headRef to be \"Frederick888:main\", got %q", headRef)
+	}
+}
+
+func Test_prSelectorForCurrentBranchPushDefaultTracking(t *testing.T) {
+	rs, cleanup := run.Stub()
+	defer cleanup(t)
+
+	rs.Register(`git config --get-regexp \^branch\\.`, 0, heredoc.Doc(`
+		branch.Frederick888/main.remote git@github.com:Frederick888/playground.git
+		branch.Frederick888/main.merge refs/heads/main
+	`))
+	rs.Register(`git rev-parse --verify --quiet --abbrev-ref Frederick888/main@\{push\}`, 1, "")
+	rs.Register(`git config push\.default`, 0, "tracking")
 
 	repo := ghrepo.NewWithHost("octocat", "playground", "github.com")
 	rem := context.Remotes{
