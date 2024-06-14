@@ -75,10 +75,12 @@ func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify
 			return nil, "", fmt.Errorf("unable to read file %s: %v", v.config.TrustedRoot, err)
 		}
 
-		scanner := bufio.NewScanner(bytes.NewReader(customTrustRoots))
-		for scanner.Scan() {
+		reader := bufio.NewReader(bytes.NewReader(customTrustRoots))
+		var line []byte
+		line, err = reader.ReadBytes('\n')
+		for err == nil {
 			// Load each trusted root
-			trustedRoot, err := root.NewTrustedRootFromJSON(scanner.Bytes())
+			trustedRoot, err := root.NewTrustedRootFromJSON(line)
 			if err != nil {
 				return nil, "", fmt.Errorf("failed to create custom verifier: %v", err)
 			}
@@ -125,7 +127,10 @@ func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify
 					}
 				}
 			}
+
+			line, err = reader.ReadBytes('\n')
 		}
+		return nil, "", fmt.Errorf("unable to use provided trusted roots")
 	}
 
 	if leafCert.Issuer.Organization[0] == PublicGoodIssuerOrg && !v.config.NoPublicGood {
