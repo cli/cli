@@ -41,6 +41,7 @@ func TestJSONFields(t *testing.T) {
 		"createdAt",
 		"deletions",
 		"files",
+		"fullDatabaseId",
 		"headRefName",
 		"headRefOid",
 		"headRepository",
