@@ -217,6 +217,10 @@ func statusRun(opts *StatusOptions) error {
 		})
 		statuses[hostname] = append(statuses[hostname], entry)
 
+		if err == nil && !isValidEntry(entry) {
+			err = cmdutil.SilentError
+		}
+
 		users := authCfg.UsersForHost(hostname)
 		for _, username := range users {
 			if username == activeUser {
@@ -233,6 +237,10 @@ func statusRun(opts *StatusOptions) error {
 				username:    username,
 			})
 			statuses[hostname] = append(statuses[hostname], entry)
+
+			if err == nil && !isValidEntry(entry) {
+				err = cmdutil.SilentError
+			}
 		}
 	}
 
@@ -243,15 +251,20 @@ func statusRun(opts *StatusOptions) error {
 			continue
 		}
 
+		stream := stdout
+		if err != nil {
+			stream = stderr
+		}
+
 		if prevEntry {
-			fmt.Fprint(stdout, "\n")
+			fmt.Fprint(stream, "\n")
 		}
 		prevEntry = true
-		fmt.Fprintf(stdout, "%s\n", cs.Bold(hostname))
-		fmt.Fprintf(stdout, "%s", strings.Join(entries.Strings(cs), "\n"))
+		fmt.Fprintf(stream, "%s\n", cs.Bold(hostname))
+		fmt.Fprintf(stream, "%s", strings.Join(entries.Strings(cs), "\n"))
 	}
 
-	return nil
+	return err
 }
 
 func displayToken(token string, printRaw bool) string {
@@ -355,4 +368,9 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) Entry {
 
 func authTokenWriteable(src string) bool {
 	return !strings.HasSuffix(src, "_TOKEN")
+}
+
+func isValidEntry(entry Entry) bool {
+	_, ok := entry.(validEntry)
+	return ok
 }
