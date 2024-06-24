@@ -25,18 +25,22 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 		Args:  cmdutil.ExactArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
 		Short: "Verify an artifact's integrity using attestations",
 		Long: heredoc.Docf(`
-			### NOTE: This feature is currently in beta, and subject to change.
-
 			Verify the integrity and provenance of an artifact using its associated
 			cryptographically signed attestations.
 
-			The command requires either:
+			In order to verify an attestation, you must validate the identity of the Actions
+			workflow that produced the attestation (a.k.a. the signer workflow). Given this
+			identity, the verification process checks the signatures in the attestations,
+			and confirms that the attestation refers to provided artifact.
+
+			To specify the artifact, the command requires:
 			* a file path to an artifact, or
 			* a container image URI (e.g. %[1]soci://<image-uri>%[1]s)
 			  * (note that if you provide an OCI URL, you must already be authenticated with
 			its container registry)
 
-			In addition, the command requires either:
+			To fetch the attestation, and validate the identity of the signer, the command
+			requires either:
 			* the %[1]s--repo%[1]s flag (e.g. --repo github/example).
 			* the %[1]s--owner%[1]s flag (e.g. --owner github), or
 
@@ -54,27 +58,38 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			To see the full results that are generated upon successful verification, i.e.
 			for use with a policy engine, provide the %[1]s--format=json%[1]s flag.
 
-			The attestation's certificate's Subject Alternative Name (SAN) identifies the entity
-			responsible for creating the attestation, which most of the time will be a GitHub
-			Actions workflow file located inside your repository. By default, this command uses
+			The signer workflow's identity is validated against the attestation's
+			certificate's Subject Alternative Name (SAN). Often, the signer workflow is the
+			same workflow that originated the run and generated the attestation, and will
+			be located inside your repository. For this reason, by default this command uses
 			either the %[1]s--repo%[1]s or the %[1]s--owner%[1]s flag value to validate the SAN.
 
-			However, if you generate attestations with a reusable workflow then the SAN will
-			identify the reusable workflow – which may or may not be located inside your %[1]s--repo%[1]s
-			or %[1]s--owner%[1]s. In these situations, you can use the %[1]s--cert-identity%[1]s or
-			%[1]s--cert-identity-regex%[1]s flags to specify the reusable workflow's URI.
+			However, sometimes the originating workflow is not be the same workflow that
+			performed the signing. If your attestation was generated via a reusable
+			workflow, then that reusable workflow is the signer whose identity needs to be
+			validated. In this situation, the signer workflow may or may not be located
+			inside your %[1]s--repo%[1]s or %[1]s--owner%[1]s.
+
+			When using reusable workflows, use the %[1]s--signer-repo%[1]s, %[1]s--signer-workflow%[1]s,
+			or %[1]s--cert-identity%[1]s flags to validate the signer workflow's identity.
 
 			For more policy verification options, see the other available flags.
 			`, "`"),
 		Example: heredoc.Doc(`
-			# Verify a local artifact linked with a repository
+			# Verify an artifact linked with a repository
 			$ gh attestation verify example.bin --repo github/example
 
-			# Verify a local artifact linked with an organization
+			# Verify an artifact linked with an organization
 			$ gh attestation verify example.bin --owner github
 
-			# Verify an OCI image using locally stored attestations
+			# Verify an artifact and output the full verification result
+			$ gh attestation verify example.bin --owner github --format json
+
+			# Verify an OCI image using attestations stored on disk
 			$ gh attestation verify oci://<image-uri> --owner github --bundle sha256:foo.jsonl
+
+			# Verify an artifact signed with a reusable workflow
+			$ gh attestation verify example.bin --owner github --signer-repo actions/example
 		`),
 		// PreRunE is used to validate flags before the command is run
 		// If an error is returned, its message will be printed to the terminal
