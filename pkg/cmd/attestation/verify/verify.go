@@ -58,8 +58,8 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			To see the full results that are generated upon successful verification, i.e.
 			for use with a policy engine, provide the %[1]s--format=json%[1]s flag.
 
-			The signer workflow's identity is validated against the attestation's
-			certificate's Subject Alternative Name (SAN). Often, the signer workflow is the
+			The signer workflow's identity is validated against the Subject Alternative Name (SAN)
+			within the attestation certificate. Often, the signer workflow is the
 			same workflow that started the run and generated the attestation, and will be
 			located inside your repository. For this reason, by default this command uses
 			either the %[1]s--repo%[1]s or the %[1]s--owner%[1]s flag value to validate the SAN.
