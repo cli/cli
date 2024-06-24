@@ -156,7 +156,7 @@ func getLowestCertInChain(ca *root.CertificateAuthority) (*x509.Certificate, err
 	if ca.Leaf != nil {
 		return ca.Leaf, nil
 	} else if len(ca.Intermediates) > 0 {
-		return ca.Intermediates[len(ca.Intermediates)-1], nil
+		return ca.Intermediates[0], nil
 	} else if ca.Root != nil {
 		return ca.Root, nil
 	}
