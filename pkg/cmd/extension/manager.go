@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -114,7 +115,20 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	externalCmd.Stdin = stdin
 	externalCmd.Stdout = stdout
 	externalCmd.Stderr = stderr
-	return true, externalCmd.Run()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for sig := range c {
+			_ = externalCmd.Process.Signal(sig)
+		}
+	}()
+
+	if err := externalCmd.Start(); err != nil {
+		return true, fmt.Errorf("failed to start extension: %v", err)
+	}
+
+	return true, externalCmd.Wait()
 }
 
 func (m *Manager) List() []extensions.Extension {
