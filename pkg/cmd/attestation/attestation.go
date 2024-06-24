@@ -17,8 +17,6 @@ func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Work with artifact attestations",
 		Aliases: []string{"at"},
 		Long: heredoc.Doc(`
-			### NOTE: This feature is currently in beta, and subject to change.
-
 			Download and verify artifact attestations.
 			`),
 	}
