@@ -304,6 +304,123 @@ func Test_listRun(t *testing.T) {
 	}
 }
 
+// Test_listRun_populatesNumSelectedReposIfRequired asserts that NumSelectedRepos
+// field is populated **only** when it's going to be presented in the output. Since
+// populating this field costs further API requests (one per variable), it's important
+// to avoid extra calls when the output will not present the field's value. Note
+// that NumSelectedRepos is only meant for organization variables.
+//
+// We should only populate the NumSelectedRepos field in these cases:
+//  1. The command is run in the TTY mode without the `--json <fields>` option.
+//  2. The command is run with `--json <fields>` option, and `numSelectedRepos`
+//     is among the selected fields. In this case, TTY mode is irrelevant.
+func Test_listRun_populatesNumSelectedReposIfRequired(t *testing.T) {
+	tests := []struct {
+		name          string
+		tty           bool
+		jsonFields    []string
+		wantPopulated bool
+	}{
+		{
+			name:          "org tty",
+			tty:           true,
+			wantPopulated: true,
+		},
+		{
+			name:          "org tty, json with numSelectedRepos",
+			tty:           true,
+			jsonFields:    []string{"numSelectedRepos"},
+			wantPopulated: true,
+		},
+		{
+			name:          "org tty, json without numSelectedRepos",
+			tty:           true,
+			jsonFields:    []string{"name"},
+			wantPopulated: false,
+		},
+		{
+			name:          "org not tty",
+			tty:           false,
+			wantPopulated: false,
+		},
+		{
+			name:          "org not tty, json with numSelectedRepos",
+			tty:           false,
+			jsonFields:    []string{"numSelectedRepos"},
+			wantPopulated: true,
+		},
+		{
+			name:          "org not tty, json without numSelectedRepos",
+			tty:           false,
+			jsonFields:    []string{"name"},
+			wantPopulated: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			reg.Verify(t)
+
+			reg.Register(
+				httpmock.REST("GET", "orgs/umbrellaOrganization/actions/variables"),
+				httpmock.JSONResponse(struct{ Variables []shared.Variable }{
+					[]shared.Variable{
+						{
+							Name:             "VARIABLE",
+							Visibility:       shared.Selected,
+							SelectedReposURL: "https://api.github.com/orgs/umbrellaOrganization/actions/variables/VARIABLE/repositories",
+						},
+					},
+				}))
+			reg.Register(
+				httpmock.REST("GET", "orgs/umbrellaOrganization/actions/variables/VARIABLE/repositories"),
+				httpmock.JSONResponse(struct {
+					TotalCount int `json:"total_count"`
+				}{999}))
+
+			opts := &ListOptions{
+				OrgName: "umbrellaOrganization",
+			}
+
+			if tt.jsonFields != nil {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(tt.jsonFields)
+				opts.Exporter = exporter
+			}
+
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
+			opts.IO = ios
+
+			opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.FromFullName("owner/repo")
+			}
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			opts.Config = func() (gh.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			opts.Now = func() time.Time {
+				t, _ := time.Parse(time.RFC822, "4 Apr 24 00:00 UTC")
+				return t
+			}
+
+			require.NoError(t, listRun(opts))
+
+			if tt.wantPopulated {
+				// There should be 2 requests; one to get the variables list and
+				// another to populate the numSelectedRepos field.
+				assert.Len(t, reg.Requests, 2)
+			} else {
+				// Only one requests to get the variables list.
+				assert.Len(t, reg.Requests, 1)
+			}
+		})
+	}
+}
+
 func Test_getVariables_pagination(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
