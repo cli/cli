@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,6 +30,8 @@ type ListOptions struct {
 	OrgName string
 	EnvName string
 }
+
+const fieldNumSelectedRepos = "numSelectedRepos"
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
@@ -94,9 +97,21 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	var variables []shared.Variable
+	// Since populating the `NumSelectedRepos` field costs further API requests
+	// (one per secret), it's important to avoid extra calls when the output will
+	// not present the field's value. So, we should only populate this field in
+	// these cases:
+	//  1. The command is run in the TTY mode without the `--json <fields>` option.
+	//  2. The command is run with `--json <fields>` option, and `numSelectedRepos`
+	//     is among the selected fields. In this case, TTY mode is irrelevant.
 	showSelectedRepoInfo := opts.IO.IsStdoutTTY()
+	if opts.Exporter != nil {
+		// Note that if there's an exporter set, then we don't mind the TTY mode
+		// because we just have to populate the requested fields.
+		showSelectedRepoInfo = slices.Contains(opts.Exporter.Fields(), fieldNumSelectedRepos)
+	}
 
+	var variables []shared.Variable
 	switch variableEntity {
 	case shared.Repository:
 		variables, err = getRepoVariables(client, baseRepo)
