@@ -82,8 +82,7 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options) error {
 	var tufOptions []*tuf.Options
 
 	tufOpt := verification.DefaultOptionsWithCacheSetting()
-	// The purpose is the verify the TUF root and repository, make
-	// sure there is no caching enabled
+	// Disable local caching, so we get up-to-date response from TUF repository
 	tufOpt.CacheValidity = 0
 
 	if opts.TufUrl != "" && opts.TufRootPath != "" {
