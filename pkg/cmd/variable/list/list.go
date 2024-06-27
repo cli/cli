@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,14 +31,7 @@ type ListOptions struct {
 	EnvName string
 }
 
-var variableFields = []string{
-	"name",
-	"value",
-	"visibility",
-	"updatedAt",
-	"numSelectedRepos",
-	"selectedReposURL",
-}
+const fieldNumSelectedRepos = "numSelectedRepos"
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
@@ -76,7 +70,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List variables for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "List variables for an environment")
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, variableFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.VariableJSONFields)
 
 	return cmd
 }
@@ -103,9 +97,21 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	var variables []Variable
+	// Since populating the `NumSelectedRepos` field costs further API requests
+	// (one per secret), it's important to avoid extra calls when the output will
+	// not present the field's value. So, we should only populate this field in
+	// these cases:
+	//  1. The command is run in the TTY mode without the `--json <fields>` option.
+	//  2. The command is run with `--json <fields>` option, and `numSelectedRepos`
+	//     is among the selected fields. In this case, TTY mode is irrelevant.
 	showSelectedRepoInfo := opts.IO.IsStdoutTTY()
+	if opts.Exporter != nil {
+		// Note that if there's an exporter set, then we don't mind the TTY mode
+		// because we just have to populate the requested fields.
+		showSelectedRepoInfo = slices.Contains(opts.Exporter.Fields(), fieldNumSelectedRepos)
+	}
 
+	var variables []shared.Variable
 	switch variableEntity {
 	case shared.Repository:
 		variables, err = getRepoVariables(client, baseRepo)
@@ -170,20 +176,7 @@ func listRun(opts *ListOptions) error {
 	return nil
 }
 
-type Variable struct {
-	Name             string            `json:"name"`
-	Value            string            `json:"value"`
-	UpdatedAt        time.Time         `json:"updated_at"`
-	Visibility       shared.Visibility `json:"visibility"`
-	SelectedReposURL string            `json:"selected_repositories_url"`
-	NumSelectedRepos int               `json:"num_selected_repos"`
-}
-
-func (v *Variable) ExportData(fields []string) map[string]interface{} {
-	return cmdutil.StructExportData(v, fields)
-}
-
-func fmtVisibility(s Variable) string {
+func fmtVisibility(s shared.Variable) string {
 	switch s.Visibility {
 	case shared.All:
 		return "Visible to all repositories"
@@ -199,22 +192,23 @@ func fmtVisibility(s Variable) string {
 	return ""
 }
 
-func getRepoVariables(client *http.Client, repo ghrepo.Interface) ([]Variable, error) {
+func getRepoVariables(client *http.Client, repo ghrepo.Interface) ([]shared.Variable, error) {
 	return getVariables(client, repo.RepoHost(), fmt.Sprintf("repos/%s/actions/variables", ghrepo.FullName(repo)))
 }
 
-func getEnvVariables(client *http.Client, repo ghrepo.Interface, envName string) ([]Variable, error) {
+func getEnvVariables(client *http.Client, repo ghrepo.Interface, envName string) ([]shared.Variable, error) {
 	path := fmt.Sprintf("repos/%s/environments/%s/variables", ghrepo.FullName(repo), envName)
 	return getVariables(client, repo.RepoHost(), path)
 }
 
-func getOrgVariables(client *http.Client, host, orgName string, showSelectedRepoInfo bool) ([]Variable, error) {
+func getOrgVariables(client *http.Client, host, orgName string, showSelectedRepoInfo bool) ([]shared.Variable, error) {
 	variables, err := getVariables(client, host, fmt.Sprintf("orgs/%s/actions/variables", orgName))
 	if err != nil {
 		return nil, err
 	}
+	apiClient := api.NewClientFromHTTP(client)
 	if showSelectedRepoInfo {
-		err = populateSelectedRepositoryInformation(client, host, variables)
+		err = shared.PopulateMultipleSelectedRepositoryInformation(apiClient, host, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -222,13 +216,13 @@ func getOrgVariables(client *http.Client, host, orgName string, showSelectedRepo
 	return variables, nil
 }
 
-func getVariables(client *http.Client, host, path string) ([]Variable, error) {
-	var results []Variable
+func getVariables(client *http.Client, host, path string) ([]shared.Variable, error) {
+	var results []shared.Variable
 	apiClient := api.NewClientFromHTTP(client)
 	path = fmt.Sprintf("%s?per_page=100", path)
 	for path != "" {
 		response := struct {
-			Variables []Variable
+			Variables []shared.Variable
 		}{}
 		var err error
 		path, err = apiClient.RESTWithNext(host, "GET", path, nil, &response)
@@ -238,21 +232,4 @@ func getVariables(client *http.Client, host, path string) ([]Variable, error) {
 		results = append(results, response.Variables...)
 	}
 	return results, nil
-}
-
-func populateSelectedRepositoryInformation(client *http.Client, host string, variables []Variable) error {
-	apiClient := api.NewClientFromHTTP(client)
-	for i, variable := range variables {
-		if variable.SelectedReposURL == "" {
-			continue
-		}
-		response := struct {
-			TotalCount int `json:"total_count"`
-		}{}
-		if err := apiClient.REST(host, "GET", variable.SelectedReposURL, nil, &response); err != nil {
-			return fmt.Errorf("failed determining selected repositories for %s: %w", variable.Name, err)
-		}
-		variables[i].NumSelectedRepos = response.TotalCount
-	}
-	return nil
 }
