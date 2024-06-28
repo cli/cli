@@ -40,7 +40,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: "~1.17.1"
           install-only: true
@@ -92,7 +92,7 @@ jobs:
           security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
           rm "$RUNNER_TEMP/cert.p12"
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: "~1.17.1"
           install-only: true
@@ -145,7 +145,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: "~1.17.1"
           install-only: true
@@ -277,11 +277,6 @@ jobs:
           rm -rf dist
           mkdir dist
           mv -v {linux,macos,windows}/gh_* dist/
-      - name: Attest release artifacts
-        if: inputs.environment == 'production'
-        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
-        with:
-          subject-path: "dist/gh_*"
       - name: Install packaging dependencies
         run: sudo apt-get install -y rpm reprepro
       - name: Set up GPG
@@ -302,6 +297,11 @@ jobs:
         run: |
           cp script/rpmmacros ~/.rpmmacros
           rpmsign --addsign dist/*.rpm
+      - name: Attest release artifacts
+        if: inputs.environment == 'production'
+        uses: actions/attest-build-provenance@bdd51370e0416ac948727f861e03c2f05d32d78e # v1.3.2
+        with:
+          subject-path: "dist/gh_*"
       - name: Run createrepo
         env:
           GPG_SIGN: ${{ inputs.environment == 'production' }}
