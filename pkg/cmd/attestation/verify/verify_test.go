@@ -220,7 +220,7 @@ func TestNewVerifyCmd(t *testing.T) {
 
 			assert.Equal(t, tc.wants.ArtifactPath, opts.ArtifactPath)
 			assert.Equal(t, tc.wants.BundlePath, opts.BundlePath)
-			assert.Equal(t, tc.wants.CustomTrustedRoot, opts.CustomTrustedRoot)
+			assert.Equal(t, tc.wants.TrustedRoot, opts.TrustedRoot)
 			assert.Equal(t, tc.wants.DenySelfHostedRunner, opts.DenySelfHostedRunner)
 			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
 			assert.Equal(t, tc.wants.Limit, opts.Limit)
