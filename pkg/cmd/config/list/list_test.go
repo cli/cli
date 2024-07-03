@@ -84,6 +84,7 @@ func Test_listRun(t *testing.T) {
 				cfg.Set("HOST", "git_protocol", "ssh")
 				cfg.Set("HOST", "editor", "/usr/bin/vim")
 				cfg.Set("HOST", "prompt", "disabled")
+				cfg.Set("HOST", "prefer_editor_prompt", "enabled")
 				cfg.Set("HOST", "pager", "less")
 				cfg.Set("HOST", "http_unix_socket", "")
 				cfg.Set("HOST", "browser", "brave")
@@ -93,6 +94,7 @@ func Test_listRun(t *testing.T) {
 			stdout: `git_protocol=ssh
 editor=/usr/bin/vim
 prompt=disabled
+prefer_editor_prompt=enabled
 pager=less
 http_unix_socket=
 browser=brave

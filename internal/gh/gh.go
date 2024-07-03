@@ -47,6 +47,8 @@ type Config interface {
 	Pager(hostname string) ConfigEntry
 	// Prompt returns the configured prompt, optionally scoped by host.
 	Prompt(hostname string) ConfigEntry
+	// PreferEditorPrompt returns the configured editor-based prompt, optionally scoped by host.
+	PreferEditorPrompt(hostname string) ConfigEntry
 
 	// Aliases provides persistent storage and modification of command aliases.
 	Aliases() AliasConfig
