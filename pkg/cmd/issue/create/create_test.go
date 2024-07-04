@@ -38,6 +38,7 @@ func TestNewCmdCreate(t *testing.T) {
 		tty       bool
 		stdin     string
 		cli       string
+		config    string
 		wantsErr  bool
 		wantsOpts CreateOptions
 	}{
@@ -126,9 +127,24 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:     "editor",
+			name:     "editor by cli",
 			tty:      false,
 			cli:      "--editor",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				EditorMode:  true,
+				Interactive: false,
+			},
+		},
+		{
+			name:     "editor by config",
+			tty:      false,
+			cli:      "",
+			config:   "prefer_editor_prompt: enabled",
 			wantsErr: false,
 			wantsOpts: CreateOptions{
 				Title:       "",
@@ -173,6 +189,12 @@ func TestNewCmdCreate(t *testing.T) {
 
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				Config: func() (gh.Config, error) {
+					if tt.config != "" {
+						return config.NewFromString(tt.config), nil
+					}
+					return config.NewBlankConfig(), nil
+				},
 			}
 
 			var opts *CreateOptions

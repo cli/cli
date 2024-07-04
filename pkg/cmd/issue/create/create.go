@@ -80,6 +80,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.BaseRepo = f.BaseRepo
 			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
+			config, err := f.Config()
+			if err != nil {
+				return err
+			}
+			opts.EditorMode = opts.EditorMode || config.PreferEditorPrompt("").Value == "enabled"
+
 			titleProvided := cmd.Flags().Changed("title")
 			bodyProvided := cmd.Flags().Changed("body")
 			if bodyFile != "" {
