@@ -51,7 +51,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Config:           f.Config,
 		Browser:          f.Browser,
 		Prompter:         f.Prompter,
-		TitledEditSurvey: prShared.TitledEditSurvey(f.Config, f.IOStreams),
+		TitledEditSurvey: prShared.TitledEditSurvey(&prShared.UserEditor{Config: f.Config, IO: f.IOStreams}),
 	}
 
 	var bodyFile string
