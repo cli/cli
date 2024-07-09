@@ -176,6 +176,21 @@ func TestNewCmdCreate(t *testing.T) {
 			cli:      "--editor --web",
 			wantsErr: true,
 		},
+		{
+			name:     "can use web even though editor is enabled by config",
+			tty:      false,
+			cli:      `--web --title mytitle --body "issue body"`,
+			config:   "prefer_editor_prompt: enabled",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "issue body",
+				RecoverFile: "",
+				WebMode:     true,
+				EditorMode:  false,
+				Interactive: false,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

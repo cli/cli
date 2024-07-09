@@ -80,11 +80,19 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.BaseRepo = f.BaseRepo
 			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--editor` or `--web`",
+				opts.EditorMode,
+				opts.WebMode,
+			); err != nil {
+				return err
+			}
+
 			config, err := f.Config()
 			if err != nil {
 				return err
 			}
-			opts.EditorMode = opts.EditorMode || config.PreferEditorPrompt("").Value == "enabled"
+			opts.EditorMode = !opts.WebMode && (opts.EditorMode || config.PreferEditorPrompt("").Value == "enabled")
 
 			titleProvided := cmd.Flags().Changed("title")
 			bodyProvided := cmd.Flags().Changed("body")
@@ -109,14 +117,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
-			}
-
-			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--editor` or `--web`",
-				opts.EditorMode,
-				opts.WebMode,
-			); err != nil {
-				return err
 			}
 
 			if runF != nil {
