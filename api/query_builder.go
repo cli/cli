@@ -249,7 +249,7 @@ func RequiredStatusCheckRollupGraphQL(prID, after string, includeEvent bool) str
 	}`), afterClause, prID, eventField)
 }
 
-var IssueFields = []string{
+var sharedIssuePRFields = []string{
 	"assignees",
 	"author",
 	"body",
@@ -268,10 +268,20 @@ var IssueFields = []string{
 	"title",
 	"updatedAt",
 	"url",
+}
+
+// Some fields are only valid in the context of issues.
+// They need to be enumerated separately in order to be filtered
+// from existing code that expects to be able to pass Issue fields
+// to PR queries, e.g. the PullRequestGraphql function.
+var issueOnlyFields = []string{
+	"isPinned",
 	"stateReason",
 }
 
-var PullRequestFields = append(IssueFields,
+var IssueFields = append(sharedIssuePRFields, issueOnlyFields...)
+
+var PullRequestFields = append(sharedIssuePRFields,
 	"additions",
 	"autoMergeRequest",
 	"baseRefName",
@@ -298,12 +308,6 @@ var PullRequestFields = append(IssueFields,
 	"reviews",
 	"statusCheckRollup",
 )
-
-// Some fields are only valid in the context of issues.
-var issueOnlyFields = []string{
-	"isPinned",
-	"stateReason",
-}
 
 // IssueGraphQL constructs a GraphQL query fragment for a set of issue fields.
 func IssueGraphQL(fields []string) string {
