@@ -128,7 +128,7 @@ func TestNewCmdCreate(t *testing.T) {
 		},
 		{
 			name:     "editor by cli",
-			tty:      false,
+			tty:      true,
 			cli:      "--editor",
 			wantsErr: false,
 			wantsOpts: CreateOptions{
@@ -142,7 +142,7 @@ func TestNewCmdCreate(t *testing.T) {
 		},
 		{
 			name:     "editor by config",
-			tty:      false,
+			tty:      true,
 			cli:      "",
 			config:   "prefer_editor_prompt: enabled",
 			wantsErr: false,
@@ -157,7 +157,7 @@ func TestNewCmdCreate(t *testing.T) {
 		},
 		{
 			name:     "editor and template",
-			tty:      false,
+			tty:      true,
 			cli:      `--editor --template "bug report"`,
 			wantsErr: false,
 			wantsOpts: CreateOptions{
@@ -172,13 +172,13 @@ func TestNewCmdCreate(t *testing.T) {
 		},
 		{
 			name:     "editor and web",
-			tty:      false,
+			tty:      true,
 			cli:      "--editor --web",
 			wantsErr: true,
 		},
 		{
 			name:     "can use web even though editor is enabled by config",
-			tty:      false,
+			tty:      true,
 			cli:      `--web --title mytitle --body "issue body"`,
 			config:   "prefer_editor_prompt: enabled",
 			wantsErr: false,
@@ -190,6 +190,12 @@ func TestNewCmdCreate(t *testing.T) {
 				EditorMode:  false,
 				Interactive: false,
 			},
+		},
+		{
+			name:     "editor with non-tty",
+			tty:      false,
+			cli:      "--editor",
+			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {

@@ -118,6 +118,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if opts.Interactive && !opts.IO.CanPrompt() {
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
 			}
+			if opts.EditorMode && !opts.IO.CanPrompt() {
+				return errors.New("--editor or enabled prefer_editor_prompt configuration are not supported in non-tty mode")
+			}
 
 			if runF != nil {
 				return runF(opts)
