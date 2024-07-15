@@ -319,6 +319,67 @@ about: This is how you report bugs
 	}
 }
 
+func TestExtractTitle(t *testing.T) {
+	tmpfile, err := os.CreateTemp(t.TempDir(), "gh-cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tmpfile.Close()
+
+	type args struct {
+		filePath string
+	}
+	tests := []struct {
+		name    string
+		prepare string
+		args    args
+		want    string
+	}{
+		{
+			name: "Complete front-matter",
+			prepare: `---
+name: Bug Report
+title: 'bug: '
+about: This is how you report bugs
+---
+
+**Template contents**
+`,
+			args: args{
+				filePath: tmpfile.Name(),
+			},
+			want: "bug: ",
+		},
+		{
+			name: "Incomplete front-matter",
+			prepare: `---
+about: This is how you report bugs
+---
+`,
+			args: args{
+				filePath: tmpfile.Name(),
+			},
+			want: "",
+		},
+		{
+			name:    "No front-matter",
+			prepare: `name: This is not yaml!`,
+			args: args{
+				filePath: tmpfile.Name(),
+			},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_ = os.WriteFile(tmpfile.Name(), []byte(tt.prepare), 0600)
+			if got := ExtractTitle(tt.args.filePath); got != tt.want {
+				t.Errorf("ExtractTitle() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestExtractContents(t *testing.T) {
 	tmpfile, err := os.CreateTemp(t.TempDir(), "gh-cli")
 	if err != nil {

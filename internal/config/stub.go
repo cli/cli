@@ -70,6 +70,9 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	mock.PromptFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Prompt(hostname)
 	}
+	mock.PreferEditorPromptFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.PreferEditorPrompt(hostname)
+	}
 	mock.VersionFunc = func() o.Option[string] {
 		return cfg.Version()
 	}
