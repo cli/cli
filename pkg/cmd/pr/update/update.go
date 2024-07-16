@@ -72,8 +72,6 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVar(&opts.Rebase, "rebase", false, "Update PR branch by rebasing on top of latest base branch")
 
-	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base")
-
 	return cmd
 }
 
