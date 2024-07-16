@@ -111,7 +111,7 @@ func updateRun(opts *UpdateOptions) error {
 	cs := opts.IO.ColorScheme()
 	if comparison.BehindBy == 0 {
 		// The PR branch is not behind the base branch, so it'a already up-to-date.
-		fmt.Fprintf(opts.IO.ErrOut, "%s PR branch already up-to-date\n", cs.SuccessIcon())
+		fmt.Fprintf(opts.IO.Out, "%s PR branch already up-to-date\n", cs.SuccessIcon())
 		return nil
 	}
 
@@ -122,7 +122,7 @@ func updateRun(opts *UpdateOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s PR branch updated\n", cs.SuccessIcon())
+	fmt.Fprintf(opts.IO.Out, "%s PR branch updated\n", cs.SuccessIcon())
 	return nil
 }
 

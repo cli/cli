@@ -114,7 +114,6 @@ func Test_updateRun(t *testing.T) {
 		input     *UpdateOptions
 		httpStubs func(*testing.T, *httpmock.Registry)
 		stdout    string
-		stderr    string
 		wantsErr  string
 	}{
 		{
@@ -152,8 +151,7 @@ func Test_updateRun(t *testing.T) {
 						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
 					}))
 			},
-			stdout: "",
-			stderr: "✓ PR branch already up-to-date\n",
+			stdout: "✓ PR branch already up-to-date\n",
 		},
 		{
 			name: "success, already up-to-date, PR branch on the same repo as base",
@@ -189,8 +187,7 @@ func Test_updateRun(t *testing.T) {
 						assert.Equal(t, "head-ref-name", inputs["headRef"])
 					}))
 			},
-			stdout: "",
-			stderr: "✓ PR branch already up-to-date\n",
+			stdout: "✓ PR branch already up-to-date\n",
 		},
 		{
 			name: "success, merge",
@@ -232,8 +229,7 @@ func Test_updateRun(t *testing.T) {
 						assert.Equal(t, "MERGE", inputs["updateMethod"])
 					}))
 			},
-			stdout: "",
-			stderr: "✓ PR branch updated\n",
+			stdout: "✓ PR branch updated\n",
 		},
 		{
 			name: "success, rebase",
@@ -276,8 +272,7 @@ func Test_updateRun(t *testing.T) {
 						assert.Equal(t, "REBASE", inputs["updateMethod"])
 					}))
 			},
-			stdout: "",
-			stderr: "✓ PR branch updated\n",
+			stdout: "✓ PR branch updated\n",
 		},
 		{
 			name: "failure, API error on ref comparison request",
@@ -347,7 +342,7 @@ func Test_updateRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, stderr := iostreams.Test()
+			ios, _, stdout, _ := iostreams.Test()
 			ios.SetStdoutTTY(true)
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
@@ -382,7 +377,6 @@ func Test_updateRun(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.stdout, stdout.String())
-			assert.Equal(t, tt.stderr, stderr.String())
 		})
 	}
 }
