@@ -132,9 +132,9 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			}
 
 			config := verification.SigstoreConfig{
-				CustomTrustedRoot: opts.CustomTrustedRoot,
-				Logger:            opts.Logger,
-				NoPublicGood:      opts.NoPublicGood,
+				TrustedRoot:  opts.TrustedRoot,
+				Logger:       opts.Logger,
+				NoPublicGood: opts.NoPublicGood,
 			}
 
 			opts.SigstoreVerifier = verification.NewLiveSigstoreVerifier(config)
@@ -156,8 +156,8 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.MarkFlagsMutuallyExclusive("owner", "repo")
 	verifyCmd.MarkFlagsOneRequired("owner", "repo")
 	verifyCmd.Flags().StringVarP(&opts.PredicateType, "predicate-type", "", "", "Filter attestations by provided predicate type")
-	verifyCmd.Flags().BoolVarP(&opts.NoPublicGood, "no-public-good", "", false, "Only verify attestations signed with GitHub's Sigstore instance")
-	verifyCmd.Flags().StringVarP(&opts.CustomTrustedRoot, "custom-trusted-root", "", "", "Path to a custom trustedroot.json file to use for verification")
+	verifyCmd.Flags().BoolVarP(&opts.NoPublicGood, "no-public-good", "", false, "Do not verify attestations signed with Sigstore public good instance")
+	verifyCmd.Flags().StringVarP(&opts.TrustedRoot, "custom-trusted-root", "", "", "Path to a trusted_root.jsonl file; likely for offline verification")
 	verifyCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
 	cmdutil.AddFormatFlags(verifyCmd, &opts.exporter)
 	// policy enforcement flags

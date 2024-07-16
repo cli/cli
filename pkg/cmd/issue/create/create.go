@@ -18,16 +18,18 @@ import (
 )
 
 type CreateOptions struct {
-	HttpClient func() (*http.Client, error)
-	Config     func() (gh.Config, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser.Browser
-	Prompter   prShared.Prompt
+	HttpClient       func() (*http.Client, error)
+	Config           func() (gh.Config, error)
+	IO               *iostreams.IOStreams
+	BaseRepo         func() (ghrepo.Interface, error)
+	Browser          browser.Browser
+	Prompter         prShared.Prompt
+	TitledEditSurvey func(string, string) (string, string, error)
 
 	RootDirOverride string
 
 	HasRepoOverride bool
+	EditorMode      bool
 	WebMode         bool
 	RecoverFile     string
 
@@ -44,11 +46,12 @@ type CreateOptions struct {
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		Config:     f.Config,
-		Browser:    f.Browser,
-		Prompter:   f.Prompter,
+		IO:               f.IOStreams,
+		HttpClient:       f.HttpClient,
+		Config:           f.Config,
+		Browser:          f.Browser,
+		Prompter:         f.Prompter,
+		TitledEditSurvey: prShared.TitledEditSurvey(&prShared.UserEditor{Config: f.Config, IO: f.IOStreams}),
 	}
 
 	var bodyFile string
@@ -77,6 +80,20 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.BaseRepo = f.BaseRepo
 			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--editor` or `--web`",
+				opts.EditorMode,
+				opts.WebMode,
+			); err != nil {
+				return err
+			}
+
+			config, err := f.Config()
+			if err != nil {
+				return err
+			}
+			opts.EditorMode = !opts.WebMode && (opts.EditorMode || config.PreferEditorPrompt("").Value == "enabled")
+
 			titleProvided := cmd.Flags().Changed("title")
 			bodyProvided := cmd.Flags().Changed("body")
 			if bodyFile != "" {
@@ -96,10 +113,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return errors.New("`--template` is not supported when using `--body` or `--body-file`")
 			}
 
-			opts.Interactive = !(titleProvided && bodyProvided)
+			opts.Interactive = !opts.EditorMode && !(titleProvided && bodyProvided)
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
+			}
+			if opts.EditorMode && !opts.IO.CanPrompt() {
+				return errors.New("--editor or enabled prefer_editor_prompt configuration are not supported in non-tty mode")
 			}
 
 			if runF != nil {
@@ -112,6 +132,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Supply a title. Will prompt for one otherwise.")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
+	cmd.Flags().BoolVarP(&opts.EditorMode, "editor", "e", false, "Skip prompts and open the text editor to write the title and body in. The first line is the title and the rest text is the body.")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to create an issue")
 	cmd.Flags().StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
@@ -285,6 +306,25 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 	} else {
+		if opts.EditorMode {
+			if opts.Template != "" {
+				var template prShared.Template
+				template, err = tpl.Select(opts.Template)
+				if err != nil {
+					return
+				}
+				if tb.Title == "" {
+					tb.Title = template.Title()
+				}
+				templateNameForSubmit = template.NameForSubmit()
+				tb.Body = string(template.Body())
+			}
+
+			tb.Title, tb.Body, err = opts.TitledEditSurvey(tb.Title, tb.Body)
+			if err != nil {
+				return
+			}
+		}
 		if tb.Title == "" {
 			err = fmt.Errorf("title can't be blank")
 			return

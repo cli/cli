@@ -15,18 +15,19 @@ import (
 )
 
 const (
-	aliasesKey        = "aliases"
-	browserKey        = "browser"
-	editorKey         = "editor"
-	gitProtocolKey    = "git_protocol"
-	hostsKey          = "hosts"
-	httpUnixSocketKey = "http_unix_socket"
-	oauthTokenKey     = "oauth_token"
-	pagerKey          = "pager"
-	promptKey         = "prompt"
-	userKey           = "user"
-	usersKey          = "users"
-	versionKey        = "version"
+	aliasesKey            = "aliases"
+	browserKey            = "browser"
+	editorKey             = "editor"
+	gitProtocolKey        = "git_protocol"
+	hostsKey              = "hosts"
+	httpUnixSocketKey     = "http_unix_socket"
+	oauthTokenKey         = "oauth_token"
+	pagerKey              = "pager"
+	promptKey             = "prompt"
+	preferEditorPromptKey = "prefer_editor_prompt"
+	userKey               = "user"
+	usersKey              = "users"
+	versionKey            = "version"
 )
 
 func NewConfig() (gh.Config, error) {
@@ -135,6 +136,11 @@ func (c *cfg) Pager(hostname string) gh.ConfigEntry {
 func (c *cfg) Prompt(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, promptKey).Unwrap()
+}
+
+func (c *cfg) PreferEditorPrompt(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, preferEditorPromptKey).Unwrap()
 }
 
 func (c *cfg) Version() o.Option[string] {
@@ -509,6 +515,8 @@ git_protocol: https
 editor:
 # When to interactively prompt. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
 prompt: enabled
+# Preference for editor-based interactive prompting. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
+prefer_editor_prompt: disabled
 # A pager program to send command output to, e.g. "less". If blank, will refer to environment. Set the value to "cat" to disable the pager.
 pager:
 # Aliases allow you to create nicknames for gh commands
@@ -553,6 +561,15 @@ var Options = []ConfigOption{
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Prompt(hostname).Value
+		},
+	},
+	{
+		Key:           preferEditorPromptKey,
+		Description:   "toggle preference for editor-based interactive prompting in the terminal",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.PreferEditorPrompt(hostname).Value
 		},
 	},
 	{
