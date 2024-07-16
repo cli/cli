@@ -3,6 +3,7 @@ package update
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -122,6 +123,11 @@ func updateRun(opts *UpdateOptions) error {
 	err = updatePullRequestBranch(apiClient, repo, pr.ID, pr.HeadRefOid, opts.Rebase)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
+		// TODO: this is a best effort approach and not a resilient way of handling API errors.
+		if strings.Contains(err.Error(), "GraphQL: merge conflict between base and head (updatePullRequestBranch)") {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Cannot update PR branch due to conflicts\n", cs.FailureIcon())
+			return cmdutil.SilentError
+		}
 		return err
 	}
 
