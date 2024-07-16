@@ -105,6 +105,7 @@ func Test_updateRun(t *testing.T) {
 				HeadRefOid:          "head-ref-oid",
 				HeadRefName:         "head-ref-name",
 				HeadRepositoryOwner: api.Owner{Login: "head-repository-owner"},
+				Mergeable:           api.PullRequestMergeableMergeable,
 			}, ghrepo.New("OWNER", "REPO")),
 		}
 	}
@@ -114,6 +115,7 @@ func Test_updateRun(t *testing.T) {
 		input     *UpdateOptions
 		httpStubs func(*testing.T, *httpmock.Registry)
 		stdout    string
+		stderr    string
 		wantsErr  string
 	}{
 		{
@@ -163,6 +165,7 @@ func Test_updateRun(t *testing.T) {
 					HeadRefOid:          "head-ref-oid",
 					HeadRefName:         "head-ref-name",
 					HeadRepositoryOwner: api.Owner{Login: "OWNER"},
+					Mergeable:           api.PullRequestMergeableMergeable,
 				}, ghrepo.New("OWNER", "REPO")),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -188,6 +191,22 @@ func Test_updateRun(t *testing.T) {
 					}))
 			},
 			stdout: "✓ PR branch already up-to-date\n",
+		},
+		{
+			name: "failure, not mergeable due to conflicts",
+			input: &UpdateOptions{
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					ID:                  "123",
+					Number:              123,
+					HeadRefOid:          "head-ref-oid",
+					HeadRefName:         "head-ref-name",
+					HeadRepositoryOwner: api.Owner{Login: "OWNER"},
+					Mergeable:           api.PullRequestMergeableConflicting,
+				}, ghrepo.New("OWNER", "REPO")),
+			},
+			stderr:   "X Cannot update PR branch due to conflicts\n",
+			wantsErr: cmdutil.SilentError.Error(),
 		},
 		{
 			name: "success, merge",
@@ -342,7 +361,7 @@ func Test_updateRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, _ := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdoutTTY(true)
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
@@ -377,6 +396,7 @@ func Test_updateRun(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.stdout, stdout.String())
+			assert.Equal(t, tt.stderr, stderr.String())
 		})
 	}
 }

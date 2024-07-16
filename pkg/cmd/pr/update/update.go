@@ -78,12 +78,18 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 func updateRun(opts *UpdateOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "number", "headRefName", "headRefOid", "headRepositoryOwner"},
+		Fields:   []string{"id", "number", "headRefName", "headRefOid", "headRepositoryOwner", "mergeable"},
 	}
 
 	pr, repo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
+	}
+
+	cs := opts.IO.ColorScheme()
+	if pr.Mergeable == api.PullRequestMergeableConflicting {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Cannot update PR branch due to conflicts\n", cs.FailureIcon())
+		return cmdutil.SilentError
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -106,7 +112,6 @@ func updateRun(opts *UpdateOptions) error {
 		return err
 	}
 
-	cs := opts.IO.ColorScheme()
 	if comparison.BehindBy == 0 {
 		// The PR branch is not behind the base branch, so it'a already up-to-date.
 		fmt.Fprintf(opts.IO.Out, "%s PR branch already up-to-date\n", cs.SuccessIcon())
