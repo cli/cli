@@ -316,6 +316,50 @@ func Test_updateRun(t *testing.T) {
 			wantsErr: "GraphQL: some error",
 		},
 		{
+			name: "failure, merge conflict error on update request",
+			input: &UpdateOptions{
+				SelectorArg: "123",
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query ComparePullRequestBaseBranchWith\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"pullRequest": {
+									"baseRef": {
+										"compare": {
+											"aheadBy": 999,
+											"behindBy": 999,
+											"Status": "BEHIND"
+										}
+									}
+								}
+							}
+						}
+					}`, func(_ string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(123), inputs["pullRequestNumber"])
+						assert.Equal(t, "head-repository-owner:head-ref-name", inputs["headRef"])
+					}))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestUpdateBranch\b`),
+					httpmock.GraphQLMutation(`{
+						"data": {},
+						"errors": [
+							{
+								"message": "merge conflict between base and head (updatePullRequestBranch)"
+							}
+						]
+					}`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "123", inputs["pullRequestId"])
+						assert.Equal(t, "head-ref-oid", inputs["expectedHeadOid"])
+						assert.Equal(t, "MERGE", inputs["updateMethod"])
+					}))
+			},
+			stderr:   "X Cannot update PR branch due to conflicts\n",
+			wantsErr: cmdutil.SilentError.Error(),
+		},
+		{
 			name: "failure, API error on update request",
 			input: &UpdateOptions{
 				SelectorArg: "123",
