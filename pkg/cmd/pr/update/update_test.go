@@ -1,4 +1,4 @@
-package update
+package update_branch
 
 import (
 	"bytes"
