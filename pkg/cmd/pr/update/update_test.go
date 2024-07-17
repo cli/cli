@@ -16,36 +16,36 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCmdUpdate(t *testing.T) {
+func TestNewCmdUpdateBranch(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		output   UpdateOptions
+		output   UpdateBranchOptions
 		wantsErr string
 	}{
 		{
 			name:   "no argument",
 			input:  "",
-			output: UpdateOptions{},
+			output: UpdateBranchOptions{},
 		},
 		{
 			name:  "with argument",
 			input: "23",
-			output: UpdateOptions{
+			output: UpdateBranchOptions{
 				SelectorArg: "23",
 			},
 		},
 		{
 			name:  "no argument, --rebase",
 			input: "--rebase",
-			output: UpdateOptions{
+			output: UpdateBranchOptions{
 				Rebase: true,
 			},
 		},
 		{
 			name:  "with argument, --rebase",
 			input: "23 --rebase",
-			output: UpdateOptions{
+			output: UpdateBranchOptions{
 				SelectorArg: "23",
 				Rebase:      true,
 			},
@@ -67,8 +67,8 @@ func TestNewCmdUpdate(t *testing.T) {
 				IOStreams: ios,
 			}
 
-			var gotOpts *UpdateOptions
-			cmd := NewCmdUpdate(f, func(opts *UpdateOptions) error {
+			var gotOpts *UpdateBranchOptions
+			cmd := NewCmdUpdateBranch(f, func(opts *UpdateBranchOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -96,9 +96,9 @@ func TestNewCmdUpdate(t *testing.T) {
 	}
 }
 
-func Test_updateRun(t *testing.T) {
-	defaultInput := func() UpdateOptions {
-		return UpdateOptions{
+func Test_updateBranchRun(t *testing.T) {
+	defaultInput := func() UpdateBranchOptions {
+		return UpdateBranchOptions{
 			Finder: shared.NewMockFinder("123", &api.PullRequest{
 				ID:                  "123",
 				Number:              123,
@@ -112,7 +112,7 @@ func Test_updateRun(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		input     *UpdateOptions
+		input     *UpdateBranchOptions
 		httpStubs func(*testing.T, *httpmock.Registry)
 		stdout    string
 		stderr    string
@@ -120,7 +120,7 @@ func Test_updateRun(t *testing.T) {
 	}{
 		{
 			name: "failure, pr not found",
-			input: &UpdateOptions{
+			input: &UpdateBranchOptions{
 				Finder:      shared.NewMockFinder("", nil, nil),
 				SelectorArg: "123",
 			},
@@ -128,7 +128,7 @@ func Test_updateRun(t *testing.T) {
 		},
 		{
 			name: "success, already up-to-date",
-			input: &UpdateOptions{
+			input: &UpdateBranchOptions{
 				SelectorArg: "123",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -157,7 +157,7 @@ func Test_updateRun(t *testing.T) {
 		},
 		{
 			name: "success, already up-to-date, PR branch on the same repo as base",
-			input: &UpdateOptions{
+			input: &UpdateBranchOptions{
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
 					ID:                  "123",
@@ -194,7 +194,7 @@ func Test_updateRun(t *testing.T) {
 		},
 		{
 			name: "failure, not mergeable due to conflicts",
-			input: &UpdateOptions{
+			input: &UpdateBranchOptions{
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
 					ID:                  "123",
@@ -210,7 +210,7 @@ func Test_updateRun(t *testing.T) {
 		},
 		{
 			name: "success, merge",
-			input: &UpdateOptions{
+			input: &UpdateBranchOptions{
 				SelectorArg: "123",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -252,7 +252,7 @@ func Test_updateRun(t *testing.T) {
 		},
 		{
 			name: "success, rebase",
-			input: &UpdateOptions{
+			input: &UpdateBranchOptions{
 				SelectorArg: "123",
 				Rebase:      true,
 			},
@@ -295,7 +295,7 @@ func Test_updateRun(t *testing.T) {
 		},
 		{
 			name: "failure, API error on ref comparison request",
-			input: &UpdateOptions{
+			input: &UpdateBranchOptions{
 				SelectorArg: "123",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -317,7 +317,7 @@ func Test_updateRun(t *testing.T) {
 		},
 		{
 			name: "failure, merge conflict error on update request",
-			input: &UpdateOptions{
+			input: &UpdateBranchOptions{
 				SelectorArg: "123",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -361,7 +361,7 @@ func Test_updateRun(t *testing.T) {
 		},
 		{
 			name: "failure, API error on update request",
-			input: &UpdateOptions{
+			input: &UpdateBranchOptions{
 				SelectorArg: "123",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -430,7 +430,7 @@ func Test_updateRun(t *testing.T) {
 			tt.input.IO = ios
 			tt.input.HttpClient = httpClient
 
-			err := updateRun(tt.input)
+			err := updateBranchRun(tt.input)
 
 			if tt.wantsErr != "" {
 				assert.EqualError(t, err, tt.wantsErr)

@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type UpdateOptions struct {
+type UpdateBranchOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	GitClient  *git.Client
@@ -27,15 +27,15 @@ type UpdateOptions struct {
 	Rebase      bool
 }
 
-func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Command {
-	opts := &UpdateOptions{
+func NewCmdUpdateBranch(f *cmdutil.Factory, runF func(*UpdateBranchOptions) error) *cobra.Command {
+	opts := &UpdateBranchOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		GitClient:  f.GitClient,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "update [<number> | <url> | <branch>]",
+		Use:   "update-branch [<number> | <url> | <branch>]",
 		Short: "Update a pull request branch",
 		Long: heredoc.Docf(`
 			Update a pull request branch with latest changes of the base branch.
@@ -47,9 +47,9 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			branch, the %[1]s--rebase%[1]s option should be provided.
 		`, "`"),
 		Example: heredoc.Doc(`
-			$ gh pr update 23
-			$ gh pr update 23 --rebase
-			$ gh pr update 23 --repo owner/repo
+			$ gh pr update-branch 23
+			$ gh pr update-branch 23 --rebase
+			$ gh pr update-branch 23 --repo owner/repo
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -67,7 +67,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
-			return updateRun(opts)
+			return updateBranchRun(opts)
 		},
 	}
 
@@ -76,7 +76,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 	return cmd
 }
 
-func updateRun(opts *UpdateOptions) error {
+func updateBranchRun(opts *UpdateBranchOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
 		Fields:   []string{"id", "number", "headRefName", "headRefOid", "headRepositoryOwner", "mergeable"},
