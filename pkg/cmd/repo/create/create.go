@@ -102,7 +102,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			# create a new remote repository and clone it locally
 			gh repo create my-project --public --clone
 
-                        # create a new remote repository in a different organization
+			# create a new remote repository in a different organization
 			gh repo create my-org/my-project --public
 
 			# create a remote repository from the current directory
