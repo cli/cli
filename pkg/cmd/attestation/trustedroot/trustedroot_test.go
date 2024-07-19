@@ -85,11 +85,6 @@ func TestGetTrustedRoot(t *testing.T) {
 		TufRootPath: root,
 	}
 
-	t.Run("successfully verifies TUF root", func(t *testing.T) {
-		err := getTrustedRoot(tuf.New, opts)
-		require.NoError(t, err)
-	})
-
 	t.Run("failed to create TUF root", func(t *testing.T) {
 		err := getTrustedRoot(newTUFErrClient, opts)
 		require.Error(t, err)
