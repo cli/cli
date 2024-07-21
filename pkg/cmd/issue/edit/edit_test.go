@@ -226,6 +226,11 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:     "both milestone and remove-milestone flags",
+			input:    "23 --milestone foo --remove-milestone",
+			wantsErr: true,
+		},
+		{
 			name:  "add label to multiple issues",
 			input: "23 34 --add-label bug",
 			output: EditOptions{
