@@ -226,17 +226,8 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:  "interactive multiple issues",
-			input: "23 34",
-			output: EditOptions{
-				SelectorArgs: []string{"23", "34"},
-				Editable: prShared.Editable{
-					Labels: prShared.EditableSlice{
-						Add:    []string{"bug"},
-						Edited: true,
-					},
-				},
-			},
+			name:     "interactive multiple issues",
+			input:    "23 34",
 			wantsErr: true,
 		},
 	}
