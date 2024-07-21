@@ -212,6 +212,20 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:  "remove-milestone flag",
+			input: "23 --remove-milestone",
+			output: EditOptions{
+				SelectorArgs: []string{"23"},
+				Editable: prShared.Editable{
+					Milestone: prShared.EditableString{
+						Value:  "",
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
 			name:  "add label to multiple issues",
 			input: "23 34 --add-label bug",
 			output: EditOptions{
