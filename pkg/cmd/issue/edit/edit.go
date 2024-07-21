@@ -32,6 +32,7 @@ type EditOptions struct {
 	Interactive  bool
 
 	prShared.Editable
+	RemoveMilestone bool
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -62,6 +63,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh issue edit 23 --add-assignee "@me" --remove-assignee monalisa,hubot
 			$ gh issue edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh issue edit 23 --milestone "Version 1"
+			$ gh issue edit 23 --remove-milestone
 			$ gh issue edit 23 --body-file body.txt
 			$ gh issue edit 23 34 --add-label "help wanted"
 		`),
@@ -95,6 +97,14 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				}
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--milestone` or `--remove-milestone`",
+				flags.Changed("milestone"),
+				opts.RemoveMilestone,
+			); err != nil {
+				return err
+			}
+
 			if flags.Changed("title") {
 				opts.Editable.Title.Edited = true
 			}
@@ -107,8 +117,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if flags.Changed("add-project") || flags.Changed("remove-project") {
 				opts.Editable.Projects.Edited = true
 			}
-			if flags.Changed("milestone") {
+			if flags.Changed("milestone") || opts.RemoveMilestone {
 				opts.Editable.Milestone.Edited = true
+
+				// Note that when `--remove-milestone` is provided, the value of
+				// `opts.Editable.Milestone.Value` will automatically be empty,
+				// which results in milestone association removal.
 			}
 
 			if !opts.Editable.Dirty() {
@@ -141,6 +155,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Add, "add-project", nil, "Add the issue to projects by `name`")
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the issue from projects by `name`")
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the issue belongs to by `name`")
+	cmd.Flags().BoolVar(&opts.RemoveMilestone, "remove-milestone", false, "Remove the milestone the issue belongs to")
 
 	return cmd
 }
