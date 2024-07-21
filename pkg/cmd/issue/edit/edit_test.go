@@ -105,6 +105,11 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:     "both body and body-file flags",
+			input:    "23 --body foo --body-file bar",
+			wantsErr: true,
+		},
+		{
 			name:  "add-assignee flag",
 			input: "23 --add-assignee monalisa,hubot",
 			output: EditOptions{
