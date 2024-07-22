@@ -145,8 +145,11 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Display active account and authentication state on each known GitHub host.
 
-			For each host, the authentication state of each known account is tested and any issues are included in
-			the output. Each host section will indicate the active account, which will be used when targeting that host.
+			For each host, the authentication state of each known account is tested and any issues are included in the output.
+			Each host section will indicate the active account, which will be used when targeting that host.
+			If an account on any host (or only the one given via %[1]s--hostname%[1]s) has authentication issues,
+			the command will exit with 1 and output to stderr.
+
 			To change the active account for a host, see %[1]sgh auth switch%[1]s.
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -158,7 +161,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check a specific hostname's auth status")
+	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check only a specific hostname's auth status")
 	cmd.Flags().BoolVarP(&opts.ShowToken, "show-token", "t", false, "Display the auth token")
 
 	return cmd
