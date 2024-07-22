@@ -33,6 +33,7 @@ import (
 	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
 	searchCmd "github.com/cli/cli/v2/pkg/cmd/search"
 	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
+	sponsorsCmd "github.com/cli/cli/v2/pkg/cmd/sponsors"
 	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
 	statusCmd "github.com/cli/cli/v2/pkg/cmd/status"
 	variableCmd "github.com/cli/cli/v2/pkg/cmd/variable"
@@ -139,6 +140,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
 	cmd.AddCommand(codespaceCmd.NewCmdCodespace(f))
 	cmd.AddCommand(projectCmd.NewCmdProject(f))
+	cmd.AddCommand(sponsorsCmd.NewCmdSponsors(f))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f
