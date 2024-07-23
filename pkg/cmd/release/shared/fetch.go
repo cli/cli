@@ -21,22 +21,22 @@ import (
 )
 
 var ReleaseFields = []string{
-	"url",
 	"apiUrl",
-	"uploadUrl",
-	"tarballUrl",
-	"zipballUrl",
-	"id",
-	"tagName",
-	"name",
-	"body",
-	"isDraft",
-	"isPrerelease",
-	"createdAt",
-	"publishedAt",
-	"targetCommitish",
 	"author",
 	"assets",
+	"body",
+	"createdAt",
+	"id",
+	"isDraft",
+	"isPrerelease",
+	"name",
+	"publishedAt",
+	"tagName",
+	"tarballUrl",
+	"targetCommitish",
+	"uploadUrl",
+	"url",
+	"zipballUrl",
 }
 
 type Release struct {
