@@ -1303,6 +1303,12 @@ func TestClientClone(t *testing.T) {
 			wantCmdArgs: `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential clone --bare github.com/cli/cli`,
 			wantTarget:  "cli.git",
 		},
+		{
+			name:        "bare clone with explicit target",
+			args:        []string{"cli-bare", "--bare"},
+			wantCmdArgs: `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential clone --bare github.com/cli/cli cli-bare`,
+			wantTarget:  "cli-bare",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
