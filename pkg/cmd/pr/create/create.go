@@ -131,6 +131,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh pr create --reviewer monalisa,hubot  --reviewer myorg/team-name
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
+			$ gh pr create --template "pull_request_template.md"
 		`),
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
