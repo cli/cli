@@ -27,6 +27,7 @@ func TestJSONFields(t *testing.T) {
 		"assets",
 		"body",
 		"createdAt",
+		"databaseId",
 		"id",
 		"isDraft",
 		"isPrerelease",

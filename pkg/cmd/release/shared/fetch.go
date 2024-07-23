@@ -26,6 +26,7 @@ var ReleaseFields = []string{
 	"assets",
 	"body",
 	"createdAt",
+	"databaseId",
 	"id",
 	"isDraft",
 	"isPrerelease",
