@@ -14,10 +14,32 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestJSONFields(t *testing.T) {
+	jsonfieldstest.ExpectCommandToSupportJSONFields(t, NewCmdView, []string{
+		"apiUrl",
+		"author",
+		"assets",
+		"body",
+		"createdAt",
+		"id",
+		"isDraft",
+		"isPrerelease",
+		"name",
+		"publishedAt",
+		"tagName",
+		"tarballUrl",
+		"targetCommitish",
+		"uploadUrl",
+		"url",
+		"zipballUrl",
+	})
+}
 
 func Test_NewCmdView(t *testing.T) {
 	tests := []struct {
