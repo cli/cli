@@ -12,19 +12,19 @@ import (
 
 func TestNewCmdList(t *testing.T) {
 	tests := []struct {
-		username string
-		cli      string
-		wants    string
+		name  string
+		cli   string
+		wants string
 	}{
 		{
-			username: "octocat",
-			cli:      "octocat",
-			wants:    "GitHub",
+			name:  "happy path",
+			cli:   "octocat",
+			wants: "octocat",
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.username, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
 				IOStreams: ios,
@@ -46,7 +46,32 @@ func TestNewCmdList(t *testing.T) {
 			_, err = cmd.ExecuteC()
 			assert.NoError(t, err)
 
-			assert.Equal(t, tt.wants, gotOpts.Sponsors[0])
+			assert.Equal(t, tt.wants, gotOpts.Username)
+		})
+	}
+}
+
+func Test_listRun(t *testing.T) {
+	tests := []struct {
+		name  string
+		opts  *ListOptions
+		wants []string
+	}{
+		{
+			name: "happy path",
+			opts: &ListOptions{
+				Username: "octocat",
+				Sponsors: []string{},
+			},
+			wants: []string{"GitHub"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := listRun(tt.opts)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wants[0], tt.opts.Sponsors[0])
 		})
 	}
 }
