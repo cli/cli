@@ -1,11 +1,13 @@
 package api
 
+import "net/http"
+
 type SponsorQuery struct {
-	User User `json:"user"`
+	User User `json:"user" graphql:"user(login: $username)"`
 }
 
 type User struct {
-	Sponsors Sponsors `json:"sponsors"`
+	Sponsors Sponsors `json:"sponsors" graphql:"sponsors(first: 30)"`
 }
 
 type Sponsors struct {
@@ -17,9 +19,10 @@ type Node struct {
 	Login string `json:"login"`
 }
 
-func GetSponsorsList(client *Client, hostname string, username string) ([]string, error) {
-	queryResult, err := querySponsorsViaReflection(client, hostname, username)
-	// queryResult, err := querySponsorsViaStringManipulation(client, hostname, username)
+func GetSponsorsList(httpClient *http.Client, hostname string, username string) ([]string, error) {
+	client := NewClientFromHTTP(httpClient)
+	//queryResult, err := querySponsorsViaReflection(client, hostname, username)
+	queryResult, err := querySponsorsViaStringManipulation(client, hostname, username)
 	if err != nil {
 		return nil, err
 	}
@@ -27,10 +30,15 @@ func GetSponsorsList(client *Client, hostname string, username string) ([]string
 	return mapQueryToSponsorsList(queryResult), nil
 }
 
+// This is currently broken. I suspect the issue is that the SponsorQuery
+// struct is not defining the variable $username correctly. I need to go
+// find an example query with a variable passed in like this to see how its
+// done. In the mean time, I'm going to move forward with the string
+// manipulation version of this function.
 func querySponsorsViaReflection(client *Client, hostname string, username string) (SponsorQuery, error) {
 	query := SponsorQuery{}
 	variables := map[string]interface{}{
-		username: username,
+		"username": username,
 	}
 
 	err := client.Query(hostname, "SponsorsList", &query, variables)
@@ -62,7 +70,7 @@ func querySponsorsViaStringManipulation(client *Client, hostname string, usernam
 		}
 	}`
 	variables := map[string]interface{}{
-		username: username,
+		"username": username,
 	}
 	var data response
 	err := client.GraphQL(hostname, query, variables, &data)

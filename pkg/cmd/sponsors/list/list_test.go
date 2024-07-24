@@ -2,9 +2,11 @@ package list
 
 import (
 	"bytes"
+	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -60,18 +62,29 @@ func Test_listRun(t *testing.T) {
 		{
 			name: "happy path",
 			opts: &ListOptions{
+				HttpClient: func() (*http.Client, error) {
+					r := &httpmock.Registry{}
+
+					r.Register(
+						httpmock.GraphQL(`query SponsorsList\b`),
+						httpmock.StringResponse(`{"data": {"user": {"sponsors": {"totalCount": 2, "nodes": [{"login": "mona"}, {"login": "lisa"}]}}}}`))
+
+					return &http.Client{Transport: r}, nil
+				},
+
 				Username: "octocat",
 				Sponsors: []string{},
 			},
-			wants: []string{"GitHub"},
+			wants: []string{"mona", "lisa"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
 			err := listRun(tt.opts)
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wants[0], tt.opts.Sponsors[0])
+			assert.Equal(t, tt.wants, tt.opts.Sponsors)
 		})
 	}
 }

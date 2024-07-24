@@ -1,17 +1,25 @@
 package list
 
 import (
+	"fmt"
+	"net/http"
+
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 
 type ListOptions struct {
+	HttpClient func() (*http.Client, error)
+
 	Username string
 	Sponsors []string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
-	opts := &ListOptions{}
+	opts := &ListOptions{
+		HttpClient: f.HttpClient,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -32,6 +40,15 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 }
 
 func listRun(opts *ListOptions) error {
-	opts.Sponsors = append(opts.Sponsors, "GitHub")
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return fmt.Errorf("could not create http client: %w", err)
+	}
+
+	opts.Sponsors, err = api.GetSponsorsList(httpClient, "", opts.Username)
+	if err != nil {
+		return err
+	}
+	fmt.Println(opts.Sponsors)
 	return nil
 }
