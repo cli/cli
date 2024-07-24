@@ -1,13 +1,14 @@
 package api
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_querySponsorsViaReflection(t *testing.T) {
+func Test_querySponsors(t *testing.T) {
 	var tests = []struct {
 		name           string
 		httpStubs      func(*httpmock.Registry)
@@ -15,7 +16,7 @@ func Test_querySponsorsViaReflection(t *testing.T) {
 		expectError    bool
 	}{
 		{
-			name: "success",
+			name: "success for querySponsorsViaReflection",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query SponsorsList`),
@@ -36,22 +37,38 @@ func Test_querySponsorsViaReflection(t *testing.T) {
 		},
 	}
 
+	queryFnData := []struct {
+		name    string
+		queryFn func(*Client, string, string) (SponsorQuery, error)
+	}{
+		{
+			name:    "querySponsorsViaReflection",
+			queryFn: querySponsorsViaReflection,
+		},
+		{
+			name:    "querySponsorsViaStringManipulation",
+			queryFn: querySponsorsViaStringManipulation,
+		},
+	}
+
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			http := &httpmock.Registry{}
-			if tt.httpStubs != nil {
-				tt.httpStubs(http)
-			}
+		for _, queryFn := range queryFnData {
+			t.Run(fmt.Sprintf("%s %s", tt.name, queryFn.name), func(t *testing.T) {
+				http := &httpmock.Registry{}
+				if tt.httpStubs != nil {
+					tt.httpStubs(http)
+				}
 
-			client := newTestClient(http)
+				client := newTestClient(http)
 
-			sponsorsList, err := querySponsorsViaReflection(client, "github.com", "octocat")
-			if (err != nil) != tt.expectError {
-				t.Fatalf("unexpected result: %v", err)
-			}
+				sponsorsList, err := queryFn.queryFn(client, "github.com", "octocat")
+				if (err != nil) != tt.expectError {
+					t.Fatalf("unexpected result: %v", err)
+				}
 
-			assert.Equal(t, tt.expectedResult, sponsorsList)
-		})
+				assert.Equal(t, tt.expectedResult, sponsorsList)
+			})
+		}
 	}
 }
 

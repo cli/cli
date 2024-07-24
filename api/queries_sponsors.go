@@ -41,7 +41,37 @@ func querySponsorsViaReflection(client *Client, hostname string, username string
 	return query, nil
 }
 
-// func querySponsorsViaStringManipulation(client *Client, hostname string, username string) (SponsorQuery, error) {}
+func querySponsorsViaStringManipulation(client *Client, hostname string, username string) (SponsorQuery, error) {
+	type response struct {
+		SponsorQuery
+	}
+
+	query := `query SponsorsList($username: String!) {
+		user(login: $username) {
+			sponsors(first: 30) {
+				totalCount
+				nodes {
+					... on User {
+						login
+					}
+					... on Organization {
+						login
+					}
+				}
+			}	
+		}
+	}`
+	variables := map[string]interface{}{
+		username: username,
+	}
+	var data response
+	err := client.GraphQL(hostname, query, variables, &data)
+	if err != nil {
+		return SponsorQuery{}, err
+	}
+
+	return data.SponsorQuery, nil
+}
 
 func mapQueryToSponsorsList(queryResult SponsorQuery) []string {
 	sponsorsList := []string{}
