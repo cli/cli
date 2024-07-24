@@ -60,8 +60,8 @@ func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get bundle verification content: %v", err)
 	}
-	leafCert, ok := verifyContent.HasCertificate()
-	if !ok {
+	leafCert := verifyContent.GetCertificate()
+	if leafCert == nil {
 		return nil, "", fmt.Errorf("leaf cert not found")
 	}
 	if len(leafCert.Issuer.Organization) != 1 {
