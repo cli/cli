@@ -16,7 +16,7 @@ func Test_querySponsors(t *testing.T) {
 		expectError    bool
 	}{
 		{
-			name: "success for querySponsorsViaReflection",
+			name: "success",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query SponsorsList`),
@@ -34,6 +34,16 @@ func Test_querySponsors(t *testing.T) {
 				},
 			},
 			expectError: false,
+		},
+		{
+			name: "error",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query SponsorsList`),
+					httpmock.StatusStringResponse(500, `Internal Server Error`))
+			},
+			expectedResult: SponsorQuery{},
+			expectError:    true,
 		},
 	}
 
