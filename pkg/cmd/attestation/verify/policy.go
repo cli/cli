@@ -61,7 +61,7 @@ func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.Pol
 		return nil, err
 	}
 
-    issuerMatcher, err := verify.NewIssuerMatcher(opts.OIDCIssuer, "")
+	issuerMatcher, err := verify.NewIssuerMatcher(opts.OIDCIssuer, "")
 	if err != nil {
 		return nil, err
 	}
