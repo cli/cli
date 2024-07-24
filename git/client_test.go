@@ -1267,6 +1267,7 @@ func TestClientPush(t *testing.T) {
 func TestClientClone(t *testing.T) {
 	tests := []struct {
 		name          string
+		args          []string
 		mods          []CommandModifier
 		cmdExitStatus int
 		cmdStdout     string
@@ -1277,21 +1278,36 @@ func TestClientClone(t *testing.T) {
 	}{
 		{
 			name:        "clone",
+			args:        []string{},
 			wantCmdArgs: `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential clone github.com/cli/cli`,
 			wantTarget:  "cli",
 		},
 		{
 			name:        "accepts command modifiers",
+			args:        []string{},
 			mods:        []CommandModifier{WithRepoDir("/path/to/repo")},
 			wantCmdArgs: `path/to/git -C /path/to/repo -c credential.helper= -c credential.helper=!"gh" auth git-credential clone github.com/cli/cli`,
 			wantTarget:  "cli",
 		},
 		{
 			name:          "git error",
+			args:          []string{},
 			cmdExitStatus: 1,
 			cmdStderr:     "git error message",
 			wantCmdArgs:   `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential clone github.com/cli/cli`,
 			wantErrorMsg:  "failed to run git: git error message",
+		},
+		{
+			name:        "bare clone",
+			args:        []string{"--bare"},
+			wantCmdArgs: `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential clone --bare github.com/cli/cli`,
+			wantTarget:  "cli.git",
+		},
+		{
+			name:        "bare clone with explicit target",
+			args:        []string{"cli-bare", "--bare"},
+			wantCmdArgs: `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential clone --bare github.com/cli/cli cli-bare`,
+			wantTarget:  "cli-bare",
 		},
 	}
 	for _, tt := range tests {
@@ -1301,7 +1317,7 @@ func TestClientClone(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
-			target, err := client.Clone(context.Background(), "github.com/cli/cli", []string{}, tt.mods...)
+			target, err := client.Clone(context.Background(), "github.com/cli/cli", tt.args, tt.mods...)
 			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
 			if tt.wantErrorMsg == "" {
 				assert.NoError(t, err)

@@ -11,6 +11,7 @@ import (
 	"path"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -594,6 +595,10 @@ func (c *Client) Clone(ctx context.Context, cloneURL string, args []string, mods
 		cloneArgs = append(cloneArgs, target)
 	} else {
 		target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
+
+		if slices.Contains(cloneArgs, "--bare") {
+			target += ".git"
+		}
 	}
 	cloneArgs = append([]string{"clone"}, cloneArgs...)
 	cmd, err := c.AuthenticatedCommand(ctx, cloneArgs...)
