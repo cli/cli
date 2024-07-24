@@ -5,12 +5,15 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
 
 	Username string
 	Sponsors []string
@@ -19,6 +22,7 @@ type ListOptions struct {
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		HttpClient: f.HttpClient,
+		IO:         f.IOStreams,
 	}
 
 	cmd := &cobra.Command{
@@ -49,6 +53,22 @@ func listRun(opts *ListOptions) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(opts.Sponsors)
+
+	return formatTTYOutput(opts)
+}
+
+func formatTTYOutput(opts *ListOptions) error {
+
+	table := tableprinter.New(opts.IO, tableprinter.WithHeader("SPONSORS"))
+	for _, sponsor := range opts.Sponsors {
+		table.AddField(sponsor)
+		table.EndRow()
+	}
+
+	err := table.Render()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

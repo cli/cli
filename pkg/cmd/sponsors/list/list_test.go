@@ -2,7 +2,9 @@ package list
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -85,6 +87,41 @@ func Test_listRun(t *testing.T) {
 			err := listRun(tt.opts)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wants, tt.opts.Sponsors)
+		})
+	}
+}
+
+func Test_formatTTYOutput(t *testing.T) {
+	tests := []struct {
+		name  string
+		opts  *ListOptions
+		wants []string
+	}{
+		{
+			name: "Simple table",
+			opts: &ListOptions{
+				Sponsors: []string{"mona", "lisa"},
+			},
+			wants: []string{
+				"SPONSORS",
+				"------",
+				"mona",
+				"lisa",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			tt.opts.IO = ios
+
+			err := formatTTYOutput(tt.opts)
+			assert.NoError(t, err)
+
+			expected := fmt.Sprintf("%s\n", strings.Join(tt.wants, "\n"))
+			assert.Equal(t, expected, stdout.String())
 		})
 	}
 }
