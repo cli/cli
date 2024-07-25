@@ -103,6 +103,7 @@ func Test_formatTTYOutput(t *testing.T) {
 		{
 			name: "Simple table",
 			opts: &ListOptions{
+				Username: "octocat",
 				Sponsors: []string{"mona", "lisa"},
 			},
 			wants: []string{
@@ -110,6 +111,22 @@ func Test_formatTTYOutput(t *testing.T) {
 				"mona",
 				"lisa",
 			},
+		},
+		{
+			name: "No Sponsors for octocat",
+			opts: &ListOptions{
+				Username: "octocat",
+				Sponsors: []string{},
+			},
+			wants: []string{"No sponsors found for octocat"},
+		},
+		{
+			name: "No Sponsors for monalisa",
+			opts: &ListOptions{
+				Username: "monalisa",
+				Sponsors: []string{},
+			},
+			wants: []string{"No sponsors found for monalisa"},
 		},
 	}
 
