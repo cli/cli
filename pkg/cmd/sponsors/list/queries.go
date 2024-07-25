@@ -86,9 +86,9 @@ func querySponsorsViaStringManipulation(client *api.Client, hostname string, use
 }
 
 func mapQueryToSponsorsList(queryResult SponsorQuery) []string {
-	sponsorsList := []string{}
-	for _, node := range queryResult.User.Sponsors.Nodes {
-		sponsorsList = append(sponsorsList, node.Login)
+	sponsorsList := make([]string, len(queryResult.User.Sponsors.Nodes))
+	for i, node := range queryResult.User.Sponsors.Nodes {
+		sponsorsList[i] = node.Login
 	}
 	return sponsorsList
 }
