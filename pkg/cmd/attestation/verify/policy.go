@@ -27,16 +27,16 @@ func expandToGitHubURL(ownerOrRepo string) string {
 func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error) {
 	if opts.SignerRepo != "" {
 		signedRepoRegex := expandToGitHubURL(opts.SignerRepo)
-		return verify.NewSANMatcher("", "", signedRepoRegex)
+		return verify.NewSANMatcher("", signedRepoRegex)
 	} else if opts.SignerWorkflow != "" {
 		validatedWorkflowRegex, err := validateSignerWorkflow(opts)
 		if err != nil {
 			return verify.SubjectAlternativeNameMatcher{}, err
 		}
 
-		return verify.NewSANMatcher("", "", validatedWorkflowRegex)
+		return verify.NewSANMatcher("", validatedWorkflowRegex)
 	} else if opts.SAN != "" || opts.SANRegex != "" {
-		return verify.NewSANMatcher(opts.SAN, "", opts.SANRegex)
+		return verify.NewSANMatcher(opts.SAN, opts.SANRegex)
 	}
 
 	return verify.SubjectAlternativeNameMatcher{}, nil
@@ -44,7 +44,6 @@ func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error
 
 func buildCertExtensions(opts *Options, runnerEnv string) certificate.Extensions {
 	extensions := certificate.Extensions{
-		Issuer:                   opts.OIDCIssuer,
 		SourceRepositoryOwnerURI: fmt.Sprintf("https://github.com/%s", opts.Owner),
 		RunnerEnvironment:        runnerEnv,
 	}
@@ -62,9 +61,14 @@ func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.Pol
 		return nil, err
 	}
 
+	issuerMatcher, err := verify.NewIssuerMatcher(opts.OIDCIssuer, "")
+	if err != nil {
+		return nil, err
+	}
+
 	extensions := buildCertExtensions(opts, runnerEnv)
 
-	certId, err := verify.NewCertificateIdentity(sanMatcher, extensions)
+	certId, err := verify.NewCertificateIdentity(sanMatcher, issuerMatcher, extensions)
 	if err != nil {
 		return nil, err
 	}

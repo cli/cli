@@ -60,7 +60,7 @@ func TestVerifyIntegration(t *testing.T) {
 
 		err := runVerify(&opts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\": failed to verify certificate identity: no matching certificate identity found")
+		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\": failed to verify certificate identity: no matching CertificateIdentity found, last error: expected SourceRepositoryURI to be \"https://github.com/sigstore/fakerepo\", got \"https://github.com/sigstore/sigstore-js\"")
 	})
 
 	t.Run("with invalid owner", func(t *testing.T) {
@@ -69,7 +69,7 @@ func TestVerifyIntegration(t *testing.T) {
 
 		err := runVerify(&opts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\": failed to verify certificate identity: no matching certificate identity found")
+		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\": failed to verify certificate identity: no matching CertificateIdentity found, last error: expected SourceRepositoryOwnerURI to be \"https://github.com/fakeowner\", got \"https://github.com/sigstore\"")
 	})
 
 	t.Run("with invalid owner and invalid repo", func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestVerifyIntegration(t *testing.T) {
 
 		err := runVerify(&opts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\": failed to verify certificate identity: no matching certificate identity found")
+		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\": failed to verify certificate identity: no matching CertificateIdentity found, last error: expected SourceRepositoryURI to be \"https://github.com/fakeowner/fakerepo\"")
 	})
 }
 
