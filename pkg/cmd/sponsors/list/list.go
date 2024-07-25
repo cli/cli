@@ -13,6 +13,7 @@ import (
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Getter     *SponsorsListGetter
 
 	Username string
 	Sponsors []string
@@ -22,6 +23,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	opts := &ListOptions{
 		HttpClient: f.HttpClient,
 		IO:         f.IOStreams,
+		Getter:     NewSponsorsListGetter(getSponsorsList),
 	}
 
 	cmd := &cobra.Command{
@@ -48,7 +50,7 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("could not create http client: %w", err)
 	}
 
-	opts.Sponsors, err = GetSponsorsList(httpClient, "", opts.Username)
+	opts.Sponsors, err = opts.Getter.get(httpClient, "", opts.Username)
 	if err != nil {
 		return err
 	}
