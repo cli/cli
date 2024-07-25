@@ -25,8 +25,7 @@ type Node struct {
 
 func GetSponsorsList(httpClient *http.Client, hostname string, username string) ([]string, error) {
 	client := api.NewClientFromHTTP(httpClient)
-	//queryResult, err := querySponsorsViaReflection(client, hostname, username)
-	queryResult, err := querySponsorsViaStringManipulation(client, hostname, username)
+	queryResult, err := querySponsors(client, hostname, username)
 	if err != nil {
 		return nil, err
 	}
@@ -34,26 +33,7 @@ func GetSponsorsList(httpClient *http.Client, hostname string, username string) 
 	return mapQueryToSponsorsList(queryResult), nil
 }
 
-// This is currently broken. I suspect the issue is that the SponsorQuery
-// struct is not defining the variable $username correctly. I need to go
-// find an example query with a variable passed in like this to see how its
-// done. In the mean time, I'm going to move forward with the string
-// manipulation version of this function.
-func querySponsorsViaReflection(client *api.Client, hostname string, username string) (SponsorQuery, error) {
-	query := SponsorQuery{}
-	variables := map[string]interface{}{
-		"username": username,
-	}
-
-	err := client.Query(hostname, "SponsorsList", &query, variables)
-	if err != nil {
-		return SponsorQuery{}, err
-	}
-
-	return query, nil
-}
-
-func querySponsorsViaStringManipulation(client *api.Client, hostname string, username string) (SponsorQuery, error) {
+func querySponsors(client *api.Client, hostname string, username string) (SponsorQuery, error) {
 	type response struct {
 		SponsorQuery
 	}

@@ -55,38 +55,22 @@ func Test_querySponsors(t *testing.T) {
 		},
 	}
 
-	queryFnData := []struct {
-		name    string
-		queryFn func(*api.Client, string, string) (SponsorQuery, error)
-	}{
-		{
-			name:    "querySponsorsViaReflection",
-			queryFn: querySponsorsViaReflection,
-		},
-		{
-			name:    "querySponsorsViaStringManipulation",
-			queryFn: querySponsorsViaStringManipulation,
-		},
-	}
-
 	for _, tt := range tests {
-		for _, queryFn := range queryFnData {
-			t.Run(fmt.Sprintf("%s %s", tt.name, queryFn.name), func(t *testing.T) {
-				http := &httpmock.Registry{}
-				if tt.httpStubs != nil {
-					tt.httpStubs(http)
-				}
+		t.Run(fmt.Sprintf(tt.name), func(t *testing.T) {
+			http := &httpmock.Registry{}
+			if tt.httpStubs != nil {
+				tt.httpStubs(http)
+			}
 
-				client := newTestClient(http)
+			client := newTestClient(http)
 
-				sponsorsList, err := queryFn.queryFn(client, "github.com", "octocat")
-				if (err != nil) != tt.expectError {
-					t.Fatalf("unexpected result: %v", err)
-				}
+			sponsorsList, err := querySponsors(client, "github.com", "octocat")
+			if (err != nil) != tt.expectError {
+				t.Fatalf("unexpected result: %v", err)
+			}
 
-				assert.Equal(t, tt.expectedResult, sponsorsList)
-			})
-		}
+			assert.Equal(t, tt.expectedResult, sponsorsList)
+		})
 	}
 }
 
