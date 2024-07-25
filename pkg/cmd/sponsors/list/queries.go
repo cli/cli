@@ -1,6 +1,10 @@
-package api
+package list
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/cli/cli/v2/api"
+)
 
 type SponsorQuery struct {
 	User User `json:"user" graphql:"user(login: $username)"`
@@ -20,7 +24,7 @@ type Node struct {
 }
 
 func GetSponsorsList(httpClient *http.Client, hostname string, username string) ([]string, error) {
-	client := NewClientFromHTTP(httpClient)
+	client := api.NewClientFromHTTP(httpClient)
 	//queryResult, err := querySponsorsViaReflection(client, hostname, username)
 	queryResult, err := querySponsorsViaStringManipulation(client, hostname, username)
 	if err != nil {
@@ -35,7 +39,7 @@ func GetSponsorsList(httpClient *http.Client, hostname string, username string) 
 // find an example query with a variable passed in like this to see how its
 // done. In the mean time, I'm going to move forward with the string
 // manipulation version of this function.
-func querySponsorsViaReflection(client *Client, hostname string, username string) (SponsorQuery, error) {
+func querySponsorsViaReflection(client *api.Client, hostname string, username string) (SponsorQuery, error) {
 	query := SponsorQuery{}
 	variables := map[string]interface{}{
 		"username": username,
@@ -49,7 +53,7 @@ func querySponsorsViaReflection(client *Client, hostname string, username string
 	return query, nil
 }
 
-func querySponsorsViaStringManipulation(client *Client, hostname string, username string) (SponsorQuery, error) {
+func querySponsorsViaStringManipulation(client *api.Client, hostname string, username string) (SponsorQuery, error) {
 	type response struct {
 		SponsorQuery
 	}

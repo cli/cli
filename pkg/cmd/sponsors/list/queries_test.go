@@ -1,12 +1,20 @@
-package api
+package list
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 )
+
+func newTestClient(reg *httpmock.Registry) *api.Client {
+	client := &http.Client{}
+	httpmock.ReplaceTripper(client, reg)
+	return api.NewClientFromHTTP(client)
+}
 
 func Test_querySponsors(t *testing.T) {
 	var tests = []struct {
@@ -49,7 +57,7 @@ func Test_querySponsors(t *testing.T) {
 
 	queryFnData := []struct {
 		name    string
-		queryFn func(*Client, string, string) (SponsorQuery, error)
+		queryFn func(*api.Client, string, string) (SponsorQuery, error)
 	}{
 		{
 			name:    "querySponsorsViaReflection",

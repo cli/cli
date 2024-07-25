@@ -83,6 +83,9 @@ func Test_listRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			tt.opts.IO = ios
 
 			err := listRun(tt.opts)
 			assert.NoError(t, err)
@@ -104,7 +107,6 @@ func Test_formatTTYOutput(t *testing.T) {
 			},
 			wants: []string{
 				"SPONSORS",
-				"------",
 				"mona",
 				"lisa",
 			},

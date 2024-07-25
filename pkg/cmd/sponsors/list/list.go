@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -49,7 +48,7 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("could not create http client: %w", err)
 	}
 
-	opts.Sponsors, err = api.GetSponsorsList(httpClient, "", opts.Username)
+	opts.Sponsors, err = GetSponsorsList(httpClient, "", opts.Username)
 	if err != nil {
 		return err
 	}
