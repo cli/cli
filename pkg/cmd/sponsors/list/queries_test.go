@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -20,6 +21,7 @@ func Test_querySponsors(t *testing.T) {
 	var tests = []struct {
 		name           string
 		httpStubs      func(*httpmock.Registry)
+		username       string
 		expectedResult SponsorQuery
 		expectError    bool
 	}{
@@ -28,8 +30,17 @@ func Test_querySponsors(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query SponsorsList`),
-					httpmock.StatusStringResponse(200, `{"data": {"user": {"sponsors": {"totalCount": 2, "nodes": [{"login": "mona"}, {"login": "lisa"}]}}}}`))
+					httpmock.GraphQLQuery(`{"data": {"user": {"sponsors": {"totalCount": 2, "nodes": [{"login": "mona"}, {"login": "lisa"}]}}}}`,
+						func(query string, vars map[string]interface{}) {
+							want := map[string]interface{}{"username": "octocat"}
+							if !reflect.DeepEqual(vars, want) {
+								t.Errorf("got variables %v, want %v", vars, want)
+							}
+						},
+					),
+				)
 			},
+			username: "octocat",
 			expectedResult: SponsorQuery{
 				User: User{
 					Sponsors: Sponsors{
@@ -44,12 +55,42 @@ func Test_querySponsors(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name: "different username",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query SponsorsList`),
+					httpmock.GraphQLQuery(`{"data": {"user": {"sponsors": {"totalCount": 2, "nodes": [{"login": "octo"}, {"login": "cat"}]}}}}`,
+						func(query string, vars map[string]interface{}) {
+							want := map[string]interface{}{"username": "monalisa"}
+							if !reflect.DeepEqual(vars, want) {
+								t.Errorf("got variables %v, want %v", vars, want)
+							}
+						},
+					),
+				)
+			},
+			username: "monalisa",
+			expectedResult: SponsorQuery{
+				User: User{
+					Sponsors: Sponsors{
+						TotalCount: 2,
+						Nodes: []Node{
+							{Login: "octo"},
+							{Login: "cat"},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
 			name: "error",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query SponsorsList`),
 					httpmock.StatusStringResponse(500, `Internal Server Error`))
 			},
+			username:       "octocat",
 			expectedResult: SponsorQuery{},
 			expectError:    true,
 		},
@@ -64,7 +105,7 @@ func Test_querySponsors(t *testing.T) {
 
 			client := newTestClient(http)
 
-			sponsorsList, err := querySponsors(client, "github.com", "octocat")
+			sponsorsList, err := querySponsors(client, "", tt.username)
 			if (err != nil) != tt.expectError {
 				t.Fatalf("unexpected result: %v", err)
 			}
