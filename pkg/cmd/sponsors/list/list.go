@@ -64,10 +64,5 @@ func formatTTYOutput(opts *ListOptions) error {
 		table.EndRow()
 	}
 
-	err := table.Render()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return table.Render()
 }
