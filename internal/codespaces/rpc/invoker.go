@@ -116,9 +116,8 @@ func connect(ctx context.Context, fwd portforwarder.PortForwarder) (Invoker, err
 		// Attempt to connect to the port
 		opts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithBlock(),
 		}
-		conn, err = grpc.DialContext(connectctx, localAddress, opts...)
+		conn, err = grpc.NewClient(localAddress, opts...)
 		ch <- err // nil if we successfully connected
 	}()
 
