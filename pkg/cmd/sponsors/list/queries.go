@@ -23,7 +23,17 @@ type Node struct {
 	Login string `json:"login"`
 }
 
-func GetSponsorsList(httpClient *http.Client, hostname string, username string) ([]string, error) {
+type GetSponsorsList func(*http.Client, string, string) ([]string, error)
+
+type SponsorsListGetter struct {
+	get GetSponsorsList
+}
+
+func NewSponsorsListGetter(getFn GetSponsorsList) *SponsorsListGetter {
+	return &SponsorsListGetter{get: getFn}
+}
+
+func getSponsorsList(httpClient *http.Client, hostname string, username string) ([]string, error) {
 	client := api.NewClientFromHTTP(httpClient)
 	queryResult, err := querySponsors(client, hostname, username)
 	if err != nil {

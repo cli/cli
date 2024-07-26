@@ -65,14 +65,9 @@ func Test_listRun(t *testing.T) {
 			opts: &ListOptions{
 				HttpClient: func() (*http.Client, error) {
 					r := &httpmock.Registry{}
-
-					r.Register(
-						httpmock.GraphQL(`query SponsorsList\b`),
-						httpmock.StringResponse(`{"data": {"user": {"sponsors": {"totalCount": 2, "nodes": [{"login": "mona"}, {"login": "lisa"}]}}}}`))
-
 					return &http.Client{Transport: r}, nil
 				},
-
+				Getter:   NewSponsorsListGetter(getterFactory([]string{"mona", "lisa"}, nil)),
 				Username: "octocat",
 				Sponsors: []string{},
 			},

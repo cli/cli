@@ -17,6 +17,46 @@ func newTestClient(reg *httpmock.Registry) *api.Client {
 	return api.NewClientFromHTTP(client)
 }
 
+func getterFactory(r []string, err error) GetSponsorsList {
+	return func(*http.Client, string, string) ([]string, error) {
+		return r, err
+	}
+}
+
+func TestSponsorsListGetter(t *testing.T) {
+
+	var tests = []struct {
+		name           string
+		get            GetSponsorsList
+		expectedResult []string
+		expectError    bool
+	}{
+		{
+			name:           "hello world",
+			get:            getterFactory([]string{"hello world"}, nil),
+			expectedResult: []string{"hello world"},
+			expectError:    false,
+		},
+		{
+			name:           "error",
+			get:            getterFactory([]string{}, fmt.Errorf("error")),
+			expectedResult: []string{},
+			expectError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sponsorsListGetter := NewSponsorsListGetter(tt.get)
+			sponsorsList, err := sponsorsListGetter.get(nil, "", "")
+			if err != nil && !tt.expectError {
+				t.Fatalf("unexpected result: %v", err)
+			}
+			assert.Equal(t, tt.expectedResult, sponsorsList)
+		})
+	}
+}
+
 func Test_querySponsors(t *testing.T) {
 	var tests = []struct {
 		name           string
