@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -15,13 +16,30 @@ import (
 
 func TestNewCmdList(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants string
+		name          string
+		cli           string
+		prompterStubs func(*prompter.PrompterMock)
+		wants         string
 	}{
 		{
-			name:  "happy path",
-			cli:   "octocat",
+			name:          "happy path",
+			cli:           "octocat",
+			prompterStubs: func(p *prompter.PrompterMock) {},
+			wants:         "octocat",
+		},
+		{
+			name: "no arguments",
+			cli:  "",
+			prompterStubs: func(p *prompter.PrompterMock) {
+				p.InputFunc = func(p, d string) (string, error) {
+					switch p {
+					case "Which user do you want to target?":
+						return "octocat", nil
+					default:
+						return d, nil
+					}
+				}
+			},
 			wants: "octocat",
 		},
 	}
@@ -29,8 +47,13 @@ func TestNewCmdList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
+			pm := &prompter.PrompterMock{}
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
+			}
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				Prompter:  pm,
 			}
 
 			argv, err := shlex.Split(tt.cli)
