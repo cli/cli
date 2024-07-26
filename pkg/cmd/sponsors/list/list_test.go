@@ -2,7 +2,6 @@ package list
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -94,35 +93,67 @@ func Test_listRun(t *testing.T) {
 	}
 }
 
-func Test_formatTTYOutput(t *testing.T) {
+func Test_formatOutput(t *testing.T) {
 	tests := []struct {
 		name  string
 		opts  *ListOptions
 		wants []string
+		isTTY bool
 	}{
 		{
 			name: "Simple table",
 			opts: &ListOptions{
+				Username: "octocat",
 				Sponsors: []string{"mona", "lisa"},
 			},
 			wants: []string{
 				"SPONSORS",
 				"mona",
 				"lisa",
+				"",
 			},
+			isTTY: true,
+		},
+		{
+			name: "No Sponsors for octocat",
+			opts: &ListOptions{
+				Username: "octocat",
+				Sponsors: []string{},
+			},
+			wants: []string{"No sponsors found for octocat\n"},
+			isTTY: true,
+		},
+		{
+			name: "No Sponsors for monalisa",
+			opts: &ListOptions{
+				Username: "monalisa",
+				Sponsors: []string{},
+			},
+			wants: []string{"No sponsors found for monalisa\n"},
+			isTTY: true,
+		},
+		{
+			name: "No Sponsors for octocat non-TTY",
+			opts: &ListOptions{
+				Username: "octocat",
+				Sponsors: []string{},
+			},
+			wants: []string{},
+			isTTY: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, _ := iostreams.Test()
-			ios.SetStdoutTTY(true)
+			ios.SetStdoutTTY(tt.isTTY)
 			tt.opts.IO = ios
 
-			err := formatTTYOutput(tt.opts)
+			err := formatOutput(tt.opts)
 			assert.NoError(t, err)
 
-			expected := fmt.Sprintf("%s\n", strings.Join(tt.wants, "\n"))
+			expected := strings.Join(tt.wants, "\n")
+
 			assert.Equal(t, expected, stdout.String())
 		})
 	}

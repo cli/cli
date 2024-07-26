@@ -53,10 +53,15 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	return formatTTYOutput(opts)
+	return formatOutput(opts)
 }
 
-func formatTTYOutput(opts *ListOptions) error {
+func formatOutput(opts *ListOptions) error {
+
+	if len(opts.Sponsors) == 0 && opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "No sponsors found for %s\n", opts.Username)
+		return nil
+	}
 
 	table := tableprinter.New(opts.IO, tableprinter.WithHeader("SPONSORS"))
 	for _, sponsor := range opts.Sponsors {
