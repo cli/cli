@@ -156,7 +156,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Add, "add-project", nil, "Add the issue to projects by `name`")
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the issue from projects by `name`")
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the issue belongs to by `name`")
-	cmd.Flags().BoolVar(&opts.RemoveMilestone, "remove-milestone", false, "Remove the milestone the issue belongs to")
+	cmd.Flags().BoolVar(&opts.RemoveMilestone, "remove-milestone", false, "Remove the milestone association from the issue")
 
 	return cmd
 }
