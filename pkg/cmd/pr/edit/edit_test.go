@@ -275,6 +275,11 @@ func TestNewCmdEdit(t *testing.T) {
 			},
 			wantsErr: false,
 		},
+		{
+			name:     "both milestone and remove-milestone flags",
+			input:    "23 --milestone foo --remove-milestone",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
