@@ -261,6 +261,20 @@ func TestNewCmdEdit(t *testing.T) {
 			},
 			wantsErr: false,
 		},
+		{
+			name:  "remove-milestone flag",
+			input: "23 --remove-milestone",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Milestone: shared.EditableString{
+						Value:  "",
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
