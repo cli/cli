@@ -122,7 +122,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 				// Note that when `--remove-milestone` is provided, the value of
 				// `opts.Editable.Milestone.Value` will automatically be empty,
-				// which results in milestone association removal.
+				// which results in milestone association removal. For reference,
+				// see the `Editable.MilestoneId` method.
 			}
 
 			if !opts.Editable.Dirty() {
