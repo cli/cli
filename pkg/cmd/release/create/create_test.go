@@ -1751,6 +1751,82 @@ func Test_createRun_interactive(t *testing.T) {
 	}
 }
 
+func Test_gitTagInfo(t *testing.T) {
+	const tagName = "foo"
+	const contentCmd = "git tag --list foo --format=%\\(contents\\)"
+	const signatureCmd = "git tag --list foo --format=%\\(contents:signature\\)"
+
+	tests := []struct {
+		name       string
+		runStubs   func(*run.CommandStubber)
+		wantErr    string
+		wantResult string
+	}{
+		{
+			name: "no signature",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent")
+				cs.Register(signatureCmd, 0, "")
+			},
+			wantResult: "some\nmultiline\ncontent",
+		},
+		{
+			name: "with signature",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN SIGNATURE-----\nfoo\n-----END SIGNATURE-----")
+				cs.Register(signatureCmd, 0, "-----BEGIN SIGNATURE-----\nfoo\n-----END SIGNATURE-----")
+			},
+			wantResult: "some\nmultiline\ncontent",
+		},
+		{
+			name: "with signature in content but not as true signature",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN SIGNATURE-----\nfoo\n-----END SIGNATURE-----")
+				cs.Register(signatureCmd, 0, "")
+			},
+			wantResult: "some\nmultiline\ncontent\n-----BEGIN SIGNATURE-----\nfoo\n-----END SIGNATURE-----",
+		},
+		{
+			name: "error getting content",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 1, "some error")
+			},
+			wantErr: fmt.Sprintf("failed to run git: %s exited with status 1", contentCmd),
+		},
+		{
+			name: "error getting signature",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "whatever")
+				cs.Register(signatureCmd, 1, "some error")
+			},
+			wantErr: fmt.Sprintf("failed to run git: %s exited with status 1", signatureCmd),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gitClient := &git.Client{GitPath: "some/path/git"}
+
+			rs, teardown := run.Stub()
+			defer teardown(t)
+			if tt.runStubs != nil {
+				tt.runStubs(rs)
+			}
+
+			result, err := gitTagInfo(gitClient, tagName)
+
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.wantResult, result)
+		})
+	}
+}
+
 func boolPtr(b bool) *bool {
 	return &b
 }
