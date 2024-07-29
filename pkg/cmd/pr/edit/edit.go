@@ -30,7 +30,6 @@ type EditOptions struct {
 	Interactive bool
 
 	shared.Editable
-	RemoveMilestone bool
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -44,6 +43,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	}
 
 	var bodyFile string
+	var removeMilestone bool
 
 	cmd := &cobra.Command{
 		Use:   "edit [<number> | <url> | <branch>]",
@@ -100,7 +100,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if err := cmdutil.MutuallyExclusive(
 				"specify only one of `--milestone` or `--remove-milestone`",
 				flags.Changed("milestone"),
-				opts.RemoveMilestone,
+				opts.removeMilestone,
 			); err != nil {
 				return err
 			}
@@ -126,7 +126,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if flags.Changed("add-project") || flags.Changed("remove-project") {
 				opts.Editable.Projects.Edited = true
 			}
-			if flags.Changed("milestone") || opts.RemoveMilestone {
+			if flags.Changed("milestone") || opts.removeMilestone {
 				opts.Editable.Milestone.Edited = true
 
 				// Note that when `--remove-milestone` is provided, the value of
@@ -164,7 +164,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Add, "add-project", nil, "Add the pull request to projects by `name`")
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the pull request from projects by `name`")
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the pull request belongs to by `name`")
-	cmd.Flags().BoolVar(&opts.RemoveMilestone, "remove-milestone", false, "Remove the milestone association from the pull request")
+	cmd.Flags().BoolVar(&removeMilestone, "remove-milestone", false, "Remove the milestone association from the pull request")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base")
 
