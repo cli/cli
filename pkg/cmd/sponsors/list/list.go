@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -12,20 +13,22 @@ import (
 )
 
 type ListOptions struct {
+	Config     func() (gh.Config, error)
+	Getter     *SponsorsListGetter
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Getter     *SponsorsListGetter
 	Prompter   prompter.Prompter
 
-	Username string
 	Sponsors []string
+	Username string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
+		Config:     f.Config,
+		Getter:     NewSponsorsListGetter(getSponsorsList),
 		HttpClient: f.HttpClient,
 		IO:         f.IOStreams,
-		Getter:     NewSponsorsListGetter(getSponsorsList),
 		Prompter:   f.Prompter,
 	}
 
@@ -36,9 +39,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) == 0 {
+				if !opts.IO.CanPrompt() {
+					return fmt.Errorf("Must specify a user")
+				}
 				input, err := opts.Prompter.Input("Which user do you want to target?", "")
 				if err != nil {
-					return fmt.Errorf("could not prompt")
+					return fmt.Errorf("Could not prompt")
 				}
 				opts.Username = input
 			} else {

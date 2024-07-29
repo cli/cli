@@ -12,20 +12,27 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdList(t *testing.T) {
 	tests := []struct {
-		name          string
-		cli           string
-		prompterStubs func(*prompter.PrompterMock)
-		wants         string
+		name             string
+		cli              string
+		prompterStubs    func(*prompter.PrompterMock)
+		wants            string
+		isPromptDisabled bool
+		tty              bool
+		env              map[string]string
+		wantsErr         bool
 	}{
 		{
-			name:          "happy path",
-			cli:           "octocat",
-			prompterStubs: func(p *prompter.PrompterMock) {},
-			wants:         "octocat",
+			name:             "happy path",
+			cli:              "octocat",
+			prompterStubs:    func(p *prompter.PrompterMock) {},
+			wants:            "octocat",
+			isPromptDisabled: false,
+			tty:              true,
 		},
 		{
 			name: "no arguments",
@@ -40,13 +47,44 @@ func TestNewCmdList(t *testing.T) {
 					}
 				}
 			},
-			wants: "octocat",
+			wants:            "octocat",
+			isPromptDisabled: false,
+			tty:              true,
+		},
+		{
+			name: "GH_PROMPT_DISABLED=true with no args",
+			cli:  "",
+			prompterStubs: func(p *prompter.PrompterMock) {
+				p.InputFunc = func(p, d string) (string, error) {
+					switch p {
+					case "Which user do you want to target?":
+						return "octocat", nil
+					default:
+						return d, nil
+					}
+				}
+			},
+			wants:            "Must specify a user",
+			isPromptDisabled: true,
+			tty:              true,
+			env:              map[string]string{"GH_PROMPT_DISABLED": "true"},
+			wantsErr:         true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					t.Setenv(k, v)
+				}
+			}
+
 			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetNeverPrompt(tt.isPromptDisabled)
+
 			pm := &prompter.PrompterMock{}
 			if tt.prompterStubs != nil {
 				tt.prompterStubs(pm)
@@ -70,8 +108,12 @@ func TestNewCmdList(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
-			assert.NoError(t, err)
+			if tt.wantsErr {
+				require.Error(t, err)
+				return
+			}
 
+			assert.NoError(t, err)
 			assert.Equal(t, tt.wants, gotOpts.Username)
 		})
 	}
