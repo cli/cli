@@ -516,12 +516,32 @@ func createRun(opts *CreateOptions) error {
 }
 
 func gitTagInfo(client *git.Client, tagName string) (string, error) {
-	cmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
+	contentCmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents)")
 	if err != nil {
 		return "", err
 	}
-	b, err := cmd.Output()
-	return string(b), err
+	content, err := contentCmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	signatureCmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:signature)")
+	if err != nil {
+		return "", err
+	}
+	signature, err := signatureCmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	if len(signature) == 0 {
+		// The tag annotation content has no trailing signature to strip out,
+		// so we return the entire content.
+		return string(content), nil
+	}
+
+	body, _ := strings.CutSuffix(string(content), "\n"+string(signature))
+	return body, nil
 }
 
 func detectPreviousTag(client *git.Client, headRef string) (string, error) {
