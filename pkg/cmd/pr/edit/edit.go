@@ -100,7 +100,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if err := cmdutil.MutuallyExclusive(
 				"specify only one of `--milestone` or `--remove-milestone`",
 				flags.Changed("milestone"),
-				opts.removeMilestone,
+				removeMilestone,
 			); err != nil {
 				return err
 			}
@@ -126,7 +126,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if flags.Changed("add-project") || flags.Changed("remove-project") {
 				opts.Editable.Projects.Edited = true
 			}
-			if flags.Changed("milestone") || opts.removeMilestone {
+			if flags.Changed("milestone") || removeMilestone {
 				opts.Editable.Milestone.Edited = true
 
 				// Note that when `--remove-milestone` is provided, the value of
