@@ -42,3 +42,16 @@ func TestListRendererDisplaysMessageWhenNoSponsorsTTY(t *testing.T) {
 	`)
 	require.Equal(t, expectedOutput, stdout.String())
 }
+
+func TestListRendererDisplaysNothingWhenNoSponsorsNonTTY(t *testing.T) {
+	io, _, stdout, _ := iostreams.Test()
+	io.SetStdoutTTY(false)
+	r := listcmd.ConsoleListRenderer{
+		IO: io,
+	}
+
+	err := r.Render([]listcmd.Sponsor{})
+	require.NoError(t, err)
+
+	require.Equal(t, "", stdout.String())
+}
