@@ -28,10 +28,6 @@ func TestVerifyCertExtensions(t *testing.T) {
 		err := VerifyCertExtensions(results, "owner", "owner/repo")
 		require.NoError(t, err)
 	})
-	t.Run("VerifyCertExtensions with repo", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "owner/repo")
-		require.NoError(t, err)
-	})
 
 	t.Run("VerifyCertExtensions with owner", func(t *testing.T) {
 		err := VerifyCertExtensions(results, "owner", "")
@@ -44,7 +40,7 @@ func TestVerifyCertExtensions(t *testing.T) {
 	})
 
 	t.Run("VerifyCertExtensions with wrong repo", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "wrong")
+		err := VerifyCertExtensions(results, "owner", "wrong")
 		require.ErrorContains(t, err, "expected SourceRepositoryURI to be https://github.com/wrong, got https://github.com/owner/repo")
 	})
 }
