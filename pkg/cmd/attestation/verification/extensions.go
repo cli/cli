@@ -10,7 +10,7 @@ func VerifyCertExtensions(results []*AttestationProcessingResult, owner string, 
 		if owner != "" {
 			expectedSourceRepositoryOwnerURI := fmt.Sprintf("https://github.com/%s", owner)
 			sourceRepositoryOwnerURI := attestation.VerificationResult.Signature.Certificate.Extensions.SourceRepositoryOwnerURI
-			if !strings.EqualFold(expectedSourceRepositoryOwnerURI, sourceRepositoryOwnerURI) {
+			if sourceRepositoryOwnerURI != "" && !strings.EqualFold(expectedSourceRepositoryOwnerURI, sourceRepositoryOwnerURI) {
 				return fmt.Errorf("expected SourceRepositoryOwnerURI to be %s, got %s", expectedSourceRepositoryOwnerURI, sourceRepositoryOwnerURI)
 			}
 		}
@@ -18,7 +18,7 @@ func VerifyCertExtensions(results []*AttestationProcessingResult, owner string, 
 		if repo != "" {
 			expectedSourceRepositoryURI := fmt.Sprintf("https://github.com/%s", repo)
 			sourceRepositoryURI := attestation.VerificationResult.Signature.Certificate.Extensions.SourceRepositoryURI
-			if !strings.EqualFold(expectedSourceRepositoryURI, sourceRepositoryURI) {
+			if sourceRepositoryURI != "" && !strings.EqualFold(expectedSourceRepositoryURI, sourceRepositoryURI) {
 				return fmt.Errorf("expected SourceRepositoryURI to be %s, got %s", expectedSourceRepositoryURI, sourceRepositoryURI)
 			}
 		}
