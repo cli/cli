@@ -21,9 +21,15 @@ type SponsorListRenderer interface {
 
 type User string
 
+type UserPrompter interface {
+	PromptForUser() (User, error)
+}
+
 type Options struct {
 	SponsorLister       SponsorLister
 	SponsorListRenderer SponsorListRenderer
+
+	UserPrompter UserPrompter
 
 	User User
 }
@@ -37,7 +43,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(Options) error) *cobra.Command {
 			$ gh sponsors list <user>
 		`),
 		Aliases: []string{"ls"},
-		Args:    cmdutil.ExactArgs(1, "must specify a user"),
+		Args:    cmdutil.MaximumArgs(1, "too many arguments"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			httpClient, err := f.HttpClient()
 			if err != nil {
@@ -52,7 +58,21 @@ func NewCmdList(f *cmdutil.Factory, runF func(Options) error) *cobra.Command {
 				SponsorListRenderer: ConsoleListRenderer{
 					IO: f.IOStreams,
 				},
-				User: User(args[0]),
+			}
+
+			// I don't love this. If we _know_ we don't have a user then we should just
+			// figure it out now instead of passing it onto the ListRun function.
+			//
+			// However, I also don't really want to prompt in this function because it's
+			// hard to test cobra lifecycle code. I think maybe it indicates a missing abstraction.
+			//
+			// Food for thought!
+			if len(args) > 0 {
+				opts.User = User(args[0])
+			} else {
+				opts.UserPrompter = ConsoleUserPrompter{
+					Prompter: f.Prompter,
+				}
 			}
 
 			if runF != nil {
@@ -66,6 +86,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(Options) error) *cobra.Command {
 }
 
 func ListRun(opts Options) error {
+	if opts.User == "" {
+		user, err := opts.UserPrompter.PromptForUser()
+		if err != nil {
+			return fmt.Errorf("prompt for user: %v", err)
+		}
+		opts.User = user
+	}
+
 	sponsors, err := opts.SponsorLister.ListSponsors(opts.User)
 	if err != nil {
 		return fmt.Errorf("sponsor list: %v", err)

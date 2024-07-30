@@ -20,6 +20,19 @@ func MinimumArgs(n int, msg string) cobra.PositionalArgs {
 	}
 }
 
+func MaximumArgs(n int, msg string) cobra.PositionalArgs {
+	if msg == "" {
+		return cobra.MaximumNArgs(1)
+	}
+
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) > n {
+			return FlagErrorf("%s", msg)
+		}
+		return nil
+	}
+}
+
 func ExactArgs(n int, msg string) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
 		if len(args) > n {

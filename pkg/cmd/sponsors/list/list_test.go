@@ -19,11 +19,6 @@ func TestNewCmdSponsors(t *testing.T) {
 		expectedOptions listcmd.Options
 	}{
 		{
-			name:        "when no arguments provided, returns a useful error",
-			args:        "",
-			expectedErr: cmdutil.FlagErrorf("must specify a user"),
-		},
-		{
 			name: "org",
 			args: "testusername",
 			expectedOptions: listcmd.Options{
@@ -106,6 +101,18 @@ func TestListSponsorsRendersRetrievedSponsors(t *testing.T) {
 	require.Equal(t, sponsorListRendererSpy.spiedSponsors, []listcmd.Sponsor{"sponsor1", "sponsor2"})
 }
 
+type fakeUserPrompter struct {
+	stubbedUser  listcmd.User
+	stubbedError error
+}
+
+func (f fakeUserPrompter) PromptForUser() (listcmd.User, error) {
+	if f.stubbedError != nil {
+		return "", f.stubbedError
+	}
+	return f.stubbedUser, nil
+}
+
 func TestListSponsorsWrapsErrorRetrievingSponsors(t *testing.T) {
 	// Given our sponsor lister returns with an error
 	listOptions := listcmd.Options{
@@ -120,4 +127,45 @@ func TestListSponsorsWrapsErrorRetrievingSponsors(t *testing.T) {
 
 	// Then it returns an informational error
 	require.ErrorContains(t, err, "sponsor list: expected test error")
+}
+
+func TestListSponsorsPromptsWhenNoUserProvidedTTY(t *testing.T) {
+	// Given no user was provided
+	sponsorListRendererSpy := &spySponsorTableRenderer{}
+	listOptions := listcmd.Options{
+		SponsorLister: fakeSponsorLister{
+			stubbedSponsors: map[listcmd.User][]listcmd.Sponsor{
+				"stubbedusername": {"sponsor1", "sponsor2"},
+			},
+		},
+		SponsorListRenderer: sponsorListRendererSpy,
+
+		UserPrompter: fakeUserPrompter{
+			stubbedUser: "stubbedusername",
+		},
+	}
+
+	// When I run the list command
+	err := listcmd.ListRun(listOptions)
+
+	// Then it is successful
+	require.NoError(t, err)
+
+	// And it uses the user provided by the prompt
+	require.Equal(t, sponsorListRendererSpy.spiedSponsors, []listcmd.Sponsor{"sponsor1", "sponsor2"})
+}
+
+func TestListingSponsorsWrapsErrorWhenPromptingForUser(t *testing.T) {
+	// Given prompting for a user errors
+	listOptions := listcmd.Options{
+		UserPrompter: fakeUserPrompter{
+			stubbedError: errors.New("expected test error"),
+		},
+	}
+
+	// When I run the list command
+	err := listcmd.ListRun(listOptions)
+
+	// Then it returns an informational error
+	require.ErrorContains(t, err, "prompt for user: expected test error")
 }
