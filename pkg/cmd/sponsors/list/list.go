@@ -78,14 +78,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(Options) error) *cobra.Command {
 			if runF != nil {
 				return runF(opts)
 			}
-			return ListRun(opts)
+			return ListSponsors(opts)
 		},
 	}
 
 	return cmd
 }
 
-func ListRun(opts Options) error {
+func ListSponsors(opts Options) error {
 	if opts.User == "" {
 		user, err := opts.UserPrompter.PromptForUser()
 		if err != nil {

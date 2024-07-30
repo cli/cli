@@ -92,7 +92,7 @@ func TestListSponsorsRendersRetrievedSponsors(t *testing.T) {
 	}
 
 	// When I run the list command
-	err := listcmd.ListRun(listOptions)
+	err := listcmd.ListSponsors(listOptions)
 
 	// Then it is successful
 	require.NoError(t, err)
@@ -123,7 +123,7 @@ func TestListSponsorsWrapsErrorRetrievingSponsors(t *testing.T) {
 	}
 
 	// When I run the list command
-	err := listcmd.ListRun(listOptions)
+	err := listcmd.ListSponsors(listOptions)
 
 	// Then it returns an informational error
 	require.ErrorContains(t, err, "sponsor list: expected test error")
@@ -146,7 +146,7 @@ func TestListSponsorsPromptsWhenNoUserProvidedTTY(t *testing.T) {
 	}
 
 	// When I run the list command
-	err := listcmd.ListRun(listOptions)
+	err := listcmd.ListSponsors(listOptions)
 
 	// Then it is successful
 	require.NoError(t, err)
@@ -164,7 +164,7 @@ func TestListingSponsorsWrapsErrorWhenPromptingForUser(t *testing.T) {
 	}
 
 	// When I run the list command
-	err := listcmd.ListRun(listOptions)
+	err := listcmd.ListSponsors(listOptions)
 
 	// Then it returns an informational error
 	require.ErrorContains(t, err, "prompt for user: expected test error")
