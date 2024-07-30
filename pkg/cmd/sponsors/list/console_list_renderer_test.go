@@ -26,3 +26,19 @@ func TestListRendererDisplaysTableTTY(t *testing.T) {
 	`)
 	require.Equal(t, expectedOutput, stdout.String())
 }
+
+func TestListRendererDisplaysMessageWhenNoSponsorsTTY(t *testing.T) {
+	io, _, stdout, _ := iostreams.Test()
+	io.SetStdoutTTY(true)
+	r := listcmd.ConsoleListRenderer{
+		IO: io,
+	}
+
+	err := r.Render([]listcmd.Sponsor{})
+	require.NoError(t, err)
+
+	expectedOutput := heredoc.Doc(`
+	No sponsors found
+	`)
+	require.Equal(t, expectedOutput, stdout.String())
+}
