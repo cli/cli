@@ -72,6 +72,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(Options) error) *cobra.Command {
 			// hard to test cobra lifecycle code. I think maybe it indicates a missing abstraction.
 			//
 			// Food for thought!
+			//
+			// Edit: more thoughts at the bottom of this file.
 			if len(args) > 0 {
 				opts.User = User(args[0])
 			} else {
@@ -120,3 +122,23 @@ func ListSponsors(opts Options) error {
 
 	return opts.SponsorListRenderer.Render(sponsors)
 }
+
+// One interesting idea here might be to throw away the idea of a Prompter and instead have a
+// `UserProvider` that can just return the argument. The advantage of this is that we push a conditional
+// up the stack. The disadvantage is that it adds a layer of indirection.
+//
+// No time to follow this through now.
+
+// func ListSponsorsExample(opts Options) error {
+// 	user, err := opts.UserProvider.ProvideUser()
+// 	if err != nil {
+// 		return fmt.Errorf("provide user: %v", err)
+// 	}
+
+// 	sponsors, err := opts.SponsorLister.ListSponsors(user)
+// 	if err != nil {
+// 		return fmt.Errorf("sponsor list: %v", err)
+// 	}
+
+// 	return opts.SponsorListRenderer.Render(sponsors)
+// }
