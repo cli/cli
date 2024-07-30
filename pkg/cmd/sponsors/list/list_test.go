@@ -20,7 +20,7 @@ func TestNewCmdList(t *testing.T) {
 		name             string
 		cli              string
 		prompterStubs    func(*prompter.PrompterMock)
-		wants            string
+		wants            ListOptions
 		isPromptDisabled bool
 		tty              bool
 		env              map[string]string
@@ -30,7 +30,7 @@ func TestNewCmdList(t *testing.T) {
 			name:             "happy path",
 			cli:              "octocat",
 			prompterStubs:    func(p *prompter.PrompterMock) {},
-			wants:            "octocat",
+			wants:            ListOptions{Username: "octocat"},
 			isPromptDisabled: false,
 			tty:              true,
 		},
@@ -47,7 +47,7 @@ func TestNewCmdList(t *testing.T) {
 					}
 				}
 			},
-			wants:            "octocat",
+			wants:            ListOptions{Username: "octocat"},
 			isPromptDisabled: false,
 			tty:              true,
 		},
@@ -64,11 +64,17 @@ func TestNewCmdList(t *testing.T) {
 					}
 				}
 			},
-			wants:            "Must specify a user",
 			isPromptDisabled: true,
 			tty:              true,
 			env:              map[string]string{"GH_PROMPT_DISABLED": "true"},
 			wantsErr:         true,
+		},
+		{
+			name:             "with --json flag",
+			cli:              "octocat --json",
+			wants:            ListOptions{Username: "octocat", JSONResponse: true},
+			isPromptDisabled: false,
+			tty:              true,
 		},
 	}
 
@@ -114,7 +120,8 @@ func TestNewCmdList(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wants, gotOpts.Username)
+			assert.Equal(t, tt.wants.Username, gotOpts.Username)
+			assert.Equal(t, tt.wants.JSONResponse, gotOpts.JSONResponse)
 		})
 	}
 }
@@ -199,6 +206,16 @@ func Test_formatOutput(t *testing.T) {
 				Sponsors: []string{},
 			},
 			wants: []string{},
+			isTTY: false,
+		},
+		{
+			name: "When JSONResponse is true",
+			opts: &ListOptions{
+				Username:     "octocat",
+				Sponsors:     []string{"mona", "lisa"},
+				JSONResponse: true,
+			},
+			wants: []string{"{\"sponsors\":[\"mona\",\"lisa\"]}"},
 			isTTY: false,
 		},
 	}

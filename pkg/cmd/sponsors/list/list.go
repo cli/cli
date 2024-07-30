@@ -1,6 +1,7 @@
 package list
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -19,8 +20,9 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	Prompter   prompter.Prompter
 
-	Sponsors []string
-	Username string
+	Sponsors     []string
+	Username     string
+	JSONResponse bool
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -59,6 +61,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		},
 	}
 
+	cmd.Flags().BoolVar(&opts.JSONResponse, "json", false, "output as json")
+
 	return cmd
 }
 
@@ -81,6 +85,16 @@ func formatOutput(opts *ListOptions) error {
 	if len(opts.Sponsors) == 0 && opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.Out, "No sponsors found for %s\n", opts.Username)
 		return nil
+	}
+
+	if opts.JSONResponse {
+		jsonMap := map[string][]string{"sponsors": opts.Sponsors}
+		jsonData, err := json.Marshal(jsonMap)
+		if err != nil {
+			return fmt.Errorf("could not marshal json: %w", err)
+		}
+		_, err = fmt.Fprintf(opts.IO.Out, "%s", string(jsonData))
+		return err
 	}
 
 	table := tableprinter.New(opts.IO, tableprinter.WithHeader("SPONSORS"))
