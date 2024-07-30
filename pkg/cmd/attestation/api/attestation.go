@@ -9,6 +9,8 @@ import (
 const (
 	GetAttestationByRepoAndSubjectDigestPath  = "repos/%s/attestations/%s"
 	GetAttestationByOwnerAndSubjectDigestPath = "orgs/%s/attestations/%s"
+	GetUsernamePath                           = "users/%s"
+	GetRepoNamePath                           = "repos/%s"
 )
 
 type ErrNoAttestations struct {
@@ -30,4 +32,11 @@ type Attestation struct {
 
 type AttestationsResponse struct {
 	Attestations []*Attestation `json:"attestations"`
+}
+
+type UserResponse struct {
+	Login string `json:"login"`
+}
+type RepoResponse struct {
+	FullName string `json:"full_name"`
 }

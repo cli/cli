@@ -19,11 +19,14 @@ const (
 
 type apiClient interface {
 	RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error)
+	REST(hostname string, method string, p string, body io.Reader, data interface{}) error
 }
 
 type Client interface {
 	GetByRepoAndDigest(repo, digest string, limit int) ([]*Attestation, error)
 	GetByOwnerAndDigest(owner, digest string, limit int) ([]*Attestation, error)
+	GetUsername(owner string) (string, error)
+	GetRepoName(repo string) (string, error)
 }
 
 type LiveClient struct {
@@ -101,4 +104,32 @@ func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*At
 	}
 
 	return attestations, nil
+}
+
+func buildGetUsernamePath(owner string) string {
+	owner = strings.Trim(owner, "/")
+	return fmt.Sprintf(GetUsernamePath, owner)
+}
+
+func (c *LiveClient) GetUsername(owner string) (string, error) {
+	var resp UserResponse
+	err := c.api.REST(c.host, http.MethodGet, buildGetUsernamePath(owner), nil, &resp)
+	if err != nil {
+		return "", err
+	}
+	return resp.Login, nil
+}
+
+func buildGetRepoNamePath(repo string) string {
+	repo = strings.Trim(repo, "/")
+	return fmt.Sprintf(GetRepoNamePath, repo)
+}
+
+func (c *LiveClient) GetRepoName(repo string) (string, error) {
+	var resp RepoResponse
+	err := c.api.REST(c.host, http.MethodGet, buildGetRepoNamePath(repo), nil, &resp)
+	if err != nil {
+		return "", err
+	}
+	return resp.FullName, nil
 }

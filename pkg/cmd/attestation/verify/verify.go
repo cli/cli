@@ -223,6 +223,27 @@ func runVerify(opts *Options) error {
 		attestations = filteredAttestations
 	}
 
+	// Normalize SAN Regex owner and repo values.
+	if opts.SANRegex != "" {
+		if opts.Owner != "" {
+			opts.Owner, err = c.APIClient.GetUsername(opts.Owner)
+			opts.SANRegex = expandToGitHubURL(opts.Owner)
+			if err != nil {
+				opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Failed to get username for %s\n"), opts.Owner)
+				return err
+			}
+		}
+
+		if opts.Repo != "" {
+			opts.Repo, err = c.APIClient.GetRepoName(opts.Repo)
+			opts.SANRegex = expandToGitHubURL(opts.Repo)
+			if err != nil {
+				opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Failed to get repository name for %s\n"), opts.Repo)
+				return err
+			}
+		}
+	}
+
 	policy, err := buildVerifyPolicy(opts, *artifact)
 	if err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build verification policy"))
