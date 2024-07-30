@@ -21,6 +21,7 @@ const (
 )
 
 func expandToGitHubURL(ownerOrRepo string) string {
+	// TODO: handle proxima prefix
 	return fmt.Sprintf("(?i)^https://github.com/%s/", ownerOrRepo)
 }
 
@@ -42,12 +43,6 @@ func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error
 	return verify.SubjectAlternativeNameMatcher{}, nil
 }
 
-func buildCertExtensions(runnerEnv string) certificate.Extensions {
-	return certificate.Extensions{
-		RunnerEnvironment: runnerEnv,
-	}
-}
-
 func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.PolicyOption, error) {
 	sanMatcher, err := buildSANMatcher(opts)
 	if err != nil {
@@ -59,7 +54,9 @@ func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.Pol
 		return nil, err
 	}
 
-	extensions := buildCertExtensions(runnerEnv)
+	extensions := certificate.Extensions{
+		RunnerEnvironment: runnerEnv,
+	}
 
 	certId, err := verify.NewCertificateIdentity(sanMatcher, issuerMatcher, extensions)
 	if err != nil {
