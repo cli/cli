@@ -26,7 +26,7 @@ import (
 )
 
 func TestJSONFields(t *testing.T) {
-	jsonfieldstest.ExpectCommandToSupportJSONFields(t, NewCmdView, []string{
+	jsonfieldstest.ExpectCommandToSupportJSONFields[ViewOptions](t, NewCmdView, []string{
 		"additions",
 		"assignees",
 		"author",

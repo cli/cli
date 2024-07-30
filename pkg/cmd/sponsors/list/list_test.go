@@ -7,6 +7,7 @@ import (
 
 	listcmd "github.com/cli/cli/v2/pkg/cmd/sponsors/list"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/require"
 )
@@ -57,23 +58,29 @@ func TestNewCmdSponsors(t *testing.T) {
 	}
 }
 
+func TestJSONFields(t *testing.T) {
+	jsonfieldstest.ExpectCommandToSupportJSONFields[listcmd.Options](t, listcmd.NewCmdList, []string{
+		"login",
+	})
+}
+
 type fakeSponsorLister struct {
-	stubbedSponsors map[listcmd.User][]listcmd.Sponsor
+	stubbedSponsors map[listcmd.User]listcmd.Sponsors
 	stubbedErr      error
 }
 
-func (s fakeSponsorLister) ListSponsors(user listcmd.User) ([]listcmd.Sponsor, error) {
+func (s fakeSponsorLister) ListSponsors(user listcmd.User) (listcmd.Sponsors, error) {
 	if s.stubbedErr != nil {
-		return nil, s.stubbedErr
+		return listcmd.Sponsors{}, s.stubbedErr
 	}
 	return s.stubbedSponsors[user], nil
 }
 
 type spySponsorTableRenderer struct {
-	spiedSponsors []listcmd.Sponsor
+	spiedSponsors listcmd.Sponsors
 }
 
-func (s *spySponsorTableRenderer) Render(sponsors []listcmd.Sponsor) error {
+func (s *spySponsorTableRenderer) Render(sponsors listcmd.Sponsors) error {
 	s.spiedSponsors = sponsors
 	return nil
 }
@@ -83,8 +90,8 @@ func TestListSponsorsRendersRetrievedSponsors(t *testing.T) {
 	sponsorListRendererSpy := &spySponsorTableRenderer{}
 	listOptions := listcmd.Options{
 		SponsorLister: fakeSponsorLister{
-			stubbedSponsors: map[listcmd.User][]listcmd.Sponsor{
-				"testusername": {"sponsor1", "sponsor2"},
+			stubbedSponsors: map[listcmd.User]listcmd.Sponsors{
+				"testusername": {{"sponsor1"}, {"sponsor2"}},
 			},
 		},
 		SponsorListRenderer: sponsorListRendererSpy,
@@ -98,7 +105,7 @@ func TestListSponsorsRendersRetrievedSponsors(t *testing.T) {
 	require.NoError(t, err)
 
 	// And it renders the list
-	require.Equal(t, sponsorListRendererSpy.spiedSponsors, []listcmd.Sponsor{"sponsor1", "sponsor2"})
+	require.Equal(t, sponsorListRendererSpy.spiedSponsors, listcmd.Sponsors{{"sponsor1"}, {"sponsor2"}})
 }
 
 type fakeUserPrompter struct {
@@ -134,8 +141,8 @@ func TestListSponsorsPromptsWhenNoUserProvidedTTY(t *testing.T) {
 	sponsorListRendererSpy := &spySponsorTableRenderer{}
 	listOptions := listcmd.Options{
 		SponsorLister: fakeSponsorLister{
-			stubbedSponsors: map[listcmd.User][]listcmd.Sponsor{
-				"stubbedusername": {"sponsor1", "sponsor2"},
+			stubbedSponsors: map[listcmd.User]listcmd.Sponsors{
+				"stubbedusername": {{"sponsor1"}, {"sponsor2"}},
 			},
 		},
 		SponsorListRenderer: sponsorListRendererSpy,
@@ -152,7 +159,7 @@ func TestListSponsorsPromptsWhenNoUserProvidedTTY(t *testing.T) {
 	require.NoError(t, err)
 
 	// And it uses the user provided by the prompt
-	require.Equal(t, sponsorListRendererSpy.spiedSponsors, []listcmd.Sponsor{"sponsor1", "sponsor2"})
+	require.Equal(t, sponsorListRendererSpy.spiedSponsors, listcmd.Sponsors{{"sponsor1"}, {"sponsor2"}})
 }
 
 func TestListingSponsorsWrapsErrorWhenPromptingForUser(t *testing.T) {

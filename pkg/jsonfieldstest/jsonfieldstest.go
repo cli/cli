@@ -26,10 +26,16 @@ func jsonFieldsFor(cmd *cobra.Command) []string {
 	return strings.Split(stringFields, ",")
 }
 
+// Haha bite me. I probably would just make the ListCmd take a pointer but I'm a masochist and I've never
+// played with type constraints before.
+type CmdRunF[T any] interface {
+	func(*T) error | func(T) error
+}
+
 // NewCmdFunc represents the typical function signature we use for creating commands e.g. `NewCmdView`.
 //
 // It is generic over `T` as each command construction has their own Options type e.g. `ViewOptions`
-type NewCmdFunc[T any] func(f *cmdutil.Factory, runF func(*T) error) *cobra.Command
+type NewCmdFunc[T any, F CmdRunF[T]] func(f *cmdutil.Factory, runF F) *cobra.Command
 
 // ExpectCommandToSupportJSONFields asserts that the provided command supports exactly the provided fields.
 // Ordering of the expected fields is not important.
@@ -38,7 +44,7 @@ type NewCmdFunc[T any] func(f *cmdutil.Factory, runF func(*T) error) *cobra.Comm
 // It can be a little tedious to rewrite the fields inline in the test but it's significantly more useful because:
 //   - It forces the test author to think about and convey exactly the expected fields for a command
 //   - It avoids accidentally adding fields to a command, and the test passing unintentionally
-func ExpectCommandToSupportJSONFields[T any](t *testing.T, fn NewCmdFunc[T], expectedFields []string) {
+func ExpectCommandToSupportJSONFields[T any, F CmdRunF[T]](t *testing.T, fn NewCmdFunc[T, F], expectedFields []string) {
 	t.Helper()
 
 	actualFields := jsonFieldsFor(fn(&cmdutil.Factory{}, nil))

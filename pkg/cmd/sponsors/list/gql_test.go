@@ -95,7 +95,7 @@ func TestGQLSponsorListing(t *testing.T) {
 	require.NoError(t, err)
 
 	// And the sponsors match the query response
-	require.Equal(t, []listcmd.Sponsor{"sponsor1", "sponsor2"}, listedSponsors)
+	require.Equal(t, listcmd.Sponsors{{"sponsor1"}, {"sponsor2"}}, listedSponsors)
 }
 
 func TestGQLSponsorListingServerError(t *testing.T) {

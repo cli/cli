@@ -12,11 +12,11 @@ import (
 func TestListRendererDisplaysTableTTY(t *testing.T) {
 	io, _, stdout, _ := iostreams.Test()
 	io.SetStdoutTTY(true)
-	r := listcmd.ConsoleListRenderer{
+	r := listcmd.TableListRenderer{
 		IO: io,
 	}
 
-	err := r.Render([]listcmd.Sponsor{"sponsor1", "sponsor2"})
+	err := r.Render(listcmd.Sponsors{{"sponsor1"}, {"sponsor2"}})
 	require.NoError(t, err)
 
 	expectedOutput := heredoc.Doc(`
@@ -30,11 +30,11 @@ func TestListRendererDisplaysTableTTY(t *testing.T) {
 func TestListRendererDisplaysMessageWhenNoSponsorsTTY(t *testing.T) {
 	io, _, stdout, _ := iostreams.Test()
 	io.SetStdoutTTY(true)
-	r := listcmd.ConsoleListRenderer{
+	r := listcmd.TableListRenderer{
 		IO: io,
 	}
 
-	err := r.Render([]listcmd.Sponsor{})
+	err := r.Render(listcmd.Sponsors{})
 	require.NoError(t, err)
 
 	expectedOutput := heredoc.Doc(`
@@ -46,11 +46,11 @@ func TestListRendererDisplaysMessageWhenNoSponsorsTTY(t *testing.T) {
 func TestListRendererDisplaysNothingWhenNoSponsorsNonTTY(t *testing.T) {
 	io, _, stdout, _ := iostreams.Test()
 	io.SetStdoutTTY(false)
-	r := listcmd.ConsoleListRenderer{
+	r := listcmd.TableListRenderer{
 		IO: io,
 	}
 
-	err := r.Render([]listcmd.Sponsor{})
+	err := r.Render(listcmd.Sponsors{})
 	require.NoError(t, err)
 
 	require.Equal(t, "", stdout.String())

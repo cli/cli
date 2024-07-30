@@ -9,14 +9,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type Sponsor string
+type Login string
+
+type Sponsor struct {
+	Login Login
+}
+
+type Sponsors []Sponsor
 
 type SponsorLister interface {
-	ListSponsors(User) ([]Sponsor, error)
+	ListSponsors(User) (Sponsors, error)
 }
 
 type SponsorListRenderer interface {
-	Render([]Sponsor) error
+	Render(Sponsors) error
 }
 
 type User string
@@ -35,6 +41,8 @@ type Options struct {
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(Options) error) *cobra.Command {
+	var machineReadableExporter cmdutil.Exporter
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List sponsors for a user",
@@ -55,9 +63,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(Options) error) *cobra.Command {
 					Hostname:  "github.com",
 					APIClient: api.NewClientFromHTTP(httpClient),
 				},
-				SponsorListRenderer: ConsoleListRenderer{
-					IO: f.IOStreams,
-				},
 			}
 
 			// I don't love this. If we _know_ we don't have a user then we should just
@@ -75,12 +80,26 @@ func NewCmdList(f *cmdutil.Factory, runF func(Options) error) *cobra.Command {
 				}
 			}
 
+			// If there were JSON flags passed, we'll use the JSON renderer
+			if machineReadableExporter != nil {
+				opts.SponsorListRenderer = JSONListRenderer{
+					IO:       f.IOStreams,
+					Exporter: machineReadableExporter,
+				}
+			} else {
+				opts.SponsorListRenderer = TableListRenderer{
+					IO: f.IOStreams,
+				}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
 			return ListSponsors(opts)
 		},
 	}
+
+	cmdutil.AddJSONFlags(cmd, &machineReadableExporter, []string{"login"})
 
 	return cmd
 }
