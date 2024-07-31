@@ -10,7 +10,7 @@ func VerifyCertExtensions(results []*AttestationProcessingResult, owner string, 
 		// TODO: handle proxima prefix
 		expectedSourceRepositoryOwnerURI := fmt.Sprintf("https://github.com/%s", owner)
 		sourceRepositoryOwnerURI := attestation.VerificationResult.Signature.Certificate.Extensions.SourceRepositoryOwnerURI
-		if sourceRepositoryOwnerURI != "" && !strings.EqualFold(expectedSourceRepositoryOwnerURI, sourceRepositoryOwnerURI) {
+		if !strings.EqualFold(expectedSourceRepositoryOwnerURI, sourceRepositoryOwnerURI) {
 			return fmt.Errorf("expected SourceRepositoryOwnerURI to be %s, got %s", expectedSourceRepositoryOwnerURI, sourceRepositoryOwnerURI)
 		}
 
@@ -19,7 +19,7 @@ func VerifyCertExtensions(results []*AttestationProcessingResult, owner string, 
 			// TODO: handle proxima prefix
 			expectedSourceRepositoryURI := fmt.Sprintf("https://github.com/%s", repo)
 			sourceRepositoryURI := attestation.VerificationResult.Signature.Certificate.Extensions.SourceRepositoryURI
-			if sourceRepositoryURI != "" && !strings.EqualFold(expectedSourceRepositoryURI, sourceRepositoryURI) {
+			if !strings.EqualFold(expectedSourceRepositoryURI, sourceRepositoryURI) {
 				return fmt.Errorf("expected SourceRepositoryURI to be %s, got %s", expectedSourceRepositoryURI, sourceRepositoryURI)
 			}
 		}
