@@ -70,7 +70,7 @@ func TestSetPolicyFlags(t *testing.T) {
 		opts.SetPolicyFlags()
 		require.Equal(t, "sigstore", opts.Owner)
 		require.Equal(t, "sigstore/sigstore-js", opts.Repo)
-		require.Equal(t, "^https://github.com/sigstore/sigstore-js/", opts.SANRegex)
+		require.Equal(t, "(?i)^https://github.com/sigstore/sigstore-js/", opts.SANRegex)
 	})
 
 	t.Run("does not set SANRegex when SANRegex and Repo are provided", func(t *testing.T) {
@@ -99,7 +99,7 @@ func TestSetPolicyFlags(t *testing.T) {
 
 		opts.SetPolicyFlags()
 		require.Equal(t, "sigstore", opts.Owner)
-		require.Equal(t, "^https://github.com/sigstore/", opts.SANRegex)
+		require.Equal(t, "(?i)^https://github.com/sigstore/", opts.SANRegex)
 	})
 
 	t.Run("does not set SANRegex when SANRegex and Owner are provided", func(t *testing.T) {
