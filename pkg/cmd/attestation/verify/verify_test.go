@@ -340,12 +340,30 @@ func TestRunVerify(t *testing.T) {
 		require.Nil(t, runVerify(&opts))
 	})
 
+	t.Run("with owner which not matches SourceRepositoryOwnerURI", func(t *testing.T) {
+		opts := publicGoodOpts
+		opts.BundlePath = ""
+		opts.Owner = "owner"
+
+		err := runVerify(&opts)
+		require.ErrorContains(t, err, "expected SourceRepositoryOwnerURI to be https://github.com/owner, got https://github.com/sigstore")
+	})
+
 	t.Run("with repo", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.BundlePath = ""
-		opts.Repo = "github/example"
+		opts.Repo = "sigstore/sigstore-js"
 
 		require.Nil(t, runVerify(&opts))
+	})
+
+	t.Run("with repo which not matches SourceRepositoryURI", func(t *testing.T) {
+		opts := publicGoodOpts
+		opts.BundlePath = ""
+		opts.Repo = "wrong/example"
+
+		err := runVerify(&opts)
+		require.ErrorContains(t, err, "expected SourceRepositoryURI to be https://github.com/wrong/example, got https://github.com/sigstore/sigstore-js")
 	})
 
 	t.Run("with invalid repo", func(t *testing.T) {
