@@ -286,7 +286,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, options IssueStatusOptio
 				}
 			}
 		}
-    }`
+	}`
 
 	variables := map[string]interface{}{
 		"owner":  repo.RepoOwner(),

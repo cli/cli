@@ -58,7 +58,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List recent workflow runs",
 		Long: heredoc.Docf(`
-		    List recent workflow runs.
+			List recent workflow runs.
 
 			Note that providing the %[1]sworkflow_name%[1]s to the %[1]s-w%[1]s flag will not fetch disabled workflows.
 			Also pass the %[1]s-a%[1]s flag to fetch disabled workflow runs using the %[1]sworkflow_name%[1]s and the %[1]s-w%[1]s flag.
