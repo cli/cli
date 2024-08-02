@@ -26,7 +26,7 @@ builds:
 
   - id: linux #build:linux
     goos: [linux]
-    goarch: [386, arm, amd64, arm64]
+    goarch: [386, arm, amd64, arm64, riscv64]
     env:
       - CGO_ENABLED=0
     binary: bin/gh
