@@ -23,7 +23,7 @@ func Default() string {
 // IsEnterprise reports whether a non-normalized host name looks like a GHE instance.
 func IsEnterprise(h string) bool {
 	normalizedHostName := NormalizeHostname(h)
-	return normalizedHostName != defaultHostname && normalizedHostName != localhost
+	return normalizedHostName != defaultHostname && !isLocal(normalizedHostName)
 }
 
 // IsTenancy reports whether a non-normalized host name looks like a tenancy instance.
@@ -76,10 +76,21 @@ func GraphQLEndpoint(hostname string) string {
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/graphql", hostname)
 	}
-	if strings.EqualFold(hostname, localhost) {
+	if isLocal(hostname) {
 		return fmt.Sprintf("http://api.%s/graphql", hostname)
 	}
 	return fmt.Sprintf("https://api.%s/graphql", hostname)
+}
+
+func isLocal(h string) bool {
+	switch parts := strings.Split(h, ":"); len(parts) {
+	case 1, 2:
+		h = parts[0]
+	default:
+		return false
+	}
+
+	return strings.EqualFold(h, localhost)
 }
 
 func RESTPrefix(hostname string) string {
@@ -89,7 +100,7 @@ func RESTPrefix(hostname string) string {
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/v3/", hostname)
 	}
-	if strings.EqualFold(hostname, localhost) {
+	if isLocal(hostname) {
 		return fmt.Sprintf("http://api.%s/", hostname)
 	}
 	return fmt.Sprintf("https://api.%s/", hostname)
@@ -97,7 +108,7 @@ func RESTPrefix(hostname string) string {
 
 func GistPrefix(hostname string) string {
 	prefix := "https://"
-	if strings.EqualFold(hostname, localhost) {
+	if isLocal(hostname) {
 		prefix = "http://"
 	}
 	return prefix + GistHost(hostname)
@@ -110,14 +121,14 @@ func GistHost(hostname string) string {
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("%s/gist/", hostname)
 	}
-	if strings.EqualFold(hostname, localhost) {
+	if isLocal(hostname) {
 		return fmt.Sprintf("%s/gist/", hostname)
 	}
 	return fmt.Sprintf("gist.%s/", hostname)
 }
 
 func HostPrefix(hostname string) string {
-	if strings.EqualFold(hostname, localhost) {
+	if isLocal(hostname) {
 		return fmt.Sprintf("http://%s/", hostname)
 	}
 	return fmt.Sprintf("https://%s/", hostname)
