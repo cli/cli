@@ -81,30 +81,26 @@ func (c LiveClient) GetAttestations(name name.Reference, digest *v1.Hash) ([]*ap
 	manifests := indexManifest.Manifests
 
 	for _, m := range manifests {
-
 		if containAllowedArtifactTypes(m.ArtifactType) {
-			manifestDigest := m.Digest.String()
-
-			digest2 := nameDegist.Context().Digest(manifestDigest)
+			artifactManifestNameDigest := nameDegist.Context().Digest(m.Digest.String())
 			// TODO: replace to use GET for more correct type
 			// OR IS IT CORRECT TO USE type IMAGE?
-			img2, err := remote.Image(digest2, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+			artifactManifest, err := remote.Image(artifactManifestNameDigest, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 			if err != nil {
 				return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
 			}
 
 			// Step 4: Get the layers
-			layers, err := img2.Layers()
+			layers, err := artifactManifest.Layers()
 			if err != nil {
 				return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
-
 			}
 
 			// For simplicity, we'll just fetch the first layer
 			if len(layers) > 0 {
 				layer := layers[0]
 
-				// Step 5: Read the blob (layer) content
+				// Step 5: Read the layer content
 				rc, err := layer.Compressed()
 				if err != nil {
 					return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
@@ -127,7 +123,6 @@ func (c LiveClient) GetAttestations(name name.Reference, digest *v1.Hash) ([]*ap
 
 				a := api.Attestation{Bundle: &bundle}
 				attestations = append(attestations, &a)
-
 			} else {
 				return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
 			}
