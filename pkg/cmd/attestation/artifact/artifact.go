@@ -54,14 +54,14 @@ func normalizeReference(reference string, pathSeparator rune) (normalized string
 	return filepath.Clean(reference), fileArtifactType, nil
 }
 
-func NewDigestedArtifact(client oci.Client, reference, digestAlg string) (artifact *DigestedArtifact, err error) {
+func NewDigestedArtifact(client oci.Client, reference, digestAlg string, useBundleFromRegistry bool) (artifact *DigestedArtifact, err error) {
 	normalized, artifactType, err := normalizeReference(reference, os.PathSeparator)
 	if err != nil {
 		return nil, err
 	}
 	if artifactType == ociArtifactType {
 		// TODO: should we allow custom digestAlg for OCI artifacts?
-		return digestContainerImageArtifact(normalized, client)
+		return digestContainerImageArtifact(normalized, client, useBundleFromRegistry)
 	}
 	return digestLocalFileArtifact(normalized, digestAlg)
 }

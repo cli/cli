@@ -150,6 +150,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	// general flags
 	verifyCmd.Flags().StringVarP(&opts.BundlePath, "bundle", "b", "", "Path to bundle on disk, either a single bundle in a JSON file or a JSON lines file with multiple bundles")
 	cmdutil.DisableAuthCheckFlag(verifyCmd.Flags().Lookup("bundle"))
+	verifyCmd.Flags().BoolVarP(&opts.UseBundleFromRegistry, "bundle-from-registry", "", false, "Use the bundle from the OCI registry")
 	cmdutil.StringEnumFlag(verifyCmd, &opts.DigestAlgorithm, "digest-alg", "d", "sha256", []string{"sha256", "sha512"}, "The algorithm used to compute a digest of the artifact")
 	verifyCmd.Flags().StringVarP(&opts.Owner, "owner", "o", "", "GitHub organization to scope attestation lookup by")
 	verifyCmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Repository name in the format <owner>/<repo>")
@@ -173,7 +174,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 }
 
 func runVerify(opts *Options) error {
-	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
+	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm, opts.UseBundleFromRegistry)
 	if err != nil {
 		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Loading digest for %s failed\n"), opts.ArtifactPath)
 		return err
@@ -182,12 +183,13 @@ func runVerify(opts *Options) error {
 	opts.Logger.Printf("Loaded digest %s for %s\n", artifact.DigestWithAlg(), artifact.URL)
 
 	c := verification.FetchAttestationsConfig{
-		APIClient:  opts.APIClient,
-		BundlePath: opts.BundlePath,
-		Digest:     artifact.DigestWithAlg(),
-		Limit:      opts.Limit,
-		Owner:      opts.Owner,
-		Repo:       opts.Repo,
+		APIClient:           opts.APIClient,
+		BundlePath:          opts.BundlePath,
+		Digest:              artifact.DigestWithAlg(),
+		Limit:               opts.Limit,
+		Owner:               opts.Owner,
+		Repo:                opts.Repo,
+		AttestationsFromOCI: artifact.Attestations(),
 	}
 	attestations, err := verification.GetAttestations(c)
 	if err != nil {
@@ -198,25 +200,19 @@ func runVerify(opts *Options) error {
 
 		if c.IsBundleProvided() {
 			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Loading attestations from %s failed\n"), artifact.URL)
+		} else if opts.UseBundleFromRegistry {
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Loading attestations from OCI registry failed"))
 		} else {
 			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Loading attestations from GitHub API failed"))
 		}
 		return err
 	}
 
-	attestationsFromOCI := artifact.Attestations()
-	if len(attestationsFromOCI) > 0 {
-		attestations = append(attestations, attestationsFromOCI...)
-
-		for _, attestation := range attestations {
-			// ja, err := attestation.Bundle.String()
-			opts.Logger.Printf("Loaded attestation from OCI registry: %s\n", attestation.Bundle.String())
-		}
-	}
-
 	pluralAttestation := text.Pluralize(len(attestations), "attestation")
 	if c.IsBundleProvided() {
 		opts.Logger.Printf("Loaded %s from %s\n", pluralAttestation, opts.BundlePath)
+	} else if opts.UseBundleFromRegistry {
+		opts.Logger.Printf("Loaded %s from %s\n", pluralAttestation, opts.ArtifactPath)
 	} else {
 		opts.Logger.Printf("Loaded %s from GitHub API\n", pluralAttestation)
 	}

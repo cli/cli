@@ -15,27 +15,28 @@ import (
 
 // Options captures the options for the verify command
 type Options struct {
-	ArtifactPath         string
-	BundlePath           string
-	Config               func() (gh.Config, error)
-	TrustedRoot          string
-	DenySelfHostedRunner bool
-	DigestAlgorithm      string
-	Limit                int
-	NoPublicGood         bool
-	OIDCIssuer           string
-	Owner                string
-	PredicateType        string
-	Repo                 string
-	SAN                  string
-	SANRegex             string
-	SignerRepo           string
-	SignerWorkflow       string
-	APIClient            api.Client
-	Logger               *io.Handler
-	OCIClient            oci.Client
-	SigstoreVerifier     verification.SigstoreVerifier
-	exporter             cmdutil.Exporter
+	ArtifactPath          string
+	BundlePath            string
+	UseBundleFromRegistry bool
+	Config                func() (gh.Config, error)
+	TrustedRoot           string
+	DenySelfHostedRunner  bool
+	DigestAlgorithm       string
+	Limit                 int
+	NoPublicGood          bool
+	OIDCIssuer            string
+	Owner                 string
+	PredicateType         string
+	Repo                  string
+	SAN                   string
+	SANRegex              string
+	SignerRepo            string
+	SignerWorkflow        string
+	APIClient             api.Client
+	Logger                *io.Handler
+	OCIClient             oci.Client
+	SigstoreVerifier      verification.SigstoreVerifier
+	exporter              cmdutil.Exporter
 }
 
 // Clean cleans the file path option values

@@ -97,7 +97,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 }
 
 func runInspect(opts *Options) error {
-	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
+	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm, false)
 	if err != nil {
 		return fmt.Errorf("failed to digest artifact: %s", err)
 	}

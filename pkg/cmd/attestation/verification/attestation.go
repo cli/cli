@@ -16,12 +16,13 @@ import (
 var ErrUnrecognisedBundleExtension = errors.New("bundle file extension not supported, must be json or jsonl")
 
 type FetchAttestationsConfig struct {
-	APIClient  api.Client
-	BundlePath string
-	Digest     string
-	Limit      int
-	Owner      string
-	Repo       string
+	APIClient           api.Client
+	BundlePath          string
+	Digest              string
+	Limit               int
+	Owner               string
+	Repo                string
+	AttestationsFromOCI []*api.Attestation
 }
 
 func (c *FetchAttestationsConfig) IsBundleProvided() bool {
@@ -32,6 +33,11 @@ func GetAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
 	if c.IsBundleProvided() {
 		return GetLocalAttestations(c.BundlePath)
 	}
+
+	if len(c.AttestationsFromOCI) > 0 {
+		return c.AttestationsFromOCI, nil
+	}
+
 	return GetRemoteAttestations(c)
 }
 
