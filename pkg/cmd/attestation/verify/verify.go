@@ -204,6 +204,16 @@ func runVerify(opts *Options) error {
 		return err
 	}
 
+	attestationsFromOCI := artifact.Attestations()
+	if len(attestationsFromOCI) > 0 {
+		attestations = append(attestations, attestationsFromOCI...)
+
+		for _, attestation := range attestations {
+			// ja, err := attestation.Bundle.String()
+			opts.Logger.Printf("Loaded attestation from OCI registry: %s\n", attestation.Bundle.String())
+		}
+	}
+
 	pluralAttestation := text.Pluralize(len(attestations), "attestation")
 	if c.IsBundleProvided() {
 		opts.Logger.Printf("Loaded %s from %s\n", pluralAttestation, opts.BundlePath)

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
+
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 )
 
@@ -19,9 +21,10 @@ const (
 
 // DigestedArtifact abstracts the software artifact being verified
 type DigestedArtifact struct {
-	URL       string
-	digest    string
-	digestAlg string
+	URL          string
+	digest       string
+	digestAlg    string
+	attestations []*api.Attestation
 }
 
 func normalizeReference(reference string, pathSeparator rune) (normalized string, artifactType artifactType, err error) {
@@ -76,4 +79,8 @@ func (a *DigestedArtifact) Algorithm() string {
 // DigestWithAlg returns the digest:algorithm of the artifact
 func (a *DigestedArtifact) DigestWithAlg() string {
 	return fmt.Sprintf("%s:%s", a.digestAlg, a.digest)
+}
+
+func (a *DigestedArtifact) Attestations() []*api.Attestation {
+	return a.attestations
 }
