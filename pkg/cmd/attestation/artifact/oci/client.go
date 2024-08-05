@@ -65,76 +65,86 @@ func (c LiveClient) GetImageDigest(name name.Reference) (*v1.Hash, error) {
 	return &desc.Digest, nil
 }
 
+// Ref: https://github.com/github/package-security/blob/main/garden/retrieve-sigstore-bundle-from-oci-registry.md
 func (c LiveClient) GetAttestations(name name.Reference, digest *v1.Hash) ([]*api.Attestation, error) {
 	attestations := []*api.Attestation{}
 	nameDegist := name.Context().Digest(digest.String())
 
-	ref, err := remote.Referrers(nameDegist, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	imageIndex, err := remote.Referrers(nameDegist, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	if err != nil {
 		return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
 	}
-	indexManifest, err := ref.IndexManifest()
+	indexManifest, err := imageIndex.IndexManifest()
 	if err != nil {
 		return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
 	}
 	manifests := indexManifest.Manifests
 
 	for _, m := range manifests {
-		allowedArtifactTypes := []string{"application/vnd.dev.sigstore.bundle.v0.3+json"}
 
-		for _, allowedType := range allowedArtifactTypes {
-			if allowedType == m.ArtifactType {
-				manifestDigest := m.Digest.String()
+		if containAllowedArtifactTypes(m.ArtifactType) {
+			manifestDigest := m.Digest.String()
 
-				digest2 := nameDegist.Context().Digest(manifestDigest)
-				// replace to use GET for more correc type
-				img2, err := remote.Image(digest2, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+			digest2 := nameDegist.Context().Digest(manifestDigest)
+			// TODO: replace to use GET for more correct type
+			// OR IS IT CORRECT TO USE type IMAGE?
+			img2, err := remote.Image(digest2, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+			if err != nil {
+				return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
+			}
+
+			// Step 4: Get the layers
+			layers, err := img2.Layers()
+			if err != nil {
+				return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
+
+			}
+
+			// For simplicity, we'll just fetch the first layer
+			if len(layers) > 0 {
+				layer := layers[0]
+
+				// Step 5: Read the blob (layer) content
+				rc, err := layer.Compressed()
+				if err != nil {
+					return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
+				}
+				defer rc.Close()
+
+				layerBytes, err := io.ReadAll(rc)
+
 				if err != nil {
 					return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
 				}
 
-				// Step 4: Get the layers
-				layers, err := img2.Layers()
+				var bundle bundle.ProtobufBundle
+				bundle.Bundle = new(protobundle.Bundle)
+				err = bundle.UnmarshalJSON(layerBytes)
+
 				if err != nil {
 					return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
-
 				}
 
-				// For simplicity, we'll just fetch the first layer
-				if len(layers) > 0 {
-					layer := layers[0]
+				a := api.Attestation{Bundle: &bundle}
+				attestations = append(attestations, &a)
 
-					// Step 5: Read the blob (layer) content
-					rc, err := layer.Compressed()
-					if err != nil {
-						return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
-					}
-					defer rc.Close()
-
-					layerBytes, err := io.ReadAll(rc)
-
-					if err != nil {
-						return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
-					}
-
-					var bundle bundle.ProtobufBundle
-					bundle.Bundle = new(protobundle.Bundle)
-					err = bundle.UnmarshalJSON(layerBytes)
-
-					if err != nil {
-						return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
-					}
-
-					a := api.Attestation{Bundle: &bundle}
-					attestations = append(attestations, &a)
-
-				} else {
-					return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
-				}
+			} else {
+				return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
 			}
 		}
 	}
 	return attestations, nil
+}
+
+func containAllowedArtifactTypes(artifactType string) bool {
+	allowedArtifactTypes := []string{"application/vnd.dev.sigstore.bundle.v0.3+json"}
+
+	for _, allowedType := range allowedArtifactTypes {
+		if allowedType == artifactType {
+			return true
+		}
+	}
+	return false
 }
 
 // Unlike other parts of this command set, we cannot pass a custom HTTP client
