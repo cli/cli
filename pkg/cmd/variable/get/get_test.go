@@ -110,6 +110,7 @@ func Test_getRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		opts       *GetOptions
+		host       string
 		httpStubs  func(*httpmock.Registry)
 		jsonFields []string
 		wantOut    string
@@ -120,8 +121,23 @@ func Test_getRun(t *testing.T) {
 			opts: &GetOptions{
 				VariableName: "VARIABLE_ONE",
 			},
+			host: "github.com",
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/VARIABLE_ONE"),
+				reg.Register(httpmock.WithHost(httpmock.REST("GET", "repos/owner/repo/actions/variables/VARIABLE_ONE"), "api.github.com"),
+					httpmock.JSONResponse(shared.Variable{
+						Value: "repo_var",
+					}))
+			},
+			wantOut: "repo_var\n",
+		},
+		{
+			name: "getting GHES repo variable",
+			opts: &GetOptions{
+				VariableName: "VARIABLE_ONE",
+			},
+			host: "example.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.WithHost(httpmock.REST("GET", "api/v3/repos/owner/repo/actions/variables/VARIABLE_ONE"), "example.com"),
 					httpmock.JSONResponse(shared.Variable{
 						Value: "repo_var",
 					}))
@@ -134,6 +150,7 @@ func Test_getRun(t *testing.T) {
 				OrgName:      "TestOrg",
 				VariableName: "VARIABLE_ONE",
 			},
+			host: "github.com",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "orgs/TestOrg/actions/variables/VARIABLE_ONE"),
 					httpmock.JSONResponse(shared.Variable{
@@ -148,8 +165,24 @@ func Test_getRun(t *testing.T) {
 				EnvName:      "Development",
 				VariableName: "VARIABLE_ONE",
 			},
+			host: "github.com",
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "repos/owner/repo/environments/Development/variables/VARIABLE_ONE"),
+				reg.Register(httpmock.WithHost(httpmock.REST("GET", "repos/owner/repo/environments/Development/variables/VARIABLE_ONE"), "api.github.com"),
+					httpmock.JSONResponse(shared.Variable{
+						Value: "env_var",
+					}))
+			},
+			wantOut: "env_var\n",
+		},
+		{
+			name: "getting GHES env variable",
+			opts: &GetOptions{
+				EnvName:      "Development",
+				VariableName: "VARIABLE_ONE",
+			},
+			host: "example.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.WithHost(httpmock.REST("GET", "api/v3/repos/owner/repo/environments/Development/variables/VARIABLE_ONE"), "example.com"),
 					httpmock.JSONResponse(shared.Variable{
 						Value: "env_var",
 					}))
@@ -161,6 +194,7 @@ func Test_getRun(t *testing.T) {
 			opts: &GetOptions{
 				VariableName: "VARIABLE_ONE",
 			},
+			host:       "github.com",
 			jsonFields: []string{"name", "value", "visibility", "updatedAt", "createdAt", "numSelectedRepos", "selectedReposURL"},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/VARIABLE_ONE"),
@@ -193,6 +227,7 @@ func Test_getRun(t *testing.T) {
 			opts: &GetOptions{
 				VariableName: "VARIABLE_ONE",
 			},
+			host: "github.com",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/VARIABLE_ONE"),
 					httpmock.StatusStringResponse(404, "not found"),
@@ -205,6 +240,7 @@ func Test_getRun(t *testing.T) {
 			opts: &GetOptions{
 				VariableName: "VARIABLE_ONE",
 			},
+			host: "github.com",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/VARIABLE_ONE"),
 					httpmock.StatusStringResponse(400, "not found"),
@@ -226,7 +262,7 @@ func Test_getRun(t *testing.T) {
 
 				tt.opts.IO = ios
 				tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-					return ghrepo.FromFullName("owner/repo")
+					return ghrepo.FromFullNameWithHost("owner/repo", tt.host)
 				}
 				tt.opts.HttpClient = func() (*http.Client, error) {
 					return &http.Client{Transport: reg}, nil
