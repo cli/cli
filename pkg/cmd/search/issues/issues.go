@@ -34,7 +34,7 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 
 			GitHub search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-issues-and-pull-requests>
-    `),
+		`),
 		Example: heredoc.Doc(`
 			# search issues matching set of keywords "readme" and "typo"
 			$ gh search issues readme typo
@@ -56,8 +56,7 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 
 			# search issues only from un-archived repositories (default is all repositories)
 			$ gh search issues --owner github --archived=false
-
-    `),
+		`),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
 				return cmdutil.FlagErrorf("specify search keywords or flags")
