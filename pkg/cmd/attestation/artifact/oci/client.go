@@ -40,7 +40,6 @@ func checkForUnauthorizedOrDeniedErr(err transport.Error) error {
 type LiveClient struct {
 	parseReference func(string, ...name.Option) (name.Reference, error)
 	get            func(name.Reference, ...remote.Option) (*remote.Descriptor, error)
-	referres       func(d name.Digest, options ...remote.Option) (v1.ImageIndex, error)
 }
 
 func (c LiveClient) ParseReference(ref string) (name.Reference, error) {
