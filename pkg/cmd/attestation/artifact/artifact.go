@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
+	"github.com/google/go-containerregistry/pkg/name"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 )
@@ -21,10 +21,10 @@ const (
 
 // DigestedArtifact abstracts the software artifact being verified
 type DigestedArtifact struct {
-	URL          string
-	digest       string
-	digestAlg    string
-	attestations []*api.Attestation
+	URL       string
+	digest    string
+	digestAlg string
+	nameRef   name.Reference
 }
 
 func normalizeReference(reference string, pathSeparator rune) (normalized string, artifactType artifactType, err error) {
@@ -54,14 +54,14 @@ func normalizeReference(reference string, pathSeparator rune) (normalized string
 	return filepath.Clean(reference), fileArtifactType, nil
 }
 
-func NewDigestedArtifact(client oci.Client, reference, digestAlg string, useBundleFromRegistry bool) (artifact *DigestedArtifact, err error) {
+func NewDigestedArtifact(client oci.Client, reference, digestAlg string) (artifact *DigestedArtifact, err error) {
 	normalized, artifactType, err := normalizeReference(reference, os.PathSeparator)
 	if err != nil {
 		return nil, err
 	}
 	if artifactType == ociArtifactType {
 		// TODO: should we allow custom digestAlg for OCI artifacts?
-		return digestContainerImageArtifact(normalized, client, useBundleFromRegistry)
+		return digestContainerImageArtifact(normalized, client)
 	}
 	return digestLocalFileArtifact(normalized, digestAlg)
 }
@@ -81,6 +81,6 @@ func (a *DigestedArtifact) DigestWithAlg() string {
 	return fmt.Sprintf("%s:%s", a.digestAlg, a.digest)
 }
 
-func (a *DigestedArtifact) Attestations() []*api.Attestation {
-	return a.attestations
+func (a *DigestedArtifact) NameRef() name.Reference {
+	return a.nameRef
 }

@@ -463,4 +463,31 @@ func TestRunVerify(t *testing.T) {
 		customOpts.BundlePath = ""
 		require.Error(t, runVerify(&customOpts))
 	})
+
+	t.Run("with valid OCI artifact", func(t *testing.T) {
+		customOpts := publicGoodOpts
+		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
+		customOpts.BundlePath = ""
+
+		require.Nil(t, runVerify(&customOpts))
+	})
+
+	t.Run("with valid OCI artifact with UseBundleFromRegistry flag", func(t *testing.T) {
+		customOpts := publicGoodOpts
+		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
+		customOpts.BundlePath = ""
+		customOpts.UseBundleFromRegistry = true
+
+		require.Nil(t, runVerify(&customOpts))
+	})
+
+	t.Run("with valid OCI artifact with UseBundleFromRegistry flag but fail on fetching bundle from registry", func(t *testing.T) {
+		customOpts := publicGoodOpts
+		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
+		customOpts.BundlePath = ""
+		customOpts.UseBundleFromRegistry = true
+		customOpts.OCIClient = oci.DeniedAttestationsClient{}
+
+		require.ErrorContains(t, runVerify(&customOpts), "no OCI attestations found")
+	})
 }

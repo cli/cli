@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -13,16 +15,14 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
-	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 )
 
 var ErrDenied = errors.New("the provided token was denied access to the requested resource, please check the token's expiration and repository access")
 var ErrRegistryAuthz = errors.New("remote registry authorization failed, please authenticate with the registry and try again")
 
 type Client interface {
-	GetImageDigest(name name.Reference) (*v1.Hash, error)
-	GetAttestations(name name.Reference, digest *v1.Hash) ([]*api.Attestation, error)
-	ParseReference(ref string) (name.Reference, error)
+	GetImageDigest(imgName string) (*v1.Hash, name.Reference, error)
+	GetAttestations(name name.Reference, digest string) ([]*api.Attestation, error)
 }
 
 func checkForUnauthorizedOrDeniedErr(err transport.Error) error {
@@ -40,6 +40,7 @@ func checkForUnauthorizedOrDeniedErr(err transport.Error) error {
 type LiveClient struct {
 	parseReference func(string, ...name.Option) (name.Reference, error)
 	get            func(name.Reference, ...remote.Option) (*remote.Descriptor, error)
+	referres       func(d name.Digest, options ...remote.Option) (v1.ImageIndex, error)
 }
 
 func (c LiveClient) ParseReference(ref string) (name.Reference, error) {
@@ -47,7 +48,11 @@ func (c LiveClient) ParseReference(ref string) (name.Reference, error) {
 }
 
 // where name is formed like ghcr.io/github/my-image-repo
-func (c LiveClient) GetImageDigest(name name.Reference) (*v1.Hash, error) {
+func (c LiveClient) GetImageDigest(imgName string) (*v1.Hash, name.Reference, error) {
+	name, err := c.parseReference(imgName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create image tag: %v", err)
+	}
 	// The user must already be authenticated with the container registry
 	// The authn.DefaultKeychain argument indicates that Get should checks the
 	// user's configuration for the registry credentials
@@ -56,90 +61,90 @@ func (c LiveClient) GetImageDigest(name name.Reference) (*v1.Hash, error) {
 		var transportErr *transport.Error
 		if errors.As(err, &transportErr) {
 			if accessErr := checkForUnauthorizedOrDeniedErr(*transportErr); accessErr != nil {
-				return nil, accessErr
+				return nil, nil, accessErr
 			}
 		}
-		return nil, fmt.Errorf("failed to fetch remote image: %v", err)
+		return nil, nil, fmt.Errorf("failed to fetch remote image: %v", err)
 	}
 
-	return &desc.Digest, nil
+	return &desc.Digest, name, nil
+}
+
+type noncompliantRegistryTransport struct{}
+
+// RoundTrip will check if a request and associated response fulfill the following:
+// 1. The response returns a 406 status code
+// 2. The request path contains /referrers/
+// If both conditions are met, the response's status code will be overwritten to 404
+// This is a temporary solution to handle non compliant registries that return
+// an unexpected status code 406 when the go-containerregistry library used
+// by this code attempts to make a request to the referrers API.
+// The go-containerregistry library can handle 404 response but not a 406 response.
+// See the related go-containerregistry issue: https://github.com/google/go-containerregistry/issues/1962
+func (a *noncompliantRegistryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	if resp.StatusCode == http.StatusNotAcceptable && strings.Contains(req.URL.Path, "/referrers/") {
+		resp.StatusCode = http.StatusNotFound
+	}
+
+	return resp, err
 }
 
 // Ref: https://github.com/github/package-security/blob/main/garden/retrieve-sigstore-bundle-from-oci-registry.md
-func (c LiveClient) GetAttestations(name name.Reference, digest *v1.Hash) ([]*api.Attestation, error) {
-	attestations := []*api.Attestation{}
-	nameDegist := name.Context().Digest(digest.String())
+func (c LiveClient) GetAttestations(ref name.Reference, digest string) ([]*api.Attestation, error) {
+	attestations := make([]*api.Attestation, 0)
 
-	imageIndex, err := remote.Referrers(nameDegist, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	transportOpts := []remote.Option{remote.WithTransport(&noncompliantRegistryTransport{}), remote.WithAuthFromKeychain(authn.DefaultKeychain)}
+	referrers, err := remote.Referrers(ref.Context().Digest(digest), transportOpts...)
 	if err != nil {
-		return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
+		return attestations, fmt.Errorf("error getting referrers: %w", err)
 	}
-	indexManifest, err := imageIndex.IndexManifest()
+	refManifest, err := referrers.IndexManifest()
 	if err != nil {
-		return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
+		return attestations, fmt.Errorf("error getting referrers manifest: %w", err)
 	}
-	manifests := indexManifest.Manifests
 
-	for _, m := range manifests {
-		if containAllowedArtifactTypes(m.ArtifactType) {
-			artifactManifestNameDigest := nameDegist.Context().Digest(m.Digest.String())
-			// TODO: replace to use GET for more correct type
-			// OR IS IT CORRECT TO USE type IMAGE?
-			artifactManifest, err := remote.Image(artifactManifestNameDigest, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	for _, refDesc := range refManifest.Manifests {
+		if !strings.HasPrefix(refDesc.ArtifactType, "application/vnd.dev.sigstore.bundle") {
+			continue
+		}
+
+		refImg, err := remote.Image(ref.Context().Digest(refDesc.Digest.String()), remote.WithAuthFromKeychain(authn.DefaultKeychain))
+		if err != nil {
+			return attestations, fmt.Errorf("error getting referrer image: %w", err)
+		}
+		layers, err := refImg.Layers()
+		if err != nil {
+			return attestations, fmt.Errorf("error getting referrer image: %w", err)
+		}
+
+		if len(layers) > 0 {
+			layer0, err := layers[0].Uncompressed()
 			if err != nil {
-				return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
+				return attestations, fmt.Errorf("error getting referrer image: %w", err)
 			}
+			defer layer0.Close()
 
-			// Step 4: Get the layers
-			layers, err := artifactManifest.Layers()
+			bundleBytes, err := io.ReadAll(layer0)
+
 			if err != nil {
-				return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
+				return attestations, fmt.Errorf("error getting referrer image: %w", err)
 			}
 
-			// For simplicity, we'll just fetch the first layer
-			if len(layers) > 0 {
-				layer := layers[0]
+			b := &bundle.ProtobufBundle{}
+			err = b.UnmarshalJSON(bundleBytes)
 
-				// Step 5: Read the layer content
-				rc, err := layer.Compressed()
-				if err != nil {
-					return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
-				}
-				defer rc.Close()
-
-				layerBytes, err := io.ReadAll(rc)
-
-				if err != nil {
-					return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
-				}
-
-				var bundle bundle.ProtobufBundle
-				bundle.Bundle = new(protobundle.Bundle)
-				err = bundle.UnmarshalJSON(layerBytes)
-
-				if err != nil {
-					return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
-				}
-
-				a := api.Attestation{Bundle: &bundle}
-				attestations = append(attestations, &a)
-			} else {
-				return attestations, fmt.Errorf("failed to fetch remote image: %v", err)
+			if err != nil {
+				return attestations, fmt.Errorf("error unmarshalling bundle: %w", err)
 			}
+
+			a := api.Attestation{Bundle: b}
+			attestations = append(attestations, &a)
+		} else {
+			return attestations, fmt.Errorf("error getting referrer image: no layers found")
 		}
 	}
 	return attestations, nil
-}
-
-func containAllowedArtifactTypes(artifactType string) bool {
-	allowedArtifactTypes := []string{"application/vnd.dev.sigstore.bundle.v0.3+json"}
-
-	for _, allowedType := range allowedArtifactTypes {
-		if allowedType == artifactType {
-			return true
-		}
-	}
-	return false
 }
 
 // Unlike other parts of this command set, we cannot pass a custom HTTP client

@@ -174,7 +174,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 }
 
 func runVerify(opts *Options) error {
-	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm, opts.UseBundleFromRegistry)
+	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
 		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Loading digest for %s failed\n"), opts.ArtifactPath)
 		return err
@@ -183,13 +183,15 @@ func runVerify(opts *Options) error {
 	opts.Logger.Printf("Loaded digest %s for %s\n", artifact.DigestWithAlg(), artifact.URL)
 
 	c := verification.FetchAttestationsConfig{
-		APIClient:           opts.APIClient,
-		BundlePath:          opts.BundlePath,
-		Digest:              artifact.DigestWithAlg(),
-		Limit:               opts.Limit,
-		Owner:               opts.Owner,
-		Repo:                opts.Repo,
-		AttestationsFromOCI: artifact.Attestations(),
+		APIClient:             opts.APIClient,
+		BundlePath:            opts.BundlePath,
+		Digest:                artifact.DigestWithAlg(),
+		Limit:                 opts.Limit,
+		Owner:                 opts.Owner,
+		Repo:                  opts.Repo,
+		OCIClient:             opts.OCIClient,
+		UseBundleFromRegistry: opts.UseBundleFromRegistry,
+		NameRef:               artifact.NameRef(),
 	}
 	attestations, err := verification.GetAttestations(c)
 	if err != nil {
@@ -200,7 +202,7 @@ func runVerify(opts *Options) error {
 
 		if c.IsBundleProvided() {
 			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Loading attestations from %s failed\n"), artifact.URL)
-		} else if opts.UseBundleFromRegistry {
+		} else if c.UseBundleFromRegistry {
 			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Loading attestations from OCI registry failed"))
 		} else {
 			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Loading attestations from GitHub API failed"))
@@ -211,7 +213,7 @@ func runVerify(opts *Options) error {
 	pluralAttestation := text.Pluralize(len(attestations), "attestation")
 	if c.IsBundleProvided() {
 		opts.Logger.Printf("Loaded %s from %s\n", pluralAttestation, opts.BundlePath)
-	} else if opts.UseBundleFromRegistry {
+	} else if c.UseBundleFromRegistry {
 		opts.Logger.Printf("Loaded %s from %s\n", pluralAttestation, opts.ArtifactPath)
 	} else {
 		opts.Logger.Printf("Loaded %s from GitHub API\n", pluralAttestation)
