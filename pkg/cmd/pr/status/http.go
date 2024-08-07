@@ -101,23 +101,23 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 	}
 
 	query := fragments + queryPrefix + `
-      viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
-       totalCount: issueCount
-        edges {
-          node {
-            ...prWithReviews
-          }
-        }
-      }
-      reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
-        totalCount: issueCount
-        edges {
-          node {
-            ...pr
-          }
-        }
-      }
-    }
+			viewerCreated: search(query: $viewerQuery, type: ISSUE, first: $per_page) {
+				totalCount: issueCount
+				edges {
+					node {
+					...prWithReviews
+					}
+				}
+			}
+			reviewRequested: search(query: $reviewerQuery, type: ISSUE, first: $per_page) {
+				totalCount: issueCount
+				edges {
+					node {
+					...pr
+					}
+				}
+			}
+		}
 	`
 
 	currentUsername := options.Username

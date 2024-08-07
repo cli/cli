@@ -32,22 +32,22 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 		Long: heredoc.Docf(`
 			### NOTE: This feature is currently in beta, and subject to change.
 
-            Output contents for a trusted_root.jsonl file, likely for offline verification.
+			Output contents for a trusted_root.jsonl file, likely for offline verification.
 
-            When using %[1]sgh attestation verify%[1]s, if your machine is on the internet,
-            this will happen automatically. But to do offline verification, you need to
-            supply a trusted root file with %[1]s--custom-trusted-root%[1]s; this command
-            will help you fetch a %[1]strusted_root.jsonl%[1]s file for that purpose.
+			When using %[1]sgh attestation verify%[1]s, if your machine is on the internet,
+			this will happen automatically. But to do offline verification, you need to
+			supply a trusted root file with %[1]s--custom-trusted-root%[1]s; this command
+			will help you fetch a %[1]strusted_root.jsonl%[1]s file for that purpose.
 
-            You can call this command without any flags to get a trusted root file covering
-            the Sigstore Public Good Instance as well as GitHub's Sigstore instance.
+			You can call this command without any flags to get a trusted root file covering
+			the Sigstore Public Good Instance as well as GitHub's Sigstore instance.
 
-            Otherwise you can use %[1]s--tuf-url%[1]s to specify the URL of a custom TUF
-            repository mirror, and %[1]s--tuf-root%[1]s should be the path to the
-            %[1]sroot.json%[1]s file that you securely obtained out-of-band.
+			Otherwise you can use %[1]s--tuf-url%[1]s to specify the URL of a custom TUF
+			repository mirror, and %[1]s--tuf-root%[1]s should be the path to the
+			%[1]sroot.json%[1]s file that you securely obtained out-of-band.
 
-            If you just want to verify the integrity of your local TUF repository, and don't
-            want the contents of a trusted_root.jsonl file, use %[1]s--verify-only%[1]s.
+			If you just want to verify the integrity of your local TUF repository, and don't
+			want the contents of a trusted_root.jsonl file, use %[1]s--verify-only%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Get a trusted_root.jsonl for both Sigstore Public Good and GitHub's instance

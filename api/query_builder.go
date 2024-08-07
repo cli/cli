@@ -152,13 +152,13 @@ func StatusCheckRollupGraphQLWithCountByState() string {
 					contexts {
 						checkRunCount,
 						checkRunCountsByState {
-						  state,
-						  count
+							state,
+							count
 						},
 						statusContextCount,
 						statusContextCountsByState {
-						  state,
-						  count
+							state,
+							count
 						}
 					}
 				}

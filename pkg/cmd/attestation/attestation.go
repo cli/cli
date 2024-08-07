@@ -18,7 +18,7 @@ func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 		Aliases: []string{"at"},
 		Long: heredoc.Doc(`
 			Download and verify artifact attestations.
-			`),
+		`),
 	}
 
 	root.AddCommand(download.NewDownloadCmd(f, nil))
