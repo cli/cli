@@ -82,6 +82,9 @@ type noncompliantRegistryTransport struct{}
 // See the related go-containerregistry issue: https://github.com/google/go-containerregistry/issues/1962
 func (a *noncompliantRegistryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := http.DefaultTransport.RoundTrip(req)
+	if err != nil {
+		return resp, err
+	}
 	if resp.StatusCode == http.StatusNotAcceptable && strings.Contains(req.URL.Path, "/referrers/") {
 		resp.StatusCode = http.StatusNotFound
 	}
