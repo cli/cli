@@ -175,12 +175,11 @@ func TestDefaultRun(t *testing.T) {
 					Repo:   repo1,
 				},
 			},
-			wantErr:    true,
-			errMsg:     "SilentError",
 			wantStdout: "no default repository has been set; use `gh repo set-default` to select one\n",
 		},
 		{
 			name: "view mode no current default",
+			tty:  false,
 			opts: SetDefaultOptions{ViewMode: true},
 			remotes: []*context.Remote{
 				{
@@ -188,10 +187,8 @@ func TestDefaultRun(t *testing.T) {
 					Repo:   repo1,
 				},
 			},
-			wantErr: true,
-			errMsg:  "SilentError",
+			wantStdout: "no default repository has been set; use `gh repo set-default` to select one\n",
 		},
-
 		{
 			name: "view mode with base resolved current default",
 			opts: SetDefaultOptions{ViewMode: true},
@@ -499,21 +496,11 @@ func TestDefaultRun(t *testing.T) {
 			defer reg.Verify(t)
 			err := setDefaultRun(&tt.opts)
 			if tt.wantErr {
-				if tt.errMsg == "SilentError" {
-					assert.ErrorIs(t, err, cmdutil.SilentError)
-				} else {
-					assert.EqualError(t, err, tt.errMsg)
-				}
-				if tt.tty && tt.wantStdout != "" {
-					assert.Equal(t, tt.wantStdout, stderr.String())
-				} else if !tt.tty {
-					assert.Empty(t, stderr.String())
-				}
+				assert.EqualError(t, err, tt.errMsg)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantStdout, stdout.String())
-			assert.Empty(t, stderr.String())
+			assert.Equal(t, tt.wantStdout, stdout.String()+stderr.String())
 		})
 	}
 }
