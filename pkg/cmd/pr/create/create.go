@@ -188,11 +188,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return err
 			}
 
-			config, err := f.Config()
+			var err error
+			opts.EditorMode, err = shared.InitEditorMode(f, opts.EditorMode, opts.WebMode, opts.IO.CanPrompt())
 			if err != nil {
 				return err
 			}
-			opts.EditorMode = !opts.WebMode && (opts.EditorMode || config.PreferEditorPrompt("").Value == "enabled")
 
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			if bodyFile != "" {
@@ -210,10 +210,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			if !opts.IO.CanPrompt() && !opts.WebMode && !(opts.FillVerbose || opts.Autofill || opts.FillFirst) && (!opts.TitleProvided || !opts.BodyProvided) {
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `fill-first` or `--fillverbose`) when not running interactively")
-			}
-
-			if opts.EditorMode && !opts.IO.CanPrompt() {
-				return errors.New("--editor or enabled prefer_editor_prompt configuration are not supported in non-tty mode")
 			}
 
 			if opts.DryRun && opts.WebMode {
