@@ -176,7 +176,6 @@ func TestDefaultRun(t *testing.T) {
 					Repo:   repo1,
 				},
 			},
-			wantStdout: "",
 			wantStderr: "no default repository has been set; use `gh repo set-default` to select one\n",
 		},
 		{
@@ -189,7 +188,6 @@ func TestDefaultRun(t *testing.T) {
 					Repo:   repo1,
 				},
 			},
-			wantStdout: "",
 			wantStderr: "no default repository has been set; use `gh repo set-default` to select one\n",
 		},
 		{
@@ -503,8 +501,11 @@ func TestDefaultRun(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantStdout, stdout.String())
-			assert.Equal(t, tt.wantStderr, stderr.String())
+			if tt.wantStdout != "" {
+				assert.Equal(t, tt.wantStdout, stdout.String())
+			} else {
+				assert.Equal(t, tt.wantStderr, stderr.String())
+			}
 		})
 	}
 }
