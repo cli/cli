@@ -528,6 +528,12 @@ func gitTagInfo(client *git.Client, tagName string) (string, error) {
 		return "", err
 	}
 
+	// If there is a signature, we should strip it from the end of the content.
+	// Note that, we can achieve this by looking for markers like "-----BEGIN PGP
+	// SIGNATURE-----" and cut the remaining text from the content, but this is
+	// not a safe approach, because, although unlikely, the content can contain
+	// a signature-like section which we shouldn't leave it as is. So, we need
+	// to get the tag signature as a whole, if any, and remote it from the content.
 	signatureCmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:signature)")
 	if err != nil {
 		return "", err
