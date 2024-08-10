@@ -118,7 +118,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Use annotated tag notes
 			$ gh release create v1.2.3 --notes-from-tag
-   
+
 			Don't mark the release as latest
 			$ gh release create v1.2.3 --latest=false 
 

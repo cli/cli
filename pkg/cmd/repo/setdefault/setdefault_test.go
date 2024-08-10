@@ -135,6 +135,7 @@ func TestDefaultRun(t *testing.T) {
 		gitStubs      func(*run.CommandStubber)
 		prompterStubs func(*prompter.PrompterMock)
 		wantStdout    string
+		wantStderr    string
 		wantErr       bool
 		errMsg        string
 	}{
@@ -175,10 +176,11 @@ func TestDefaultRun(t *testing.T) {
 					Repo:   repo1,
 				},
 			},
-			wantStdout: "no default repository has been set; use `gh repo set-default` to select one\n",
+			wantStderr: "no default repository has been set; use `gh repo set-default` to select one\n",
 		},
 		{
 			name: "view mode no current default",
+			tty:  false,
 			opts: SetDefaultOptions{ViewMode: true},
 			remotes: []*context.Remote{
 				{
@@ -186,6 +188,7 @@ func TestDefaultRun(t *testing.T) {
 					Repo:   repo1,
 				},
 			},
+			wantStderr: "no default repository has been set; use `gh repo set-default` to select one\n",
 		},
 		{
 			name: "view mode with base resolved current default",
@@ -466,7 +469,7 @@ func TestDefaultRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
+		io, _, stdout, stderr := iostreams.Test()
 		io.SetStdinTTY(tt.tty)
 		io.SetStdoutTTY(tt.tty)
 		io.SetStderrTTY(tt.tty)
@@ -498,7 +501,11 @@ func TestDefaultRun(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantStdout, stdout.String())
+			if tt.wantStdout != "" {
+				assert.Equal(t, tt.wantStdout, stdout.String())
+			} else {
+				assert.Equal(t, tt.wantStderr, stderr.String())
+			}
 		})
 	}
 }

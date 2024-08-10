@@ -88,7 +88,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			If required checks have not yet passed, auto-merge will be enabled.
 			If required checks have passed, the pull request will be added to the merge queue.
 			To bypass a merge queue and merge directly, pass the %[1]s--admin%[1]s flag.
-    	`, "`"),
+		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)

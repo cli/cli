@@ -56,11 +56,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		Short: "View the summary of a workflow",
 		Args:  cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
-		  # Interactively select a workflow to view
-		  $ gh workflow view
+			# Interactively select a workflow to view
+			$ gh workflow view
 
-		  # View a specific workflow
-		  $ gh workflow view 0451
+			# View a specific workflow
+			$ gh workflow view 0451
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override

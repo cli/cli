@@ -105,24 +105,27 @@ func removeRun(opts *DeleteOptions) error {
 		}
 	}
 
-	var path string
-	switch secretEntity {
-	case shared.Organization:
-		path = fmt.Sprintf("orgs/%s/%s/secrets/%s", orgName, secretApp, opts.SecretName)
-	case shared.Environment:
-		path = fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(baseRepo), envName, opts.SecretName)
-	case shared.User:
-		path = fmt.Sprintf("user/codespaces/secrets/%s", opts.SecretName)
-	case shared.Repository:
-		path = fmt.Sprintf("repos/%s/%s/secrets/%s", ghrepo.FullName(baseRepo), secretApp, opts.SecretName)
-	}
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
 
-	host, _ := cfg.Authentication().DefaultHost()
+	var path string
+	var host string
+	switch secretEntity {
+	case shared.Organization:
+		path = fmt.Sprintf("orgs/%s/%s/secrets/%s", orgName, secretApp, opts.SecretName)
+		host, _ = cfg.Authentication().DefaultHost()
+	case shared.Environment:
+		path = fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(baseRepo), envName, opts.SecretName)
+		host = baseRepo.RepoHost()
+	case shared.User:
+		path = fmt.Sprintf("user/codespaces/secrets/%s", opts.SecretName)
+		host, _ = cfg.Authentication().DefaultHost()
+	case shared.Repository:
+		path = fmt.Sprintf("repos/%s/%s/secrets/%s", ghrepo.FullName(baseRepo), secretApp, opts.SecretName)
+		host = baseRepo.RepoHost()
+	}
 
 	err = client.REST(host, "DELETE", path, nil, nil)
 	if err != nil {

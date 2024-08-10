@@ -88,7 +88,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			To create a remote repository non-interactively, supply the repository name and one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
 			Pass %[1]s--clone%[1]s to clone the new repository locally.
 
-                        If the %[1]sOWNER/%[1]s portion of the %[1]sOWNER/REPO%[1]s name argument is omitted, it
+			If the %[1]sOWNER/%[1]s portion of the %[1]sOWNER/REPO%[1]s name argument is omitted, it
 			defaults to the name of the authenticating user.
 
 			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s.
