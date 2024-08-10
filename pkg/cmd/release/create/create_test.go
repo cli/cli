@@ -1750,20 +1750,44 @@ func Test_gitTagInfo(t *testing.T) {
 			wantResult: "some\nmultiline\ncontent",
 		},
 		{
-			name: "with signature",
+			name: "with signature (PGP)",
 			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN SIGNATURE-----\nfoo\n-----END SIGNATURE-----")
-				cs.Register(signatureCmd, 0, "-----BEGIN SIGNATURE-----\nfoo\n-----END SIGNATURE-----")
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN PGP SIGNATURE-----\n\nfoo\n-----END PGP SIGNATURE-----")
+				cs.Register(signatureCmd, 0, "-----BEGIN PGP SIGNATURE-----\n\nfoo\n-----END PGP SIGNATURE-----")
+			},
+			wantResult: "some\nmultiline\ncontent",
+		},
+		{
+			name: "with signature (PGP, RFC1991)",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN PGP MESSAGE-----\n\nfoo\n-----END PGP MESSAGE-----")
+				cs.Register(signatureCmd, 0, "-----BEGIN PGP MESSAGE-----\n\nfoo\n-----END PGP MESSAGE-----")
+			},
+			wantResult: "some\nmultiline\ncontent",
+		},
+		{
+			name: "with signature (SSH)",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN SSH SIGNATURE-----\nfoo\n-----END SSH SIGNATURE-----")
+				cs.Register(signatureCmd, 0, "-----BEGIN SSH SIGNATURE-----\nfoo\n-----END SSH SIGNATURE-----")
+			},
+			wantResult: "some\nmultiline\ncontent",
+		},
+		{
+			name: "with signature (X.509)",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN SIGNED MESSAGE-----\nfoo\n-----END SIGNED MESSAGE-----")
+				cs.Register(signatureCmd, 0, "-----BEGIN SIGNED MESSAGE-----\nfoo\n-----END SIGNED MESSAGE-----")
 			},
 			wantResult: "some\nmultiline\ncontent",
 		},
 		{
 			name: "with signature in content but not as true signature",
 			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN SIGNATURE-----\nfoo\n-----END SIGNATURE-----")
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN PGP SIGNATURE-----\n\nfoo\n-----END PGP SIGNATURE-----")
 				cs.Register(signatureCmd, 0, "")
 			},
-			wantResult: "some\nmultiline\ncontent\n-----BEGIN SIGNATURE-----\nfoo\n-----END SIGNATURE-----",
+			wantResult: "some\nmultiline\ncontent\n-----BEGIN PGP SIGNATURE-----\n\nfoo\n-----END PGP SIGNATURE-----",
 		},
 		{
 			name: "error getting content",
