@@ -21,19 +21,11 @@ type GetOptions struct {
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
+	Exporter cmdutil.Exporter
+
 	VariableName string
 	OrgName      string
 	EnvName      string
-}
-
-type getVariableResponse struct {
-	Value string `json:"value"`
-	// Other available but unused fields
-	// Name             string            `json:"name"`
-	// UpdatedAt        time.Time         `json:"updated_at"`
-	// Visibility       shared.Visibility `json:"visibility"`
-	// SelectedReposURL string            `json:"selected_repositories_url"`
-	// NumSelectedRepos int               `json:"num_selected_repos"`
 }
 
 func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command {
@@ -72,6 +64,7 @@ func NewCmdGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Command 
 	}
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Get a variable for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Get a variable for an environment")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.VariableJSONFields)
 
 	return cmd
 }
@@ -99,25 +92,27 @@ func getRun(opts *GetOptions) error {
 		}
 	}
 
-	var path string
-	switch variableEntity {
-	case shared.Organization:
-		path = fmt.Sprintf("orgs/%s/actions/variables/%s", orgName, opts.VariableName)
-	case shared.Environment:
-		path = fmt.Sprintf("repos/%s/environments/%s/variables/%s", ghrepo.FullName(baseRepo), envName, opts.VariableName)
-	case shared.Repository:
-		path = fmt.Sprintf("repos/%s/actions/variables/%s", ghrepo.FullName(baseRepo), opts.VariableName)
-	}
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
 
-	host, _ := cfg.Authentication().DefaultHost()
+	var path string
+	var host string
+	switch variableEntity {
+	case shared.Organization:
+		path = fmt.Sprintf("orgs/%s/actions/variables/%s", orgName, opts.VariableName)
+		host, _ = cfg.Authentication().DefaultHost()
+	case shared.Environment:
+		path = fmt.Sprintf("repos/%s/environments/%s/variables/%s", ghrepo.FullName(baseRepo), envName, opts.VariableName)
+		host = baseRepo.RepoHost()
+	case shared.Repository:
+		path = fmt.Sprintf("repos/%s/actions/variables/%s", ghrepo.FullName(baseRepo), opts.VariableName)
+		host = baseRepo.RepoHost()
+	}
 
-	var response getVariableResponse
-	if err = client.REST(host, "GET", path, nil, &response); err != nil {
+	var variable shared.Variable
+	if err = client.REST(host, "GET", path, nil, &variable); err != nil {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 			return fmt.Errorf("variable %s was not found", opts.VariableName)
@@ -126,7 +121,13 @@ func getRun(opts *GetOptions) error {
 		return fmt.Errorf("failed to get variable %s: %w", opts.VariableName, err)
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s\n", response.Value)
+	if opts.Exporter != nil {
+		if err := shared.PopulateSelectedRepositoryInformation(client, host, &variable); err != nil {
+			return err
+		}
+		return opts.Exporter.Write(opts.IO, &variable)
+	}
 
+	fmt.Fprintf(opts.IO.Out, "%s\n", variable.Value)
 	return nil
 }

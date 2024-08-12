@@ -113,6 +113,11 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:     "both body and body-file flags",
+			input:    "23 --body foo --body-file bar",
+			wantsErr: true,
+		},
+		{
 			name:  "base flag",
 			input: "23 --base base-branch-name",
 			output: EditOptions{
@@ -255,6 +260,25 @@ func TestNewCmdEdit(t *testing.T) {
 				},
 			},
 			wantsErr: false,
+		},
+		{
+			name:  "remove-milestone flag",
+			input: "23 --remove-milestone",
+			output: EditOptions{
+				SelectorArg: "23",
+				Editable: shared.Editable{
+					Milestone: shared.EditableString{
+						Value:  "",
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "both milestone and remove-milestone flags",
+			input:    "23 --milestone foo --remove-milestone",
+			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {

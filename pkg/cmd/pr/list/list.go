@@ -72,7 +72,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 			Find a PR that introduced a given commit
 			$ gh pr list --search "<SHA>" --state merged
-    	`),
+		`),
 		Aliases: []string{"ls"},
 		Args:    cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {

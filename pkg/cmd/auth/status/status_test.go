@@ -100,7 +100,8 @@ func Test_statusRun(t *testing.T) {
 					return nil, context.DeadlineExceeded
 				})
 			},
-			wantOut: heredoc.Doc(`
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
 				github.com
 				  X Timeout trying to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
@@ -159,7 +160,53 @@ func Test_statusRun(t *testing.T) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
 			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				ghe.io
+				  X Failed to log in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
+				  - To re-authenticate, run: gh auth login -h ghe.io
+				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+			`),
+		},
+		{
+			name: "bad token on other host",
+			opts: StatusOptions{
+				Hostname: "ghe.io",
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", "repo, read:org"))
+			},
 			wantOut: heredoc.Doc(`
+				ghe.io
+				  ✓ Logged in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
+			`),
+		},
+		{
+			name: "bad token on selected host",
+			opts: StatusOptions{
+				Hostname: "ghe.io",
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
 				ghe.io
 				  X Failed to log in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
@@ -355,7 +402,8 @@ func Test_statusRun(t *testing.T) {
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa-ghe-2"}}}`))
 			},
-			wantOut: heredoc.Doc(`
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
 				github.com
 				  ✓ Logged in to github.com account monalisa-2 (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true

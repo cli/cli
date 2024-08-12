@@ -123,6 +123,15 @@ func StringResponse(body string) Responder {
 	}
 }
 
+func WithHost(matcher Matcher, host string) Matcher {
+	return func(req *http.Request) bool {
+		if !strings.EqualFold(req.Host, host) {
+			return false
+		}
+		return matcher(req)
+	}
+}
+
 func WithHeader(responder Responder, header string, value string) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		resp, _ := responder(req)

@@ -36,7 +36,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 
 			GitHub search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-issues-and-pull-requests>
-    `),
+		`),
 		Example: heredoc.Doc(`
 			# search pull requests matching set of keywords "fix" and "bug"
 			$ gh search prs fix bug
@@ -58,7 +58,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 
 			# search pull requests only from un-archived repositories (default is all repositories)
 			$ gh search prs --owner github --archived=false
-    `),
+		`),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
 				return cmdutil.FlagErrorf("specify search keywords or flags")

@@ -18,7 +18,7 @@ type Options struct {
 	ArtifactPath         string
 	BundlePath           string
 	Config               func() (gh.Config, error)
-	CustomTrustedRoot    string
+	TrustedRoot          string
 	DenySelfHostedRunner bool
 	DigestAlgorithm      string
 	Limit                int

@@ -17,7 +17,7 @@ func NewCmdVariable(f *cmdutil.Factory) *cobra.Command {
 		Long: heredoc.Docf(`
 			Variables can be set at the repository, environment or organization level for use in
 			GitHub Actions or Dependabot. Run %[1]sgh help variable set%[1]s to learn how to get started.
-    `, "`"),
+		`, "`"),
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)

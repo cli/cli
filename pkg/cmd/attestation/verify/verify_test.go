@@ -76,7 +76,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				Limit:            30,
 				OIDCIssuer:       GitHubOIDCIssuer,
 				Owner:            "sigstore",
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: false,
@@ -91,7 +91,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				Limit:            30,
 				OIDCIssuer:       GitHubOIDCIssuer,
 				Owner:            "sigstore",
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: false,
@@ -105,7 +105,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				OIDCIssuer:       GitHubOIDCIssuer,
 				Owner:            "sigstore",
 				Limit:            30,
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: true,
@@ -133,7 +133,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				Limit:            30,
 				OIDCIssuer:       GitHubOIDCIssuer,
 				Owner:            "sigstore",
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: false,
@@ -147,7 +147,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				OIDCIssuer:       GitHubOIDCIssuer,
 				Owner:            "sigstore",
 				Limit:            101,
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: false,
@@ -161,7 +161,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				OIDCIssuer:       GitHubOIDCIssuer,
 				Owner:            "sigstore",
 				Limit:            0,
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: true,
@@ -176,7 +176,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				OIDCIssuer:       GitHubOIDCIssuer,
 				Owner:            "sigstore",
 				SAN:              "https://github.com/sigstore/",
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsErr: true,
@@ -191,7 +191,7 @@ func TestNewVerifyCmd(t *testing.T) {
 				Limit:            30,
 				OIDCIssuer:       GitHubOIDCIssuer,
 				Owner:            "sigstore",
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 			},
 			wantsExporter: true,
@@ -220,7 +220,7 @@ func TestNewVerifyCmd(t *testing.T) {
 
 			assert.Equal(t, tc.wants.ArtifactPath, opts.ArtifactPath)
 			assert.Equal(t, tc.wants.BundlePath, opts.BundlePath)
-			assert.Equal(t, tc.wants.CustomTrustedRoot, opts.CustomTrustedRoot)
+			assert.Equal(t, tc.wants.TrustedRoot, opts.TrustedRoot)
 			assert.Equal(t, tc.wants.DenySelfHostedRunner, opts.DenySelfHostedRunner)
 			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
 			assert.Equal(t, tc.wants.Limit, opts.Limit)
@@ -340,12 +340,30 @@ func TestRunVerify(t *testing.T) {
 		require.Nil(t, runVerify(&opts))
 	})
 
+	t.Run("with owner which not matches SourceRepositoryOwnerURI", func(t *testing.T) {
+		opts := publicGoodOpts
+		opts.BundlePath = ""
+		opts.Owner = "owner"
+
+		err := runVerify(&opts)
+		require.ErrorContains(t, err, "expected SourceRepositoryOwnerURI to be https://github.com/owner, got https://github.com/sigstore")
+	})
+
 	t.Run("with repo", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.BundlePath = ""
-		opts.Repo = "github/example"
+		opts.Repo = "sigstore/sigstore-js"
 
 		require.Nil(t, runVerify(&opts))
+	})
+
+	t.Run("with repo which not matches SourceRepositoryURI", func(t *testing.T) {
+		opts := publicGoodOpts
+		opts.BundlePath = ""
+		opts.Repo = "wrong/example"
+
+		err := runVerify(&opts)
+		require.ErrorContains(t, err, "expected SourceRepositoryURI to be https://github.com/wrong/example, got https://github.com/sigstore/sigstore-js")
 	})
 
 	t.Run("with invalid repo", func(t *testing.T) {
