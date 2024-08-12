@@ -58,15 +58,28 @@ func (c DeniedClient) GetAttestations(name name.Reference, digest string) ([]*ap
 	return nil, nil
 }
 
-type DeniedAttestationsClient struct{}
+type NoAttestationsClient struct{}
 
-func (c DeniedAttestationsClient) GetImageDigest(imgName string) (*v1.Hash, name.Reference, error) {
+func (c NoAttestationsClient) GetImageDigest(imgName string) (*v1.Hash, name.Reference, error) {
 	return &v1.Hash{
 		Hex:       "1234567890abcdef",
 		Algorithm: "sha256",
 	}, nil, nil
 }
 
-func (c DeniedAttestationsClient) GetAttestations(name name.Reference, digest string) ([]*api.Attestation, error) {
+func (c NoAttestationsClient) GetAttestations(name name.Reference, digest string) ([]*api.Attestation, error) {
 	return nil, nil
+}
+
+type FailedToFetchAttestationsClient struct{}
+
+func (c FailedToFetchAttestationsClient) GetImageDigest(imgName string) (*v1.Hash, name.Reference, error) {
+	return &v1.Hash{
+		Hex:       "1234567890abcdef",
+		Algorithm: "sha256",
+	}, nil, nil
+}
+
+func (c FailedToFetchAttestationsClient) GetAttestations(name name.Reference, digest string) ([]*api.Attestation, error) {
+	return nil, fmt.Errorf("failed to fetch attestations")
 }

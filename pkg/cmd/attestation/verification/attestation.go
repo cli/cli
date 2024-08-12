@@ -126,7 +126,6 @@ func GetRemoteAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error
 }
 
 func GetOCIAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
-
 	attestations, err := c.OCIClient.GetAttestations(c.NameRef, c.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch OCI attestations: %w", err)

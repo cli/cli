@@ -92,7 +92,6 @@ func (a *noncompliantRegistryTransport) RoundTrip(req *http.Request) (*http.Resp
 	return resp, err
 }
 
-// Ref: https://github.com/github/package-security/blob/main/garden/retrieve-sigstore-bundle-from-oci-registry.md
 func (c LiveClient) GetAttestations(ref name.Reference, digest string) ([]*api.Attestation, error) {
 	attestations := make([]*api.Attestation, 0)
 
