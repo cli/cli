@@ -66,6 +66,11 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
+
+			Exit codes:
+		      0: All checks passed
+		      1: One or more checks failed
+		      8: Checks pending
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -174,6 +179,14 @@ func checksRun(opts *ChecksOptions) error {
 	checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required, includeEvent)
 	if err != nil {
 		return err
+	}
+
+	if len(checks) == 0 {
+		if opts.Exporter != nil {
+			return opts.Exporter.Write(opts.IO, []check{})
+		}
+		fmt.Fprintf(opts.IO.Out, "No checks reported on the '%s' branch\n", pr.HeadRefName)
+		return cmdutil.NoChecksError
 	}
 
 	if opts.Exporter != nil {
