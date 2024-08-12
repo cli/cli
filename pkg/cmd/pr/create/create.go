@@ -230,7 +230,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default [current branch])")
-	fl.BoolVarP(&opts.EditorMode, "editor", "e", false, "Skip prompts and open the text editor to write the title and body in. The first line is the title and the rest text is the body.")
+	fl.BoolVarP(&opts.EditorMode, "editor", "e", false, "Skip prompts and open the text editor to write the title and body in. The first line is the title and the remaining text is the body.")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.FillVerbose, "fill-verbose", "", false, "Use commits msg+body for description")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Use commit info for title and body")
