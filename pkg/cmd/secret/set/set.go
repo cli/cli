@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"github.com/cli/cli/v2/internal/prompter"
 	"io"
 	"net/http"
 	"os"
@@ -29,7 +30,7 @@ type SetOptions struct {
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (ghContext.Remotes, error)
-	Prompter   iprompter
+	Prompter   prompter.Prompter
 
 	RandomOverride func() io.Reader
 
@@ -45,10 +46,7 @@ type SetOptions struct {
 	Application     string
 
 	HasRepoOverride bool
-}
-
-type iprompter interface {
-	Password(string) (string, error)
+	Interactive     bool
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -82,6 +80,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			# Read secret value from an environment variable
 			$ gh secret set MYSECRET --body "$ENV_VALUE"
 
+			# Set secret for a specific remote repository
+			$ gh secret set MYSECRET --repo origin/repo --body "$ENV_VALUE"
+
 			# Read secret value from a file
 			$ gh secret set MYSECRET < myfile.txt
 
@@ -111,6 +112,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
+			flagCount := cmdutil.CountSetFlags(cmd.Flags())
+
 			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserSecrets); err != nil {
 				return err
 			}
@@ -129,6 +132,10 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				}
 			} else {
 				opts.SecretName = args[0]
+
+				if flagCount == 0 {
+					opts.Interactive = true
+				}
 			}
 
 			if cmd.Flags().Changed("visibility") {
@@ -197,7 +204,17 @@ func setRun(opts *SetOptions) error {
 
 		err = cmdutil.ValidateHasOnlyOneRemote(opts.HasRepoOverride, opts.Remotes)
 		if err != nil {
-			return err
+			if opts.Interactive {
+				selectedRepo, errSelectedRepo := cmdutil.PromptForRepo(baseRepo, opts.Remotes, opts.Prompter)
+
+				if errSelectedRepo != nil {
+					return errSelectedRepo
+				}
+
+				baseRepo = selectedRepo
+			} else {
+				return err
+			}
 		}
 
 		host = baseRepo.RepoHost()
