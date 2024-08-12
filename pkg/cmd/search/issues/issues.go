@@ -157,7 +157,7 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 	cmd.Flags().BoolVar(&noLabel, "no-label", false, "Filter on missing label")
 	cmd.Flags().BoolVar(&noMilestone, "no-milestone", false, "Filter on missing milestone")
 	cmd.Flags().BoolVar(&noProject, "no-project", false, "Filter on missing project")
-	cmd.Flags().StringVar(&opts.Query.Qualifiers.Project, "project", "", "Filter on project board `number`")
+	cmd.Flags().StringVar(&opts.Query.Qualifiers.Project, "project", "", "Filter on project board `owner/number`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Reactions, "reactions", "", "Filter on `number` of reactions")
 	cmd.Flags().StringSliceVarP(&opts.Query.Qualifiers.Repo, "repo", "R", nil, "Filter on repository")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Qualifiers.State, "state", "", "", []string{"open", "closed"}, "Filter based on state")
