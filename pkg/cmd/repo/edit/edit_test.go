@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -199,6 +200,7 @@ func Test_editRun_interactive(t *testing.T) {
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
+				Detector:        &fd.EnabledDetectorMock{},
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				el := append(editList, optionAllowForking)
@@ -246,6 +248,7 @@ func Test_editRun_interactive(t *testing.T) {
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
+				Detector:        &fd.EnabledDetectorMock{},
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
@@ -321,6 +324,7 @@ func Test_editRun_interactive(t *testing.T) {
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
+				Detector:        &fd.EnabledDetectorMock{},
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
@@ -367,6 +371,7 @@ func Test_editRun_interactive(t *testing.T) {
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
+				Detector:        &fd.EnabledDetectorMock{},
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
@@ -426,6 +431,7 @@ func Test_editRun_interactive(t *testing.T) {
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
+				Detector:        &fd.EnabledDetectorMock{},
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,

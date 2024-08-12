@@ -18,6 +18,7 @@ import (
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
@@ -39,6 +40,7 @@ type CreateOptions struct {
 	Browser    browser.Browser
 	Prompter   shared.Prompt
 	Finder     shared.PRFinder
+	Detector   fd.Detector
 
 	TitleProvided bool
 	BodyProvided  bool
@@ -84,6 +86,7 @@ type CreateContext struct {
 	IsPushEnabled      bool
 	Client             *api.Client
 	GitClient          *git.Client
+	RepositoryFeatures fd.RepositoryFeatures
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -342,7 +345,7 @@ func createRun(opts *CreateOptions) (err error) {
 	if !opts.BodyProvided {
 		templateContent := ""
 		if opts.RecoverFile == "" {
-			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.Prompter, opts.RootDirOverride, opts.RepoOverride == "", true)
+			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.Prompter, opts.RootDirOverride, opts.RepoOverride == "", true, opts.Detector)
 			var template shared.Template
 
 			if opts.Template != "" {
@@ -676,6 +679,15 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		baseTrackingBranch = fmt.Sprintf("%s/%s", baseRemote.Name, baseBranch)
 	}
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+	repoFeatures, err := opts.Detector.RepositoryFeatures()
+	if err != nil {
+		return nil, err
+	}
+
 	return &CreateContext{
 		BaseRepo:           baseRepo,
 		HeadRepo:           headRepo,
@@ -688,6 +700,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		RepoContext:        repoContext,
 		Client:             client,
 		GitClient:          gitClient,
+		RepositoryFeatures: repoFeatures,
 	}, nil
 }
 
@@ -720,7 +733,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		return errors.New("pull request title must not be blank")
 	}
 
-	err := shared.AddMetadataToIssueParams(client, ctx.BaseRepo, params, &state)
+	err := shared.AddMetadataToIssueParams(client, ctx.BaseRepo, params, &state, ctx.RepositoryFeatures.ProjectsV1)
 	if err != nil {
 		return err
 	}
@@ -943,7 +956,7 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 		ctx.BaseRepo,
 		"compare/%s...%s?expand=1",
 		url.PathEscape(ctx.BaseBranch), url.PathEscape(ctx.HeadBranchLabel))
-	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.BaseRepo, u, state)
+	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.BaseRepo, u, state, ctx.RepositoryFeatures.ProjectsV1)
 	if err != nil {
 		return "", err
 	}

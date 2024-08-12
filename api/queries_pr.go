@@ -84,7 +84,7 @@ type PullRequest struct {
 
 	Assignees      Assignees
 	Labels         Labels
-	ProjectCards   ProjectCards
+	ProjectCards   ProjectCards // TODO: This needs to be refactored as unable to use skip/include directives when no longer available
 	ProjectItems   ProjectItems
 	Milestone      *Milestone
 	Comments       Comments

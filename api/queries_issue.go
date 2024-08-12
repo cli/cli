@@ -39,7 +39,7 @@ type Issue struct {
 	Author           Author
 	Assignees        Assignees
 	Labels           Labels
-	ProjectCards     ProjectCards
+	ProjectCards     ProjectCards // TODO: This needs to be refactored because include/skip directives won't suffice for fields like this
 	ProjectItems     ProjectItems
 	Milestone        *Milestone
 	ReactionGroups   ReactionGroups

@@ -14,6 +14,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -263,7 +264,8 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "no args",
 			opts: CreateOptions{
-				WebMode: true,
+				WebMode:  true,
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
@@ -271,9 +273,10 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "title and body",
 			opts: CreateOptions{
-				WebMode: true,
-				Title:   "myissue",
-				Body:    "hello cli",
+				WebMode:  true,
+				Title:    "myissue",
+				Body:     "hello cli",
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=hello+cli&title=myissue",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
@@ -283,6 +286,7 @@ func Test_createRun(t *testing.T) {
 			opts: CreateOptions{
 				WebMode:   true,
 				Assignees: []string{"monalisa"},
+				Detector:  &fd.EnabledDetectorMock{},
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=monalisa&body=",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
@@ -292,6 +296,7 @@ func Test_createRun(t *testing.T) {
 			opts: CreateOptions{
 				WebMode:   true,
 				Assignees: []string{"@me"},
+				Detector:  &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(r *httpmock.Registry) {
 				r.Register(
@@ -309,6 +314,7 @@ func Test_createRun(t *testing.T) {
 			opts: CreateOptions{
 				WebMode:  true,
 				Projects: []string{"cleanup"},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(r *httpmock.Registry) {
 				r.Register(
@@ -363,7 +369,8 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "has templates",
 			opts: CreateOptions{
-				WebMode: true,
+				WebMode:  true,
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(r *httpmock.Registry) {
 				r.Register(
@@ -383,8 +390,9 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "too long body",
 			opts: CreateOptions{
-				WebMode: true,
-				Body:    strings.Repeat("A", 9216),
+				WebMode:  true,
+				Body:     strings.Repeat("A", 9216),
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: "cannot open in browser: maximum URL length exceeded",
 		},
@@ -412,6 +420,7 @@ func Test_createRun(t *testing.T) {
 			opts: CreateOptions{
 				EditorMode:       true,
 				TitledEditSurvey: func(string, string) (string, string, error) { return "title", "body", nil },
+				Detector:         &fd.EnabledDetectorMock{},
 			},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
@@ -450,6 +459,7 @@ func Test_createRun(t *testing.T) {
 				EditorMode:       true,
 				Template:         "Bug report",
 				TitledEditSurvey: func(title string, body string) (string, string, error) { return title, body, nil },
+				Detector:         &fd.EnabledDetectorMock{},
 			},
 			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
 			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
@@ -554,6 +564,17 @@ func TestIssueCreate(t *testing.T) {
 				"hasIssuesEnabled": true
 			} } }`),
 	)
+
+	http.Register(
+		httpmock.GraphQL(`query Repository_fields\b`),
+		httpmock.StringResponse(`{ "data": { "Repository": { "fields": [
+			{ "name": "autoMergeAllowed" },
+			{ "name": "projects" },
+			{ "name": "pullRequestTemplates" },
+			{ "name": "visibility" }
+		] } } }`),
+	)
+
 	http.Register(
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
@@ -586,6 +607,17 @@ func TestIssueCreate_recover(t *testing.T) {
 				"id": "REPOID",
 				"hasIssuesEnabled": true
 			} } }`))
+
+	http.Register(
+		httpmock.GraphQL(`query Repository_fields\b`),
+		httpmock.StringResponse(`{ "data": { "Repository": { "fields": [
+			{ "name": "autoMergeAllowed" },
+			{ "name": "projects" },
+			{ "name": "pullRequestTemplates" },
+			{ "name": "visibility" }
+		] } } }`),
+	)
+
 	http.Register(
 		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
@@ -670,6 +702,17 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 				"hasIssuesEnabled": true
 			} } }`),
 	)
+
+	http.Register(
+		httpmock.GraphQL(`query Repository_fields\b`),
+		httpmock.StringResponse(`{ "data": { "Repository": { "fields": [
+			{ "name": "autoMergeAllowed" },
+			{ "name": "projects" },
+			{ "name": "pullRequestTemplates" },
+			{ "name": "visibility" }
+		] } } }`),
+	)
+
 	http.Register(
 		httpmock.GraphQL(`query IssueTemplates\b`),
 		httpmock.StringResponse(`
@@ -734,6 +777,16 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 			} } }`),
 	)
 
+	http.Register(
+		httpmock.GraphQL(`query Repository_fields\b`),
+		httpmock.StringResponse(`{ "data": { "Repository": { "fields": [
+			{ "name": "autoMergeAllowed" },
+			{ "name": "projects" },
+			{ "name": "pullRequestTemplates" },
+			{ "name": "visibility" }
+		] } } }`),
+	)
+
 	pm := &prompter.PrompterMock{}
 	pm.InputFunc = func(p, d string) (string, error) {
 		if p == "Title" {
@@ -773,6 +826,15 @@ func TestIssueCreate_metadata(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "main")
+	http.Register(
+		httpmock.GraphQL(`query Repository_fields\b`),
+		httpmock.StringResponse(`{ "data": { "Repository": { "fields": [
+			{ "name": "autoMergeAllowed" },
+			{ "name": "projects" },
+			{ "name": "pullRequestTemplates" },
+			{ "name": "visibility" }
+		] } } }`),
+	)
 	http.Register(
 		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
@@ -880,6 +942,16 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 			} } }`),
 	)
 
+	http.Register(
+		httpmock.GraphQL(`query Repository_fields\b`),
+		httpmock.StringResponse(`{ "data": { "Repository": { "fields": [
+			{ "name": "autoMergeAllowed" },
+			{ "name": "projects" },
+			{ "name": "pullRequestTemplates" },
+			{ "name": "visibility" }
+		] } } }`),
+	)
+
 	_, err := runCommand(http, true, `-t heres -b johnny`, nil)
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Errorf("error running command `issue create`: %v", err)
@@ -906,6 +978,15 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 			"hasIssuesEnabled": true
 		} } }
 	`))
+	http.Register(
+		httpmock.GraphQL(`query Repository_fields\b`),
+		httpmock.StringResponse(`{ "data": { "Repository": { "fields": [
+			{ "name": "autoMergeAllowed" },
+			{ "name": "projects" },
+			{ "name": "pullRequestTemplates" },
+			{ "name": "visibility" }
+		] } } }`),
+	)
 	http.Register(
 		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
 		httpmock.StringResponse(`
@@ -944,6 +1025,15 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 	defer http.Verify(t)
 
 	http.StubRepoInfoResponse("OWNER", "REPO", "main")
+	http.Register(
+		httpmock.GraphQL(`query Repository_fields\b`),
+		httpmock.StringResponse(`{ "data": { "Repository": { "fields": [
+			{ "name": "autoMergeAllowed" },
+			{ "name": "projects" },
+			{ "name": "pullRequestTemplates" },
+			{ "name": "visibility" }
+		] } } }`),
+	)
 	http.Register(
 		httpmock.GraphQL(`query RepositoryProjectList\b`),
 		httpmock.StringResponse(`

@@ -376,12 +376,12 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 	return nil
 }
 
-func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable) error {
+func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable, includeProjects bool) error {
 	input := api.RepoMetadataInput{
 		Reviewers:  editable.Reviewers.Edited,
 		Assignees:  editable.Assignees.Edited,
 		Labels:     editable.Labels.Edited,
-		Projects:   editable.Projects.Edited,
+		Projects:   editable.Projects.Edited && includeProjects, // TODO: This is a bit of a smell
 		Milestones: editable.Milestone.Edited,
 	}
 	metadata, err := api.RepoMetadata(client, repo, input)

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -37,13 +38,16 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "",
 				Interactive: true,
+				Detector:    &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
 		{
-			name:     "two arguments",
-			input:    "1 2",
-			output:   EditOptions{},
+			name:  "two arguments",
+			input: "1 2",
+			output: EditOptions{
+				Detector: &fd.EnabledDetectorMock{},
+			},
 			wantsErr: true,
 		},
 		{
@@ -52,6 +56,7 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Interactive: true,
+				Detector:    &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -66,6 +71,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -80,6 +86,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -95,6 +102,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -109,6 +117,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -128,6 +137,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -142,6 +152,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -156,6 +167,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -170,6 +182,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -184,6 +197,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -198,6 +212,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -212,6 +227,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -228,6 +244,7 @@ func TestNewCmdEdit(t *testing.T) {
 						},
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -244,6 +261,7 @@ func TestNewCmdEdit(t *testing.T) {
 						},
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -258,6 +276,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -272,6 +291,7 @@ func TestNewCmdEdit(t *testing.T) {
 						Edited: true,
 					},
 				},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			wantsErr: false,
 		},
@@ -381,7 +401,8 @@ func Test_editRun(t *testing.T) {
 						Edited: true,
 					},
 				},
-				Fetcher: testFetcher{},
+				Fetcher:  testFetcher{},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				mockRepoMetadata(reg, false)
@@ -435,7 +456,8 @@ func Test_editRun(t *testing.T) {
 						Edited: true,
 					},
 				},
-				Fetcher: testFetcher{},
+				Fetcher:  testFetcher{},
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				mockRepoMetadata(reg, true)
@@ -456,6 +478,7 @@ func Test_editRun(t *testing.T) {
 				Surveyor:        testSurveyor{},
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
+				Detector:        &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				mockRepoMetadata(reg, false)
@@ -477,6 +500,7 @@ func Test_editRun(t *testing.T) {
 				Surveyor:        testSurveyor{skipReviewers: true},
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
+				Detector:        &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				mockRepoMetadata(reg, true)
@@ -661,8 +685,8 @@ type testSurveyor struct {
 }
 type testEditorRetriever struct{}
 
-func (f testFetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable) error {
-	return shared.FetchOptions(client, repo, opts)
+func (f testFetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable, includeProjectsV1 bool) error {
+	return shared.FetchOptions(client, repo, opts, includeProjectsV1)
 }
 
 func (s testSurveyor) FieldsToEdit(e *shared.Editable) error {

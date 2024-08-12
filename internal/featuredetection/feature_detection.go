@@ -41,12 +41,7 @@ type RepositoryFeatures struct {
 	PullRequestTemplateQuery bool
 	VisibilityField          bool
 	AutoMerge                bool
-}
-
-var allRepositoryFeatures = RepositoryFeatures{
-	PullRequestTemplateQuery: true,
-	VisibilityField:          true,
-	AutoMerge:                true,
+	ProjectsV1               bool
 }
 
 type detector struct {
@@ -163,10 +158,6 @@ func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
 }
 
 func (d *detector) RepositoryFeatures() (RepositoryFeatures, error) {
-	if !ghinstance.IsEnterprise(d.host) {
-		return allRepositoryFeatures, nil
-	}
-
 	features := RepositoryFeatures{}
 
 	var featureDetection struct {
@@ -193,6 +184,10 @@ func (d *detector) RepositoryFeatures() (RepositoryFeatures, error) {
 		}
 		if field.Name == "autoMergeAllowed" {
 			features.AutoMerge = true
+		}
+		// v2 memex projects are accessed through `projectsV2` field and currently supported in all GitHub distributions
+		if field.Name == "projects" {
+			features.ProjectsV1 = true
 		}
 	}
 

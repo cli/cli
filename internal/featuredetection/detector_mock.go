@@ -25,5 +25,10 @@ func (md *EnabledDetectorMock) PullRequestFeatures() (PullRequestFeatures, error
 }
 
 func (md *EnabledDetectorMock) RepositoryFeatures() (RepositoryFeatures, error) {
-	return allRepositoryFeatures, nil
+	return RepositoryFeatures{
+		PullRequestTemplateQuery: true,
+		VisibilityField:          true,
+		AutoMerge:                true,
+		ProjectsV1:               true,
+	}, nil
 }

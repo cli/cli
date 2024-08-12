@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
@@ -141,8 +140,7 @@ type templateManager struct {
 	fetchError error
 }
 
-func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, p iprompter, dir string, allowFS bool, isPR bool) *templateManager {
-	cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, p iprompter, dir string, allowFS bool, isPR bool, detector fd.Detector) *templateManager {
 	return &templateManager{
 		repo:       repo,
 		rootDir:    dir,
@@ -150,7 +148,7 @@ func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, p ipromp
 		isPR:       isPR,
 		httpClient: httpClient,
 		prompter:   p,
-		detector:   fd.NewDetector(cachedClient, repo.RepoHost()),
+		detector:   detector,
 	}
 }
 

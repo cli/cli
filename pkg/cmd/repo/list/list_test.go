@@ -333,7 +333,8 @@ func TestRepoList_nontty(t *testing.T) {
 			t, _ := time.Parse(time.RFC822, "19 Feb 21 15:00 UTC")
 			return t
 		},
-		Limit: 30,
+		Limit:    30,
+		Detector: &fd.EnabledDetectorMock{},
 	}
 
 	err := listRun(&opts)
@@ -374,7 +375,8 @@ func TestRepoList_tty(t *testing.T) {
 			t, _ := time.Parse(time.RFC822, "19 Feb 21 15:00 UTC")
 			return t
 		},
-		Limit: 30,
+		Limit:    30,
+		Detector: &fd.EnabledDetectorMock{},
 	}
 
 	err := listRun(&opts)
@@ -403,6 +405,16 @@ func TestRepoList_filtering(t *testing.T) {
 			assert.Equal(t, "PRIVATE", params["privacy"])
 			assert.Equal(t, float64(2), params["perPage"])
 		}),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`query Repository_fields\b`),
+		httpmock.StringResponse(`{ "data": { "Repository": { "fields": [
+			{ "name": "autoMergeAllowed" },
+			{ "name": "projects" },
+			{ "name": "pullRequestTemplates" },
+			{ "name": "visibility" }
+		] } } }`),
 	)
 
 	output, err := runCommand(http, true, `--visibility=private --limit 2 `)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -345,6 +346,7 @@ func Test_editRun(t *testing.T) {
 					},
 				},
 				FetchOptions: prShared.FetchOptions,
+				Detector:     &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGet(t, reg)
@@ -385,6 +387,7 @@ func Test_editRun(t *testing.T) {
 					},
 				},
 				FetchOptions: prShared.FetchOptions,
+				Detector:     &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Should only be one fetch of metadata.
@@ -435,6 +438,7 @@ func Test_editRun(t *testing.T) {
 					},
 				},
 				FetchOptions: prShared.FetchOptions,
+				Detector:     &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueNumberGet(t, reg, 123)
@@ -468,6 +472,7 @@ func Test_editRun(t *testing.T) {
 					},
 				},
 				FetchOptions: prShared.FetchOptions,
+				Detector:     &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Should only be one fetch of metadata.
@@ -548,6 +553,7 @@ func Test_editRun(t *testing.T) {
 				},
 				FetchOptions:    prShared.FetchOptions,
 				DetermineEditor: func() (string, error) { return "vim", nil },
+				Detector:        &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGet(t, reg)

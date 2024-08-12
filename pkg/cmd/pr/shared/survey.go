@@ -173,7 +173,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		Reviewers:  isChosen("Reviewers"),
 		Assignees:  isChosen("Assignees"),
 		Labels:     isChosen("Labels"),
-		Projects:   isChosen("Projects"),
+		Projects:   isChosen("Projects"), // TODO: This doesn't account for repo features, leaky abstraction
 		Milestones: isChosen("Milestone"),
 	}
 	metadataResult, err := fetcher.RepoMetadataFetch(metadataInput)

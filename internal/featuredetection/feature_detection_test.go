@@ -262,12 +262,43 @@ func TestRepositoryFeatures(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name:     "github.com",
+			name:     "github.com has v1 classic projects query",
 			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query Repository_fields\b`: heredoc.Doc(`
+					{ "data": { "Repository": { "fields": [
+						{"name": "projects"},
+						{"name": "pullRequestTemplates"},
+						{"name": "visibility"},
+						{"name": "autoMergeAllowed"}
+					] } } }
+				`),
+			},
 			wantFeatures: RepositoryFeatures{
 				PullRequestTemplateQuery: true,
 				VisibilityField:          true,
 				AutoMerge:                true,
+				ProjectsV1:               true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "github.com without v1 classic projects",
+			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query Repository_fields\b`: heredoc.Doc(`
+					{ "data": { "Repository": { "fields": [
+						{"name": "pullRequestTemplates"},
+						{"name": "visibility"},
+						{"name": "autoMergeAllowed"}
+					] } } }
+				`),
+			},
+			wantFeatures: RepositoryFeatures{
+				PullRequestTemplateQuery: true,
+				VisibilityField:          true,
+				AutoMerge:                true,
+				ProjectsV1:               false,
 			},
 			wantErr: false,
 		},
