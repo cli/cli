@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -356,4 +357,27 @@ func TitledEditSurvey(editor Editor) func(string, string) (string, string, error
 		title, body, _ := strings.Cut(titleAndBody, "\n")
 		return title, strings.TrimSuffix(body, "\n"), nil
 	}
+}
+
+func InitEditorMode(f *cmdutil.Factory, editorMode bool, webMode bool, canPrompt bool) (bool, error) {
+	if err := cmdutil.MutuallyExclusive(
+		"specify only one of `--editor` or `--web`",
+		editorMode,
+		webMode,
+	); err != nil {
+		return false, err
+	}
+
+	config, err := f.Config()
+	if err != nil {
+		return false, err
+	}
+
+	editorMode = !webMode && (editorMode || config.PreferEditorPrompt("").Value == "enabled")
+
+	if editorMode && !canPrompt {
+		return false, errors.New("--editor or enabled prefer_editor_prompt configuration are not supported in non-tty mode")
+	}
+
+	return editorMode, nil
 }

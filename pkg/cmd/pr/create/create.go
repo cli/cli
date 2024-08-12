@@ -30,15 +30,16 @@ import (
 
 type CreateOptions struct {
 	// This struct stores user input and factory functions
-	HttpClient func() (*http.Client, error)
-	GitClient  *git.Client
-	Config     func() (gh.Config, error)
-	IO         *iostreams.IOStreams
-	Remotes    func() (ghContext.Remotes, error)
-	Branch     func() (string, error)
-	Browser    browser.Browser
-	Prompter   shared.Prompt
-	Finder     shared.PRFinder
+	HttpClient       func() (*http.Client, error)
+	GitClient        *git.Client
+	Config           func() (gh.Config, error)
+	IO               *iostreams.IOStreams
+	Remotes          func() (ghContext.Remotes, error)
+	Branch           func() (string, error)
+	Browser          browser.Browser
+	Prompter         shared.Prompt
+	Finder           shared.PRFinder
+	TitledEditSurvey func(string, string) (string, string, error)
 
 	TitleProvided bool
 	BodyProvided  bool
@@ -49,6 +50,7 @@ type CreateOptions struct {
 	Autofill    bool
 	FillVerbose bool
 	FillFirst   bool
+	EditorMode  bool
 	WebMode     bool
 	RecoverFile string
 
@@ -88,14 +90,15 @@ type CreateContext struct {
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		GitClient:  f.GitClient,
-		Config:     f.Config,
-		Remotes:    f.Remotes,
-		Branch:     f.Branch,
-		Browser:    f.Browser,
-		Prompter:   f.Prompter,
+		IO:               f.IOStreams,
+		HttpClient:       f.HttpClient,
+		GitClient:        f.GitClient,
+		Config:           f.Config,
+		Remotes:          f.Remotes,
+		Branch:           f.Branch,
+		Browser:          f.Browser,
+		Prompter:         f.Prompter,
+		TitledEditSurvey: shared.TitledEditSurvey(&shared.UserEditor{Config: f.Config, IO: f.IOStreams}),
 	}
 
 	var bodyFile string
@@ -177,6 +180,20 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--fill-verbose` is not supported with `--fill`")
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--editor` or `--web`",
+				opts.EditorMode,
+				opts.WebMode,
+			); err != nil {
+				return err
+			}
+
+			var err error
+			opts.EditorMode, err = shared.InitEditorMode(f, opts.EditorMode, opts.WebMode, opts.IO.CanPrompt())
+			if err != nil {
+				return err
+			}
+
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			if bodyFile != "" {
 				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
@@ -213,6 +230,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default [current branch])")
+	fl.BoolVarP(&opts.EditorMode, "editor", "e", false, "Skip prompts and open the text editor to write the title and body in. The first line is the title and the remaining text is the body.")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.FillVerbose, "fill-verbose", "", false, "Use commits msg+body for description")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Use commit info for title and body")
@@ -315,7 +333,7 @@ func createRun(opts *CreateOptions) (err error) {
 			ghrepo.FullName(ctx.BaseRepo))
 	}
 
-	if opts.FillVerbose || opts.Autofill || opts.FillFirst || (opts.TitleProvided && opts.BodyProvided) {
+	if !opts.EditorMode && (opts.FillVerbose || opts.Autofill || opts.FillFirst || (opts.TitleProvided && opts.BodyProvided)) {
 		err = handlePush(*opts, *ctx)
 		if err != nil {
 			return
@@ -330,71 +348,101 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
-	if !opts.TitleProvided {
-		err = shared.TitleSurvey(opts.Prompter, state)
-		if err != nil {
-			return
-		}
+	action := shared.SubmitAction
+	if opts.IsDraft {
+		action = shared.SubmitDraftAction
 	}
 
-	defer shared.PreserveInput(opts.IO, state, &err)()
+	tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.Prompter, opts.RootDirOverride, opts.RepoOverride == "", true)
 
-	if !opts.BodyProvided {
-		templateContent := ""
-		if opts.RecoverFile == "" {
-			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.Prompter, opts.RootDirOverride, opts.RepoOverride == "", true)
+	if opts.EditorMode {
+		if opts.Template != "" {
 			var template shared.Template
+			template, err = tpl.Select(opts.Template)
+			if err != nil {
+				return
+			}
+			if state.Title == "" {
+				state.Title = template.Title()
+			}
+			state.Body = string(template.Body())
+		}
 
-			if opts.Template != "" {
-				template, err = tpl.Select(opts.Template)
-				if err != nil {
-					return
+		state.Title, state.Body, err = opts.TitledEditSurvey(state.Title, state.Body)
+		if err != nil {
+			return
+		}
+		if state.Title == "" {
+			err = fmt.Errorf("title can't be blank")
+			return
+		}
+	} else {
+
+		if !opts.TitleProvided {
+			err = shared.TitleSurvey(opts.Prompter, state)
+			if err != nil {
+				return
+			}
+		}
+
+		defer shared.PreserveInput(opts.IO, state, &err)()
+
+		if !opts.BodyProvided {
+			templateContent := ""
+			if opts.RecoverFile == "" {
+				var template shared.Template
+
+				if opts.Template != "" {
+					template, err = tpl.Select(opts.Template)
+					if err != nil {
+						return
+					}
+				} else {
+					template, err = tpl.Choose()
+					if err != nil {
+						return
+					}
 				}
-			} else {
-				template, err = tpl.Choose()
-				if err != nil {
-					return
+
+				if template != nil {
+					templateContent = string(template.Body())
 				}
 			}
 
-			if template != nil {
-				templateContent = string(template.Body())
+			err = shared.BodySurvey(opts.Prompter, state, templateContent)
+			if err != nil {
+				return
 			}
 		}
 
-		err = shared.BodySurvey(opts.Prompter, state, templateContent)
-		if err != nil {
-			return
-		}
-	}
-
-	openURL, err = generateCompareURL(*ctx, *state)
-	if err != nil {
-		return
-	}
-
-	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL) && !opts.DryRun
-	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
-	action, err := shared.ConfirmPRSubmission(opts.Prompter, allowPreview, allowMetadata, state.Draft)
-	if err != nil {
-		return fmt.Errorf("unable to confirm: %w", err)
-	}
-
-	if action == shared.MetadataAction {
-		fetcher := &shared.MetadataFetcher{
-			IO:        opts.IO,
-			APIClient: client,
-			Repo:      ctx.BaseRepo,
-			State:     state,
-		}
-		err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.BaseRepo, fetcher, state)
+		openURL, err = generateCompareURL(*ctx, *state)
 		if err != nil {
 			return
 		}
 
-		action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata() && !opts.DryRun, false, state.Draft)
+		allowPreview := !state.HasMetadata() && shared.ValidURL(openURL) && !opts.DryRun
+		allowMetadata := ctx.BaseRepo.ViewerCanTriage()
+		action, err = shared.ConfirmPRSubmission(opts.Prompter, allowPreview, allowMetadata, state.Draft)
 		if err != nil {
-			return
+			return fmt.Errorf("unable to confirm: %w", err)
+		}
+
+		if action == shared.MetadataAction {
+			fetcher := &shared.MetadataFetcher{
+				IO:        opts.IO,
+				APIClient: client,
+				Repo:      ctx.BaseRepo,
+				State:     state,
+			}
+			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.BaseRepo, fetcher, state)
+			if err != nil {
+				return
+			}
+
+			action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata() && !opts.DryRun, false, state.Draft)
+			if err != nil {
+				return
+			}
 		}
 	}
 
