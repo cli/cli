@@ -15,7 +15,7 @@ require (
 	github.com/cli/oauth v1.0.1
 	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.4
-	github.com/creack/pty v1.1.21
+	github.com/creack/pty v1.1.23
 	github.com/distribution/reference v0.5.0
 	github.com/gabriel-vasile/mimetype v1.4.5
 	github.com/gdamore/tcell/v2 v2.5.4
