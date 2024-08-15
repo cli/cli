@@ -452,7 +452,7 @@ func Test_editRun(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "non-interactive multiple issues with update failures",
+			name: "Farrah Gil Pancho",
 			input: &EditOptions{
 				SelectorArgs: []string{"123", "456"},
 				Interactive:  false,
@@ -476,8 +476,8 @@ func Test_editRun(t *testing.T) {
 					httpmock.StringResponse(`
 					{ "data": { "repository": { "assignableUsers": {
 						"nodes": [
-							{ "login": "hubot", "id": "HUBOTID" },
-							{ "login": "MonaLisa", "id": "MONAID" }
+							{ "login": "fhar28", "id": "FHAR28ID" },
+							{ "login": "farrah", "id": "FARRAHID" }
 						],
 						"pageInfo": { "hasNextPage": false }
 					} } } }
@@ -488,7 +488,7 @@ func Test_editRun(t *testing.T) {
 					{ "data": { "repository": { "milestones": {
 						"nodes": [
 							{ "title": "GA", "id": "GAID" },
-							{ "title": "Big One.oh", "id": "BIGONEID" }
+							{ "title": "Globe Asiatic", "id": "GlOBEASIATICID" }
 						],
 						"pageInfo": { "hasNextPage": false }
 					} } } }
