@@ -84,6 +84,16 @@ func (opts *Options) AreFlagsValid() error {
 		return fmt.Errorf("limit %d not allowed, must be between 1 and 1000", opts.Limit)
 	}
 
+	// Check that the bundle-from-registry flag is only used with OCI artifact paths
+	if opts.UseBundleFromRegistry && !strings.HasPrefix(opts.ArtifactPath, "oci://") {
+		return fmt.Errorf("bundle-from-registry flag can only be used with OCI artifact paths")
+	}
+
+	// Check that both the bundle-from-registry and bundle-path flags are not used together
+	if opts.UseBundleFromRegistry && opts.BundlePath != "" {
+		return fmt.Errorf("bundle-from-registry flag cannot be used with bundle-path flag")
+	}
+
 	return nil
 }
 
