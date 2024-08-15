@@ -1080,7 +1080,7 @@ func Test_createRun(t *testing.T) {
 					}
 				}
 			},
-			expectedErrOut: "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n",
+			expectedErrOut: "Opening https://github.com/OWNER/REPO/compare/master...feature in your browser.\n",
 			expectedBrowse: "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1",
 		},
 		{
@@ -1113,7 +1113,7 @@ func Test_createRun(t *testing.T) {
 					}
 				}
 			},
-			expectedErrOut: "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n",
+			expectedErrOut: "Opening https://github.com/OWNER/REPO/compare/master...feature in your browser.\n",
 			expectedBrowse: "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1",
 		},
 		{

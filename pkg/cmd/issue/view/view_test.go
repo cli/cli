@@ -123,7 +123,7 @@ func TestIssueView_web(t *testing.T) {
 	}
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", stderr.String())
+	assert.Equal(t, "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n", stderr.String())
 	browser.Verify(t, "https://github.com/OWNER/REPO/issues/123")
 }
 

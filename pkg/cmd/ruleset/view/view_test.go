@@ -317,7 +317,7 @@ func Test_viewRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/rulesetViewRepo.json"),
 				)
 			},
-			wantStdout: "Opening github.com/my-owner/repo-name/rules/42 in your browser.\n",
+			wantStdout: "Opening https://github.com/my-owner/repo-name/rules/42 in your browser.\n",
 			wantStderr: "",
 			wantBrowse: "https://github.com/my-owner/repo-name/rules/42",
 		},
@@ -352,7 +352,7 @@ func Test_viewRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/rulesetViewOrg.json"),
 				)
 			},
-			wantStdout: "Opening github.com/organizations/my-owner/settings/rules/74 in your browser.\n",
+			wantStdout: "Opening https://github.com/organizations/my-owner/settings/rules/74 in your browser.\n",
 			wantStderr: "",
 			wantBrowse: "https://github.com/organizations/my-owner/settings/rules/74",
 		},
