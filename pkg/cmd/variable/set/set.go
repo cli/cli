@@ -178,7 +178,11 @@ func setRun(opts *SetOptions) error {
 
 		err = cmdutil.ValidateHasOnlyOneRemote(opts.HasRepoOverride, opts.Remotes)
 		if err != nil {
-			if opts.Interactive {
+			defaultRepo := cmdutil.DefaultRepo(opts.Remotes)
+
+			if defaultRepo != nil {
+				baseRepo = defaultRepo
+			} else if opts.Interactive {
 				selectedRepo, errSelectedRepo := cmdutil.PromptForRepo(baseRepo, opts.Remotes, opts.Prompter)
 
 				if errSelectedRepo != nil {

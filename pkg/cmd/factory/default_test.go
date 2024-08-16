@@ -253,7 +253,7 @@ func Test_SmartBaseRepo(t *testing.T) {
 	}
 }
 
-// Defined in pkg/cmdutil/repo_override.go but test it along with other BaseRepo functions
+// Defined in pkg/cmdutil/repo.go but test it along with other BaseRepo functions
 func Test_OverrideBaseRepo(t *testing.T) {
 	tests := []struct {
 		name        string
