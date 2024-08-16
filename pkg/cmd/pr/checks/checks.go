@@ -66,6 +66,9 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
+
+			Additional exit codes:
+				8: Checks pending
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
