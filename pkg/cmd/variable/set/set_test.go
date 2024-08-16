@@ -419,6 +419,8 @@ func Test_setRun_org(t *testing.T) {
 	}
 }
 
+// TOOD: add test for getRemote_prompt
+
 func Test_getBody_prompt(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	ios.SetStdinTTY(true)

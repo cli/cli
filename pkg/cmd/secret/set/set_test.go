@@ -549,6 +549,8 @@ func Test_setRun_shouldNotStore(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+// TOOD: add test for getRemote_prompt
+
 func Test_getBody(t *testing.T) {
 	tests := []struct {
 		name    string
