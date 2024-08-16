@@ -168,6 +168,11 @@ func TestDisplayURL(t *testing.T) {
 			url:  "https://github.com/cli/cli/issues/9470?q=is:issue#issue-command",
 			want: "https://github.com/cli/cli/issues/9470",
 		},
+		{
+			name: "preserve http protocol use despite insecure",
+			url:  "http://github.com/cli/cli/issues/9470",
+			want: "http://github.com/cli/cli/issues/9470",
+		},
 	}
 
 	for _, tt := range tests {
