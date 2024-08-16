@@ -129,6 +129,31 @@ func TestGenManJSONFields(t *testing.T) {
 	checkStringContains(t, output, "baz")
 }
 
+func TestGenManDocExitCodes(t *testing.T) {
+	header := &GenManHeader{
+		Title:   "Project",
+		Section: "1",
+	}
+	cmd := &cobra.Command{
+		Use:   "test-command",
+		Short: "A test command",
+		Long:  "A test command for checking exit codes section",
+	}
+	buf := new(bytes.Buffer)
+	if err := renderMan(cmd, header, buf); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	// Check for the presence of the exit codes section
+	checkStringContains(t, output, ".SH EXIT CODES")
+	checkStringContains(t, output, "0: Successful execution")
+	checkStringContains(t, output, "1: Error")
+	checkStringContains(t, output, "2: Command canceled")
+	checkStringContains(t, output, "4: Authentication required")
+	checkStringContains(t, output, "NOTE: Specific commands may have additional exit codes. Refer to the command's help for more information.")
+}
+
 func TestManPrintFlagsHidesShortDeprecated(t *testing.T) {
 	c := &cobra.Command{}
 	c.Flags().StringP("foo", "f", "default", "Foo flag")

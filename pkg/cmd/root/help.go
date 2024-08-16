@@ -182,6 +182,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	helpEntries = append(helpEntries, helpEntry{"LEARN MORE", heredoc.Docf(`
 		Use %[1]sgh <command> <subcommand> --help%[1]s for more information about a command.
 		Read the manual at https://cli.github.com/manual
+		Learn about exit codes using %[1]sgh help exit-codes%[1]s
 	`, "`")})
 
 	out := f.IOStreams.Out
