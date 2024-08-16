@@ -198,16 +198,6 @@ func manPrintJSONFields(buf *bytes.Buffer, command *cobra.Command) {
 	buf.WriteString("\n")
 }
 
-func manPrintExitCodes(buf *bytes.Buffer) {
-	buf.WriteString("# EXIT CODES\n")
-	buf.WriteString("0\n:   Success\n\n")
-	buf.WriteString("1\n:   Error\n\n")
-	buf.WriteString("2\n:   Command canceled\n\n")
-	buf.WriteString("4\n:   Authentication required\n\n")
-	buf.WriteString("8\n:   Checks pending\n\n")
-	buf.WriteString("NOTE: Specific commands may have additional exit codes. Refer to the command's help for more information.\n\n")
-}
-
 func genMan(cmd *cobra.Command, header *GenManHeader) []byte {
 	cmd.InitDefaultHelpCmd()
 	cmd.InitDefaultHelpFlag()
@@ -227,7 +217,6 @@ func genMan(cmd *cobra.Command, header *GenManHeader) []byte {
 	manPrintOptions(buf, cmd)
 	manPrintAliases(buf, cmd)
 	manPrintJSONFields(buf, cmd)
-	manPrintExitCodes(buf)
 	if len(cmd.Example) > 0 {
 		buf.WriteString("# EXAMPLE\n")
 		buf.WriteString(fmt.Sprintf("```\n%s\n```\n", cmd.Example))

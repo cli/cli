@@ -44,9 +44,6 @@ func IsUserCancellation(err error) bool {
 	return errors.Is(err, CancelError) || errors.Is(err, terminal.InterruptErr)
 }
 
-// NoChecksError signals that no checks were reported for the pull request
-var NoChecksError = errors.New("NoChecksError")
-
 func MutuallyExclusive(message string, conditions ...bool) error {
 	numTrue := 0
 	for _, ok := range conditions {
