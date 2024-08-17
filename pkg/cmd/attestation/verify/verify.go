@@ -235,6 +235,12 @@ func runVerify(opts *Options) error {
 		return sigstoreRes.Error
 	}
 
+	// Verify extensions
+	if err := verification.VerifyCertExtensions(sigstoreRes.VerifyResults, opts.Owner, opts.Repo); err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Verification failed"))
+		return err
+	}
+
 	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!\n"))
 
 	// If an exporter is provided with the --json flag, write the results to the terminal in JSON format

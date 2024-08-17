@@ -100,6 +100,19 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 		require.Len(t, res.VerifyResults, 2)
 		require.NoError(t, res.Error)
 	})
+
+	t.Run("with invalid bundle version", func(t *testing.T) {
+		attestations := getAttestationsFor(t, "../test/data/sigstore-js-2.1.0-bundle-v0.1.json")
+		require.Len(t, attestations, 1)
+
+		verifier := NewLiveSigstoreVerifier(SigstoreConfig{
+			Logger: io.NewTestHandler(),
+		})
+
+		res := verifier.Verify(attestations, publicGoodPolicy(t))
+		require.Len(t, res.VerifyResults, 0)
+		require.ErrorContains(t, res.Error, "unsupported bundle version")
+	})
 }
 
 func publicGoodPolicy(t *testing.T) verify.PolicyBuilder {

@@ -21,7 +21,8 @@ const (
 )
 
 func expandToGitHubURL(ownerOrRepo string) string {
-	return fmt.Sprintf("^https://github.com/%s/", ownerOrRepo)
+	// TODO: handle proxima prefix
+	return fmt.Sprintf("(?i)^https://github.com/%s/", ownerOrRepo)
 }
 
 func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error) {
@@ -42,19 +43,6 @@ func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error
 	return verify.SubjectAlternativeNameMatcher{}, nil
 }
 
-func buildCertExtensions(opts *Options, runnerEnv string) certificate.Extensions {
-	extensions := certificate.Extensions{
-		SourceRepositoryOwnerURI: fmt.Sprintf("https://github.com/%s", opts.Owner),
-		RunnerEnvironment:        runnerEnv,
-	}
-
-	// if opts.Repo is set, set the SourceRepositoryURI field before returning the extensions
-	if opts.Repo != "" {
-		extensions.SourceRepositoryURI = fmt.Sprintf("https://github.com/%s", opts.Repo)
-	}
-	return extensions
-}
-
 func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.PolicyOption, error) {
 	sanMatcher, err := buildSANMatcher(opts)
 	if err != nil {
@@ -66,7 +54,9 @@ func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.Pol
 		return nil, err
 	}
 
-	extensions := buildCertExtensions(opts, runnerEnv)
+	extensions := certificate.Extensions{
+		RunnerEnvironment: runnerEnv,
+	}
 
 	certId, err := verify.NewCertificateIdentity(sanMatcher, issuerMatcher, extensions)
 	if err != nil {

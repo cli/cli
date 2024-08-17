@@ -60,7 +60,7 @@ func newSSHCmd(app *App) *cobra.Command {
 			The %[1]sssh%[1]s command will automatically create a public/private ssh key pair in the
 			%[1]s~/.ssh%[1]s directory if you do not have an existing valid key pair. When selecting the
 			key pair to use, the preferred order is:
-			  
+
 			1. Key specified by %[1]s-i%[1]s in %[1]s<ssh-flags>%[1]s
 			2. Automatic key, if it already exists
 			3. First valid key pair in ssh config (according to %[1]sssh -G%[1]s)
