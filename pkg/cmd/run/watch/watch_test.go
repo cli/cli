@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -297,6 +298,71 @@ func TestWatchRun(t *testing.T) {
 			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk CI · 2\nTriggered via push about 59 minutes ago\n\n\x1b[?1049lX trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run CI (2) completed with 'failure'\n",
 			wantErr: true,
 			errMsg:  "SilentError",
+		},
+		{
+			name: "failed to get run status",
+			tty:  true,
+			opts: &WatchOptions{
+				RunID: "1234",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.TestRunWithCommit(1234, shared.InProgress, "", "commit2")),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.StatusJSONResponse(404, api.HTTPError{
+						StatusCode: 404,
+						Message:    "run 1234 not found",
+					}),
+				)
+			},
+			wantOut: "\x1b[?1049h\x1b[?1049l",
+			wantErr: true,
+			errMsg:  "failed to get run: HTTP 404: run 1234 not found (https://api.github.com/repos/OWNER/REPO/actions/runs/1234?exclude_pull_requests=true)",
+		},
+		{
+			name: "annotation endpoint forbidden (fine grained tokens)",
+			tty:  true,
+			opts: &WatchOptions{
+				RunID: "2",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				inProgressRun := shared.TestRunWithCommit(2, shared.InProgress, "", "commit2")
+				completedRun := shared.TestRun(2, shared.Completed, shared.Success)
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
+					httpmock.JSONResponse(inProgressRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/2/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJob,
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
+					httpmock.JSONResponse(shared.SuccessfulJobAnnotations))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/20/annotations"),
+					httpmock.StatusStringResponse(403, "Forbidden"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/2"),
+					httpmock.JSONResponse(completedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: "\x1b[?1049h\x1b[?1049l✓ trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nrequesting annotations returned 403 Forbidden as the token does not have sufficient permissions. Note that it is not currently possible to create a fine-grained PAT with the `checks:read` permission.\n✓ Run CI (2) completed with 'success'\n",
 		},
 	}
 

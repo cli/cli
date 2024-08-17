@@ -13,11 +13,12 @@ import (
 
 func TestNewCmdarchiveItem(t *testing.T) {
 	tests := []struct {
-		name        string
-		cli         string
-		wants       archiveItemOpts
-		wantsErr    bool
-		wantsErrMsg string
+		name          string
+		cli           string
+		wants         archiveItemOpts
+		wantsErr      bool
+		wantsErrMsg   string
+		wantsExporter bool
 	}{
 		{
 			name:        "missing-id",
@@ -66,9 +67,9 @@ func TestNewCmdarchiveItem(t *testing.T) {
 			name: "json",
 			cli:  "--format json --id 123",
 			wants: archiveItemOpts{
-				format: "json",
 				itemID: "123",
 			},
+			wantsExporter: true,
 		},
 	}
 
@@ -103,7 +104,7 @@ func TestNewCmdarchiveItem(t *testing.T) {
 			assert.Equal(t, tt.wants.owner, gotOpts.owner)
 			assert.Equal(t, tt.wants.itemID, gotOpts.itemID)
 			assert.Equal(t, tt.wants.undo, gotOpts.undo)
-			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 		})
 	}
 }
@@ -633,5 +634,101 @@ func TestRunArchive_Me_Undo(t *testing.T) {
 	assert.Equal(
 		t,
 		"Unarchived item\n",
+		stdout.String())
+}
+
+func TestRunArchive_JSON(t *testing.T) {
+	defer gock.Off()
+	gock.Observe(gock.DumpRequest)
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// get project ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserProject.*",
+			"variables": map[string]interface{}{
+				"login":       "monalisa",
+				"number":      1,
+				"firstItems":  0,
+				"afterItems":  nil,
+				"firstFields": 0,
+				"afterFields": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"id": "an ID",
+					},
+				},
+			},
+		})
+
+	// archive item
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation ArchiveProjectItem.*","variables":{"input":{"projectId":"an ID","itemId":"item ID"}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"archiveProjectV2Item": map[string]interface{}{
+					"item": map[string]interface{}{
+						"id": "item ID",
+						"content": map[string]interface{}{
+							"__typename": "Issue",
+							"title":      "a title",
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := archiveItemConfig{
+		opts: archiveItemOpts{
+			owner:    "monalisa",
+			number:   1,
+			itemID:   "item ID",
+			exporter: cmdutil.NewJSONExporter(),
+		},
+		client: client,
+		io:     ios,
+	}
+
+	err := runArchiveItem(config)
+	assert.NoError(t, err)
+	assert.JSONEq(
+		t,
+		`{"id":"item ID","title":"a title","body":"","type":"Issue"}`,
 		stdout.String())
 }

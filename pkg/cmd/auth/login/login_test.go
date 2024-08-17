@@ -10,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -17,7 +18,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
-	"github.com/zalando/go-keyring"
+	"github.com/stretchr/testify/require"
 )
 
 func stubHomeDir(t *testing.T, dir string) {
@@ -42,17 +43,16 @@ func Test_NewCmdLogin(t *testing.T) {
 		wantsErr    bool
 	}{
 		{
-			name:        "nontty, with-token",
-			stdin:       "abc123\n",
-			cli:         "--with-token",
-			defaultHost: "github.com",
+			name:  "nontty, with-token",
+			stdin: "abc123\n",
+			cli:   "--with-token",
 			wants: LoginOptions{
 				Hostname: "github.com",
 				Token:    "abc123",
 			},
 		},
 		{
-			name:        "nontty, Enterprise host",
+			name:        "nontty, with-token, enterprise default host",
 			stdin:       "abc123\n",
 			cli:         "--with-token",
 			defaultHost: "git.example.com",
@@ -205,10 +205,32 @@ func Test_NewCmdLogin(t *testing.T) {
 				InsecureStorage: true,
 			},
 		},
+		{
+			name:     "tty skip-ssh-key",
+			stdinTTY: true,
+			cli:      "--skip-ssh-key",
+			wants: LoginOptions{
+				SkipSSHKeyPrompt: true,
+				Interactive:      true,
+			},
+		},
+		{
+			name: "nontty skip-ssh-key",
+			cli:  "--skip-ssh-key",
+			wants: LoginOptions{
+				Hostname:         "github.com",
+				SkipSSHKeyPrompt: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Make sure there is a default host set so that
+			// the local configuration file never read from.
+			if tt.defaultHost == "" {
+				tt.defaultHost = "github.com"
+			}
 			t.Setenv("GH_HOST", tt.defaultHost)
 
 			ios, stdin, _, _ := iostreams.Test()
@@ -258,8 +280,9 @@ func Test_loginRun_nontty(t *testing.T) {
 	tests := []struct {
 		name            string
 		opts            *LoginOptions
+		env             map[string]string
 		httpStubs       func(*httpmock.Registry)
-		cfgStubs        func(*config.ConfigMock)
+		cfgStubs        func(*testing.T, gh.Config)
 		wantHosts       string
 		wantErr         string
 		wantStderr      string
@@ -274,8 +297,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc123\n    user: x-access-token\n",
+			wantHosts: "github.com:\n    users:\n        monalisa:\n            oauth_token: abc123\n    oauth_token: abc123\n    user: monalisa\n",
 		},
 		{
 			name: "insecure with token and https git-protocol",
@@ -287,8 +313,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc123\n    user: x-access-token\n    git_protocol: https\n",
+			wantHosts: "github.com:\n    users:\n        monalisa:\n            oauth_token: abc123\n    git_protocol: https\n    oauth_token: abc123\n    user: monalisa\n",
 		},
 		{
 			name: "with token and non-default host",
@@ -299,8 +328,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "albert.wesker:\n    oauth_token: abc123\n    user: x-access-token\n",
+			wantHosts: "albert.wesker:\n    users:\n        monalisa:\n            oauth_token: abc123\n    oauth_token: abc123\n    user: monalisa\n",
 		},
 		{
 			name: "missing repo scope",
@@ -333,8 +365,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,admin:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc456\n    user: x-access-token\n",
+			wantHosts: "github.com:\n    users:\n        monalisa:\n            oauth_token: abc456\n    oauth_token: abc456\n    user: monalisa\n",
 		},
 		{
 			name: "github.com token from environment",
@@ -342,18 +377,12 @@ func Test_loginRun_nontty(t *testing.T) {
 				Hostname: "github.com",
 				Token:    "abc456",
 			},
-			cfgStubs: func(c *config.ConfigMock) {
-				authCfg := c.Authentication()
-				authCfg.SetToken("value_from_env", "GH_TOKEN")
-				c.AuthenticationFunc = func() *config.AuthConfig {
-					return authCfg
-				}
-			},
+			env:     map[string]string{"GH_TOKEN": "value_from_env"},
 			wantErr: "SilentError",
 			wantStderr: heredoc.Doc(`
-				The value of the GH_TOKEN environment variable is being used for authentication.
-				To have GitHub CLI store credentials instead, first clear the value from the environment.
-			`),
+                The value of the GH_TOKEN environment variable is being used for authentication.
+                To have GitHub CLI store credentials instead, first clear the value from the environment.
+            `),
 		},
 		{
 			name: "GHE token from environment",
@@ -361,18 +390,12 @@ func Test_loginRun_nontty(t *testing.T) {
 				Hostname: "ghe.io",
 				Token:    "abc456",
 			},
-			cfgStubs: func(c *config.ConfigMock) {
-				authCfg := c.Authentication()
-				authCfg.SetToken("value_from_env", "GH_ENTERPRISE_TOKEN")
-				c.AuthenticationFunc = func() *config.AuthConfig {
-					return authCfg
-				}
-			},
+			env:     map[string]string{"GH_ENTERPRISE_TOKEN": "value_from_env"},
 			wantErr: "SilentError",
 			wantStderr: heredoc.Doc(`
-				The value of the GH_ENTERPRISE_TOKEN environment variable is being used for authentication.
-				To have GitHub CLI store credentials instead, first clear the value from the environment.
-			`),
+                The value of the GH_ENTERPRISE_TOKEN environment variable is being used for authentication.
+                To have GitHub CLI store credentials instead, first clear the value from the environment.
+            `),
 		},
 		{
 			name: "with token and secure storage",
@@ -382,9 +405,39 @@ func Test_loginRun_nontty(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
 			},
-			wantHosts:       "github.com:\n    user: x-access-token\n",
+			wantHosts:       "github.com:\n    users:\n        monalisa:\n    user: monalisa\n",
 			wantSecureToken: "abc123",
+		},
+		{
+			name: "given we are already logged in, and log in as a new user, it is added to the config",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+				Token:    "newUserToken",
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
+				require.NoError(t, err)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"newUser"}}}`))
+			},
+			wantHosts: heredoc.Doc(`
+                github.com:
+                    users:
+                        monalisa:
+                            oauth_token: abc123
+                        newUser:
+                    git_protocol: https
+                    user: newUser
+            `),
+			wantSecureToken: "newUserToken",
 		},
 	}
 
@@ -395,13 +448,11 @@ func Test_loginRun_nontty(t *testing.T) {
 			ios.SetStdoutTTY(false)
 			tt.opts.IO = ios
 
-			keyring.MockInit()
-			readConfigs := config.StubWriteConfig(t)
-			cfg := config.NewBlankConfig()
+			cfg, readConfigs := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
-			tt.opts.Config = func() (config.Config, error) {
+			tt.opts.Config = func() (gh.Config, error) {
 				return cfg, nil
 			}
 
@@ -412,6 +463,10 @@ func Test_loginRun_nontty(t *testing.T) {
 			}
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
+			}
+
+			for k, v := range tt.env {
+				t.Setenv(k, v)
 			}
 
 			_, restoreRun := run.Stub()
@@ -446,37 +501,11 @@ func Test_loginRun_Survey(t *testing.T) {
 		httpStubs       func(*httpmock.Registry)
 		prompterStubs   func(*prompter.PrompterMock)
 		runStubs        func(*run.CommandStubber)
-		cfgStubs        func(*config.ConfigMock)
+		cfgStubs        func(*testing.T, gh.Config)
 		wantHosts       string
 		wantErrOut      *regexp.Regexp
 		wantSecureToken string
 	}{
-		{
-			name: "already authenticated",
-			opts: &LoginOptions{
-				Interactive: true,
-			},
-			cfgStubs: func(c *config.ConfigMock) {
-				authCfg := c.Authentication()
-				authCfg.SetToken("ghi789", "oauth_token")
-				c.AuthenticationFunc = func() *config.AuthConfig {
-					return authCfg
-				}
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
-			},
-			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
-					if prompt == "What account do you want to log into?" {
-						return prompter.IndexFor(opts, "GitHub.com")
-					}
-					return -1, prompter.NoSuchPromptErr(prompt)
-				}
-			},
-			wantHosts:  "",
-			wantErrOut: nil,
-		},
 		{
 			name: "hostname set",
 			opts: &LoginOptions{
@@ -485,15 +514,18 @@ func Test_loginRun_Survey(t *testing.T) {
 				InsecureStorage: true,
 			},
 			wantHosts: heredoc.Doc(`
-				rebecca.chambers:
-				    oauth_token: def456
-				    user: jillv
-				    git_protocol: https
-			`),
+                rebecca.chambers:
+                    users:
+                        jillv:
+                            oauth_token: def456
+                    git_protocol: https
+                    oauth_token: def456
+                    user: jillv
+            `),
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
@@ -516,11 +548,14 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name: "choose enterprise",
 			wantHosts: heredoc.Doc(`
-				brad.vickers:
-				    oauth_token: def456
-				    user: jillv
-				    git_protocol: https
-			`),
+                brad.vickers:
+                    users:
+                        jillv:
+                            oauth_token: def456
+                    git_protocol: https
+                    oauth_token: def456
+                    user: jillv
+            `),
 			opts: &LoginOptions{
 				Interactive:     true,
 				InsecureStorage: true,
@@ -530,7 +565,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					switch prompt {
 					case "What account do you want to log into?":
 						return prompter.IndexFor(opts, "GitHub Enterprise Server")
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
@@ -556,11 +591,14 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name: "choose github.com",
 			wantHosts: heredoc.Doc(`
-				github.com:
-				    oauth_token: def456
-				    user: jillv
-				    git_protocol: https
-			`),
+                github.com:
+                    users:
+                        jillv:
+                            oauth_token: def456
+                    git_protocol: https
+                    oauth_token: def456
+                    user: jillv
+            `),
 			opts: &LoginOptions{
 				Interactive:     true,
 				InsecureStorage: true,
@@ -570,7 +608,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					switch prompt {
 					case "What account do you want to log into?":
 						return prompter.IndexFor(opts, "GitHub.com")
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
@@ -587,11 +625,14 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name: "sets git_protocol",
 			wantHosts: heredoc.Doc(`
-				github.com:
-				    oauth_token: def456
-				    user: jillv
-				    git_protocol: ssh
-			`),
+                github.com:
+                    users:
+                        jillv:
+                            oauth_token: def456
+                    git_protocol: ssh
+                    oauth_token: def456
+                    user: jillv
+            `),
 			opts: &LoginOptions{
 				Interactive:     true,
 				InsecureStorage: true,
@@ -601,7 +642,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					switch prompt {
 					case "What account do you want to log into?":
 						return prompter.IndexFor(opts, "GitHub.com")
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "SSH")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
@@ -620,7 +661,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
-					case "What is your preferred protocol for Git operations?":
+					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
 						return prompter.IndexFor(opts, "Paste an authentication token")
@@ -633,12 +674,57 @@ func Test_loginRun_Survey(t *testing.T) {
 				rs.Register(`git config credential\.helper`, 1, "")
 			},
 			wantHosts: heredoc.Doc(`
-				github.com:
-				    user: jillv
-				    git_protocol: https
-			`),
+                github.com:
+                    git_protocol: https
+                    users:
+                        jillv:
+                    user: jillv
+            `),
 			wantErrOut:      regexp.MustCompile("Logged in as jillv"),
 			wantSecureToken: "def456",
+		},
+		{
+			name: "given we log in as a user that is already in the config, we get an informational message",
+			opts: &LoginOptions{
+				Hostname:        "github.com",
+				Interactive:     true,
+				InsecureStorage: true,
+			},
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+					switch prompt {
+					case "What is your preferred protocol for Git operations on this host?":
+						return prompter.IndexFor(opts, "HTTPS")
+					case "How would you like to authenticate GitHub CLI?":
+						return prompter.IndexFor(opts, "Paste an authentication token")
+					}
+					return -1, prompter.NoSuchPromptErr(prompt)
+				}
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				_, err := c.Authentication().Login("github.com", "monalisa", "abc123", "https", false)
+				require.NoError(t, err)
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git config credential\.https:/`, 1, "")
+				rs.Register(`git config credential\.helper`, 1, "")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
+			},
+			wantHosts: heredoc.Doc(`
+            github.com:
+                users:
+                    monalisa:
+                        oauth_token: def456
+                git_protocol: https
+                user: monalisa
+                oauth_token: def456
+            `),
+			wantErrOut: regexp.MustCompile(`! You were already logged in to this account`),
 		},
 	}
 
@@ -655,14 +741,11 @@ func Test_loginRun_Survey(t *testing.T) {
 
 			tt.opts.IO = ios
 
-			keyring.MockInit()
-			readConfigs := config.StubWriteConfig(t)
-
-			cfg := config.NewBlankConfig()
+			cfg, readConfigs := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
-			tt.opts.Config = func() (config.Config, error) {
+			tt.opts.Config = func() (gh.Config, error) {
 				return cfg, nil
 			}
 

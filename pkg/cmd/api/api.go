@@ -17,7 +17,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
@@ -29,11 +29,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	ttyIndent = "  "
+)
+
 type ApiOptions struct {
 	AppVersion string
 	BaseRepo   func() (ghrepo.Interface, error)
 	Branch     func() (string, error)
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
@@ -48,6 +52,7 @@ type ApiOptions struct {
 	Previews            []string
 	ShowResponseHeaders bool
 	Paginate            bool
+	Slurp               bool
 	Silent              bool
 	Template            string
 	CacheTTL            time.Duration
@@ -71,50 +76,52 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			Makes an authenticated HTTP request to the GitHub API and prints the response.
 
 			The endpoint argument should either be a path of a GitHub API v3 endpoint, or
-			"graphql" to access the GitHub API v4.
+			%[1]sgraphql%[1]s to access the GitHub API v4.
 
-			Placeholder values "{owner}", "{repo}", and "{branch}" in the endpoint
+			Placeholder values %[1]s{owner}%[1]s, %[1]s{repo}%[1]s, and %[1]s{branch}%[1]s in the endpoint
 			argument will get replaced with values from the repository of the current
-			directory or the repository specified in the GH_REPO environment variable.
+			directory or the repository specified in the %[1]sGH_REPO%[1]s environment variable.
 			Note that in some shells, for example PowerShell, you may need to enclose
-			any value that contains "{...}" in quotes to prevent the shell from
+			any value that contains %[1]s{...}%[1]s in quotes to prevent the shell from
 			applying special meaning to curly braces.
 
-			The default HTTP request method is "GET" normally and "POST" if any parameters
+			The default HTTP request method is %[1]sGET%[1]s normally and %[1]sPOST%[1]s if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
 
-			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string
+			Pass one or more %[1]s-f/--raw-field%[1]s values in %[1]skey=value%[1]s format to add static string
 			parameters to the request payload. To add non-string or placeholder-determined values, see
-			%[1]s--field%[1]s below. Note that adding request parameters will automatically switch the
-			request method to POST. To send the parameters as a GET query string instead, use
+			%[1]s-F/--field%[1]s below. Note that adding request parameters will automatically switch the
+			request method to %[1]sPOST%[1]s. To send the parameters as a %[1]sGET%[1]s query string instead, use
 			%[1]s--method GET%[1]s.
 
 			The %[1]s-F/--field%[1]s flag has magic type conversion based on the format of the value:
 
-			- literal values "true", "false", "null", and integer numbers get converted to
+			- literal values %[1]strue%[1]s, %[1]sfalse%[1]s, %[1]snull%[1]s, and integer numbers get converted to
 			  appropriate JSON types;
-			- placeholder values "{owner}", "{repo}", and "{branch}" get populated with values
+			- placeholder values %[1]s{owner}%[1]s, %[1]s{repo}%[1]s, and %[1]s{branch}%[1]s get populated with values
 			  from the repository of the current directory;
-			- if the value starts with "@", the rest of the value is interpreted as a
-			  filename to read the value from. Pass "-" to read from standard input.
+			- if the value starts with %[1]s@%[1]s, the rest of the value is interpreted as a
+			  filename to read the value from. Pass %[1]s-%[1]s to read from standard input.
 
-			For GraphQL requests, all fields other than "query" and "operationName" are
+			For GraphQL requests, all fields other than %[1]squery%[1]s and %[1]soperationName%[1]s are
 			interpreted as GraphQL variables.
 
-			To pass nested parameters in the request payload, use "key[subkey]=value" syntax when
+			To pass nested parameters in the request payload, use %[1]skey[subkey]=value%[1]s syntax when
 			declaring fields. To pass nested values as arrays, declare multiple fields with the
-			syntax "key[]=value1", "key[]=value2". To pass an empty array, use "key[]" without a
+			syntax %[1]skey[]=value1%[1]s, %[1]skey[]=value2%[1]s. To pass an empty array, use %[1]skey[]%[1]s without a
 			value.
 
 			To pass pre-constructed JSON or payloads in other formats, a request body may be read
-			from file specified by %[1]s--input%[1]s. Use "-" to read from standard input. When passing the
+			from file specified by %[1]s--input%[1]s. Use %[1]s-%[1]s to read from standard input. When passing the
 			request body this way, any parameters specified via field flags are added to the query
 			string of the endpoint URL.
 
 			In %[1]s--paginate%[1]s mode, all pages of results will sequentially be requested until
 			there are no more pages of results. For GraphQL requests, this requires that the
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
-			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection.
+			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection. Each page is a separate
+			JSON array or object. Pass %[1]s--slurp%[1]s to wrap all pages of JSON arrays or objects
+			into an outer JSON array.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list releases in the current repository
@@ -142,6 +149,13 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			$ gh api repos/{owner}/{repo}/issues --template \
 			  '{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " | color "yellow"}}){{"\n"}}{{end}}'
 
+			# update allowed values of the "environment" custom property in a deeply nested array
+			gh api -X PATCH /orgs/{org}/properties/schema \
+			   -F 'properties[][property_name]=environment' \
+			   -F 'properties[][default_value]=production' \
+			   -F 'properties[][allowed_values][]=staging' \
+			   -F 'properties[][allowed_values][]=production'
+
 			# list releases with GraphQL
 			$ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
 			  query($name: String!, $owner: String!) {
@@ -167,6 +181,22 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			    }
 			  }
 			'
+
+			# get the percentage of forks for the current user
+			$ gh api graphql --paginate --slurp -f query='
+			  query($endCursor: String) {
+			    viewer {
+			      repositories(first: 100, after: $endCursor) {
+			        nodes { isFork }
+			        pageInfo {
+			          hasNextPage
+			          endCursor
+			        }
+			      }
+			    }
+			  }
+			' | jq 'def count(e): reduce e as $_ (0;.+1);
+			[.[].data.viewer.repositories.nodes[]] as $r | count(select($r[].isFork))/count($r[])'
 		`),
 		Annotations: map[string]string{
 			"help:environment": heredoc.Doc(`
@@ -209,6 +239,19 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return err
 			}
 
+			if opts.Slurp && !opts.Paginate {
+				return cmdutil.FlagErrorf("`--paginate` required when passing `--slurp`")
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"the `--slurp` option is not supported with `--jq` or `--template`",
+				opts.Slurp,
+				opts.FilterOutput != "",
+				opts.Template != "",
+			); err != nil {
+				return err
+			}
+
 			if err := cmdutil.MutuallyExclusive(
 				"only one of `--template`, `--jq`, `--silent`, or `--verbose` may be used",
 				opts.Verbose,
@@ -233,6 +276,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
 	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "GitHub API preview `names` to request (without the \"-preview\" suffix)")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
+	cmd.Flags().BoolVar(&opts.Slurp, "slurp", false, "Use with \"--paginate\" to return an array of all pages of either JSON arrays or objects")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
@@ -265,8 +309,38 @@ func apiRun(opts *ApiOptions) error {
 		method = "POST"
 	}
 
+	if !opts.Silent {
+		if err := opts.IO.StartPager(); err == nil {
+			defer opts.IO.StopPager()
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+		}
+	}
+
+	var bodyWriter io.Writer = opts.IO.Out
+	var headersWriter io.Writer = opts.IO.Out
+	if opts.Silent {
+		bodyWriter = io.Discard
+	}
+	if opts.Verbose {
+		// httpClient handles output when verbose flag is specified.
+		bodyWriter = io.Discard
+		headersWriter = io.Discard
+	}
+
 	if opts.Paginate && !isGraphQL {
 		requestPath = addPerPage(requestPath, 100, params)
+	}
+
+	// Similar to `jq --slurp`, write all pages JSON arrays or objects into a JSON array.
+	if opts.Paginate && opts.Slurp {
+		w := &jsonArrayWriter{
+			Writer: bodyWriter,
+			color:  opts.IO.ColorEnabled(),
+		}
+		defer w.Close()
+
+		bodyWriter = w
 	}
 
 	if opts.RequestInputFile != "" {
@@ -298,14 +372,13 @@ func apiRun(opts *ApiOptions) error {
 				log = opts.IO.Out
 			}
 			opts := api.HTTPClientOptions{
-				AppVersion:        opts.AppVersion,
-				CacheTTL:          opts.CacheTTL,
-				Config:            cfg.Authentication(),
-				EnableCache:       opts.CacheTTL > 0,
-				Log:               log,
-				LogColorize:       opts.IO.ColorEnabled(),
-				LogVerboseHTTP:    opts.Verbose,
-				SkipAcceptHeaders: true,
+				AppVersion:     opts.AppVersion,
+				CacheTTL:       opts.CacheTTL,
+				Config:         cfg.Authentication(),
+				EnableCache:    opts.CacheTTL > 0,
+				Log:            log,
+				LogColorize:    opts.IO.ColorEnabled(),
+				LogVerboseHTTP: opts.Verbose,
 			}
 			return api.NewHTTPClient(opts)
 		}
@@ -313,25 +386,6 @@ func apiRun(opts *ApiOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
-	}
-
-	if !opts.Silent {
-		if err := opts.IO.StartPager(); err == nil {
-			defer opts.IO.StopPager()
-		} else {
-			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
-		}
-	}
-
-	var bodyWriter io.Writer = opts.IO.Out
-	var headersWriter io.Writer = opts.IO.Out
-	if opts.Silent {
-		bodyWriter = io.Discard
-	}
-	if opts.Verbose {
-		// httpClient handles output when verbose flag is specified.
-		bodyWriter = io.Discard
-		headersWriter = io.Discard
 	}
 
 	host, _ := cfg.Authentication().DefaultHost()
@@ -357,6 +411,12 @@ func apiRun(opts *ApiOptions) error {
 		if !isGraphQL {
 			requestPath, hasNextPage = findNextPage(resp)
 			requestBody = nil // prevent repeating GET parameters
+		}
+
+		// Tell optional jsonArrayWriter to start a new page.
+		err = startPage(bodyWriter)
+		if err != nil {
+			return err
 		}
 
 		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, tmpl, isFirstPage, !hasNextPage)
@@ -418,7 +478,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 		// TODO: reuse parsed query across pagination invocations
 		indent := ""
 		if opts.IO.IsStdoutTTY() {
-			indent = "  "
+			indent = ttyIndent
 		}
 		err = jq.EvaluateFormatted(responseBody, bodyWriter, opts.FilterOutput, indent, opts.IO.ColorEnabled())
 		if err != nil {
@@ -430,9 +490,9 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 			return
 		}
 	} else if isJSON && opts.IO.ColorEnabled() {
-		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
+		err = jsoncolor.Write(bodyWriter, responseBody, ttyIndent)
 	} else {
-		if isJSON && opts.Paginate && !isGraphQLPaginate && !opts.ShowResponseHeaders {
+		if isJSON && opts.Paginate && !opts.Slurp && !isGraphQLPaginate && !opts.ShowResponseHeaders {
 			responseBody = &paginatedArrayReader{
 				Reader:      responseBody,
 				isFirstPage: isFirstPage,

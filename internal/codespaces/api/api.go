@@ -201,6 +201,7 @@ type Codespace struct {
 	GitStatus                      CodespaceGitStatus  `json:"git_status"`
 	Connection                     CodespaceConnection `json:"connection"`
 	Machine                        CodespaceMachine    `json:"machine"`
+	RuntimeConstraints             RuntimeConstraints  `json:"runtime_constraints"`
 	VSCSTarget                     string              `json:"vscs_target"`
 	PendingOperation               bool                `json:"pending_operation"`
 	PendingOperationDisabledReason string              `json:"pending_operation_disabled_reason"`
@@ -246,11 +247,20 @@ const (
 )
 
 type CodespaceConnection struct {
-	SessionID      string   `json:"sessionId"`
-	SessionToken   string   `json:"sessionToken"`
-	RelayEndpoint  string   `json:"relayEndpoint"`
-	RelaySAS       string   `json:"relaySas"`
-	HostPublicKeys []string `json:"hostPublicKeys"`
+	TunnelProperties TunnelProperties `json:"tunnelProperties"`
+}
+
+type TunnelProperties struct {
+	ConnectAccessToken     string `json:"connectAccessToken"`
+	ManagePortsAccessToken string `json:"managePortsAccessToken"`
+	ServiceUri             string `json:"serviceUri"`
+	TunnelId               string `json:"tunnelId"`
+	ClusterId              string `json:"clusterId"`
+	Domain                 string `json:"domain"`
+}
+
+type RuntimeConstraints struct {
+	AllowedPortPrivacySettings []string `json:"allowed_port_privacy_settings"`
 }
 
 // ListCodespaceFields is the list of exportable fields for a codespace when using the `gh cs list` command.
@@ -627,6 +637,45 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 	}
 
 	return response.Machines, nil
+}
+
+// GetCodespacesPermissionsCheck returns a bool indicating whether the user has accepted permissions for the given repo and devcontainer path.
+func (a *API) GetCodespacesPermissionsCheck(ctx context.Context, repoID int, branch string, devcontainerPath string) (bool, error) {
+	reqURL := fmt.Sprintf("%s/repositories/%d/codespaces/permissions_check", a.githubAPI, repoID)
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("error creating request: %w", err)
+	}
+
+	q := req.URL.Query()
+	q.Add("ref", branch)
+	q.Add("devcontainer_path", devcontainerPath)
+	req.URL.RawQuery = q.Encode()
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/repositories/*/codespaces/permissions_check")
+	if err != nil {
+		return false, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, api.HandleHTTPError(resp)
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var response struct {
+		Accepted bool `json:"accepted"`
+	}
+	if err := json.Unmarshal(b, &response); err != nil {
+		return false, fmt.Errorf("error unmarshalling response: %w", err)
+	}
+
+	return response.Accepted, nil
 }
 
 // RepoSearchParameters are the optional parameters for searching for repositories.
@@ -1161,4 +1210,14 @@ func (a *API) withRetry(f func() (*http.Response, error)) (*http.Response, error
 		}
 		return nil, fmt.Errorf("received response with status code %d", resp.StatusCode)
 	}, backoff.WithMaxRetries(bo, 3))
+}
+
+// HTTPClient returns the HTTP client used to make requests to the API.
+func (a *API) HTTPClient() (*http.Client, error) {
+	httpClient, err := a.client()
+	if err != nil {
+		return nil, err
+	}
+
+	return httpClient, nil
 }

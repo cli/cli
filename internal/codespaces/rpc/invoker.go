@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
-	"github.com/cli/cli/v2/pkg/liveshare"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -31,6 +31,7 @@ const (
 	codespacesInternalSessionName = "CodespacesInternal"
 	clientName                    = "gh"
 	connectedEventName            = "connected"
+	keepAliveEventName            = "keepAlive"
 )
 
 type StartSSHServerOptions struct {
@@ -43,24 +44,26 @@ type Invoker interface {
 	RebuildContainer(ctx context.Context, full bool) error
 	StartSSHServer(ctx context.Context) (int, string, error)
 	StartSSHServerWithOptions(ctx context.Context, options StartSSHServerOptions) (int, string, error)
+	KeepAlive()
 }
 
 type invoker struct {
-	conn            *grpc.ClientConn
-	session         liveshare.LiveshareSession
-	listener        net.Listener
-	jupyterClient   jupyter.JupyterServerHostClient
-	codespaceClient codespace.CodespaceHostClient
-	sshClient       ssh.SshServerHostClient
-	cancelPF        context.CancelFunc
+	conn              *grpc.ClientConn
+	fwd               portforwarder.PortForwarder
+	listener          net.Listener
+	jupyterClient     jupyter.JupyterServerHostClient
+	codespaceClient   codespace.CodespaceHostClient
+	sshClient         ssh.SshServerHostClient
+	cancelPF          context.CancelFunc
+	keepAliveOverride bool
 }
 
 // Connects to the internal RPC server and returns a new invoker for it
-func CreateInvoker(ctx context.Context, session liveshare.LiveshareSession) (Invoker, error) {
+func CreateInvoker(ctx context.Context, fwd portforwarder.PortForwarder) (Invoker, error) {
 	ctx, cancel := context.WithTimeout(ctx, ConnectionTimeout)
 	defer cancel()
 
-	invoker, err := connect(ctx, session)
+	invoker, err := connect(ctx, fwd)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to internal server: %w", err)
 	}
@@ -69,7 +72,7 @@ func CreateInvoker(ctx context.Context, session liveshare.LiveshareSession) (Inv
 }
 
 // Finds a free port to listen on and creates a new RPC invoker that connects to that port
-func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, error) {
+func connect(ctx context.Context, fwd portforwarder.PortForwarder) (Invoker, error) {
 	listener, err := listenTCP()
 	if err != nil {
 		return nil, err
@@ -77,7 +80,7 @@ func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, 
 	localAddress := listener.Addr().String()
 
 	invoker := &invoker{
-		session:  session,
+		fwd:      fwd,
 		listener: listener,
 	}
 
@@ -100,8 +103,12 @@ func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, 
 
 	// Tunnel the remote gRPC server port to the local port
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, codespacesInternalSessionName, codespacesInternalPort, true)
-		ch <- fwd.ForwardToListener(pfctx, listener)
+		// Start forwarding the port locally
+		opts := portforwarder.ForwardPortOpts{
+			Port:     codespacesInternalPort,
+			Internal: true,
+		}
+		ch <- fwd.ForwardPortToListener(pfctx, opts, listener)
 	}()
 
 	var conn *grpc.ClientConn
@@ -109,9 +116,8 @@ func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, 
 		// Attempt to connect to the port
 		opts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithBlock(),
 		}
-		conn, err = grpc.DialContext(connectctx, localAddress, opts...)
+		conn, err = grpc.NewClient(localAddress, opts...)
 		ch <- err // nil if we successfully connected
 	}()
 
@@ -252,6 +258,12 @@ func listenTCP() (*net.TCPListener, error) {
 	return listener, nil
 }
 
+// KeepAlive sets a flag to continuously send activity signals to
+// the codespace even if there is no other activity (e.g. stdio)
+func (i *invoker) KeepAlive() {
+	i.keepAliveOverride = true
+}
+
 // Periodically check whether there is a reason to keep the connection alive, and if so, notify the codespace to do so
 func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
@@ -262,7 +274,15 @@ func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			reason := i.session.GetKeepAliveReason()
+			reason := ""
+
+			// If the keep alive override flag is set, we don't need to check for activity on the forwarder
+			// Otherwise, grab the reason from the forwarder
+			if i.keepAliveOverride {
+				reason = keepAliveEventName
+			} else {
+				reason = i.fwd.GetKeepAliveReason()
+			}
 			_ = i.notifyCodespaceOfClientActivity(ctx, reason)
 		}
 	}

@@ -21,11 +21,14 @@ type ListOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Exporter   cmdutil.Exporter
 	Now        time.Time
 
 	Limit int
 	Order string
 	Sort  string
+	Key   string
+	Ref   string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -36,7 +39,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List Github Actions caches",
+		Short: "List GitHub Actions caches",
 		Example: heredoc.Doc(`
 		# List caches for current repository
 		$ gh cache list
@@ -46,6 +49,15 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 		# List caches sorted by least recently accessed
 		$ gh cache list --sort last_accessed_at --order asc
+
+		# List caches that have keys matching a prefix (or that match exactly)
+		$ gh cache list --key key-prefix
+
+		# To list caches for a specific branch, replace <branch-name> with the actual branch name
+		$ gh cache list --ref refs/heads/<branch-name>
+
+		# To list caches for a specific pull request, replace <pr-number> with the actual pull request number
+		$ gh cache list --ref refs/pull/<pr-number>/merge
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -68,6 +80,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of caches to fetch")
 	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "O", "desc", []string{"asc", "desc"}, "Order of caches returned")
 	cmdutil.StringEnumFlag(cmd, &opts.Sort, "sort", "S", "last_accessed_at", []string{"created_at", "last_accessed_at", "size_in_bytes"}, "Sort fetched caches")
+	cmd.Flags().StringVarP(&opts.Key, "key", "k", "", "Filter by cache key prefix")
+	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "Filter by ref, formatted as refs/heads/<branch name> or refs/pull/<number>/merge")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.CacheFields)
 
 	return cmd
 }
@@ -85,7 +100,7 @@ func listRun(opts *ListOptions) error {
 	client := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	result, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order})
+	result, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order, Key: opts.Key, Ref: opts.Ref})
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("%s Failed to get caches: %w", opts.IO.ColorScheme().FailureIcon(), err)
@@ -101,6 +116,10 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.Out, "Failed to start pager: %v\n", err)
 	}
 
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, result.ActionsCaches)
+	}
+
 	if opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.Out, "\nShowing %d of %s in %s\n\n", len(result.ActionsCaches), text.Pluralize(result.TotalCount, "cache"), ghrepo.FullName(repo))
 	}
@@ -109,14 +128,13 @@ func listRun(opts *ListOptions) error {
 		opts.Now = time.Now()
 	}
 
-	tp := tableprinter.New(opts.IO)
-	tp.HeaderRow("ID", "KEY", "SIZE", "CREATED", "ACCESSED")
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("ID", "KEY", "SIZE", "CREATED", "ACCESSED"))
 	for _, cache := range result.ActionsCaches {
 		tp.AddField(opts.IO.ColorScheme().Cyan(fmt.Sprintf("%d", cache.Id)))
 		tp.AddField(cache.Key)
 		tp.AddField(humanFileSize(cache.SizeInBytes))
-		tp.AddTimeField(time.Now(), cache.CreatedAt, opts.IO.ColorScheme().Gray)
-		tp.AddTimeField(time.Now(), cache.LastAccessedAt, opts.IO.ColorScheme().Gray)
+		tp.AddTimeField(opts.Now, cache.CreatedAt, opts.IO.ColorScheme().Gray)
+		tp.AddTimeField(opts.Now, cache.LastAccessedAt, opts.IO.ColorScheme().Gray)
 		tp.EndRow()
 	}
 

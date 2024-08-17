@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
@@ -61,9 +62,9 @@ func TestListRun(t *testing.T) {
 			isTTY: true,
 			wantStdout: heredoc.Doc(`
 				TITLE          ID    KEY                  TYPE            ADDED
-				Mac            1234  ssh-rsa AAAABbBB123  authentication  1d
-				hubot@Windows  5678  ssh-rsa EEEEEEEK247  authentication  1d
-				Mac Signing    321   ssh-rsa AAAABbBB123  signing         1d
+				Mac            1234  ssh-rsa AAAABbBB123  authentication  about 1 day ago
+				hubot@Windows  5678  ssh-rsa EEEEEEEK247  authentication  about 1 day ago
+				Mac Signing    321   ssh-rsa AAAABbBB123  signing         about 1 day ago
 			`),
 			wantStderr: "",
 		},
@@ -138,7 +139,7 @@ func TestListRun(t *testing.T) {
 			},
 			wantStdout: heredoc.Doc(`
 				TITLE  ID    KEY                  TYPE            ADDED
-				Mac    1234  ssh-rsa AAAABbBB123  authentication  1d
+				Mac    1234  ssh-rsa AAAABbBB123  authentication  about 1 day ago
 			`),
 			wantStderr: heredoc.Doc(`
 			warning:  HTTP 404 (https://api.github.com/user/ssh_signing_keys?per_page=100)
@@ -172,7 +173,7 @@ func TestListRun(t *testing.T) {
 			},
 			wantStdout: heredoc.Doc(`
 				TITLE  ID    KEY                  TYPE     ADDED
-				Mac    1234  ssh-rsa AAAABbBB123  signing  1d
+				Mac    1234  ssh-rsa AAAABbBB123  signing  about 1 day ago
 			`),
 			wantStderr: heredoc.Doc(`
 				warning:  HTTP 404 (https://api.github.com/user/keys?per_page=100)
@@ -233,7 +234,7 @@ func TestListRun(t *testing.T) {
 
 			opts := tt.opts
 			opts.IO = ios
-			opts.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
+			opts.Config = func() (gh.Config, error) { return config.NewBlankConfig(), nil }
 
 			err := listRun(&opts)
 			if (err != nil) != tt.wantErr {

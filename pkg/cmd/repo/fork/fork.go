@@ -14,7 +14,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -32,7 +32,7 @@ type iprompter interface {
 type ForkOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (ghContext.Remotes, error)
@@ -88,11 +88,13 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 			With no argument, creates a fork of the current repository. Otherwise, forks
 			the specified repository.
 
-			By default, the new fork is set to be your "origin" remote and any existing
-			origin remote is renamed to "upstream". To alter this behavior, you can set
+			By default, the new fork is set to be your %[1]sorigin%[1]s remote and any existing
+			origin remote is renamed to %[1]supstream%[1]s. To alter this behavior, you can set
 			a name for the new fork's remote with %[1]s--remote-name%[1]s.
 
-			Additional git clone flags can be passed after %[1]s--%[1]s.
+			The %[1]supstream%[1]s remote will be set as the default remote repository.
+
+			Additional %[1]sgit clone%[1]s flags can be passed after %[1]s--%[1]s.
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptOk := opts.IO.CanPrompt()
@@ -241,7 +243,9 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol, _ := cfg.Get(repoToFork.RepoHost(), "git_protocol")
+	protocolConfig := cfg.GitProtocol(repoToFork.RepoHost())
+	protocolIsConfiguredByUser := protocolConfig.Source == gh.ConfigUserProvided
+	protocol := protocolConfig.Value
 
 	gitClient := opts.GitClient
 	ctx := context.Background()
@@ -252,7 +256,7 @@ func forkRun(opts *ForkOptions) error {
 			return err
 		}
 
-		if protocol == "" { // user has no set preference
+		if !protocolIsConfiguredByUser {
 			if remote, err := remotes.FindByRepo(repoToFork.RepoOwner(), repoToFork.RepoName()); err == nil {
 				scheme := ""
 				if remote.FetchURL != nil {
@@ -350,18 +354,26 @@ func forkRun(opts *ForkOptions) error {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 
+			gc := gitClient.Copy()
+			gc.RepoDir = cloneDir
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
-			_, err = gitClient.AddRemote(ctx, "upstream", upstreamURL, []string{}, git.WithRepoDir(cloneDir))
-			if err != nil {
+			upstreamRemote := "upstream"
+
+			if _, err := gc.AddRemote(ctx, upstreamRemote, upstreamURL, []string{}); err != nil {
 				return err
 			}
 
-			if err := gitClient.Fetch(ctx, "upstream", "", git.WithRepoDir(cloneDir)); err != nil {
+			if err := gc.SetRemoteResolution(ctx, upstreamRemote, "base"); err != nil {
+				return err
+			}
+
+			if err := gc.Fetch(ctx, upstreamRemote, ""); err != nil {
 				return err
 			}
 
 			if connectedToTerminal {
 				fmt.Fprintf(stderr, "%s Cloned fork\n", cs.SuccessIcon())
+				fmt.Fprintf(stderr, "%s Repository %s set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n", cs.WarningIcon(), cs.Bold(ghrepo.FullName(repoToFork)))
 			}
 		}
 	}

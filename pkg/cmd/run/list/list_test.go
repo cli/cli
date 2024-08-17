@@ -2,6 +2,7 @@ package list
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -169,16 +170,166 @@ func TestListRun(t *testing.T) {
 			},
 			wantOut: heredoc.Doc(`
 				STATUS  TITLE        WORKFLOW  BRANCH  EVENT  ID    ELAPSED  AGE
-				X       cool commit  CI        trunk   push   1     4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   2     4m34s    Feb 23, 2021
-				✓       cool commit  CI        trunk   push   3     4m34s    Feb 23, 2021
-				X       cool commit  CI        trunk   push   4     4m34s    Feb 23, 2021
-				X       cool commit  CI        trunk   push   1234  4m34s    Feb 23, 2021
-				-       cool commit  CI        trunk   push   6     4m34s    Feb 23, 2021
-				-       cool commit  CI        trunk   push   7     4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   8     4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   9     4m34s    Feb 23, 2021
-				X       cool commit  CI        trunk   push   10    4m34s    Feb 23, 2021
+				X       cool commit  CI        trunk   push   1     4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   2     4m34s    about 4 minutes ago
+				✓       cool commit  CI        trunk   push   3     4m34s    about 4 minutes ago
+				X       cool commit  CI        trunk   push   4     4m34s    about 4 minutes ago
+				X       cool commit  CI        trunk   push   1234  4m34s    about 4 minutes ago
+				-       cool commit  CI        trunk   push   6     4m34s    about 4 minutes ago
+				-       cool commit  CI        trunk   push   7     4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   8     4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   9     4m34s    about 4 minutes ago
+				X       cool commit  CI        trunk   push   10    4m34s    about 4 minutes ago
+			`),
+		},
+		{
+			name: "inactive disabled workflow selected",
+			opts: &ListOptions{
+				Limit:            defaultLimit,
+				now:              shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+				WorkflowSelector: "d. inact",
+				All:              false,
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				// Uses abbreviated names and commit messages because of output column limit
+				workflow := workflowShared.Workflow{
+					Name:  "d. inact",
+					ID:    1206,
+					Path:  ".github/workflows/disabledInactivity.yml",
+					State: workflowShared.DisabledInactivity,
+				}
+
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							workflow,
+						},
+					}))
+			},
+			wantErr:    true,
+			wantErrMsg: "could not find any workflows named d. inact",
+		},
+		{
+			name: "inactive disabled workflow selected and all states applied",
+			opts: &ListOptions{
+				Limit:            defaultLimit,
+				now:              shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+				WorkflowSelector: "d. inact",
+				All:              true,
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				// Uses abbreviated names and commit messages because of output column limit
+				workflow := workflowShared.Workflow{
+					Name:  "d. inact",
+					ID:    1206,
+					Path:  ".github/workflows/disabledInactivity.yml",
+					State: workflowShared.DisabledInactivity,
+				}
+
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							workflow,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", fmt.Sprintf("repos/OWNER/REPO/actions/workflows/%d/runs", workflow.ID)),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: []shared.Run{
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 101, shared.Completed, shared.TimedOut, "dicto"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 102, shared.InProgress, shared.TimedOut, "diito"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 103, shared.Completed, shared.Success, "dics"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 104, shared.Completed, shared.Cancelled, "dicc"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 105, shared.Completed, shared.Failure, "dicf"),
+						},
+					}))
+			},
+			wantOut: heredoc.Doc(`
+				STATUS  TITLE  WORKFLOW  BRANCH  EVENT  ID   ELAPSED  AGE
+				X       dicto  d. inact  trunk   push   101  4m34s    about 4 minutes ago
+				*       diito  d. inact  trunk   push   102  4m34s    about 4 minutes ago
+				✓       dics   d. inact  trunk   push   103  4m34s    about 4 minutes ago
+				X       dicc   d. inact  trunk   push   104  4m34s    about 4 minutes ago
+				X       dicf   d. inact  trunk   push   105  4m34s    about 4 minutes ago
+			`),
+		},
+		{
+			name: "manually disabled workflow selected",
+			opts: &ListOptions{
+				Limit:            defaultLimit,
+				now:              shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+				WorkflowSelector: "d. man",
+				All:              false,
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				// Uses abbreviated names and commit messages because of output column limit
+				workflow := workflowShared.Workflow{
+					Name:  "d. man",
+					ID:    456,
+					Path:  ".github/workflows/disabled.yml",
+					State: workflowShared.DisabledManually,
+				}
+
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							workflow,
+						},
+					}))
+			},
+			wantErr:    true,
+			wantErrMsg: "could not find any workflows named d. man",
+		},
+		{
+			name: "manually disabled workflow selected and all states applied",
+			opts: &ListOptions{
+				Limit:            defaultLimit,
+				now:              shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+				WorkflowSelector: "d. man",
+				All:              true,
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				// Uses abbreviated names and commit messages because of output column limit
+				workflow := workflowShared.Workflow{
+					Name:  "d. man",
+					ID:    456,
+					Path:  ".github/workflows/disabled.yml",
+					State: workflowShared.DisabledManually,
+				}
+
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							workflow,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", fmt.Sprintf("repos/OWNER/REPO/actions/workflows/%d/runs", workflow.ID)),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: []shared.Run{
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 201, shared.Completed, shared.TimedOut, "dmcto"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 202, shared.InProgress, shared.TimedOut, "dmito"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 203, shared.Completed, shared.Success, "dmcs"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 204, shared.Completed, shared.Cancelled, "dmcc"),
+							shared.TestRunWithWorkflowAndCommit(workflow.ID, 205, shared.Completed, shared.Failure, "dmcf"),
+						},
+					}))
+			},
+			wantOut: heredoc.Doc(`
+				STATUS  TITLE  WORKFLOW  BRANCH  EVENT  ID   ELAPSED  AGE
+				X       dmcto  d. man    trunk   push   201  4m34s    about 4 minutes ago
+				*       dmito  d. man    trunk   push   202  4m34s    about 4 minutes ago
+				✓       dmcs   d. man    trunk   push   203  4m34s    about 4 minutes ago
+				X       dmcc   d. man    trunk   push   204  4m34s    about 4 minutes ago
+				X       dmcf   d. man    trunk   push   205  4m34s    about 4 minutes ago
 			`),
 		},
 		{
@@ -203,16 +354,16 @@ func TestListRun(t *testing.T) {
 					}))
 			},
 			wantOut: heredoc.Doc(`
-				completed	timed_out	cool commit	CI	trunk	push	1	4m34s	Feb 23, 2021
-				in_progress		cool commit	CI	trunk	push	2	4m34s	Feb 23, 2021
-				completed	success	cool commit	CI	trunk	push	3	4m34s	Feb 23, 2021
-				completed	cancelled	cool commit	CI	trunk	push	4	4m34s	Feb 23, 2021
-				completed	failure	cool commit	CI	trunk	push	1234	4m34s	Feb 23, 2021
-				completed	neutral	cool commit	CI	trunk	push	6	4m34s	Feb 23, 2021
-				completed	skipped	cool commit	CI	trunk	push	7	4m34s	Feb 23, 2021
-				requested		cool commit	CI	trunk	push	8	4m34s	Feb 23, 2021
-				queued		cool commit	CI	trunk	push	9	4m34s	Feb 23, 2021
-				completed	stale	cool commit	CI	trunk	push	10	4m34s	Feb 23, 2021
+				completed	timed_out	cool commit	CI	trunk	push	1	4m34s	2021-02-23T04:51:00Z
+				in_progress		cool commit	CI	trunk	push	2	4m34s	2021-02-23T04:51:00Z
+				completed	success	cool commit	CI	trunk	push	3	4m34s	2021-02-23T04:51:00Z
+				completed	cancelled	cool commit	CI	trunk	push	4	4m34s	2021-02-23T04:51:00Z
+				completed	failure	cool commit	CI	trunk	push	1234	4m34s	2021-02-23T04:51:00Z
+				completed	neutral	cool commit	CI	trunk	push	6	4m34s	2021-02-23T04:51:00Z
+				completed	skipped	cool commit	CI	trunk	push	7	4m34s	2021-02-23T04:51:00Z
+				requested		cool commit	CI	trunk	push	8	4m34s	2021-02-23T04:51:00Z
+				queued		cool commit	CI	trunk	push	9	4m34s	2021-02-23T04:51:00Z
+				completed	stale	cool commit	CI	trunk	push	10	4m34s	2021-02-23T04:51:00Z
 			`),
 		},
 		{
@@ -249,107 +400,107 @@ func TestListRun(t *testing.T) {
 			},
 			wantOut: heredoc.Doc(`
 				STATUS  TITLE        WORKFLOW  BRANCH  EVENT  ID   ELAPSED  AGE
-				*       cool commit  CI        trunk   push   0    4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   1    4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   2    4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   3    4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   4    4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   5    4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   6    4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   7    4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   8    4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   9    4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   10   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   11   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   12   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   13   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   14   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   15   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   16   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   17   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   18   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   19   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   20   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   21   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   22   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   23   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   24   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   25   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   26   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   27   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   28   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   29   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   30   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   31   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   32   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   33   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   34   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   35   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   36   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   37   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   38   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   39   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   40   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   41   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   42   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   43   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   44   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   45   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   46   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   47   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   48   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   49   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   50   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   51   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   52   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   53   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   54   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   55   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   56   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   57   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   58   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   59   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   60   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   61   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   62   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   63   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   64   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   65   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   66   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   67   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   68   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   69   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   70   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   71   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   72   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   73   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   74   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   75   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   76   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   77   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   78   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   79   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   80   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   81   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   82   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   83   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   84   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   85   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   86   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   87   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   88   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   89   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   90   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   91   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   92   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   93   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   94   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   95   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   96   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   97   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   98   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   99   4m34s    Feb 23, 2021
-				*       cool commit  CI        trunk   push   100  4m34s    Feb 23, 2021
+				*       cool commit  CI        trunk   push   0    4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   1    4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   2    4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   3    4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   4    4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   5    4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   6    4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   7    4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   8    4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   9    4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   10   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   11   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   12   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   13   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   14   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   15   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   16   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   17   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   18   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   19   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   20   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   21   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   22   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   23   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   24   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   25   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   26   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   27   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   28   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   29   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   30   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   31   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   32   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   33   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   34   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   35   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   36   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   37   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   38   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   39   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   40   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   41   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   42   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   43   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   44   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   45   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   46   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   47   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   48   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   49   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   50   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   51   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   52   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   53   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   54   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   55   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   56   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   57   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   58   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   59   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   60   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   61   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   62   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   63   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   64   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   65   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   66   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   67   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   68   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   69   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   70   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   71   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   72   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   73   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   74   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   75   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   76   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   77   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   78   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   79   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   80   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   81   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   82   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   83   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   84   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   85   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   86   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   87   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   88   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   89   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   90   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   91   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   92   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   93   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   94   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   95   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   96   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   97   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   98   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   99   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   100  4m34s    about 4 minutes ago
 			`),
 		},
 		{
@@ -386,9 +537,9 @@ func TestListRun(t *testing.T) {
 			},
 			wantOut: heredoc.Doc(`
 				STATUS  TITLE        WORKFLOW    BRANCH  EVENT  ID    ELAPSED  AGE
-				*       cool commit  a workflow  trunk   push   2     4m34s    Feb 23, 2021
-				✓       cool commit  a workflow  trunk   push   3     4m34s    Feb 23, 2021
-				X       cool commit  a workflow  trunk   push   1234  4m34s    Feb 23, 2021
+				*       cool commit  a workflow  trunk   push   2     4m34s    about 4 minute...
+				✓       cool commit  a workflow  trunk   push   3     4m34s    about 4 minute...
+				X       cool commit  a workflow  trunk   push   1234  4m34s    about 4 minute...
 			`),
 		},
 		{
@@ -472,6 +623,24 @@ func TestListRun(t *testing.T) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
 						"created": []string{">=2023-04-24"},
+					}),
+					httpmock.JSONResponse(shared.RunsPayload{}),
+				)
+			},
+			wantErr:    true,
+			wantErrMsg: "no runs found",
+		},
+		{
+			name: "commit filter applied",
+			opts: &ListOptions{
+				Limit:  defaultLimit,
+				Commit: "1234567890123456789012345678901234567890",
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
+						"head_sha": []string{"1234567890123456789012345678901234567890"},
 					}),
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)

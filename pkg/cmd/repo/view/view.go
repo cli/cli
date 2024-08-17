@@ -11,7 +11,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -26,7 +26,7 @@ type ViewOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
 	Exporter   cmdutil.Exporter
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 
 	RepoArg string
 	Web     bool
@@ -45,13 +45,15 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "view [<repository>]",
 		Short: "View a repository",
-		Long: `Display the description and the README of a GitHub repository.
+		Long: heredoc.Docf(`
+			Display the description and the README of a GitHub repository.
 
-With no argument, the repository for the current directory is displayed.
+			With no argument, the repository for the current directory is displayed.
 
-With '--web', open the repository in a web browser instead.
+			With %[1]s--web%[1]s, open the repository in a web browser instead.
 
-With '--branch', view a specific branch of the repository.`,
+			With %[1]s--branch%[1]s, view a specific branch of the repository.
+		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) > 0 {

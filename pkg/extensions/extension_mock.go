@@ -35,6 +35,9 @@ var _ Extension = &ExtensionMock{}
 //			NameFunc: func() string {
 //				panic("mock out the Name method")
 //			},
+//			OwnerFunc: func() string {
+//				panic("mock out the Owner method")
+//			},
 //			PathFunc: func() string {
 //				panic("mock out the Path method")
 //			},
@@ -69,6 +72,9 @@ type ExtensionMock struct {
 	// NameFunc mocks the Name method.
 	NameFunc func() string
 
+	// OwnerFunc mocks the Owner method.
+	OwnerFunc func() string
+
 	// PathFunc mocks the Path method.
 	PathFunc func() string
 
@@ -98,6 +104,9 @@ type ExtensionMock struct {
 		// Name holds details about calls to the Name method.
 		Name []struct {
 		}
+		// Owner holds details about calls to the Owner method.
+		Owner []struct {
+		}
 		// Path holds details about calls to the Path method.
 		Path []struct {
 		}
@@ -114,6 +123,7 @@ type ExtensionMock struct {
 	lockIsPinned        sync.RWMutex
 	lockLatestVersion   sync.RWMutex
 	lockName            sync.RWMutex
+	lockOwner           sync.RWMutex
 	lockPath            sync.RWMutex
 	lockURL             sync.RWMutex
 	lockUpdateAvailable sync.RWMutex
@@ -278,6 +288,33 @@ func (mock *ExtensionMock) NameCalls() []struct {
 	mock.lockName.RLock()
 	calls = mock.calls.Name
 	mock.lockName.RUnlock()
+	return calls
+}
+
+// Owner calls OwnerFunc.
+func (mock *ExtensionMock) Owner() string {
+	if mock.OwnerFunc == nil {
+		panic("ExtensionMock.OwnerFunc: method is nil but Extension.Owner was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockOwner.Lock()
+	mock.calls.Owner = append(mock.calls.Owner, callInfo)
+	mock.lockOwner.Unlock()
+	return mock.OwnerFunc()
+}
+
+// OwnerCalls gets all the calls that were made to Owner.
+// Check the length with:
+//
+//	len(mockedExtension.OwnerCalls())
+func (mock *ExtensionMock) OwnerCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockOwner.RLock()
+	calls = mock.calls.Owner
+	mock.lockOwner.RUnlock()
 	return calls
 }
 

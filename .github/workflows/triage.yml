@@ -1,0 +1,67 @@
+name: Discussion Triage
+run-name: ${{ github.event_name == 'issues' && github.event.issue.title || github.event.pull_request.title }}
+on:
+  issues:
+    types:
+      - labeled
+  pull_request_target:
+    types:
+      - labeled
+env:
+  TARGET_REPO: github/cli
+jobs:
+  issue:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'discuss'
+    steps:
+      - name: Create issue based on source issue
+        env:
+          BODY: ${{ github.event.issue.body }}
+          CREATED: ${{ github.event.issue.created_at }}
+          GH_TOKEN: ${{ secrets.CLI_DISCUSSION_TRIAGE_TOKEN }}
+          LINK: ${{ github.repository }}#${{ github.event.issue.number }}
+          TITLE: ${{ github.event.issue.title }}
+          TRIGGERED_BY: ${{ github.triggering_actor }}
+        run: |
+          # Markdown quote source body by replacing newlines for newlines and markdown quoting
+          BODY="${BODY//$'\n'/$'\n'> }"
+
+          # Create issue using dynamically constructed body within heredoc
+          cat << EOF | gh issue create --title "Triage issue \"$TITLE\"" --body-file - --repo "$TARGET_REPO" --label triage
+          **Title:** $TITLE
+          **Issue:** $LINK
+          **Created:** $CREATED
+          **Triggered by:** @$TRIGGERED_BY
+
+          ---
+
+          > $BODY
+          EOF
+
+  pull_request:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target' && github.event.action == 'labeled' && github.event.label.name == 'discuss'
+    steps:
+      - name: Create issue based on source pull request
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          CREATED: ${{ github.event.pull_request.created_at }}
+          GH_TOKEN: ${{ secrets.CLI_DISCUSSION_TRIAGE_TOKEN }}
+          LINK: ${{ github.repository }}#${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+          TRIGGERED_BY: ${{ github.triggering_actor }}
+        run: |
+          # Markdown quote source body by replacing newlines for newlines and markdown quoting
+          BODY="${BODY//$'\n'/$'\n'> }"
+
+          # Create issue using dynamically constructed body within heredoc
+          cat << EOF | gh issue create --title "Triage PR \"$TITLE\"" --body-file - --repo "$TARGET_REPO" --label triage
+          **Title:** $TITLE
+          **Pull request:** $LINK
+          **Created:** $CREATED
+          **Triggered by:** @$TRIGGERED_BY
+
+          ---
+
+          > $BODY
+          EOF

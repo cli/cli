@@ -29,7 +29,7 @@ func explainer() string {
 		 - viewing and creating pull requests
 		 - viewing and creating issues
 		 - viewing and creating releases
-		 - working with Actions
+		 - working with GitHub Actions
 		 - adding repository and environment secrets`)
 }
 
@@ -121,12 +121,11 @@ func setDefaultRun(opts *SetDefaultOptions) error {
 	if opts.ViewMode {
 		if currentDefaultRepo != nil {
 			fmt.Fprintln(opts.IO.Out, displayRemoteRepoName(currentDefaultRepo))
-		} else if opts.IO.IsStdoutTTY() {
-			fmt.Fprintln(opts.IO.Out, "no default repository has been set; use `gh repo set-default` to select one")
+		} else {
+			fmt.Fprintln(opts.IO.ErrOut, "no default repository has been set; use `gh repo set-default` to select one")
 		}
 		return nil
 	}
-
 	cs := opts.IO.ColorScheme()
 
 	if opts.UnsetMode {

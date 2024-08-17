@@ -9,6 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -180,10 +181,11 @@ func Test_listRun(t *testing.T) {
 				)
 			},
 			wantOut: heredoc.Doc(`
-				1234567890  cool.txt                         1 file    public  about 6 hours ago
-				4567890123                                   1 file    public  about 6 hours ago
-				2345678901  tea leaves thwart those who ...  2 files   secret  about 6 hours ago
-				3456789012  short desc                       11 files  secret  about 6 hours ago
+				ID          DESCRIPTION                  FILES     VISIBILITY  UPDATED
+				1234567890  cool.txt                     1 file    public      about 6 hours ago
+				4567890123                               1 file    public      about 6 hours ago
+				2345678901  tea leaves thwart those ...  2 files   secret      about 6 hours ago
+				3456789012  short desc                   11 files  secret      about 6 hours ago
 			`),
 		},
 		{
@@ -214,8 +216,9 @@ func Test_listRun(t *testing.T) {
 				)
 			},
 			wantOut: heredoc.Doc(`
-				1234567890  cool.txt  1 file  public  about 6 hours ago
-				4567890123            1 file  public  about 6 hours ago
+				ID          DESCRIPTION  FILES   VISIBILITY  UPDATED
+				1234567890  cool.txt     1 file  public      about 6 hours ago
+				4567890123               1 file  public      about 6 hours ago
 			`),
 		},
 		{
@@ -261,8 +264,9 @@ func Test_listRun(t *testing.T) {
 				)
 			},
 			wantOut: heredoc.Doc(`
-				2345678901  tea leaves thwart those who ...  2 files   secret  about 6 hours ago
-				3456789012  short desc                       11 files  secret  about 6 hours ago
+				ID          DESCRIPTION                  FILES     VISIBILITY  UPDATED
+				2345678901  tea leaves thwart those ...  2 files   secret      about 6 hours ago
+				3456789012  short desc                   11 files  secret      about 6 hours ago
 			`),
 		},
 		{
@@ -285,7 +289,10 @@ func Test_listRun(t *testing.T) {
 					)),
 				)
 			},
-			wantOut: "1234567890  cool.txt  1 file  public  about 6 hours ago\n",
+			wantOut: heredoc.Doc(`
+				ID          DESCRIPTION  FILES   VISIBILITY  UPDATED
+				1234567890  cool.txt     1 file  public      about 6 hours ago
+			`),
 		},
 		{
 			name: "nontty output",
@@ -361,7 +368,7 @@ func Test_listRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		tt.opts.Config = func() (config.Config, error) {
+		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
 

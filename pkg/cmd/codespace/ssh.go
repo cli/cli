@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -18,10 +18,10 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
 	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/cli/cli/v2/pkg/ssh"
 	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
@@ -53,39 +53,39 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd := &cobra.Command{
 		Use:   "ssh [<flags>...] [-- <ssh-flags>...] [<command>]",
 		Short: "SSH into a codespace",
-		Long: heredoc.Doc(`
-			The 'ssh' command is used to SSH into a codespace. In its simplest form, you can
-			run 'gh cs ssh', select a codespace interactively, and connect.
+		Long: heredoc.Docf(`
+			The %[1]sssh%[1]s command is used to SSH into a codespace. In its simplest form, you can
+			run %[1]sgh cs ssh%[1]s, select a codespace interactively, and connect.
 			
-			The 'ssh' command will automatically create a public/private ssh key pair in the
-			~/.ssh directory if you do not have an existing valid key pair. When selecting the
+			The %[1]sssh%[1]s command will automatically create a public/private ssh key pair in the
+			%[1]s~/.ssh%[1]s directory if you do not have an existing valid key pair. When selecting the
 			key pair to use, the preferred order is:
-			  
-			1. Key specified by -i in <ssh-flags>
+
+			1. Key specified by %[1]s-i%[1]s in %[1]s<ssh-flags>%[1]s
 			2. Automatic key, if it already exists
-			3. First valid key pair in ssh config (according to ssh -G)
+			3. First valid key pair in ssh config (according to %[1]sssh -G%[1]s)
 			4. Automatic key, newly created
 
-			The 'ssh' command also supports deeper integration with OpenSSH using a '--config'
+			The %[1]sssh%[1]s command also supports deeper integration with OpenSSH using a %[1]s--config%[1]s
 			option that generates per-codespace ssh configuration in OpenSSH format.
-			Including this configuration in your ~/.ssh/config improves the user experience
-			of tools that integrate with OpenSSH, such as bash/zsh completion of ssh hostnames,
-			remote path completion for scp/rsync/sshfs, git ssh remotes, and so on.
+			Including this configuration in your %[1]s~/.ssh/config%[1]s improves the user experience
+			of tools that integrate with OpenSSH, such as Bash/Zsh completion of ssh hostnames,
+			remote path completion for %[1]sscp/rsync/sshfs%[1]s, %[1]sgit%[1]s ssh remotes, and so on.
 
 			Once that is set up (see the second example below), you can ssh to codespaces as
-			if they were ordinary remote hosts (using 'ssh', not 'gh cs ssh').
+			if they were ordinary remote hosts (using %[1]sssh%[1]s, not %[1]sgh cs ssh%[1]s).
 
 			Note that the codespace you are connecting to must have an SSH server pre-installed.
 			If the docker image being used for the codespace does not have an SSH server,
-			install it in your Dockerfile or, for codespaces that use Debian-based images,
-			you can add the following to your devcontainer.json:
+			install it in your %[1]sDockerfile%[1]s or, for codespaces that use Debian-based images,
+			you can add the following to your %[1]sdevcontainer.json%[1]s:
 
-			"features": {
-				"ghcr.io/devcontainers/features/sshd:1": {
-					"version": "latest"
+				"features": {
+					"ghcr.io/devcontainers/features/sshd:1": {
+						"version": "latest"
+					}
 				}
-			}
-		`),
+		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh codespace ssh
 
@@ -144,6 +144,24 @@ func newSSHCmd(app *App) *cobra.Command {
 	return sshCmd
 }
 
+type combinedReadWriteHalfCloser struct {
+	io.ReadCloser
+	io.WriteCloser
+}
+
+func (crwc *combinedReadWriteHalfCloser) Close() error {
+	werr := crwc.WriteCloser.Close()
+	rerr := crwc.ReadCloser.Close()
+	if werr != nil {
+		return werr
+	}
+	return rerr
+}
+
+func (crwc *combinedReadWriteHalfCloser) CloseWrite() error {
+	return crwc.WriteCloser.Close()
+}
+
 // SSH opens an ssh session or runs an ssh command in a codespace.
 func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
@@ -175,11 +193,16 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return err
 	}
 
-	session, err := startLiveShareSession(ctx, codespace, a, opts.debug, opts.debugFile)
+	codespaceConnection, err := codespaces.GetCodespaceConnection(ctx, a, a.apiClient, codespace)
 	if err != nil {
-		return err
+		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
-	defer safeClose(session, &err)
+
+	fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+	if err != nil {
+		return fmt.Errorf("failed to create port forwarder: %w", err)
+	}
+	defer safeClose(fwd, &err)
 
 	var (
 		invoker             rpc.Invoker
@@ -187,7 +210,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		sshUser             string
 	)
 	err = a.RunWithProgress("Fetching SSH Details", func() (err error) {
-		invoker, err = rpc.CreateInvoker(ctx, session)
+		invoker, err = rpc.CreateInvoker(ctx, fwd)
 		if err != nil {
 			return
 		}
@@ -203,9 +226,25 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 
 	if opts.stdio {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
-		stdio := liveshare.NewReadWriteHalfCloser(os.Stdin, os.Stdout)
-		err := fwd.Forward(ctx, stdio) // always non-nil
+		stdio := &combinedReadWriteHalfCloser{os.Stdin, os.Stdout}
+		opts := portforwarder.ForwardPortOpts{
+			Port:      remoteSSHServerPort,
+			Internal:  true,
+			KeepAlive: true,
+		}
+
+		// Forward the port
+		err = fwd.ForwardPort(ctx, opts)
+		if err != nil {
+			return fmt.Errorf("failed to forward port: %w", err)
+		}
+
+		// Connect to the forwarded port
+		err = fwd.ConnectToForwardedPort(ctx, stdio, opts)
+		if err != nil {
+			return fmt.Errorf("failed to connect to forwarded port: %w", err)
+		}
+
 		return fmt.Errorf("tunnel closed: %w", err)
 	}
 
@@ -227,22 +266,38 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
-		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
+		opts := portforwarder.ForwardPortOpts{
+			Port:      remoteSSHServerPort,
+			Internal:  true,
+			KeepAlive: true,
+		}
+		tunnelClosed <- fwd.ForwardPortToListener(ctx, opts, listen)
 	}()
 
 	shellClosed := make(chan error, 1)
 	go func() {
-		var err error
 		if opts.scpArgs != nil {
 			// args is the correct variable to use here, we just use scpArgs as the check for which command to run
-			err = codespaces.Copy(ctx, args, localSSHServerPort, connectDestination)
+			shellClosed <- codespaces.Copy(ctx, args, localSSHServerPort, connectDestination)
 		} else {
-			err = codespaces.Shell(
-				ctx, a.errLogger, args, localSSHServerPort, connectDestination, opts.printConnDetails,
+			// Parse the ssh args to determine if the user specified a command
+			args, command, err := codespaces.ParseSSHArgs(args)
+			if err != nil {
+				shellClosed <- err
+				return
+			}
+
+			// If the user specified a command, we need to keep the shell alive
+			// since it will be non-interactive and the codespace might shut down
+			// before the command finishes
+			if command != nil {
+				invoker.KeepAlive()
+			}
+
+			shellClosed <- codespaces.Shell(
+				ctx, a.errLogger, args, command, localSSHServerPort, connectDestination, opts.printConnDetails,
 			)
 		}
-		shellClosed <- err
 	}()
 
 	select {
@@ -526,27 +581,37 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			result := sshResult{}
 			defer wg.Done()
 
-			session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, cs)
+			codespaceConnection, err := codespaces.GetCodespaceConnection(ctx, a, a.apiClient, cs)
 			if err != nil {
 				result.err = fmt.Errorf("error connecting to codespace: %w", err)
-			} else {
-				defer safeClose(session, &err)
-
-				invoker, err := rpc.CreateInvoker(ctx, session)
-				if err != nil {
-					result.err = fmt.Errorf("error connecting to codespace: %w", err)
-				} else {
-					defer safeClose(invoker, &err)
-
-					_, result.user, err = invoker.StartSSHServer(ctx)
-					if err != nil {
-						result.err = fmt.Errorf("error getting ssh server details: %w", err)
-					} else {
-						result.codespace = cs
-					}
-				}
+				sshUsers <- result
+				return
 			}
 
+			fwd, err := portforwarder.NewPortForwarder(ctx, codespaceConnection)
+			if err != nil {
+				result.err = fmt.Errorf("failed to create port forwarder: %w", err)
+				sshUsers <- result
+				return
+			}
+			defer safeClose(fwd, &err)
+
+			invoker, err := rpc.CreateInvoker(ctx, fwd)
+			if err != nil {
+				result.err = fmt.Errorf("error connecting to codespace: %w", err)
+				sshUsers <- result
+				return
+			}
+			defer safeClose(invoker, &err)
+
+			_, result.user, err = invoker.StartSSHServer(ctx)
+			if err != nil {
+				result.err = fmt.Errorf("error getting ssh server details: %w", err)
+				sshUsers <- result
+				return
+			}
+
+			result.codespace = cs
 			sshUsers <- result
 		}()
 	}
@@ -640,7 +705,7 @@ func newCpCmd(app *App) *cobra.Command {
 		Use:   "cp [-e] [-r] [-- [<scp flags>...]] <sources>... <dest>",
 		Short: "Copy files between local and remote file systems",
 		Long: heredoc.Docf(`
-			The cp command copies files between the local and remote file systems.
+			The %[1]scp%[1]s command copies files between the local and remote file systems.
 
 			As with the UNIX %[1]scp%[1]s command, the first argument specifies the source and the last
 			specifies the destination; additional sources may be specified after the first,
@@ -648,7 +713,7 @@ func newCpCmd(app *App) *cobra.Command {
 
 			The %[1]s--recursive%[1]s flag is required if any source is a directory.
 
-			A "remote:" prefix on any file name argument indicates that it refers to
+			A %[1]sremote:%[1]s prefix on any file name argument indicates that it refers to
 			the file system of the remote (Codespace) machine. It is resolved relative
 			to the home directory of the remote user.
 
@@ -658,8 +723,8 @@ func newCpCmd(app *App) *cobra.Command {
 			environment variables, and backticks. For security, do not use this flag with arguments
 			provided by untrusted users; see <https://lwn.net/Articles/835962/> for discussion.
 			
-			By default, the 'cp' command will create a public/private ssh key pair to authenticate with 
-			the codespace inside the ~/.ssh directory.
+			By default, the %[1]scp%[1]s command will create a public/private ssh key pair to authenticate with 
+			the codespace inside the %[1]s~/.ssh directory%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh codespace cp -e README.md 'remote:/workspaces/$RepositoryName/'
@@ -721,44 +786,4 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 		return cmdutil.FlagErrorf("at least one argument must have a 'remote:' prefix")
 	}
 	return a.SSH(ctx, nil, opts.sshOptions)
-}
-
-// fileLogger is a wrapper around an log.Logger configured to write
-// to a file. It exports two additional methods to get the log file name
-// and close the file handle when the operation is finished.
-type fileLogger struct {
-	*log.Logger
-
-	f *os.File
-}
-
-// newFileLogger creates a new fileLogger. It returns an error if the file
-// cannot be created. The file is created on the specified path, if the path
-// is empty it is created in the temporary directory.
-func newFileLogger(file string) (fl *fileLogger, err error) {
-	var f *os.File
-	if file == "" {
-		f, err = os.CreateTemp("", "")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create tmp file: %w", err)
-		}
-	} else {
-		f, err = os.Create(file)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &fileLogger{
-		Logger: log.New(f, "", log.LstdFlags),
-		f:      f,
-	}, nil
-}
-
-func (fl *fileLogger) Name() string {
-	return fl.f.Name()
-}
-
-func (fl *fileLogger) Close() error {
-	return fl.f.Close()
 }

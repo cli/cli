@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -14,7 +14,7 @@ import (
 )
 
 type SetOptions struct {
-	Config func() (config.Config, error)
+	Config func() (gh.Config, error)
 	IO     *iostreams.IOStreams
 
 	Name              string
@@ -35,21 +35,21 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "set <alias> <expansion>",
 		Short: "Create a shortcut for a gh command",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Define a word that will expand to a full gh command when invoked.
 
 			The expansion may specify additional arguments and flags. If the expansion includes
-			positional placeholders such as "$1", extra arguments that follow the alias will be
+			positional placeholders such as %[1]s$1%[1]s, extra arguments that follow the alias will be
 			inserted appropriately. Otherwise, extra arguments will be appended to the expanded
 			command.
 
-			Use "-" as expansion argument to read the expansion string from standard input. This
+			Use %[1]s-%[1]s as expansion argument to read the expansion string from standard input. This
 			is useful to avoid quoting issues when defining expansions.
 
-			If the expansion starts with "!" or if "--shell" was given, the expansion is a shell
-			expression that will be evaluated through the "sh" interpreter when the alias is
+			If the expansion starts with %[1]s!%[1]s or if %[1]s--shell%[1]s was given, the expansion is a shell
+			expression that will be evaluated through the %[1]ssh%[1]s interpreter when the alias is
 			invoked. This allows for chaining multiple commands via piping and redirection.
-		`),
+		`, "`"),
 		Example: heredoc.Doc(`
 			# note: Command Prompt on Windows requires using double quotes for arguments
 			$ gh alias set pv 'pr view'

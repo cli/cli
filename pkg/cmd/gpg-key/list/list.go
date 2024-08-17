@@ -6,17 +6,16 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HTTPClient func() (*http.Client, error)
 }
 
@@ -71,31 +70,15 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no GPG keys present in the GitHub account")
 	}
 
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	t := utils.NewTablePrinter(opts.IO)
+	t := tableprinter.New(opts.IO, tableprinter.WithHeader("EMAIL", "KEY ID", "PUBLIC KEY", "ADDED", "EXPIRES"))
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
 
-	if t.IsTTY() {
-		t.AddField("EMAIL", nil, nil)
-		t.AddField("KEY ID", nil, nil)
-		t.AddField("PUBLIC KEY", nil, nil)
-		t.AddField("ADDED", nil, nil)
-		t.AddField("EXPIRES", nil, nil)
-		t.EndRow()
-	}
-
 	for _, gpgKey := range gpgKeys {
-		t.AddField(gpgKey.Emails.String(), nil, nil)
-		t.AddField(gpgKey.KeyID, nil, nil)
-		t.AddField(gpgKey.PublicKey, truncateMiddle, nil)
-
-		createdAt := gpgKey.CreatedAt.Format(time.RFC3339)
-		if t.IsTTY() {
-			createdAt = text.FuzzyAgoAbbr(now, gpgKey.CreatedAt)
-		}
-		t.AddField(createdAt, nil, cs.Gray)
-
+		t.AddField(gpgKey.Emails.String())
+		t.AddField(gpgKey.KeyID)
+		t.AddField(gpgKey.PublicKey, tableprinter.WithTruncate(truncateMiddle))
+		t.AddTimeField(now, gpgKey.CreatedAt, cs.Gray)
 		expiresAt := gpgKey.ExpiresAt.Format(time.RFC3339)
 		if t.IsTTY() {
 			if gpgKey.ExpiresAt.IsZero() {
@@ -104,8 +87,7 @@ func listRun(opts *ListOptions) error {
 				expiresAt = gpgKey.ExpiresAt.Format("2006-01-02")
 			}
 		}
-		t.AddField(expiresAt, nil, cs.Gray)
-
+		t.AddField(expiresAt, tableprinter.WithColor(cs.Gray))
 		t.EndRow()
 	}
 

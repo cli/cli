@@ -45,7 +45,7 @@ func NewCmdCommits(f *cmdutil.Factory, runF func(*CommitsOptions) error) *cobra.
 
 			GitHub search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-commits>
-    `),
+		`),
 		Example: heredoc.Doc(`
 			# search commits matching set of keywords "readme" and "typo"
 			$ gh search commits readme typo
@@ -64,7 +64,7 @@ func NewCmdCommits(f *cmdutil.Factory, runF func(*CommitsOptions) error) *cobra.
 
 			# search commits authored before February 1st, 2022
 			$ gh search commits --author-date="<2022-02-01"
-    `),
+		`),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
 				return cmdutil.FlagErrorf("specify search keywords or flags")
@@ -155,8 +155,7 @@ func displayResults(io *iostreams.IOStreams, now time.Time, results search.Commi
 		now = time.Now()
 	}
 	cs := io.ColorScheme()
-	tp := tableprinter.New(io)
-	tp.HeaderRow("Repo", "SHA", "Message", "Author", "Created")
+	tp := tableprinter.New(io, tableprinter.WithHeader("Repo", "SHA", "Message", "Author", "Created"))
 	for _, commit := range results.Items {
 		tp.AddField(commit.Repo.FullName)
 		tp.AddField(commit.Sha)

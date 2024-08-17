@@ -5,14 +5,15 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
+
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -35,6 +36,8 @@ type ListOptions struct {
 	Status           string
 	Event            string
 	Created          string
+	Commit           string
+	All              bool
 
 	now time.Time
 }
@@ -52,8 +55,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:     "list",
-		Short:   "List recent workflow runs",
+		Use:   "list",
+		Short: "List recent workflow runs",
+		Long: heredoc.Docf(`
+			List recent workflow runs.
+
+			Note that providing the %[1]sworkflow_name%[1]s to the %[1]s-w%[1]s flag will not fetch disabled workflows.
+			Also pass the %[1]s-a%[1]s flag to fetch disabled workflow runs using the %[1]sworkflow_name%[1]s and the %[1]s-w%[1]s flag.
+		`, "`"),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -78,6 +87,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Actor, "user", "u", "", "Filter runs by user who triggered the run")
 	cmd.Flags().StringVarP(&opts.Event, "event", "e", "", "Filter runs by which `event` triggered the run")
 	cmd.Flags().StringVarP(&opts.Created, "created", "", "", "Filter runs by the `date` it was created")
+	cmd.Flags().StringVarP(&opts.Commit, "commit", "c", "", "Filter runs by the `SHA` of the commit")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Include disabled workflows")
 	cmdutil.StringEnumFlag(cmd, &opts.Status, "status", "s", "", shared.AllStatuses, "Filter runs by status")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
 
@@ -104,14 +115,19 @@ func listRun(opts *ListOptions) error {
 		Status:  opts.Status,
 		Event:   opts.Event,
 		Created: opts.Created,
+		Commit:  opts.Commit,
 	}
 
 	opts.IO.StartProgressIndicator()
 	if opts.WorkflowSelector != "" {
+		// initially the workflow state is limited to 'active'
 		states := []workflowShared.WorkflowState{workflowShared.Active}
-		if workflow, err := workflowShared.ResolveWorkflow(
-			opts.Prompter, opts.IO, client, baseRepo, false, opts.WorkflowSelector,
-			states); err == nil {
+		if opts.All {
+			// the all flag tells us to add the remaining workflow states
+			// note: this will be incomplete if more workflow states are added to `workflowShared`
+			states = append(states, workflowShared.DisabledManually, workflowShared.DisabledInactivity)
+		}
+		if workflow, err := workflowShared.ResolveWorkflow(opts.Prompter, opts.IO, client, baseRepo, false, opts.WorkflowSelector, states); err == nil {
 			filters.WorkflowID = workflow.ID
 			filters.WorkflowName = workflow.Name
 		} else {
@@ -138,46 +154,29 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, runs)
 	}
 
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(opts.IO)
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("STATUS", "TITLE", "WORKFLOW", "BRANCH", "EVENT", "ID", "ELAPSED", "AGE"))
 
 	cs := opts.IO.ColorScheme()
-
-	if tp.IsTTY() {
-		tp.AddField("STATUS", nil, nil)
-		tp.AddField("TITLE", nil, nil)
-		tp.AddField("WORKFLOW", nil, nil)
-		tp.AddField("BRANCH", nil, nil)
-		tp.AddField("EVENT", nil, nil)
-		tp.AddField("ID", nil, nil)
-		tp.AddField("ELAPSED", nil, nil)
-		tp.AddField("AGE", nil, nil)
-		tp.EndRow()
-	}
 
 	for _, run := range runs {
 		if tp.IsTTY() {
 			symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
-			tp.AddField(symbol, nil, symbolColor)
+			tp.AddField(symbol, tableprinter.WithColor(symbolColor))
 		} else {
-			tp.AddField(string(run.Status), nil, nil)
-			tp.AddField(string(run.Conclusion), nil, nil)
+			tp.AddField(string(run.Status))
+			tp.AddField(string(run.Conclusion))
 		}
-
-		tp.AddField(run.Title(), nil, cs.Bold)
-
-		tp.AddField(run.WorkflowName(), nil, nil)
-		tp.AddField(run.HeadBranch, nil, cs.Bold)
-		tp.AddField(string(run.Event), nil, nil)
-		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
-
-		tp.AddField(run.Duration(opts.now).String(), nil, nil)
-		tp.AddField(text.FuzzyAgoAbbr(time.Now(), run.StartedTime()), nil, nil)
+		tp.AddField(run.Title(), tableprinter.WithColor(cs.Bold))
+		tp.AddField(run.WorkflowName())
+		tp.AddField(run.HeadBranch, tableprinter.WithColor(cs.Bold))
+		tp.AddField(string(run.Event))
+		tp.AddField(fmt.Sprintf("%d", run.ID), tableprinter.WithColor(cs.Cyan))
+		tp.AddField(run.Duration(opts.now).String())
+		tp.AddTimeField(opts.now, run.StartedTime(), cs.Gray)
 		tp.EndRow()
 	}
 
-	err = tp.Render()
-	if err != nil {
+	if err := tp.Render(); err != nil {
 		return err
 	}
 

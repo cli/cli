@@ -45,12 +45,18 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "watch <run-id>",
 		Short: "Watch a run until it completes, showing its progress",
+		Long: heredoc.Docf(`
+			Watch a run until it completes, showing its progress.
+
+			This command does not support authenticating via fine grained PATs
+			as it is not currently possible to create a PAT with the %[1]schecks:read%[1]s permission.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Watch a run until it's done
 			gh run watch
 
 			# Run some other command when the run is finished
-			gh run watch && notify-send "run is done!"
+			gh run watch && notify-send 'run is done!'
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
@@ -132,7 +138,7 @@ func watchRun(opts *WatchOptions) error {
 	prNumber := ""
 	number, err := shared.PullRequestForRun(client, repo, *run)
 	if err == nil {
-		prNumber = fmt.Sprintf(" #%d", number)
+		prNumber = fmt.Sprintf(" %s#%d", ghrepo.FullName(repo), number)
 	}
 
 	annotationCache := map[int64][]shared.Annotation{}
@@ -173,7 +179,7 @@ func watchRun(opts *WatchOptions) error {
 	opts.IO.StopAlternateScreenBuffer()
 
 	if err != nil {
-		return nil
+		return err
 	}
 
 	// Write the last temporary buffer one last time
@@ -207,34 +213,35 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	jobs, err := shared.GetJobs(client, repo, run)
+	jobs, err := shared.GetJobs(client, repo, run, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}
 
 	var annotations []shared.Annotation
+	var missingAnnotationsPermissions bool
 
-	var annotationErr error
-	var as []shared.Annotation
 	for _, job := range jobs {
 		if as, ok := annotationCache[job.ID]; ok {
 			annotations = as
 			continue
 		}
 
-		as, annotationErr = shared.GetAnnotations(client, repo, job)
-		if annotationErr != nil {
+		as, err := shared.GetAnnotations(client, repo, job)
+		if err != nil {
+			if err != shared.ErrMissingAnnotationsPermissions {
+				return nil, fmt.Errorf("failed to get annotations: %w", err)
+			}
+
+			missingAnnotationsPermissions = true
 			break
 		}
+
 		annotations = append(annotations, as...)
 
 		if job.Status != shared.InProgress {
 			annotationCache[job.ID] = annotations
 		}
-	}
-
-	if annotationErr != nil {
-		return nil, fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber, 0))
@@ -248,7 +255,11 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 
 	fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
 
-	if len(annotations) > 0 {
+	if missingAnnotationsPermissions {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
+		fmt.Fprintf(out, "requesting annotations returned 403 Forbidden as the token does not have sufficient permissions. Note that it is not currently possible to create a fine-grained PAT with the `checks:read` permission.")
+	} else if len(annotations) > 0 {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
 		fmt.Fprintln(out, shared.RenderAnnotations(cs, annotations))

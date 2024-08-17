@@ -98,6 +98,62 @@ func TestGenManSeeAlso(t *testing.T) {
 	}
 }
 
+func TestGenManAliases(t *testing.T) {
+	buf := new(bytes.Buffer)
+	header := &GenManHeader{}
+	if err := renderMan(aliasCmd, header, buf); err != nil {
+		t.Fatal(err)
+	}
+
+	output := buf.String()
+
+	checkStringContains(t, output, translate(aliasCmd.Name()))
+	checkStringContains(t, output, "ALIASES")
+	checkStringContains(t, output, "foo")
+	checkStringContains(t, output, "yoo")
+}
+
+func TestGenManJSONFields(t *testing.T) {
+	buf := new(bytes.Buffer)
+	header := &GenManHeader{}
+	if err := renderMan(jsonCmd, header, buf); err != nil {
+		t.Fatal(err)
+	}
+
+	output := buf.String()
+
+	checkStringContains(t, output, translate(jsonCmd.Name()))
+	checkStringContains(t, output, "JSON FIELDS")
+	checkStringContains(t, output, "foo")
+	checkStringContains(t, output, "bar")
+	checkStringContains(t, output, "baz")
+}
+
+func TestGenManDocExitCodes(t *testing.T) {
+	header := &GenManHeader{
+		Title:   "Project",
+		Section: "1",
+	}
+	cmd := &cobra.Command{
+		Use:   "test-command",
+		Short: "A test command",
+		Long:  "A test command for checking exit codes section",
+	}
+	buf := new(bytes.Buffer)
+	if err := renderMan(cmd, header, buf); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	// Check for the presence of the exit codes section
+	checkStringContains(t, output, ".SH EXIT CODES")
+	checkStringContains(t, output, "0: Successful execution")
+	checkStringContains(t, output, "1: Error")
+	checkStringContains(t, output, "2: Command canceled")
+	checkStringContains(t, output, "4: Authentication required")
+	checkStringContains(t, output, "NOTE: Specific commands may have additional exit codes. Refer to the command's help for more information.")
+}
+
 func TestManPrintFlagsHidesShortDeprecated(t *testing.T) {
 	c := &cobra.Command{}
 	c.Flags().StringP("foo", "f", "default", "Foo flag")
@@ -107,7 +163,7 @@ func TestManPrintFlagsHidesShortDeprecated(t *testing.T) {
 	manPrintFlags(buf, c.Flags())
 
 	got := buf.String()
-	expected := "`--foo` `<string>`\n:   Foo flag\n\n"
+	expected := "`--foo` `<string> (default \"default\")`\n:   Foo flag\n\n"
 	if got != expected {
 		t.Errorf("Expected %q, got %q", expected, got)
 	}
@@ -127,6 +183,107 @@ func TestGenManTree(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(tmpdir, "do.1")); err != nil {
 		t.Fatalf("Expected file 'do.1' to exist")
+	}
+}
+
+func TestManPrintFlagsShowsDefaultValues(t *testing.T) {
+	type TestOptions struct {
+		Limit     int
+		Template  string
+		Fork      bool
+		NoArchive bool
+		Topic     []string
+	}
+	opts := TestOptions{}
+	// Int flag should show it
+	c := &cobra.Command{}
+	c.Flags().IntVar(&opts.Limit, "limit", 30, "Some limit")
+
+	buf := new(bytes.Buffer)
+	manPrintFlags(buf, c.Flags())
+
+	got := buf.String()
+	expected := "`--limit` `<int> (default 30)`\n:   Some limit\n\n"
+	if got != expected {
+		t.Errorf("Expected %q, got %q", expected, got)
+	}
+
+	// Bool flag should hide it if default is false
+	c = &cobra.Command{}
+	c.Flags().BoolVar(&opts.Fork, "fork", false, "Show only forks")
+
+	buf = new(bytes.Buffer)
+	manPrintFlags(buf, c.Flags())
+
+	got = buf.String()
+	expected = "`--fork`\n:   Show only forks\n\n"
+	if got != expected {
+		t.Errorf("Expected %q, got %q", expected, got)
+	}
+
+	// Bool flag should show it if default is true
+	c = &cobra.Command{}
+	c.Flags().BoolVar(&opts.NoArchive, "no-archived", true, "Hide archived")
+
+	buf = new(bytes.Buffer)
+	manPrintFlags(buf, c.Flags())
+
+	got = buf.String()
+	expected = "`--no-archived` `(default true)`\n:   Hide archived\n\n"
+	if got != expected {
+		t.Errorf("Expected %q, got %q", expected, got)
+	}
+
+	// String flag should show it if default is not an empty string
+	c = &cobra.Command{}
+	c.Flags().StringVar(&opts.Template, "template", "T1", "Some template")
+
+	buf = new(bytes.Buffer)
+	manPrintFlags(buf, c.Flags())
+
+	got = buf.String()
+	expected = "`--template` `<string> (default \"T1\")`\n:   Some template\n\n"
+	if got != expected {
+		t.Errorf("Expected %q, got %q", expected, got)
+	}
+
+	// String flag should hide it if default is an empty string
+	c = &cobra.Command{}
+	c.Flags().StringVar(&opts.Template, "template", "", "Some template")
+
+	buf = new(bytes.Buffer)
+	manPrintFlags(buf, c.Flags())
+
+	got = buf.String()
+	expected = "`--template` `<string>`\n:   Some template\n\n"
+	if got != expected {
+		t.Errorf("Expected %q, got %q", expected, got)
+	}
+
+	// String slice flag should hide it if default is an empty slice
+	c = &cobra.Command{}
+	c.Flags().StringSliceVar(&opts.Topic, "topic", nil, "Some topics")
+
+	buf = new(bytes.Buffer)
+	manPrintFlags(buf, c.Flags())
+
+	got = buf.String()
+	expected = "`--topic` `<strings>`\n:   Some topics\n\n"
+	if got != expected {
+		t.Errorf("Expected %q, got %q", expected, got)
+	}
+
+	// String slice flag should show it if default is not an empty slice
+	c = &cobra.Command{}
+	c.Flags().StringSliceVar(&opts.Topic, "topic", []string{"apples", "oranges"}, "Some topics")
+
+	buf = new(bytes.Buffer)
+	manPrintFlags(buf, c.Flags())
+
+	got = buf.String()
+	expected = "`--topic` `<strings> (default [apples,oranges])`\n:   Some topics\n\n"
+	if got != expected {
+		t.Errorf("Expected %q, got %q", expected, got)
 	}
 }
 

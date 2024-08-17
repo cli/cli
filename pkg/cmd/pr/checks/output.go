@@ -28,7 +28,7 @@ func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 	case "pending":
 		mark = "*"
 		markColor = cs.Yellow
-	case "skipping":
+	case "skipping", "cancel":
 		mark = "-"
 		markColor = cs.Gray
 	}
@@ -49,7 +49,11 @@ func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 		tp.AddField(o.Link)
 	} else {
 		tp.AddField(o.Name)
-		tp.AddField(o.Bucket)
+		if o.Bucket == "cancel" {
+			tp.AddField("fail")
+		} else {
+			tp.AddField(o.Bucket)
+		}
 		if elapsed == "" {
 			tp.AddField("0")
 		} else {
@@ -69,12 +73,14 @@ func printSummary(io *iostreams.IOStreams, counts checkCounts) {
 			summary = "Some checks were not successful"
 		} else if counts.Pending > 0 {
 			summary = "Some checks are still pending"
+		} else if counts.Canceled > 0 {
+			summary = "Some checks were cancelled"
 		} else {
 			summary = "All checks were successful"
 		}
 
-		tallies := fmt.Sprintf("%d failing, %d successful, %d skipped, and %d pending checks",
-			counts.Failed, counts.Passed, counts.Skipping, counts.Pending)
+		tallies := fmt.Sprintf("%d cancelled, %d failing, %d successful, %d skipped, and %d pending checks",
+			counts.Canceled, counts.Failed, counts.Passed, counts.Skipping, counts.Pending)
 
 		summary = fmt.Sprintf("%s\n%s", io.ColorScheme().Bold(summary), tallies)
 	}
@@ -86,7 +92,14 @@ func printSummary(io *iostreams.IOStreams, counts checkCounts) {
 }
 
 func printTable(io *iostreams.IOStreams, checks []check) error {
-	tp := tableprinter.New(io)
+	var headers []string
+	if io.IsStdoutTTY() {
+		headers = []string{"", "NAME", "DESCRIPTION", "ELAPSED", "URL"}
+	} else {
+		headers = []string{"NAME", "STATUS", "ELAPSED", "URL", "DESCRIPTION"}
+	}
+
+	tp := tableprinter.New(io, tableprinter.WithHeader(headers...))
 
 	sort.Slice(checks, func(i, j int) bool {
 		b0 := checks[i].Bucket

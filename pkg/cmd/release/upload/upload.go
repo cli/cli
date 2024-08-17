@@ -38,12 +38,12 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "upload <tag> <files>...",
 		Short: "Upload assets to a release",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Upload asset files to a GitHub Release.
 
-			To define a display label for an asset, append text starting with '#' after the
+			To define a display label for an asset, append text starting with %[1]s#%[1]s after the
 			file name.
-		`),
+		`, "`"),
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override

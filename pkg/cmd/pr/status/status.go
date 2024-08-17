@@ -13,8 +13,8 @@ import (
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -26,7 +26,7 @@ import (
 type StatusOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (ghContext.Remotes, error)
@@ -276,14 +276,14 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 				fmt.Fprint(w, cs.Green(fmt.Sprintf("✓ %s Approved", s)))
 			}
 
-			if pr.Mergeable == "MERGEABLE" {
+			if pr.Mergeable == api.PullRequestMergeableMergeable {
 				// prefer "No merge conflicts" to "Mergeable" as there is more to mergeability
 				// than the git status. Missing or failing required checks prevent merging
 				// even though a PR is technically mergeable, which is often a source of confusion.
 				fmt.Fprintf(w, " %s", cs.Green("✓ No merge conflicts"))
-			} else if pr.Mergeable == "CONFLICTING" {
+			} else if pr.Mergeable == api.PullRequestMergeableConflicting {
 				fmt.Fprintf(w, " %s", cs.Red("× Merge conflicts"))
-			} else if pr.Mergeable == "UNKNOWN" {
+			} else if pr.Mergeable == api.PullRequestMergeableUnknown {
 				fmt.Fprintf(w, " %s", cs.Yellow("! Merge conflict status unknown"))
 			}
 

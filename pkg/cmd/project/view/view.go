@@ -7,7 +7,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -16,10 +15,10 @@ import (
 )
 
 type viewOpts struct {
-	web    bool
-	owner  string
-	number int32
-	format string
+	web      bool
+	owner    string
+	number   int32
+	exporter cmdutil.Exporter
 }
 
 type viewConfig struct {
@@ -77,24 +76,12 @@ func NewCmdView(f *cmdutil.Factory, runF func(config viewConfig) error) *cobra.C
 
 	viewCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	viewCmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open a project in the browser")
-	cmdutil.StringEnumFlag(viewCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(viewCmd, &opts.exporter)
 
 	return viewCmd
 }
 
 func runView(config viewConfig) error {
-	if config.opts.web {
-		url, err := buildURL(config)
-		if err != nil {
-			return err
-		}
-
-		if err := config.URLOpener(url); err != nil {
-			return err
-		}
-		return nil
-	}
-
 	canPrompt := config.io.CanPrompt()
 	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
@@ -106,36 +93,15 @@ func runView(config viewConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, *project)
+	if config.opts.web {
+		return config.URLOpener(project.URL)
+	}
+
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, *project)
 	}
 
 	return printResults(config, project)
-}
-
-// TODO: support non-github.com hostnames
-func buildURL(config viewConfig) (string, error) {
-	var url string
-	if config.opts.owner == "@me" {
-		owner, err := config.client.ViewerLoginName()
-		if err != nil {
-			return "", err
-		}
-		url = fmt.Sprintf("https://github.com/users/%s/projects/%d", owner, config.opts.number)
-	} else {
-		_, ownerType, err := config.client.OwnerIDAndType(config.opts.owner)
-		if err != nil {
-			return "", err
-		}
-
-		if ownerType == queries.UserOwner {
-			url = fmt.Sprintf("https://github.com/users/%s/projects/%d", config.opts.owner, config.opts.number)
-		} else {
-			url = fmt.Sprintf("https://github.com/orgs/%s/projects/%d", config.opts.owner, config.opts.number)
-		}
-	}
-
-	return url, nil
 }
 
 func printResults(config viewConfig, project *queries.Project) error {
@@ -189,15 +155,5 @@ func printResults(config viewConfig, project *queries.Project) error {
 		return err
 	}
 	_, err = fmt.Fprint(config.io.Out, out)
-	return err
-}
-
-func printJSON(config viewConfig, project queries.Project) error {
-	b, err := format.JSONProject(project)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
 	return err
 }

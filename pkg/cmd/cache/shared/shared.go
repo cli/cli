@@ -2,11 +2,23 @@ package shared
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 )
+
+var CacheFields = []string{
+	"createdAt",
+	"id",
+	"key",
+	"lastAccessedAt",
+	"ref",
+	"sizeInBytes",
+	"version",
+}
 
 type Cache struct {
 	CreatedAt      time.Time `json:"created_at"`
@@ -27,6 +39,8 @@ type GetCachesOptions struct {
 	Limit int
 	Order string
 	Sort  string
+	Key   string
+	Ref   string
 }
 
 // Return a list of caches for a repository. Pass a negative limit to request
@@ -45,6 +59,12 @@ func GetCaches(client *api.Client, repo ghrepo.Interface, opts GetCachesOptions)
 	}
 	if opts.Order != "" {
 		path += fmt.Sprintf("&direction=%s", opts.Order)
+	}
+	if opts.Key != "" {
+		path += fmt.Sprintf("&key=%s", url.QueryEscape(opts.Key))
+	}
+	if opts.Ref != "" {
+		path += fmt.Sprintf("&ref=%s", url.QueryEscape(opts.Ref))
 	}
 
 	var result *CachePayload
@@ -70,4 +90,8 @@ pagination:
 	}
 
 	return result, nil
+}
+
+func (c *Cache) ExportData(fields []string) map[string]interface{} {
+	return cmdutil.StructExportData(c, fields)
 }

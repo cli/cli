@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
-	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -20,7 +19,7 @@ type createItemOpts struct {
 	owner     string
 	number    int32
 	projectID string
-	format    string
+	exporter  cmdutil.Exporter
 }
 
 type createItemConfig struct {
@@ -76,7 +75,7 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 	createItemCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
 	createItemCmd.Flags().StringVar(&opts.title, "title", "", "Title for the draft issue")
 	createItemCmd.Flags().StringVar(&opts.body, "body", "", "Body for the draft issue")
-	cmdutil.StringEnumFlag(createItemCmd, &opts.format, "format", "", "", []string{"json"}, "Output format")
+	cmdutil.AddFormatFlags(createItemCmd, &opts.exporter)
 
 	_ = createItemCmd.MarkFlagRequired("title")
 
@@ -103,8 +102,8 @@ func runCreateItem(config createItemConfig) error {
 		return err
 	}
 
-	if config.opts.format == "json" {
-		return printJSON(config, query.CreateProjectDraftItem.ProjectV2Item)
+	if config.opts.exporter != nil {
+		return config.opts.exporter.Write(config.io, query.CreateProjectDraftItem.ProjectV2Item)
 	}
 
 	return printResults(config, query.CreateProjectDraftItem.ProjectV2Item)
@@ -126,15 +125,5 @@ func printResults(config createItemConfig, item queries.ProjectItem) error {
 	}
 
 	_, err := fmt.Fprintf(config.io.Out, "Created item\n")
-	return err
-}
-
-func printJSON(config createItemConfig, item queries.ProjectItem) error {
-	b, err := format.JSONProjectItem(item)
-	if err != nil {
-		return err
-	}
-
-	_, err = config.io.Out.Write(b)
 	return err
 }

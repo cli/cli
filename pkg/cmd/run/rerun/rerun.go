@@ -44,13 +44,16 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 		Long: heredoc.Docf(`
 			Rerun an entire run, only failed jobs, or a specific job from a run.
 
-			Note that due for historical reasons, the %[1]s--job%[1]s flag may not take what you expect.
+			Note that due to historical reasons, the %[1]s--job%[1]s flag may not take what you expect.
 			Specifically, when navigating to a job in the browser, the URL looks like this:
-			%[1]shttps://github.com/<org>/<repo>/actions/runs/<run-id>/jobs/<number>%[1]s.
+			%[1]shttps://github.com/<owner>/<repo>/actions/runs/<run-id>/jobs/<number>%[1]s.
 
-			However, this %[1]snumber%[1]s should not be used with the %[1]s--job%[1]s flag and will result in the
+			However, this %[1]s<number>%[1]s should not be used with the %[1]s--job%[1]s flag and will result in the
 			API returning %[1]s404 NOT FOUND%[1]s. Instead, you can get the correct job IDs using the following command:
-			%[1]sgh run view <run-id> --json jobs --jq '.jobs[] | {name, databaseId}'%[1]s.
+			
+				gh run view <run-id> --json jobs --jq '.jobs[] | {name, databaseId}'
+
+			You will need to use databaseId field for triggering job re-runs.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -68,7 +71,11 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			}
 
 			if opts.RunID != "" && opts.JobID != "" {
-				return cmdutil.FlagErrorf("specify only one of `<run-id>` or `--job`")
+				opts.RunID = ""
+				if opts.IO.CanPrompt() {
+					cs := opts.IO.ColorScheme()
+					fmt.Fprintf(opts.IO.ErrOut, "%s both run and job IDs specified; ignoring run ID\n", cs.WarningIcon())
+				}
 			}
 
 			if runF != nil {
@@ -79,7 +86,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().BoolVar(&opts.OnlyFailed, "failed", false, "Rerun only failed jobs, including dependencies")
-	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "Rerun a specific job from a run, including dependencies")
+	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "Rerun a specific job ID from a run, including dependencies")
 	cmd.Flags().BoolVarP(&opts.Debug, "debug", "d", false, "Rerun with debug logging")
 
 	return cmd

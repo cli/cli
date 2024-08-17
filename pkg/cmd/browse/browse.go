@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -36,13 +37,14 @@ type BrowseOptions struct {
 
 	SelectorArg string
 
-	Branch        string
-	Commit        string
-	ProjectsFlag  bool
-	ReleasesFlag  bool
-	SettingsFlag  bool
-	WikiFlag      bool
-	NoBrowserFlag bool
+	Branch          string
+	Commit          string
+	ProjectsFlag    bool
+	ReleasesFlag    bool
+	SettingsFlag    bool
+	WikiFlag        bool
+	NoBrowserFlag   bool
+	HasRepoOverride bool
 }
 
 func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
@@ -64,6 +66,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 		Example: heredoc.Doc(`
 			$ gh browse
 			#=> Open the home page of the current repository
+
+			$ gh browse script/
+			#=> Open the script directory of the current repository
 
 			$ gh browse 217
 			#=> Open issue or pull request 217
@@ -129,8 +134,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("%q is an invalid argument when using `--branch` or `--commit`", opts.SelectorArg)
 			}
 
-			if cmd.Flags().Changed("repo") {
+			if cmd.Flags().Changed("repo") || os.Getenv("GH_REPO") != "" {
 				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
+				opts.HasRepoOverride = true
 			}
 
 			if runF != nil {
@@ -275,7 +281,7 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 	}
 
 	p = filepath.ToSlash(parts[0])
-	if !path.IsAbs(p) {
+	if !path.IsAbs(p) && !opts.HasRepoOverride {
 		p = path.Join(opts.PathFromRepoRoot(), p)
 		if p == "." || strings.HasPrefix(p, "..") {
 			p = ""

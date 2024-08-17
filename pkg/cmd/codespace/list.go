@@ -7,9 +7,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -116,25 +115,23 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 		return a.browser.Browse(fmt.Sprintf("%s/codespaces?repository_id=%d", a.apiClient.ServerURL(), codespaces[0].Repository.ID))
 	}
 
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(a.io)
-	if tp.IsTTY() {
-		tp.AddField("NAME", nil, nil)
-		tp.AddField("DISPLAY NAME", nil, nil)
-		if opts.orgName != "" {
-			tp.AddField("OWNER", nil, nil)
-		}
-		tp.AddField("REPOSITORY", nil, nil)
-		tp.AddField("BRANCH", nil, nil)
-		tp.AddField("STATE", nil, nil)
-		tp.AddField("CREATED AT", nil, nil)
-
-		if hasNonProdVSCSTarget {
-			tp.AddField("VSCS TARGET", nil, nil)
-		}
-
-		tp.EndRow()
+	headers := []string{
+		"NAME",
+		"DISPLAY NAME",
 	}
+	if opts.orgName != "" {
+		headers = append(headers, "OWNER")
+	}
+	headers = append(headers,
+		"REPOSITORY",
+		"BRANCH",
+		"STATE",
+		"CREATED AT",
+	)
+	if hasNonProdVSCSTarget {
+		headers = append(headers, "VSCS TARGET")
+	}
+	tp := tableprinter.New(a.io, tableprinter.WithHeader(headers...))
 
 	cs := a.io.ColorScheme()
 	for _, apiCodespace := range codespaces {
@@ -158,31 +155,27 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 			nameColor = cs.Gray
 		}
 
-		tp.AddField(formattedName, nil, nameColor)
-		tp.AddField(c.DisplayName, nil, nil)
+		tp.AddField(formattedName, tableprinter.WithColor(nameColor))
+		tp.AddField(c.DisplayName)
 		if opts.orgName != "" {
-			tp.AddField(c.Owner.Login, nil, nil)
+			tp.AddField(c.Owner.Login)
 		}
-		tp.AddField(c.Repository.FullName, nil, nil)
-		tp.AddField(c.branchWithGitStatus(), nil, cs.Cyan)
+		tp.AddField(c.Repository.FullName)
+		tp.AddField(c.branchWithGitStatus(), tableprinter.WithColor(cs.Cyan))
 		if c.PendingOperation {
-			tp.AddField(c.PendingOperationDisabledReason, nil, nameColor)
+			tp.AddField(c.PendingOperationDisabledReason, tableprinter.WithColor(nameColor))
 		} else {
-			tp.AddField(c.State, nil, stateColor)
+			tp.AddField(c.State, tableprinter.WithColor(stateColor))
 		}
 
-		if tp.IsTTY() {
-			ct, err := time.Parse(time.RFC3339, c.CreatedAt)
-			if err != nil {
-				return fmt.Errorf("error parsing date %q: %w", c.CreatedAt, err)
-			}
-			tp.AddField(text.FuzzyAgoAbbr(time.Now(), ct), nil, cs.Gray)
-		} else {
-			tp.AddField(c.CreatedAt, nil, nil)
+		ct, err := time.Parse(time.RFC3339, c.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error parsing date %q: %w", c.CreatedAt, err)
 		}
+		tp.AddTimeField(time.Now(), ct, cs.Gray)
 
 		if hasNonProdVSCSTarget {
-			tp.AddField(c.VSCSTarget, nil, nil)
+			tp.AddField(c.VSCSTarget)
 		}
 
 		tp.EndRow()

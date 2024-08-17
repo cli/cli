@@ -72,6 +72,7 @@ var RunFields = []string{
 	"createdAt",
 	"updatedAt",
 	"startedAt",
+	"attempt",
 	"status",
 	"conclusion",
 	"event",
@@ -97,7 +98,7 @@ type Run struct {
 	workflowName   string // cache column
 	WorkflowID     int64  `json:"workflow_id"`
 	Number         int64  `json:"run_number"`
-	Attempts       uint64 `json:"run_attempt"`
+	Attempt        uint64 `json:"run_attempt"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
@@ -186,9 +187,9 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 						"number":     s.Number,
 					})
 				}
-				var completedAt *time.Time
+				var completedAt time.Time
 				if !j.CompletedAt.IsZero() {
-					completedAt = &j.CompletedAt
+					completedAt = j.CompletedAt
 				}
 				jobs = append(jobs, map[string]interface{}{
 					"databaseId":  j.ID,
@@ -200,8 +201,8 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 					"completedAt": completedAt,
 					"url":         j.URL,
 				})
-				data[f] = jobs
 			}
+			data[f] = jobs
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
@@ -260,6 +261,14 @@ type CheckRun struct {
 	ID int64
 }
 
+var ErrMissingAnnotationsPermissions = errors.New("missing annotations permissions error")
+
+// GetAnnotations fetches annotations from the REST API.
+//
+// If the job has no annotations, an empy slice is returned.
+// If the API returns a 403, a custom ErrMissingAnnotationsPermissions error is returned.
+//
+// When fine-grained PATs support checks:read permission, we can remove the need for this at the call sites.
 func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annotation, error) {
 	var result []*Annotation
 
@@ -268,9 +277,18 @@ func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annot
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
 		var httpError api.HTTPError
-		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
+		if !errors.As(err, &httpError) {
+			return nil, err
+		}
+
+		if httpError.StatusCode == http.StatusNotFound {
 			return []Annotation{}, nil
 		}
+
+		if httpError.StatusCode == http.StatusForbidden {
+			return nil, ErrMissingAnnotationsPermissions
+		}
+
 		return nil, err
 	}
 
@@ -307,6 +325,7 @@ type FilterOptions struct {
 	Status       string
 	Event        string
 	Created      string
+	Commit       string
 }
 
 // GetRunsWithFilter fetches 50 runs from the API and filters them in-memory
@@ -357,6 +376,9 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 		}
 		if opts.Created != "" {
 			path += fmt.Sprintf("&created=%s", url.QueryEscape(opts.Created))
+		}
+		if opts.Commit != "" {
+			path += fmt.Sprintf("&head_sha=%s", url.QueryEscape(opts.Commit))
 		}
 	}
 
@@ -429,7 +451,7 @@ type JobsPayload struct {
 	Jobs       []Job
 }
 
-func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error) {
+func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run, attempt uint64) ([]Job, error) {
 	if run.Jobs != nil {
 		return run.Jobs, nil
 	}
@@ -437,6 +459,10 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error)
 	query := url.Values{}
 	query.Set("per_page", "100")
 	jobsPath := fmt.Sprintf("%s?%s", run.JobsURL, query.Encode())
+
+	if attempt > 0 {
+		jobsPath = fmt.Sprintf("repos/%s/actions/runs/%d/attempts/%d/jobs?%s", ghrepo.FullName(repo), run.ID, attempt, query.Encode())
+	}
 
 	for jobsPath != "" {
 		var resp JobsPayload

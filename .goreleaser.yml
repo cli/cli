@@ -7,11 +7,10 @@ release:
 
 before:
   hooks:
-    - >-
+    - >- # The linux and windows archives package the manpages below
       {{ if eq .Runtime.Goos "windows" }}echo{{ end }} make manpages GH_VERSION={{.Version}}
-    - >-
-      {{ if ne .Runtime.Goos "linux" }}echo{{ end }} make completions
-
+    - >- # On linux the completions are used in nfpms below, but on macos they are used outside in the deployment build.
+      {{ if eq .Runtime.Goos "windows" }}echo{{ end }} make completions
 builds:
   - id: macos #build:macos
     goos: [darwin]
@@ -41,7 +40,7 @@ builds:
     hooks:
       post:
         - cmd: >-
-            {{ if eq .Runtime.Goos "windows" }}.\script\sign{{ else }}./script/sign{{ end }} '{{ .Path }}'
+            {{ if eq .Runtime.Goos "windows" }}pwsh .\script\sign.ps1{{ else }}./script/sign{{ end }} '{{ .Path }}'
           output: true
     binary: bin/gh
     main: ./cmd/gh

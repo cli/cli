@@ -11,7 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -29,7 +29,7 @@ type iprompter interface {
 
 type CreateOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -94,11 +94,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			To create a release from an annotated git tag, first create one locally with
 			git, push the tag to GitHub, then run this command.
 			Use %[1]s--notes-from-tag%[1]s to automatically generate the release notes
- 			from the annotated git tag.
+			from the annotated git tag.
 
 			When using automatically generated release notes, a release title will also be automatically
 			generated unless a title was explicitly passed. Additional release notes can be prepended to
-			automatically generated notes by using the notes parameter.
+			automatically generated notes by using the %[1]s--notes%[1]s flag.
 		`, "`"),
 		Example: heredoc.Doc(`
 			Interactively create a release
@@ -115,6 +115,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Use release notes from a file
 			$ gh release create v1.2.3 -F changelog.md
+
+			Use annotated tag notes
+			$ gh release create v1.2.3 --notes-from-tag
+
+			Don't mark the release as latest
+			$ gh release create v1.2.3 --latest=false 
 
 			Upload all tarballs in a directory as release assets
 			$ gh release create v1.2.3 ./dist/*.tgz
@@ -178,14 +184,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVarP(&opts.Draft, "draft", "d", false, "Save the release as a draft instead of publishing it")
 	cmd.Flags().BoolVarP(&opts.Prerelease, "prerelease", "p", false, "Mark the release as a prerelease")
-	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
+	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default [main branch])")
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
-	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
+	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default [automatic based on date and version]). --latest=false to explicitly NOT set as latest")
 	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
 	cmd.Flags().BoolVarP(&opts.NotesFromTag, "notes-from-tag", "", false, "Automatically generate notes from annotated tag")
 
@@ -499,7 +505,7 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if draftWhileUploading {
-			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory)
+			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory, opts.IsLatest)
 			if err != nil {
 				return cleanupDraftRelease(err)
 			}
@@ -513,12 +519,38 @@ func createRun(opts *CreateOptions) error {
 }
 
 func gitTagInfo(client *git.Client, tagName string) (string, error) {
-	cmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
+	contentCmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents)")
 	if err != nil {
 		return "", err
 	}
-	b, err := cmd.Output()
-	return string(b), err
+	content, err := contentCmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	// If there is a signature, we should strip it from the end of the content.
+	// Note that, we can achieve this by looking for markers like "-----BEGIN PGP
+	// SIGNATURE-----" and cut the remaining text from the content, but this is
+	// not a safe approach, because, although unlikely, the content can contain
+	// a signature-like section which we shouldn't leave it as is. So, we need
+	// to get the tag signature as a whole, if any, and remote it from the content.
+	signatureCmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:signature)")
+	if err != nil {
+		return "", err
+	}
+	signature, err := signatureCmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	if len(signature) == 0 {
+		// The tag annotation content has no trailing signature to strip out,
+		// so we return the entire content.
+		return string(content), nil
+	}
+
+	body, _ := strings.CutSuffix(string(content), "\n"+string(signature))
+	return body, nil
 }
 
 func detectPreviousTag(client *git.Client, headRef string) (string, error) {

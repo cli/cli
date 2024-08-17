@@ -19,6 +19,15 @@ const (
 	DEVCONTAINER_PROMPT_DEFAULT = "Default Codespaces configuration"
 )
 
+const (
+	permissionsPollingInterval = 5 * time.Second
+	permissionsPollingTimeout  = 1 * time.Minute
+)
+
+const (
+	displayNameMaxLength = 48 // 48 is the max length of the display name in the API
+)
+
 var (
 	DEFAULT_DEVCONTAINER_DEFINITIONS = []string{".devcontainer.json", ".devcontainer/devcontainer.json"}
 )
@@ -105,7 +114,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
-	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "display name for the codespace")
+	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", fmt.Sprintf("display name for the codespace (%d characters or less)", displayNameMaxLength))
 
 	return createCmd
 }
@@ -131,6 +140,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return a.browser.Browse(fmt.Sprintf("%s/codespaces/new", a.apiClient.ServerURL()))
 	}
 
+	prompter := &Prompter{}
 	promptForRepoAndBranch := userInputs.Repository == "" && !opts.useWeb
 	if promptForRepoAndBranch {
 		var defaultRepo string
@@ -158,7 +168,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 				Validate: survey.Required,
 			},
 		}
-		if err := ask(repoQuestions, &userInputs); err != nil {
+		if err := prompter.Ask(repoQuestions, &userInputs); err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
 	}
@@ -203,7 +213,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			},
 		}
 
-		if err := ask(branchQuestions, &userInputs); err != nil {
+		if err := prompter.Ask(branchQuestions, &userInputs); err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
 	}
@@ -250,7 +260,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 					},
 				}
 
-				if err := ask([]*survey.Question{devContainerPathQuestion}, &devContainerPath); err != nil {
+				if err := prompter.Ask([]*survey.Question{devContainerPathQuestion}, &devContainerPath); err != nil {
 					return fmt.Errorf("failed to prompt: %w", err)
 				}
 			}
@@ -268,13 +278,17 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	// web UI also provide a way to select machine type
 	// therefore we let the user choose from the web UI instead of prompting from CLI
 	if !(opts.useWeb && opts.machine == "") {
-		machine, err = getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location, devContainerPath)
+		machine, err = getMachineName(ctx, a.apiClient, prompter, repository.ID, opts.machine, branch, userInputs.Location, devContainerPath)
 		if err != nil {
 			return fmt.Errorf("error getting machine type: %w", err)
 		}
 		if machine == "" {
 			return errors.New("there are no available machine types for this repository")
 		}
+	}
+
+	if len(opts.displayName) > displayNameMaxLength {
+		return fmt.Errorf("error creating codespace: display name should contain a maximum of %d characters", displayNameMaxLength)
 	}
 
 	createParams := &api.CreateCodespaceParams{
@@ -307,7 +321,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			return fmt.Errorf("error creating codespace: %w", err)
 		}
 
-		codespace, err = a.handleAdditionalPermissions(ctx, createParams, aerr.AllowPermissionsURL)
+		codespace, err = a.handleAdditionalPermissions(ctx, prompter, createParams, aerr.AllowPermissionsURL)
 		if err != nil {
 			// this error could be a cmdutil.SilentError (in the case that the user opened the browser) so we don't want to wrap it
 			return err
@@ -331,7 +345,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	return nil
 }
 
-func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api.CreateCodespaceParams, allowPermissionsURL string) (*api.Codespace, error) {
+func (a *App) handleAdditionalPermissions(ctx context.Context, prompter SurveyPrompter, createParams *api.CreateCodespaceParams, allowPermissionsURL string) (*api.Codespace, error) {
 	var (
 		isInteractive = a.io.CanPrompt()
 		cs            = a.io.ColorScheme()
@@ -366,24 +380,25 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 		Accept string
 	}
 
-	if err := ask(permsSurvey, &answers); err != nil {
+	if err := prompter.Ask(permsSurvey, &answers); err != nil {
 		return nil, fmt.Errorf("error getting answers: %w", err)
 	}
 
 	// if the user chose to continue in the browser, open the URL
 	if answers.Accept == choices[0] {
-		fmt.Fprintln(a.io.ErrOut, "Please re-run the create request after accepting permissions in the browser.")
 		if err := a.browser.Browse(allowPermissionsURL); err != nil {
 			return nil, fmt.Errorf("error opening browser: %w", err)
 		}
-		// browser opened successfully but we do not know if they accepted the permissions
-		// so we must exit and wait for the user to attempt the create again
-		return nil, cmdutil.SilentError
-	}
 
-	// if the user chose to create the codespace without the permissions,
-	// we can continue with the create opting out of the additional permissions
-	createParams.PermissionsOptOut = true
+		// Poll until the user has accepted the permissions or timeout
+		if err := a.pollForPermissions(ctx, createParams); err != nil {
+			return nil, fmt.Errorf("error polling for permissions: %w", err)
+		}
+	} else {
+		// If the user chose to create the codespace without the permissions,
+		// we can continue with the create opting out of the additional permissions
+		createParams.PermissionsOptOut = true
+	}
 
 	var codespace *api.Codespace
 	err := a.RunWithProgress("Creating codespace", func() (err error) {
@@ -396,6 +411,39 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	}
 
 	return codespace, nil
+}
+
+func (a *App) pollForPermissions(ctx context.Context, createParams *api.CreateCodespaceParams) error {
+	return a.RunWithProgress("Waiting for permissions to be accepted in the browser", func() (err error) {
+		ctx, cancel := context.WithTimeout(ctx, permissionsPollingTimeout)
+		defer cancel()
+
+		done := make(chan error, 1)
+		go func() {
+			for {
+				accepted, err := a.apiClient.GetCodespacesPermissionsCheck(ctx, createParams.RepositoryID, createParams.Branch, createParams.DevContainerPath)
+				if err != nil {
+					done <- err
+					return
+				}
+
+				if accepted {
+					done <- nil
+					return
+				}
+
+				// Wait before polling again
+				time.Sleep(permissionsPollingInterval)
+			}
+		}()
+
+		select {
+		case err := <-done:
+			return err
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for permissions to be accepted in the browser")
+		}
+	})
 }
 
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
@@ -463,7 +511,7 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string, devcontainerPath string) (string, error) {
+func getMachineName(ctx context.Context, apiClient apiClient, prompter SurveyPrompter, repoID int, machine, branch, location string, devcontainerPath string) (string, error) {
 	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location, devcontainerPath)
 	if err != nil {
 		return "", fmt.Errorf("error requesting machine instance types: %w", err)
@@ -514,7 +562,7 @@ func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machin
 	}
 
 	var machineAnswers struct{ Machine string }
-	if err := ask(machineSurvey, &machineAnswers); err != nil {
+	if err := prompter.Ask(machineSurvey, &machineAnswers); err != nil {
 		return "", fmt.Errorf("error getting machine: %w", err)
 	}
 

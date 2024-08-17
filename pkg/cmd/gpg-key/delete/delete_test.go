@@ -6,10 +6,12 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -170,6 +172,19 @@ func Test_deleteRun(t *testing.T) {
 			wantErr:    true,
 			wantErrMsg: "unable to delete GPG key ABC123: either the GPG key is not found or it is not owned by you",
 		},
+		{
+			name: "delete failed",
+			opts: DeleteOptions{KeyID: "ABC123", Confirmed: true},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "user/gpg_keys"), httpmock.StatusStringResponse(200, keysResp))
+				reg.Register(httpmock.REST("DELETE", "user/gpg_keys/123"), httpmock.StatusJSONResponse(404, api.HTTPError{
+					StatusCode: 404,
+					Message:    "GPG key 123 not found",
+				}))
+			},
+			wantErr:    true,
+			wantErrMsg: "HTTP 404: GPG key 123 not found (https://api.github.com/user/gpg_keys/123)",
+		},
 	}
 
 	for _, tt := range tests {
@@ -187,7 +202,7 @@ func Test_deleteRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-		tt.opts.Config = func() (config.Config, error) {
+		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
 		ios, _, stdout, _ := iostreams.Test()

@@ -126,7 +126,25 @@ func Test_httpRequest(t *testing.T) {
 				method:  "GET",
 				u:       "https://api.github.com/repos/octocat/spoon-knife",
 				body:    "",
-				headers: "",
+				headers: "Accept: */*\r\n",
+			},
+		},
+		{
+			name: "GET with accept header",
+			args: args{
+				client:  &httpClient,
+				host:    "github.com",
+				method:  "GET",
+				p:       "repos/octocat/spoon-knife",
+				params:  nil,
+				headers: []string{"Accept: testing"},
+			},
+			wantErr: false,
+			want: expects{
+				method:  "GET",
+				u:       "https://api.github.com/repos/octocat/spoon-knife",
+				body:    "",
+				headers: "Accept: testing\r\n",
 			},
 		},
 		{
@@ -144,7 +162,7 @@ func Test_httpRequest(t *testing.T) {
 				method:  "GET",
 				u:       "https://api.github.com/repos/octocat/spoon-knife",
 				body:    "",
-				headers: "",
+				headers: "Accept: */*\r\n",
 			},
 		},
 		{
@@ -162,7 +180,7 @@ func Test_httpRequest(t *testing.T) {
 				method:  "GET",
 				u:       "https://api.github.com/repos/octocat/spoon-knife",
 				body:    "",
-				headers: "",
+				headers: "Accept: */*\r\n",
 			},
 		},
 		{
@@ -180,7 +198,7 @@ func Test_httpRequest(t *testing.T) {
 				method:  "GET",
 				u:       "https://example.org/api/v3/repos/octocat/spoon-knife",
 				body:    "",
-				headers: "",
+				headers: "Accept: */*\r\n",
 			},
 		},
 		{
@@ -200,7 +218,7 @@ func Test_httpRequest(t *testing.T) {
 				method:  "GET",
 				u:       "https://api.github.com/repos/octocat/spoon-knife?a=b",
 				body:    "",
-				headers: "",
+				headers: "Accept: */*\r\n",
 			},
 		},
 		{
@@ -220,7 +238,7 @@ func Test_httpRequest(t *testing.T) {
 				method:  "POST",
 				u:       "https://api.github.com/repos",
 				body:    `{"a":"b"}`,
-				headers: "Content-Type: application/json; charset=utf-8\r\n",
+				headers: "Accept: */*\r\nContent-Type: application/json; charset=utf-8\r\n",
 			},
 		},
 		{
@@ -240,7 +258,7 @@ func Test_httpRequest(t *testing.T) {
 				method:  "POST",
 				u:       "https://api.github.com/graphql",
 				body:    `{"variables":{"a":"b"}}`,
-				headers: "Content-Type: application/json; charset=utf-8\r\n",
+				headers: "Accept: */*\r\nContent-Type: application/json; charset=utf-8\r\n",
 			},
 		},
 		{
@@ -258,7 +276,7 @@ func Test_httpRequest(t *testing.T) {
 				method:  "POST",
 				u:       "https://example.org/api/graphql",
 				body:    `{}`,
-				headers: "Content-Type: application/json; charset=utf-8\r\n",
+				headers: "Accept: */*\r\nContent-Type: application/json; charset=utf-8\r\n",
 			},
 		},
 		{

@@ -7,7 +7,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -18,7 +19,7 @@ import (
 
 type ReviewOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	Prompter   prompter.Prompter
 
@@ -156,15 +157,11 @@ func reviewRun(opts *ReviewOptions) error {
 
 	var reviewData *api.PullRequestReviewInput
 	if opts.InteractiveMode {
-		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+		reviewData, err = reviewSurvey(opts)
 		if err != nil {
 			return err
 		}
-		reviewData, err = reviewSurvey(opts, editorCommand)
-		if err != nil {
-			return err
-		}
-		if reviewData == nil && err == nil {
+		if reviewData == nil {
 			fmt.Fprint(opts.IO.ErrOut, "Discarding.\n")
 			return nil
 		}
@@ -194,17 +191,17 @@ func reviewRun(opts *ReviewOptions) error {
 
 	switch reviewData.State {
 	case api.ReviewComment:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Reviewed pull request #%d\n", cs.Gray("-"), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Reviewed pull request %s#%d\n", cs.Gray("-"), ghrepo.FullName(baseRepo), pr.Number)
 	case api.ReviewApprove:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Approved pull request #%d\n", cs.SuccessIcon(), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Approved pull request %s#%d\n", cs.SuccessIcon(), ghrepo.FullName(baseRepo), pr.Number)
 	case api.ReviewRequestChanges:
-		fmt.Fprintf(opts.IO.ErrOut, "%s Requested changes to pull request #%d\n", cs.Red("+"), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Requested changes to pull request %s#%d\n", cs.Red("+"), ghrepo.FullName(baseRepo), pr.Number)
 	}
 
 	return nil
 }
 
-func reviewSurvey(opts *ReviewOptions, editorCommand string) (*api.PullRequestReviewInput, error) {
+func reviewSurvey(opts *ReviewOptions) (*api.PullRequestReviewInput, error) {
 	options := []string{"Comment", "Approve", "Request Changes"}
 	reviewType, err := opts.Prompter.Select(
 		"What kind of review do you want to give?",

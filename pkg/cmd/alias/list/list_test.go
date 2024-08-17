@@ -7,6 +7,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -66,7 +67,7 @@ func TestAliasList(t *testing.T) {
 
 			factory := &cmdutil.Factory{
 				IOStreams: ios,
-				Config: func() (config.Config, error) {
+				Config: func() (gh.Config, error) {
 					return cfg, nil
 				},
 			}

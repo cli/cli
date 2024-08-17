@@ -3,23 +3,129 @@ package status
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
+type validEntry struct {
+	active      bool
+	host        string
+	user        string
+	token       string
+	tokenSource string
+	gitProtocol string
+	scopes      string
+}
+
+func (e validEntry) String(cs *iostreams.ColorScheme) string {
+	var sb strings.Builder
+
+	sb.WriteString(
+		fmt.Sprintf("  %s Logged in to %s account %s (%s)\n", cs.SuccessIcon(), e.host, cs.Bold(e.user), e.tokenSource),
+	)
+	activeStr := fmt.Sprintf("%v", e.active)
+	sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+	sb.WriteString(fmt.Sprintf("  - Git operations protocol: %s\n", cs.Bold(e.gitProtocol)))
+	sb.WriteString(fmt.Sprintf("  - Token: %s\n", cs.Bold(e.token)))
+
+	if expectScopes(e.token) {
+		sb.WriteString(fmt.Sprintf("  - Token scopes: %s\n", cs.Bold(displayScopes(e.scopes))))
+		if err := shared.HeaderHasMinimumScopes(e.scopes); err != nil {
+			var missingScopesError *shared.MissingScopesError
+			if errors.As(err, &missingScopesError) {
+				missingScopes := strings.Join(missingScopesError.MissingScopes, ",")
+				sb.WriteString(fmt.Sprintf("  %s Missing required token scopes: %s\n",
+					cs.WarningIcon(),
+					cs.Bold(displayScopes(missingScopes))))
+				refreshInstructions := fmt.Sprintf("gh auth refresh -h %s", e.host)
+				sb.WriteString(fmt.Sprintf("  - To request missing scopes, run: %s\n", cs.Bold(refreshInstructions)))
+			}
+		}
+	}
+
+	return sb.String()
+}
+
+type invalidTokenEntry struct {
+	active           bool
+	host             string
+	user             string
+	tokenSource      string
+	tokenIsWriteable bool
+}
+
+func (e invalidTokenEntry) String(cs *iostreams.ColorScheme) string {
+	var sb strings.Builder
+
+	if e.user != "" {
+		sb.WriteString(fmt.Sprintf("  %s Failed to log in to %s account %s (%s)\n", cs.Red("X"), e.host, cs.Bold(e.user), e.tokenSource))
+	} else {
+		sb.WriteString(fmt.Sprintf("  %s Failed to log in to %s using token (%s)\n", cs.Red("X"), e.host, e.tokenSource))
+	}
+	activeStr := fmt.Sprintf("%v", e.active)
+	sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+	sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.tokenSource))
+	if e.tokenIsWriteable {
+		loginInstructions := fmt.Sprintf("gh auth login -h %s", e.host)
+		logoutInstructions := fmt.Sprintf("gh auth logout -h %s -u %s", e.host, e.user)
+		sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
+		sb.WriteString(fmt.Sprintf("  - To forget about this account, run: %s\n", cs.Bold(logoutInstructions)))
+	}
+
+	return sb.String()
+}
+
+type timeoutErrorEntry struct {
+	active      bool
+	host        string
+	user        string
+	tokenSource string
+}
+
+func (e timeoutErrorEntry) String(cs *iostreams.ColorScheme) string {
+	var sb strings.Builder
+
+	if e.user != "" {
+		sb.WriteString(fmt.Sprintf("  %s Timeout trying to log in to %s account %s (%s)\n", cs.Red("X"), e.host, cs.Bold(e.user), e.tokenSource))
+	} else {
+		sb.WriteString(fmt.Sprintf("  %s Timeout trying to log in to %s using token (%s)\n", cs.Red("X"), e.host, e.tokenSource))
+	}
+	activeStr := fmt.Sprintf("%v", e.active)
+	sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
+
+	return sb.String()
+}
+
+type Entry interface {
+	String(cs *iostreams.ColorScheme) string
+}
+
+type Entries []Entry
+
+func (e Entries) Strings(cs *iostreams.ColorScheme) []string {
+	var out []string
+	for _, entry := range e {
+		out = append(out, entry.String(cs))
+	}
+	return out
+}
+
 type StatusOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 
 	Hostname  string
 	ShowToken bool
@@ -35,12 +141,17 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "status",
 		Args:  cobra.ExactArgs(0),
-		Short: "View authentication status",
-		Long: heredoc.Doc(`Verifies and displays information about your authentication state.
+		Short: "Display active account and authentication state on each known GitHub host",
+		Long: heredoc.Docf(`
+			Display active account and authentication state on each known GitHub host.
 
-			This command will test your authentication state for each GitHub host that gh knows about and
-			report on any issues.
-		`),
+			For each host, the authentication state of each known account is tested and any issues are included in the output.
+			Each host section will indicate the active account, which will be used when targeting that host.
+			If an account on any host (or only the one given via %[1]s--hostname%[1]s) has authentication issues,
+			the command will exit with 1 and output to stderr.
+
+			To change the active account for a host, see %[1]sgh auth switch%[1]s.
+		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(opts)
@@ -50,7 +161,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check a specific hostname's auth status")
+	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check only a specific hostname's auth status")
 	cmd.Flags().BoolVarP(&opts.ShowToken, "show-token", "t", false, "Display the auth token")
 
 	return cmd
@@ -63,18 +174,22 @@ func statusRun(opts *StatusOptions) error {
 	}
 	authCfg := cfg.Authentication()
 
-	// TODO check tty
-
 	stderr := opts.IO.ErrOut
 	stdout := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
-	statusInfo := map[string][]string{}
+	statuses := make(map[string]Entries)
 
 	hostnames := authCfg.Hosts()
 	if len(hostnames) == 0 {
 		fmt.Fprintf(stderr,
-			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", cs.Bold("gh auth login"))
+			"You are not logged into any GitHub hosts. To log in, run: %s\n", cs.Bold("gh auth login"))
+		return cmdutil.SilentError
+	}
+
+	if opts.Hostname != "" && !slices.Contains(hostnames, opts.Hostname) {
+		fmt.Fprintf(stderr,
+			"You are not logged into any accounts on %s\n", opts.Hostname)
 		return cmdutil.SilentError
 	}
 
@@ -83,113 +198,76 @@ func statusRun(opts *StatusOptions) error {
 		return err
 	}
 
-	var failed bool
-	var isHostnameFound bool
-
 	for _, hostname := range hostnames {
 		if opts.Hostname != "" && opts.Hostname != hostname {
 			continue
 		}
-		isHostnameFound = true
 
-		token, tokenSource := authCfg.Token(hostname)
-		if tokenSource == "oauth_token" {
-			// The go-gh function TokenForHost returns this value as source for tokens read from the
-			// config file, but we want the file path instead. This attempts to reconstruct it.
-			tokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
+		var activeUser string
+		gitProtocol := cfg.GitProtocol(hostname).Value
+		activeUserToken, activeUserTokenSource := authCfg.ActiveToken(hostname)
+		if authTokenWriteable(activeUserTokenSource) {
+			activeUser, _ = authCfg.ActiveUser(hostname)
 		}
-		_, tokenIsWriteable := shared.AuthTokenWriteable(authCfg, hostname)
+		entry := buildEntry(httpClient, buildEntryOptions{
+			active:      true,
+			gitProtocol: gitProtocol,
+			hostname:    hostname,
+			showToken:   opts.ShowToken,
+			token:       activeUserToken,
+			tokenSource: activeUserTokenSource,
+			username:    activeUser,
+		})
+		statuses[hostname] = append(statuses[hostname], entry)
 
-		statusInfo[hostname] = []string{}
-		addMsg := func(x string, ys ...interface{}) {
-			statusInfo[hostname] = append(statusInfo[hostname], fmt.Sprintf(x, ys...))
-		}
-
-		scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
-		if err != nil {
-			addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
-			addMsg("- The %s token in %s is invalid.", cs.Bold(hostname), tokenSource)
-			if tokenIsWriteable {
-				addMsg("- To re-authenticate, run: %s %s",
-					cs.Bold("gh auth login -h"), cs.Bold(hostname))
-				addMsg("- To forget about this host, run: %s %s",
-					cs.Bold("gh auth logout -h"), cs.Bold(hostname))
-			}
-			failed = true
-			continue
+		if err == nil && !isValidEntry(entry) {
+			err = cmdutil.SilentError
 		}
 
-		if err := shared.HeaderHasMinimumScopes(scopesHeader); err != nil {
-			var missingScopes *shared.MissingScopesError
-			if errors.As(err, &missingScopes) {
-				addMsg("%s %s: the token in %s is %s", cs.Red("X"), hostname, tokenSource, err)
-				if tokenIsWriteable {
-					addMsg("- To request missing scopes, run: %s %s",
-						cs.Bold("gh auth refresh -h"),
-						cs.Bold(hostname))
-				}
+		users := authCfg.UsersForHost(hostname)
+		for _, username := range users {
+			if username == activeUser {
+				continue
 			}
-			failed = true
-		} else {
-			apiClient := api.NewClientFromHTTP(httpClient)
-			username, err := api.CurrentLoginName(apiClient, hostname)
-			if err != nil {
-				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
-				failed = true
-			}
+			token, tokenSource, _ := authCfg.TokenForUser(hostname, username)
+			entry := buildEntry(httpClient, buildEntryOptions{
+				active:      false,
+				gitProtocol: gitProtocol,
+				hostname:    hostname,
+				showToken:   opts.ShowToken,
+				token:       token,
+				tokenSource: tokenSource,
+				username:    username,
+			})
+			statuses[hostname] = append(statuses[hostname], entry)
 
-			addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
-			proto, _ := authCfg.GitProtocol(hostname)
-			if proto != "" {
-				addMsg("%s Git operations for %s configured to use %s protocol.",
-					cs.SuccessIcon(), hostname, cs.Bold(proto))
-			}
-			addMsg("%s Token: %s", cs.SuccessIcon(), displayToken(token, opts.ShowToken))
-
-			if scopesHeader != "" {
-				addMsg("%s Token scopes: %s", cs.SuccessIcon(), scopesHeader)
-			} else if expectScopes(token) {
-				addMsg("%s Token scopes: none", cs.Red("X"))
+			if err == nil && !isValidEntry(entry) {
+				err = cmdutil.SilentError
 			}
 		}
-	}
-
-	if !isHostnameFound {
-		fmt.Fprintf(stderr,
-			"Hostname %q not found among authenticated GitHub hosts\n", opts.Hostname)
-		return cmdutil.SilentError
 	}
 
 	prevEntry := false
 	for _, hostname := range hostnames {
-		lines, ok := statusInfo[hostname]
+		entries, ok := statuses[hostname]
 		if !ok {
 			continue
 		}
-		if prevEntry && failed {
-			fmt.Fprint(stderr, "\n")
-		} else if prevEntry && !failed {
-			fmt.Fprint(stdout, "\n")
+
+		stream := stdout
+		if err != nil {
+			stream = stderr
+		}
+
+		if prevEntry {
+			fmt.Fprint(stream, "\n")
 		}
 		prevEntry = true
-		if failed {
-			fmt.Fprintf(stderr, "%s\n", cs.Bold(hostname))
-			for _, line := range lines {
-				fmt.Fprintf(stderr, "  %s\n", line)
-			}
-		} else {
-			fmt.Fprintf(stdout, "%s\n", cs.Bold(hostname))
-			for _, line := range lines {
-				fmt.Fprintf(stdout, "  %s\n", line)
-			}
-		}
+		fmt.Fprintf(stream, "%s\n", cs.Bold(hostname))
+		fmt.Fprintf(stream, "%s", strings.Join(entries.Strings(cs), "\n"))
 	}
 
-	if failed {
-		return cmdutil.SilentError
-	}
-
-	return nil
+	return err
 }
 
 func displayToken(token string, printRaw bool) string {
@@ -205,6 +283,97 @@ func displayToken(token string, printRaw bool) string {
 	return strings.Repeat("*", len(token))
 }
 
+func displayScopes(scopes string) string {
+	if scopes == "" {
+		return "none"
+	}
+	list := strings.Split(scopes, ",")
+	for i, s := range list {
+		list[i] = fmt.Sprintf("'%s'", strings.TrimSpace(s))
+	}
+	return strings.Join(list, ", ")
+}
+
 func expectScopes(token string) bool {
 	return strings.HasPrefix(token, "ghp_") || strings.HasPrefix(token, "gho_")
+}
+
+type buildEntryOptions struct {
+	active      bool
+	gitProtocol string
+	hostname    string
+	showToken   bool
+	token       string
+	tokenSource string
+	username    string
+}
+
+func buildEntry(httpClient *http.Client, opts buildEntryOptions) Entry {
+	tokenIsWriteable := authTokenWriteable(opts.tokenSource)
+
+	if opts.tokenSource == "oauth_token" {
+		// The go-gh function TokenForHost returns this value as source for tokens read from the
+		// config file, but we want the file path instead. This attempts to reconstruct it.
+		opts.tokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
+	}
+
+	// If token is not writeable, then it came from an environment variable and
+	// we need to fetch the username as it won't be stored in the config.
+	if !tokenIsWriteable {
+		// The httpClient will automatically use the correct token here as
+		// the token from the environment variable take highest precedence.
+		apiClient := api.NewClientFromHTTP(httpClient)
+		var err error
+		opts.username, err = api.CurrentLoginName(apiClient, opts.hostname)
+		if err != nil {
+			return invalidTokenEntry{
+				active:           opts.active,
+				host:             opts.hostname,
+				user:             opts.username,
+				tokenIsWriteable: tokenIsWriteable,
+				tokenSource:      opts.tokenSource,
+			}
+		}
+	}
+
+	// Get scopes for token.
+	scopesHeader, err := shared.GetScopes(httpClient, opts.hostname, opts.token)
+	if err != nil {
+		var networkError net.Error
+		if errors.As(err, &networkError) && networkError.Timeout() {
+			return timeoutErrorEntry{
+				active:      opts.active,
+				host:        opts.hostname,
+				user:        opts.username,
+				tokenSource: opts.tokenSource,
+			}
+		}
+
+		return invalidTokenEntry{
+			active:           opts.active,
+			host:             opts.hostname,
+			user:             opts.username,
+			tokenIsWriteable: tokenIsWriteable,
+			tokenSource:      opts.tokenSource,
+		}
+	}
+
+	return validEntry{
+		active:      opts.active,
+		gitProtocol: opts.gitProtocol,
+		host:        opts.hostname,
+		scopes:      scopesHeader,
+		token:       displayToken(opts.token, opts.showToken),
+		tokenSource: opts.tokenSource,
+		user:        opts.username,
+	}
+}
+
+func authTokenWriteable(src string) bool {
+	return !strings.HasSuffix(src, "_TOKEN")
+}
+
+func isValidEntry(entry Entry) bool {
+	_, ok := entry.(validEntry)
+	return ok
 }

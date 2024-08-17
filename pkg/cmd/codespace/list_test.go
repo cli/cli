@@ -85,6 +85,7 @@ func TestApp_List(t *testing.T) {
 						return []*api.Codespace{
 							{
 								DisplayName: "CS1",
+								CreatedAt:   "2023-01-01T00:00:00Z",
 							},
 						}, nil
 					},
@@ -106,6 +107,7 @@ func TestApp_List(t *testing.T) {
 						return []*api.Codespace{
 							{
 								DisplayName: "CS1",
+								CreatedAt:   "2023-01-01T00:00:00Z",
 							},
 						}, nil
 					},
@@ -129,6 +131,7 @@ func TestApp_List(t *testing.T) {
 						return []*api.Codespace{
 							{
 								DisplayName: "CS1",
+								CreatedAt:   "2023-01-01T00:00:00Z",
 							},
 						}, nil
 					},
@@ -159,6 +162,7 @@ func TestApp_List(t *testing.T) {
 						return []*api.Codespace{
 							{
 								DisplayName: "CS1",
+								CreatedAt:   "2023-01-01T00:00:00Z",
 							},
 						}, nil
 					},
