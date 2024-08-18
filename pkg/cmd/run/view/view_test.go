@@ -1523,6 +1523,18 @@ func Test_attachRunLog(t *testing.T) {
 			wantFilename: "cool job  with slash/1_fob the barz.txt",
 		},
 		{
+			name: "job name with colon matches dir with colon removed",
+			job: shared.Job{
+				Name: "cool job : with colon",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "cool job  with colon/1_fob the barz.txt",
+		},
+		{
 			name: "Job name with really long name (over the ZIP limit)",
 			job: shared.Job{
 				Name: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_",
