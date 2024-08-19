@@ -866,3 +866,27 @@ func Test_createRun(t *testing.T) {
 		})
 	}
 }
+
+func Test_getRepoVisibilityOptions(t *testing.T) {
+	tests := []struct {
+		name  string
+		owner string
+		want  []string
+	}{
+		{
+			name:  "user repo",
+			owner: "",
+			want:  []string{"Public", "Private"},
+		},
+		{
+			name:  "org repo",
+			owner: "fooOrg",
+			want:  []string{"Public", "Private", "Internal"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, getRepoVisibilityOptions(tt.owner))
+		})
+	}
+}
