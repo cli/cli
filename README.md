@@ -60,6 +60,14 @@ Additional Conda installation options available on the [gh-feedstock page](https
 
 For more information about the Webi installer see [its homepage](https://webinstall.dev/).
 
+#### Flox
+
+| Install:          | Upgrade:                |
+| ----------------- | ----------------------- |
+| `flox install gh` | `flox upgrade toplevel` |
+
+For more information about Flox, see [its homepage](https://flox.dev)
+
 ### Linux & BSD
 
 `gh` is available via:
