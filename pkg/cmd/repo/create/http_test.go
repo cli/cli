@@ -681,6 +681,63 @@ func Test_repoCreate(t *testing.T) {
 			},
 			wantRepo: "https://github.com/snacks-inc/crisps",
 		},
+		{
+			name:     "create personal repository but try to set it as 'internal'",
+			hostname: "github.com",
+			input: repoCreateInput{
+				Name:        "winter-foods",
+				Description: "roasted chestnuts",
+				HomepageURL: "http://example.com",
+				Visibility:  "internal",
+				OwnerLogin:  "OWNER",
+			},
+			wantErr: true,
+			stubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "users/OWNER"),
+					httpmock.StringResponse(`{ "node_id": "1234", "type": "Not-Org" }`))
+				r.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.GraphQLMutation(
+						`{
+							"errors": [
+								{
+									"message": "Only organization-owned repositories can have internal visibility",
+								}
+							],
+							"data": null
+							}
+						}`,
+						func(map[string]interface{}) {}),
+				)
+			},
+		},
+		{
+			name:     "create personal repository with README but try to set it as 'internal'",
+			hostname: "github.com",
+			input: repoCreateInput{
+				Name:        "winter-foods",
+				Description: "roasted chestnuts",
+				HomepageURL: "http://example.com",
+				Visibility:  "internal",
+				OwnerLogin:  "OWNER",
+				InitReadme:  true,
+			},
+			wantErr: true,
+			stubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "users/OWNER"),
+					httpmock.StringResponse(`{ "node_id": "1234", "type": "Not-Org" }`))
+				r.Register(
+					httpmock.REST("POST", "user/repos"),
+					httpmock.RESTPayload(201, `{
+						"name":"winter-foods", 
+						"owner":{"login": "OWNER"}, 
+						"html_url":"the://URL"
+					}`, func(payload map[string]interface{}) {}),
+				)
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
