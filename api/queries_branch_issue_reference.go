@@ -138,6 +138,9 @@ func FindRepoBranchID(client *Client, repo ghrepo.Interface, ref string) (string
 
 	branchID := query.Repository.Ref.Target.Oid
 	if branchID == "" {
+		if ref != "" {
+			return "", "", fmt.Errorf("could not find branch %q in %s", ref, ghrepo.FullName(repo))
+		}
 		branchID = query.Repository.DefaultBranchRef.Target.Oid
 	}
 
