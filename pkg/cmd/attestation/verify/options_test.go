@@ -128,7 +128,7 @@ func TestSetPolicyFlags(t *testing.T) {
 
 		err := opts.AreFlagsValid()
 		require.Error(t, err)
-		require.ErrorContains(t, err, "bundle-from-registry flag can only be used with OCI artifact paths")
+		require.ErrorContains(t, err, "bundle-from-oci flag can only be used with OCI artifact paths")
 	})
 
 	t.Run("does not return error when UseBundleFromRegistry is true and ArtifactPath is an OCI path", func(t *testing.T) {
@@ -157,6 +157,6 @@ func TestSetPolicyFlags(t *testing.T) {
 
 		err := opts.AreFlagsValid()
 		require.Error(t, err)
-		require.ErrorContains(t, err, "bundle-from-registry flag cannot be used with bundle-path flag")
+		require.ErrorContains(t, err, "bundle-from-oci flag cannot be used with bundle-path flag")
 	})
 }
