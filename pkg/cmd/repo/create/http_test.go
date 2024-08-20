@@ -696,19 +696,9 @@ func Test_repoCreate(t *testing.T) {
 				r.Register(
 					httpmock.REST("GET", "users/OWNER"),
 					httpmock.StringResponse(`{ "node_id": "1234", "type": "Not-Org" }`))
-				r.Register(
+				r.Exclude(
+					t,
 					httpmock.GraphQL(`mutation RepositoryCreate\b`),
-					httpmock.GraphQLMutation(
-						`{
-							"errors": [
-								{
-									"message": "Only organization-owned repositories can have internal visibility",
-								}
-							],
-							"data": null
-							}
-						}`,
-						func(map[string]interface{}) {}),
 				)
 			},
 		},

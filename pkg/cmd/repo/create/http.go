@@ -99,6 +99,11 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		isOrg = owner.IsOrganization()
 	}
 
+	isInternal := strings.ToLower(input.Visibility) == "internal"
+	if isInternal && !isOrg {
+		return nil, fmt.Errorf("internal repositories can only be created within an organization")
+	}
+
 	if input.TemplateRepositoryID != "" {
 		var response struct {
 			CloneTemplateRepository struct {
