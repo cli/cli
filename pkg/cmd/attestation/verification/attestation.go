@@ -131,7 +131,7 @@ func GetOCIAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
 		return nil, fmt.Errorf("failed to fetch OCI attestations: %w", err)
 	}
 	if len(attestations) == 0 {
-		return nil, fmt.Errorf("no OCI attestations found")
+		return nil, fmt.Errorf("no attestations found in the OCI registry. Retry the command without the --bundle-from-oci flag to check GitHub for the attestation")
 	}
 	return attestations, nil
 }
