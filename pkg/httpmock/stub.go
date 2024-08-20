@@ -18,6 +18,7 @@ type Stub struct {
 	matched   bool
 	Matcher   Matcher
 	Responder Responder
+	exclude   bool
 }
 
 func MatchAny(*http.Request) bool {

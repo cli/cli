@@ -728,13 +728,9 @@ func Test_repoCreate(t *testing.T) {
 				r.Register(
 					httpmock.REST("GET", "users/OWNER"),
 					httpmock.StringResponse(`{ "node_id": "1234", "type": "Not-Org" }`))
-				r.Register(
+				r.Exclude(
+					t,
 					httpmock.REST("POST", "user/repos"),
-					httpmock.RESTPayload(201, `{
-						"name":"winter-foods", 
-						"owner":{"login": "OWNER"}, 
-						"html_url":"the://URL"
-					}`, func(payload map[string]interface{}) {}),
 				)
 			},
 		},
