@@ -129,7 +129,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("MergeFastForward", "FETCH_HEAD").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER/REPO\" to local repository\n",
 		},
 		{
 			name: "sync local repo with parent - notty",
@@ -162,7 +162,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("MergeFastForward", "FETCH_HEAD").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced the \"trunk\" branch from OWNER2/REPO2 to local repository\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER2/REPO2\" to local repository\n",
 		},
 		{
 			name: "sync local repo with parent and force specified",
@@ -179,7 +179,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("ResetHard", "FETCH_HEAD").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER/REPO\" to local repository\n",
 		},
 		{
 			name: "sync local repo with specified source repo and force specified",
@@ -197,7 +197,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("IsDirty").Return(false, nil).Once()
 				mgc.On("ResetHard", "FETCH_HEAD").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced the \"trunk\" branch from OWNER2/REPO2 to local repository\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER2/REPO2\" to local repository\n",
 		},
 		{
 			name: "sync local repo with parent and not fast forward merge",
@@ -257,7 +257,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("CurrentBranch").Return("test", nil).Once()
 				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER/REPO\" to local repository\n",
 		},
 		{
 			name: "sync local repo with parent - create new branch",
@@ -271,7 +271,7 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("CurrentBranch").Return("test", nil).Once()
 				mgc.On("CreateBranch", "trunk", "FETCH_HEAD", "origin/trunk").Return(nil).Once()
 			},
-			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
+			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER/REPO\" to local repository\n",
 		},
 		{
 			name: "sync remote fork with parent with new api - tty",
