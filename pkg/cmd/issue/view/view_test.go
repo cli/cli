@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
@@ -66,7 +67,10 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		},
 	}
 
-	cmd := NewCmdView(factory, nil)
+	cmd := NewCmdView(factory, func(opts *ViewOptions) error {
+		opts.Detector = &featuredetection.EnabledDetectorMock{}
+		return viewRun(opts)
+	})
 
 	argv, err := shlex.Split(cli)
 	if err != nil {
@@ -274,6 +278,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},
 				SelectorArg: "123",
+				Detector:    &featuredetection.EnabledDetectorMock{},
 			}
 
 			err := viewRun(&opts)

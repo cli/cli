@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -19,6 +20,7 @@ type TransferOptions struct {
 	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Detector   fd.Detector
 
 	IssueSelector    string
 	DestRepoSelector string
@@ -57,7 +59,7 @@ func transferRun(opts *TransferOptions) error {
 		return err
 	}
 
-	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.IssueSelector, []string{"id", "number"})
+	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.IssueSelector, []string{"id", "number"}, opts.Detector)
 	if err != nil {
 		return err
 	}

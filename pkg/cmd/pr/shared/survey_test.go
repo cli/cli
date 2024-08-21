@@ -14,7 +14,7 @@ type metadataFetcher struct {
 	metadataResult *api.RepoMetadataResult
 }
 
-func (mf *metadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput) (*api.RepoMetadataResult, error) {
+func (mf *metadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput, includeProjectV1 bool) (*api.RepoMetadataResult, error) {
 	return mf.metadataResult, nil
 }
 
@@ -68,7 +68,7 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		Assignees: []string{"hubot"},
 		Type:      PRMetadata,
 	}
-	err := MetadataSurvey(pm, ios, repo, fetcher, state)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state, true)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -113,7 +113,7 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
 	}
-	err := MetadataSurvey(pm, ios, repo, fetcher, state)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state, true)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())

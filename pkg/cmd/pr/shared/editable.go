@@ -376,7 +376,7 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 	return nil
 }
 
-func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable) error {
+func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable, includeProjectV1 bool) error {
 	input := api.RepoMetadataInput{
 		Reviewers:  editable.Reviewers.Edited,
 		Assignees:  editable.Assignees.Edited,
@@ -384,7 +384,7 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 		Projects:   editable.Projects.Edited,
 		Milestones: editable.Milestone.Edited,
 	}
-	metadata, err := api.RepoMetadata(client, repo, input)
+	metadata, err := api.RepoMetadata(client, repo, input, includeProjectV1)
 	if err != nil {
 		return err
 	}

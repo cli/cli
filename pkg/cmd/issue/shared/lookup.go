@@ -19,7 +19,7 @@ import (
 
 // IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
 // could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
-func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
+func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string, detector fd.Detector) (*api.Issue, ghrepo.Interface, error) {
 	issueNumber, baseRepo, err := IssueNumberAndRepoFromArg(arg)
 	if err != nil {
 		return nil, nil, err
@@ -32,13 +32,13 @@ func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.I
 		}
 	}
 
-	issue, err := findIssueOrPR(httpClient, baseRepo, issueNumber, fields)
+	issue, err := findIssueOrPR(httpClient, baseRepo, issueNumber, fields, detector)
 	return issue, baseRepo, err
 }
 
 // IssuesFromArgWithFields loads 1 or more issues or pull requests with the specified fields. If some of the fields
 // could not be fetched by GraphQL, this returns non-nil issues and a *PartialLoadError.
-func IssuesFromArgsWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), args []string, fields []string) ([]*api.Issue, ghrepo.Interface, error) {
+func IssuesFromArgsWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), args []string, fields []string, detector fd.Detector) ([]*api.Issue, ghrepo.Interface, error) {
 	var issuesRepo ghrepo.Interface
 	issueNumbers := make([]int, 0, len(args))
 
@@ -75,7 +75,7 @@ func IssuesFromArgsWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo
 	for _, num := range issueNumbers {
 		issueNumber := num
 		g.Go(func() error {
-			issue, err := findIssueOrPR(httpClient, issuesRepo, issueNumber, fields)
+			issue, err := findIssueOrPR(httpClient, issuesRepo, issueNumber, fields, detector)
 			if err != nil {
 				return err
 			}
@@ -142,12 +142,15 @@ type PartialLoadError struct {
 	error
 }
 
-func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.Issue, error) {
+func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string, detector fd.Detector) (*api.Issue, error) {
+	if detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		detector = fd.NewDetector(cachedClient, repo.RepoHost())
+	}
+
 	fieldSet := set.NewStringSet()
 	fieldSet.AddValues(fields)
 	if fieldSet.Contains("stateReason") {
-		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		detector := fd.NewDetector(cachedClient, repo.RepoHost())
 		features, err := detector.IssueFeatures()
 		if err != nil {
 			return nil, err
@@ -162,6 +165,15 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 		getProjectItems = true
 		fieldSet.Remove("projectItems")
 		fieldSet.Add("number")
+	}
+	if fieldSet.Contains("projectCards") {
+		includeProjectV1, err := detector.ProjectV1()
+		if err != nil {
+			return nil, err
+		}
+		if !includeProjectV1 {
+			fieldSet.Remove("projectCards")
+		}
 	}
 
 	fields = fieldSet.ToSlice()

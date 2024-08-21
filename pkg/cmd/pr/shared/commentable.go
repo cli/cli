@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
@@ -45,6 +46,7 @@ type CommentableOptions struct {
 	EditLast              bool
 	Quiet                 bool
 	Host                  string
+	Detector              fd.Detector
 }
 
 func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {

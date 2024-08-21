@@ -2,6 +2,8 @@ package featuredetection
 
 import (
 	"net/http"
+	"os"
+	"strconv"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -12,6 +14,7 @@ type Detector interface {
 	IssueFeatures() (IssueFeatures, error)
 	PullRequestFeatures() (PullRequestFeatures, error)
 	RepositoryFeatures() (RepositoryFeatures, error)
+	ProjectV1() (bool, error)
 }
 
 type IssueFeatures struct {
@@ -197,4 +200,33 @@ func (d *detector) RepositoryFeatures() (RepositoryFeatures, error) {
 	}
 
 	return features, nil
+}
+
+func (d *detector) ProjectV1() (bool, error) {
+	// Bypass feature detection logic for testing purposes
+	if env := os.Getenv("INCLUDE_PROJECT_V1"); env != "" {
+		return strconv.ParseBool(env)
+	}
+	var featureDetection struct {
+		Repository struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"Repository: __type(name: \"Repository\")"`
+	}
+
+	gql := api.NewClientFromHTTP(d.httpClient)
+
+	err := gql.Query(d.host, "ProjectV1FeatureDetection", &featureDetection, nil)
+	if err != nil {
+		return false, err
+	}
+
+	for _, field := range featureDetection.Repository.Fields {
+		if field.Name == "projects" {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
