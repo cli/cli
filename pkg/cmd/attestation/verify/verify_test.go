@@ -488,7 +488,7 @@ func TestRunVerify(t *testing.T) {
 		customOpts.UseBundleFromRegistry = true
 		customOpts.OCIClient = oci.NoAttestationsClient{}
 
-		require.ErrorContains(t, runVerify(&customOpts), "no OCI attestations found")
+		require.ErrorContains(t, runVerify(&customOpts), "no attestations found in the OCI registry. Retry the command without the --bundle-from-oci flag to check GitHub for the attestation")
 	})
 
 	t.Run("with valid OCI artifact with UseBundleFromRegistry flag but fail on fetching bundle from registry", func(t *testing.T) {
@@ -498,6 +498,6 @@ func TestRunVerify(t *testing.T) {
 		customOpts.UseBundleFromRegistry = true
 		customOpts.OCIClient = oci.NoAttestationsClient{}
 
-		require.ErrorContains(t, runVerify(&customOpts), "no OCI attestations found")
+		require.ErrorContains(t, runVerify(&customOpts), "no attestations found in the OCI registry. Retry the command without the --bundle-from-oci flag to check GitHub for the attestation")
 	})
 }
