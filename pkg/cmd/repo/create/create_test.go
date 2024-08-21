@@ -639,9 +639,9 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "noninteractive create from scratch",
 			opts: &CreateOptions{
-				Interactive: false,
-				Name:        "REPO",
-				Visibility:  "PRIVATE",
+				Interactive:      false,
+				Name:             "REPO",
+				VisibilityOption: VisibilityOptionPrivate,
 			},
 			tty: false,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -666,10 +666,10 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "noninteractive create from source",
 			opts: &CreateOptions{
-				Interactive: false,
-				Source:      ".",
-				Name:        "REPO",
-				Visibility:  "PRIVATE",
+				Interactive:      false,
+				Source:           ".",
+				Name:             "REPO",
+				VisibilityOption: VisibilityOptionPrivate,
 			},
 			tty: false,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -699,10 +699,10 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "noninteractive clone from scratch",
 			opts: &CreateOptions{
-				Interactive: false,
-				Name:        "REPO",
-				Visibility:  "PRIVATE",
-				Clone:       true,
+				Interactive:      false,
+				Name:             "REPO",
+				VisibilityOption: VisibilityOptionPrivate,
+				Clone:            true,
 			},
 			tty: false,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -731,11 +731,11 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "noninteractive clone with readme",
 			opts: &CreateOptions{
-				Interactive: false,
-				Name:        "ElliotAlderson",
-				Visibility:  "PRIVATE",
-				Clone:       true,
-				AddReadme:   true,
+				Interactive:      false,
+				Name:             "ElliotAlderson",
+				VisibilityOption: VisibilityOptionPrivate,
+				Clone:            true,
+				AddReadme:        true,
 			},
 			tty: false,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -760,12 +760,12 @@ func Test_createRun(t *testing.T) {
 		{
 			name: "noninteractive create from template with retry",
 			opts: &CreateOptions{
-				Interactive: false,
-				Name:        "REPO",
-				Visibility:  "PRIVATE",
-				Clone:       true,
-				Template:    "mytemplate",
-				BackOff:     &backoff.ZeroBackOff{},
+				Interactive:      false,
+				Name:             "REPO",
+				VisibilityOption: VisibilityOptionPrivate,
+				Clone:            true,
+				Template:         "mytemplate",
+				BackOff:          &backoff.ZeroBackOff{},
 			},
 			tty: false,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -871,18 +871,23 @@ func Test_getRepoVisibilityOptions(t *testing.T) {
 	tests := []struct {
 		name  string
 		owner string
-		want  []string
+		want  visibilityOptions
 	}{
 		{
 			name:  "user repo",
 			owner: "",
-			want:  []string{"Public", "Private"},
+			want: visibilityOptions{
+				def:  VisibilityOptionPublic,
+				rest: []VisibilityOption{VisibilityOptionPrivate},
+			},
 		},
 		{
 			name:  "org repo",
 			owner: "fooOrg",
-			want:  []string{"Public", "Private", "Internal"},
-		},
+			want: visibilityOptions{
+				def:  VisibilityOptionPublic,
+				rest: []VisibilityOption{VisibilityOptionPrivate, VisibilityOptionInternal},
+			}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

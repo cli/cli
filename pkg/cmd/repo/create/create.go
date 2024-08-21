@@ -35,6 +35,77 @@ type iprompter interface {
 	Confirm(string, bool) (bool, error)
 }
 
+type VisibilityOption string
+
+const (
+	VisibilityOptionPublic   VisibilityOption = "Public"
+	VisibilityOptionPrivate  VisibilityOption = "Private"
+	VisibilityOptionInternal VisibilityOption = "Internal"
+)
+
+func (v VisibilityOption) forSelectionPrompt() string {
+	return string(v)
+}
+
+func (v VisibilityOption) forConfirmationPrompt() string {
+	return strings.ToLower(string(v))
+}
+
+func (v VisibilityOption) toRepoVisibility() visibility {
+	switch v {
+	case VisibilityOptionPublic:
+		return visibilityPublic
+	case VisibilityOptionPrivate:
+		return visibilityPrivate
+	case VisibilityOptionInternal:
+		return visibilityInternal
+	default:
+		panic("invalid visibility option: " + v)
+	}
+}
+
+func parseVisibilityOption(s string) VisibilityOption {
+	switch s {
+	case "Public":
+		return VisibilityOptionPublic
+	case "Private":
+		return VisibilityOptionPrivate
+	case "Internal":
+		return VisibilityOptionInternal
+	default:
+		panic("invalid visibility option text: " + s)
+	}
+}
+
+type visibilityOptions struct {
+	def  VisibilityOption
+	rest []VisibilityOption
+}
+
+func (v visibilityOptions) defaultPrompterOption() string {
+	return v.def.forSelectionPrompt()
+}
+
+func (v visibilityOptions) prompterOptions() []string {
+	opts := make([]string, len(v.rest)+1)
+	opts[0] = v.def.forSelectionPrompt()
+	for i, vis := range v.rest {
+		opts[i+1] = vis.forSelectionPrompt()
+	}
+
+	return opts
+}
+
+var userVisibilities = visibilityOptions{
+	def:  VisibilityOptionPublic,
+	rest: []VisibilityOption{VisibilityOptionPrivate},
+}
+
+var orgVisibilities = visibilityOptions{
+	def:  VisibilityOptionPublic,
+	rest: []VisibilityOption{VisibilityOptionPrivate, VisibilityOptionInternal},
+}
+
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
@@ -51,7 +122,7 @@ type CreateOptions struct {
 	Public             bool
 	Private            bool
 	Internal           bool
-	Visibility         string
+	VisibilityOption   VisibilityOption
 	Push               bool
 	Clone              bool
 	Source             string
@@ -133,11 +204,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				}
 
 				if opts.Public {
-					opts.Visibility = "PUBLIC"
+					opts.VisibilityOption = VisibilityOptionPublic
 				} else if opts.Private {
-					opts.Visibility = "PRIVATE"
+					opts.VisibilityOption = VisibilityOptionPrivate
 				} else {
-					opts.Visibility = "INTERNAL"
+					opts.VisibilityOption = VisibilityOptionInternal
 				}
 			}
 
@@ -295,7 +366,7 @@ func createFromScratch(opts *CreateOptions) error {
 	host, _ := cfg.Authentication().DefaultHost()
 
 	if opts.Interactive {
-		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, "")
+		opts.Name, opts.Description, opts.VisibilityOption, err = interactiveRepoInfo(httpClient, host, opts.Prompter, "")
 		if err != nil {
 			return err
 		}
@@ -316,7 +387,7 @@ func createFromScratch(opts *CreateOptions) error {
 		if idx := strings.IndexRune(opts.Name, '/'); idx > 0 {
 			targetRepo = opts.Name[0:idx+1] + shared.NormalizeRepoName(opts.Name[idx+1:])
 		}
-		confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(opts.Visibility)), true)
+		confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, opts.VisibilityOption.forConfirmationPrompt()), true)
 		if err != nil {
 			return err
 		} else if !confirmed {
@@ -336,7 +407,7 @@ func createFromScratch(opts *CreateOptions) error {
 
 	input := repoCreateInput{
 		Name:               repoToCreate.RepoName(),
-		Visibility:         opts.Visibility,
+		Visibility:         opts.VisibilityOption.toRepoVisibility(),
 		OwnerLogin:         repoToCreate.RepoOwner(),
 		TeamSlug:           opts.Team,
 		Description:        opts.Description,
@@ -433,7 +504,7 @@ func createFromTemplate(opts *CreateOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
-	opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, "")
+	opts.Name, opts.Description, opts.VisibilityOption, err = interactiveRepoInfo(httpClient, host, opts.Prompter, "")
 	if err != nil {
 		return err
 	}
@@ -456,7 +527,7 @@ func createFromTemplate(opts *CreateOptions) error {
 	}
 	input := repoCreateInput{
 		Name:                 repoToCreate.RepoName(),
-		Visibility:           opts.Visibility,
+		Visibility:           opts.VisibilityOption.toRepoVisibility(),
 		OwnerLogin:           repoToCreate.RepoOwner(),
 		TeamSlug:             opts.Team,
 		Description:          opts.Description,
@@ -475,7 +546,7 @@ func createFromTemplate(opts *CreateOptions) error {
 	if idx := strings.IndexRune(opts.Name, '/'); idx > 0 {
 		targetRepo = opts.Name[0:idx+1] + shared.NormalizeRepoName(opts.Name[idx+1:])
 	}
-	confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(opts.Visibility)), true)
+	confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, opts.VisibilityOption.forConfirmationPrompt()), true)
 	if err != nil {
 		return err
 	} else if !confirmed {
@@ -574,7 +645,7 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 
 	if opts.Interactive {
-		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(httpClient, host, opts.Prompter, filepath.Base(absPath))
+		opts.Name, opts.Description, opts.VisibilityOption, err = interactiveRepoInfo(httpClient, host, opts.Prompter, filepath.Base(absPath))
 		if err != nil {
 			return err
 		}
@@ -597,7 +668,7 @@ func createFromLocal(opts *CreateOptions) error {
 
 	input := repoCreateInput{
 		Name:              repoToCreate.RepoName(),
-		Visibility:        opts.Visibility,
+		Visibility:        opts.VisibilityOption.toRepoVisibility(),
 		OwnerLogin:        repoToCreate.RepoOwner(),
 		TeamSlug:          opts.Team,
 		Description:       opts.Description,
@@ -841,7 +912,7 @@ func interactiveLicense(client *http.Client, hostname string, prompter iprompter
 }
 
 // name, description, and visibility
-func interactiveRepoInfo(client *http.Client, hostname string, prompter iprompter, defaultName string) (string, string, string, error) {
+func interactiveRepoInfo(client *http.Client, hostname string, prompter iprompter, defaultName string) (string, string, VisibilityOption, error) {
 	name, owner, err := interactiveRepoNameAndOwner(client, hostname, prompter, defaultName)
 	if err != nil {
 		return "", "", "", err
@@ -855,22 +926,21 @@ func interactiveRepoInfo(client *http.Client, hostname string, prompter iprompte
 		return "", "", "", err
 	}
 
-	visibilityOptions := getRepoVisibilityOptions(owner)
-	selected, err := prompter.Select("Visibility", "Public", visibilityOptions)
+	visibilityOpts := getRepoVisibilityOptions(owner)
+	selected, err := prompter.Select("Visibility", visibilityOpts.defaultPrompterOption(), visibilityOpts.prompterOptions())
 	if err != nil {
 		return "", "", "", err
 	}
 
-	return name, description, strings.ToUpper(visibilityOptions[selected]), nil
+	return name, description, parseVisibilityOption(visibilityOpts.prompterOptions()[selected]), nil
 }
 
-func getRepoVisibilityOptions(owner string) []string {
-	visibilityOptions := []string{"Public", "Private"}
-	// orgs can also create internal repos
-	if owner != "" {
-		visibilityOptions = append(visibilityOptions, "Internal")
+func getRepoVisibilityOptions(owner string) visibilityOptions {
+	if owner == "" {
+		// users can only create public and private repos
+		return userVisibilities
 	}
-	return visibilityOptions
+	return orgVisibilities
 }
 
 func interactiveRepoNameAndOwner(client *http.Client, hostname string, prompter iprompter, defaultName string) (string, string, error) {

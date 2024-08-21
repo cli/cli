@@ -11,12 +11,28 @@ import (
 	"github.com/shurcooL/githubv4"
 )
 
+type visibility string
+
+var (
+	visibilityPublic   visibility = "public"
+	visibilityPrivate  visibility = "private"
+	visibilityInternal visibility = "internal"
+)
+
+func (v visibility) forREST() string {
+	return string(v)
+}
+
+func (v visibility) forGQL() string {
+	return strings.ToUpper(string(v))
+}
+
 // repoCreateInput is input parameters for the repoCreate method
 type repoCreateInput struct {
 	Name                 string
 	HomepageURL          string
 	Description          string
-	Visibility           string
+	Visibility           visibility
 	OwnerLogin           string
 	TeamSlug             string
 	TemplateRepositoryID string
@@ -99,8 +115,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		isOrg = owner.IsOrganization()
 	}
 
-	isInternal := strings.ToLower(input.Visibility) == "internal"
-	if isInternal && !isOrg {
+	if input.Visibility == visibilityInternal && !isOrg {
 		return nil, fmt.Errorf("internal repositories can only be created within an organization")
 	}
 
@@ -123,7 +138,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			"input": cloneTemplateRepositoryInput{
 				Name:               input.Name,
 				Description:        input.Description,
-				Visibility:         strings.ToUpper(input.Visibility),
+				Visibility:         input.Visibility.forGQL(),
 				OwnerID:            ownerID,
 				RepositoryID:       input.TemplateRepositoryID,
 				IncludeAllBranches: input.IncludeAllBranches,
@@ -177,7 +192,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			Name:              input.Name,
 			HomepageURL:       input.HomepageURL,
 			Description:       input.Description,
-			IsPrivate:         strings.EqualFold(input.Visibility, "PRIVATE"),
+			IsPrivate:         input.Visibility == visibilityPrivate,
 			TeamID:            teamIDv3,
 			HasIssuesEnabled:  input.HasIssuesEnabled,
 			HasWikiEnabled:    input.HasWikiEnabled,
@@ -189,7 +204,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		path := "user/repos"
 		if isOrg {
 			path = fmt.Sprintf("orgs/%s/repos", input.OwnerLogin)
-			inputv3.Visibility = strings.ToLower(input.Visibility)
+			inputv3.Visibility = input.Visibility.forREST()
 		}
 
 		body := &bytes.Buffer{}
@@ -216,7 +231,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			Name:             input.Name,
 			Description:      input.Description,
 			HomepageURL:      input.HomepageURL,
-			Visibility:       strings.ToUpper(input.Visibility),
+			Visibility:       input.Visibility.forGQL(),
 			OwnerID:          ownerID,
 			TeamID:           teamID,
 			HasIssuesEnabled: input.HasIssuesEnabled,
