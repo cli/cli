@@ -16,6 +16,7 @@ func Test_repoCreate(t *testing.T) {
 		input    repoCreateInput
 		stubs    func(t *testing.T, r *httpmock.Registry)
 		wantErr  bool
+		errMsg   string
 		wantRepo string
 	}{
 		{
@@ -692,6 +693,7 @@ func Test_repoCreate(t *testing.T) {
 				OwnerLogin:  "OWNER",
 			},
 			wantErr: true,
+			errMsg:  "internal repositories can only be created within an organization",
 			stubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.REST("GET", "users/OWNER"),
@@ -714,6 +716,7 @@ func Test_repoCreate(t *testing.T) {
 				InitReadme:  true,
 			},
 			wantErr: true,
+			errMsg:  "internal repositories can only be created within an organization",
 			stubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
 					httpmock.REST("GET", "users/OWNER"),
@@ -734,6 +737,9 @@ func Test_repoCreate(t *testing.T) {
 			r, err := repoCreate(httpClient, tt.hostname, tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.ErrorContains(t, err, tt.errMsg)
+				}
 				return
 			} else {
 				assert.NoError(t, err)
