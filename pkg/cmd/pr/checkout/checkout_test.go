@@ -125,6 +125,7 @@ func Test_checkoutRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git show-ref --verify -- refs/heads/foobar`, 1, "")
 				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git show-ref --verify -- refs/heads/origin/feature`, 0, "")
 				cs.Register(`git checkout -b foobar --track origin/feature`, 0, "")
 			},
 		},
@@ -278,6 +279,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 
 	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+	cs.Register(`git show-ref --verify -- refs/heads/origin/feature`, 0, "")
 	cs.Register(`git checkout -b feature --track origin/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
@@ -331,6 +333,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 
 	cs.Register(`git fetch robot-fork \+refs/heads/feature:refs/remotes/robot-fork/feature`, 0, "")
 	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
+	cs.Register(`git show-ref --verify -- refs/heads/robot-fork/feature`, 0, "")
 	cs.Register(`git checkout -b feature --track robot-fork/feature`, 0, "")
 
 	output, err := runCommand(http, remotes, "master", `123`)

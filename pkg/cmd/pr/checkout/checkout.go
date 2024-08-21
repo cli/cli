@@ -166,6 +166,9 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 			cmds = append(cmds, []string{"merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 		}
 	default:
+		if !localBranchExists(opts.GitClient, remoteBranch) {
+			cmds = append(cmds, []string{"config", "--add", fmt.Sprintf("remote.%s.fetch", remote.Name), refSpec})
+		}
 		cmds = append(cmds, []string{"checkout", "-b", localBranch, "--track", remoteBranch})
 	}
 
