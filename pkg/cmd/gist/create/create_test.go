@@ -296,7 +296,7 @@ func Test_createRun(t *testing.T) {
 				WebMode:   true,
 				Filenames: []string{fixtureFile},
 			},
-			wantOut:    "Opening gist.github.com/aa5a315d61ae9438b18d in your browser.\n",
+			wantOut:    "Opening https://gist.github.com/aa5a315d61ae9438b18d in your browser.\n",
 			wantStderr: "- Creating gist fixture.txt\n✓ Created secret gist fixture.txt\n",
 			wantErr:    false,
 			wantBrowse: "https://gist.github.com/aa5a315d61ae9438b18d",

@@ -146,3 +146,38 @@ func TestFormatSlice(t *testing.T) {
 		})
 	}
 }
+
+func TestDisplayURL(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+		want string
+	}{
+		{
+			name: "simple",
+			url:  "https://github.com/cli/cli/issues/9470",
+			want: "https://github.com/cli/cli/issues/9470",
+		},
+		{
+			name: "without scheme",
+			url:  "github.com/cli/cli/issues/9470",
+			want: "https://github.com/cli/cli/issues/9470",
+		},
+		{
+			name: "with query param and anchor",
+			url:  "https://github.com/cli/cli/issues/9470?q=is:issue#issue-command",
+			want: "https://github.com/cli/cli/issues/9470",
+		},
+		{
+			name: "preserve http protocol use despite insecure",
+			url:  "http://github.com/cli/cli/issues/9470",
+			want: "http://github.com/cli/cli/issues/9470",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, DisplayURL(tt.url))
+		})
+	}
+}

@@ -640,7 +640,7 @@ func TestPRView_web_currentBranch(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/pull/10 in your browser.\n", output.Stderr())
+	assert.Equal(t, "Opening https://github.com/OWNER/REPO/pull/10 in your browser.\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/10", output.BrowsedURL)
 }
 
