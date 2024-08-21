@@ -856,11 +856,11 @@ func Test_createRun(t *testing.T) {
 			defer reg.Verify(t)
 			err := createRun(tt.opts)
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
+				require.Error(t, err)
+				require.Equal(t, tt.errMsg, err.Error())
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, "", stderr.String())
 		})
