@@ -71,25 +71,14 @@ func OverrideBaseRepoFunc(f *Factory, override string) func() (ghrepo.Interface,
 	return f.BaseRepo
 }
 
-func DefaultRepo(remotes func() (ghContext.Remotes, error)) ghrepo.Interface {
-	if remotes, _ := remotes(); remotes != nil {
-		if defaultRemote, _ := remotes.ResolvedRemote(); defaultRemote != nil {
-			return defaultRemote.Repo
-		}
-	}
-
-	return nil
-}
-
 func PromptForRepo(baseRepo ghrepo.Interface, remotes func() (ghContext.Remotes, error), survey prompter.Prompter) (ghrepo.Interface, error) {
 	var defaultRepo string
 	var remoteArray []string
-	var selectedRepo ghrepo.Interface
 
 	if remotes, _ := remotes(); remotes != nil {
 		if defaultRemote, _ := remotes.ResolvedRemote(); defaultRemote != nil {
 			// this is a remote explicitly chosen via `repo set-default`
-			return defaultRemote.Repo, nil
+			defaultRepo = ghrepo.FullName(defaultRemote)
 		} else if len(remotes) > 0 {
 			// as a fallback, just pick the first remote
 			defaultRepo = ghrepo.FullName(remotes[0])
