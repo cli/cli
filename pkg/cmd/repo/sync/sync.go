@@ -156,7 +156,7 @@ func syncLocalRepo(opts *SyncOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Synced the \"%s\" branch from %s to local repository\n",
+		fmt.Fprintf(opts.IO.Out, "%s Synced the \"%s\" branch from \"%s\" to local repository\n",
 			cs.SuccessIcon(),
 			opts.Branch,
 			ghrepo.FullName(srcRepo))
