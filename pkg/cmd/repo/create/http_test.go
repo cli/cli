@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_repoCreate(t *testing.T) {
@@ -736,14 +737,14 @@ func Test_repoCreate(t *testing.T) {
 			httpClient := &http.Client{Transport: reg}
 			r, err := repoCreate(httpClient, tt.hostname, tt.input)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errMsg != "" {
 					assert.ErrorContains(t, err, tt.errMsg)
 				}
 				return
-			} else {
-				assert.NoError(t, err)
 			}
+
+			require.NoError(t, err)
 			assert.Equal(t, tt.wantRepo, ghrepo.GenerateRepoURL(r, ""))
 		})
 	}
