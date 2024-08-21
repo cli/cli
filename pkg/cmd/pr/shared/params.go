@@ -11,7 +11,7 @@ import (
 	"github.com/google/shlex"
 )
 
-func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, baseURL string, state IssueMetadataState) (string, error) {
+func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, baseURL string, state IssueMetadataState, includeProjectV1 bool) (string, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return "", err
@@ -31,7 +31,7 @@ func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, ba
 		q.Set("labels", strings.Join(state.Labels, ","))
 	}
 	if len(state.Projects) > 0 {
-		projectPaths, err := api.ProjectNamesToPaths(client, baseRepo, state.Projects)
+		projectPaths, err := api.ProjectNamesToPaths(client, baseRepo, state.Projects, includeProjectV1)
 		if err != nil {
 			return "", fmt.Errorf("could not add to project: %w", err)
 		}
@@ -51,7 +51,7 @@ func ValidURL(urlStr string) bool {
 
 // Ensure that tb.MetadataResult object exists and contains enough pre-fetched API data to be able
 // to resolve all object listed in tb to GraphQL IDs.
-func fillMetadata(client *api.Client, baseRepo ghrepo.Interface, tb *IssueMetadataState) error {
+func fillMetadata(client *api.Client, baseRepo ghrepo.Interface, tb *IssueMetadataState, includeProjectV1 bool) error {
 	resolveInput := api.RepoResolveInput{}
 
 	if len(tb.Assignees) > 0 && (tb.MetadataResult == nil || len(tb.MetadataResult.AssignableUsers) == 0) {
@@ -74,7 +74,7 @@ func fillMetadata(client *api.Client, baseRepo ghrepo.Interface, tb *IssueMetada
 		resolveInput.Milestones = tb.Milestones
 	}
 
-	metadataResult, err := api.RepoResolveMetadataIDs(client, baseRepo, resolveInput)
+	metadataResult, err := api.RepoResolveMetadataIDs(client, baseRepo, resolveInput, includeProjectV1)
 	if err != nil {
 		return err
 	}
@@ -88,12 +88,12 @@ func fillMetadata(client *api.Client, baseRepo ghrepo.Interface, tb *IssueMetada
 	return nil
 }
 
-func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]interface{}, tb *IssueMetadataState) error {
+func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, params map[string]interface{}, tb *IssueMetadataState, includeProjectV1 bool) error {
 	if !tb.HasMetadata() {
 		return nil
 	}
 
-	if err := fillMetadata(client, baseRepo, tb); err != nil {
+	if err := fillMetadata(client, baseRepo, tb, includeProjectV1); err != nil {
 		return err
 	}
 

@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -1526,6 +1527,7 @@ func Test_createRun(t *testing.T) {
 				GhPath:  "some/path/gh",
 				GitPath: "some/path/git",
 			}
+			opts.Detector = &featuredetection.EnabledDetectorMock{}
 			cleanSetup := func() {}
 			if tt.setup != nil {
 				cleanSetup = tt.setup(&opts, t)

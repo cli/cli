@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -193,7 +194,7 @@ func TestIssueFromArgWithFields(t *testing.T) {
 				tt.httpStub(reg)
 			}
 			httpClient := &http.Client{Transport: reg}
-			issue, repo, err := IssueFromArgWithFields(httpClient, tt.args.baseRepoFn, tt.args.selector, []string{"number"})
+			issue, repo, err := IssueFromArgWithFields(httpClient, tt.args.baseRepoFn, tt.args.selector, []string{"number"}, &fd.EnabledDetectorMock{})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("IssueFromArgWithFields() error = %v, wantErr %v", err, tt.wantErr)
 				if issue == nil {
@@ -289,7 +290,7 @@ func TestIssuesFromArgsWithFields(t *testing.T) {
 				tt.httpStub(reg)
 			}
 			httpClient := &http.Client{Transport: reg}
-			issues, repo, err := IssuesFromArgsWithFields(httpClient, tt.args.baseRepoFn, tt.args.selectors, []string{"number"})
+			issues, repo, err := IssuesFromArgsWithFields(httpClient, tt.args.baseRepoFn, tt.args.selectors, []string{"number"}, &fd.EnabledDetectorMock{})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("IssuesFromArgsWithFields() error = %v, wantErr %v", err, tt.wantErr)
 				if issues == nil {

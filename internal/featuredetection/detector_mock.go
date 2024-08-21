@@ -14,6 +14,10 @@ func (md *DisabledDetectorMock) RepositoryFeatures() (RepositoryFeatures, error)
 	return RepositoryFeatures{}, nil
 }
 
+func (md *DisabledDetectorMock) ProjectV1() (bool, error) {
+	return false, nil
+}
+
 type EnabledDetectorMock struct{}
 
 func (md *EnabledDetectorMock) IssueFeatures() (IssueFeatures, error) {
@@ -26,4 +30,8 @@ func (md *EnabledDetectorMock) PullRequestFeatures() (PullRequestFeatures, error
 
 func (md *EnabledDetectorMock) RepositoryFeatures() (RepositoryFeatures, error) {
 	return allRepositoryFeatures, nil
+}
+
+func (md *EnabledDetectorMock) ProjectV1() (bool, error) {
+	return true, nil
 }

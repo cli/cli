@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -96,6 +97,7 @@ type LockOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   iprompter
+	Detector   fd.Detector
 
 	ParentCmd   string
 	Reason      string
@@ -214,7 +216,7 @@ func lockRun(state string, opts *LockOptions) error {
 		return err
 	}
 
-	issuePr, baseRepo, err := issueShared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, fields())
+	issuePr, baseRepo, err := issueShared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, fields(), opts.Detector)
 
 	parent := alias[opts.ParentCmd]
 

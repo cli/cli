@@ -83,6 +83,8 @@ type FindOptions struct {
 	BaseBranch string
 	// States lists the possible PR states to scope the PR-for-branch lookup to.
 	States []string
+	// Detector determines which features are available.
+	Detector fd.Detector
 }
 
 func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, error) {
@@ -130,6 +132,11 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		return nil, nil, err
 	}
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, f.repo.RepoHost())
+	}
+
 	// TODO(josebalius): Should we be guarding here?
 	if f.progress != nil {
 		f.progress.StartProgressIndicator()
@@ -142,9 +149,7 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	fields.AddValues([]string{"id", "number"}) // for additional preload queries below
 
 	if fields.Contains("isInMergeQueue") || fields.Contains("isMergeQueueEnabled") {
-		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		detector := fd.NewDetector(cachedClient, f.repo.RepoHost())
-		prFeatures, err := detector.PullRequestFeatures()
+		prFeatures, err := opts.Detector.PullRequestFeatures()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -158,6 +163,15 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	if fields.Contains("projectItems") {
 		getProjectItems = true
 		fields.Remove("projectItems")
+	}
+	if fields.Contains("projectCards") {
+		includeProjectV1, err := opts.Detector.ProjectV1()
+		if err != nil {
+			return nil, nil, err
+		}
+		if !includeProjectV1 {
+			fields.Remove("projectCards")
+		}
 	}
 
 	var pr *api.PullRequest

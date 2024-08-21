@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -20,6 +21,7 @@ type DeleteOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   iprompter
+	Detector   fd.Detector
 
 	SelectorArg string
 	Confirmed   bool
@@ -71,7 +73,7 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, []string{"id", "number", "title"})
+	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, []string{"id", "number", "title"}, opts.Detector)
 	if err != nil {
 		return err
 	}

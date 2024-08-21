@@ -851,7 +851,7 @@ type RepoMetadataInput struct {
 }
 
 // RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
-func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput) (*RepoMetadataResult, error) {
+func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput, includeProjectV1 bool) (*RepoMetadataResult, error) {
 	var result RepoMetadataResult
 	var g errgroup.Group
 
@@ -900,7 +900,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	if input.Projects {
 		g.Go(func() error {
 			var err error
-			result.Projects, result.ProjectsV2, err = relevantProjects(client, repo)
+			result.Projects, result.ProjectsV2, err = relevantProjects(client, repo, includeProjectV1)
 			return err
 		})
 	}
@@ -931,7 +931,7 @@ type RepoResolveInput struct {
 }
 
 // RepoResolveMetadataIDs looks up GraphQL node IDs in bulk
-func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoResolveInput) (*RepoMetadataResult, error) {
+func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoResolveInput, includeProjectV1 bool) (*RepoMetadataResult, error) {
 	users := input.Assignees
 	hasUser := func(target string) bool {
 		for _, u := range users {
@@ -956,7 +956,7 @@ func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoRes
 		Projects:   len(input.Projects) > 0,
 		Milestones: len(input.Milestones) > 0,
 	}
-	result, err := RepoMetadata(client, repo, mi)
+	result, err := RepoMetadata(client, repo, mi, includeProjectV1)
 	if err != nil {
 		return result, err
 	}
@@ -1220,8 +1220,8 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 	return milestones, nil
 }
 
-func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string) ([]string, error) {
-	projects, projectsV2, err := relevantProjects(client, repo)
+func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string, includeProjectV1 bool) ([]string, error) {
+	projects, projectsV2, err := relevantProjects(client, repo, includeProjectV1)
 	if err != nil {
 		return nil, err
 	}
@@ -1234,7 +1234,7 @@ func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []s
 // - ProjectsV2 owned by current user
 // - ProjectsV2 linked to repository
 // - ProjectsV2 owned by repository organization, if it belongs to one
-func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []ProjectV2, error) {
+func relevantProjects(client *Client, repo ghrepo.Interface, includeProjectV1 bool) ([]RepoProject, []ProjectV2, error) {
 	var repoProjects []RepoProject
 	var orgProjects []RepoProject
 	var userProjectsV2 []ProjectV2
@@ -1243,23 +1243,26 @@ func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []P
 
 	g, _ := errgroup.WithContext(context.Background())
 
-	g.Go(func() error {
-		var err error
-		repoProjects, err = RepoProjects(client, repo)
-		if err != nil {
-			err = fmt.Errorf("error fetching repo projects (classic): %w", err)
-		}
-		return err
-	})
-	g.Go(func() error {
-		var err error
-		orgProjects, err = OrganizationProjects(client, repo)
-		if err != nil && !strings.Contains(err.Error(), errorResolvingOrganization) {
-			err = fmt.Errorf("error fetching organization projects (classic): %w", err)
+	if includeProjectV1 {
+		g.Go(func() error {
+			var err error
+			repoProjects, err = RepoProjects(client, repo)
+			if err != nil {
+				err = fmt.Errorf("error fetching repo projects (classic): %w", err)
+			}
 			return err
-		}
-		return nil
-	})
+		})
+		g.Go(func() error {
+			var err error
+			orgProjects, err = OrganizationProjects(client, repo)
+			if err != nil && !strings.Contains(err.Error(), errorResolvingOrganization) {
+				err = fmt.Errorf("error fetching organization projects (classic): %w", err)
+				return err
+			}
+			return nil
+		})
+	}
+
 	g.Go(func() error {
 		var err error
 		userProjectsV2, err = CurrentUserProjectsV2(client, repo.RepoHost())

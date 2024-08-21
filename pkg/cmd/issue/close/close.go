@@ -67,7 +67,7 @@ func closeRun(opts *CloseOptions) error {
 		return err
 	}
 
-	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, []string{"id", "number", "title", "state"})
+	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, []string{"id", "number", "title", "state"}, opts.Detector)
 	if err != nil {
 		return err
 	}
@@ -109,6 +109,7 @@ func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue, 
 	}
 
 	if reason != "" {
+		// Should this be moved up into closeRun()?
 		if detector == nil {
 			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
 			detector = fd.NewDetector(cachedClient, repo.RepoHost())
