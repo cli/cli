@@ -204,6 +204,20 @@ Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?que
 nix-env -iA nixos.gh
 ```
 
+### Flox
+
+Flox users can install from the [official community nixpkgs](https://github.com/flox/nixpkgs).
+
+```bash
+# To install
+flox install gh
+
+# To upgrade
+flox upgrade toplevel
+```
+
+For more information about Flox, see [its homepage](https://flox.dev).
+
 ### openSUSE Tumbleweed
 
 openSUSE Tumbleweed users can install from the [official distribution repo](https://software.opensuse.org/package/gh):
