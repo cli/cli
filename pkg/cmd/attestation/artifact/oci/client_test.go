@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 
@@ -30,9 +30,10 @@ func TestGetImageDigest_Success(t *testing.T) {
 		},
 	}
 
-	digest, err := c.GetImageDigest("test")
+	digest, nameRef, err := c.GetImageDigest("test")
 	require.NoError(t, err)
 	require.Equal(t, &expectedDigest, digest)
+	require.Equal(t, name.Tag{}, nameRef)
 }
 
 func TestGetImageDigest_ReferenceFail(t *testing.T) {
@@ -45,9 +46,10 @@ func TestGetImageDigest_ReferenceFail(t *testing.T) {
 		},
 	}
 
-	digest, err := c.GetImageDigest("test")
+	digest, nameRef, err := c.GetImageDigest("test")
 	require.Error(t, err)
 	require.Nil(t, digest)
+	require.Nil(t, nameRef)
 }
 
 func TestGetImageDigest_AuthFail(t *testing.T) {
@@ -60,10 +62,11 @@ func TestGetImageDigest_AuthFail(t *testing.T) {
 		},
 	}
 
-	digest, err := c.GetImageDigest("test")
+	digest, nameRef, err := c.GetImageDigest("test")
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrRegistryAuthz)
 	require.Nil(t, digest)
+	require.Nil(t, nameRef)
 }
 
 func TestGetImageDigest_Denied(t *testing.T) {
@@ -76,8 +79,9 @@ func TestGetImageDigest_Denied(t *testing.T) {
 		},
 	}
 
-	digest, err := c.GetImageDigest("test")
+	digest, nameRef, err := c.GetImageDigest("test")
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrDenied)
 	require.Nil(t, digest)
+	require.Nil(t, nameRef)
 }

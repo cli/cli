@@ -15,7 +15,8 @@ func digestContainerImageArtifact(url string, client oci.Client) (*DigestedArtif
 		return nil, fmt.Errorf("artifact %s is not a valid registry reference: %v", url, err)
 	}
 
-	digest, err := client.GetImageDigest(named.String())
+	digest, nameRef, err := client.GetImageDigest(named.String())
+
 	if err != nil {
 		return nil, err
 	}
@@ -24,5 +25,6 @@ func digestContainerImageArtifact(url string, client oci.Client) (*DigestedArtif
 		URL:       fmt.Sprintf("oci://%s", named.String()),
 		digest:    digest.Hex,
 		digestAlg: digest.Algorithm,
+		nameRef:   nameRef,
 	}, nil
 }
