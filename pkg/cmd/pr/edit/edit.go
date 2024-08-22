@@ -237,13 +237,13 @@ func editRun(opts *EditOptions) error {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
 		opts.Detector = fd.NewDetector(cachedClient, repo.RepoHost())
 	}
-	includeProjectV1, err := opts.Detector.ProjectV1()
+	projectsV1Support, err := opts.Detector.ProjectsV1()
 	if err != nil {
 		return err
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = opts.Fetcher.EditableOptionsFetch(apiClient, repo, &editable, includeProjectV1)
+	err = opts.Fetcher.EditableOptionsFetch(apiClient, repo, &editable, projectsV1Support)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -323,13 +323,13 @@ func (s surveyor) EditFields(editable *shared.Editable, editorCmd string) error 
 }
 
 type EditableOptionsFetcher interface {
-	EditableOptionsFetch(*api.Client, ghrepo.Interface, *shared.Editable, bool) error
+	EditableOptionsFetch(*api.Client, ghrepo.Interface, *shared.Editable, gh.ProjectsV1Support) error
 }
 
 type fetcher struct{}
 
-func (f fetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable, includeProjectV1 bool) error {
-	return shared.FetchOptions(client, repo, opts, includeProjectV1)
+func (f fetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable, projectsV1Support gh.ProjectsV1Support) error {
+	return shared.FetchOptions(client, repo, opts, projectsV1Support)
 }
 
 type EditorRetriever interface {
