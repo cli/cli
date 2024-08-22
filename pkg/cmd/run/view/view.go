@@ -546,6 +546,7 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	// * Truncate long job names
 	//
 	sanitizedJobName := strings.ReplaceAll(job.Name, "/", "")
+	sanitizedJobName = strings.ReplaceAll(sanitizedJobName, ":", "")
 	sanitizedJobName = truncateAsUTF16(sanitizedJobName, JOB_NAME_MAX_LENGTH)
 	re := fmt.Sprintf(`^%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
