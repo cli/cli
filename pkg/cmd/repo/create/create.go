@@ -855,13 +855,22 @@ func interactiveRepoInfo(client *http.Client, hostname string, prompter iprompte
 		return "", "", "", err
 	}
 
-	visibilityOptions := []string{"Public", "Private", "Internal"}
+	visibilityOptions := getRepoVisibilityOptions(owner)
 	selected, err := prompter.Select("Visibility", "Public", visibilityOptions)
 	if err != nil {
 		return "", "", "", err
 	}
 
 	return name, description, strings.ToUpper(visibilityOptions[selected]), nil
+}
+
+func getRepoVisibilityOptions(owner string) []string {
+	visibilityOptions := []string{"Public", "Private"}
+	// orgs can also create internal repos
+	if owner != "" {
+		visibilityOptions = append(visibilityOptions, "Internal")
+	}
+	return visibilityOptions
 }
 
 func interactiveRepoNameAndOwner(client *http.Client, hostname string, prompter iprompter, defaultName string) (string, string, error) {
