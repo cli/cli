@@ -10,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	shared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -29,7 +30,7 @@ type EditOptions struct {
 	DetermineEditor    func() (string, error)
 	FieldsToEditSurvey func(prShared.EditPrompter, *prShared.Editable) error
 	EditFieldsSurvey   func(prShared.EditPrompter, *prShared.Editable, string) error
-	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable, bool) error
+	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable, gh.ProjectsV1Support) error
 
 	SelectorArgs []string
 	Interactive  bool
@@ -180,7 +181,7 @@ func editRun(opts *EditOptions) error {
 		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
 	}
 
-	includeProjectV1, err := opts.Detector.ProjectV1()
+	projectsV1Support, err := opts.Detector.ProjectsV1()
 	if err != nil {
 		return err
 	}
@@ -218,7 +219,7 @@ func editRun(opts *EditOptions) error {
 	// Fetch editable shared fields once for all issues.
 	apiClient := api.NewClientFromHTTP(httpClient)
 	opts.IO.StartProgressIndicatorWithLabel("Fetching repository information")
-	err = opts.FetchOptions(apiClient, repo, &editable, includeProjectV1)
+	err = opts.FetchOptions(apiClient, repo, &editable, projectsV1Support)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
