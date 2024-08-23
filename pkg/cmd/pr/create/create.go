@@ -88,7 +88,7 @@ type CreateContext struct {
 	IsPushEnabled      bool
 	Client             *api.Client
 	GitClient          *git.Client
-	IncludeProjectV1   bool
+	ProjectsV1Support  gh.ProjectsV1Support
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -437,7 +437,7 @@ func createRun(opts *CreateOptions) (err error) {
 				Repo:      ctx.BaseRepo,
 				State:     state,
 			}
-			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.BaseRepo, fetcher, state, ctx.IncludeProjectV1)
+			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.BaseRepo, fetcher, state, ctx.ProjectsV1Support)
 			if err != nil {
 				return
 			}
@@ -731,7 +731,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
 		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
 	}
-	includeProjectV1, err := opts.Detector.ProjectV1()
+	projectsV1Support, err := opts.Detector.ProjectsV1()
 	if err != nil {
 		return nil, err
 	}
@@ -748,7 +748,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		RepoContext:        repoContext,
 		Client:             client,
 		GitClient:          gitClient,
-		IncludeProjectV1:   includeProjectV1,
+		ProjectsV1Support:  projectsV1Support,
 	}, nil
 }
 
@@ -781,7 +781,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		return errors.New("pull request title must not be blank")
 	}
 
-	err := shared.AddMetadataToIssueParams(client, ctx.BaseRepo, params, &state, ctx.IncludeProjectV1)
+	err := shared.AddMetadataToIssueParams(client, ctx.BaseRepo, params, &state, ctx.ProjectsV1Support)
 	if err != nil {
 		return err
 	}
@@ -1004,7 +1004,7 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 		ctx.BaseRepo,
 		"compare/%s...%s?expand=1",
 		url.PathEscape(ctx.BaseBranch), url.PathEscape(ctx.HeadBranchLabel))
-	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.BaseRepo, u, state, ctx.IncludeProjectV1)
+	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.BaseRepo, u, state, ctx.ProjectsV1Support)
 	if err != nil {
 		return "", err
 	}

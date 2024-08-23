@@ -154,7 +154,7 @@ func createRun(opts *CreateOptions) (err error) {
 		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
 	}
 
-	includeProjectV1, err := opts.Detector.ProjectV1()
+	projectsV1Support, err := opts.Detector.ProjectsV1()
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func createRun(opts *CreateOptions) (err error) {
 	if opts.WebMode {
 		var openURL string
 		if opts.Title != "" || opts.Body != "" || tb.HasMetadata() {
-			openURL, err = generatePreviewURL(apiClient, baseRepo, tb, includeProjectV1)
+			openURL, err = generatePreviewURL(apiClient, baseRepo, tb, projectsV1Support)
 			if err != nil {
 				return
 			}
@@ -273,7 +273,7 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
-		openURL, err = generatePreviewURL(apiClient, baseRepo, tb, includeProjectV1)
+		openURL, err = generatePreviewURL(apiClient, baseRepo, tb, projectsV1Support)
 		if err != nil {
 			return
 		}
@@ -292,7 +292,7 @@ func createRun(opts *CreateOptions) (err error) {
 				Repo:      baseRepo,
 				State:     &tb,
 			}
-			err = prShared.MetadataSurvey(opts.Prompter, opts.IO, baseRepo, fetcher, &tb, includeProjectV1)
+			err = prShared.MetadataSurvey(opts.Prompter, opts.IO, baseRepo, fetcher, &tb, projectsV1Support)
 			if err != nil {
 				return
 			}
@@ -348,7 +348,7 @@ func createRun(opts *CreateOptions) (err error) {
 			params["issueTemplate"] = templateNameForSubmit
 		}
 
-		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb, includeProjectV1)
+		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb, projectsV1Support)
 		if err != nil {
 			return
 		}
@@ -367,7 +367,7 @@ func createRun(opts *CreateOptions) (err error) {
 	return
 }
 
-func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb prShared.IssueMetadataState, includeProjectV1 bool) (string, error) {
+func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb prShared.IssueMetadataState, projectsV1Support gh.ProjectsV1Support) (string, error) {
 	openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
-	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb, includeProjectV1)
+	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb, projectsV1Support)
 }

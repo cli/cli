@@ -5,8 +5,10 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIssueFeatures(t *testing.T) {
@@ -347,4 +349,84 @@ func TestRepositoryFeatures(t *testing.T) {
 			assert.Equal(t, tt.wantFeatures, gotFeatures)
 		})
 	}
+}
+
+func TestProjectV1SupportEnvOverride(t *testing.T) {
+	tt := []struct {
+		name            string
+		envVal          string
+		expectedSupport gh.ProjectsV1Support
+		expectedErr     bool
+	}{
+		{
+			name:            "PROJECTS_V1_SUPPORTED=true",
+			envVal:          "true",
+			expectedSupport: gh.ProjectsV1Supported,
+		},
+		{
+			name:            "PROJECTS_V1_SUPPORTED=false",
+			envVal:          "false",
+			expectedSupport: gh.ProjectsV1Unsupported,
+		},
+		{
+			name:        "PROJECTS_V1_SUPPORTED=nonboolean",
+			envVal:      "nonboolean",
+			expectedErr: true,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("PROJECTS_V1_SUPPORTED", tc.envVal)
+
+			detector := detector{}
+			support, err := detector.ProjectsV1()
+
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedSupport, support)
+		})
+	}
+}
+
+func TestProjectV1APINotSupported(t *testing.T) {
+	// Given the API does not include projects in the returned fields
+	reg := &httpmock.Registry{}
+	httpClient := &http.Client{}
+	httpmock.ReplaceTripper(httpClient, reg)
+	reg.Register(
+		httpmock.GraphQL(`query ProjectsV1FeatureDetection\b`),
+		httpmock.StringResponse(heredoc.Doc(`{ "data": { "Repository": { "fields": [] } } }`)),
+	)
+
+	// When we call the api to detect for ProjectV1 support
+	detector := detector{httpClient: httpClient}
+	actualSupport, err := detector.ProjectsV1()
+
+	// Then it succeeds and reports ProjectV1 is not supported
+	require.NoError(t, err)
+	require.Equal(t, gh.ProjectsV1Unsupported, actualSupport)
+}
+
+func TestProjectV1APISupported(t *testing.T) {
+	// Given the API includes projects in the returned fields
+	reg := &httpmock.Registry{}
+	httpClient := &http.Client{}
+	httpmock.ReplaceTripper(httpClient, reg)
+	reg.Register(
+		httpmock.GraphQL(`query ProjectsV1FeatureDetection\b`),
+		httpmock.StringResponse(heredoc.Doc(`{ "data": { "Repository": { "fields": [ {"name": "projects"} ] } } }`)),
+	)
+
+	// When we call the api to detect for ProjectV1 support
+	detector := detector{httpClient: httpClient}
+	actualSupport, err := detector.ProjectsV1()
+
+	// Then it succeeds and reports ProjectV1 is supported
+	require.NoError(t, err)
+	require.Equal(t, gh.ProjectsV1Supported, actualSupport)
 }

@@ -16,6 +16,7 @@ import (
 	remotes "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/set"
@@ -165,11 +166,11 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		fields.Remove("projectItems")
 	}
 	if fields.Contains("projectCards") {
-		includeProjectV1, err := opts.Detector.ProjectV1()
+		projectsV1Support, err := opts.Detector.ProjectsV1()
 		if err != nil {
 			return nil, nil, err
 		}
-		if !includeProjectV1 {
+		if projectsV1Support == gh.ProjectsV1Unsupported {
 			fields.Remove("projectCards")
 		}
 	}

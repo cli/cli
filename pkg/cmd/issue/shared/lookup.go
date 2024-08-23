@@ -12,6 +12,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/set"
 	"golang.org/x/sync/errgroup"
@@ -167,11 +168,11 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 		fieldSet.Add("number")
 	}
 	if fieldSet.Contains("projectCards") {
-		includeProjectV1, err := detector.ProjectV1()
+		projectsV1Support, err := detector.ProjectsV1()
 		if err != nil {
 			return nil, err
 		}
-		if !includeProjectV1 {
+		if projectsV1Support == gh.ProjectsV1Unsupported {
 			fieldSet.Remove("projectCards")
 		}
 	}
