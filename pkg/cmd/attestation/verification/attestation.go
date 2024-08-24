@@ -3,6 +3,7 @@ package verification
 import (
 	"bufio"
 	"encoding/json"
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -88,6 +89,10 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	var line []byte
 	line, err = reader.ReadBytes('\n')
 	for err == nil {
+		if len(bytes.TrimSpace(line)) == 0 {
+	            line, err = reader.ReadBytes('\n')
+	            continue
+	        }
 		var bundle bundle.ProtobufBundle
 		bundle.Bundle = new(protobundle.Bundle)
 		err = bundle.UnmarshalJSON(line)
