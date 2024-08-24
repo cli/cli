@@ -44,6 +44,13 @@ func Test_NewCmdStatus(t *testing.T) {
 				ShowToken: true,
 			},
 		},
+		{
+			name: "active",
+			cli:  "--active",
+			wants: StatusOptions{
+				Active: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -431,6 +438,27 @@ func Test_statusRun(t *testing.T) {
 				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
 				  - To re-authenticate, run: gh auth login -h ghe.io
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+			`),
+		},
+		{
+			name: "active",
+			opts: StatusOptions{
+				Active: true,
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "github.com", "monalisa-2", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				github.com
+				  ✓ Logged in to github.com account monalisa-2 (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
 			`),
 		},
 	}

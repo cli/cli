@@ -129,6 +129,7 @@ type StatusOptions struct {
 
 	Hostname  string
 	ShowToken bool
+	Active    bool
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -163,6 +164,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check only a specific hostname's auth status")
 	cmd.Flags().BoolVarP(&opts.ShowToken, "show-token", "t", false, "Display the auth token")
+	cmd.Flags().BoolVarP(&opts.Active, "active", "a", false, "Display the active account only")
 
 	return cmd
 }
@@ -222,6 +224,10 @@ func statusRun(opts *StatusOptions) error {
 
 		if err == nil && !isValidEntry(entry) {
 			err = cmdutil.SilentError
+		}
+
+		if opts.Active {
+			continue
 		}
 
 		users := authCfg.UsersForHost(hostname)
