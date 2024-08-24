@@ -100,7 +100,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "all"}, "Filter by state")
-	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of issues to fetch")
+	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of issues to fetch (use 0 for no limit)")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
@@ -205,6 +205,9 @@ func listRun(opts *ListOptions) error {
 		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, !filterOptions.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
+	if opts.LimitResults < 0 {
+	        return cmdutil.FlagErrorf("invalid limit: %v", opts.LimitResults)
+	}
 
 	issueShared.PrintIssues(opts.IO, opts.Now(), "", len(listResult.Issues), listResult.Issues)
 
@@ -225,6 +228,31 @@ func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.Filt
 
 		return searchIssues(apiClient, repo, filters, limit)
 	}
+
+	var allIssues []api.Issue
+        page := 1
+        perPage := 100 // GitHub's max per page
+
+        for limit == 0 || len(allIssues) < limit {
+            issues, response, err := fetchIssuePage(client, repo, filters, page, perPage)
+            if err != nil {
+                return nil, err
+            }
+            allIssues = append(allIssues, issues...)
+            if response.NextPage == 0 {
+                break
+            }
+            page = response.NextPage
+        }
+
+        if limit > 0 && len(allIssues) > limit {
+            allIssues = allIssues[:limit]
+        }
+
+        return &api.IssuesAndTotalCount{
+            Issues:     allIssues,
+            TotalCount: len(allIssues),
+        }, nil
 
 	var err error
 	meReplacer := prShared.NewMeReplacer(apiClient, repo.RepoHost())
