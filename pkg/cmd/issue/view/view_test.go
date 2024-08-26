@@ -2,12 +2,15 @@ package view
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/featuredetection"
@@ -492,6 +495,117 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 			assert.Equal(t, "", output.Stderr())
 			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
+		})
+	}
+}
+
+// This is an Integration Test for the humanPreview
+func Test_humanPreview(t *testing.T) {
+	tests := map[string]struct {
+		baseRepo         ghrepo.Interface
+		issueFixture     string
+		isCommentPreview bool
+		expectedOutput   string
+	}{
+		"projectcards included (v1 projects are supported)": {
+			baseRepo:         ghrepo.New("OWNER", "REPO"),
+			issueFixture:     "./fixtures/issueView_v1ProjectsEnabled.json",
+			isCommentPreview: true,
+			// This is super fragile but it's working for now
+			expectedOutput: "ix of coins OWNER/REPO#123\nOpen • marseilles opened about 1 day ago • 9 comments\nProjects: Project 1 (Column name)\nMilestone: \n\n\n  **bold story**                                                              \n\n\n———————— Not showing 9 comments ————————\n\n\nUse --comments to view the full conversation\nView this issue on GitHub: https://github.com/OWNER/REPO/issues/123\n",
+		},
+		"projectcards aren't included (v1 projects are supported)": {
+			baseRepo:         ghrepo.New("OWNER", "REPO"),
+			issueFixture:     "./fixtures/issueView_v1ProjectsDisabled.json",
+			isCommentPreview: true,
+			// This is super fragile but it's working for now
+			expectedOutput: "ix of coins OWNER/REPO#123\nOpen • marseilles opened about 1 day ago • 9 comments\nMilestone: \n\n\n  **bold story**                                                              \n\n\n———————— Not showing 9 comments ————————\n\n\nUse --comments to view the full conversation\nView this issue on GitHub: https://github.com/OWNER/REPO/issues/123\n",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
+
+			issue := &api.Issue{}
+
+			f, err := os.Open(tc.issueFixture)
+			if err != nil {
+				t.Errorf("Error opening fixture at %s: %v", tc.issueFixture, err)
+			}
+			defer f.Close()
+
+			dec := json.NewDecoder(f)
+			err = dec.Decode(&issue)
+			if err != nil {
+				t.Errorf("Error decoding fixture at %s: %v", tc.issueFixture, err)
+			}
+
+			ipf := &IssuePrintFormatter{
+				issue:       issue,
+				colorScheme: ios.ColorScheme(),
+				IO:          ios,
+				time:        issue.CreatedAt.Add(24 * time.Hour),
+				baseRepo:    tc.baseRepo,
+			}
+
+			err = humanIssuePreview(ipf, tc.isCommentPreview)
+			if err != nil {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tc.expectedOutput, stdout.String())
+		})
+	}
+}
+
+func Test_rawPreview(t *testing.T) {
+	tests := map[string]struct {
+		Issue          *api.Issue
+		issueCreatedAt string
+		expectedOutput string
+	}{
+		"basic issue": {
+			Issue: &api.Issue{
+				Title: "issueTitle",
+				State: "issueState",
+				Author: api.Author{
+					Login: "authorLogin",
+				},
+				Comments: api.Comments{
+					TotalCount: 1,
+				},
+				Milestone: &api.Milestone{
+					Title: "milestoneTitle",
+				},
+				Number: 123,
+				Body:   "issueBody",
+			},
+			issueCreatedAt: "2011-01-26T19:01:12Z",
+			expectedOutput: "title:\tissueTitle\nstate:\tissueState\nauthor:\tauthorLogin\nlabels:\t\ncomments:\t1\nassignees:\t\nprojects:\t\nmilestone:\tmilestoneTitle\nnumber:\t123\n--\nissueBody\n",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
+
+			createdAt, err := time.Parse(time.RFC3339, "2011-01-26T19:01:12Z")
+			if err != nil {
+				t.Errorf("Error parsing time: %v", err)
+			}
+
+			tc.Issue.CreatedAt = createdAt
+
+			err = rawIssuePreview(ios, tc.Issue)
+			if err != nil {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tc.expectedOutput, stdout.String())
 		})
 	}
 }

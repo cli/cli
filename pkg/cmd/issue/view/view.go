@@ -129,7 +129,7 @@ func viewRun(opts *ViewOptions) error {
 		return opts.Exporter.Write(opts.IO, issue)
 	}
 
-	issuePrint := &IssuePrint{
+	ipf := &IssuePrintFormatter{
 		issue:       issue,
 		colorScheme: opts.IO.ColorScheme(),
 		IO:          opts.IO,
@@ -139,7 +139,7 @@ func viewRun(opts *ViewOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		isCommentsPreview := !opts.Comments
-		return issuePrint.humanPreview(isCommentsPreview)
+		return humanIssuePreview(ipf, isCommentsPreview)
 	}
 
 	if opts.Comments {
@@ -147,7 +147,7 @@ func viewRun(opts *ViewOptions) error {
 		return nil
 	}
 
-	return issuePrint.rawPreview()
+	return rawIssuePreview(opts.IO, issue)
 }
 
 func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string, detector fd.Detector) (*api.Issue, ghrepo.Interface, error) {
@@ -166,4 +166,66 @@ func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error),
 		err = preloadIssueComments(client, repo, issue)
 	}
 	return issue, repo, err
+}
+
+func rawIssuePreview(IO *iostreams.IOStreams, issue *api.Issue) error {
+
+	out := IO.Out
+
+	ipf := &IssuePrintFormatter{
+		issue: issue,
+	}
+
+	assignees := ipf.getAssigneeList()
+	labels := ipf.getLabelList()
+	projects := ipf.getProjectList()
+
+	// Print empty strings for empty values so the number of metadata lines is consistent when
+	// processing many issues with head and grep.
+	fmt.Fprintf(out, "title:\t%s\n", issue.Title)
+	fmt.Fprintf(out, "state:\t%s\n", issue.State)
+	fmt.Fprintf(out, "author:\t%s\n", issue.Author.Login)
+	fmt.Fprintf(out, "labels:\t%s\n", labels)
+	fmt.Fprintf(out, "comments:\t%d\n", issue.Comments.TotalCount)
+	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
+	fmt.Fprintf(out, "projects:\t%s\n", projects)
+	var milestoneTitle string
+	if issue.Milestone != nil {
+		milestoneTitle = issue.Milestone.Title
+	}
+	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
+	fmt.Fprintf(out, "number:\t%d\n", issue.Number)
+	fmt.Fprintln(out, "--")
+	fmt.Fprintln(out, issue.Body)
+	return nil
+}
+
+func humanIssuePreview(ipf *IssuePrintFormatter, isCommentsPreview bool) error {
+
+	// header (Title and State)
+	ipf.header()
+	// Reactions
+	ipf.reactions()
+	// Metadata
+	ipf.assigneeList()
+	ipf.labelList()
+	ipf.projectList()
+	ipf.milestone()
+
+	// Body
+	err := ipf.body()
+	if err != nil {
+		return err
+	}
+
+	// Comments
+	err = ipf.comments(isCommentsPreview)
+	if err != nil {
+		return err
+	}
+
+	// Footer
+	ipf.footer()
+
+	return nil
 }
