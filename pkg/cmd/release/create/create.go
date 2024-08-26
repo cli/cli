@@ -114,7 +114,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh release create v1.2.3 --generate-notes
 
 			Use release notes from a file
-			$ gh release create v1.2.3 -F changelog.md
+			$ gh release create v1.2.3 -F release-notes.md
 
 			Use annotated tag notes
 			$ gh release create v1.2.3 --notes-from-tag
