@@ -3,7 +3,6 @@ package view
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -133,8 +132,17 @@ func viewRun(opts *ViewOptions) error {
 		return opts.Exporter.Write(opts.IO, issue)
 	}
 
+	issuePrint := &IssuePrint{
+		issue:       issue,
+		colorScheme: opts.IO.ColorScheme(),
+		IO:          opts.IO,
+		time:        opts.Now(),
+		baseRepo:    baseRepo,
+	}
+
 	if opts.IO.IsStdoutTTY() {
-		return printHumanIssuePreview(opts, baseRepo, issue)
+		isCommentsPreview := !opts.Comments
+		return issuePrint.humanPreview(isCommentsPreview)
 	}
 
 	if opts.Comments {
@@ -142,7 +150,7 @@ func viewRun(opts *ViewOptions) error {
 		return nil
 	}
 
-	return printRawIssuePreview(opts.IO.Out, issue)
+	return issuePrint.rawPreview()
 }
 
 func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string, detector fd.Detector) (*api.Issue, ghrepo.Interface, error) {
@@ -163,133 +171,141 @@ func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error),
 	return issue, repo, err
 }
 
-func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
-	assignees := issueAssigneeList(*issue)
-	labels := issueLabelList(issue, nil)
-	projects := issueProjectList(*issue)
+type IssuePrint struct {
+	issue       *api.Issue
+	colorScheme *iostreams.ColorScheme
+	IO          *iostreams.IOStreams
+	time        time.Time
+	baseRepo    ghrepo.Interface
+}
+
+func (i *IssuePrint) rawPreview() error {
+	assignees := i.getAssigneeList()
+	labels := i.getLabelList()
+	projects := i.getProjectList()
 
 	// Print empty strings for empty values so the number of metadata lines is consistent when
 	// processing many issues with head and grep.
-	fmt.Fprintf(out, "title:\t%s\n", issue.Title)
-	fmt.Fprintf(out, "state:\t%s\n", issue.State)
-	fmt.Fprintf(out, "author:\t%s\n", issue.Author.Login)
-	fmt.Fprintf(out, "labels:\t%s\n", labels)
-	fmt.Fprintf(out, "comments:\t%d\n", issue.Comments.TotalCount)
-	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
-	fmt.Fprintf(out, "projects:\t%s\n", projects)
+	fmt.Fprintf(i.IO.Out, "title:\t%s\n", i.issue.Title)
+	fmt.Fprintf(i.IO.Out, "state:\t%s\n", i.issue.State)
+	fmt.Fprintf(i.IO.Out, "author:\t%s\n", i.issue.Author.Login)
+	fmt.Fprintf(i.IO.Out, "labels:\t%s\n", labels)
+	fmt.Fprintf(i.IO.Out, "comments:\t%d\n", i.issue.Comments.TotalCount)
+	fmt.Fprintf(i.IO.Out, "assignees:\t%s\n", assignees)
+	fmt.Fprintf(i.IO.Out, "projects:\t%s\n", projects)
 	var milestoneTitle string
-	if issue.Milestone != nil {
-		milestoneTitle = issue.Milestone.Title
+	if i.issue.Milestone != nil {
+		milestoneTitle = i.issue.Milestone.Title
 	}
-	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
-	fmt.Fprintf(out, "number:\t%d\n", issue.Number)
-	fmt.Fprintln(out, "--")
-	fmt.Fprintln(out, issue.Body)
+	fmt.Fprintf(i.IO.Out, "milestone:\t%s\n", milestoneTitle)
+	fmt.Fprintf(i.IO.Out, "number:\t%d\n", i.issue.Number)
+	fmt.Fprintln(i.IO.Out, "--")
+	fmt.Fprintln(i.IO.Out, i.issue.Body)
 	return nil
 }
 
-func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue *api.Issue) error {
-	out := opts.IO.Out
-	cs := opts.IO.ColorScheme()
+func (i *IssuePrint) humanPreview(isCommentsPreview bool) error {
 
-	// Header (Title and State)
-	fmt.Fprintf(out, "%s %s#%d\n", cs.Bold(issue.Title), ghrepo.FullName(baseRepo), issue.Number)
-	fmt.Fprintf(out,
-		"%s • %s opened %s • %s\n",
-		issueStateTitleWithColor(cs, issue),
-		issue.Author.Login,
-		text.FuzzyAgo(opts.Now(), issue.CreatedAt),
-		text.Pluralize(issue.Comments.TotalCount, "comment"),
-	)
-
+	// header (Title and State)
+	i.header()
 	// Reactions
-	if reactions := prShared.ReactionGroupList(issue.ReactionGroups); reactions != "" {
-		fmt.Fprint(out, reactions)
-		fmt.Fprintln(out)
-	}
-
+	i.reactions()
 	// Metadata
-	if assignees := issueAssigneeList(*issue); assignees != "" {
-		fmt.Fprint(out, cs.Bold("Assignees: "))
-		fmt.Fprintln(out, assignees)
-	}
-	if labels := issueLabelList(issue, cs); labels != "" {
-		fmt.Fprint(out, cs.Bold("Labels: "))
-		fmt.Fprintln(out, labels)
-	}
-	if projects := issueProjectList(*issue); projects != "" {
-		fmt.Fprint(out, cs.Bold("Projects: "))
-		fmt.Fprintln(out, projects)
-	}
-	if issue.Milestone != nil {
-		fmt.Fprint(out, cs.Bold("Milestone: "))
-		fmt.Fprintln(out, issue.Milestone.Title)
-	}
+	i.assigneeList()
+	i.labelList()
+	i.projectList()
+	i.milestone()
 
 	// Body
-	var md string
-	var err error
-	if issue.Body == "" {
-		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
-	} else {
-		md, err = markdown.Render(issue.Body,
-			markdown.WithTheme(opts.IO.TerminalTheme()),
-			markdown.WithWrap(opts.IO.TerminalWidth()))
-		if err != nil {
-			return err
-		}
+	err := i.body()
+	if err != nil {
+		return err
 	}
-	fmt.Fprintf(out, "\n%s\n", md)
 
 	// Comments
-	if issue.Comments.TotalCount > 0 {
-		preview := !opts.Comments
-		comments, err := prShared.CommentList(opts.IO, issue.Comments, api.PullRequestReviews{}, preview)
-		if err != nil {
-			return err
-		}
-		fmt.Fprint(out, comments)
+	err = i.comments(isCommentsPreview)
+	if err != nil {
+		return err
 	}
 
 	// Footer
-	fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s\n"), issue.URL)
+	i.footer()
 
 	return nil
 }
 
-func issueStateTitleWithColor(cs *iostreams.ColorScheme, issue *api.Issue) string {
-	colorFunc := cs.ColorFromString(prShared.ColorForIssueState(*issue))
+func (i *IssuePrint) header() {
+	fmt.Fprintf(i.IO.Out, "%s %s#%d\n", i.colorScheme.Bold(i.issue.Title), ghrepo.FullName(i.baseRepo), i.issue.Number)
+	fmt.Fprintf(i.IO.Out,
+		"%s • %s opened %s • %s\n",
+		i.issueStateTitleWithColor(),
+		i.issue.Author.Login,
+		text.FuzzyAgo(i.time, i.issue.CreatedAt),
+		text.Pluralize(i.issue.Comments.TotalCount, "comment"),
+	)
+}
+
+func (i *IssuePrint) issueStateTitleWithColor() string {
+	colorFunc := i.colorScheme.ColorFromString(prShared.ColorForIssueState(*i.issue))
 	state := "Open"
-	if issue.State == "CLOSED" {
+	if i.issue.State == "CLOSED" {
 		state = "Closed"
 	}
 	return colorFunc(state)
 }
 
-func issueAssigneeList(issue api.Issue) string {
-	if len(issue.Assignees.Nodes) == 0 {
+func (i *IssuePrint) reactions() {
+	if reactions := prShared.ReactionGroupList(i.issue.ReactionGroups); reactions != "" {
+		fmt.Fprint(i.IO.Out, reactions)
+		fmt.Fprintln(i.IO.Out)
+	}
+}
+
+func (i *IssuePrint) assigneeList() {
+	if assignees := i.getAssigneeList(); assignees != "" {
+		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Assignees: "))
+		fmt.Fprintln(i.IO.Out, assignees)
+	}
+}
+
+func (i *IssuePrint) getAssigneeList() string {
+	if len(i.issue.Assignees.Nodes) == 0 {
 		return ""
 	}
 
-	AssigneeNames := make([]string, 0, len(issue.Assignees.Nodes))
-	for _, assignee := range issue.Assignees.Nodes {
+	AssigneeNames := make([]string, 0, len(i.issue.Assignees.Nodes))
+	for _, assignee := range i.issue.Assignees.Nodes {
 		AssigneeNames = append(AssigneeNames, assignee.Login)
 	}
 
 	list := strings.Join(AssigneeNames, ", ")
-	if issue.Assignees.TotalCount > len(issue.Assignees.Nodes) {
+	if i.issue.Assignees.TotalCount > len(i.issue.Assignees.Nodes) {
 		list += ", …"
 	}
 	return list
 }
 
-func issueProjectList(issue api.Issue) string {
-	if len(issue.ProjectCards.Nodes) == 0 {
+func (i *IssuePrint) labelList() {
+	if labels := i.getLabelList(); labels != "" {
+		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Labels: "))
+		fmt.Fprintln(i.IO.Out, labels)
+	}
+}
+
+func (i *IssuePrint) projectList() {
+	if projects := i.getProjectList(); projects != "" {
+		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Projects: "))
+		fmt.Fprintln(i.IO.Out, projects)
+	}
+}
+
+func (i *IssuePrint) getProjectList() string {
+	if len(i.issue.ProjectCards.Nodes) == 0 {
 		return ""
 	}
 
-	projectNames := make([]string, 0, len(issue.ProjectCards.Nodes))
-	for _, project := range issue.ProjectCards.Nodes {
+	projectNames := make([]string, 0, len(i.issue.ProjectCards.Nodes))
+	for _, project := range i.issue.ProjectCards.Nodes {
 		colName := project.Column.Name
 		if colName == "" {
 			colName = "Awaiting triage"
@@ -298,30 +314,69 @@ func issueProjectList(issue api.Issue) string {
 	}
 
 	list := strings.Join(projectNames, ", ")
-	if issue.ProjectCards.TotalCount > len(issue.ProjectCards.Nodes) {
+	if i.issue.ProjectCards.TotalCount > len(i.issue.ProjectCards.Nodes) {
 		list += ", …"
 	}
 	return list
 }
 
-func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme) string {
-	if len(issue.Labels.Nodes) == 0 {
+func (i *IssuePrint) getLabelList() string {
+	if len(i.issue.Labels.Nodes) == 0 {
 		return ""
 	}
 
 	// ignore case sort
-	sort.SliceStable(issue.Labels.Nodes, func(i, j int) bool {
-		return strings.ToLower(issue.Labels.Nodes[i].Name) < strings.ToLower(issue.Labels.Nodes[j].Name)
+	sort.SliceStable(i.issue.Labels.Nodes, func(j, k int) bool {
+		return strings.ToLower(i.issue.Labels.Nodes[j].Name) < strings.ToLower(i.issue.Labels.Nodes[k].Name)
 	})
 
-	labelNames := make([]string, len(issue.Labels.Nodes))
-	for i, label := range issue.Labels.Nodes {
-		if cs == nil {
-			labelNames[i] = label.Name
+	labelNames := make([]string, len(i.issue.Labels.Nodes))
+	for j, label := range i.issue.Labels.Nodes {
+		if i.colorScheme == nil {
+			labelNames[j] = label.Name
 		} else {
-			labelNames[i] = cs.HexToRGB(label.Color, label.Name)
+			labelNames[j] = i.colorScheme.HexToRGB(label.Color, label.Name)
 		}
 	}
 
 	return strings.Join(labelNames, ", ")
+}
+
+func (i *IssuePrint) milestone() {
+	if i.issue.Milestone != nil {
+		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Milestone: "))
+		fmt.Fprintln(i.IO.Out, i.issue.Milestone.Title)
+	}
+}
+
+func (i *IssuePrint) body() error {
+	var md string
+	var err error
+	if i.issue.Body == "" {
+		md = fmt.Sprintf("\n  %s\n\n", i.colorScheme.Gray("No description provided"))
+	} else {
+		md, err = markdown.Render(i.issue.Body,
+			markdown.WithTheme(i.IO.TerminalTheme()),
+			markdown.WithWrap(i.IO.TerminalWidth()))
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(i.IO.Out, "\n%s\n", md)
+	return nil
+}
+
+func (i *IssuePrint) comments(isPreview bool) error {
+	if i.issue.Comments.TotalCount > 0 {
+		comments, err := prShared.CommentList(i.IO, i.issue.Comments, api.PullRequestReviews{}, isPreview)
+		if err != nil {
+			return err
+		}
+		fmt.Fprint(i.IO.Out, comments)
+	}
+	return nil
+}
+
+func (i *IssuePrint) footer() {
+	fmt.Fprintf(i.IO.Out, i.colorScheme.Gray("View this issue on GitHub: %s\n"), i.issue.URL)
 }

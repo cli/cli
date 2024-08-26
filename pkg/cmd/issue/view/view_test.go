@@ -499,6 +499,7 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 	}
 }
 
+// Maybe I should be testing the issueProjectList function instead...
 func Test_printHumanIssuePreview(t *testing.T) {
 	tests := map[string]struct {
 		opts           *ViewOptions
@@ -548,7 +549,15 @@ func Test_printHumanIssuePreview(t *testing.T) {
 				return issue.CreatedAt.Add(24 * time.Hour)
 			}
 
-			err = printHumanIssuePreview(tc.opts, tc.baseRepo, issue)
+			issuePrint := &IssuePrint{
+				issue:       issue,
+				colorScheme: ios.ColorScheme(),
+				IO:          ios,
+				time:        tc.opts.Now(),
+				baseRepo:    tc.baseRepo,
+			}
+
+			err = issuePrint.humanPreview(!tc.opts.Comments)
 			if err != nil {
 				assert.NoError(t, err)
 			}
