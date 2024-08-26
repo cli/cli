@@ -14,7 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/markdown"
 )
 
-type IssuePrint struct {
+type IssuePrintFormatter struct {
 	issue       *api.Issue
 	colorScheme *iostreams.ColorScheme
 	IO          *iostreams.IOStreams
@@ -22,62 +22,7 @@ type IssuePrint struct {
 	baseRepo    ghrepo.Interface
 }
 
-func (i *IssuePrint) rawPreview() error {
-	assignees := i.getAssigneeList()
-	labels := i.getLabelList()
-	projects := i.getProjectList()
-
-	// Print empty strings for empty values so the number of metadata lines is consistent when
-	// processing many issues with head and grep.
-	fmt.Fprintf(i.IO.Out, "title:\t%s\n", i.issue.Title)
-	fmt.Fprintf(i.IO.Out, "state:\t%s\n", i.issue.State)
-	fmt.Fprintf(i.IO.Out, "author:\t%s\n", i.issue.Author.Login)
-	fmt.Fprintf(i.IO.Out, "labels:\t%s\n", labels)
-	fmt.Fprintf(i.IO.Out, "comments:\t%d\n", i.issue.Comments.TotalCount)
-	fmt.Fprintf(i.IO.Out, "assignees:\t%s\n", assignees)
-	fmt.Fprintf(i.IO.Out, "projects:\t%s\n", projects)
-	var milestoneTitle string
-	if i.issue.Milestone != nil {
-		milestoneTitle = i.issue.Milestone.Title
-	}
-	fmt.Fprintf(i.IO.Out, "milestone:\t%s\n", milestoneTitle)
-	fmt.Fprintf(i.IO.Out, "number:\t%d\n", i.issue.Number)
-	fmt.Fprintln(i.IO.Out, "--")
-	fmt.Fprintln(i.IO.Out, i.issue.Body)
-	return nil
-}
-
-func (i *IssuePrint) humanPreview(isCommentsPreview bool) error {
-
-	// header (Title and State)
-	i.header()
-	// Reactions
-	i.reactions()
-	// Metadata
-	i.assigneeList()
-	i.labelList()
-	i.projectList()
-	i.milestone()
-
-	// Body
-	err := i.body()
-	if err != nil {
-		return err
-	}
-
-	// Comments
-	err = i.comments(isCommentsPreview)
-	if err != nil {
-		return err
-	}
-
-	// Footer
-	i.footer()
-
-	return nil
-}
-
-func (i *IssuePrint) header() {
+func (i *IssuePrintFormatter) header() {
 	fmt.Fprintf(i.IO.Out, "%s %s#%d\n", i.colorScheme.Bold(i.issue.Title), ghrepo.FullName(i.baseRepo), i.issue.Number)
 	fmt.Fprintf(i.IO.Out,
 		"%s • %s opened %s • %s\n",
@@ -88,7 +33,7 @@ func (i *IssuePrint) header() {
 	)
 }
 
-func (i *IssuePrint) issueStateTitleWithColor() string {
+func (i *IssuePrintFormatter) issueStateTitleWithColor() string {
 	colorFunc := i.colorScheme.ColorFromString(prShared.ColorForIssueState(*i.issue))
 	state := "Open"
 	if i.issue.State == "CLOSED" {
@@ -97,21 +42,21 @@ func (i *IssuePrint) issueStateTitleWithColor() string {
 	return colorFunc(state)
 }
 
-func (i *IssuePrint) reactions() {
+func (i *IssuePrintFormatter) reactions() {
 	if reactions := prShared.ReactionGroupList(i.issue.ReactionGroups); reactions != "" {
 		fmt.Fprint(i.IO.Out, reactions)
 		fmt.Fprintln(i.IO.Out)
 	}
 }
 
-func (i *IssuePrint) assigneeList() {
+func (i *IssuePrintFormatter) assigneeList() {
 	if assignees := i.getAssigneeList(); assignees != "" {
 		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Assignees: "))
 		fmt.Fprintln(i.IO.Out, assignees)
 	}
 }
 
-func (i *IssuePrint) getAssigneeList() string {
+func (i *IssuePrintFormatter) getAssigneeList() string {
 	if len(i.issue.Assignees.Nodes) == 0 {
 		return ""
 	}
@@ -128,21 +73,21 @@ func (i *IssuePrint) getAssigneeList() string {
 	return list
 }
 
-func (i *IssuePrint) labelList() {
+func (i *IssuePrintFormatter) labelList() {
 	if labels := i.getLabelList(); labels != "" {
 		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Labels: "))
 		fmt.Fprintln(i.IO.Out, labels)
 	}
 }
 
-func (i *IssuePrint) projectList() {
+func (i *IssuePrintFormatter) projectList() {
 	if projects := i.getProjectList(); projects != "" {
 		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Projects: "))
 		fmt.Fprintln(i.IO.Out, projects)
 	}
 }
 
-func (i *IssuePrint) getProjectList() string {
+func (i *IssuePrintFormatter) getProjectList() string {
 	if len(i.issue.ProjectCards.Nodes) == 0 {
 		return ""
 	}
@@ -163,7 +108,7 @@ func (i *IssuePrint) getProjectList() string {
 	return list
 }
 
-func (i *IssuePrint) getLabelList() string {
+func (i *IssuePrintFormatter) getLabelList() string {
 	if len(i.issue.Labels.Nodes) == 0 {
 		return ""
 	}
@@ -185,14 +130,14 @@ func (i *IssuePrint) getLabelList() string {
 	return strings.Join(labelNames, ", ")
 }
 
-func (i *IssuePrint) milestone() {
+func (i *IssuePrintFormatter) milestone() {
 	if i.issue.Milestone != nil {
 		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Milestone: "))
 		fmt.Fprintln(i.IO.Out, i.issue.Milestone.Title)
 	}
 }
 
-func (i *IssuePrint) body() error {
+func (i *IssuePrintFormatter) body() error {
 	var md string
 	var err error
 	if i.issue.Body == "" {
@@ -209,7 +154,7 @@ func (i *IssuePrint) body() error {
 	return nil
 }
 
-func (i *IssuePrint) comments(isPreview bool) error {
+func (i *IssuePrintFormatter) comments(isPreview bool) error {
 	if i.issue.Comments.TotalCount > 0 {
 		comments, err := prShared.CommentList(i.IO, i.issue.Comments, api.PullRequestReviews{}, isPreview)
 		if err != nil {
@@ -220,6 +165,6 @@ func (i *IssuePrint) comments(isPreview bool) error {
 	return nil
 }
 
-func (i *IssuePrint) footer() {
+func (i *IssuePrintFormatter) footer() {
 	fmt.Fprintf(i.IO.Out, i.colorScheme.Gray("View this issue on GitHub: %s\n"), i.issue.URL)
 }
