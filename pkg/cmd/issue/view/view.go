@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -129,6 +130,8 @@ func viewRun(opts *ViewOptions) error {
 		return opts.Exporter.Write(opts.IO, issue)
 	}
 
+	issue.Labels.SortAlphabeticallyIgnoreCase()
+
 	ipf := &IssuePrintFormatter{
 		issue:       issue,
 		colorScheme: opts.IO.ColorScheme(),
@@ -172,13 +175,10 @@ func rawIssuePreview(IO *iostreams.IOStreams, issue *api.Issue) error {
 
 	out := IO.Out
 
-	ipf := &IssuePrintFormatter{
-		issue: issue,
-	}
-
-	assignees := ipf.getAssigneeList()
-	labels := ipf.getLabelList()
-	projects := ipf.getProjectList()
+	assignees := issue.GetAssigneeListString()
+	// Labels no longer have color in the raw issue preview
+	labels := strings.Join(issue.Labels.Names(), ", ")
+	projects := issue.GetProjectListString()
 
 	// Print empty strings for empty values so the number of metadata lines is consistent when
 	// processing many issues with head and grep.

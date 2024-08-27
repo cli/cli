@@ -2,7 +2,6 @@ package view
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -50,74 +49,27 @@ func (i *IssuePrintFormatter) reactions() {
 }
 
 func (i *IssuePrintFormatter) assigneeList() {
-	if assignees := i.getAssigneeList(); assignees != "" {
+	if assignees := i.issue.GetAssigneeListString(); assignees != "" {
 		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Assignees: "))
 		fmt.Fprintln(i.IO.Out, assignees)
 	}
 }
 
-func (i *IssuePrintFormatter) getAssigneeList() string {
-	if len(i.issue.Assignees.Nodes) == 0 {
-		return ""
-	}
-
-	AssigneeNames := make([]string, 0, len(i.issue.Assignees.Nodes))
-	for _, assignee := range i.issue.Assignees.Nodes {
-		AssigneeNames = append(AssigneeNames, assignee.Login)
-	}
-
-	list := strings.Join(AssigneeNames, ", ")
-	if i.issue.Assignees.TotalCount > len(i.issue.Assignees.Nodes) {
-		list += ", …"
-	}
-	return list
-}
-
 func (i *IssuePrintFormatter) labelList() {
-	if labels := i.getLabelList(); labels != "" {
+	if labels := i.getColorizedLabelsList(); labels != "" {
 		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Labels: "))
 		fmt.Fprintln(i.IO.Out, labels)
 	}
 }
 
 func (i *IssuePrintFormatter) projectList() {
-	if projects := i.getProjectList(); projects != "" {
+	if projects := i.issue.GetProjectListString(); projects != "" {
 		fmt.Fprint(i.IO.Out, i.colorScheme.Bold("Projects: "))
 		fmt.Fprintln(i.IO.Out, projects)
 	}
 }
 
-func (i *IssuePrintFormatter) getProjectList() string {
-	if len(i.issue.ProjectCards.Nodes) == 0 {
-		return ""
-	}
-
-	projectNames := make([]string, 0, len(i.issue.ProjectCards.Nodes))
-	for _, project := range i.issue.ProjectCards.Nodes {
-		colName := project.Column.Name
-		if colName == "" {
-			colName = "Awaiting triage"
-		}
-		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, colName))
-	}
-
-	list := strings.Join(projectNames, ", ")
-	if i.issue.ProjectCards.TotalCount > len(i.issue.ProjectCards.Nodes) {
-		list += ", …"
-	}
-	return list
-}
-
-func (i *IssuePrintFormatter) getLabelList() string {
-	if len(i.issue.Labels.Nodes) == 0 {
-		return ""
-	}
-
-	// ignore case sort
-	sort.SliceStable(i.issue.Labels.Nodes, func(j, k int) bool {
-		return strings.ToLower(i.issue.Labels.Nodes[j].Name) < strings.ToLower(i.issue.Labels.Nodes[k].Name)
-	})
-
+func (i *IssuePrintFormatter) getColorizedLabelsList() string {
 	labelNames := make([]string, len(i.issue.Labels.Nodes))
 	for j, label := range i.issue.Labels.Nodes {
 		if i.colorScheme == nil {
