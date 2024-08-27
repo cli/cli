@@ -76,35 +76,25 @@ func loadBundleFromJSONFile(path string) ([]*api.Attestation, error) {
 }
 
 func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
-	file, err := os.Open(path)
+        fileContent, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not open file: %v", err)
+		return nil, fmt.Errorf("could not read file: %v", err)
 	}
-	defer file.Close()
 
-	attestations := []*api.Attestation{}
+    	attestations := []*api.Attestation{}
+	
+    	decoder := json.NewDecoder(bytes.NewReader(fileContent))
 
-	reader := bufio.NewReader(file)
-
-	var line []byte
-	line, err = reader.ReadBytes('\n')
-	for err == nil {
-		if len(bytes.TrimSpace(line)) == 0 {
-			line, err = reader.ReadBytes('\n')
-			continue
-		}
+	for decoder.More() {
 		var bundle bundle.ProtobufBundle
 		bundle.Bundle = new(protobundle.Bundle)
-		err = bundle.UnmarshalJSON(line)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal bundle from JSON: %v", err)
+		if err := decoder.Decode(&bundle); err != nil {
+		    return nil, fmt.Errorf("failed to unmarshal bundle from JSON: %v", err)
 		}
 		a := api.Attestation{Bundle: &bundle}
 		attestations = append(attestations, &a)
-
-		line, err = reader.ReadBytes('\n')
 	}
-
+	
 	return attestations, nil
 }
 
