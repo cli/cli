@@ -132,13 +132,7 @@ func viewRun(opts *ViewOptions) error {
 
 	issue.Labels.SortAlphabeticallyIgnoreCase()
 
-	ipf := &IssuePrintFormatter{
-		issue:       issue,
-		colorScheme: opts.IO.ColorScheme(),
-		IO:          opts.IO,
-		time:        opts.Now(),
-		baseRepo:    baseRepo,
-	}
+	ipf := NewIssuePrintFormatter(issue, opts.IO, opts.Now(), baseRepo)
 
 	if opts.IO.IsStdoutTTY() {
 		isCommentsPreview := !opts.Comments

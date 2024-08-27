@@ -543,13 +543,7 @@ func Test_humanPreview(t *testing.T) {
 				t.Errorf("Error decoding fixture at %s: %v", tc.issueFixture, err)
 			}
 
-			ipf := &IssuePrintFormatter{
-				issue:       issue,
-				colorScheme: ios.ColorScheme(),
-				IO:          ios,
-				time:        issue.CreatedAt.Add(24 * time.Hour),
-				baseRepo:    tc.baseRepo,
-			}
+			ipf := NewIssuePrintFormatter(issue, ios, issue.CreatedAt.Add(24*time.Hour), tc.baseRepo)
 
 			err = humanIssuePreview(ipf, tc.isCommentPreview)
 			if err != nil {

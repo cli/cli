@@ -21,6 +21,16 @@ type IssuePrintFormatter struct {
 	baseRepo    ghrepo.Interface
 }
 
+func NewIssuePrintFormatter(issue *api.Issue, IO *iostreams.IOStreams, timeNow time.Time, baseRepo ghrepo.Interface) *IssuePrintFormatter {
+	return &IssuePrintFormatter{
+		issue:       issue,
+		colorScheme: IO.ColorScheme(),
+		IO:          IO,
+		time:        timeNow,
+		baseRepo:    baseRepo,
+	}
+}
+
 func (i *IssuePrintFormatter) header() {
 	fmt.Fprintf(i.IO.Out, "%s %s#%d\n", i.colorScheme.Bold(i.issue.Title), ghrepo.FullName(i.baseRepo), i.issue.Number)
 	fmt.Fprintf(i.IO.Out,
