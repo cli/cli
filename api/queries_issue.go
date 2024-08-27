@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -82,6 +84,12 @@ func (l Labels) Names() []string {
 	return names
 }
 
+func (l Labels) SortAlphabeticallyIgnoreCase() {
+	slices.SortStableFunc(l.Nodes, func(a, b IssueLabel) int {
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	})
+}
+
 type ProjectCards struct {
 	Nodes      []*ProjectInfo
 	TotalCount int
@@ -92,12 +100,16 @@ type ProjectItems struct {
 }
 
 type ProjectInfo struct {
-	Project struct {
-		Name string `json:"name"`
-	} `json:"project"`
-	Column struct {
-		Name string `json:"name"`
-	} `json:"column"`
+	Project ProjectV1ProjectName   `json:"project"`
+	Column  ProjectV1ProjectColumn `json:"column"`
+}
+
+type ProjectV1ProjectName struct {
+	Name string `json:"name"`
+}
+
+type ProjectV1ProjectColumn struct {
+	Name string `json:"name"`
 }
 
 type ProjectV2Item struct {
@@ -332,4 +344,42 @@ func (i Issue) Identifier() string {
 
 func (i Issue) CurrentUserComments() []Comment {
 	return i.Comments.CurrentUserComments()
+}
+
+func (i Issue) GetAssigneeListString() string {
+	if len(i.Assignees.Nodes) == 0 {
+		return ""
+	}
+
+	AssigneeNames := make([]string, 0, len(i.Assignees.Nodes))
+	for _, assignee := range i.Assignees.Nodes {
+		AssigneeNames = append(AssigneeNames, assignee.Login)
+	}
+
+	list := strings.Join(AssigneeNames, ", ")
+	if i.Assignees.TotalCount > len(i.Assignees.Nodes) {
+		list += ", …"
+	}
+	return list
+}
+
+func (i Issue) GetProjectListString() string {
+	if len(i.ProjectCards.Nodes) == 0 {
+		return ""
+	}
+
+	projectNames := make([]string, 0, len(i.ProjectCards.Nodes))
+	for _, project := range i.ProjectCards.Nodes {
+		colName := project.Column.Name
+		if colName == "" {
+			colName = "Awaiting triage"
+		}
+		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, colName))
+	}
+
+	list := strings.Join(projectNames, ", ")
+	if i.ProjectCards.TotalCount > len(i.ProjectCards.Nodes) {
+		list += ", …"
+	}
+	return list
 }
