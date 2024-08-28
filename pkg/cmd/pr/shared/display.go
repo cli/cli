@@ -33,12 +33,12 @@ func ColorForPRState(pr api.PullRequest) string {
 	}
 }
 
-func ColorForIssueState(issue api.Issue) string {
-	switch issue.State {
+func ColorForIssueState(state string, stateReason string) string {
+	switch state {
 	case "OPEN":
 		return "green"
 	case "CLOSED":
-		if issue.StateReason == "NOT_PLANNED" {
+		if stateReason == "NOT_PLANNED" {
 			return "gray"
 		}
 		return "magenta"
