@@ -288,15 +288,62 @@ func Test_getProjectListString(t *testing.T) {
 				TotalCount: 0,
 			},
 			projectItems: api.ProjectItems{
-				Nodes: []*api.ProjectV2Item{},
+				Nodes: []*api.ProjectV2Item{
+					{
+						ID: "projectItemID",
+						Project: api.ProjectV2ItemProject{
+							ID:    "projectID",
+							Title: "V2 Project Title",
+						},
+						Status: api.ProjectV2ItemStatus{
+							OptionID: "statusID",
+							Name:     "STATUS",
+						},
+					},
+					{
+						ID: "projectItemID2",
+						Project: api.ProjectV2ItemProject{
+							ID:    "projectID2",
+							Title: "V2 Project Title 2",
+						},
+						Status: api.ProjectV2ItemStatus{
+							OptionID: "statusID2",
+							Name:     "",
+						},
+					},
+				},
 			},
-			expected: "",
+			expected: "V2 Project Title (STATUS), V2 Project Title 2 (Backlog)",
+		},
+		"1 v1 project and 1 v2 project": {
+			projectCards: api.ProjectCards{
+				Nodes: []*api.ProjectInfo{
+					{Project: api.ProjectV1ProjectName{Name: "V1 Project Name"}, Column: api.ProjectV1ProjectColumn{Name: "COLUMN"}},
+				},
+				TotalCount: 1,
+			},
+			projectItems: api.ProjectItems{
+				Nodes: []*api.ProjectV2Item{
+					{
+						ID: "projectItemID",
+						Project: api.ProjectV2ItemProject{
+							ID:    "projectID",
+							Title: "V2 Project Title",
+						},
+						Status: api.ProjectV2ItemStatus{
+							OptionID: "statusID",
+							Name:     "STATUS",
+						},
+					},
+				},
+			},
+			expected: "V1 Project Name (COLUMNS), V2 Project Title (STATUS)",
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, getProjectListString(tc.projectCards, tc.projectItems))
+			assert.Equal(t, getProjectListString(tc.projectCards, tc.projectItems), tc.expected)
 		})
 	}
 }

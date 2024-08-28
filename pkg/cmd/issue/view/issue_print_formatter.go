@@ -74,17 +74,25 @@ func apiIssueToPresentationIssue(issue *api.Issue, colorScheme *iostreams.ColorS
 }
 
 func getProjectListString(projectCards api.ProjectCards, projectItems api.ProjectItems) string {
-	if len(projectCards.Nodes) == 0 {
+	if len(projectCards.Nodes) == 0 && len(projectItems.Nodes) == 0 {
 		return ""
 	}
 
-	projectNames := make([]string, 0, len(projectCards.Nodes))
-	for _, project := range projectCards.Nodes {
+	projectNames := make([]string, len(projectCards.Nodes)+len(projectItems.Nodes))
+	for i, project := range projectCards.Nodes {
 		colName := project.Column.Name
 		if colName == "" {
 			colName = "Awaiting triage"
 		}
-		projectNames = append(projectNames, fmt.Sprintf("%s (%s)", project.Project.Name, colName))
+		projectNames[i] = fmt.Sprintf("%s (%s)", project.Project.Name, colName)
+	}
+
+	for i, project := range projectItems.Nodes {
+		statusName := project.Status.Name
+		if statusName == "" {
+			statusName = "Backlog"
+		}
+		projectNames[i+len(projectCards.Nodes)] = fmt.Sprintf("%s (%s)", project.Project.Title, statusName)
 	}
 
 	list := strings.Join(projectNames, ", ")
