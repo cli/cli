@@ -18,7 +18,7 @@ func Test_apiIssueToPresentationIssue(t *testing.T) {
 
 	tests := map[string]struct {
 		issue  *api.Issue
-		expect *presentationIssue
+		expect *PresentationIssue
 	}{
 		"basic integration test": {
 			issue: &api.Issue{
@@ -104,7 +104,7 @@ func Test_apiIssueToPresentationIssue(t *testing.T) {
 				},
 				CreatedAt: createdAt,
 			},
-			expect: &presentationIssue{
+			expect: &PresentationIssue{
 				Title:     "Title",
 				Number:    123,
 				CreatedAt: createdAt,
@@ -166,11 +166,11 @@ func Test_apiIssueToPresentationIssue(t *testing.T) {
 
 func Test_ipf_RenderRawIssuePreview(t *testing.T) {
 	tests := map[string]struct {
-		presentationIssue *presentationIssue
+		presentationIssue *PresentationIssue
 		expectedOutput    string
 	}{
 		"basic issue": {
-			presentationIssue: &presentationIssue{
+			presentationIssue: &PresentationIssue{
 				Title:      "issueTitle",
 				State:      "issueState",
 				Author:     "authorLogin",
@@ -362,7 +362,7 @@ func Test_ipf_reactions(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			presentationIssue := &presentationIssue{
+			presentationIssue := &PresentationIssue{
 				Reactions: tc.reactions,
 			}
 
@@ -419,7 +419,7 @@ func Test_ipf_header(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			presentationIssue := &presentationIssue{
+			presentationIssue := &PresentationIssue{
 				Title:  tc.title,
 				Number: tc.number,
 				Comments: api.Comments{
@@ -459,7 +459,7 @@ func Test_ipf_assigneeList(t *testing.T) {
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
 
-			presentationIssue := &presentationIssue{
+			presentationIssue := &PresentationIssue{
 				AssigneesList: tc.assignees,
 			}
 
@@ -491,7 +491,7 @@ func Test_ipf_labelList(t *testing.T) {
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
 
-			presentationIssue := &presentationIssue{
+			presentationIssue := &PresentationIssue{
 				LabelsList: tc.labels,
 			}
 
@@ -523,7 +523,7 @@ func Test_ipf_projectList(t *testing.T) {
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
 
-			presentationIssue := &presentationIssue{
+			presentationIssue := &PresentationIssue{
 				ProjectsList: tc.projectList,
 			}
 
@@ -555,7 +555,7 @@ func Test_ipf_milestone(t *testing.T) {
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
 
-			presentationIssue := &presentationIssue{
+			presentationIssue := &PresentationIssue{
 				MilestoneTitle: tc.milestone,
 			}
 
@@ -587,7 +587,7 @@ func Test_ipf_body(t *testing.T) {
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
 
-			presentationIssue := &presentationIssue{
+			presentationIssue := &PresentationIssue{
 				Body: tc.body,
 			}
 
@@ -657,7 +657,7 @@ func Test_ipf_comments(t *testing.T) {
 				tc.commentNodes[i].CreatedAt = timeNow.AddDate(0, 0, -1)
 			}
 
-			presentationIssue := &presentationIssue{
+			presentationIssue := &PresentationIssue{
 				Comments: api.Comments{
 					Nodes:      tc.commentNodes,
 					TotalCount: len(tc.commentNodes),
@@ -697,7 +697,7 @@ func Test_ipf_footer(t *testing.T) {
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
 
-			presentationIssue := &presentationIssue{
+			presentationIssue := &PresentationIssue{
 				URL: tc.url,
 			}
 

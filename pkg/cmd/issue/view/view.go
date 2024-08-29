@@ -33,6 +33,40 @@ type ViewOptions struct {
 	Exporter    cmdutil.Exporter
 
 	Now func() time.Time
+
+	IssuePrinter IssuePrinter
+}
+
+type IssuePrinter interface {
+	Print(*PresentationIssue, ghrepo.Interface) error
+}
+
+type RawIssuePrinter struct {
+	IO       *iostreams.IOStreams
+	TimeNow  time.Time
+	Comments bool
+}
+
+func (p *RawIssuePrinter) Print(issue *PresentationIssue, repo ghrepo.Interface) error {
+	if p.Comments {
+		fmt.Fprint(p.IO.Out, prShared.RawCommentList(issue.Comments, api.PullRequestReviews{}))
+		return nil
+	}
+
+	ipf := NewIssuePrintFormatter(issue, p.IO, p.TimeNow, repo)
+	return ipf.renderRawIssuePreview()
+}
+
+type RichIssuePrinter struct {
+	IO       *iostreams.IOStreams
+	TimeNow  time.Time
+	Comments bool
+}
+
+func (p *RichIssuePrinter) Print(issue *PresentationIssue, repo ghrepo.Interface) error {
+	ipf := NewIssuePrintFormatter(issue, p.IO, p.TimeNow, repo)
+	isCommentsPreview := !p.Comments
+	return ipf.renderHumanIssuePreview(isCommentsPreview)
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -58,6 +92,20 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
+			}
+
+			if opts.IO.IsStdoutTTY() {
+				opts.IssuePrinter = &RichIssuePrinter{
+					IO:       opts.IO,
+					TimeNow:  opts.Now(),
+					Comments: opts.Comments,
+				}
+			} else {
+				opts.IssuePrinter = &RawIssuePrinter{
+					IO:       opts.IO,
+					TimeNow:  opts.Now(),
+					Comments: opts.Comments,
+				}
 			}
 
 			if runF != nil {
@@ -136,19 +184,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	ipf := NewIssuePrintFormatter(presentationIssue, opts.IO, opts.Now(), baseRepo)
-
-	if opts.IO.IsStdoutTTY() {
-		isCommentsPreview := !opts.Comments
-		return ipf.renderHumanIssuePreview(isCommentsPreview)
-	}
-
-	if opts.Comments {
-		fmt.Fprint(opts.IO.Out, prShared.RawCommentList(issue.Comments, api.PullRequestReviews{}))
-		return nil
-	}
-
-	return ipf.renderRawIssuePreview()
+	return opts.IssuePrinter.Print(presentationIssue, baseRepo)
 }
 
 func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string, detector fd.Detector) (*api.Issue, ghrepo.Interface, error) {

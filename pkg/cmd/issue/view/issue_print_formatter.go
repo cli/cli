@@ -14,14 +14,14 @@ import (
 )
 
 type IssuePrintFormatter struct {
-	presentationIssue *presentationIssue
+	presentationIssue *PresentationIssue
 	colorScheme       *iostreams.ColorScheme
 	IO                *iostreams.IOStreams
 	time              time.Time
 	baseRepo          ghrepo.Interface
 }
 
-type presentationIssue struct {
+type PresentationIssue struct {
 	Title          string
 	Number         int
 	CreatedAt      time.Time
@@ -38,7 +38,7 @@ type presentationIssue struct {
 	URL            string
 }
 
-func NewIssuePrintFormatter(presentationIssue *presentationIssue, IO *iostreams.IOStreams, timeNow time.Time, baseRepo ghrepo.Interface) *IssuePrintFormatter {
+func NewIssuePrintFormatter(presentationIssue *PresentationIssue, IO *iostreams.IOStreams, timeNow time.Time, baseRepo ghrepo.Interface) *IssuePrintFormatter {
 	return &IssuePrintFormatter{
 		presentationIssue: presentationIssue,
 		colorScheme:       IO.ColorScheme(),
@@ -48,8 +48,8 @@ func NewIssuePrintFormatter(presentationIssue *presentationIssue, IO *iostreams.
 	}
 }
 
-func apiIssueToPresentationIssue(issue *api.Issue, colorScheme *iostreams.ColorScheme) (*presentationIssue, error) {
-	presentationIssue := &presentationIssue{
+func apiIssueToPresentationIssue(issue *api.Issue, colorScheme *iostreams.ColorScheme) (*PresentationIssue, error) {
+	presentationIssue := &PresentationIssue{
 		Title:         issue.Title,
 		Number:        issue.Number,
 		CreatedAt:     issue.CreatedAt,
