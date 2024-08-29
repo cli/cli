@@ -41,7 +41,6 @@ func TestIsHostSupported(t *testing.T) {
 			t.Setenv("GH_HOST", tc.host)
 
 			host, _ := ghauth.DefaultHost()
-
 			err := IsHostSupported(host)
 			if tc.expectedErr {
 				require.ErrorIs(t, err, ErrUnsupportedHost)
