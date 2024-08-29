@@ -139,6 +139,8 @@ func (c Comment) Reactions() ReactionGroups {
 	return c.ReactionGroups
 }
 
+// TODO: What is this supposed to do, and how does it relate to
+// formatting comments for PR or Issue view?
 func (c Comment) Status() string {
 	return ""
 }

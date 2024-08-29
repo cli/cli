@@ -164,41 +164,6 @@ func Test_apiIssueToPresentationIssue(t *testing.T) {
 // 	return
 // }
 
-func Test_ipf_RenderRawIssuePreview(t *testing.T) {
-	tests := map[string]struct {
-		presentationIssue *PresentationIssue
-		expectedOutput    string
-	}{
-		"basic issue": {
-			presentationIssue: &PresentationIssue{
-				Title:      "issueTitle",
-				State:      "issueState",
-				Author:     "authorLogin",
-				LabelsList: "labelsList",
-				Comments: api.Comments{
-					TotalCount: 1,
-				},
-				AssigneesList:  "assigneesList",
-				ProjectsList:   "projectsList",
-				MilestoneTitle: "milestoneTitle",
-				Number:         123,
-				Body:           "issueBody",
-			},
-			expectedOutput: "title:\tissueTitle\nstate:\tissueState\nauthor:\tauthorLogin\nlabels:\tlabelsList\ncomments:\t1\nassignees:\tassigneesList\nprojects:\tprojectsList\nmilestone:\tmilestoneTitle\nnumber:\t123\n--\nissueBody\n",
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			ios, _, stdout, _ := iostreams.Test()
-
-			ipf := NewIssuePrintFormatter(tc.presentationIssue, ios, time.Time{}, ghrepo.New("OWNER", "REPO"))
-			ipf.renderRawIssuePreview()
-			assert.Equal(t, tc.expectedOutput, stdout.String())
-		})
-	}
-}
-
 func Test_getAssigneeListString(t *testing.T) {
 	tests := map[string]struct {
 		assignees api.Assignees

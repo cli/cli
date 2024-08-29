@@ -159,26 +159,6 @@ func (ipf *IssuePrintFormatter) renderHumanIssuePreview(isCommentsPreview bool) 
 	return nil
 }
 
-func (ipf *IssuePrintFormatter) renderRawIssuePreview() error {
-
-	out := ipf.IO.Out
-	pi := ipf.presentationIssue
-	// Print empty strings for empty values so the number of metadata lines is consistent when
-	// processing many issues with head and grep.
-	fmt.Fprintf(out, "title:\t%s\n", pi.Title)
-	fmt.Fprintf(out, "state:\t%s\n", pi.State)
-	fmt.Fprintf(out, "author:\t%s\n", pi.Author)
-	fmt.Fprintf(out, "labels:\t%s\n", pi.LabelsList)
-	fmt.Fprintf(out, "comments:\t%d\n", pi.Comments.TotalCount)
-	fmt.Fprintf(out, "assignees:\t%s\n", pi.AssigneesList)
-	fmt.Fprintf(out, "projects:\t%s\n", pi.ProjectsList)
-	fmt.Fprintf(out, "milestone:\t%s\n", pi.MilestoneTitle)
-	fmt.Fprintf(out, "number:\t%d\n", pi.Number)
-	fmt.Fprintln(out, "--")
-	fmt.Fprintln(out, pi.Body)
-	return nil
-}
-
 func (i *IssuePrintFormatter) header() {
 	fmt.Fprintf(i.IO.Out, "%s %s#%d\n", i.colorScheme.Bold(i.presentationIssue.Title), ghrepo.FullName(i.baseRepo), i.presentationIssue.Number)
 	fmt.Fprintf(i.IO.Out,
