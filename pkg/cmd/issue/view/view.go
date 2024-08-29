@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
-	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/set"
@@ -38,47 +37,7 @@ type ViewOptions struct {
 }
 
 type IssuePrinter interface {
-	Print(*PresentationIssue, ghrepo.Interface) error
-}
-
-type RawIssuePrinter struct {
-	IO       *iostreams.IOStreams
-	Comments bool
-}
-
-func (p *RawIssuePrinter) Print(pi *PresentationIssue, repo ghrepo.Interface) error {
-	if p.Comments {
-		fmt.Fprint(p.IO.Out, prShared.RawCommentList(pi.Comments, api.PullRequestReviews{}))
-		return nil
-	}
-
-	// Print empty strings for empty values so the number of metadata lines is consistent when
-	// processing many issues with head and grep.
-	fmt.Fprintf(p.IO.Out, "title:\t%s\n", pi.Title)
-	fmt.Fprintf(p.IO.Out, "state:\t%s\n", pi.State)
-	fmt.Fprintf(p.IO.Out, "author:\t%s\n", pi.Author)
-	fmt.Fprintf(p.IO.Out, "labels:\t%s\n", pi.LabelsList)
-	fmt.Fprintf(p.IO.Out, "comments:\t%d\n", pi.Comments.TotalCount)
-	fmt.Fprintf(p.IO.Out, "assignees:\t%s\n", pi.AssigneesList)
-	fmt.Fprintf(p.IO.Out, "projects:\t%s\n", pi.ProjectsList)
-	fmt.Fprintf(p.IO.Out, "milestone:\t%s\n", pi.MilestoneTitle)
-	fmt.Fprintf(p.IO.Out, "number:\t%d\n", pi.Number)
-	fmt.Fprintln(p.IO.Out, "--")
-	fmt.Fprintln(p.IO.Out, pi.Body)
-
-	return nil
-}
-
-type RichIssuePrinter struct {
-	IO       *iostreams.IOStreams
-	TimeNow  time.Time
-	Comments bool
-}
-
-func (p *RichIssuePrinter) Print(issue *PresentationIssue, repo ghrepo.Interface) error {
-	ipf := NewIssuePrintFormatter(issue, p.IO, p.TimeNow, repo)
-	isCommentsPreview := !p.Comments
-	return ipf.renderHumanIssuePreview(isCommentsPreview)
+	Print(PresentationIssue, ghrepo.Interface) error
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -190,7 +149,7 @@ func viewRun(opts *ViewOptions) error {
 
 	issue.Labels.SortAlphabeticallyIgnoreCase()
 
-	presentationIssue, err := apiIssueToPresentationIssue(issue, opts.IO.ColorScheme())
+	presentationIssue, err := MapApiIssueToPresentationIssue(issue, opts.IO.ColorScheme())
 	if err != nil {
 		return err
 	}
