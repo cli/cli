@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
@@ -19,6 +20,7 @@ type Options struct {
 	TufUrl      string
 	TufRootPath string
 	VerifyOnly  bool
+	Hostname    string
 }
 
 type tufClientInstantiator func(o *tuf.Options) (*tuf.Client, error)
@@ -54,7 +56,11 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 			gh attestation trusted-root
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := auth.IsHostSupported(); err != nil {
+			if opts.Hostname == "" {
+				opts.Hostname, _ = ghauth.DefaultHost()
+			}
+
+			if err := auth.IsHostSupported(opts.Hostname); err != nil {
 				return err
 			}
 
@@ -74,6 +80,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 	trustedRootCmd.Flags().StringVarP(&opts.TufRootPath, "tuf-root", "", "", "Path to the TUF root.json file on disk")
 	trustedRootCmd.MarkFlagsRequiredTogether("tuf-url", "tuf-root")
 	trustedRootCmd.Flags().BoolVarP(&opts.VerifyOnly, "verify-only", "", false, "Don't output trusted_root.jsonl contents")
+	trustedRootCmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Configure host to use")
 
 	return &trustedRootCmd
 }

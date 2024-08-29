@@ -18,6 +18,7 @@ type Options struct {
 	OCIClient        oci.Client
 	SigstoreVerifier verification.SigstoreVerifier
 	exporter         cmdutil.Exporter
+	Hostname         string
 }
 
 // Clean cleans the file path option values

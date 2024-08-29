@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
@@ -119,11 +120,16 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			if err != nil {
 				return err
 			}
-			opts.APIClient = api.NewLiveClient(hc, opts.Logger)
 
 			opts.OCIClient = oci.NewLiveClient()
 
-			if err := auth.IsHostSupported(); err != nil {
+			if opts.Hostname == "" {
+				opts.Hostname, _ = ghauth.DefaultHost()
+			}
+			err = auth.IsHostSupported(opts.Hostname)
+			opts.APIClient = api.NewLiveClient(hc, opts.Hostname, opts.Logger)
+
+			if err != nil {
 				return err
 			}
 
@@ -169,6 +175,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.Flags().StringVarP(&opts.SignerWorkflow, "signer-workflow", "", "", "Workflow that signed attestation in the format [host/]<owner>/<repo>/<path>/<to>/<workflow>")
 	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex", "signer-repo", "signer-workflow")
 	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", GitHubOIDCIssuer, "Issuer of the OIDC token")
+	verifyCmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Configure host to use")
 
 	return verifyCmd
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
@@ -66,8 +67,10 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.OCIClient = oci.NewLiveClient()
-
-			if err := auth.IsHostSupported(); err != nil {
+			if opts.Hostname == "" {
+				opts.Hostname, _ = ghauth.DefaultHost()
+			}
+			if err := auth.IsHostSupported(opts.Hostname); err != nil {
 				return err
 			}
 
@@ -90,6 +93,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 
 	inspectCmd.Flags().StringVarP(&opts.BundlePath, "bundle", "b", "", "Path to bundle on disk, either a single bundle in a JSON file or a JSON lines file with multiple bundles")
 	inspectCmd.MarkFlagRequired("bundle") //nolint:errcheck
+	inspectCmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Configure host to use")
 	cmdutil.StringEnumFlag(inspectCmd, &opts.DigestAlgorithm, "digest-alg", "d", "sha256", []string{"sha256", "sha512"}, "The algorithm used to compute a digest of the artifact")
 	cmdutil.AddFormatFlags(inspectCmd, &opts.exporter)
 

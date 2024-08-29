@@ -8,7 +8,6 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	ioconfig "github.com/cli/cli/v2/pkg/cmd/attestation/io"
-	"github.com/cli/go-gh/v2/pkg/auth"
 )
 
 const (
@@ -32,9 +31,7 @@ type LiveClient struct {
 	logger *ioconfig.Handler
 }
 
-func NewLiveClient(hc *http.Client, l *ioconfig.Handler) *LiveClient {
-	host, _ := auth.DefaultHost()
-
+func NewLiveClient(hc *http.Client, host string, l *ioconfig.Handler) *LiveClient {
 	return &LiveClient{
 		api:    api.NewClientFromHTTP(hc),
 		host:   strings.TrimSuffix(host, "/"),
