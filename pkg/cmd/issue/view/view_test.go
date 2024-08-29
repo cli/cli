@@ -157,7 +157,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				`state:\tOPEN`,
 				`comments:\t9`,
 				`labels:\tClosed: Duplicate, Closed: Won't Fix, help wanted, Status: In Progress, Type: Bug`,
-				`projects:\tProject 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
+				`projects:\tProject 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\), v2ProjectTitle (v2ProjectStatusName)\n`,
 				`milestone:\tuluru\n`,
 				`number:\t123\n`,
 				`\*\*bold story\*\*`,
