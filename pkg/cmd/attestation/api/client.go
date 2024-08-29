@@ -8,7 +8,6 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	ioconfig "github.com/cli/cli/v2/pkg/cmd/attestation/io"
-	"github.com/cli/go-gh/v2/pkg/auth"
 )
 
 const (
@@ -18,12 +17,14 @@ const (
 )
 
 type apiClient interface {
+	REST(hostname, method, p string, body io.Reader, data interface{}) error
 	RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error)
 }
 
 type Client interface {
 	GetByRepoAndDigest(repo, digest string, limit int) ([]*Attestation, error)
 	GetByOwnerAndDigest(owner, digest string, limit int) ([]*Attestation, error)
+	GetTrustDomain() (string, error)
 }
 
 type LiveClient struct {
@@ -32,9 +33,7 @@ type LiveClient struct {
 	logger *ioconfig.Handler
 }
 
-func NewLiveClient(hc *http.Client, l *ioconfig.Handler) *LiveClient {
-	host, _ := auth.DefaultHost()
-
+func NewLiveClient(hc *http.Client, host string, l *ioconfig.Handler) *LiveClient {
 	return &LiveClient{
 		api:    api.NewClientFromHTTP(hc),
 		host:   strings.TrimSuffix(host, "/"),
@@ -62,6 +61,12 @@ func (c *LiveClient) BuildOwnerAndDigestURL(owner, digest string) string {
 func (c *LiveClient) GetByOwnerAndDigest(owner, digest string, limit int) ([]*Attestation, error) {
 	url := c.BuildOwnerAndDigestURL(owner, digest)
 	return c.getAttestations(url, owner, digest, limit)
+}
+
+// GetTrustDomain returns the current trust domain. If the default is used
+// the empty string is returned
+func (c *LiveClient) GetTrustDomain() (string, error) {
+	return c.getTrustDomain(MetaPath)
 }
 
 func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*Attestation, error) {
@@ -101,4 +106,15 @@ func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*At
 	}
 
 	return attestations, nil
+}
+
+func (c *LiveClient) getTrustDomain(url string) (string, error) {
+	var resp MetaResponse
+
+	err := c.api.REST(c.host, http.MethodGet, url, nil, &resp)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Domains.ArtifactAttestations.TrustDomain, nil
 }

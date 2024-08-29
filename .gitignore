@@ -27,4 +27,7 @@
 # vim
 *.swp
 
+# Emacs
+*~
+
 vendor/

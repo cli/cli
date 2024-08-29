@@ -1,8 +1,8 @@
 package verify
 
 import (
+	"errors"
 	"fmt"
-	"os"
 	"regexp"
 
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
@@ -13,21 +13,23 @@ import (
 )
 
 const (
-	GitHubOIDCIssuer = "https://token.actions.githubusercontent.com"
+	GitHubOIDCIssuer       = "https://token.actions.githubusercontent.com"
+	GitHubTenantOIDCIssuer = "https://token.actions.%s.ghe.com"
 	// represents the GitHub hosted runner in the certificate RunnerEnvironment extension
 	GitHubRunner = "github-hosted"
-	githubHost   = "github.com"
 	hostRegex    = `^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+.*$`
 )
 
-func expandToGitHubURL(ownerOrRepo string) string {
-	// TODO: handle proxima prefix
-	return fmt.Sprintf("(?i)^https://github.com/%s/", ownerOrRepo)
+func expandToGitHubURL(tenant, ownerOrRepo string) string {
+	if tenant == "" {
+		return fmt.Sprintf("(?i)^https://github.com/%s/", ownerOrRepo)
+	}
+	return fmt.Sprintf("(?i)^https://%s.ghe.com/%s/", tenant, ownerOrRepo)
 }
 
 func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error) {
 	if opts.SignerRepo != "" {
-		signedRepoRegex := expandToGitHubURL(opts.SignerRepo)
+		signedRepoRegex := expandToGitHubURL(opts.Tenant, opts.SignerRepo)
 		return verify.NewSANMatcher("", signedRepoRegex)
 	} else if opts.SignerWorkflow != "" {
 		validatedWorkflowRegex, err := validateSignerWorkflow(opts)
@@ -118,37 +120,9 @@ func validateSignerWorkflow(opts *Options) (string, error) {
 		return addSchemeToRegex(opts.SignerWorkflow), nil
 	}
 
-	// if the provided workflow does not contain a host, check for a host
-	// and prepend it to the workflow
-	host, err := chooseHost(opts)
-	if err != nil {
-		return "", err
+	if opts.Hostname == "" {
+		return "", errors.New("unknown host")
 	}
 
-	return addSchemeToRegex(fmt.Sprintf("%s/%s", host, opts.SignerWorkflow)), nil
-}
-
-// if a host was not provided as part of a flag argument choose a host based
-// on gh cli configuration
-func chooseHost(opts *Options) (string, error) {
-	// check if GH_HOST is set and use that host if it is
-	host := os.Getenv("GH_HOST")
-	if host != "" {
-		return host, nil
-	}
-
-	// check if the CLI is authenticated with any hosts
-	cfg, err := opts.Config()
-	if err != nil {
-		return "", err
-	}
-
-	// if authenticated, return the authenticated host
-	authCfg := cfg.Authentication()
-	if host, _ := authCfg.DefaultHost(); host != "" {
-		return host, nil
-	}
-
-	// if not authenticated, return the default host github.com
-	return githubHost, nil
+	return addSchemeToRegex(fmt.Sprintf("%s/%s", opts.Hostname, opts.SignerWorkflow)), nil
 }

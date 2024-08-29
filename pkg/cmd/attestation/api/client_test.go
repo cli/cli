@@ -172,3 +172,35 @@ func TestGetByDigest_Error(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, attestations)
 }
+
+func TestGetTrustDomain(t *testing.T) {
+	fetcher := mockMetaGenerator{
+		TrustDomain: "foo",
+	}
+
+	t.Run("with returned trust domain", func(t *testing.T) {
+		c := LiveClient{
+			api: mockAPIClient{
+				OnREST: fetcher.OnREST,
+			},
+			logger: io.NewTestHandler(),
+		}
+		td, err := c.GetTrustDomain()
+		require.Nil(t, err)
+		require.Equal(t, "foo", td)
+
+	})
+
+	t.Run("with error", func(t *testing.T) {
+		c := LiveClient{
+			api: mockAPIClient{
+				OnREST: fetcher.OnRESTError,
+			},
+			logger: io.NewTestHandler(),
+		}
+		td, err := c.GetTrustDomain()
+		require.Equal(t, "", td)
+		require.ErrorContains(t, err, "test error")
+	})
+
+}

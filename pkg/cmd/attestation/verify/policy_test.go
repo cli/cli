@@ -1,7 +1,6 @@
 package verify
 
 import (
-	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
@@ -32,13 +31,12 @@ func TestBuildPolicy(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func ValidateSignerWorkflow(t *testing.T) {
+func TestValidateSignerWorkflow(t *testing.T) {
 	type testcase struct {
 		name                   string
 		providedSignerWorkflow string
 		expectedWorkflowRegex  string
-		ghHost                 string
-		authHost               string
+		host                   string
 	}
 
 	testcases := []testcase{
@@ -56,13 +54,19 @@ func ValidateSignerWorkflow(t *testing.T) {
 			name:                   "workflow with GH_HOST set",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
 			expectedWorkflowRegex:  "^https://myhost.github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			ghHost:                 "myhost.github.com",
+			host:                   "myhost.github.com",
 		},
 		{
 			name:                   "workflow with authenticated host",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
 			expectedWorkflowRegex:  "^https://authedhost.github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
-			authHost:               "authedhost.github.com",
+			host:                   "authedhost.github.com",
+		},
+		{
+			name:                   "workflow with authenticated host",
+			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
+			expectedWorkflowRegex:  "^https://authedhost.github.com/github/artifact-attestations-workflows/.github/workflows/attest.yml",
+			host:                   "authedhost.github.com",
 		},
 	}
 
@@ -74,22 +78,29 @@ func ValidateSignerWorkflow(t *testing.T) {
 			SignerWorkflow: tc.providedSignerWorkflow,
 		}
 
-		if tc.ghHost != "" {
-			err := os.Setenv("GH_HOST", tc.ghHost)
-			require.NoError(t, err)
+		// All host resolution is done verify.go:RunE
+		if tc.host == "" {
+			// Set to default host
+			tc.host = "github.com"
 		}
-
-		if tc.authHost != "" {
-			cfg, err := opts.Config()
-			require.NoError(t, err)
-
-			// if authenticated, return the authenticated host
-			authCfg := cfg.Authentication()
-			authCfg.SetDefaultHost(tc.authHost, "")
-		}
+		opts.Hostname = tc.host
 
 		workflowRegex, err := validateSignerWorkflow(opts)
 		require.NoError(t, err)
 		require.Equal(t, tc.expectedWorkflowRegex, workflowRegex)
+
 	}
+}
+
+func TestValidateSignerWorkflowNoHost(t *testing.T) {
+	cmdFactory := factory.New("test")
+	opts := &Options{
+		Config:         cmdFactory.Config,
+		SignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
+	}
+
+	workflowRegex, err := validateSignerWorkflow(opts)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "unknown host")
+	require.Equal(t, "", workflowRegex)
 }
