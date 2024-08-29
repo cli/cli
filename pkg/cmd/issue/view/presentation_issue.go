@@ -56,13 +56,13 @@ func getProjectListString(projectCards api.ProjectCards, projectItems api.Projec
 		return ""
 	}
 
-	projectNames := make([]string, len(projectCards.Nodes)+len(projectItems.Nodes))
+	projectNamesAndStatus := make([]string, len(projectCards.Nodes)+len(projectItems.Nodes))
 	for i, project := range projectCards.Nodes {
 		colName := project.Column.Name
 		if colName == "" {
 			colName = "Awaiting triage"
 		}
-		projectNames[i] = fmt.Sprintf("%s (%s)", project.Project.Name, colName)
+		projectNamesAndStatus[i] = fmt.Sprintf("%s (%s)", project.Project.Name, colName)
 	}
 
 	for i, project := range projectItems.Nodes {
@@ -70,10 +70,10 @@ func getProjectListString(projectCards api.ProjectCards, projectItems api.Projec
 		if statusName == "" {
 			statusName = "Backlog"
 		}
-		projectNames[i+len(projectCards.Nodes)] = fmt.Sprintf("%s (%s)", project.Project.Title, statusName)
+		projectNamesAndStatus[i+len(projectCards.Nodes)] = fmt.Sprintf("%s (%s)", project.Project.Title, statusName)
 	}
 
-	list := strings.Join(projectNames, ", ")
+	list := strings.Join(projectNamesAndStatus, ", ")
 	if projectCards.TotalCount > len(projectCards.Nodes) {
 		list += ", …"
 	}

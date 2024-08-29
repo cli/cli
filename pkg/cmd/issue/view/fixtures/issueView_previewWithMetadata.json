@@ -42,6 +42,21 @@
           ],
           "totalCount": 5
         },
+        "projectitems": {
+          "nodes": [
+            {
+              "id": "v2ProjectId",
+              "project": {
+                "id": "v2ProjectNameId",
+                "title": "v2ProjectTitle"
+              },
+              "status": {
+                "id": "v2ProjectStatusId",
+                "name": "v2ProjectStatusName"
+              }
+            }
+          ]
+        },
         "projectcards": {
           "nodes": [
             {
