@@ -10,6 +10,13 @@ import (
 	"github.com/magiconair/properties/assert"
 )
 
+// Should we write an integration test for Print? I'm not sure how easy
+// this is or how much value it will add...
+//
+// func Test_Print(t *testing.T) {
+// 	 ...test logic...
+// }
+
 // This does not test color, just output
 func Test_header(t *testing.T) {
 	tests := map[string]struct {

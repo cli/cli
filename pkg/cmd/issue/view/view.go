@@ -147,6 +147,7 @@ func viewRun(opts *ViewOptions) error {
 		return opts.Exporter.Write(opts.IO, issue)
 	}
 
+	// Todo: remove this from the api package and move to the presentationIssue
 	issue.Labels.SortAlphabeticallyIgnoreCase()
 
 	presentationIssue, err := MapApiIssueToPresentationIssue(issue, opts.IO.ColorScheme())
