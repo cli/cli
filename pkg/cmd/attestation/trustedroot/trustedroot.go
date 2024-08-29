@@ -80,7 +80,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 	trustedRootCmd.Flags().StringVarP(&opts.TufRootPath, "tuf-root", "", "", "Path to the TUF root.json file on disk")
 	trustedRootCmd.MarkFlagsRequiredTogether("tuf-url", "tuf-root")
 	trustedRootCmd.Flags().BoolVarP(&opts.VerifyOnly, "verify-only", "", false, "Don't output trusted_root.jsonl contents")
-	trustedRootCmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Configure host to use")
+	trustedRootCmd.Flags().StringVarP(&opts.Hostname, "hostname", "", "", "Configure host to use")
 
 	return &trustedRootCmd
 }

@@ -93,7 +93,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 
 	inspectCmd.Flags().StringVarP(&opts.BundlePath, "bundle", "b", "", "Path to bundle on disk, either a single bundle in a JSON file or a JSON lines file with multiple bundles")
 	inspectCmd.MarkFlagRequired("bundle") //nolint:errcheck
-	inspectCmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Configure host to use")
+	inspectCmd.Flags().StringVarP(&opts.Hostname, "hostname", "", "", "Configure host to use")
 	cmdutil.StringEnumFlag(inspectCmd, &opts.DigestAlgorithm, "digest-alg", "d", "sha256", []string{"sha256", "sha512"}, "The algorithm used to compute a digest of the artifact")
 	cmdutil.AddFormatFlags(inspectCmd, &opts.exporter)
 

@@ -109,7 +109,7 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 	downloadCmd.Flags().StringVarP(&opts.PredicateType, "predicate-type", "", "", "Filter attestations by provided predicate type")
 	cmdutil.StringEnumFlag(downloadCmd, &opts.DigestAlgorithm, "digest-alg", "d", "sha256", []string{"sha256", "sha512"}, "The algorithm used to compute a digest of the artifact")
 	downloadCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
-	downloadCmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Configure host to use")
+	downloadCmd.Flags().StringVarP(&opts.Hostname, "hostname", "", "", "Configure host to use")
 
 	return downloadCmd
 }
