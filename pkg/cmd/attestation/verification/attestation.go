@@ -83,15 +83,6 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	}
 	defer file.Close()
 
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get file info: %v", err)
-	}
-
-	if fileInfo.Size() == 0 {
-		return nil, ErrEmptyJSONLFile
-	}
-
 	attestations := []*api.Attestation{}
 
 	reader := bufio.NewReader(file)
@@ -113,6 +104,10 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 		attestations = append(attestations, &a)
 
 		line, err = reader.ReadBytes('\n')
+	}
+
+	if len(attestations) == 0 {
+		return nil, ErrEmptyJSONLFile
 	}
 
 	return attestations, nil
