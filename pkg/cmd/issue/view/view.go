@@ -81,7 +81,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return viewRun(opts)
+			issueFinder := &issueFinder{}
+			return viewRun(opts, issueFinder)
 		},
 	}
 
@@ -94,10 +95,16 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 var defaultFields = []string{
 	"number", "url", "state", "createdAt", "title", "body", "author", "milestone",
-	"assignees", "labels", "projectCards", "projectItems", "reactionGroups", "lastComment", "stateReason",
+	"assignees", "labels", "projectCards", "reactionGroups", "lastComment", "stateReason",
 }
 
-func viewRun(opts *ViewOptions) error {
+type IssueFinder interface {
+	findIssue(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string, detector fd.Detector) (*api.Issue, ghrepo.Interface, error)
+}
+
+type issueFinder struct{}
+
+func viewRun(opts *ViewOptions, issueFinder IssueFinder) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -119,7 +126,7 @@ func viewRun(opts *ViewOptions) error {
 	opts.IO.DetectTerminalTheme()
 
 	opts.IO.StartProgressIndicator()
-	issue, baseRepo, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice(), opts.Detector)
+	issue, baseRepo, err := issueFinder.findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice(), opts.Detector)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		var loadErr *issueShared.PartialLoadError
@@ -158,7 +165,7 @@ func viewRun(opts *ViewOptions) error {
 	return opts.IssuePrinter.Print(presentationIssue, baseRepo)
 }
 
-func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string, detector fd.Detector) (*api.Issue, ghrepo.Interface, error) {
+func (f *issueFinder) findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string, detector fd.Detector) (*api.Issue, ghrepo.Interface, error) {
 	fieldSet := set.NewStringSet()
 	fieldSet.AddValues(fields)
 	fieldSet.Add("id")

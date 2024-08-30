@@ -69,7 +69,8 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 
 	cmd := NewCmdView(factory, func(opts *ViewOptions) error {
 		opts.Detector = &featuredetection.EnabledDetectorMock{}
-		return viewRun(opts)
+		issueFinder := &issueFinder{}
+		return viewRun(opts, issueFinder)
 	})
 
 	argv, err := shlex.Split(cli)
@@ -110,6 +111,8 @@ func TestIssueView_web(t *testing.T) {
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	issueFinder := &issueFinder{}
+
 	err := viewRun(&ViewOptions{
 		IO:      ios,
 		Browser: browser,
@@ -121,7 +124,7 @@ func TestIssueView_web(t *testing.T) {
 		},
 		WebMode:     true,
 		SelectorArg: "123",
-	})
+	}, issueFinder)
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
@@ -157,7 +160,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				`state:\tOPEN`,
 				`comments:\t9`,
 				`labels:\tClosed: Duplicate, Closed: Won't Fix, help wanted, Status: In Progress, Type: Bug`,
-				`projects:\tProject 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\), v2ProjectTitle (v2ProjectStatusName)\n`,
+				`projects:\tProject 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\), v2ProjectTitle \(v2ProjectStatusName\)\n`,
 				`milestone:\tuluru\n`,
 				`number:\t123\n`,
 				`\*\*bold story\*\*`,
@@ -283,7 +286,8 @@ func TestIssueView_tty_Preview(t *testing.T) {
 				IssuePrinter: &RichIssuePrinter{IO: ios, TimeNow: stubbedTime},
 			}
 
-			err := viewRun(&opts)
+			issueFinder := &issueFinder{}
+			err := viewRun(&opts, issueFinder)
 			assert.NoError(t, err)
 
 			assert.Equal(t, "", stderr.String())
