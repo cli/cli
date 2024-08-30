@@ -29,7 +29,7 @@ func TestLoadBundlesFromJSONLinesFile_RejectEmptyJSONLFile(t *testing.T) {
 
 	attestations, err := loadBundlesFromJSONLinesFile(emptyJSONL.Name())
 
-	require.ErrorIs(t, err, ErrEmptyJSONLFile)
+	require.ErrorIs(t, err, ErrEmptyBundleFile)
 	require.Nil(t, attestations)
 }
 
