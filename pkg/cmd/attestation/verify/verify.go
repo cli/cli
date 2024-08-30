@@ -127,11 +127,11 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 				opts.Hostname, _ = ghauth.DefaultHost()
 			}
 			err = auth.IsHostSupported(opts.Hostname)
-			opts.APIClient = api.NewLiveClient(hc, opts.Hostname, opts.Logger)
-
 			if err != nil {
 				return err
 			}
+
+			opts.APIClient = api.NewLiveClient(hc, opts.Hostname, opts.Logger)
 
 			if runF != nil {
 				return runF(opts)
