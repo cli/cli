@@ -2,8 +2,11 @@ package featuredetection
 
 import (
 	"net/http"
+	"os"
+	"strconv"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"golang.org/x/sync/errgroup"
 )
@@ -12,6 +15,7 @@ type Detector interface {
 	IssueFeatures() (IssueFeatures, error)
 	PullRequestFeatures() (PullRequestFeatures, error)
 	RepositoryFeatures() (RepositoryFeatures, error)
+	ProjectsV1() (gh.ProjectsV1Support, error)
 }
 
 type IssueFeatures struct {
@@ -197,4 +201,36 @@ func (d *detector) RepositoryFeatures() (RepositoryFeatures, error) {
 	}
 
 	return features, nil
+}
+
+func (d *detector) ProjectsV1() (gh.ProjectsV1Support, error) {
+	// Bypass feature detection logic for testing purposes
+	if env := os.Getenv("PROJECTS_V1_SUPPORTED"); env != "" {
+		b, err := strconv.ParseBool(env)
+		if err != nil {
+			return nil, err
+		}
+		return gh.ParseProjectsV1Support(b), nil
+	}
+
+	var featureDetection struct {
+		Repository struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"Repository: __type(name: \"Repository\")"`
+	}
+
+	gql := api.NewClientFromHTTP(d.httpClient)
+	if err := gql.Query(d.host, "ProjectsV1FeatureDetection", &featureDetection, nil); err != nil {
+		return nil, err
+	}
+
+	for _, field := range featureDetection.Repository.Fields {
+		if field.Name == "projects" {
+			return gh.ProjectsV1Supported, nil
+		}
+	}
+
+	return gh.ProjectsV1Unsupported, nil
 }

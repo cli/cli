@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
@@ -25,6 +27,7 @@ type CreateOptions struct {
 	Browser          browser.Browser
 	Prompter         prShared.Prompt
 	TitledEditSurvey func(string, string) (string, string, error)
+	Detector         fd.Detector
 
 	RootDirOverride string
 
@@ -146,6 +149,16 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+
+	projectsV1Support, err := opts.Detector.ProjectsV1()
+	if err != nil {
+		return err
+	}
+
 	isTerminal := opts.IO.IsStdoutTTY()
 
 	var milestones []string
@@ -182,7 +195,7 @@ func createRun(opts *CreateOptions) (err error) {
 	if opts.WebMode {
 		var openURL string
 		if opts.Title != "" || opts.Body != "" || tb.HasMetadata() {
-			openURL, err = generatePreviewURL(apiClient, baseRepo, tb)
+			openURL, err = generatePreviewURL(apiClient, baseRepo, tb, projectsV1Support)
 			if err != nil {
 				return
 			}
@@ -260,7 +273,7 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
-		openURL, err = generatePreviewURL(apiClient, baseRepo, tb)
+		openURL, err = generatePreviewURL(apiClient, baseRepo, tb, projectsV1Support)
 		if err != nil {
 			return
 		}
@@ -279,7 +292,7 @@ func createRun(opts *CreateOptions) (err error) {
 				Repo:      baseRepo,
 				State:     &tb,
 			}
-			err = prShared.MetadataSurvey(opts.Prompter, opts.IO, baseRepo, fetcher, &tb)
+			err = prShared.MetadataSurvey(opts.Prompter, opts.IO, baseRepo, fetcher, &tb, projectsV1Support)
 			if err != nil {
 				return
 			}
@@ -335,7 +348,7 @@ func createRun(opts *CreateOptions) (err error) {
 			params["issueTemplate"] = templateNameForSubmit
 		}
 
-		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb)
+		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb, projectsV1Support)
 		if err != nil {
 			return
 		}
@@ -354,7 +367,7 @@ func createRun(opts *CreateOptions) (err error) {
 	return
 }
 
-func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb prShared.IssueMetadataState) (string, error) {
+func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb prShared.IssueMetadataState, projectsV1Support gh.ProjectsV1Support) (string, error) {
 	openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
-	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb)
+	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb, projectsV1Support)
 }

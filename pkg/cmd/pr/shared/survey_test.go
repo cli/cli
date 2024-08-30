@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -14,7 +15,7 @@ type metadataFetcher struct {
 	metadataResult *api.RepoMetadataResult
 }
 
-func (mf *metadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput) (*api.RepoMetadataResult, error) {
+func (mf *metadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput, projectsV1Support gh.ProjectsV1Support) (*api.RepoMetadataResult, error) {
 	return mf.metadataResult, nil
 }
 
@@ -68,7 +69,7 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		Assignees: []string{"hubot"},
 		Type:      PRMetadata,
 	}
-	err := MetadataSurvey(pm, ios, repo, fetcher, state)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state, gh.ProjectsV1Supported)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -113,7 +114,7 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
 	}
-	err := MetadataSurvey(pm, ios, repo, fetcher, state)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state, gh.ProjectsV1Supported)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())

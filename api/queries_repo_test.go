@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -150,7 +151,7 @@ func Test_RepoMetadata(t *testing.T) {
 		  { "data": { "viewer": { "login": "monalisa" } } }
 		`))
 
-	result, err := RepoMetadata(client, repo, input)
+	result, err := RepoMetadata(client, repo, input, gh.ProjectsV1Supported)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -291,7 +292,7 @@ func Test_ProjectNamesToPaths(t *testing.T) {
 		} } } }
 		`))
 
-	projectPaths, err := ProjectNamesToPaths(client, repo, []string{"Triage", "Roadmap", "TriageV2", "RoadmapV2", "MonalisaV2"})
+	projectPaths, err := ProjectNamesToPaths(client, repo, []string{"Triage", "Roadmap", "TriageV2", "RoadmapV2", "MonalisaV2"}, gh.ProjectsV1Supported)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -351,7 +352,7 @@ t001: team(slug:"robots"){id,slug}
 			}
 		}))
 
-	result, err := RepoResolveMetadataIDs(client, repo, input)
+	result, err := RepoResolveMetadataIDs(client, repo, input, gh.ProjectsV1Supported)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

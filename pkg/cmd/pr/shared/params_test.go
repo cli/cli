@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -265,7 +266,7 @@ func Test_WithPrAndIssueQueryParams(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := WithPrAndIssueQueryParams(nil, nil, tt.args.baseURL, tt.args.state)
+			got, err := WithPrAndIssueQueryParams(nil, nil, tt.args.baseURL, tt.args.state, gh.ProjectsV1Unsupported)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("WithPrAndIssueQueryParams() error = %v, wantErr %v", err, tt.wantErr)
 				return

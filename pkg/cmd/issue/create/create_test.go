@@ -14,6 +14,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -475,6 +476,7 @@ func Test_createRun(t *testing.T) {
 			}
 			browser := &browser.Stub{}
 			opts.Browser = browser
+			opts.Detector = &featuredetection.EnabledDetectorMock{}
 
 			err := createRun(opts)
 			if tt.wantsErr == "" {
@@ -521,6 +523,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 
 	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
 		opts.RootDirOverride = rootDir
+		opts.Detector = &featuredetection.EnabledDetectorMock{}
 		return createRun(opts)
 	})
 

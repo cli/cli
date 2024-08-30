@@ -3,9 +3,11 @@ package edit
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -25,6 +27,7 @@ type EditOptions struct {
 	Fetcher         EditableOptionsFetcher
 	EditorRetriever EditorRetriever
 	Prompter        shared.EditPrompter
+	Detector        fd.Detector
 
 	SelectorArg string
 	Interactive bool
@@ -230,8 +233,17 @@ func editRun(opts *EditOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, repo.RepoHost())
+	}
+	projectsV1Support, err := opts.Detector.ProjectsV1()
+	if err != nil {
+		return err
+	}
+
 	opts.IO.StartProgressIndicator()
-	err = opts.Fetcher.EditableOptionsFetch(apiClient, repo, &editable)
+	err = opts.Fetcher.EditableOptionsFetch(apiClient, repo, &editable, projectsV1Support)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -311,13 +323,13 @@ func (s surveyor) EditFields(editable *shared.Editable, editorCmd string) error 
 }
 
 type EditableOptionsFetcher interface {
-	EditableOptionsFetch(*api.Client, ghrepo.Interface, *shared.Editable) error
+	EditableOptionsFetch(*api.Client, ghrepo.Interface, *shared.Editable, gh.ProjectsV1Support) error
 }
 
 type fetcher struct{}
 
-func (f fetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable) error {
-	return shared.FetchOptions(client, repo, opts)
+func (f fetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable, projectsV1Support gh.ProjectsV1Support) error {
+	return shared.FetchOptions(client, repo, opts, projectsV1Support)
 }
 
 type EditorRetriever interface {

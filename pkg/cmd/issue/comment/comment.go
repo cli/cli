@@ -44,7 +44,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 				if opts.EditLast {
 					fields = append(fields, "comments")
 				}
-				return issueShared.IssueFromArgWithFields(httpClient, f.BaseRepo, args[0], fields)
+				return issueShared.IssueFromArgWithFields(httpClient, f.BaseRepo, args[0], fields, opts.Detector)
 			}
 			return prShared.CommentablePreRun(cmd, opts)
 		},

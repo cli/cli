@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -502,6 +504,7 @@ func Test_editRun(t *testing.T) {
 
 			tt.input.IO = ios
 			tt.input.HttpClient = httpClient
+			tt.input.Detector = &featuredetection.EnabledDetectorMock{}
 
 			err := editRun(tt.input)
 			assert.NoError(t, err)
@@ -661,8 +664,8 @@ type testSurveyor struct {
 }
 type testEditorRetriever struct{}
 
-func (f testFetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable) error {
-	return shared.FetchOptions(client, repo, opts)
+func (f testFetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable, projectsV1Support gh.ProjectsV1Support) error {
+	return shared.FetchOptions(client, repo, opts, projectsV1Support)
 }
 
 func (s testSurveyor) FieldsToEdit(e *shared.Editable) error {

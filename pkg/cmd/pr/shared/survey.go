@@ -132,19 +132,19 @@ type MetadataFetcher struct {
 	State     *IssueMetadataState
 }
 
-func (mf *MetadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput) (*api.RepoMetadataResult, error) {
+func (mf *MetadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput, projectsV1Support gh.ProjectsV1Support) (*api.RepoMetadataResult, error) {
 	mf.IO.StartProgressIndicator()
-	metadataResult, err := api.RepoMetadata(mf.APIClient, mf.Repo, input)
+	metadataResult, err := api.RepoMetadata(mf.APIClient, mf.Repo, input, projectsV1Support)
 	mf.IO.StopProgressIndicator()
 	mf.State.MetadataResult = metadataResult
 	return metadataResult, err
 }
 
 type RepoMetadataFetcher interface {
-	RepoMetadataFetch(api.RepoMetadataInput) (*api.RepoMetadataResult, error)
+	RepoMetadataFetch(api.RepoMetadataInput, gh.ProjectsV1Support) (*api.RepoMetadataResult, error)
 }
 
-func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState) error {
+func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState, projectsV1Support gh.ProjectsV1Support) error {
 	isChosen := func(m string) bool {
 		for _, c := range state.Metadata {
 			if m == c {
@@ -177,7 +177,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		Projects:   isChosen("Projects"),
 		Milestones: isChosen("Milestone"),
 	}
-	metadataResult, err := fetcher.RepoMetadataFetch(metadataInput)
+	metadataResult, err := fetcher.RepoMetadataFetch(metadataInput, projectsV1Support)
 	if err != nil {
 		return fmt.Errorf("error fetching metadata options: %w", err)
 	}

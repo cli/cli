@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
 func RequestableReviewersForCompletion(httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
 	client := api.NewClientFromHTTP(api.NewCachedHTTPClient(httpClient, time.Minute*2))
 
-	metadata, err := api.RepoMetadata(client, repo, api.RepoMetadataInput{Reviewers: true})
+	metadata, err := api.RepoMetadata(client, repo, api.RepoMetadataInput{Reviewers: true}, gh.ProjectsV1Unsupported)
 	if err != nil {
 		return nil, err
 	}

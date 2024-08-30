@@ -18,6 +18,7 @@ import (
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
@@ -40,6 +41,7 @@ type CreateOptions struct {
 	Prompter         shared.Prompt
 	Finder           shared.PRFinder
 	TitledEditSurvey func(string, string) (string, string, error)
+	Detector         fd.Detector
 
 	TitleProvided bool
 	BodyProvided  bool
@@ -86,6 +88,7 @@ type CreateContext struct {
 	IsPushEnabled      bool
 	Client             *api.Client
 	GitClient          *git.Client
+	ProjectsV1Support  gh.ProjectsV1Support
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -434,7 +437,7 @@ func createRun(opts *CreateOptions) (err error) {
 				Repo:      ctx.BaseRepo,
 				State:     state,
 			}
-			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.BaseRepo, fetcher, state)
+			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.BaseRepo, fetcher, state, ctx.ProjectsV1Support)
 			if err != nil {
 				return
 			}
@@ -724,6 +727,15 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		baseTrackingBranch = fmt.Sprintf("%s/%s", baseRemote.Name, baseBranch)
 	}
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+	projectsV1Support, err := opts.Detector.ProjectsV1()
+	if err != nil {
+		return nil, err
+	}
+
 	return &CreateContext{
 		BaseRepo:           baseRepo,
 		HeadRepo:           headRepo,
@@ -736,6 +748,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		RepoContext:        repoContext,
 		Client:             client,
 		GitClient:          gitClient,
+		ProjectsV1Support:  projectsV1Support,
 	}, nil
 }
 
@@ -768,7 +781,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		return errors.New("pull request title must not be blank")
 	}
 
-	err := shared.AddMetadataToIssueParams(client, ctx.BaseRepo, params, &state)
+	err := shared.AddMetadataToIssueParams(client, ctx.BaseRepo, params, &state, ctx.ProjectsV1Support)
 	if err != nil {
 		return err
 	}
@@ -991,7 +1004,7 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 		ctx.BaseRepo,
 		"compare/%s...%s?expand=1",
 		url.PathEscape(ctx.BaseBranch), url.PathEscape(ctx.HeadBranchLabel))
-	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.BaseRepo, u, state)
+	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.BaseRepo, u, state, ctx.ProjectsV1Support)
 	if err != nil {
 		return "", err
 	}

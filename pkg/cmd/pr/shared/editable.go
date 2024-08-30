@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/set"
 )
@@ -376,7 +377,7 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 	return nil
 }
 
-func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable) error {
+func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable, projectsV1Support gh.ProjectsV1Support) error {
 	input := api.RepoMetadataInput{
 		Reviewers:  editable.Reviewers.Edited,
 		Assignees:  editable.Assignees.Edited,
@@ -384,7 +385,7 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 		Projects:   editable.Projects.Edited,
 		Milestones: editable.Milestone.Edited,
 	}
-	metadata, err := api.RepoMetadata(client, repo, input)
+	metadata, err := api.RepoMetadata(client, repo, input, projectsV1Support)
 	if err != nil {
 		return err
 	}

@@ -5,9 +5,12 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	shared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -22,11 +25,12 @@ type EditOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   prShared.EditPrompter
+	Detector   fd.Detector
 
 	DetermineEditor    func() (string, error)
 	FieldsToEditSurvey func(prShared.EditPrompter, *prShared.Editable) error
 	EditFieldsSurvey   func(prShared.EditPrompter, *prShared.Editable, string) error
-	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable) error
+	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable, gh.ProjectsV1Support) error
 
 	SelectorArgs []string
 	Interactive  bool
@@ -167,6 +171,21 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+
+	projectsV1Support, err := opts.Detector.ProjectsV1()
+	if err != nil {
+		return err
+	}
+
 	// Prompt the user which fields they'd like to edit.
 	editable := opts.Editable
 	if opts.Interactive {
@@ -192,7 +211,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	// Get all specified issues and make sure they are within the same repo.
-	issues, repo, err := shared.IssuesFromArgsWithFields(httpClient, opts.BaseRepo, opts.SelectorArgs, lookupFields)
+	issues, repo, err := shared.IssuesFromArgsWithFields(httpClient, opts.BaseRepo, opts.SelectorArgs, lookupFields, opts.Detector)
 	if err != nil {
 		return err
 	}
@@ -200,7 +219,7 @@ func editRun(opts *EditOptions) error {
 	// Fetch editable shared fields once for all issues.
 	apiClient := api.NewClientFromHTTP(httpClient)
 	opts.IO.StartProgressIndicatorWithLabel("Fetching repository information")
-	err = opts.FetchOptions(apiClient, repo, &editable)
+	err = opts.FetchOptions(apiClient, repo, &editable, projectsV1Support)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
