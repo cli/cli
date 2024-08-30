@@ -143,6 +143,7 @@ type PartialLoadError struct {
 	error
 }
 
+// This has no tests
 func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string, detector fd.Detector) (*api.Issue, error) {
 	if detector == nil {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
