@@ -17,6 +17,7 @@ import (
 )
 
 var ErrUnrecognisedBundleExtension = errors.New("bundle file extension not supported, must be json or jsonl")
+var ErrEmptyJSONLFile = errors.New("provided jsonl file is empty")
 
 type FetchAttestationsConfig struct {
 	APIClient             api.Client
@@ -81,6 +82,15 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 		return nil, fmt.Errorf("could not open file: %v", err)
 	}
 	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file info: %v", err)
+	}
+
+	if fileInfo.Size() == 0 {
+		return nil, ErrEmptyJSONLFile
+	}
 
 	attestations := []*api.Attestation{}
 
