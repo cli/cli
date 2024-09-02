@@ -9,7 +9,7 @@ func WithoutIndentation() glamour.TermRendererOption {
 	return ghMarkdown.WithoutIndentation()
 }
 
-// WithoutWrap is a rendering option that set the character limit for soft
+// WithWrap is a rendering option that set the character limit for soft
 // wrapping the markdown rendering. There is a max limit of 120 characters.
 // If 0 is passed then wrapping is disabled.
 func WithWrap(w int) glamour.TermRendererOption {
