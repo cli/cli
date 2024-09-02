@@ -1,7 +1,6 @@
 package verification
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
