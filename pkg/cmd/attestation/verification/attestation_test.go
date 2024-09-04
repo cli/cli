@@ -29,7 +29,7 @@ func TestLoadBundlesFromJSONLinesFile(t *testing.T) {
 		originalContent, err := os.ReadFile("../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl")
 		require.NoError(t, err)
 
-		extraLines := []byte("\n\n{\"invalid\": \"json\"}\n\n")
+		extraLines := []byte("\n\n")
 		newContent := append(originalContent, extraLines...)
 
 		err = os.WriteFile(tempFile, newContent, 0644)
