@@ -1,6 +1,8 @@
 package verification
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
@@ -12,11 +14,32 @@ import (
 )
 
 func TestLoadBundlesFromJSONLinesFile(t *testing.T) {
-	path := "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl"
-	attestations, err := loadBundlesFromJSONLinesFile(path)
+	t.Run("with original file", func(t *testing.T) {
+		path := "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl"
+		attestations, err := loadBundlesFromJSONLinesFile(path)
+		require.NoError(t, err)
+		require.Len(t, attestations, 2)
+	})
 
-	require.NoError(t, err)
-	require.Len(t, attestations, 2)
+	t.Run("with extra lines", func(t *testing.T) {
+		// Create a temporary file with extra lines
+		tempDir := t.TempDir()
+		tempFile := filepath.Join(tempDir, "test_with_extra_lines.jsonl")
+
+		originalContent, err := os.ReadFile("../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl")
+		require.NoError(t, err)
+
+		extraLines := []byte("\n\n")
+		newContent := append(originalContent, extraLines...)
+
+		err = os.WriteFile(tempFile, newContent, 0644)
+		require.NoError(t, err)
+
+		// Test the function with the new file
+		attestations, err := loadBundlesFromJSONLinesFile(tempFile)
+		require.NoError(t, err)
+		require.Len(t, attestations, 2, "Should still load 2 valid attestations")
+	})
 }
 
 func TestLoadBundleFromJSONFile(t *testing.T) {
