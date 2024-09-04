@@ -42,6 +42,19 @@ func TestLoadBundlesFromJSONLinesFile(t *testing.T) {
 	})
 }
 
+func TestLoadBundlesFromJSONLinesFile_RejectEmptyJSONLFile(t *testing.T) {
+	// Create a temporary file
+	emptyJSONL, err := os.CreateTemp("", "empty.jsonl")
+	require.NoError(t, err)
+	err = emptyJSONL.Close()
+	require.NoError(t, err)
+
+	attestations, err := loadBundlesFromJSONLinesFile(emptyJSONL.Name())
+
+	require.ErrorIs(t, err, ErrEmptyBundleFile)
+	require.Nil(t, attestations)
+}
+
 func TestLoadBundleFromJSONFile(t *testing.T) {
 	path := "../test/data/sigstore-js-2.1.0-bundle.json"
 	attestations, err := loadBundleFromJSONFile(path)
