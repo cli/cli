@@ -92,7 +92,7 @@ func TestGetLocalAttestations(t *testing.T) {
 func TestFilterAttestations(t *testing.T) {
 	attestations := []*api.Attestation{
 		{
-			Bundle: &bundle.ProtobufBundle{
+			Bundle: &bundle.Bundle{
 				Bundle: &protobundle.Bundle{
 					Content: &protobundle.Bundle_DsseEnvelope{
 						DsseEnvelope: &dsse.Envelope{
@@ -104,7 +104,7 @@ func TestFilterAttestations(t *testing.T) {
 			},
 		},
 		{
-			Bundle: &bundle.ProtobufBundle{
+			Bundle: &bundle.Bundle{
 				Bundle: &protobundle.Bundle{
 					Content: &protobundle.Bundle_DsseEnvelope{
 						DsseEnvelope: &dsse.Envelope{
@@ -116,7 +116,7 @@ func TestFilterAttestations(t *testing.T) {
 			},
 		},
 		{
-			Bundle: &bundle.ProtobufBundle{
+			Bundle: &bundle.Bundle{
 				Bundle: &protobundle.Bundle{
 					Content: &protobundle.Bundle_DsseEnvelope{
 						DsseEnvelope: &dsse.Envelope{

@@ -25,7 +25,7 @@ func newErrNoAttestations(name, digest string) ErrNoAttestations {
 }
 
 type Attestation struct {
-	Bundle *bundle.ProtobufBundle `json:"bundle"`
+	Bundle *bundle.Bundle `json:"bundle"`
 }
 
 type AttestationsResponse struct {
