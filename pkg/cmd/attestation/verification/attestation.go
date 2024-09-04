@@ -75,25 +75,25 @@ func loadBundleFromJSONFile(path string) ([]*api.Attestation, error) {
 }
 
 func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
-        fileContent, err := os.ReadFile(path)
+	fileContent, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not read file: %v", err)
 	}
 
-    	attestations := []*api.Attestation{}
-	
-    	decoder := json.NewDecoder(bytes.NewReader(fileContent))
+	attestations := []*api.Attestation{}
+
+	decoder := json.NewDecoder(bytes.NewReader(fileContent))
 
 	for decoder.More() {
 		var bundle bundle.ProtobufBundle
 		bundle.Bundle = new(protobundle.Bundle)
 		if err := decoder.Decode(&bundle); err != nil {
-		    return nil, fmt.Errorf("failed to unmarshal bundle from JSON: %v", err)
+			return nil, fmt.Errorf("failed to unmarshal bundle from JSON: %v", err)
 		}
 		a := api.Attestation{Bundle: &bundle}
 		attestations = append(attestations, &a)
 	}
-	
+
 	return attestations, nil
 }
 
