@@ -87,6 +87,14 @@ func TestGetLocalAttestations(t *testing.T) {
 		require.ErrorIs(t, err, ErrUnrecognisedBundleExtension)
 		require.Nil(t, attestations)
 	})
+
+	t.Run("with non-existent bundle file", func(t *testing.T) {
+		path := "../test/data/not-found-bundle.json"
+		attestations, err := GetLocalAttestations(path)
+
+		require.ErrorContains(t, err, "bundle could not be loaded from JSON file")
+		require.Nil(t, attestations)
+	})
 }
 
 func TestFilterAttestations(t *testing.T) {

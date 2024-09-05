@@ -186,7 +186,7 @@ func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy ve
 		verifier, issuer, err := v.chooseVerifier(apr.Attestation.Bundle)
 		if err != nil {
 			return &SigstoreResults{
-				Error: fmt.Errorf("failed to find recognized issuer from bundle content: %v", err),
+				Error: fmt.Errorf("failed to find recognized issuer from bundle content"),
 			}
 		}
 

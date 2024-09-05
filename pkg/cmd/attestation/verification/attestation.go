@@ -53,13 +53,21 @@ func GetLocalAttestations(path string) ([]*api.Attestation, error) {
 	case ".json":
 		attestations, err := loadBundleFromJSONFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("bundle could not be loaded from JSON file at %s", path)
+			var pathErr *os.PathError
+			if errors.As(err, &pathErr) {
+				return nil, fmt.Errorf("bundle could not be loaded from JSON file at %s", path)
+			}
+			return nil, fmt.Errorf("bundle content could not be parsed")
 		}
 		return attestations, nil
 	case ".jsonl":
 		attestations, err := loadBundlesFromJSONLinesFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("bundles could not be loaded from JSON lines file at %s", path)
+			var pathErr *os.PathError
+			if errors.As(err, &pathErr) {
+				return nil, fmt.Errorf("bundles could not be loaded from JSON lines file at %s", path)
+			}
+			return nil, fmt.Errorf("bundle content could not be parsed")
 		}
 		return attestations, nil
 	}
