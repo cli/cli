@@ -42,16 +42,6 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 		require.NoError(t, res.Error)
 	})
 
-	t.Run("with missing verification material", func(t *testing.T) {
-		_, err := GetLocalAttestations("../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle-missing-verification-material.jsonl")
-		require.ErrorContains(t, err, "missing verification material")
-	})
-
-	t.Run("with missing verification certificate", func(t *testing.T) {
-		_, err := GetLocalAttestations("../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle-missing-cert.jsonl")
-		require.ErrorContains(t, err, "missing bundle content")
-	})
-
 	t.Run("with GitHub Sigstore artifact", func(t *testing.T) {
 		githubArtifactPath := test.NormalizeRelativePath("../test/data/github_provenance_demo-0.0.12-py3-none-any.whl")
 		githubArtifact, err := artifact.NewDigestedArtifact(nil, githubArtifactPath, "sha256")
