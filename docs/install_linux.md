@@ -23,6 +23,9 @@ Install:
 && sudo apt install gh -y
 ```
 
+> **Note**
+> We were recently forced to change our GPG signing key. If you've previously downloaded the `githubcli-archive-keyring.gpg` file, you should re-download it again per above instructions. If you are using a keyserver to download the key, the ID of the new key is `23F3D4EA75716059`.
+
 Upgrade:
 
 ```bash
@@ -61,6 +64,9 @@ type -p yum-config-manager >/dev/null || sudo yum install yum-utils
 sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
 sudo yum install gh
 ```
+
+> **Note**
+> We were recently forced to change our GPG signing key. If you've added the repository previously and now you're getting a GPG signing key error, disable the repository first with `sudo yum-config-manager --disable gh-cli` and add it again with `sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo`.
 
 Upgrade:
 
