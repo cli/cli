@@ -307,18 +307,10 @@ func buildTableVerifyContent(results []*verification.AttestationProcessingResult
 	content := make([][]string, len(results))
 
 	for i, res := range results {
-		if res.VerificationResult == nil ||
-			res.VerificationResult.Signature == nil ||
-			res.VerificationResult.Signature.Certificate == nil {
-			return nil, fmt.Errorf("bundle missing verification result fields")
-		}
 		builderSignerURI := res.VerificationResult.Signature.Certificate.Extensions.BuildSignerURI
 		repoAndOrg, workflow, err := extractAttestationDetail(builderSignerURI)
 		if err != nil {
 			return nil, err
-		}
-		if res.VerificationResult.Statement == nil {
-			return nil, fmt.Errorf("bundle missing attestation statement (bundle must originate from GitHub Artifact Attestations)")
 		}
 		predicateType := res.VerificationResult.Statement.PredicateType
 		content[i] = []string{repoAndOrg, predicateType, workflow}
