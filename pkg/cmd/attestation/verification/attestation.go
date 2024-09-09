@@ -86,7 +86,7 @@ func loadBundleFromJSONFile(path string) ([]*api.Attestation, error) {
 func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	fileContent, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not read file: %v", err)
+		return nil, err
 	}
 
 	attestations := []*api.Attestation{}

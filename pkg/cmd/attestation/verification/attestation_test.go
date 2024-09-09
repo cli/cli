@@ -88,11 +88,19 @@ func TestGetLocalAttestations(t *testing.T) {
 		require.Nil(t, attestations)
 	})
 
-	t.Run("with non-existent bundle file", func(t *testing.T) {
+	t.Run("with non-existent bundle file and JSON file", func(t *testing.T) {
 		path := "../test/data/not-found-bundle.json"
 		attestations, err := GetLocalAttestations(path)
 
 		require.ErrorContains(t, err, "bundle could not be loaded from JSON file")
+		require.Nil(t, attestations)
+	})
+
+	t.Run("with non-existent bundle file and JSON lines file", func(t *testing.T) {
+		path := "../test/data/not-found-bundle.jsonl"
+		attestations, err := GetLocalAttestations(path)
+
+		require.ErrorContains(t, err, "bundles could not be loaded from JSON lines file")
 		require.Nil(t, attestations)
 	})
 }
