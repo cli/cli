@@ -132,7 +132,7 @@ func (c LiveClient) GetAttestations(ref name.Reference, digest string) ([]*api.A
 				return attestations, fmt.Errorf("error getting referrer image: %w", err)
 			}
 
-			b := &bundle.ProtobufBundle{}
+			b := &bundle.Bundle{}
 			err = b.UnmarshalJSON(bundleBytes)
 
 			if err != nil {

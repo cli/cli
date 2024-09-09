@@ -8,7 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 
-	"github.com/in-toto/in-toto-golang/in_toto"
+	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 

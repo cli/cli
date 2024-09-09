@@ -94,7 +94,7 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	decoder := json.NewDecoder(bytes.NewReader(fileContent))
 
 	for decoder.More() {
-		var bundle bundle.ProtobufBundle
+		var bundle bundle.Bundle
 		bundle.Bundle = new(protobundle.Bundle)
 		if err := decoder.Decode(&bundle); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal bundle from JSON: %v", err)

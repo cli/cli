@@ -55,7 +55,7 @@ func NewLiveSigstoreVerifier(config SigstoreConfig) *LiveSigstoreVerifier {
 	}
 }
 
-func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.ProtobufBundle) (*verify.SignedEntityVerifier, string, error) {
+func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.Bundle) (*verify.SignedEntityVerifier, string, error) {
 	if !b.MinVersion("0.2") {
 		return nil, "", fmt.Errorf("unsupported bundle version: %s", b.MediaType)
 	}

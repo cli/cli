@@ -43,31 +43,13 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 	})
 
 	t.Run("with missing verification material", func(t *testing.T) {
-		attestations := getAttestationsFor(t, "../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle-missing-verification-material.jsonl")
-		require.NotNil(t, attestations)
-
-		verifier := NewLiveSigstoreVerifier(SigstoreConfig{
-			Logger: io.NewTestHandler(),
-		})
-
-		res := verifier.Verify(attestations, publicGoodPolicy(t))
-		require.Error(t, res.Error)
-		require.ErrorContains(t, res.Error, "failed to get bundle verification content")
-		require.Nil(t, res.VerifyResults)
+		_, err := GetLocalAttestations("../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle-missing-verification-material.jsonl")
+		require.ErrorContains(t, err, "missing verification material")
 	})
 
 	t.Run("with missing verification certificate", func(t *testing.T) {
-		attestations := getAttestationsFor(t, "../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle-missing-cert.jsonl")
-		require.NotNil(t, attestations)
-
-		verifier := NewLiveSigstoreVerifier(SigstoreConfig{
-			Logger: io.NewTestHandler(),
-		})
-
-		res := verifier.Verify(attestations, publicGoodPolicy(t))
-		require.Error(t, res.Error)
-		require.ErrorContains(t, res.Error, "leaf cert not found")
-		require.Nil(t, res.VerifyResults)
+		_, err := GetLocalAttestations("../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle-missing-cert.jsonl")
+		require.ErrorContains(t, err, "missing bundle content")
 	})
 
 	t.Run("with GitHub Sigstore artifact", func(t *testing.T) {
