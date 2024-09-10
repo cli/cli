@@ -87,6 +87,18 @@ func TestGetLocalAttestations(t *testing.T) {
 		require.ErrorIs(t, err, ErrUnrecognisedBundleExtension)
 		require.Nil(t, attestations)
 	})
+
+	t.Run("with missing verification material", func(t *testing.T) {
+		path := "../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle-missing-verification-material.jsonl"
+		_, err := GetLocalAttestations(path)
+		require.ErrorContains(t, err, "missing verification material")
+	})
+
+	t.Run("with missing verification certificate", func(t *testing.T) {
+		path := "../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle-missing-cert.jsonl"
+		_, err := GetLocalAttestations(path)
+		require.ErrorContains(t, err, "missing bundle content")
+	})
 }
 
 func TestFilterAttestations(t *testing.T) {
