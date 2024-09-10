@@ -56,6 +56,8 @@ func GetLocalAttestations(path string) ([]*api.Attestation, error) {
 			var pathErr *os.PathError
 			if errors.As(err, &pathErr) {
 				return nil, fmt.Errorf("bundle could not be loaded from JSON file at %s", path)
+			} else if errors.Is(err, bundle.ErrValidation) {
+				return nil, err
 			}
 			return nil, fmt.Errorf("bundle content could not be parsed")
 		}
@@ -66,6 +68,8 @@ func GetLocalAttestations(path string) ([]*api.Attestation, error) {
 			var pathErr *os.PathError
 			if errors.As(err, &pathErr) {
 				return nil, fmt.Errorf("bundles could not be loaded from JSON lines file at %s", path)
+			} else if errors.Is(err, bundle.ErrValidation) {
+				return nil, err
 			}
 			return nil, fmt.Errorf("bundle content could not be parsed")
 		}
@@ -97,10 +101,7 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 		var b bundle.Bundle
 		b.Bundle = new(protobundle.Bundle)
 		if err := decoder.Decode(&b); err != nil {
-			if errors.Is(err, bundle.ErrValidation) {
-				return nil, err
-			}
-			return nil, fmt.Errorf("failed to unmarshal bundle from JSON")
+			return nil, err
 		}
 		a := api.Attestation{Bundle: &b}
 		attestations = append(attestations, &a)
