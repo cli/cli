@@ -3,8 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -82,12 +80,6 @@ func (l Labels) Names() []string {
 		names[i] = l.Name
 	}
 	return names
-}
-
-func (l Labels) SortAlphabeticallyIgnoreCase() {
-	slices.SortStableFunc(l.Nodes, func(a, b IssueLabel) int {
-		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
-	})
 }
 
 type ProjectCards struct {
