@@ -7,15 +7,8 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/magiconair/properties/assert"
+	"github.com/stretchr/testify/assert"
 )
-
-// Should we write an integration test for Print? I'm not sure how easy
-// this is or how much value it will add...
-//
-// func Test_Print(t *testing.T) {
-// 	 ...test logic...
-// }
 
 // This does not test color, just output
 func Test_header(t *testing.T) {
@@ -293,7 +286,7 @@ func Test_body(t *testing.T) {
 				t.Fatal(err)
 			}
 			// This is getting around whitespace issues I was having with assert.Equal
-			assert.Matches(t, stdout.String(), tc.expected)
+			assert.Contains(t, stdout.String(), tc.expected)
 		})
 	}
 }
