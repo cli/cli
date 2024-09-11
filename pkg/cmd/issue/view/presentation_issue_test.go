@@ -139,7 +139,7 @@ func Test_MapApiIssueToPresentationIssue(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// These are here for development purposes
+			// These are here to aid development and debugging of the individual pieces
 			assert.Equal(t, presentationIssue.Title, tc.expect.Title)
 			assert.Equal(t, presentationIssue.Number, tc.expect.Number)
 			assert.Equal(t, presentationIssue.CreatedAt, tc.expect.CreatedAt)
@@ -154,7 +154,7 @@ func Test_MapApiIssueToPresentationIssue(t *testing.T) {
 			assert.Equal(t, presentationIssue.Body, tc.expect.Body)
 			assert.Equal(t, presentationIssue.URL, tc.expect.URL)
 
-			// This is the actual test
+			// This tests the entire struct
 			assert.Equal(t, presentationIssue, tc.expect)
 		})
 	}

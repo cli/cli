@@ -312,7 +312,7 @@ func Test_comments(t *testing.T) {
 					ReactionGroups: api.ReactionGroups{},
 				},
 			},
-			expected:  "monalisa () • Dec 31, 2021 • Newest comment\n\n  body 1\n",
+			expected:  "monalisa () • Dec 31, 2021 • Newest comment\n\n  body 1",
 			isPreview: false,
 		},
 		"preview": {
@@ -331,7 +331,7 @@ func Test_comments(t *testing.T) {
 	}
 	for name, tc := range test {
 		t.Run(name, func(t *testing.T) {
-			ios, _, _, _ := iostreams.Test()
+			ios, _, stdout, _ := iostreams.Test()
 			ios.SetStdoutTTY(true)
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
@@ -363,8 +363,7 @@ func Test_comments(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// I can't get these strings to match
-			// assert.Matches(t, stdout.String(), tc.expected)
+			assert.Contains(t, stdout.String(), tc.expected)
 		})
 	}
 }
