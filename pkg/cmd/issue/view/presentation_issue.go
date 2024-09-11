@@ -28,6 +28,9 @@ type PresentationIssue struct {
 	URL            string
 }
 
+// Creates a new PresentationIssue from an api.Issue.
+// The PresentationIssue is what the issue printers need to display an
+// issue to the user.
 func MapApiIssueToPresentationIssue(issue *api.Issue, colorScheme *iostreams.ColorScheme) (PresentationIssue, error) {
 	presentationIssue := PresentationIssue{
 		Title:         issue.Title,

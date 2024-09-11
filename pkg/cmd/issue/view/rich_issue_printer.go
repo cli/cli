@@ -18,6 +18,7 @@ type RichIssuePrinter struct {
 	Comments bool
 }
 
+// Print outputs an issue to the terminal for TTY use cases.
 func (p *RichIssuePrinter) Print(pi PresentationIssue, repo ghrepo.Interface) error {
 	// I think I'd like to make this easier to understand what the output should look like.
 	// That's probably doable by removing these helpers and just using a formatted string.

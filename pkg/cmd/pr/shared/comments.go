@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/v2/pkg/markdown"
 )
 
-// TODO: can this interface be removed?
 type Comment interface {
 	Identifier() string
 	AuthorLogin() string
@@ -26,14 +25,6 @@ type Comment interface {
 	Reactions() api.ReactionGroups
 	Status() string
 }
-
-// type PresentationComment struct {
-// 	AuthorLogin string
-// 	Assocation  string
-// 	IsEdited    bool
-// 	Status      string ????
-// 	Content     string
-// }
 
 func RawCommentList(comments api.Comments, reviews api.PullRequestReviews) string {
 	sortedComments := sortComments(comments, reviews)

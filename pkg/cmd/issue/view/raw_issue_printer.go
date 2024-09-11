@@ -14,6 +14,7 @@ type RawIssuePrinter struct {
 	Comments bool
 }
 
+// Print outputs the issue to the terminal for non-TTY use cases.
 func (p *RawIssuePrinter) Print(pi PresentationIssue, repo ghrepo.Interface) error {
 	if p.Comments {
 		fmt.Fprint(p.IO.Out, prShared.RawCommentList(pi.Comments, api.PullRequestReviews{}))
