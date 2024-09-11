@@ -38,15 +38,15 @@ require (
 	github.com/rivo/tview v0.0.0-20221029100920-c4a7e501810d
 	github.com/shurcooL/githubv4 v0.0.0-20240120211514-18a1ae0e79dc
 	github.com/sigstore/protobuf-specs v0.3.2
-	github.com/sigstore/sigstore-go v0.6.1
+	github.com/sigstore/sigstore-go v0.6.2
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
 	github.com/zalando/go-keyring v0.2.5
-	golang.org/x/crypto v0.26.0
+	golang.org/x/crypto v0.27.0
 	golang.org/x/sync v0.8.0
-	golang.org/x/term v0.23.0
-	golang.org/x/text v0.17.0
+	golang.org/x/term v0.24.0
+	golang.org/x/text v0.18.0
 	google.golang.org/grpc v1.64.1
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/h2non/gock.v1 v1.1.2
@@ -159,7 +159,7 @@ require (
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/net v0.27.0 // indirect
-	golang.org/x/sys v0.23.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240520151616-dc85e6b867a5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240520151616-dc85e6b867a5 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
