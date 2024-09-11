@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -38,7 +39,7 @@ func MapApiIssueToPresentationIssue(issue *api.Issue, colorScheme *iostreams.Col
 		StateReason:   issue.StateReason,
 		Reactions:     prShared.ReactionGroupList(issue.ReactionGroups),
 		AssigneesList: getAssigneeListString(issue.Assignees),
-		LabelsList:    getColorizedLabelsList(issue.Labels, colorScheme),
+		LabelsList:    getColorizedLabelsList(sortAlphabeticallyIgnoreCase(issue.Labels), colorScheme),
 		ProjectsList:  getProjectListString(issue.ProjectCards, issue.ProjectItems),
 		Body:          issue.Body,
 		URL:           issue.URL,
@@ -108,4 +109,11 @@ func getColorizedLabelsList(issueLabels api.Labels, colorScheme *iostreams.Color
 	}
 
 	return strings.Join(labelNames, ", ")
+}
+
+func sortAlphabeticallyIgnoreCase(l api.Labels) api.Labels {
+	slices.SortStableFunc(l.Nodes, func(a, b api.IssueLabel) int {
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	})
+	return l
 }

@@ -343,3 +343,56 @@ func Test_getProjectListString(t *testing.T) {
 		})
 	}
 }
+
+func Test_sortAlphabeticallyIgnoreCase(t *testing.T) {
+	tests := map[string]struct {
+		labels   api.Labels
+		expected api.Labels
+	}{
+		"no repeat labels": {
+			labels: api.Labels{
+				Nodes: []api.IssueLabel{
+					{Name: "c"},
+					{Name: "B"},
+					{Name: "a"},
+				},
+			},
+			expected: api.Labels{
+				Nodes: []api.IssueLabel{
+					{Name: "a"},
+					{Name: "B"},
+					{Name: "c"},
+				},
+			},
+		},
+		"repeat labels case insensitive": {
+			labels: api.Labels{
+				Nodes: []api.IssueLabel{
+					{Name: "c"},
+					{Name: "B"},
+					{Name: "C"},
+				},
+			},
+			expected: api.Labels{
+				Nodes: []api.IssueLabel{
+					{Name: "B"},
+					{Name: "c"},
+					{Name: "C"},
+				},
+			},
+		},
+		"no labels": {
+			labels: api.Labels{
+				Nodes: []api.IssueLabel{},
+			},
+			expected: api.Labels{
+				Nodes: []api.IssueLabel{},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, sortAlphabeticallyIgnoreCase(tc.labels))
+		})
+	}
+}
