@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
@@ -37,6 +38,9 @@ type Options struct {
 	OCIClient             oci.Client
 	SigstoreVerifier      verification.SigstoreVerifier
 	exporter              cmdutil.Exporter
+	Hostname              string
+	// Tenant is only set when tenancy is used
+	Tenant string
 }
 
 // Clean cleans the file path option values
@@ -57,12 +61,12 @@ func (opts *Options) SetPolicyFlags() {
 		opts.Owner = splitRepo[0]
 
 		if !isSignerIdentityProvided(opts) {
-			opts.SANRegex = expandToGitHubURL(opts.Repo)
+			opts.SANRegex = expandToGitHubURL(opts.Tenant, opts.Repo)
 		}
 		return
 	}
 	if !isSignerIdentityProvided(opts) {
-		opts.SANRegex = expandToGitHubURL(opts.Owner)
+		opts.SANRegex = expandToGitHubURL(opts.Tenant, opts.Owner)
 	}
 }
 
@@ -92,6 +96,13 @@ func (opts *Options) AreFlagsValid() error {
 	// Check that both the bundle-from-oci and bundle-path flags are not used together
 	if opts.UseBundleFromRegistry && opts.BundlePath != "" {
 		return fmt.Errorf("bundle-from-oci flag cannot be used with bundle-path flag")
+	}
+
+	// Verify provided hostname
+	if opts.Hostname != "" {
+		if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
+			return fmt.Errorf("error parsing hostname: %w", err)
+		}
 	}
 
 	return nil

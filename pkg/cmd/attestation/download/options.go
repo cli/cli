@@ -24,6 +24,7 @@ type Options struct {
 	Owner           string
 	PredicateType   string
 	Repo            string
+	Hostname        string
 }
 
 func (opts *Options) AreFlagsValid() error {

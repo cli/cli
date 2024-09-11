@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
+	"github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,8 +29,10 @@ func TestVerifyIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	host, _ := auth.DefaultHost()
+
 	publicGoodOpts := Options{
-		APIClient:        api.NewLiveClient(hc, logger),
+		APIClient:        api.NewLiveClient(hc, host, logger),
 		ArtifactPath:     artifactPath,
 		BundlePath:       bundlePath,
 		DigestAlgorithm:  "sha512",
@@ -99,8 +102,10 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	host, _ := auth.DefaultHost()
+
 	baseOpts := Options{
-		APIClient:        api.NewLiveClient(hc, logger),
+		APIClient:        api.NewLiveClient(hc, host, logger),
 		ArtifactPath:     artifactPath,
 		BundlePath:       bundlePath,
 		DigestAlgorithm:  "sha256",
@@ -185,8 +190,10 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	host, _ := auth.DefaultHost()
+
 	baseOpts := Options{
-		APIClient:        api.NewLiveClient(hc, logger),
+		APIClient:        api.NewLiveClient(hc, host, logger),
 		ArtifactPath:     artifactPath,
 		BundlePath:       bundlePath,
 		Config:           cmdFactory.Config,
@@ -203,6 +210,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 		name           string
 		signerWorkflow string
 		expectErr      bool
+		host           string
 	}
 
 	testcases := []testcase{
@@ -220,12 +228,14 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 			name:           "valid signer workflow without host (defaults to github.com)",
 			signerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
 			expectErr:      false,
+			host:           "github.com",
 		},
 	}
 
 	for _, tc := range testcases {
 		opts := baseOpts
 		opts.SignerWorkflow = tc.signerWorkflow
+		opts.Hostname = tc.host
 
 		err := runVerify(&opts)
 		if tc.expectErr {

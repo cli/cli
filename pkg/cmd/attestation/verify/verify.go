@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
@@ -13,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/spf13/cobra"
@@ -109,9 +111,6 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			// Clean file path options
 			opts.Clean()
 
-			// set policy flags based on what has been provided
-			opts.SetPolicyFlags()
-
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -119,22 +118,47 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			if err != nil {
 				return err
 			}
-			opts.APIClient = api.NewLiveClient(hc, opts.Logger)
 
 			opts.OCIClient = oci.NewLiveClient()
 
-			if err := auth.IsHostSupported(); err != nil {
+			if opts.Hostname == "" {
+				opts.Hostname, _ = ghauth.DefaultHost()
+			}
+			err = auth.IsHostSupported(opts.Hostname)
+			if err != nil {
 				return err
 			}
 
-			if runF != nil {
-				return runF(opts)
-			}
+			opts.APIClient = api.NewLiveClient(hc, opts.Hostname, opts.Logger)
 
 			config := verification.SigstoreConfig{
 				TrustedRoot:  opts.TrustedRoot,
 				Logger:       opts.Logger,
 				NoPublicGood: opts.NoPublicGood,
+			}
+
+			// Prepare for tenancy if detected
+			if ghinstance.IsTenancy(opts.Hostname) {
+				td, err := opts.APIClient.GetTrustDomain()
+				if err != nil {
+					return fmt.Errorf("error getting trust domain, make sure you are authenticated against the host: %w", err)
+				}
+
+				tenant, found := ghinstance.TenantName(opts.Hostname)
+				if !found {
+					return fmt.Errorf("invalid hostname provided: '%s'",
+						opts.Hostname)
+				}
+				config.TrustDomain = td
+				opts.Tenant = tenant
+				opts.OIDCIssuer = fmt.Sprintf(GitHubTenantOIDCIssuer, tenant)
+			}
+
+			// set policy flags based on what has been provided
+			opts.SetPolicyFlags()
+
+			if runF != nil {
+				return runF(opts)
 			}
 
 			opts.SigstoreVerifier = verification.NewLiveSigstoreVerifier(config)
@@ -169,6 +193,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.Flags().StringVarP(&opts.SignerWorkflow, "signer-workflow", "", "", "Workflow that signed attestation in the format [host/]<owner>/<repo>/<path>/<to>/<workflow>")
 	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex", "signer-repo", "signer-workflow")
 	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", GitHubOIDCIssuer, "Issuer of the OIDC token")
+	verifyCmd.Flags().StringVarP(&opts.Hostname, "hostname", "", "", "Configure host to use")
 
 	return verifyCmd
 }
@@ -244,7 +269,7 @@ func runVerify(opts *Options) error {
 	}
 
 	// Verify extensions
-	if err := verification.VerifyCertExtensions(sigstoreRes.VerifyResults, opts.Owner, opts.Repo); err != nil {
+	if err := verification.VerifyCertExtensions(sigstoreRes.VerifyResults, opts.Tenant, opts.Owner, opts.Repo); err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Verification failed"))
 		return err
 	}
@@ -264,7 +289,7 @@ func runVerify(opts *Options) error {
 	opts.Logger.Printf("%s was attested by:\n", artifact.DigestWithAlg())
 
 	// Otherwise print the results to the terminal in a table
-	tableContent, err := buildTableVerifyContent(sigstoreRes.VerifyResults)
+	tableContent, err := buildTableVerifyContent(opts.Tenant, sigstoreRes.VerifyResults)
 	if err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to parse results"))
 		return err
@@ -280,30 +305,44 @@ func runVerify(opts *Options) error {
 	return nil
 }
 
-func extractAttestationDetail(builderSignerURI string) (string, string, error) {
+func extractAttestationDetail(tenant, builderSignerURI string) (string, string, error) {
 	// If given a build signer URI like
 	// https://github.com/foo/bar/.github/workflows/release.yml@refs/heads/main
 	// We want to extract:
 	// * foo/bar
 	// * .github/workflows/release.yml@refs/heads/main
-	orgAndRepoRegexp := regexp.MustCompile(`https://github\.com/([^/]+/[^/]+)/`)
+	var orgAndRepoRegexp *regexp.Regexp
+	var workflowRegexp *regexp.Regexp
+
+	if tenant == "" {
+		orgAndRepoRegexp = regexp.MustCompile(`https://github\.com/([^/]+/[^/]+)/`)
+		workflowRegexp = regexp.MustCompile(`https://github\.com/[^/]+/[^/]+/(.+)`)
+	} else {
+		var tr = regexp.QuoteMeta(tenant)
+		orgAndRepoRegexp = regexp.MustCompile(fmt.Sprintf(
+			`https://%s\.ghe\.com/([^/]+/[^/]+)/`,
+			tr))
+		workflowRegexp = regexp.MustCompile(fmt.Sprintf(
+			`https://%s\.ghe\.com/[^/]+/[^/]+/(.+)`,
+			tr))
+	}
+
 	match := orgAndRepoRegexp.FindStringSubmatch(builderSignerURI)
 	if len(match) < 2 {
 		return "", "", fmt.Errorf("no match found for org and repo")
 	}
-	repoAndOrg := match[1]
+	orgAndRepo := match[1]
 
-	workflowRegexp := regexp.MustCompile(`https://github\.com/[^/]+/[^/]+/(.+)`)
 	match = workflowRegexp.FindStringSubmatch(builderSignerURI)
 	if len(match) < 2 {
 		return "", "", fmt.Errorf("no match found for workflow")
 	}
 	workflow := match[1]
 
-	return repoAndOrg, workflow, nil
+	return orgAndRepo, workflow, nil
 }
 
-func buildTableVerifyContent(results []*verification.AttestationProcessingResult) ([][]string, error) {
+func buildTableVerifyContent(tenant string, results []*verification.AttestationProcessingResult) ([][]string, error) {
 	content := make([][]string, len(results))
 
 	for i, res := range results {
@@ -313,7 +352,7 @@ func buildTableVerifyContent(results []*verification.AttestationProcessingResult
 			return nil, fmt.Errorf("bundle missing verification result fields")
 		}
 		builderSignerURI := res.VerificationResult.Signature.Certificate.Extensions.BuildSignerURI
-		repoAndOrg, workflow, err := extractAttestationDetail(builderSignerURI)
+		repoAndOrg, workflow, err := extractAttestationDetail(tenant, builderSignerURI)
 		if err != nil {
 			return nil, err
 		}

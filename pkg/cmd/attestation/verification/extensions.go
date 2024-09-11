@@ -1,28 +1,50 @@
 package verification
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
 
-func VerifyCertExtensions(results []*AttestationProcessingResult, owner string, repo string) error {
-	for _, attestation := range results {
-		// TODO: handle proxima prefix
-		expectedSourceRepositoryOwnerURI := fmt.Sprintf("https://github.com/%s", owner)
-		sourceRepositoryOwnerURI := attestation.VerificationResult.Signature.Certificate.Extensions.SourceRepositoryOwnerURI
-		if !strings.EqualFold(expectedSourceRepositoryOwnerURI, sourceRepositoryOwnerURI) {
-			return fmt.Errorf("expected SourceRepositoryOwnerURI to be %s, got %s", expectedSourceRepositoryOwnerURI, sourceRepositoryOwnerURI)
-		}
+func VerifyCertExtensions(results []*AttestationProcessingResult, tenant, owner, repo string) error {
+	if len(results) == 0 {
+		return errors.New("no attestations proccessing results")
+	}
 
-		// if repo is set, check the SourceRepositoryURI field
-		if repo != "" {
-			// TODO: handle proxima prefix
-			expectedSourceRepositoryURI := fmt.Sprintf("https://github.com/%s", repo)
-			sourceRepositoryURI := attestation.VerificationResult.Signature.Certificate.Extensions.SourceRepositoryURI
-			if !strings.EqualFold(expectedSourceRepositoryURI, sourceRepositoryURI) {
-				return fmt.Errorf("expected SourceRepositoryURI to be %s, got %s", expectedSourceRepositoryURI, sourceRepositoryURI)
-			}
+	for _, attestation := range results {
+		if err := verifyCertExtensions(attestation, tenant, owner, repo); err != nil {
+			return err
 		}
 	}
+	return nil
+}
+
+func verifyCertExtensions(attestation *AttestationProcessingResult, tenant, owner, repo string) error {
+	var want string
+
+	if tenant == "" {
+		want = fmt.Sprintf("https://github.com/%s", owner)
+	} else {
+		want = fmt.Sprintf("https://%s.ghe.com/%s", tenant, owner)
+	}
+	sourceRepositoryOwnerURI := attestation.VerificationResult.Signature.Certificate.Extensions.SourceRepositoryOwnerURI
+	if !strings.EqualFold(want, sourceRepositoryOwnerURI) {
+		return fmt.Errorf("expected SourceRepositoryOwnerURI to be %s, got %s", want, sourceRepositoryOwnerURI)
+	}
+
+	// if repo is set, check the SourceRepositoryURI field
+	if repo != "" {
+		if tenant == "" {
+			want = fmt.Sprintf("https://github.com/%s", repo)
+		} else {
+			want = fmt.Sprintf("https://%s.ghe.com/%s", tenant, repo)
+		}
+
+		sourceRepositoryURI := attestation.VerificationResult.Signature.Certificate.Extensions.SourceRepositoryURI
+		if !strings.EqualFold(want, sourceRepositoryURI) {
+			return fmt.Errorf("expected SourceRepositoryURI to be %s, got %s", want, sourceRepositoryURI)
+		}
+	}
+
 	return nil
 }

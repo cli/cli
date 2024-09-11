@@ -36,6 +36,8 @@ type SigstoreConfig struct {
 	TrustedRoot  string
 	Logger       *io.Handler
 	NoPublicGood bool
+	// If tenancy mode is not used, trust domain is empty
+	TrustDomain string
 }
 
 type SigstoreVerifier interface {
@@ -144,7 +146,7 @@ func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.Bundle) (*verify.SignedE
 
 		return publicGoodVerifier, issuer, nil
 	} else if leafCert.Issuer.Organization[0] == GitHubIssuerOrg || v.config.NoPublicGood {
-		ghVerifier, err := newGitHubVerifier()
+		ghVerifier, err := newGitHubVerifier(v.config.TrustDomain)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to create GitHub Sigstore verifier: %v", err)
 		}
@@ -240,13 +242,25 @@ func newCustomVerifier(trustedRoot *root.TrustedRoot) (*verify.SignedEntityVerif
 	return gv, nil
 }
 
-func newGitHubVerifier() (*verify.SignedEntityVerifier, error) {
+func newGitHubVerifier(trustDomain string) (*verify.SignedEntityVerifier, error) {
+	var tr string
+
 	opts := GitHubTUFOptions()
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client: %v", err)
 	}
-	trustedRoot, err := root.GetTrustedRoot(client)
+
+	if trustDomain == "" {
+		tr = "trusted_root.json"
+	} else {
+		tr = fmt.Sprintf("%s.trusted_root.json", trustDomain)
+	}
+	jsonBytes, err := client.GetTarget(tr)
+	if err != nil {
+		return nil, err
+	}
+	trustedRoot, err := root.NewTrustedRootFromJSON(jsonBytes)
 	if err != nil {
 		return nil, err
 	}

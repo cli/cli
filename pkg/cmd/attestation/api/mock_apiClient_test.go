@@ -10,10 +10,15 @@ import (
 
 type mockAPIClient struct {
 	OnRESTWithNext func(hostname, method, p string, body io.Reader, data interface{}) (string, error)
+	OnREST         func(hostname, method, p string, body io.Reader, data interface{}) error
 }
 
 func (m mockAPIClient) RESTWithNext(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
 	return m.OnRESTWithNext(hostname, method, p, body, data)
+}
+
+func (m mockAPIClient) REST(hostname, method, p string, body io.Reader, data interface{}) error {
+	return m.OnREST(hostname, method, p, body, data)
 }
 
 type mockDataGenerator struct {
@@ -86,4 +91,27 @@ func (m mockDataGenerator) OnRESTWithNextNoAttestations(hostname, method, p stri
 
 func (m mockDataGenerator) OnRESTWithNextError(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
 	return "", errors.New("failed to get attestations")
+}
+
+type mockMetaGenerator struct {
+	TrustDomain string
+}
+
+func (m mockMetaGenerator) OnREST(hostname, method, p string, body io.Reader, data interface{}) error {
+	var template = `
+{
+  "domains": {
+    "artifact_attestations": {
+      "trust_domain": "%s"
+    }
+  }
+}
+`
+	var jsonString = fmt.Sprintf(template, m.TrustDomain)
+	return json.Unmarshal([]byte(jsonString), &data)
+
+}
+
+func (m mockMetaGenerator) OnRESTError(hostname, method, p string, body io.Reader, data interface{}) error {
+	return errors.New("test error")
 }
