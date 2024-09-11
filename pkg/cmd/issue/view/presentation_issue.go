@@ -41,9 +41,9 @@ func MapApiIssueToPresentationIssue(issue *api.Issue, colorScheme *iostreams.Col
 		State:         issue.State,
 		StateReason:   issue.StateReason,
 		Reactions:     prShared.ReactionGroupList(issue.ReactionGroups),
-		AssigneesList: getAssigneeListString(issue.Assignees),
-		LabelsList:    getColorizedLabelsList(sortAlphabeticallyIgnoreCase(issue.Labels), colorScheme),
-		ProjectsList:  getProjectListString(issue.ProjectCards, issue.ProjectItems),
+		AssigneesList: stringifyAssignees(issue.Assignees),
+		LabelsList:    stringifyAndColorizeLabels(sortAlphabeticallyIgnoreCase(issue.Labels), colorScheme),
+		ProjectsList:  stringifyProjects(issue.ProjectCards, issue.ProjectItems),
 		Body:          issue.Body,
 		URL:           issue.URL,
 	}
@@ -55,7 +55,7 @@ func MapApiIssueToPresentationIssue(issue *api.Issue, colorScheme *iostreams.Col
 	return presentationIssue, nil
 }
 
-func getProjectListString(projectCards api.ProjectCards, projectItems api.ProjectItems) string {
+func stringifyProjects(projectCards api.ProjectCards, projectItems api.ProjectItems) string {
 	if len(projectCards.Nodes) == 0 && len(projectItems.Nodes) == 0 {
 		return ""
 	}
@@ -84,7 +84,7 @@ func getProjectListString(projectCards api.ProjectCards, projectItems api.Projec
 	return list
 }
 
-func getAssigneeListString(issueAssignees api.Assignees) string {
+func stringifyAssignees(issueAssignees api.Assignees) string {
 	if len(issueAssignees.Nodes) == 0 {
 		return ""
 	}
@@ -101,7 +101,7 @@ func getAssigneeListString(issueAssignees api.Assignees) string {
 	return list
 }
 
-func getColorizedLabelsList(issueLabels api.Labels, colorScheme *iostreams.ColorScheme) string {
+func stringifyAndColorizeLabels(issueLabels api.Labels, colorScheme *iostreams.ColorScheme) string {
 	labelNames := make([]string, len(issueLabels.Nodes))
 	for j, label := range issueLabels.Nodes {
 		if colorScheme == nil {

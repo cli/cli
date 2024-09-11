@@ -160,7 +160,7 @@ func Test_MapApiIssueToPresentationIssue(t *testing.T) {
 	}
 }
 
-func Test_getAssigneeListString(t *testing.T) {
+func Test_stringifyAssignees(t *testing.T) {
 	tests := map[string]struct {
 		assignees api.Assignees
 		expected  string
@@ -183,12 +183,12 @@ func Test_getAssigneeListString(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, getAssigneeListString(tc.assignees))
+			assert.Equal(t, tc.expected, stringifyAssignees(tc.assignees))
 		})
 	}
 }
 
-func Test_getColorizedLabelsList(t *testing.T) {
+func Test_stringifyAndColorizeLabels(t *testing.T) {
 	tests := map[string]struct {
 		labels               api.Labels
 		isColorSchemeEnabled bool
@@ -231,12 +231,12 @@ func Test_getColorizedLabelsList(t *testing.T) {
 			ios.SetStderrTTY(true)
 			ios.SetColorEnabled(tc.isColorSchemeEnabled)
 
-			assert.Equal(t, getColorizedLabelsList(tc.labels, ios.ColorScheme()), tc.expected)
+			assert.Equal(t, stringifyAndColorizeLabels(tc.labels, ios.ColorScheme()), tc.expected)
 		})
 	}
 }
 
-func Test_getProjectListString(t *testing.T) {
+func Test_stringifyProjects(t *testing.T) {
 	tests := map[string]struct {
 		projectCards api.ProjectCards
 		projectItems api.ProjectItems
@@ -339,7 +339,7 @@ func Test_getProjectListString(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, getProjectListString(tc.projectCards, tc.projectItems), tc.expected)
+			assert.Equal(t, stringifyProjects(tc.projectCards, tc.projectItems), tc.expected)
 		})
 	}
 }
