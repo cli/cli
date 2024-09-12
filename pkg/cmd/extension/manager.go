@@ -280,9 +280,11 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	}
 
 	if asset == nil {
+		issueCreateCommand := generateMissingBinaryIssueCreateCommand(repo.RepoOwner(), repo.RepoName(), platform)
+
 		return fmt.Errorf(
-			"%[1]s unsupported for %[2]s. Open an issue: `gh issue create -R %[3]s/%[1]s -t'Support %[2]s'`",
-			repo.RepoName(), platform, repo.RepoOwner())
+			"%[1]s unsupported for %[2]s. Open an issue: `%[3]s`",
+			repo.RepoName(), platform, issueCreateCommand)
 	}
 
 	name := repo.RepoName()
@@ -332,6 +334,15 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	}
 
 	return nil
+}
+
+func generateMissingBinaryIssueCreateCommand(repoOwner string, repoName string, currentPlatform string) string {
+	issueBody := generateMissingBinaryIssueBody(currentPlatform)
+	return fmt.Sprintf("gh issue create -R %[1]s/%[2]s --title \"Add support for the %[3]s architecture\" --body \"%[4]s\"", repoOwner, repoName, currentPlatform, issueBody)
+}
+
+func generateMissingBinaryIssueBody(currentPlatform string) string {
+	return fmt.Sprintf("This extension does not support the %[1]s architecture. I tried to install it on a %[1]s machine, and it failed due to the lack of an available binary. Would you be able to update the extension's build and release process to include the relevant binary? For more details, see <https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions>.", currentPlatform)
 }
 
 func writeManifest(dir, name string, data []byte) (writeErr error) {
