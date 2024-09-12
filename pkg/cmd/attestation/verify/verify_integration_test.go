@@ -38,7 +38,7 @@ func TestVerifyIntegration(t *testing.T) {
 		DigestAlgorithm:  "sha512",
 		Logger:           logger,
 		OCIClient:        oci.NewLiveClient(),
-		OIDCIssuer:       GitHubOIDCIssuer,
+		OIDCIssuer:       verification.GitHubOIDCIssuer,
 		Owner:            "sigstore",
 		SANRegex:         "^https://github.com/sigstore/",
 		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
@@ -180,7 +180,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		DigestAlgorithm:  "sha256",
 		Logger:           logger,
 		OCIClient:        oci.NewLiveClient(),
-		OIDCIssuer:       GitHubOIDCIssuer,
+		OIDCIssuer:       verification.GitHubOIDCIssuer,
 		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
 	}
 
@@ -269,7 +269,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 		DigestAlgorithm:  "sha256",
 		Logger:           logger,
 		OCIClient:        oci.NewLiveClient(),
-		OIDCIssuer:       GitHubOIDCIssuer,
+		OIDCIssuer:       verification.GitHubOIDCIssuer,
 		Owner:            "malancas",
 		Repo:             "malancas/attest-demo",
 		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),

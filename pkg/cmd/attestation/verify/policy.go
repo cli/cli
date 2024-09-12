@@ -13,8 +13,6 @@ import (
 )
 
 const (
-	GitHubOIDCIssuer       = "https://token.actions.githubusercontent.com"
-	GitHubTenantOIDCIssuer = "https://token.actions.%s.ghe.com"
 	// represents the GitHub hosted runner in the certificate RunnerEnvironment extension
 	GitHubRunner = "github-hosted"
 	hostRegex    = `^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+.*$`
@@ -51,7 +49,8 @@ func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.Pol
 		return nil, err
 	}
 
-	issuerMatcher, err := verify.NewIssuerMatcher(opts.OIDCIssuer, "")
+	// Accept any issuer, we will verify the issuer as part of the extension verification
+	issuerMatcher, err := verify.NewIssuerMatcher("", ".*")
 	if err != nil {
 		return nil, err
 	}

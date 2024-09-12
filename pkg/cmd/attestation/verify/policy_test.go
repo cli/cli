@@ -22,7 +22,6 @@ func TestBuildPolicy(t *testing.T) {
 
 	opts := &Options{
 		ArtifactPath: artifactPath,
-		OIDCIssuer:   GitHubOIDCIssuer,
 		Owner:        "sigstore",
 		SANRegex:     "^https://github.com/sigstore/",
 	}
