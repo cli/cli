@@ -267,14 +267,14 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	if asset == nil && isMacARM {
 		for _, a := range r.Assets {
 			if strings.HasSuffix(a.Name, "darwin-amd64") {
-				if hasRosetta() {
-					asset = &a
-					break
-				} else {
+				if !hasRosetta() {
 					return fmt.Errorf(
 						"%[1]s unsupported for %[2]s. Install Rosetta with `softwareupdate --install-rosetta` to use the available darwin-amd64 binary, or open an issue: `gh issue create -R %[3]s/%[1]s -t'Support %[2]s'`",
 						repo.RepoName(), platform, repo.RepoOwner())
 				}
+
+				asset = &a
+				break
 			}
 		}
 	}
