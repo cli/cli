@@ -99,6 +99,9 @@ var HelpTopics = []helpTopic{
 
 			%[1]sGH_PATH%[1]s: set the path to the gh executable, useful for when gh can not properly determine
 			its own path such as in the cygwin terminal.
+
+			%[1]sGH_NO_ROSETTA%[1]s: set to any value to disable the use of Rosetta 2 on Apple Silicon Macs.
+			This is primarily used for testing purposes.
 		`, "`"),
 	},
 	{
