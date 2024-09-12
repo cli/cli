@@ -94,6 +94,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 		},
 	}
 
+	cmdutil.DisableAuthCheck(&trustedRootCmd)
 	trustedRootCmd.Flags().StringVarP(&opts.TufUrl, "tuf-url", "", "", "URL to the TUF repository mirror")
 	trustedRootCmd.Flags().StringVarP(&opts.TufRootPath, "tuf-root", "", "", "Path to the TUF root.json file on disk")
 	trustedRootCmd.MarkFlagsRequiredTogether("tuf-url", "tuf-root")
