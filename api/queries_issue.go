@@ -92,12 +92,16 @@ type ProjectItems struct {
 }
 
 type ProjectInfo struct {
-	Project struct {
-		Name string `json:"name"`
-	} `json:"project"`
-	Column struct {
-		Name string `json:"name"`
-	} `json:"column"`
+	Project ProjectV1ProjectName   `json:"project"`
+	Column  ProjectV1ProjectColumn `json:"column"`
+}
+
+type ProjectV1ProjectName struct {
+	Name string `json:"name"`
+}
+
+type ProjectV1ProjectColumn struct {
+	Name string `json:"name"`
 }
 
 type ProjectV2Item struct {

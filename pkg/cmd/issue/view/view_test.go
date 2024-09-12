@@ -265,11 +265,11 @@ func TestIssueView_tty_Preview(t *testing.T) {
 
 			httpReg.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse(tc.fixture))
 
+			stubbedTime, _ := time.Parse(time.RFC822, "03 Nov 20 15:04 UTC")
 			opts := ViewOptions{
 				IO: ios,
 				Now: func() time.Time {
-					t, _ := time.Parse(time.RFC822, "03 Nov 20 15:04 UTC")
-					return t
+					return stubbedTime
 				},
 				HttpClient: func() (*http.Client, error) {
 					return &http.Client{Transport: httpReg}, nil
@@ -279,6 +279,8 @@ func TestIssueView_tty_Preview(t *testing.T) {
 				},
 				SelectorArg: "123",
 				Detector:    &featuredetection.EnabledDetectorMock{},
+
+				IssuePrinter: &RichIssuePrinter{IO: ios, TimeNow: stubbedTime},
 			}
 
 			err := viewRun(&opts)

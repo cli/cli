@@ -32,7 +32,7 @@ func PrintIssues(io *iostreams.IOStreams, now time.Time, prefix string, totalCou
 			issueNum = "#" + issueNum
 		}
 		issueNum = prefix + issueNum
-		table.AddField(issueNum, tableprinter.WithColor(cs.ColorFromString(prShared.ColorForIssueState(issue))))
+		table.AddField(issueNum, tableprinter.WithColor(cs.ColorFromString(prShared.ColorForIssueState(issue.State, issue.StateReason))))
 		if !isTTY {
 			table.AddField(issue.State)
 		}
