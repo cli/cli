@@ -771,7 +771,7 @@ func possibleDists() []string {
 	}
 }
 
-func hasRosetta() bool {
+var hasRosetta = func() bool {
 	_, err := os.Stat("/Library/Apple/usr/libexec/oah/libRosettaRuntime")
 	return err == nil
 }
