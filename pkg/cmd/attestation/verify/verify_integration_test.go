@@ -85,6 +85,75 @@ func TestVerifyIntegration(t *testing.T) {
 	})
 }
 
+func TestVerifyIntegrationCustomIssuer(t *testing.T) {
+	artifactPath := test.NormalizeRelativePath("../test/data/custom-issuer-artifact")
+	bundlePath := test.NormalizeRelativePath("../test/data/custom-issuer.sigstore.json")
+
+	logger := io.NewTestHandler()
+
+	sigstoreConfig := verification.SigstoreConfig{
+		Logger: logger,
+	}
+
+	cmdFactory := factory.New("test")
+
+	hc, err := cmdFactory.HttpClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	host, _ := auth.DefaultHost()
+
+	baseOpts := Options{
+		APIClient:        api.NewLiveClient(hc, host, logger),
+		ArtifactPath:     artifactPath,
+		BundlePath:       bundlePath,
+		DigestAlgorithm:  "sha256",
+		Logger:           logger,
+		OCIClient:        oci.NewLiveClient(),
+		OIDCIssuer:       "https://token.actions.githubusercontent.com/hammer-time",
+		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
+	}
+
+	t.Run("with owner and valid workflow SAN", func(t *testing.T) {
+		opts := baseOpts
+		opts.Owner = "too-legit"
+		opts.SAN = "https://github.com/too-legit/attest/.github/workflows/integration.yml@refs/heads/main"
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
+	t.Run("with owner and valid workflow SAN regex", func(t *testing.T) {
+		opts := baseOpts
+		opts.Owner = "too-legit"
+		opts.SANRegex = "^https://github.com/too-legit/attest"
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
+	t.Run("with repo and valid workflow SAN", func(t *testing.T) {
+		opts := baseOpts
+		opts.Owner = "too-legit"
+		opts.Repo = "too-legit/attest"
+		opts.SAN = "https://github.com/too-legit/attest/.github/workflows/integration.yml@refs/heads/main"
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+
+	t.Run("with repo and valid workflow SAN regex", func(t *testing.T) {
+		opts := baseOpts
+		opts.Owner = "too-legit"
+		opts.Repo = "too-legit/attest"
+		opts.SANRegex = "^https://github.com/too-legit/attest"
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
+	})
+}
+
 func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 	artifactPath := test.NormalizeRelativePath("../test/data/reusable-workflow-artifact")
 	bundlePath := test.NormalizeRelativePath("../test/data/reusable-workflow-attestation.sigstore.json")
