@@ -280,11 +280,13 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	}
 
 	if asset == nil {
+		cs := m.io.ColorScheme()
+		errorMessageInRed := fmt.Sprintf(cs.Red("%[1]s unsupported for %[2]s."), repo.RepoName(), platform)
 		issueCreateCommand := generateMissingBinaryIssueCreateCommand(repo.RepoOwner(), repo.RepoName(), platform)
 
 		return fmt.Errorf(
-			"%[1]s unsupported for %[2]s. Open an issue: `%[3]s`",
-			repo.RepoName(), platform, issueCreateCommand)
+			"%[1]s\n\nOpen an issue on the extension's repo by running the following command:\n\n	`%[2]s`",
+			errorMessageInRed, issueCreateCommand)
 	}
 
 	name := repo.RepoName()
