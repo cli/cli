@@ -69,6 +69,15 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 			}
 
 			if ghinstance.IsTenancy(opts.Hostname) {
+				c, err := f.Config()
+				if err != nil {
+					return err
+				}
+
+				if token, _ := c.Authentication().ActiveToken(opts.Hostname); token == "" {
+					return fmt.Errorf("not authenticated with %s", opts.Hostname)
+				}
+
 				hc, err := f.HttpClient()
 				if err != nil {
 					return err
