@@ -202,7 +202,7 @@ func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy ve
 			))
 
 			return &SigstoreResults{
-				Error: fmt.Errorf("verifying with issuer \"%s\": %v", issuer, err),
+				Error: fmt.Errorf("verifying with issuer \"%s\"", issuer),
 			}
 		}
 

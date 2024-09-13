@@ -53,13 +53,25 @@ func GetLocalAttestations(path string) ([]*api.Attestation, error) {
 	case ".json":
 		attestations, err := loadBundleFromJSONFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("bundle could not be loaded from JSON file: %v", err)
+			var pathErr *os.PathError
+			if errors.As(err, &pathErr) {
+				return nil, fmt.Errorf("bundle could not be loaded from JSON file at %s", path)
+			} else if errors.Is(err, bundle.ErrValidation) {
+				return nil, err
+			}
+			return nil, fmt.Errorf("bundle content could not be parsed")
 		}
 		return attestations, nil
 	case ".jsonl":
 		attestations, err := loadBundlesFromJSONLinesFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("bundles could not be loaded from JSON lines file: %v", err)
+			var pathErr *os.PathError
+			if errors.As(err, &pathErr) {
+				return nil, fmt.Errorf("bundles could not be loaded from JSON lines file at %s", path)
+			} else if errors.Is(err, bundle.ErrValidation) {
+				return nil, err
+			}
+			return nil, fmt.Errorf("bundle content could not be parsed")
 		}
 		return attestations, nil
 	}
@@ -78,7 +90,7 @@ func loadBundleFromJSONFile(path string) ([]*api.Attestation, error) {
 func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	fileContent, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not read file: %v", err)
+		return nil, err
 	}
 
 	attestations := []*api.Attestation{}
@@ -86,12 +98,12 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	decoder := json.NewDecoder(bytes.NewReader(fileContent))
 
 	for decoder.More() {
-		var bundle bundle.Bundle
-		bundle.Bundle = new(protobundle.Bundle)
-		if err := decoder.Decode(&bundle); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal bundle from JSON: %v", err)
+		var b bundle.Bundle
+		b.Bundle = new(protobundle.Bundle)
+		if err := decoder.Decode(&b); err != nil {
+			return nil, err
 		}
-		a := api.Attestation{Bundle: &bundle}
+		a := api.Attestation{Bundle: &b}
 		attestations = append(attestations, &a)
 	}
 

@@ -88,16 +88,32 @@ func TestGetLocalAttestations(t *testing.T) {
 		require.Nil(t, attestations)
 	})
 
+	t.Run("with non-existent bundle file and JSON file", func(t *testing.T) {
+		path := "../test/data/not-found-bundle.json"
+		attestations, err := GetLocalAttestations(path)
+
+		require.ErrorContains(t, err, "bundle could not be loaded from JSON file")
+		require.Nil(t, attestations)
+	})
+
+	t.Run("with non-existent bundle file and JSON lines file", func(t *testing.T) {
+		path := "../test/data/not-found-bundle.jsonl"
+		attestations, err := GetLocalAttestations(path)
+
+		require.ErrorContains(t, err, "bundles could not be loaded from JSON lines file")
+		require.Nil(t, attestations)
+	})
+
 	t.Run("with missing verification material", func(t *testing.T) {
 		path := "../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle-missing-verification-material.jsonl"
 		_, err := GetLocalAttestations(path)
-		require.ErrorContains(t, err, "missing verification material")
+		require.ErrorIs(t, err, bundle.ErrMissingVerificationMaterial)
 	})
 
 	t.Run("with missing verification certificate", func(t *testing.T) {
 		path := "../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle-missing-cert.jsonl"
 		_, err := GetLocalAttestations(path)
-		require.ErrorContains(t, err, "missing bundle content")
+		require.ErrorIs(t, err, bundle.ErrMissingBundleContent)
 	})
 }
 
