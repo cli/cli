@@ -254,6 +254,10 @@ func TestGraphQLEndpoint(t *testing.T) {
 			host: "ghe.io",
 			want: "https://ghe.io/api/graphql",
 		},
+		{
+			host: "tenant.ghe.com",
+			want: "https://api.tenant.ghe.com/graphql",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.host, func(t *testing.T) {
@@ -284,6 +288,10 @@ func TestRESTPrefix(t *testing.T) {
 		{
 			host: "ghe.io",
 			want: "https://ghe.io/api/v3/",
+		},
+		{
+			host: "tenant.ghe.com",
+			want: "https://api.tenant.ghe.com/",
 		},
 	}
 	for _, tt := range tests {

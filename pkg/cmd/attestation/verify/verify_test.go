@@ -43,7 +43,7 @@ func TestNewVerifyCmd(t *testing.T) {
 			},
 		},
 	}
-	testReg.Register(httpmock.REST(http.MethodGet, "api/v3/meta"),
+	testReg.Register(httpmock.REST(http.MethodGet, "meta"),
 		httpmock.StatusJSONResponse(200, &metaResp))
 
 	f := &cmdutil.Factory{
