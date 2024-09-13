@@ -912,6 +912,58 @@ func TestManager_Install_binary_unsupported(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_Install_rosetta_fallback_not_found(t *testing.T) {
+	repo := ghrepo.NewWithHost("owner", "gh-bin-ext", "example.com")
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-darwin-amd64",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.1",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-darwin-amd64",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+
+	ios, _, stdout, stderr := iostreams.Test()
+	tempDir := t.TempDir()
+
+	m := newTestManager(tempDir, &client, nil, ios)
+	m.platform = func() (string, string) {
+		return "darwin-arm64", ""
+	}
+
+	originalHasRosetta := hasRosetta
+	t.Cleanup(func() { hasRosetta = originalHasRosetta })
+	hasRosetta = func() bool {
+		return false
+	}
+
+	err := m.Install(repo, "")
+	assert.EqualError(t, err, "gh-bin-ext unsupported for darwin-arm64. Install Rosetta with `softwareupdate --install-rosetta` to use the available darwin-amd64 binary, or open an issue: `gh issue create -R owner/gh-bin-ext -t'Support darwin-arm64'`")
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
 func TestManager_Install_binary(t *testing.T) {
 	repo := ghrepo.NewWithHost("owner", "gh-bin-ext", "example.com")
 
@@ -969,6 +1021,80 @@ func TestManager_Install_binary(t *testing.T) {
 	}, bm)
 
 	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
+	assert.NoError(t, err)
+	assert.Equal(t, "FAKE BINARY", string(fakeBin))
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_Install_amd64_when_supported(t *testing.T) {
+	repo := ghrepo.NewWithHost("owner", "gh-bin-ext", "example.com")
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-darwin-amd64",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.1",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-darwin-amd64",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "release/cool"),
+		httpmock.StringResponse("FAKE BINARY"))
+
+	ios, _, stdout, stderr := iostreams.Test()
+	tempDir := t.TempDir()
+
+	m := newTestManager(tempDir, &client, nil, ios)
+	m.platform = func() (string, string) {
+		return "darwin-arm64", ""
+	}
+
+	originalHasRosetta := hasRosetta
+	t.Cleanup(func() { hasRosetta = originalHasRosetta })
+	hasRosetta = func() bool {
+		return true
+	}
+
+	err := m.Install(repo, "")
+	assert.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
+	assert.NoError(t, err)
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	assert.NoError(t, err)
+
+	assert.Equal(t, binManifest{
+		Name:  "gh-bin-ext",
+		Owner: "owner",
+		Host:  "example.com",
+		Tag:   "v1.0.1",
+		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"),
+	}, bm)
+
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"))
 	assert.NoError(t, err)
 	assert.Equal(t, "FAKE BINARY", string(fakeBin))
 
