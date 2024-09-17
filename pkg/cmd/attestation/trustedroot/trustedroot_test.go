@@ -130,7 +130,7 @@ func TestNewTrustedRootWithTenancy(t *testing.T) {
 		assert.ErrorContains(t, err, "not authenticated")
 	})
 
-	t.Run("Host wth auth configured", func(t *testing.T) {
+	t.Run("Host with auth configured", func(t *testing.T) {
 		f := &cmdutil.Factory{
 			IOStreams: testIO,
 			Config: func() (gh.Config, error) {
