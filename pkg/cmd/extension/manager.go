@@ -285,8 +285,8 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 		issueCreateCommand := generateMissingBinaryIssueCreateCommand(repo.RepoOwner(), repo.RepoName(), platform)
 
 		return fmt.Errorf(
-			"%[1]s\n\nOpen an issue on the extension's repo by running the following command:\n\n	`%[2]s`",
-			errorMessageInRed, issueCreateCommand)
+			"%[1]s\n\nTo request support for %[2]s, open an issue on the extension's repo by running the following command:\n\n	`%[3]s`",
+			errorMessageInRed, platform, issueCreateCommand)
 	}
 
 	name := repo.RepoName()
