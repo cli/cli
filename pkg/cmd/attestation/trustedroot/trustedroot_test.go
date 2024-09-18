@@ -109,7 +109,7 @@ func TestNewTrustedRootWithTenancy(t *testing.T) {
 			Config: func() (gh.Config, error) {
 				return &ghmock.ConfigMock{
 					AuthenticationFunc: func() gh.AuthConfig {
-						return &MockAuthConfig{Token: ""}
+						return &stubAuthConfig{hasActiveToken: false}
 					},
 				}, nil
 			},
@@ -136,7 +136,7 @@ func TestNewTrustedRootWithTenancy(t *testing.T) {
 			Config: func() (gh.Config, error) {
 				return &ghmock.ConfigMock{
 					AuthenticationFunc: func() gh.AuthConfig {
-						return &MockAuthConfig{Token: "TOKEN"}
+						return &stubAuthConfig{hasActiveToken: true}
 					},
 				}, nil
 			},
@@ -186,13 +186,13 @@ func TestGetTrustedRoot(t *testing.T) {
 
 }
 
-type MockAuthConfig struct {
+type stubAuthConfig struct {
 	config.AuthConfig
-	Token string
+	hasActiveToken bool
 }
 
-var _ gh.AuthConfig = (*MockAuthConfig)(nil)
+var _ gh.AuthConfig = (*stubAuthConfig)(nil)
 
-func (c *MockAuthConfig) ActiveToken(host string) (string, string) {
-	return c.Token, ""
+func (c *stubAuthConfig) HasActiveToken(host string) bool {
+	return c.hasActiveToken
 }

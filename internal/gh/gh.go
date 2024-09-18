@@ -93,6 +93,9 @@ type Migration interface {
 // with knowledge on how to access encrypted storage when neccesarry.
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig interface {
+	// HasActiveToken returns true when a token for the hostname is present.
+	HasActiveToken(hostname string) bool
+
 	// ActiveToken will retrieve the active auth token for the given hostname, searching environment variables,
 	// general configuration, and finally encrypted storage.
 	ActiveToken(hostname string) (token string, source string)
