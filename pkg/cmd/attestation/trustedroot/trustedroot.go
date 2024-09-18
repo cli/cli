@@ -74,7 +74,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 					return err
 				}
 
-				if token, _ := c.Authentication().ActiveToken(opts.Hostname); token == "" {
+				if !c.Authentication().HasActiveToken(opts.Hostname) {
 					return fmt.Errorf("not authenticated with %s", opts.Hostname)
 				}
 
