@@ -217,8 +217,7 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	return token, source
 }
 
-// HasActiveToken returns true when a token for the hostname is
-// present.
+// HasActiveToken returns true when a token for the hostname is present.
 func (c *AuthConfig) HasActiveToken(hostname string) bool {
 	token, _ := c.ActiveToken(hostname)
 	return token != ""
