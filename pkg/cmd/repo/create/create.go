@@ -93,7 +93,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s.
 			By default, the remote repository name will be the name of the source directory.
+
 			Pass %[1]s--push%[1]s to push any local commits to the new repository.
+
+			For language or platform .gitignore templates to use with %[1]s--gitignore%[1]s, <https://github.com/github/gitignore>.
+
+			For license keywords to use with %[1]s--license%[1]s, <https://choosealicense.com/>.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# create a repository interactively
