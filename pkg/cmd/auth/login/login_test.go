@@ -547,7 +547,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://rebecca.chambers/settings/tokens"),
 		},
 		{
-			name: "choose other",
+			name: "choose Other",
 			wantHosts: heredoc.Doc(`
                 brad.vickers:
                     users:
@@ -565,7 +565,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
 					case "What account do you want to log into?":
-						return prompter.IndexFor(opts, "other")
+						return prompter.IndexFor(opts, "Other")
 					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
@@ -816,15 +816,15 @@ func Test_promptForHostname(t *testing.T) {
 		expect            string
 	}{
 		{
-			name:              "select GitHub.com",
+			name:              "select 'GitHub.com'",
 			selectedIndex:     0,
 			expectedSelection: "GitHub.com",
 			expect:            "github.com",
 		},
 		{
-			name:              "select other",
+			name:              "select 'Other'",
 			selectedIndex:     1,
-			expectedSelection: "other",
+			expectedSelection: "Other",
 			inputHostname:     "github.enterprise.com",
 			expect:            "github.enterprise.com",
 		},

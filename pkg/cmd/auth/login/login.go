@@ -226,7 +226,7 @@ func loginRun(opts *LoginOptions) error {
 }
 
 func promptForHostname(opts *LoginOptions) (string, error) {
-	options := []string{"GitHub.com", "other"}
+	options := []string{"GitHub.com", "Other"}
 	hostType, err := opts.Prompter.Select(
 		"What account do you want to log into?",
 		options[0],
