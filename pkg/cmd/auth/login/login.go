@@ -59,9 +59,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		Long: heredoc.Docf(`
 			Authenticate with a GitHub host.
 
-			The %[1]shostname%[1]s is the domain where the GitHub instance you are logging into is hosted.
-			For example, "github.com" is the hostname for GitHub.com. To authenticate with
-			a different hostname like github.enterprise.com, use that hostname instead.
+			The %[1]shostname%[1]s is where you log in to GitHub. The default hostname is %[1]sgithub.com%[1]s.
 
 			The default authentication mode is a web-based browser flow. After completion, an
 			authentication token will be stored securely in the system credential store.
