@@ -1098,7 +1098,7 @@ func TestManager_Install_amd64_when_supported(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "FAKE BINARY", string(fakeBin))
 
-	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "gh-bin-ext not available for darwin-arm64. Falling back to compatible darwin-amd64 binary\n", stdout.String())
 	assert.Equal(t, "", stderr.String())
 }
 
