@@ -233,12 +233,10 @@ func promptForHostname(opts *LoginOptions) (string, error) {
 		return "", err
 	}
 
-	isEnterprise := hostType == 1
-
-	hostname := ghinstance.Default()
-	if isEnterprise {
-		hostname, err = opts.Prompter.InputHostname()
+	isGitHubDotCom := hostType == 0
+	if isGitHubDotCom {
+		return ghinstance.Default(), nil
 	}
 
-	return hostname, err
+	return opts.Prompter.InputHostname()
 }
