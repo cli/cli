@@ -906,7 +906,7 @@ func TestManager_Install_binary_unsupported(t *testing.T) {
 	m := newTestManager(tempDir, &client, nil, ios)
 
 	err := m.Install(repo, "")
-	assert.EqualError(t, err, "gh-bin-ext unsupported for windows-amd64. Open an issue: `gh issue create -R owner/gh-bin-ext -t'Support windows-amd64'`")
+	assert.EqualError(t, err, "gh-bin-ext unsupported for windows-amd64.\n\nTo request support for windows-amd64, open an issue on the extension's repo by running the following command:\n\n\t`gh issue create -R owner/gh-bin-ext --title \"Add support for the windows-amd64 architecture\" --body \"This extension does not support the windows-amd64 architecture. I tried to install it on a windows-amd64 machine, and it failed due to the lack of an available binary. Would you be able to update the extension's build and release process to include the relevant binary? For more details, see <https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions>.\"`")
 
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())

@@ -69,6 +69,15 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 			}
 
 			if ghinstance.IsTenancy(opts.Hostname) {
+				c, err := f.Config()
+				if err != nil {
+					return err
+				}
+
+				if !c.Authentication().HasActiveToken(opts.Hostname) {
+					return fmt.Errorf("not authenticated with %s", opts.Hostname)
+				}
+
 				hc, err := f.HttpClient()
 				if err != nil {
 					return err
@@ -94,6 +103,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 		},
 	}
 
+	cmdutil.DisableAuthCheck(&trustedRootCmd)
 	trustedRootCmd.Flags().StringVarP(&opts.TufUrl, "tuf-url", "", "", "URL to the TUF repository mirror")
 	trustedRootCmd.Flags().StringVarP(&opts.TufRootPath, "tuf-root", "", "", "Path to the TUF root.json file on disk")
 	trustedRootCmd.MarkFlagsRequiredTogether("tuf-url", "tuf-root")
@@ -116,6 +126,12 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options) error {
 	// Disable local caching, so we get up-to-date response from TUF repository
 	tufOpt.CacheValidity = 0
 
+	// Target will be either the default trusted root, or the trust domain-qualified one
+	ghTR := defaultTR
+	if opts.TrustDomain != "" {
+		ghTR = fmt.Sprintf("%s.%s", opts.TrustDomain, defaultTR)
+	}
+
 	if opts.TufUrl != "" && opts.TufRootPath != "" {
 		tufRoot, err := os.ReadFile(opts.TufRootPath)
 		if err != nil {
@@ -126,7 +142,7 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options) error {
 		tufOpt.RepositoryBaseURL = opts.TufUrl
 		tufOptions = append(tufOptions, tufConfig{
 			tufOptions: tufOpt,
-			targets:    []string{defaultTR},
+			targets:    []string{ghTR},
 		})
 	} else {
 		// Get from both Sigstore public good and GitHub private instance
@@ -137,14 +153,9 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options) error {
 
 		tufOpt = verification.GitHubTUFOptions()
 		tufOpt.CacheValidity = 0
-		targets := []string{defaultTR}
-		if opts.TrustDomain != "" {
-			targets = append(targets, fmt.Sprintf("%s.%s",
-				opts.TrustDomain, defaultTR))
-		}
 		tufOptions = append(tufOptions, tufConfig{
 			tufOptions: tufOpt,
-			targets:    targets,
+			targets:    []string{ghTR},
 		})
 	}
 

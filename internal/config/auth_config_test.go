@@ -52,8 +52,32 @@ func TestTokenFromKeyringForUserErrorsIfUsernameIsBlank(t *testing.T) {
 	require.ErrorContains(t, err, "username cannot be blank")
 }
 
+func TestHasActiveToken(t *testing.T) {
+	// Given the user has logged in for a host
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
+	require.NoError(t, err)
+
+	// When we check if that host has an active token
+	hasActiveToken := authCfg.HasActiveToken("github.com")
+
+	// Then there is an active token
+	require.True(t, hasActiveToken, "expected there to be an active token")
+}
+
+func TestHasNoActiveToken(t *testing.T) {
+	// Given there are no users logged in for a host
+	authCfg := newTestAuthConfig(t)
+
+	// When we check if any host has an active token
+	hasActiveToken := authCfg.HasActiveToken("github.com")
+
+	// Then there is no active token
+	require.False(t, hasActiveToken, "expected there to be no active token")
+}
+
 func TestTokenStoredInConfig(t *testing.T) {
-	// When the user has logged in insecurely
+	// Given the user has logged in insecurely
 	authCfg := newTestAuthConfig(t)
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
 	require.NoError(t, err)

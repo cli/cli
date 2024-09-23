@@ -217,6 +217,12 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	return token, source
 }
 
+// HasActiveToken returns true when a token for the hostname is present.
+func (c *AuthConfig) HasActiveToken(hostname string) bool {
+	token, _ := c.ActiveToken(hostname)
+	return token != ""
+}
+
 // HasEnvToken returns true when a token has been specified in an
 // environment variable, else returns false.
 func (c *AuthConfig) HasEnvToken() bool {
