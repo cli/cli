@@ -350,17 +350,6 @@ func listGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string,
 	return gitIgnoreTemplates, nil
 }
 
-// listLicenseTemplates uses API v3 here because license template isn't supported by GraphQL yet.
-func listLicenseTemplates(httpClient *http.Client, hostname string) ([]api.License, error) {
-	var licenseTemplates []api.License
-	client := api.NewClientFromHTTP(httpClient)
-	err := client.REST(hostname, "GET", "licenses", nil, &licenseTemplates)
-	if err != nil {
-		return nil, err
-	}
-	return licenseTemplates, nil
-}
-
 // Returns the current username and any orgs that user is a member of.
 func userAndOrgs(httpClient *http.Client, hostname string) (string, []string, error) {
 	client := api.NewClientFromHTTP(httpClient)

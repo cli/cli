@@ -244,7 +244,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			return nil, cobra.ShellCompDirectiveError
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		licenses, err := listLicenseTemplates(httpClient, hostname)
+		licenses, err := shared.ListLicenseTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -830,7 +830,7 @@ func interactiveLicense(client *http.Client, hostname string, prompter iprompter
 		return "", nil
 	}
 
-	licenses, err := listLicenseTemplates(client, hostname)
+	licenses, err := shared.ListLicenseTemplates(client, hostname)
 	if err != nil {
 		return "", err
 	}
