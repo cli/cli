@@ -43,6 +43,20 @@ sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.re
 sudo dnf install gh --repo gh-cli
 ```
 
+<details>
+<summary>Show dnf5 commands</summary>
+
+If you're using `dnf5`, commands will vary slightly:
+
+```bash
+sudo dnf5 install dnf5-plugins
+sudo dnf5 config-manager addrepo --from-repofile=https://cli.github.com/packages/rpm/gh-cli.repo
+sudo dnf5 install gh --repo gh-cli
+```
+
+For more details, check out the [`dnf5 config-manager` documentation](https://dnf5.readthedocs.io/en/latest/dnf5_plugins/config-manager.8.html).
+</details>
+
 Alternatively, install from the [community repository](https://packages.fedoraproject.org/pkgs/gh/gh/):
 
 ```bash
