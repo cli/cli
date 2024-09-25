@@ -49,6 +49,9 @@ Alternatively, install from the [community repository](https://packages.fedorapr
 sudo dnf install gh
 ```
 
+> [!NOTE]
+> If errors regarding GPG signatures occur, see [cli/cli#9569](https://github.com/cli/cli/issues/9569) for steps to fix this.
+
 Upgrade:
 
 ```bash
@@ -90,6 +93,9 @@ Upgrade:
 sudo zypper ref
 sudo zypper update gh
 ```
+
+> [!NOTE]
+> If errors regarding GPG signatures occur, see [cli/cli#9569](https://github.com/cli/cli/issues/9569) for steps to fix this.
 
 ## Manual installation
 
