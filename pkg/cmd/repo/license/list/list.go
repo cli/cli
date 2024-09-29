@@ -66,7 +66,7 @@ func listRun(opts *ListOptions) error {
 }
 
 func renderLicenseTemplatesTable(licenses []api.License, opts *ListOptions) error {
-	t := tableprinter.New(opts.IO, tableprinter.WithHeader("KEY", "NAME"))
+	t := tableprinter.New(opts.IO, tableprinter.WithHeader("LICENSE KEY", "LICENSE NAME"))
 	for _, l := range licenses {
 		t.AddField(l.Key)
 		t.AddField(l.Name)

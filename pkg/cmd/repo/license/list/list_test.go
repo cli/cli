@@ -133,14 +133,14 @@ func TestListRun(t *testing.T) {
 					))
 			},
 			wantStdout: heredoc.Doc(`
-				KEY         NAME
-				mit         MIT License
-				lgpl-3.0    GNU Lesser General Public License v3.0
-				mpl-2.0     Mozilla Public License 2.0
-				agpl-3.0    GNU Affero General Public License v3.0
-				unlicense   The Unlicense
-				apache-2.0  Apache License 2.0
-				gpl-3.0     GNU General Public License v3.0
+				LICENSE KEY  LICENSE NAME
+				mit          MIT License
+				lgpl-3.0     GNU Lesser General Public License v3.0
+				mpl-2.0      Mozilla Public License 2.0
+				agpl-3.0     GNU Affero General Public License v3.0
+				unlicense    The Unlicense
+				apache-2.0   Apache License 2.0
+				gpl-3.0      GNU General Public License v3.0
 				`),
 			wantStderr: "",
 			opts:       &ListOptions{},
@@ -189,8 +189,8 @@ func TestListRun(t *testing.T) {
 				return
 			}
 
-			assert.Equal(t, tt.wantStdout, stdout.String(), "Stdout differs from expected")
-			assert.Equal(t, tt.wantStderr, stderr.String(), "Stderr differs from expected")
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }
