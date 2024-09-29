@@ -18,15 +18,9 @@ type LicenseRenderer interface {
 
 type TableLicenseRenderer struct{}
 
-var licenseFields = []string{
-	"key",
-	"name",
-}
-
 type ListOptions struct {
 	IO         *iostreams.IOStreams
 	HTTPClient func() (*http.Client, error)
-	Exporter   cmdutil.Exporter
 	Config     func() (gh.Config, error)
 }
 
@@ -50,8 +44,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			return listRun(opts)
 		},
 	}
-	// cmdutil.AddFormatFlags(cmd, &opts.Exporter)
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, licenseFields)
 	return cmd
 }
 
@@ -74,10 +66,6 @@ func listRun(opts *ListOptions) error {
 
 	if len(licenses) == 0 {
 		return cmdutil.NewNoResultsError("no licenses found")
-	}
-
-	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO, licenses)
 	}
 
 	r := &TableLicenseRenderer{}
