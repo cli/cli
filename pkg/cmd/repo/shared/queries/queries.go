@@ -6,7 +6,7 @@ import (
 	"github.com/cli/cli/v2/api"
 )
 
-// ListLicenseTemplates fetches available repository templates.
+// ListLicenseTemplates fetches available repository license templates.
 // It uses API v3 because license template isn't supported by GraphQL.
 func ListLicenseTemplates(httpClient *http.Client, hostname string) ([]api.License, error) {
 	var licenseTemplates []api.License
