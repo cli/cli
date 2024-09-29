@@ -211,6 +211,11 @@ type License struct {
 	Name string `json:"name"`
 }
 
+type GitIgnore struct {
+	Name   string `json:"name"`
+	Source string `json:"source"`
+}
+
 // RepoOwner is the login name of the owner
 func (r Repository) RepoOwner() string {
 	return r.Owner.Login

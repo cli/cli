@@ -1,6 +1,7 @@
 package queries
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -228,6 +229,59 @@ func TestListGitIgnoreTemplates(t *testing.T) {
 				assert.Error(t, err, "Expected error while fetching /gitignore/templates")
 			}
 			assert.Equal(t, tt.wantGitIgnoreTemplates, gotGitIgnoreTemplates, "GitIgnore templates fetched is not as expected")
+		})
+	}
+}
+
+func TestGitIgnoreTemplate(t *testing.T) {
+	tests := []struct {
+		name                  string
+		httpStubs             func(t *testing.T, reg *httpmock.Registry)
+		gitIgnoreTemplateName string
+		wantGitIgnoreTemplate api.GitIgnore
+		wantErr               bool
+		wantErrMsg            string
+		httpClient            func() (*http.Client, error)
+	}{
+		{
+			name:                  "happy path",
+			gitIgnoreTemplateName: "Go",
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "gitignore/templates/Go"),
+					httpmock.StringResponse(`{
+						"name": "Go",
+						"source": "# If you prefer the allow list template instead of the deny list, see community template:\n# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore\n#\n# Binaries for programs and plugins\n*.exe\n*.exe~\n*.dll\n*.so\n*.dylib\n\n# Test binary, built with go test -c\n*.test\n\n# Output of the go coverage tool, specifically when used with LiteIDE\n*.out\n\n# Dependency directories (remove the comment below to include it)\n# vendor/\n\n# Go workspace file\ngo.work\ngo.work.sum\n\n# env file\n.env\n"
+						}`,
+					))
+			},
+			wantGitIgnoreTemplate: api.GitIgnore{
+				Name:   "Go",
+				Source: "# If you prefer the allow list template instead of the deny list, see community template:\n# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore\n#\n# Binaries for programs and plugins\n*.exe\n*.exe~\n*.dll\n*.so\n*.dylib\n\n# Test binary, built with go test -c\n*.test\n\n# Output of the go coverage tool, specifically when used with LiteIDE\n*.out\n\n# Dependency directories (remove the comment below to include it)\n# vendor/\n\n# Go workspace file\ngo.work\ngo.work.sum\n\n# env file\n.env\n",
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		reg := &httpmock.Registry{}
+		if tt.httpStubs != nil {
+			tt.httpStubs(t, reg)
+		}
+		tt.httpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+		client, _ := tt.httpClient()
+		t.Run(tt.name, func(t *testing.T) {
+			defer reg.Verify(t)
+			gotGitIgnoreTemplate, err := GitIgnoreTemplate(client, "api.github.com", tt.gitIgnoreTemplateName)
+			if !tt.wantErr {
+				assert.NoError(t, err, fmt.Sprintf("Expected no error while fetching /gitignore/templates/%v", tt.gitIgnoreTemplateName))
+			}
+			if tt.wantErr {
+				assert.Error(t, err, fmt.Sprintf("Expected error while fetching /gitignore/templates/%v", tt.gitIgnoreTemplateName))
+			}
+			assert.Equal(t, tt.wantGitIgnoreTemplate, gotGitIgnoreTemplate, fmt.Sprintf("GitIgnore template \"%v\" fetched is not as expected", tt.gitIgnoreTemplateName))
 		})
 	}
 }

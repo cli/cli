@@ -151,7 +151,7 @@ func TestListRun(t *testing.T) {
 			wantStdout: "",
 			wantStderr: "",
 			wantErr:    true,
-			errMsg:     "No .gitignore templates found",
+			errMsg:     "No gitignore templates found",
 			opts:       &ListOptions{},
 		},
 	}

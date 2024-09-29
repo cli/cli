@@ -1,6 +1,7 @@
 package list
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
@@ -50,6 +51,12 @@ func listRun(opts *ListOptions) error {
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
+	}
+
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
 	hostname, _ := cfg.Authentication().DefaultHost()
