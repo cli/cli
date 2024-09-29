@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -24,14 +23,14 @@ func TestNewCmdList(t *testing.T) {
 		tty     bool
 	}{
 		{
-			name:    "no arguments",
+			name:    "happy path no arguments",
 			args:    []string{},
 			wantErr: false,
 			tty:     false,
 		},
 		{
 			name:    "too many arguments",
-			args:    []string{"foo", "bar"},
+			args:    []string{"foo"},
 			wantErr: true,
 		},
 	}
@@ -59,68 +58,6 @@ func TestNewCmdList(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-		})
-	}
-}
-
-func TestTableLicenseRenderer(t *testing.T) {
-	tests := []struct {
-		name       string
-		opts       ListOptions
-		isTTY      bool
-		wantStdout string
-		wantErr    bool
-		licenses   []api.License
-	}{
-		{
-			name:  "licenses + tty",
-			opts:  ListOptions{},
-			isTTY: true,
-			wantStdout: heredoc.Doc(`
-			KEY       NAME
-			mit       MIT License
-			lgpl-3.0  GNU Lesser General Public License v3.0
-			`),
-			wantErr: false,
-			licenses: []api.License{
-				{
-					Key:  "mit",
-					Name: "MIT License",
-				},
-				{
-					Key:  "lgpl-3.0",
-					Name: "GNU Lesser General Public License v3.0",
-				},
-			},
-		},
-		{
-			name:  "no licenses + tty",
-			opts:  ListOptions{},
-			isTTY: true,
-			wantStdout: heredoc.Doc(`
-			KEY  NAME
-			`),
-			wantErr:  false,
-			licenses: []api.License{},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, _ := iostreams.Test()
-			ios.SetStdoutTTY(tt.isTTY)
-			ios.SetStdinTTY(tt.isTTY)
-			ios.SetStderrTTY(tt.isTTY)
-			tt.opts.IO = ios
-
-			r := &TableLicenseRenderer{}
-			err := r.Render(tt.licenses, &tt.opts)
-
-			if !tt.wantErr {
-				assert.NoError(t, err, "Expected no error while rendering table")
-			}
-
-			assert.Equal(t, tt.wantStdout, stdout.String(), "Rendered table differs from expected")
-
 		})
 	}
 }

@@ -12,12 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type LicenseRenderer interface {
-	Render([]api.License, ListOptions) error
-}
-
-type TableLicenseRenderer struct{}
-
 type ListOptions struct {
 	IO         *iostreams.IOStreams
 	HTTPClient func() (*http.Client, error)
@@ -68,11 +62,10 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no licenses found")
 	}
 
-	r := &TableLicenseRenderer{}
-	return r.Render(licenses, opts)
+	return renderLicenseTemplatesTable(licenses, opts)
 }
 
-func (r *TableLicenseRenderer) Render(licenses []api.License, opts *ListOptions) error {
+func renderLicenseTemplatesTable(licenses []api.License, opts *ListOptions) error {
 	t := tableprinter.New(opts.IO, tableprinter.WithHeader("KEY", "NAME"))
 	for _, l := range licenses {
 		t.AddField(l.Key)
