@@ -228,7 +228,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			return nil, cobra.ShellCompDirectiveError
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		results, err := listGitIgnoreTemplates(httpClient, hostname)
+		results, err := queries.ListGitIgnoreTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -812,7 +812,7 @@ func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompt
 		return "", nil
 	}
 
-	templates, err := listGitIgnoreTemplates(client, hostname)
+	templates, err := queries.ListGitIgnoreTemplates(client, hostname)
 	if err != nil {
 		return "", err
 	}

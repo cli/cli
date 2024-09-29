@@ -3,7 +3,6 @@ package list
 import (
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared/queries"
@@ -27,9 +26,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:     "list",
-		Short:   "List available repository license templates",
+		Short:   "List available repository .gitignore templates",
 		Aliases: []string{"ls"},
-		Args:    cmdutil.ExactArgs(0, "gh repo license list takes no arguments"),
+		Args:    cmdutil.ExactArgs(0, "gh repo gitignore list takes no arguments"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if runF != nil {
@@ -53,23 +52,22 @@ func listRun(opts *ListOptions) error {
 	}
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	licenseTemplates, err := queries.ListLicenseTemplates(client, hostname)
+	gitIgnoreTemplates, err := queries.ListGitIgnoreTemplates(client, hostname)
 	if err != nil {
 		return err
 	}
 
-	if len(licenseTemplates) == 0 {
-		return cmdutil.NewNoResultsError("No repository license templates found")
+	if len(gitIgnoreTemplates) == 0 {
+		return cmdutil.NewNoResultsError("No .gitignore templates found")
 	}
 
-	return renderLicenseTemplatesTable(licenseTemplates, opts)
+	return renderGitIgnoreTemplatesTable(gitIgnoreTemplates, opts)
 }
 
-func renderLicenseTemplatesTable(licenseTemplates []api.License, opts *ListOptions) error {
-	t := tableprinter.New(opts.IO, tableprinter.WithHeader("LICENSE KEY", "LICENSE NAME"))
-	for _, l := range licenseTemplates {
-		t.AddField(l.Key)
-		t.AddField(l.Name)
+func renderGitIgnoreTemplatesTable(gitIgnoreTemplates []string, opts *ListOptions) error {
+	t := tableprinter.New(opts.IO, tableprinter.WithHeader("GITIGNORE"))
+	for _, gt := range gitIgnoreTemplates {
+		t.AddField(gt)
 		t.EndRow()
 	}
 

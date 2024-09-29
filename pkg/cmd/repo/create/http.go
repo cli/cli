@@ -339,17 +339,6 @@ func listTemplateRepositories(client *http.Client, hostname, owner string) ([]ap
 	return templateRepositories, nil
 }
 
-// listGitIgnoreTemplates uses API v3 here because gitignore template isn't supported by GraphQL yet.
-func listGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string, error) {
-	var gitIgnoreTemplates []string
-	client := api.NewClientFromHTTP(httpClient)
-	err := client.REST(hostname, "GET", "gitignore/templates", nil, &gitIgnoreTemplates)
-	if err != nil {
-		return []string{}, err
-	}
-	return gitIgnoreTemplates, nil
-}
-
 // Returns the current username and any orgs that user is a member of.
 func userAndOrgs(httpClient *http.Client, hostname string) (string, []string, error) {
 	client := api.NewClientFromHTTP(httpClient)

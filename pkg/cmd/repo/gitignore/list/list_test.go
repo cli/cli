@@ -74,90 +74,84 @@ func TestListRun(t *testing.T) {
 		errMsg     string
 	}{
 		{
-			name:  "license list tty",
+			name:  "gitignore list tty",
 			isTTY: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "licenses"),
+					httpmock.REST("GET", "gitignore/templates"),
 					httpmock.StringResponse(`[
-						{
-							"key": "mit",
-							"name": "MIT License",
-							"spdx_id": "MIT",
-							"url": "https://api.github.com/licenses/mit",
-							"node_id": "MDc6TGljZW5zZW1pdA=="
-						},
-						{
-							"key": "lgpl-3.0",
-							"name": "GNU Lesser General Public License v3.0",
-							"spdx_id": "LGPL-3.0",
-							"url": "https://api.github.com/licenses/lgpl-3.0",
-							"node_id": "MDc6TGljZW5zZW1pdA=="
-						},
-						{
-							"key": "mpl-2.0",
-							"name": "Mozilla Public License 2.0",
-							"spdx_id": "MPL-2.0",
-							"url": "https://api.github.com/licenses/mpl-2.0",
-							"node_id": "MDc6TGljZW5zZW1pdA=="
-						},
-						{
-							"key": "agpl-3.0",
-							"name": "GNU Affero General Public License v3.0",
-							"spdx_id": "AGPL-3.0",
-							"url": "https://api.github.com/licenses/agpl-3.0",
-							"node_id": "MDc6TGljZW5zZW1pdA=="
-						},
-						{
-							"key": "unlicense",
-							"name": "The Unlicense",
-							"spdx_id": "Unlicense",
-							"url": "https://api.github.com/licenses/unlicense",
-							"node_id": "MDc6TGljZW5zZW1pdA=="
-						},
-						{
-							"key": "apache-2.0",
-							"name": "Apache License 2.0",
-							"spdx_id": "Apache-2.0",
-							"url": "https://api.github.com/licenses/apache-2.0",
-							"node_id": "MDc6TGljZW5zZW1pdA=="
-						},
-						{
-							"key": "gpl-3.0",
-							"name": "GNU General Public License v3.0",
-							"spdx_id": "GPL-3.0",
-							"url": "https://api.github.com/licenses/gpl-3.0",
-							"node_id": "MDc6TGljZW5zZW1pdA=="
-						}
+						"AL",
+						"Actionscript",
+						"Ada",
+						"Agda",
+						"Android",
+						"AppEngine",
+						"AppceleratorTitanium",
+						"ArchLinuxPackages",
+						"Autotools",
+						"Ballerina",
+						"C",
+						"C++",
+						"CFWheels",
+						"CMake",
+						"CUDA",
+						"CakePHP",
+						"ChefCookbook",
+						"Clojure",
+						"CodeIgniter",
+						"CommonLisp",
+						"Composer",
+						"Concrete5",
+						"Coq",
+						"CraftCMS",
+						"D"
 						]`,
 					))
 			},
 			wantStdout: heredoc.Doc(`
-				LICENSE KEY  LICENSE NAME
-				mit          MIT License
-				lgpl-3.0     GNU Lesser General Public License v3.0
-				mpl-2.0      Mozilla Public License 2.0
-				agpl-3.0     GNU Affero General Public License v3.0
-				unlicense    The Unlicense
-				apache-2.0   Apache License 2.0
-				gpl-3.0      GNU General Public License v3.0
+				GITIGNORE
+				AL
+				Actionscript
+				Ada
+				Agda
+				Android
+				AppEngine
+				AppceleratorTitanium
+				ArchLinuxPackages
+				Autotools
+				Ballerina
+				C
+				C++
+				CFWheels
+				CMake
+				CUDA
+				CakePHP
+				ChefCookbook
+				Clojure
+				CodeIgniter
+				CommonLisp
+				Composer
+				Concrete5
+				Coq
+				CraftCMS
+				D
 				`),
 			wantStderr: "",
 			opts:       &ListOptions{},
 		},
 		{
-			name:  "license list no license templates tty",
+			name:  "gitignore list no .gitignore templates tty",
 			isTTY: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "licenses"),
+					httpmock.REST("GET", "gitignore/templates"),
 					httpmock.StringResponse(`[]`),
 				)
 			},
 			wantStdout: "",
 			wantStderr: "",
 			wantErr:    true,
-			errMsg:     "No repository license templates found",
+			errMsg:     "No .gitignore templates found",
 			opts:       &ListOptions{},
 		},
 	}

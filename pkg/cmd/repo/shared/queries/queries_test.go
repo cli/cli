@@ -134,3 +134,100 @@ func TestListLicenseTemplates(t *testing.T) {
 		})
 	}
 }
+
+func TestListGitIgnoreTemplates(t *testing.T) {
+	tests := []struct {
+		name                   string
+		httpStubs              func(t *testing.T, reg *httpmock.Registry)
+		wantGitIgnoreTemplates []string
+		wantErr                bool
+		wantErrMsg             string
+		httpClient             func() (*http.Client, error)
+	}{
+		{
+			name: "happy path",
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "gitignore/templates"),
+					httpmock.StringResponse(`[
+						"AL",
+						"Actionscript",
+						"Ada",
+						"Agda",
+						"Android",
+						"AppEngine",
+						"AppceleratorTitanium",
+						"ArchLinuxPackages",
+						"Autotools",
+						"Ballerina",
+						"C",
+						"C++",
+						"CFWheels",
+						"CMake",
+						"CUDA",
+						"CakePHP",
+						"ChefCookbook",
+						"Clojure",
+						"CodeIgniter",
+						"CommonLisp",
+						"Composer",
+						"Concrete5",
+						"Coq",
+						"CraftCMS",
+						"D"
+						]`,
+					))
+			},
+			wantGitIgnoreTemplates: []string{
+				"AL",
+				"Actionscript",
+				"Ada",
+				"Agda",
+				"Android",
+				"AppEngine",
+				"AppceleratorTitanium",
+				"ArchLinuxPackages",
+				"Autotools",
+				"Ballerina",
+				"C",
+				"C++",
+				"CFWheels",
+				"CMake",
+				"CUDA",
+				"CakePHP",
+				"ChefCookbook",
+				"Clojure",
+				"CodeIgniter",
+				"CommonLisp",
+				"Composer",
+				"Concrete5",
+				"Coq",
+				"CraftCMS",
+				"D",
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		reg := &httpmock.Registry{}
+		if tt.httpStubs != nil {
+			tt.httpStubs(t, reg)
+		}
+		tt.httpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+		client, _ := tt.httpClient()
+		t.Run(tt.name, func(t *testing.T) {
+			defer reg.Verify(t)
+			gotGitIgnoreTemplates, err := ListGitIgnoreTemplates(client, "api.github.com")
+			if !tt.wantErr {
+				assert.NoError(t, err, "Expected no error while fetching /gitignore/templates")
+			}
+			if tt.wantErr {
+				assert.Error(t, err, "Expected error while fetching /gitignore/templates")
+			}
+			assert.Equal(t, tt.wantGitIgnoreTemplates, gotGitIgnoreTemplates, "GitIgnore templates fetched is not as expected")
+		})
+	}
+}
