@@ -19,7 +19,8 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared/format"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -244,7 +245,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			return nil, cobra.ShellCompDirectiveError
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		licenses, err := shared.ListLicenseTemplates(httpClient, hostname)
+		licenses, err := queries.ListLicenseTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -317,9 +318,9 @@ func createFromScratch(opts *CreateOptions) error {
 			return err
 		}
 
-		targetRepo := shared.NormalizeRepoName(opts.Name)
+		targetRepo := format.NormalizeRepoName(opts.Name)
 		if idx := strings.IndexRune(opts.Name, '/'); idx > 0 {
-			targetRepo = opts.Name[0:idx+1] + shared.NormalizeRepoName(opts.Name[idx+1:])
+			targetRepo = opts.Name[0:idx+1] + format.NormalizeRepoName(opts.Name[idx+1:])
 		}
 		confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(opts.Visibility)), true)
 		if err != nil {
@@ -476,9 +477,9 @@ func createFromTemplate(opts *CreateOptions) error {
 	}
 	templateRepoMainBranch := templateRepo.DefaultBranchRef.Name
 
-	targetRepo := shared.NormalizeRepoName(opts.Name)
+	targetRepo := format.NormalizeRepoName(opts.Name)
 	if idx := strings.IndexRune(opts.Name, '/'); idx > 0 {
-		targetRepo = opts.Name[0:idx+1] + shared.NormalizeRepoName(opts.Name[idx+1:])
+		targetRepo = opts.Name[0:idx+1] + format.NormalizeRepoName(opts.Name[idx+1:])
 	}
 	confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(opts.Visibility)), true)
 	if err != nil {
@@ -830,7 +831,7 @@ func interactiveLicense(client *http.Client, hostname string, prompter iprompter
 		return "", nil
 	}
 
-	licenses, err := shared.ListLicenseTemplates(client, hostname)
+	licenses, err := queries.ListLicenseTemplates(client, hostname)
 	if err != nil {
 		return "", err
 	}

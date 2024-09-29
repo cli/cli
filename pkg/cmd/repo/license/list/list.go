@@ -6,7 +6,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/tableprinter"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -67,7 +67,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	licenses, err := shared.ListLicenseTemplates(client, hostname)
+	licenses, err := queries.ListLicenseTemplates(client, hostname)
 	if err != nil {
 		return err
 	}

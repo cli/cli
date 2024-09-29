@@ -16,7 +16,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared/format"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -225,7 +225,7 @@ func forkRun(opts *ForkOptions) error {
 	}
 
 	// Rename the new repo if necessary
-	if opts.ForkName != "" && !strings.EqualFold(forkedRepo.RepoName(), shared.NormalizeRepoName(opts.ForkName)) {
+	if opts.ForkName != "" && !strings.EqualFold(forkedRepo.RepoName(), format.NormalizeRepoName(opts.ForkName)) {
 		forkedRepo, err = api.RenameRepo(apiClient, forkedRepo, opts.ForkName)
 		if err != nil {
 			return fmt.Errorf("could not rename fork: %w", err)
