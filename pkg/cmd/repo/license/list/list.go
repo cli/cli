@@ -59,7 +59,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(licenses) == 0 {
-		return cmdutil.NewNoResultsError("no licenses found")
+		return cmdutil.NewNoResultsError("No licenses found")
 	}
 
 	return renderLicenseTemplatesTable(licenses, opts)

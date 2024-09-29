@@ -157,7 +157,7 @@ func TestListRun(t *testing.T) {
 			wantStdout: "",
 			wantStderr: "",
 			wantErr:    true,
-			errMsg:     "no licenses found",
+			errMsg:     "No licenses found",
 			opts:       &ListOptions{},
 		},
 	}
