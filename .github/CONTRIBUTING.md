@@ -51,7 +51,7 @@ Please note that this project adheres to a [Contributor Code of Conduct][code-of
 
 We generate manual pages from source on every release. You do not need to submit pull requests for documentation specifically; manual pages for commands will automatically get updated after your pull requests gets accepted.
 
-## Design guidelines  
+## Design guidelines
 
 ### Proposing a design
 
