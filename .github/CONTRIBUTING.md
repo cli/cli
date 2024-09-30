@@ -65,9 +65,9 @@ To propose a design:
 - Mock up the design you are proposing using our [Google Docs Template][] or code blocks.
   - Mock ups should cleary illustrate the command(s) being run and the expected output(s).
 
-### Revewing a design
+### (core team only) Revewing a design
 
-Maintainers will review the design proposal and provide feedback. Once a maintainer approves the design and adds the [`help wanted`][hw] label to the issue, a PR can be opened to provide the implementation.
+A member of the core team will [triage](../docs/triage.md) the design proposal. Once a member of the core team has reviewd the design, they may add the [`help wanted`][hw] label to the issue, so a PR can be opened to provide the implementation.
 
 ## Resources
 

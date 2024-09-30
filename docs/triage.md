@@ -39,13 +39,13 @@ the changeset is feasible and to allow the associated CI run for new contributor
   - e.g. we have already discussed not wanting to do or it's a duplicate issue
   - add the appropriate label (e.g. `duplicate`)
   - comment and close
-- do we want outside contribution for this?
+- do we want external contribution for this?
   - e.g. the task is relatively straightforward, the core team does not have the bandwidth to take it on
   - ensure that the thread contains all the context necessary for someone new to pick this up
   - add the `help wanted` label
   - consider adding `good first issue` label
   - comment acknowledging that that we are accepting contributions for this and add any other details you feel may be necessary to complete the work
-- do we want outside design contribution for this?
+- do we want external design contribution for this?
   - e.g. the task is worthwhile, but needs design work to flesh out the details before implementation and the core team does not have the bandwidth to take it on
   - ensure that the thread contains all the context necessary for someone new to pick this up
   - add both the `help wanted` and `needs-design` labels
