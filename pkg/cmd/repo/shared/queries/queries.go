@@ -19,6 +19,18 @@ func ListLicenseTemplates(httpClient *http.Client, hostname string) ([]api.Licen
 	return licenseTemplates, nil
 }
 
+// LicenseTemplate fetches an available repository license template.
+// It uses API v3 because license template isn't supported by GraphQL.
+func LicenseTemplate(httpClient *http.Client, hostname string, licenseTemplateName string) (api.License, error) {
+	var licenseTemplates api.License
+	client := api.NewClientFromHTTP(httpClient)
+	err := client.REST(hostname, "GET", fmt.Sprintf("licenses/%v", licenseTemplateName), nil, &licenseTemplates)
+	if err != nil {
+		return api.License{}, err
+	}
+	return licenseTemplates, nil
+}
+
 // ListGitIgnoreTemplates fetches available repository gitignore templates.
 // It uses API v3 here because gitignore template isn't supported by GraphQL.
 func ListGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string, error) {
@@ -33,10 +45,10 @@ func ListGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string,
 
 // ViewGitIgnoreTemplate fetches available repository gitignore templates.
 // It uses API v3 here because gitignore template isn't supported by GraphQL.
-func GitIgnoreTemplate(httpClient *http.Client, hostname string, gitIgnoreTemplate string) (api.GitIgnore, error) {
+func GitIgnoreTemplate(httpClient *http.Client, hostname string, gitIgnoreTemplateName string) (api.GitIgnore, error) {
 	var gitIgnoreTemplateResponse api.GitIgnore
 	client := api.NewClientFromHTTP(httpClient)
-	err := client.REST(hostname, "GET", fmt.Sprintf("gitignore/templates/%v", gitIgnoreTemplate), nil, &gitIgnoreTemplateResponse)
+	err := client.REST(hostname, "GET", fmt.Sprintf("gitignore/templates/%v", gitIgnoreTemplateName), nil, &gitIgnoreTemplateResponse)
 	if err != nil {
 		return api.GitIgnore{}, err
 	}

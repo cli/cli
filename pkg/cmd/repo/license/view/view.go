@@ -19,7 +19,7 @@ type ViewOptions struct {
 	IO         *iostreams.IOStreams
 	HTTPClient func() (*http.Client, error)
 	Config     func() (gh.Config, error)
-	Template   string
+	License    string
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -27,20 +27,20 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HTTPClient: f.HttpClient,
 		Config:     f.Config,
-		Template:   "",
+		License:    "",
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view <template>",
-		Short: "View an available repository gitignore template",
+		Use:   "view <license>",
+		Short: "View an available repository license template",
 		Long: heredoc.Docf(`
-		View an available repository %[1]s.gitignore%[1]s template.
+		View an available repository license template.
 		
-		%[1]s<template>%[1]s is a case-sensitive %[1]s.gitignore%[1]s template name.
+		%[1]s<license>%[1]s is a license name or SPDX ID.
 		`, "`"),
-		Args: cmdutil.ExactArgs(1, "gh repo gitignore view only takes a single template argument"),
+		Args: cmdutil.ExactArgs(1, "gh repo licese view only takes a single license argument"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Template = args[0]
+			opts.License = args[0]
 			if runF != nil {
 				return runF(opts)
 			}
@@ -51,8 +51,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 }
 
 func viewRun(opts *ViewOptions) error {
-	if opts.Template == "" {
-		return errors.New("no template provided")
+	if opts.License == "" {
+		return errors.New("no license provided")
 	}
 
 	client, err := opts.HTTPClient()
@@ -72,28 +72,26 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	gitIgnore, err := queries.GitIgnoreTemplate(client, hostname, opts.Template)
+	license, err := queries.LicenseTemplate(client, hostname, opts.License)
 	if err != nil {
 		if strings.Contains(err.Error(), "HTTP 404") {
-			return fmt.Errorf("'%s' is not a valid gitignore template. Run `gh repo gitignore list` for options", opts.Template)
+			return fmt.Errorf("'%s' is not a valid license template name or SPDX ID. Run `gh repo license list` for options", opts.License)
 		}
 		return err
 	}
 
-	return renderGitIgnore(gitIgnore, opts)
+	return renderLicense(license, opts)
 }
 
-func renderGitIgnore(licenseTemplate api.GitIgnore, opts *ViewOptions) error {
-	// I wanted to render this in a markdown code block and benefit
-	// from .gitignore syntax highlighting. But, the upstream syntax highlighter
-	// does not currently support .gitignore.
-	// So, I just add a newline and print the content as is instead.
-	// Ref: https://github.com/alecthomas/chroma/pull/755
+func renderLicense(licenseTemplate api.License, opts *ViewOptions) error {
+	cs := opts.IO.ColorScheme()
 	var out strings.Builder
 	if opts.IO.IsStdoutTTY() {
-		out.WriteString("\n")
+		out.WriteString(fmt.Sprintf("\n%s\n", cs.Gray(licenseTemplate.Description)))
+		out.WriteString(fmt.Sprintf("\n%s\n", cs.Grayf("To implement: %s", licenseTemplate.Implementation)))
+		out.WriteString(fmt.Sprintf("\n%s\n\n", cs.Grayf("For more information, see: %s", licenseTemplate.HTMLURL)))
 	}
-	out.WriteString(licenseTemplate.Source)
+	out.WriteString(licenseTemplate.Body)
 	_, err := opts.IO.Out.Write([]byte(out.String()))
 	if err != nil {
 		return err

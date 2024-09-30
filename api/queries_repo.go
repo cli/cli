@@ -207,8 +207,18 @@ type IssueLabel struct {
 }
 
 type License struct {
-	Key  string `json:"key"`
-	Name string `json:"name"`
+	Key            string   `json:"key"`
+	Name           string   `json:"name"`
+	SPDXID         string   `json:"spdx_id"`
+	URL            string   `json:"url"`
+	NodeID         string   `json:"node_id"`
+	HTMLURL        string   `json:"html_url"`
+	Description    string   `json:"description"`
+	Implementation string   `json:"implementation"`
+	Permissions    []string `json:"permissions"`
+	Conditions     []string `json:"conditions"`
+	Limitations    []string `json:"limitations"`
+	Body           string   `json:"body"`
 }
 
 type GitIgnore struct {
