@@ -25,7 +25,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
 
       - name: Verify dependencies
         run: |
@@ -53,6 +53,6 @@ jobs:
           assert-nothing-changed go fmt ./...
           assert-nothing-changed go mod tidy
 
-          bin/golangci-lint run --out-format=github-actions --timeout=3m || STATUS=$?
+          bin/golangci-lint run --out-format=colored-line-number --timeout=3m || STATUS=$?
 
           exit $STATUS
