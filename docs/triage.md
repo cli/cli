@@ -40,7 +40,7 @@ the changeset is feasible and to allow the associated CI run for new contributor
   - add the appropriate label (e.g. `duplicate`)
   - comment and close
 - do we want external contribution for this?
-  - e.g. the task is relatively straightforward, the core team does not have the bandwidth to take it on
+  - e.g. the task is relatively straightforward, but the core team does not have the bandwidth to take it on
   - ensure that the thread contains all the context necessary for someone new to pick this up
   - add the `help wanted` label
   - consider adding `good first issue` label
