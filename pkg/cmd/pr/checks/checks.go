@@ -296,12 +296,12 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 	}
 
 	if len(statusCheckRollup.Nodes) == 0 {
-		return nil, checkCounts{}, fmt.Errorf("no checks reported on the '%s' branch", pr.HeadRefName)
+		return nil, checkCounts{}, cmdutil.NewNoResultsError(fmt.Sprintf("no checks reported on the '%s' branch", pr.HeadRefName))
 	}
 
 	checks, counts := aggregateChecks(statusCheckRollup.Nodes, requiredChecks)
 	if len(checks) == 0 && requiredChecks {
-		return checks, counts, fmt.Errorf("no required checks reported on the '%s' branch", pr.HeadRefName)
+		return checks, counts, cmdutil.NewNoResultsError(fmt.Sprintf("no required checks reported on the '%s' branch", pr.HeadRefName))
 	}
 	return checks, counts, nil
 }
