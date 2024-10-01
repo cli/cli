@@ -89,6 +89,7 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 				}
 				commits = append(commits, map[string]interface{}{
 					"oid":             commit.OID,
+					"message":         commit.Message,
 					"messageHeadline": commit.MessageHeadline,
 					"messageBody":     commit.MessageBody,
 					"committedDate":   commit.CommittedDate,

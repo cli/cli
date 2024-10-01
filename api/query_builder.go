@@ -122,6 +122,7 @@ var prCommits = shortenQuery(`
 						user{id,login}
 					}
 				},
+				message,
 				messageHeadline,
 				messageBody,
 				oid,

@@ -38,6 +38,11 @@ func TestPullRequestGraphQL(t *testing.T) {
 			fields: []string{"projectItems"},
 			want:   `projectItems(first:100){nodes{id, project{id,title}, status:fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue{optionId,name}}},totalCount}`,
 		},
+		{
+			name:   "commits",
+			fields: []string{"commits"},
+			want:   "commits(first: 100) {nodes {commit {authors(first:100) {nodes {name,email,user{id,login}}},message,messageHeadline,messageBody,oid,committedDate,authoredDate}}}",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

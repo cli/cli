@@ -260,6 +260,7 @@ type PullRequestCommitCommit struct {
 			User  GitHubUser
 		}
 	}
+	Message         string
 	MessageHeadline string
 	MessageBody     string
 	CommittedDate   time.Time
