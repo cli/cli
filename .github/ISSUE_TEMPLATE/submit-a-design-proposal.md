@@ -23,7 +23,7 @@ has both the `needs-design` and `help-wanted` labels.
 <!--
 Describe the design you are proposing to resolve the issue.
 
-All CLI designs must adhere to the [Pimer CLI design reference](https://primer.style/cli/).
+All CLI designs must adhere to the [Primer CLI design reference](https://primer.style/cli/).
 -->
 
 ### Mockup

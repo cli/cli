@@ -9,14 +9,14 @@ Please do:
 * Check existing issues to verify that an existing [bug][bug issues] or [feature request][feature request issues] issue does not already exist for the same problem or feature.
 * Open an issue if things aren't working as expected.
 * Open an issue to propose a significant change.
-* Open an issue to propose a design for an issue labelled [`needs-design` and `help wanted`][needs design and help wanted], following the [proposing a design guidelines](#proposing-a-design).
+* Open an issue to propose a design for an issue labelled [`needs-design` and `help wanted`][needs design and help wanted], following the [proposing a design guidelines](#proposing-a-design) instructions below.
 * Open a pull request to fix a bug.
 * Open a pull request to fix documentation about a command.
 * Open a pull request for any issue labelled [`help wanted`][hw] or [`good first issue`][gfi].
 
 Please avoid:
 
-* Opening pull requests for issues marked `needs-investigation`, or `blocked`.
+* Opening pull requests for issues marked `needs-design`, `needs-investigation`, or `blocked`.
 * Opening pull requests that haven't been approved for work in an issue
 * Adding installation instructions specifically for your OS/package manager.
 * Opening pull requests for any issue marked `core`. These issues require additional context from
@@ -67,7 +67,7 @@ To propose a design:
 
 ### (core team only) Revewing a design
 
-A member of the core team will [triage](../docs/triage.md) the design proposal. Once a member of the core team has reviewd the design, they may add the [`help wanted`][hw] label to the issue, so a PR can be opened to provide the implementation.
+A member of the core team will [triage](../docs/triage.md) the design proposal. Once a member of the core team has reviewed the design, they may add the [`help wanted`][hw] label to the issue, so a PR can be opened to provide the implementation.
 
 ## Resources
 
