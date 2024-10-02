@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdChecks(t *testing.T) {
@@ -133,7 +134,8 @@ func Test_checksRun(t *testing.T) {
 		disableDetector bool
 		httpStubs       func(*httpmock.Registry)
 		wantOut         string
-		wantErr         string
+		wantErrMsg      string
+		wantErrAs       error
 	}{
 		{
 			name: "no commits tty",
@@ -144,8 +146,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"node":{}}}`),
 				)
 			},
-			wantOut: "",
-			wantErr: "no commit found on the pull request",
+			wantOut:    "",
+			wantErrMsg: "no commit found on the pull request",
 		},
 		{
 			name: "no checks tty",
@@ -156,8 +158,9 @@ func Test_checksRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"node":{"statusCheckRollup":{"nodes":[{"commit":{"oid": "abc"}}]}}}}`),
 				)
 			},
-			wantOut: "",
-			wantErr: "no checks reported on the 'trunk' branch",
+			wantOut:    "",
+			wantErrMsg: "no checks reported on the 'trunk' branch",
+			wantErrAs:  &cmdutil.NoResultsError{},
 		},
 		{
 			name: "some failing tty",
@@ -171,13 +174,13 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				Some checks were not successful
 				0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				X  sad tests                1m26s    sweet link
 				✓  cool tests               1m26s    sweet link
 				*  slow tests               1m26s    sweet link
 			`),
-			wantErr: "SilentError",
+			wantErrMsg: "SilentError",
 		},
 		{
 			name: "some cancelled tty",
@@ -191,13 +194,13 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				Some checks were cancelled
 				1 cancelled, 0 failing, 2 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME           DESCRIPTION  ELAPSED  URL
 				✓  cool tests                  1m26s    sweet link
 				-  sad tests                   1m26s    sweet link
 				✓  awesome tests               1m26s    sweet link
 			`),
-			wantErr: "",
+			wantErrMsg: "",
 		},
 		{
 			name: "some pending tty",
@@ -211,14 +214,14 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				Some checks are still pending
 				1 cancelled, 0 failing, 2 successful, 0 skipped, and 1 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				✓  cool tests               1m26s    sweet link
 				✓  rad tests                1m26s    sweet link
 				*  slow tests               1m26s    sweet link
 				-  sad tests                1m26s    sweet link
 			`),
-			wantErr: "PendingError",
+			wantErrMsg: "PendingError",
 		},
 		{
 			name: "all passing tty",
@@ -232,13 +235,13 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME           DESCRIPTION  ELAPSED  URL
 				✓  awesome tests               1m26s    sweet link
 				✓  cool tests                  1m26s    sweet link
 				✓  rad tests                   1m26s    sweet link
 			`),
-			wantErr: "",
+			wantErrMsg: "",
 		},
 		{
 			name:  "watch all passing tty",
@@ -253,7 +256,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Docf(`
 				%[1]s[?1049hAll checks were successful
 				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME           DESCRIPTION  ELAPSED  URL
 				✓  awesome tests               1m26s    sweet link
 				✓  cool tests                  1m26s    sweet link
@@ -266,7 +269,7 @@ func Test_checksRun(t *testing.T) {
 				✓  cool tests                  1m26s    sweet link
 				✓  rad tests                   1m26s    sweet link
 			`, "\x1b"),
-			wantErr: "",
+			wantErrMsg: "",
 		},
 		{
 			name:     "watch some failing with fail fast tty",
@@ -281,23 +284,23 @@ func Test_checksRun(t *testing.T) {
 			},
 			wantOut: heredoc.Docf(`
 				%[1]s[?1049h%[1]s[0;0H%[1]s[JRefreshing checks status every 0 seconds. Press Ctrl+C to quit.
-				
+
 				Some checks were not successful
 				0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				X  sad tests                1m26s    sweet link
 				✓  cool tests               1m26s    sweet link
 				*  slow tests               1m26s    sweet link
 				%[1]s[?1049lSome checks were not successful
 				0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				X  sad tests                1m26s    sweet link
 				✓  cool tests               1m26s    sweet link
 				*  slow tests               1m26s    sweet link
 			`, "\x1b"),
-			wantErr: "SilentError",
+			wantErrMsg: "SilentError",
 		},
 		{
 			name: "with statuses tty",
@@ -311,13 +314,13 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				Some checks were not successful
 				0 cancelled, 1 failing, 2 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				X  a status                          sweet link
 				✓  cool tests               1m26s    sweet link
 				✓  rad tests                1m26s    sweet link
 			`),
-			wantErr: "SilentError",
+			wantErrMsg: "SilentError",
 		},
 		{
 			name: "no commits",
@@ -327,8 +330,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"node":{}}}`),
 				)
 			},
-			wantOut: "",
-			wantErr: "no commit found on the pull request",
+			wantOut:    "",
+			wantErrMsg: "no commit found on the pull request",
 		},
 		{
 			name: "no checks",
@@ -338,8 +341,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"node":{"statusCheckRollup":{"nodes":[{"commit":{"oid": "abc"}}]}}}}`),
 				)
 			},
-			wantOut: "",
-			wantErr: "no checks reported on the 'trunk' branch",
+			wantOut:    "",
+			wantErrMsg: "no checks reported on the 'trunk' branch",
 		},
 		{
 			name: "some failing",
@@ -349,8 +352,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someFailing.json"),
 				)
 			},
-			wantOut: "sad tests\tfail\t1m26s\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\n",
-			wantErr: "SilentError",
+			wantOut:    "sad tests\tfail\t1m26s\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\n",
+			wantErrMsg: "SilentError",
 		},
 		{
 			name: "some pending",
@@ -360,8 +363,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/somePending.json"),
 				)
 			},
-			wantOut: "cool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\nsad tests\tfail\t1m26s\tsweet link\t\n",
-			wantErr: "PendingError",
+			wantOut:    "cool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\nsad tests\tfail\t1m26s\tsweet link\t\n",
+			wantErrMsg: "PendingError",
 		},
 		{
 			name: "all passing",
@@ -371,8 +374,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/allPassing.json"),
 				)
 			},
-			wantOut: "awesome tests\tpass\t1m26s\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\n",
-			wantErr: "",
+			wantOut:    "awesome tests\tpass\t1m26s\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\n",
+			wantErrMsg: "",
 		},
 		{
 			name: "with statuses",
@@ -382,8 +385,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withStatuses.json"),
 				)
 			},
-			wantOut: "a status\tfail\t0\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\n",
-			wantErr: "SilentError",
+			wantOut:    "a status\tfail\t0\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\n",
+			wantErrMsg: "SilentError",
 		},
 		{
 			name: "some skipped tty",
@@ -397,13 +400,13 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 1 successful, 2 skipped, and 0 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				✓  cool tests               1m26s    sweet link
 				-  rad tests                1m26s    sweet link
 				-  skip tests               1m26s    sweet link
 			`),
-			wantErr: "",
+			wantErrMsg: "",
 		},
 		{
 			name: "some skipped",
@@ -413,8 +416,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someSkipping.json"),
 				)
 			},
-			wantOut: "cool tests\tpass\t1m26s\tsweet link\t\nrad tests\tskipping\t1m26s\tsweet link\t\nskip tests\tskipping\t1m26s\tsweet link\t\n",
-			wantErr: "",
+			wantOut:    "cool tests\tpass\t1m26s\tsweet link\t\nrad tests\tskipping\t1m26s\tsweet link\t\nskip tests\tskipping\t1m26s\tsweet link\t\n",
+			wantErrMsg: "",
 		},
 		{
 			name:     "only required tty",
@@ -429,11 +432,11 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 1 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				✓  cool tests               1m26s    sweet link
 			`),
-			wantErr: "",
+			wantErrMsg: "",
 		},
 		{
 			name:     "only required",
@@ -444,8 +447,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/onlyRequired.json"),
 				)
 			},
-			wantOut: "cool tests\tpass\t1m26s\tsweet link\t\n",
-			wantErr: "",
+			wantOut:    "cool tests\tpass\t1m26s\tsweet link\t\n",
+			wantErrMsg: "",
 		},
 		{
 			name:     "only required but no required checks tty",
@@ -457,8 +460,9 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someSkipping.json"),
 				)
 			},
-			wantOut: "",
-			wantErr: "no required checks reported on the 'trunk' branch",
+			wantOut:    "",
+			wantErrMsg: "no required checks reported on the 'trunk' branch",
+			wantErrAs:  &cmdutil.NoResultsError{},
 		},
 		{
 			name:     "only required but no required checks",
@@ -469,8 +473,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/someSkipping.json"),
 				)
 			},
-			wantOut: "",
-			wantErr: "no required checks reported on the 'trunk' branch",
+			wantOut:    "",
+			wantErrMsg: "no required checks reported on the 'trunk' branch",
 		},
 		{
 			name: "descriptions tty",
@@ -484,13 +488,13 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME           DESCRIPTION          ELAPSED  URL
 				✓  awesome tests  awesome description  1m26s    sweet link
 				✓  cool tests     cool description     1m26s    sweet link
 				✓  rad tests      rad description      1m26s    sweet link
 			`),
-			wantErr: "",
+			wantErrMsg: "",
 		},
 		{
 			name: "descriptions",
@@ -500,8 +504,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withDescriptions.json"),
 				)
 			},
-			wantOut: "awesome tests\tpass\t1m26s\tsweet link\tawesome description\ncool tests\tpass\t1m26s\tsweet link\tcool description\nrad tests\tpass\t1m26s\tsweet link\trad description\n",
-			wantErr: "",
+			wantOut:    "awesome tests\tpass\t1m26s\tsweet link\tawesome description\ncool tests\tpass\t1m26s\tsweet link\tcool description\nrad tests\tpass\t1m26s\tsweet link\trad description\n",
+			wantErrMsg: "",
 		},
 		{
 			name: "events tty",
@@ -515,12 +519,12 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 2 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME                             DESCRIPTION       ELAPSED  URL
 				✓  tests/cool tests (pull_request)  cool description  1m26s    sweet link
 				✓  tests/cool tests (push)          cool description  1m26s    sweet link
 			`),
-			wantErr: "",
+			wantErrMsg: "",
 		},
 		{
 			name:            "events not supported tty",
@@ -535,11 +539,11 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 1 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME              DESCRIPTION       ELAPSED  URL
 				✓  tests/cool tests  cool description  1m26s    sweet link
 			`),
-			wantErr: "",
+			wantErrMsg: "",
 		},
 		{
 			name: "events",
@@ -549,8 +553,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withEvents.json"),
 				)
 			},
-			wantOut: "cool tests\tpass\t1m26s\tsweet link\tcool description\ncool tests\tpass\t1m26s\tsweet link\tcool description\n",
-			wantErr: "",
+			wantOut:    "cool tests\tpass\t1m26s\tsweet link\tcool description\ncool tests\tpass\t1m26s\tsweet link\tcool description\n",
+			wantErrMsg: "",
 		},
 		{
 			name:            "events not supported",
@@ -561,8 +565,8 @@ func Test_checksRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/withoutEvents.json"),
 				)
 			},
-			wantOut: "cool tests\tpass\t1m26s\tsweet link\tcool description\n",
-			wantErr: "",
+			wantOut:    "cool tests\tpass\t1m26s\tsweet link\tcool description\n",
+			wantErrMsg: "",
 		},
 	}
 
@@ -600,10 +604,16 @@ func Test_checksRun(t *testing.T) {
 			}
 
 			err := checksRun(opts)
-			if tt.wantErr != "" {
-				assert.EqualError(t, err, tt.wantErr)
-			} else {
-				assert.NoError(t, err)
+			if tt.wantErrMsg == "" && tt.wantErrAs == nil {
+				require.NoError(t, err)
+			}
+
+			if tt.wantErrMsg != "" {
+				require.EqualError(t, err, tt.wantErrMsg)
+			}
+
+			if tt.wantErrAs != nil {
+				require.ErrorAs(t, err, tt.wantErrAs)
 			}
 
 			assert.Equal(t, tt.wantOut, stdout.String())
