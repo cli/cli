@@ -1,0 +1,5 @@
+{
+    "yaml.schemas": {
+        "https://ms-python.vscode-unpkg.net/ms-python/python/2024.14.1%2Bweb/extension/schemas/conda-environment.json": "github://github%2B7b2276223a312c22726566223a7b2274797065223a322c226964223a2262653435656564633138633161303837323334653139656130336264303731653337616465393531227d7d/cli/cli/.goreleaser.yml"
+    }
+}
