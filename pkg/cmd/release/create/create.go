@@ -114,9 +114,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh release create v1.2.3 --generate-notes
 
 			Use release notes from a file
-			$ gh release create v1.2.3 -F changelog.md
-   
-   			Don't mark the release as latest
+			$ gh release create v1.2.3 -F release-notes.md
+
+			Use annotated tag notes
+			$ gh release create v1.2.3 --notes-from-tag
+
+			Don't mark the release as latest
 			$ gh release create v1.2.3 --latest=false 
 
 			Upload all tarballs in a directory as release assets
@@ -516,12 +519,38 @@ func createRun(opts *CreateOptions) error {
 }
 
 func gitTagInfo(client *git.Client, tagName string) (string, error) {
-	cmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
+	contentCmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents)")
 	if err != nil {
 		return "", err
 	}
-	b, err := cmd.Output()
-	return string(b), err
+	content, err := contentCmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	// If there is a signature, we should strip it from the end of the content.
+	// Note that, we can achieve this by looking for markers like "-----BEGIN PGP
+	// SIGNATURE-----" and cut the remaining text from the content, but this is
+	// not a safe approach, because, although unlikely, the content can contain
+	// a signature-like section which we shouldn't leave it as is. So, we need
+	// to get the tag signature as a whole, if any, and remote it from the content.
+	signatureCmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:signature)")
+	if err != nil {
+		return "", err
+	}
+	signature, err := signatureCmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	if len(signature) == 0 {
+		// The tag annotation content has no trailing signature to strip out,
+		// so we return the entire content.
+		return string(content), nil
+	}
+
+	body, _ := strings.CutSuffix(string(content), "\n"+string(signature))
+	return body, nil
 }
 
 func detectPreviousTag(client *git.Client, headRef string) (string, error) {

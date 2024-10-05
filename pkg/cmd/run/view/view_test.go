@@ -1183,7 +1183,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
 			browsedURL: "https://github.com/runs/3",
-			wantOut:    "Opening github.com/runs/3 in your browser.\n",
+			wantOut:    "Opening https://github.com/runs/3 in your browser.\n",
 		},
 		{
 			name: "web job",
@@ -1204,7 +1204,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
 			browsedURL: "https://github.com/jobs/10?check_suite_focus=true",
-			wantOut:    "Opening github.com/jobs/10 in your browser.\n",
+			wantOut:    "Opening https://github.com/jobs/10 in your browser.\n",
 		},
 		{
 			name: "hide job header, failure",
@@ -1319,6 +1319,38 @@ func TestViewRun(t *testing.T) {
 			},
 			errMsg:  "failed to get annotations: HTTP 500 (https://api.github.com/repos/OWNER/REPO/check-runs/20/annotations)",
 			wantErr: true,
+		},
+		{
+			name: "annotation endpoint forbidden (fine grained tokens)",
+			tty:  true,
+			opts: &ViewOptions{
+				RunID: "1234",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/artifacts"),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestForRun`),
+					httpmock.StringResponse(``))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/20/annotations"),
+					httpmock.StatusStringResponse(403, "Forbidden"))
+			},
+			wantOut: "\nX trunk CI · 1234\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nrequesting annotations returned 403 Forbidden as the token does not have sufficient permissions. Note that it is not currently possible to create a fine-grained PAT with the `checks:read` permission.\n\nTo see what failed, try: gh run view 1234 --log-failed\nView this run on GitHub: https://github.com/runs/1234\n",
 		},
 	}
 
@@ -1489,6 +1521,18 @@ func Test_attachRunLog(t *testing.T) {
 			wantMatch: true,
 			// not the double space in the dir name, as the slash has been removed
 			wantFilename: "cool job  with slash/1_fob the barz.txt",
+		},
+		{
+			name: "job name with colon matches dir with colon removed",
+			job: shared.Job{
+				Name: "cool job : with colon",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "cool job  with colon/1_fob the barz.txt",
 		},
 		{
 			name: "Job name with really long name (over the ZIP limit)",

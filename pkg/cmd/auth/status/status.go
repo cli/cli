@@ -129,6 +129,7 @@ type StatusOptions struct {
 
 	Hostname  string
 	ShowToken bool
+	Active    bool
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -145,8 +146,11 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Display active account and authentication state on each known GitHub host.
 
-			For each host, the authentication state of each known account is tested and any issues are included in
-			the output. Each host section will indicate the active account, which will be used when targeting that host.
+			For each host, the authentication state of each known account is tested and any issues are included in the output.
+			Each host section will indicate the active account, which will be used when targeting that host.
+			If an account on any host (or only the one given via %[1]s--hostname%[1]s) has authentication issues,
+			the command will exit with 1 and output to stderr.
+
 			To change the active account for a host, see %[1]sgh auth switch%[1]s.
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -158,8 +162,9 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check a specific hostname's auth status")
+	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "Check only a specific hostname's auth status")
 	cmd.Flags().BoolVarP(&opts.ShowToken, "show-token", "t", false, "Display the auth token")
+	cmd.Flags().BoolVarP(&opts.Active, "active", "a", false, "Display the active account only")
 
 	return cmd
 }
@@ -217,6 +222,14 @@ func statusRun(opts *StatusOptions) error {
 		})
 		statuses[hostname] = append(statuses[hostname], entry)
 
+		if err == nil && !isValidEntry(entry) {
+			err = cmdutil.SilentError
+		}
+
+		if opts.Active {
+			continue
+		}
+
 		users := authCfg.UsersForHost(hostname)
 		for _, username := range users {
 			if username == activeUser {
@@ -233,6 +246,10 @@ func statusRun(opts *StatusOptions) error {
 				username:    username,
 			})
 			statuses[hostname] = append(statuses[hostname], entry)
+
+			if err == nil && !isValidEntry(entry) {
+				err = cmdutil.SilentError
+			}
 		}
 	}
 
@@ -243,15 +260,20 @@ func statusRun(opts *StatusOptions) error {
 			continue
 		}
 
+		stream := stdout
+		if err != nil {
+			stream = stderr
+		}
+
 		if prevEntry {
-			fmt.Fprint(stdout, "\n")
+			fmt.Fprint(stream, "\n")
 		}
 		prevEntry = true
-		fmt.Fprintf(stdout, "%s\n", cs.Bold(hostname))
-		fmt.Fprintf(stdout, "%s", strings.Join(entries.Strings(cs), "\n"))
+		fmt.Fprintf(stream, "%s\n", cs.Bold(hostname))
+		fmt.Fprintf(stream, "%s", strings.Join(entries.Strings(cs), "\n"))
 	}
 
-	return nil
+	return err
 }
 
 func displayToken(token string, printRaw bool) string {
@@ -355,4 +377,9 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) Entry {
 
 func authTokenWriteable(src string) bool {
 	return !strings.HasSuffix(src, "_TOKEN")
+}
+
+func isValidEntry(entry Entry) bool {
+	_, ok := entry.(validEntry)
+	return ok
 }

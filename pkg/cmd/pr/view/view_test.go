@@ -18,11 +18,61 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestJSONFields(t *testing.T) {
+	jsonfieldstest.ExpectCommandToSupportJSONFields(t, NewCmdView, []string{
+		"additions",
+		"assignees",
+		"author",
+		"autoMergeRequest",
+		"baseRefName",
+		"body",
+		"changedFiles",
+		"closed",
+		"closedAt",
+		"comments",
+		"commits",
+		"createdAt",
+		"deletions",
+		"files",
+		"fullDatabaseId",
+		"headRefName",
+		"headRefOid",
+		"headRepository",
+		"headRepositoryOwner",
+		"id",
+		"isCrossRepository",
+		"isDraft",
+		"labels",
+		"latestReviews",
+		"maintainerCanModify",
+		"mergeCommit",
+		"mergeStateStatus",
+		"mergeable",
+		"mergedAt",
+		"mergedBy",
+		"milestone",
+		"number",
+		"potentialMergeCommit",
+		"projectCards",
+		"projectItems",
+		"reactionGroups",
+		"reviewDecision",
+		"reviewRequests",
+		"reviews",
+		"state",
+		"statusCheckRollup",
+		"title",
+		"updatedAt",
+		"url",
+	})
+}
 
 func Test_NewCmdView(t *testing.T) {
 	tests := []struct {
@@ -590,7 +640,7 @@ func TestPRView_web_currentBranch(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/pull/10 in your browser.\n", output.Stderr())
+	assert.Equal(t, "Opening https://github.com/OWNER/REPO/pull/10 in your browser.\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/10", output.BrowsedURL)
 }
 

@@ -1,7 +1,7 @@
 package verification
 
 import (
-	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,19 +9,25 @@ import (
 	"path/filepath"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
+	"github.com/google/go-containerregistry/pkg/name"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 )
 
 var ErrUnrecognisedBundleExtension = errors.New("bundle file extension not supported, must be json or jsonl")
+var ErrEmptyBundleFile = errors.New("provided bundle file is empty")
 
 type FetchAttestationsConfig struct {
-	APIClient  api.Client
-	BundlePath string
-	Digest     string
-	Limit      int
-	Owner      string
-	Repo       string
+	APIClient             api.Client
+	BundlePath            string
+	Digest                string
+	Limit                 int
+	Owner                 string
+	Repo                  string
+	OCIClient             oci.Client
+	UseBundleFromRegistry bool
+	NameRef               name.Reference
 }
 
 func (c *FetchAttestationsConfig) IsBundleProvided() bool {
@@ -32,6 +38,11 @@ func GetAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
 	if c.IsBundleProvided() {
 		return GetLocalAttestations(c.BundlePath)
 	}
+
+	if c.UseBundleFromRegistry {
+		return GetOCIAttestations(c)
+	}
+
 	return GetRemoteAttestations(c)
 }
 
@@ -42,13 +53,25 @@ func GetLocalAttestations(path string) ([]*api.Attestation, error) {
 	case ".json":
 		attestations, err := loadBundleFromJSONFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("bundle could not be loaded from JSON file: %v", err)
+			var pathErr *os.PathError
+			if errors.As(err, &pathErr) {
+				return nil, fmt.Errorf("bundle could not be loaded from JSON file at %s", path)
+			} else if errors.Is(err, bundle.ErrValidation) {
+				return nil, err
+			}
+			return nil, fmt.Errorf("bundle content could not be parsed")
 		}
 		return attestations, nil
 	case ".jsonl":
 		attestations, err := loadBundlesFromJSONLinesFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("bundles could not be loaded from JSON lines file: %v", err)
+			var pathErr *os.PathError
+			if errors.As(err, &pathErr) {
+				return nil, fmt.Errorf("bundles could not be loaded from JSON lines file at %s", path)
+			} else if errors.Is(err, bundle.ErrValidation) {
+				return nil, err
+			}
+			return nil, fmt.Errorf("bundle content could not be parsed")
 		}
 		return attestations, nil
 	}
@@ -65,29 +88,27 @@ func loadBundleFromJSONFile(path string) ([]*api.Attestation, error) {
 }
 
 func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
-	file, err := os.Open(path)
+	fileContent, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not open file: %v", err)
+		return nil, err
 	}
-	defer file.Close()
 
 	attestations := []*api.Attestation{}
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		b := scanner.Bytes()
-		var bundle bundle.ProtobufBundle
-		bundle.Bundle = new(protobundle.Bundle)
-		err = bundle.UnmarshalJSON(b)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal bundle from JSON: %v", err)
+	decoder := json.NewDecoder(bytes.NewReader(fileContent))
+
+	for decoder.More() {
+		var b bundle.Bundle
+		b.Bundle = new(protobundle.Bundle)
+		if err := decoder.Decode(&b); err != nil {
+			return nil, err
 		}
-		a := api.Attestation{Bundle: &bundle}
+		a := api.Attestation{Bundle: &b}
 		attestations = append(attestations, &a)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
+	if len(attestations) == 0 {
+		return nil, ErrEmptyBundleFile
 	}
 
 	return attestations, nil
@@ -113,6 +134,17 @@ func GetRemoteAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error
 		return attestations, nil
 	}
 	return nil, fmt.Errorf("owner or repo must be provided")
+}
+
+func GetOCIAttestations(c FetchAttestationsConfig) ([]*api.Attestation, error) {
+	attestations, err := c.OCIClient.GetAttestations(c.NameRef, c.Digest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch OCI attestations: %w", err)
+	}
+	if len(attestations) == 0 {
+		return nil, fmt.Errorf("no attestations found in the OCI registry. Retry the command without the --bundle-from-oci flag to check GitHub for the attestation")
+	}
+	return attestations, nil
 }
 
 type IntotoStatement struct {

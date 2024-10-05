@@ -158,25 +158,25 @@ var HelpTopics = []helpTopic{
 			$ gh pr list --json number,title,author
 			[
 			  {
-				"author": {
-				  "login": "monalisa"
-				},
-				"number": 123,
-				"title": "A helpful contribution"
+			    "author": {
+			      "login": "monalisa"
+			    },
+			    "number": 123,
+			    "title": "A helpful contribution"
 			  },
 			  {
-				"author": {
-				  "login": "codercat"
-				},
-				"number": 124,
-				"title": "Improve the docs"
+			    "author": {
+			      "login": "codercat"
+			    },
+			    "number": 124,
+			    "title": "Improve the docs"
 			  },
 			  {
-				"author": {
-				  "login": "cli-maintainer"
-				},
-				"number": 125,
-				"title": "An exciting new feature"
+			    "author": {
+			      "login": "cli-maintainer"
+			    },
+			    "number": 125,
+			    "title": "An exciting new feature"
 			  }
 			]
 
@@ -193,32 +193,31 @@ var HelpTopics = []helpTopic{
 			  | map(.labels = (.labels | map(.name))) # show only the label names
 			  | .[:3]                                 # select the first 3 results'
 			  [
-				{
-				  "labels": [
-					"enhancement",
-					"needs triage"
-				  ],
-				  "number": 123,
-				  "title": "A helpful contribution"
-				},
-				{
-				  "labels": [
-					"help wanted",
-					"docs",
-					"good first issue"
-				  ],
-				  "number": 125,
-				  "title": "Improve the docs"
-				},
-				{
-				  "labels": [
-					"enhancement",
-				  ],
-				  "number": 7221,
-				  "title": "An exciting new feature"
-				}
+			    {
+			      "labels": [
+			        "enhancement",
+			        "needs triage"
+			      ],
+			      "number": 123,
+			      "title": "A helpful contribution"
+			    },
+			    {
+			      "labels": [
+			        "help wanted",
+			        "docs",
+			        "good first issue"
+			      ],
+			      "number": 125,
+			      "title": "Improve the docs"
+			    },
+			    {
+			      "labels": [
+			        "enhancement",
+			      ],
+			      "number": 7221,
+			      "title": "An exciting new feature"
+			    }
 			  ]
-			  
 			# using the --template flag with the hyperlink helper
 			gh issue list --json title,url --template '{{range .}}{{hyperlink .url .title}}{{"\n"}}{{end}}'
 
@@ -266,7 +265,7 @@ var HelpTopics = []helpTopic{
 
 			- If a command is running but gets cancelled, the exit code will be 2
 
-			- If a command encounters an authentication issue, the exit code will be 4
+			- If a command requires authentication, the exit code will be 4
 
 			NOTE: It is possible that a particular command may have more exit codes, so it is a good
 			practice to check documentation for the command if you are relying on exit codes to

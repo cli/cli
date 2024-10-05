@@ -44,6 +44,13 @@ func Test_NewCmdStatus(t *testing.T) {
 				ShowToken: true,
 			},
 		},
+		{
+			name: "active",
+			cli:  "--active",
+			wants: StatusOptions{
+				Active: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -100,7 +107,8 @@ func Test_statusRun(t *testing.T) {
 					return nil, context.DeadlineExceeded
 				})
 			},
-			wantOut: heredoc.Doc(`
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
 				github.com
 				  X Timeout trying to log in to github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
@@ -159,7 +167,53 @@ func Test_statusRun(t *testing.T) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
 			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				ghe.io
+				  X Failed to log in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
+				  - To re-authenticate, run: gh auth login -h ghe.io
+				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+			`),
+		},
+		{
+			name: "bad token on other host",
+			opts: StatusOptions{
+				Hostname: "ghe.io",
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", "repo, read:org"))
+			},
 			wantOut: heredoc.Doc(`
+				ghe.io
+				  ✓ Logged in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
+			`),
+		},
+		{
+			name: "bad token on selected host",
+			opts: StatusOptions{
+				Hostname: "ghe.io",
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
 				ghe.io
 				  X Failed to log in to ghe.io account monalisa-ghe (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
@@ -335,14 +389,14 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "multiple hosts with multiple accounts with environment tokens and with errors",
 			opts: StatusOptions{},
-			env:  map[string]string{"GH_ENTERPRISE_TOKEN": "gho_abc123"},
+			env:  map[string]string{"GH_ENTERPRISE_TOKEN": "gho_abc123"}, // monalisa-ghe-2
 			cfgStubs: func(t *testing.T, c gh.Config) {
 				login(t, c, "github.com", "monalisa", "gho_def456", "https")
 				login(t, c, "github.com", "monalisa-2", "gho_ghi789", "https")
 				login(t, c, "ghe.io", "monalisa-ghe", "gho_xyz123", "ssh")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				// Get scopes for monalia-2
+				// Get scopes for monalisa-2
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 				// Get scopes for monalisa
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo"))
@@ -355,7 +409,8 @@ func Test_statusRun(t *testing.T) {
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa-ghe-2"}}}`))
 			},
-			wantOut: heredoc.Doc(`
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
 				github.com
 				  ✓ Logged in to github.com account monalisa-2 (GH_CONFIG_DIR/hosts.yml)
 				  - Active account: true
@@ -383,6 +438,94 @@ func Test_statusRun(t *testing.T) {
 				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
 				  - To re-authenticate, run: gh auth login -h ghe.io
 				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe
+			`),
+		},
+		{
+			name: "multiple accounts on a host, only active users",
+			opts: StatusOptions{
+				Active: true,
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "github.com", "monalisa-2", "gho_abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				github.com
+				  ✓ Logged in to github.com account monalisa-2 (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
+			`),
+		},
+		{
+			name: "multiple hosts with multiple accounts, only active users",
+			opts: StatusOptions{
+				Active: true,
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "github.com", "monalisa-2", "gho_abc123", "https")
+				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "ssh")
+				login(t, c, "ghe.io", "monalisa-ghe-2", "gho_abc123", "ssh")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				// Get scopes for monalisa-2
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				// Get scopes for monalisa-ghe-2
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				github.com
+				  ✓ Logged in to github.com account monalisa-2 (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
+
+				ghe.io
+				  ✓ Logged in to ghe.io account monalisa-ghe-2 (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: ssh
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
+			`),
+		},
+		{
+			name: "multiple hosts with multiple accounts, only active users with errors",
+			opts: StatusOptions{
+				Active: true,
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "gho_abc123", "https")
+				login(t, c, "github.com", "monalisa-2", "gho_abc123", "https")
+				login(t, c, "ghe.io", "monalisa-ghe", "gho_abc123", "ssh")
+				login(t, c, "ghe.io", "monalisa-ghe-2", "gho_abc123", "ssh")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				// Get scopes for monalisa-2
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				// Error getting scopes for monalisa-ghe-2
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(404, "{}"))
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  ✓ Logged in to github.com account monalisa-2 (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
+
+				ghe.io
+				  X Failed to log in to ghe.io account monalisa-ghe-2 (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - The token in GH_CONFIG_DIR/hosts.yml is invalid.
+				  - To re-authenticate, run: gh auth login -h ghe.io
+				  - To forget about this account, run: gh auth logout -h ghe.io -u monalisa-ghe-2
 			`),
 		},
 	}

@@ -338,10 +338,17 @@ func runView(opts *ViewOptions) error {
 	}
 
 	var annotations []shared.Annotation
+	var missingAnnotationsPermissions bool
+
 	for _, job := range jobs {
 		as, err := shared.GetAnnotations(client, repo, job)
 		if err != nil {
-			return fmt.Errorf("failed to get annotations: %w", err)
+			if err != shared.ErrMissingAnnotationsPermissions {
+				return fmt.Errorf("failed to get annotations: %w", err)
+			}
+
+			missingAnnotationsPermissions = true
+			break
 		}
 		annotations = append(annotations, as...)
 	}
@@ -373,7 +380,11 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
 	}
 
-	if len(annotations) > 0 {
+	if missingAnnotationsPermissions {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
+		fmt.Fprintln(out, "requesting annotations returned 403 Forbidden as the token does not have sufficient permissions. Note that it is not currently possible to create a fine-grained PAT with the `checks:read` permission.")
+	} else if len(annotations) > 0 {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
 		fmt.Fprintln(out, shared.RenderAnnotations(cs, annotations))
@@ -535,6 +546,7 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	// * Truncate long job names
 	//
 	sanitizedJobName := strings.ReplaceAll(job.Name, "/", "")
+	sanitizedJobName = strings.ReplaceAll(sanitizedJobName, ":", "")
 	sanitizedJobName = truncateAsUTF16(sanitizedJobName, JOB_NAME_MAX_LENGTH)
 	re := fmt.Sprintf(`^%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)

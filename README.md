@@ -23,6 +23,9 @@ If you are a hubber and are interested in shipping new commands for the CLI, che
 
 `gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], [Webi][], and as a downloadable binary including Mac OS installer `.pkg` from the [releases page][].
 
+> [!NOTE]
+> As of May 29th, Mac OS installer `.pkg` are unsigned with efforts prioritized in [`cli/cli#9139`](https://github.com/cli/cli/issues/9139) to support signing them.
+
 #### Homebrew
 
 | Install:          | Upgrade:          |
@@ -56,6 +59,14 @@ Additional Conda installation options available on the [gh-feedstock page](https
 | `curl -sS https://webi.sh/gh \| sh` | `webi gh@stable` |
 
 For more information about the Webi installer see [its homepage](https://webinstall.dev/).
+
+#### Flox
+
+| Install:          | Upgrade:                |
+| ----------------- | ----------------------- |
+| `flox install gh` | `flox upgrade toplevel` |
+
+For more information about Flox, see [its homepage](https://flox.dev)
 
 ### Linux & BSD
 

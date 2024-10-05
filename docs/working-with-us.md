@@ -4,6 +4,9 @@ POV: your team at GitHub is interested in shipping a new command in `gh`.
 
 This document outlines the process the CLI team prefers for helping ensure success both for your new feature and the CLI project as a whole.
 
+> [!NOTE]
+> External contributors, please see [CONTRIBUTING.md](/.github/CONTRIBUTING.md).
+
 ## Step 0: Create an extension
 
 Even if you want to see your code merged into `gh`, you should start with [an extension](https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions) written in Go and leveraging [go-gh](https://github.com/cli/go-gh). Though `gh` extensions can be written in any language, we treat Go as a first class experience and ship a library of helpers for extensions written in Go.

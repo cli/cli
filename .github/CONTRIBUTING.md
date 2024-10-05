@@ -6,9 +6,10 @@ We accept pull requests for bug fixes and features where we've discussed the app
 
 Please do:
 
-* Check existing issues to verify that the [bug][bug issues] or [feature request][feature request issues] has not already been submitted.
+* Check existing issues to verify that an existing [bug][bug issues] or [feature request][feature request issues] issue does not already exist for the same problem or feature.
 * Open an issue if things aren't working as expected.
 * Open an issue to propose a significant change.
+* Open an issue to propose a design for an issue labelled [`needs-design` and `help wanted`][needs design and help wanted], following the [proposing a design guidelines](#proposing-a-design) instructions below.
 * Open a pull request to fix a bug.
 * Open a pull request to fix documentation about a command.
 * Open a pull request for any issue labelled [`help wanted`][hw] or [`good first issue`][gfi].
@@ -52,7 +53,21 @@ We generate manual pages from source on every release. You do not need to submit
 
 ## Design guidelines
 
-You may reference the [CLI Design System][] when suggesting features, and are welcome to use our [Google Docs Template][] to suggest designs.
+### Proposing a design
+
+You may propose a design to solve an open bug or feature request issue that has both [the `needs-design` and `help-wanted` labels][needs design and help wanted].
+
+To propose a design:
+
+- Open a new issue using the [design proposal issue template](./ISSUE_TEMPLATE/submit-a-design-proposal.md).
+- Include a link to the issue that the design is for.
+- Describe the design you are proposing to resolve the issue, leveraging the [CLI Design System][].
+- Mock up the design you are proposing using our [Google Docs Template][] or code blocks.
+  - Mock ups should cleary illustrate the command(s) being run and the expected output(s).
+
+### (core team only) Revewing a design
+
+A member of the core team will [triage](../docs/triage.md) the design proposal. Once a member of the core team has reviewed the design, they may add the [`help wanted`][hw] label to the issue, so a PR can be opened to provide the implementation.
 
 ## Resources
 
@@ -62,6 +77,7 @@ You may reference the [CLI Design System][] when suggesting features, and are we
 
 
 [bug issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3Abug
+[needs design and help wanted]: https://github.com/cli/cli/issues?q=state%3Aclosed%20is%3Aissue%20label%3Aneeds-design%20label%3A%22help%20wanted%22
 [feature request issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3Aenhancement
 [hw]: https://github.com/cli/cli/labels/help%20wanted
 [gfi]: https://github.com/cli/cli/labels/good%20first%20issue

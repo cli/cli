@@ -9,6 +9,7 @@ import (
 type MockClient struct {
 	OnGetByRepoAndDigest  func(repo, digest string, limit int) ([]*Attestation, error)
 	OnGetByOwnerAndDigest func(owner, digest string, limit int) ([]*Attestation, error)
+	OnGetTrustDomain      func() (string, error)
 }
 
 func (m MockClient) GetByRepoAndDigest(repo, digest string, limit int) ([]*Attestation, error) {
@@ -17,6 +18,10 @@ func (m MockClient) GetByRepoAndDigest(repo, digest string, limit int) ([]*Attes
 
 func (m MockClient) GetByOwnerAndDigest(owner, digest string, limit int) ([]*Attestation, error) {
 	return m.OnGetByOwnerAndDigest(owner, digest, limit)
+}
+
+func (m MockClient) GetTrustDomain() (string, error) {
+	return m.OnGetTrustDomain()
 }
 
 func makeTestAttestation() Attestation {

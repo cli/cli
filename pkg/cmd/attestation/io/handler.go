@@ -62,6 +62,10 @@ func (h *Handler) VerbosePrintf(f string, v ...interface{}) (int, error) {
 }
 
 func (h *Handler) PrintTable(headers []string, rows [][]string) error {
+	if !h.IO.IsStdoutTTY() {
+		return nil
+	}
+
 	t := tableprinter.New(h.IO, tableprinter.WithHeader(headers...))
 
 	for _, row := range rows {

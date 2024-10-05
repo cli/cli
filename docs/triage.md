@@ -8,6 +8,8 @@ triage role. The initial expectation is that the person in the role for the week
 
 Review and label [open issues missing either the `enhancement`, `bug`, or `docs` label](https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+-label%3Abug%2Cenhancement%2Cdocs+).
 
+Any issue that is accepted to be done as either an `enhancement`, `bug`, or `docs` requires explicit Acceptance Criteria in a comment on the issue before `needs-triage` label is removed.
+
 To be considered triaged, `enhancement` issues require at least one of the following additional labels:
 
 - `core`: reserved for the core CLI team
@@ -31,27 +33,32 @@ the changeset is feasible and to allow the associated CI run for new contributor
 
 - can this be closed outright?
   - e.g. spam/junk
+  - add the `invalid` label
   - close without comment
 - do we not want to do it?
-  - e.g. have already discussed not wanting to do or duplicate issue
+  - e.g. we have already discussed not wanting to do or it's a duplicate issue
+  - add the appropriate label (e.g. `duplicate`)
   - comment and close
-- are we ok with outside contribution for this?
-  - e.g. the task is relatively straightforward, but no people on our team have the bandwidth to take it on at the moment
+- do we want external contribution for this?
+  - e.g. the task is relatively straightforward, but the core team does not have the bandwidth to take it on
   - ensure that the thread contains all the context necessary for someone new to pick this up
-  - add `help wanted` label
+  - add the `help wanted` label
   - consider adding `good first issue` label
+- do we want external design contribution for this?
+  - e.g. the task is worthwhile, but needs design work to flesh out the details before implementation and the core team does not have the bandwidth to take it on
+  - ensure that the thread contains all the context necessary for someone new to pick this up
+  - add both the `help wanted` and `needs-design` labels
 - do we want to do it?
+  - add the `core` label
   - comment acknowledging that
-  - add `core` label
-  - add to the project “TODO” column if this is something that should ship soon
 - is it intriguing, but requires discussion?
-  - label `discuss`
-  - label `needs-investigation` if engineering research is required before action can be taken
+  - Add the `discuss` label
+  - Add the `needs-investigation` label if engineering research is required before action can be taken
 - does it need more info from the issue author?
   - ask the user for details
-  - add `needs-user-input` label
+  - add the `needs-user-input` label
 - is it a usage/support question?
-  - consider converting the Issue to a Discussion
+  - Convert the Issue to a Discussion
 
 ## Weekly PR audit
 

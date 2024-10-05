@@ -12,6 +12,6 @@ import (
 var SigstoreBundleRaw []byte
 
 // SigstoreBundle returns a test *sigstore.Bundle
-func SigstoreBundle(t *testing.T) *bundle.ProtobufBundle {
+func SigstoreBundle(t *testing.T) *bundle.Bundle {
 	return sgData.TestBundle(t, SigstoreBundleRaw)
 }

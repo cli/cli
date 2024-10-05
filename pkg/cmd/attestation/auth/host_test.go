@@ -3,6 +3,8 @@ package auth
 import (
 	"testing"
 
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,7 +40,8 @@ func TestIsHostSupported(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("GH_HOST", tc.host)
 
-			err := IsHostSupported()
+			host, _ := ghauth.DefaultHost()
+			err := IsHostSupported(host)
 			if tc.expectedErr {
 				require.ErrorIs(t, err, ErrUnsupportedHost)
 			} else {

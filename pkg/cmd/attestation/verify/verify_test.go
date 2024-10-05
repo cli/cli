@@ -35,10 +35,21 @@ var (
 
 func TestNewVerifyCmd(t *testing.T) {
 	testIO, _, _, _ := iostreams.Test()
+	var testReg httpmock.Registry
+	var metaResp = api.MetaResponse{
+		Domains: api.Domain{
+			ArtifactAttestations: api.ArtifactAttestations{
+				TrustDomain: "foo",
+			},
+		},
+	}
+	testReg.Register(httpmock.REST(http.MethodGet, "meta"),
+		httpmock.StatusJSONResponse(200, &metaResp))
+
 	f := &cmdutil.Factory{
 		IOStreams: testIO,
 		HttpClient: func() (*http.Client, error) {
-			reg := &httpmock.Registry{}
+			reg := &testReg
 			client := &http.Client{}
 			httpmock.ReplaceTripper(client, reg)
 			return client, nil
@@ -60,9 +71,10 @@ func TestNewVerifyCmd(t *testing.T) {
 				BundlePath:       test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
 				DigestAlgorithm:  "sha384",
 				Limit:            30,
-				OIDCIssuer:       GitHubOIDCIssuer,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
 				Owner:            "sigstore",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "github.com",
 			},
 			wantsErr: true,
 		},
@@ -74,12 +86,45 @@ func TestNewVerifyCmd(t *testing.T) {
 				BundlePath:       test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
 				DigestAlgorithm:  "sha256",
 				Limit:            30,
-				OIDCIssuer:       GitHubOIDCIssuer,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
 				Owner:            "sigstore",
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "github.com",
 			},
 			wantsErr: false,
+		},
+		{
+			name: "Custom host",
+			cli:  fmt.Sprintf("%s --bundle %s --owner sigstore --hostname foo.ghe.com", artifactPath, bundlePath),
+			wants: Options{
+				ArtifactPath:     test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				BundlePath:       test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
+				DigestAlgorithm:  "sha256",
+				Limit:            30,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
+				Owner:            "sigstore",
+				SANRegex:         "(?i)^https://foo.ghe.com/sigstore/",
+				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "foo.ghe.com",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "Invalid custom host",
+			cli:  fmt.Sprintf("%s --bundle %s --owner sigstore --hostname foo.bar.com", artifactPath, bundlePath),
+			wants: Options{
+				ArtifactPath:     test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
+				BundlePath:       test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
+				DigestAlgorithm:  "sha256",
+				Limit:            30,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
+				Owner:            "sigstore",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
+				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "foo.ghe.com",
+			},
+			wantsErr: true,
 		},
 		{
 			name: "Use custom digest-alg value",
@@ -89,10 +134,11 @@ func TestNewVerifyCmd(t *testing.T) {
 				BundlePath:       test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json"),
 				DigestAlgorithm:  "sha512",
 				Limit:            30,
-				OIDCIssuer:       GitHubOIDCIssuer,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
 				Owner:            "sigstore",
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "github.com",
 			},
 			wantsErr: false,
 		},
@@ -102,11 +148,12 @@ func TestNewVerifyCmd(t *testing.T) {
 			wants: Options{
 				ArtifactPath:     test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz"),
 				DigestAlgorithm:  "sha256",
-				OIDCIssuer:       GitHubOIDCIssuer,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
 				Owner:            "sigstore",
 				Limit:            30,
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "github.com",
 			},
 			wantsErr: true,
 		},
@@ -116,11 +163,12 @@ func TestNewVerifyCmd(t *testing.T) {
 			wants: Options{
 				ArtifactPath:     artifactPath,
 				DigestAlgorithm:  "sha256",
-				OIDCIssuer:       GitHubOIDCIssuer,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
 				Owner:            "sigstore",
 				Repo:             "sigstore/sigstore-js",
 				Limit:            30,
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "github.com",
 			},
 			wantsErr: true,
 		},
@@ -131,10 +179,11 @@ func TestNewVerifyCmd(t *testing.T) {
 				ArtifactPath:     artifactPath,
 				DigestAlgorithm:  "sha256",
 				Limit:            30,
-				OIDCIssuer:       GitHubOIDCIssuer,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
 				Owner:            "sigstore",
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "github.com",
 			},
 			wantsErr: false,
 		},
@@ -144,11 +193,12 @@ func TestNewVerifyCmd(t *testing.T) {
 			wants: Options{
 				ArtifactPath:     artifactPath,
 				DigestAlgorithm:  "sha256",
-				OIDCIssuer:       GitHubOIDCIssuer,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
 				Owner:            "sigstore",
 				Limit:            101,
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "github.com",
 			},
 			wantsErr: false,
 		},
@@ -158,11 +208,12 @@ func TestNewVerifyCmd(t *testing.T) {
 			wants: Options{
 				ArtifactPath:     artifactPath,
 				DigestAlgorithm:  "sha256",
-				OIDCIssuer:       GitHubOIDCIssuer,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
 				Owner:            "sigstore",
 				Limit:            0,
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "github.com",
 			},
 			wantsErr: true,
 		},
@@ -173,11 +224,12 @@ func TestNewVerifyCmd(t *testing.T) {
 				ArtifactPath:     artifactPath,
 				DigestAlgorithm:  "sha256",
 				Limit:            30,
-				OIDCIssuer:       GitHubOIDCIssuer,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
 				Owner:            "sigstore",
 				SAN:              "https://github.com/sigstore/",
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "github.com",
 			},
 			wantsErr: true,
 		},
@@ -189,10 +241,11 @@ func TestNewVerifyCmd(t *testing.T) {
 				BundlePath:       bundlePath,
 				DigestAlgorithm:  "sha256",
 				Limit:            30,
-				OIDCIssuer:       GitHubOIDCIssuer,
+				OIDCIssuer:       verification.GitHubOIDCIssuer,
 				Owner:            "sigstore",
-				SANRegex:         "^https://github.com/sigstore/",
+				SANRegex:         "(?i)^https://github.com/sigstore/",
 				SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+				Hostname:         "github.com",
 			},
 			wantsExporter: true,
 		},
@@ -220,7 +273,7 @@ func TestNewVerifyCmd(t *testing.T) {
 
 			assert.Equal(t, tc.wants.ArtifactPath, opts.ArtifactPath)
 			assert.Equal(t, tc.wants.BundlePath, opts.BundlePath)
-			assert.Equal(t, tc.wants.CustomTrustedRoot, opts.CustomTrustedRoot)
+			assert.Equal(t, tc.wants.TrustedRoot, opts.TrustedRoot)
 			assert.Equal(t, tc.wants.DenySelfHostedRunner, opts.DenySelfHostedRunner)
 			assert.Equal(t, tc.wants.DigestAlgorithm, opts.DigestAlgorithm)
 			assert.Equal(t, tc.wants.Limit, opts.Limit)
@@ -230,6 +283,7 @@ func TestNewVerifyCmd(t *testing.T) {
 			assert.Equal(t, tc.wants.Repo, opts.Repo)
 			assert.Equal(t, tc.wants.SAN, opts.SAN)
 			assert.Equal(t, tc.wants.SANRegex, opts.SANRegex)
+			assert.Equal(t, tc.wants.Hostname, opts.Hostname)
 			assert.NotNil(t, opts.APIClient)
 			assert.NotNil(t, opts.Logger)
 			assert.NotNil(t, opts.OCIClient)
@@ -277,7 +331,7 @@ func TestJSONOutput(t *testing.T) {
 		APIClient:        api.NewTestClient(),
 		Logger:           io.NewHandler(testIO),
 		OCIClient:        oci.MockClient{},
-		OIDCIssuer:       GitHubOIDCIssuer,
+		OIDCIssuer:       verification.GitHubOIDCIssuer,
 		Owner:            "sigstore",
 		SANRegex:         "^https://github.com/sigstore/",
 		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
@@ -300,7 +354,7 @@ func TestRunVerify(t *testing.T) {
 		APIClient:        api.NewTestClient(),
 		Logger:           logger,
 		OCIClient:        oci.MockClient{},
-		OIDCIssuer:       GitHubOIDCIssuer,
+		OIDCIssuer:       verification.GitHubOIDCIssuer,
 		Owner:            "sigstore",
 		SANRegex:         "^https://github.com/sigstore/",
 		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
@@ -340,12 +394,41 @@ func TestRunVerify(t *testing.T) {
 		require.Nil(t, runVerify(&opts))
 	})
 
+	t.Run("with owner which not matches SourceRepositoryOwnerURI", func(t *testing.T) {
+		opts := publicGoodOpts
+		opts.BundlePath = ""
+		opts.Owner = "owner"
+
+		err := runVerify(&opts)
+		require.ErrorContains(t, err, "expected SourceRepositoryOwnerURI to be https://github.com/owner, got https://github.com/sigstore")
+	})
+
 	t.Run("with repo", func(t *testing.T) {
 		opts := publicGoodOpts
 		opts.BundlePath = ""
-		opts.Repo = "github/example"
+		opts.Repo = "sigstore/sigstore-js"
 
 		require.Nil(t, runVerify(&opts))
+	})
+
+	// Test with bad tenancy
+	t.Run("with bad tenancy", func(t *testing.T) {
+		opts := publicGoodOpts
+		opts.BundlePath = ""
+		opts.Repo = "sigstore/sigstore-js"
+		opts.Tenant = "foo"
+
+		err := runVerify(&opts)
+		require.ErrorContains(t, err, "expected SourceRepositoryOwnerURI to be https://foo.ghe.com/sigstore, got https://github.com/sigstore")
+	})
+
+	t.Run("with repo which not matches SourceRepositoryURI", func(t *testing.T) {
+		opts := publicGoodOpts
+		opts.BundlePath = ""
+		opts.Repo = "wrong/example"
+
+		err := runVerify(&opts)
+		require.ErrorContains(t, err, "expected SourceRepositoryURI to be https://github.com/wrong/example, got https://github.com/sigstore/sigstore-js")
 	})
 
 	t.Run("with invalid repo", func(t *testing.T) {
@@ -391,7 +474,7 @@ func TestRunVerify(t *testing.T) {
 			APIClient:        api.NewTestClient(),
 			DigestAlgorithm:  "sha512",
 			Logger:           logger,
-			OIDCIssuer:       GitHubOIDCIssuer,
+			OIDCIssuer:       verification.GitHubOIDCIssuer,
 			Owner:            "sigstore",
 			SAN:              SigstoreSanValue,
 			SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
@@ -444,5 +527,42 @@ func TestRunVerify(t *testing.T) {
 		customOpts.APIClient = nil
 		customOpts.BundlePath = ""
 		require.Error(t, runVerify(&customOpts))
+	})
+
+	t.Run("with valid OCI artifact", func(t *testing.T) {
+		customOpts := publicGoodOpts
+		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
+		customOpts.BundlePath = ""
+
+		require.Nil(t, runVerify(&customOpts))
+	})
+
+	t.Run("with valid OCI artifact with UseBundleFromRegistry flag", func(t *testing.T) {
+		customOpts := publicGoodOpts
+		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
+		customOpts.BundlePath = ""
+		customOpts.UseBundleFromRegistry = true
+
+		require.Nil(t, runVerify(&customOpts))
+	})
+
+	t.Run("with valid OCI artifact with UseBundleFromRegistry flag but no bundle return from registry", func(t *testing.T) {
+		customOpts := publicGoodOpts
+		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
+		customOpts.BundlePath = ""
+		customOpts.UseBundleFromRegistry = true
+		customOpts.OCIClient = oci.NoAttestationsClient{}
+
+		require.ErrorContains(t, runVerify(&customOpts), "no attestations found in the OCI registry. Retry the command without the --bundle-from-oci flag to check GitHub for the attestation")
+	})
+
+	t.Run("with valid OCI artifact with UseBundleFromRegistry flag but fail on fetching bundle from registry", func(t *testing.T) {
+		customOpts := publicGoodOpts
+		customOpts.ArtifactPath = "oci://ghcr.io/github/test"
+		customOpts.BundlePath = ""
+		customOpts.UseBundleFromRegistry = true
+		customOpts.OCIClient = oci.NoAttestationsClient{}
+
+		require.ErrorContains(t, runVerify(&customOpts), "no attestations found in the OCI registry. Retry the command without the --bundle-from-oci flag to check GitHub for the attestation")
 	})
 }

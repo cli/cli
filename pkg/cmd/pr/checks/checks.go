@@ -61,12 +61,18 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "checks [<number> | <url> | <branch>]",
 		Short: "Show CI status for a single pull request",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Show CI status for a single pull request.
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
-		`),
+
+			When the %[1]s--json%[1]s flag is used, it includes a %[1]sbucket%[1]s field, which categorizes
+			the %[1]sstate%[1]s field into %[1]spass%[1]s, %[1]sfail%[1]s, %[1]spending%[1]s, %[1]sskipping%[1]s, or %[1]scancel%[1]s.
+
+			Additional exit codes:
+				8: Checks pending
+		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)

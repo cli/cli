@@ -50,7 +50,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 			of the source repository to update the matching branch on the destination
 			repository so they are equal. A fast forward update will be used except when the
 			%[1]s--force%[1]s flag is specified, then the two branches will
-			by synced using a hard reset.
+			be synced using a hard reset.
 
 			Without an argument, the local repository is selected as the destination repository.
 
@@ -156,7 +156,7 @@ func syncLocalRepo(opts *SyncOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Synced the \"%s\" branch from %s to local repository\n",
+		fmt.Fprintf(opts.IO.Out, "%s Synced the \"%s\" branch from \"%s\" to local repository\n",
 			cs.SuccessIcon(),
 			opts.Branch,
 			ghrepo.FullName(srcRepo))

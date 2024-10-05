@@ -55,17 +55,27 @@ type AttestationDetail struct {
 	WorkflowID     string `json:"workflowId"`
 }
 
-func getOrgAndRepo(repoURL string) (string, string, error) {
-	after, found := strings.CutPrefix(repoURL, "https://github.com/")
-	if !found {
-		return "", "", fmt.Errorf("failed to get org and repo from %s", repoURL)
+func getOrgAndRepo(tenant, repoURL string) (string, string, error) {
+	var after string
+	var found bool
+	if tenant == "" {
+		after, found = strings.CutPrefix(repoURL, "https://github.com/")
+		if !found {
+			return "", "", fmt.Errorf("failed to get org and repo from %s", repoURL)
+		}
+	} else {
+		after, found = strings.CutPrefix(repoURL,
+			fmt.Sprintf("https://%s.ghe.com/", tenant))
+		if !found {
+			return "", "", fmt.Errorf("failed to get org and repo from %s", repoURL)
+		}
 	}
 
 	parts := strings.Split(after, "/")
 	return parts[0], parts[1], nil
 }
 
-func getAttestationDetail(attr api.Attestation) (AttestationDetail, error) {
+func getAttestationDetail(tenant string, attr api.Attestation) (AttestationDetail, error) {
 	envelope, err := attr.Bundle.Envelope()
 	if err != nil {
 		return AttestationDetail{}, fmt.Errorf("failed to get envelope from bundle: %v", err)
@@ -87,7 +97,7 @@ func getAttestationDetail(attr api.Attestation) (AttestationDetail, error) {
 		return AttestationDetail{}, fmt.Errorf("failed to unmarshal predicate: %v", err)
 	}
 
-	org, repo, err := getOrgAndRepo(predicate.BuildDefinition.ExternalParameters.Workflow.Repository)
+	org, repo, err := getOrgAndRepo(tenant, predicate.BuildDefinition.ExternalParameters.Workflow.Repository)
 	if err != nil {
 		return AttestationDetail{}, fmt.Errorf("failed to parse attestation content: %v", err)
 	}
@@ -101,11 +111,11 @@ func getAttestationDetail(attr api.Attestation) (AttestationDetail, error) {
 	}, nil
 }
 
-func getDetailsAsSlice(results []*verification.AttestationProcessingResult) ([][]string, error) {
+func getDetailsAsSlice(tenant string, results []*verification.AttestationProcessingResult) ([][]string, error) {
 	details := make([][]string, len(results))
 
 	for i, result := range results {
-		detail, err := getAttestationDetail(*result.Attestation)
+		detail, err := getAttestationDetail(tenant, *result.Attestation)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get attestation detail: %v", err)
 		}
@@ -114,11 +124,11 @@ func getDetailsAsSlice(results []*verification.AttestationProcessingResult) ([][
 	return details, nil
 }
 
-func getAttestationDetails(results []*verification.AttestationProcessingResult) ([]AttestationDetail, error) {
+func getAttestationDetails(tenant string, results []*verification.AttestationProcessingResult) ([]AttestationDetail, error) {
 	details := make([]AttestationDetail, len(results))
 
 	for i, result := range results {
-		detail, err := getAttestationDetail(*result.Attestation)
+		detail, err := getAttestationDetail(tenant, *result.Attestation)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get attestation detail: %v", err)
 		}

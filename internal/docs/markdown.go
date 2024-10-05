@@ -103,7 +103,7 @@ type flagView struct {
 var flagsTemplate = `
 <dl class="flags">{{ range . }}
 	<dt>{{ if .Shorthand }}<code>-{{.Shorthand}}</code>, {{ end }}
-		<code>--{{.Name}}{{ if .Varname }} &lt;{{.Varname}}&gt;{{ end }}{{.DefValue}} </code></dt>
+		<code>--{{.Name}}{{ if .Varname }} &lt;{{.Varname}}&gt;{{ end }}{{.DefValue}}</code></dt>
 	<dd>{{.Usage}}</dd>
 {{ end }}</dl>
 `

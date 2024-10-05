@@ -49,6 +49,9 @@ var _ gh.Config = &ConfigMock{}
 //			PagerFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Pager method")
 //			},
+//			PreferEditorPromptFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the PreferEditorPrompt method")
+//			},
 //			PromptFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Prompt method")
 //			},
@@ -97,6 +100,9 @@ type ConfigMock struct {
 
 	// PagerFunc mocks the Pager method.
 	PagerFunc func(hostname string) gh.ConfigEntry
+
+	// PreferEditorPromptFunc mocks the PreferEditorPrompt method.
+	PreferEditorPromptFunc func(hostname string) gh.ConfigEntry
 
 	// PromptFunc mocks the Prompt method.
 	PromptFunc func(hostname string) gh.ConfigEntry
@@ -158,6 +164,11 @@ type ConfigMock struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
+		// PreferEditorPrompt holds details about calls to the PreferEditorPrompt method.
+		PreferEditorPrompt []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
 		// Prompt holds details about calls to the Prompt method.
 		Prompt []struct {
 			// Hostname is the hostname argument value.
@@ -179,20 +190,21 @@ type ConfigMock struct {
 		Write []struct {
 		}
 	}
-	lockAliases        sync.RWMutex
-	lockAuthentication sync.RWMutex
-	lockBrowser        sync.RWMutex
-	lockCacheDir       sync.RWMutex
-	lockEditor         sync.RWMutex
-	lockGetOrDefault   sync.RWMutex
-	lockGitProtocol    sync.RWMutex
-	lockHTTPUnixSocket sync.RWMutex
-	lockMigrate        sync.RWMutex
-	lockPager          sync.RWMutex
-	lockPrompt         sync.RWMutex
-	lockSet            sync.RWMutex
-	lockVersion        sync.RWMutex
-	lockWrite          sync.RWMutex
+	lockAliases            sync.RWMutex
+	lockAuthentication     sync.RWMutex
+	lockBrowser            sync.RWMutex
+	lockCacheDir           sync.RWMutex
+	lockEditor             sync.RWMutex
+	lockGetOrDefault       sync.RWMutex
+	lockGitProtocol        sync.RWMutex
+	lockHTTPUnixSocket     sync.RWMutex
+	lockMigrate            sync.RWMutex
+	lockPager              sync.RWMutex
+	lockPreferEditorPrompt sync.RWMutex
+	lockPrompt             sync.RWMutex
+	lockSet                sync.RWMutex
+	lockVersion            sync.RWMutex
+	lockWrite              sync.RWMutex
 }
 
 // Aliases calls AliasesFunc.
@@ -501,6 +513,38 @@ func (mock *ConfigMock) PagerCalls() []struct {
 	mock.lockPager.RLock()
 	calls = mock.calls.Pager
 	mock.lockPager.RUnlock()
+	return calls
+}
+
+// PreferEditorPrompt calls PreferEditorPromptFunc.
+func (mock *ConfigMock) PreferEditorPrompt(hostname string) gh.ConfigEntry {
+	if mock.PreferEditorPromptFunc == nil {
+		panic("ConfigMock.PreferEditorPromptFunc: method is nil but Config.PreferEditorPrompt was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockPreferEditorPrompt.Lock()
+	mock.calls.PreferEditorPrompt = append(mock.calls.PreferEditorPrompt, callInfo)
+	mock.lockPreferEditorPrompt.Unlock()
+	return mock.PreferEditorPromptFunc(hostname)
+}
+
+// PreferEditorPromptCalls gets all the calls that were made to PreferEditorPrompt.
+// Check the length with:
+//
+//	len(mockedConfig.PreferEditorPromptCalls())
+func (mock *ConfigMock) PreferEditorPromptCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockPreferEditorPrompt.RLock()
+	calls = mock.calls.PreferEditorPrompt
+	mock.lockPreferEditorPrompt.RUnlock()
 	return calls
 }
 

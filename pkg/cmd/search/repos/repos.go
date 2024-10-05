@@ -46,7 +46,7 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 
 			GitHub search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-for-repositories>
-    `),
+		`),
 		Example: heredoc.Doc(`
 			# search repositories matching set of keywords "cli" and "shell"
 			$ gh search repos cli shell
@@ -68,7 +68,7 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 
 			# search repositories excluding archived repositories
 			$ gh search repos --archived=false
-    `),
+		`),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
 				return cmdutil.FlagErrorf("specify search keywords or flags")

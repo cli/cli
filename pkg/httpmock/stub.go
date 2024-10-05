@@ -18,6 +18,7 @@ type Stub struct {
 	matched   bool
 	Matcher   Matcher
 	Responder Responder
+	exclude   bool
 }
 
 func MatchAny(*http.Request) bool {
@@ -120,6 +121,15 @@ func decodeJSONBody(req *http.Request, dest interface{}) error {
 func StringResponse(body string) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		return httpResponse(200, req, bytes.NewBufferString(body)), nil
+	}
+}
+
+func WithHost(matcher Matcher, host string) Matcher {
+	return func(req *http.Request) bool {
+		if !strings.EqualFold(req.Host, host) {
+			return false
+		}
+		return matcher(req)
 	}
 }
 
