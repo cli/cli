@@ -1,24 +1,789 @@
-{
-	"image": "mcr.microsoft.com/devcontainers/go:1.21",
-	"features": {
-		"ghcr.io/devcontainers/features/sshd:1": {}
-	},
-	"remoteUser": "vscode",
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"golang.go"
-			],
-			"settings": {
-				"go.toolsManagement.checkForUpdates": "local",
-				"go.useLanguageServer": true,
-				"go.gopath": "/go"
-			}
-		}
-	},
-	"runArgs": [
-		"--cap-add=SYS_PTRACE",
-		"--security-opt",
-		"seccomp=unconfined"
-	]
-}
+diff --git a/README.md b/README.md
+dizin 1ddeb1dfe03..66b7a711ebf 100644
+--- a/README.md
++++ b/README.md
+@@ -29,19 +29,781 @@ Eğer bir hubber iseniz ve CLI için yeni komutlar göndermekle ilgileniyorsanız,
+ #### Ev yapımı bira
+ 
+ | Kurulum: | Yükseltme: |
+-| ----------------- | ----------------- |
++| bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz------------------ | # npm
++npm install @mempool/mempool.js bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz--kaydet
++
++# iplik
++yarn @mempool/mempool.jsbc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz------------------ |
+ | `brew gh'yi kur` | `brew gh'yi yükselt` |
+ 
+ #### MacPort'lar
+ 
+ | Kurulum: | Yükseltme: |
+-| ----------------------- | ---------------------------------------------- |
++| [
++ {
++ txid: "bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz",
++ sürüm: 1,
++ kilitlenme süresi: 0,
++ vin: [ [Nesne] ],
++ vout: [ [Nesne], [Nesne] ],
++ boyut: 255,
++ ağırlık: 1020,
++ ücret: 10000,
++ durum: {
++ doğrulandı: doğru,
++ blok_yüksekliği: 326148,
++ block_hash: "00000000000000001e4118adcfbb02364bc13c41c210d8811e4f39aeb3687e36",
++ blok_zamanı: 1413798020
++ }
++ },
++ ...
++]<div align="center">
++ <a href="https://github.com/webpack/webpack">
++ <img width="200" height="200" src="https://webpack.js.org/assets/icon-square-big.svg">
++ </a>
++</div>
++
++[![npm][npm]][npm-url]
++[![düğüm][düğüm]][düğüm-url]
++[![testler][testler]][testler-url]
++[![kapsam][kapak]][kapak-url'si]
++[![tartışma][tartışma]][tartışma-url]
++[![indirilenler][indirilenler]][npm-url]
++[![katkıda bulunanlar][katkıda bulunanlar]][katkıda bulunanların-url'si]
++
++# webpack-dev-sunucusu
++
++ [webpack](https://webpack.js.org)'u, aşağıdaki özellikleri sağlayan bir geliştirme sunucusuyla kullanın:
++canlı yeniden yükleme. Bu yalnızca **geliştirme** için kullanılmalıdır.
++
++Perde altında [webpack-dev-middleware][middleware-url] kullanır, bu da
++Webpack varlıklarına hızlı bellek içi erişim.
++
++## İçindekiler
++
++- [Başlarken](#başlarken)
++- [Kullanım](#kullanım)
++ - [CLI ile](#cli-ile)
++ - [NPM Komut Dosyalarıyla](#with-npm-scripts)
++ - [API ile](#API-ile)
++ - [TypeScript ile](#with-typescript)
++ - [Sonuç](#sonuç)
++- [Tarayıcı Desteği](#tarayıcı-destek)
++- [Destek](#destek)
++- [Katkıda Bulunma](#katkıda bulunma)
++- [Atıf](#atıf)
++- [Lisans](#lisans)
++-![mempool-graph-2h-1727891684](https://github.com/user-attachments/assets/a8945974-ad1b-49fc-afc8-bc8cdb8ae5fb)
++-[KOD SAHİPLERİ.txt](https://github.com/user-attachments/files/17264783/KOD SAHİPLERİ.txt)
++-[dışa-aktar-Sarsilmaz02-1727746198.json.gz](https://github.com/user-attachments/files/17264785/dışa-aktar-Sarsilmaz02-1727746198.json.gz)
++
++
++## Başlarken
++
++İlk önce modülü yükleyelim:
++
++```konsol
++# npm
++npm install @mempool/mempool.js --kaydet
++
++# iplik
++yarn @mempool/mempool.js'yi ekle
++
++```
++
++veya
++
++```konsol
++yarn add -D webpack-dev-server, mempoolJS'yi "@mempool/mempool.js" dosyasından içe aktar;
++
++const init = asenkron () => {
++  
++ const { bitcoin: { adresler } } = mempoolJS({
++ ana bilgisayar adı: 'mempool.space'
++ });
++
++ sabit adres = 'bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz';
++ const addressTxs = await adresler.getAddressTxs({ adres });
++ console.log(adresTxs);
++          
++};
++
++başlat();
++```
++
++veya
++
++```konsol
++pnpm -D webpack-dev-server'ı ekle
++```
++
++_Not: webpack-dev-server'ı global olarak yükleyip çalıştırabilmenize rağmen, şunu öneriyoruz:
++yerel olarak kurulum. webpack-dev-server her zaman yerel bir kurulum kullanacaktır
++küresel bir tane üzerinde._
++
++## Kullanım
++
++Modülü kullanmanın iki ana, önerilen yöntemi vardır:
++
++### CLI ile
++
++Bunu kullanmanın en kolay yolu [webpack CLI](https://webpack.js.org/api/cli/) iledir. Webpack'inizin bulunduğu dizinde
++`webpack.config.js` şu şekilde çalıştırılabilir:
++
++```konsol
++npx webpack hizmeti
++```
++
++`webpack serve` ile aşağıdaki seçenekler mevcuttur:
++
++```
++Kullanım: webpack serve|server|s [girişler...] [seçenekler]
++
++Webpack dev sunucusunu çalıştırın.
++
++Seçenekler:
++ -c, --config <değer...> Webpack yapılandırma dosyasına (örneğin ./webpack.config.js) giden yolu belirtin.
++ --config-name <değer...> Kullanılacak yapılandırmanın adı.
++ -m, --merge 'webpack-merge' kullanarak iki veya daha fazla yapılandırmayı birleştirin.
++ --disable-interpret Yapılandırma dosyasının yüklenmesi için yorumlamayı devre dışı bırakır.
++ --env <değer...> Fonksiyon olduğunda yapılandırmaya geçirilen ortam.
++ --node-env <değer> process.env.NODE_ENV öğesini belirtilen değere ayarlar.
++ --define-process-env-node-env <değer> process.env.NODE_ENV'yi belirtilen değere ayarlar. (Şu anda `--node-env` için bir takma addır)
++ --analyze Paket bilgilerini almak için webpack-bundle-analyzer eklentisini çağırır.
++ --progress [değer] Derleme sırasında derleme ilerlemesini yazdır.
++ -j, --json [değer] Sonucu JSON olarak yazdırır veya bir dosyada saklar.
++ --fail-on-warnings Webpack'ten gelen uyarılarda sıfır olmayan çıkış koduyla webpack-cli işlemini durdurur
++ -d, --devtool <değer> Hata ayıklamayı geliştirmek için bir geliştirici aracı (false | eval | [inline-|hidden-|eval-][nosources-][cheap-[module-]]source-map).
++ --no-devtool Olumsuz 'devtool' seçeneği.
++ --entry <değer...> Başlangıçta yüklenen bir modül. Sadece sonuncusu dışa aktarılır.
++ --mode <değer> Üretim optimizasyonlarını veya geliştirme ipuçlarını etkinleştirir.
++ --name <değer> Yapılandırmanın adı. Birden fazla yapılandırma yüklenirken kullanılır.
++ -o, --output-path <değer> Mutlak yol olarak çıkış dizini (gerekli).
++ --stats [değer] İstatistik seçenekleri nesnesi veya önceden ayarlanmış ad.
++ --no-stats Olumsuz 'istatistikler' seçeneği.
++ -t, --target <değer...> İçin inşa edilecek ortam. İçin inşa edilecek ortam. Mümkün olduğunda hepsi için inşa edilecek ortamların dizisi.
++ --no-target Olumsuz 'target' seçeneği.
++ --watch-options-stdin Stdin akışı sona erdiğinde izlemeyi durdur.
++ --no-watch-options-stdin Olumsuz 'watch-options-stdin' seçeneği.
++ --allowed-hosts <değer...> Dev sunucusuna erişime izin verilen ana bilgisayarları saymaya izin verir (dev sunucusuna proxy kullandığınızda kullanışlıdır, varsayılan olarak 'auto'dur).
++ --allowed-hosts-reset 'allowedHosts' yapılandırmasında sağlanan tüm öğeleri temizler. Dev sunucusuna erişime izin verilen ana bilgisayarları saymaya olanak tanır (dev sunucusuna proxy uyguladığınızda yararlıdır, varsayılan olarak 'auto'dur).
++ --bonjour Başlangıçta ZeroConf ağı üzerinden dev sunucusunun yayınlanmasına izin verir.
++ --no-bonjour Başlangıçta ZeroConf ağı üzerinden dev sunucusunun yayınlanmasına izin vermez.
++ --no-client İstemci betiğini devre dışı bırakır.
++ --client-logging <değer> Tarayıcıda günlük düzeyini ayarlamanıza olanak tanır.
++ --client-overlay Derleyici hataları veya uyarıları olduğunda tarayıcıda tam ekran kaplamayı etkinleştirir.
++ --no-client-overlay Derleyici hataları veya uyarıları olduğunda tarayıcıdaki tam ekran kaplamayı devre dışı bırakır.
++ --client-overlay-errors Derleyici hataları olduğunda tarayıcıda tam ekran kaplamayı etkinleştirir.
++ --no-client-overlay-errors Derleyici hataları olduğunda tarayıcıdaki tam ekran kaplamayı devre dışı bırakır.
++ --client-overlay-warnings Derleyici uyarıları olduğunda tarayıcıda tam ekran kaplamayı etkinleştirir.
++ --no-client-overlay-warnings Derleyici uyarıları olduğunda tarayıcıdaki tam ekran kaplamayı devre dışı bırakır.
++ --client-overlay-runtime-errors Yakalanmamış çalışma zamanı hataları olduğunda tarayıcıda tam ekran kaplamayı etkinleştirir.
++ --no-client-overlay-runtime-errors Yakalanmamış çalışma zamanı hataları olduğunda tarayıcıdaki tam ekran kaplamayı devre dışı bırakır.
++ --client-overlay-trusted-types-policy-name <değer> Kaplama için Güvenilir Türler politikasının adı. Varsayılanı 'webpack-dev-server#overlay'dır.
++ --client-progress Tarayıcıda derleme ilerleme durumunu yüzde olarak yazdırır.
++ --no-client-progress Tarayıcıda derleme ilerleme durumunu yüzde olarak yazdırmaz.
++ --client-reconnect [değer] dev-server'a istemciye yeniden bağlanmayı kaç kez denemesi gerektiğini söyler.
++ --no-client-reconnect Geliştirici sunucusuna istemciye yeniden bağlanmayı denememesini söyler.
++ --client-web-socket-transport <değer> Geliştirme sunucusuyla iletişim kurmak için özel web soketi taşımasını ayarlamayı sağlar.
++ --client-web-socket-url <değer> Web soketi sunucusuna URL belirtmenize olanak tanır (geliştirme sunucusuna proxy verdiğinizde ve istemci betiğinin her zaman nereye bağlanacağını bilmediğinde kullanışlıdır).
++ --client-web-socket-url-hostname <değer> devServer'a bağlı istemcilere sağlanan ana bilgisayar adını kullanmalarını söyler.
++ --client-web-socket-url-pathname <değer> devServer'a bağlı istemcilere bağlanmak için sağlanan yolu kullanmalarını söyler.
++ --client-web-socket-url-password <değer> devServer'a bağlı istemcilere kimlik doğrulaması için sağlanan parolayı kullanmalarını söyler.
++ --client-web-socket-url-port <değer> devServer'a bağlı istemcilere sağlanan portu kullanmalarını söyler.
++ --client-web-socket-url-protocol <değer> devServer'a bağlı istemcilere sağlanan protokolü kullanmalarını söyler.
++ --client-web-socket-url-username <değer> devServer'a bağlı istemcilere kimlik doğrulaması için verilen kullanıcı adını kullanmalarını söyler.
++ --compress Sunulan her şey için gzip sıkıştırmasını etkinleştirir.
++ --no-compress Sunulan her şey için gzip sıkıştırmasını devre dışı bırakır.
++ --history-api-fallback Belirtilen bir dizin sayfası (varsayılan olarak 'index.html') üzerinden isteklerin proxy'lenmesine olanak tanır; HTML5 Geçmiş API'sini kullanan Tek Sayfalık Uygulamalar için yararlıdır.
++ --no-history-api-fallback Belirtilen bir dizin sayfası üzerinden proxy isteklerine izin vermez.
++ --host <değer> Kullanılacak ana bilgisayar adını belirtmeye izin verir.
++ --hot [değer] Sıcak Modül Değiştirmeyi etkinleştirir.
++ --no-hot Sıcak Modül Değiştirmeyi devre dışı bırakır.
++ --ipc [değer] Bir unix soketini dinle.
++ --live-reload Dosya değişiklikleri algılandığında sayfanın/sayfaların yeniden yüklenmesini/yenilenmesini etkinleştirir (varsayılan olarak etkindir).
++ --no-live-reload Dosya değişiklikleri algılandığında sayfanın/sayfaların yeniden yüklenmesini/yenilenmesini devre dışı bırakır (varsayılan olarak etkindir).
++ --open [değer...] Sunucu başlatıldıktan sonra tarayıcıyı/tarayıcıları ve sayfayı/sayfaları açacak şekilde dev sunucusunu yapılandırmanıza olanak tanır (varsayılan tarayıcınızı açmak için true olarak ayarlayın).
++ --no-open Varsayılan tarayıcıyı açmaz.
++ --open-target <değer...> Tarayıcıda belirtilen sayfayı açar.
++ --open-app-name <değer...> Belirtilen tarayıcıyı aç.
++ --open-reset 'open' yapılandırmasında sağlanan tüm öğeleri temizler. Sunucu başlatıldıktan sonra tarayıcıyı(ları) ve sayfayı(ları) açmak üzere dev sunucusunu yapılandırmaya izin verir (varsayılan tarayıcınızı açmak için true olarak ayarlayın).
++ --open-target-reset 'open.target' yapılandırmasında sağlanan tüm öğeleri temizler. Tarayıcıda belirtilen sayfayı açar.
++ --open-app-name-reset 'open.app.name' yapılandırmasında sağlanan tüm öğeleri temizle. Belirtilen tarayıcıyı aç.
++ --port <değer> Kullanılacak bir port belirtmeye izin verir.
++ --server-type <değer> Sunucuyu ve seçenekleri ayarlamanıza olanak tanır (varsayılan olarak 'http').
++ --server-options-passphrase <değer> Bir pfx dosyası için parola.
++ --server-options-request-cert SSL sertifikası talebi.
++ --no-server-options-request-cert SSL sertifikası talebinde bulunmaz.
++ --server-options-ca <değer...> Bir SSL CA sertifikasına veya bir SSL CA sertifikasının içeriğine giden yol.
++ --server-options-ca-reset 'server.options.ca' yapılandırmasında sağlanan tüm öğeleri temizleyin. Bir SSL CA sertifikasına giden yol veya bir SSL CA sertifikasının içeriği.
++ --server-options-cert <değer...> Bir SSL sertifikasına veya bir SSL sertifikasının içeriğine giden yol.
++ --server-options-cert-reset 'server.options.cert' yapılandırmasında sağlanan tüm öğeleri temizleyin. Bir SSL sertifikasına veya bir SSL sertifikasının içeriğine giden yol.
++ --server-options-crl <değer...> PEM biçimli CRL'lere (Sertifika İptal Listeleri) veya PEM biçimli CRL'lerin (Sertifika İptal Listeleri) içeriğine giden yol.
++ --server-options-crl-reset 'server.options.crl' yapılandırmasında sağlanan tüm öğeleri temizle. PEM biçimli CRL'lere (Sertifika İptal Listeleri) veya PEM biçimli CRL'lerin (Sertifika İptal Listeleri) içeriğine giden yol.
++ --server-options-key <değer...> Bir SSL anahtarının yolu veya bir SSL anahtarının içeriği.
++ --server-options-key-reset 'server.options.key' yapılandırmasında sağlanan tüm öğeleri temizleyin. Bir SSL anahtarına giden yol veya bir SSL anahtarının içeriği.
++ --server-options-pfx <değer...> Bir SSL pfx dosyasının yolu veya bir SSL pfx dosyasının içeriği.
++ --server-options-pfx-reset 'server.options.pfx' yapılandırmasında sağlanan tüm öğeleri temizle. Bir SSL pfx dosyasının yolu veya bir SSL pfx dosyasının içeriği.
++ --static [değer...] Dizinlerden (varsayılan olarak 'genel' dizin) statik dosyaların sunulmasına yönelik seçenekleri yapılandırmaya olanak tanır.
++ --no-static Dizinlerden statik dosyaların sunulmasına yönelik seçeneklerin yapılandırılmasına izin vermez.
++ --static-directory <değer...> Statik içerikler için dizin.
++ --static-public-path <değer...> Statik dosyalar tarayıcıda bu genel yol altında kullanılabilir olacaktır.
++ --static-serve-index Etkinleştirildiğinde dev sunucusuna serveIndex ara yazılımını kullanmasını söyler.
++ --no-static-serve-index Geliştirici sunucusuna serveIndex ara yazılımını kullanmasını söylemez.
++ --static-watch Statik içerik dizinindeki dosyaları izler.
++ --no-static-watch Statik içerik dizinindeki dosyaları izlemez.
++ --static-reset 'Statik' yapılandırmada sağlanan tüm öğeleri temizler. Statik dosyaları dizinden (varsayılan olarak 'genel' dizin) sunmak için seçenekleri yapılandırmaya izin verir.
++ --static-public-path-reset 'static.publicPath' yapılandırmasında sağlanan tüm öğeleri temizleyin. Statik dosyalar tarayıcıda bu genel yol altında kullanılabilir olacaktır.
++ --watch-files <değer...> Dosya değişikliklerini izlemek için kullanılacak kümeler/dizinler/dosyalar listesini yapılandırmaya izin verir.
++ --watch-files-reset 'watchFiles' yapılandırmasında sağlanan tüm öğeleri temizler. Dosya değişikliklerini izlemek için glob'lar/dizinler/dosyalar listesini yapılandırmaya izin verir.
++ --no-web-socket-server Web soket sunucusunu ve seçeneklerini ayarlamayı engeller.
++ --web-socket-server-type <değer> Web soket sunucusunu ve seçeneklerini ayarlamanıza olanak tanır (varsayılan olarak 'ws').
++
++Küresel seçenekler:
++ --color Konsolda renkleri etkinleştirir.
++ --no-color Konsoldaki renkleri devre dışı bırakır.
++ -v, --version 'webpack', 'webpack-cli' ve 'webpack-dev-server' ve komutların sürüm numaralarını çıktı olarak verir.
++ -h, --help [ayrıntılı] Komutlar ve seçenekler için yardımı görüntüle.
++
++Desteklenen tüm komutların ve seçeneklerin listesini görmek için 'webpack --help=verbose' komutunu çalıştırın.
++
++Webpack dokümantasyonu: https://webpack.js.org/.
++CLI dokümantasyonu: https://webpack.js.org/api/cli/.
++Webpack ekibi tarafından ♥ ile yapılmıştır.
++```
++
++> [!NOT]
++>
++> _Yukarıdaki seçeneklere ilişkin ayrıntılı dokümantasyon şu [bağlantıda](https://webpack.js.org/configuration/dev-server/) mevcuttur._
++
++### NPM Komut Dosyaları ile
++
++NPM package.json betikleri, yerel olarak yüklenen dosyaları çalıştırmak için kullanışlı ve kullanışlı bir araçtır
++ ikili dosyaları tam yolları hakkında endişelenmenize gerek kalmadan tanımlayın. Basitçe bir
++komut dosyası şu şekilde:
++
++```json
++[
++ {
++ txid: "dba43fd04b7ae3df8e5b596f2e7fab247c58629d622e3a5213f03a5a09684430",
++ sürüm: 1,
++ kilitlenme süresi: 0,
++ vin: [ [Nesne] ],
++ vout: [ [Nesne], [Nesne] ],
++ boyut: 255,
++ ağırlık: 1020,
++ ücret: 10000,
++ durum: {
++ doğrulandı: doğru,
++ blok_yüksekliği: 326148,
++ block_hash: "00000000000000001e4118adcfbb02364bc13c41c210d8811e4f39aeb3687e36",
++ blok_zamanı: 05-ekim-2024
++ }
++ },
++ ...
++]
++```
++
++Ve terminalinizde/konsolunuzda aşağıdakini çalıştırın:
++
++```konsol
++npm çalıştır hizmet ver
++```
++
++NPM, `node_modules` içindeki ikili dosyaya sizin için otomatik olarak başvuracaktır ve
++dosyayı veya komutu çalıştır.
++
++### API ile
++
++webpack-dev-server'ı CLI üzerinden çalıştırmanız önerilirken, API üzerinden de bir sunucu başlatmayı seçebilirsiniz.
++
++İlgili [`webpack-dev-server` için API belgelerine](https://webpack.js.org/api/webpack-dev-server/) bakın.
++
++### TypeScript ile
++
++Webpack yapılandırmasında TypeScript kullanıyorsanız, TS hatalarından kaçınmak için `devServer` özelliğini düzgün bir şekilde yazmanız gerekir (örneğin `'devServer' 'Configuration'` türünde mevcut değildir). Bunun için şunlardan birini kullanın:
++
++```ts
++/// <referans yolu="node_modules/webpack-dev-server/types/lib/Server.d.ts"/>
++import type { Yapılandırma } from "webpack";
++
++// Mantığınız
++```
++
++Veya `webpack-dev-server`'dan türü içe aktarabilirsiniz, yani
++
++```ts
++import type { Yapılandırma DevServerConfiguration olarak } from "webpack-dev-server";
++import type { Yapılandırma } from "webpack";
++
++const devServer: DevServerYapılandırması = {};
++const config: Yapılandırma = { devServer };
++
++// modül.ihracatlar
++varsayılan yapılandırmayı dışa aktar;
++```
++
++### Sonuç
++
++Her iki yöntem de bir sunucu örneği başlatacak ve bağlantıları dinlemeye başlayacaktır
++`localhost`'tan `8080` portunda.
++
++webpack-dev-server varsayılan olarak dosyaların canlı olarak yeniden yüklenmesini destekleyecek şekilde yapılandırılmıştır
++Sunucu çalışırken varlıklarınızı düzenlersiniz.
++
++Daha fazla kullanım durumu ve seçenek için [**dokümantasyona**][docs-url] bakın.
++
++## Tarayıcı Desteği
++
++`webpack-dev-server` istemci (tarayıcı) betiklerini bir ES5'e dönüştürürken
++durum, proje yalnızca resmi olarak _son iki majör sürümünü destekliyor
++tarayıcılar_. Her çılgınlığı destekleyecek kaynaklara sahip değiliz
++orada bir tarayıcı var.
++
++Gizli/eski bir tarayıcıda bir hata bulursanız, bunu aktif olarak memnuniyetle karşılarız.
++Hatayı çözmek için Çekme İsteği.
++
++## Destek
++
++ Depodaki sorunları hatalara, özelliklere ve daha fazlasına odaklı tutmak için elimizden geleni yapıyoruz.
++modül için kodda gerekli değişiklikler. Bu nedenle, kullanıcılardan şunu istiyoruz
++Genel destek, "nasıl yapılır" veya "bu neden işe yaramıyor" sorularını deneyerek
++Mevcut diğer destek kanallarının listesi.
++
++Webpack-dev-server desteği için ilk durağınız mükemmel olmalıdır
++[documentation][docs-url] modül için. İyileştirme için bir fırsat görürseniz
++Bu belgelerden herhangi biri için lütfen [webpack.js.org deposuna][wjo-url] gidin ve bir
++çekme isteği.
++
++Oradan, kullanıcıları [webpack tartışmaları][tartışma-url] adresini ziyaret etmeye teşvik ediyoruz ve
++oradaki iyi insanlarla konuş. Cevap arayışın sohbette kuru kalırsa,
++ [StackOverflow][stack-url] adresine gidin ve hızlı bir arama yapın veya yeni bir tane açın
++soru. Unutmayın; sizinkini içeren soruları cevaplamak her zaman çok daha kolaydır.
++`webpack.config.js` ve ilgili dosyalar!
++
++Eğer twitter'ı iyi biliyorsanız sorunuzla birlikte [#webpack][hash-url] tweet'i atabilirsiniz
++ve birileri çıkıp yardım eli uzatmalı.
++
++Bir :bug: keşfettiyseniz, bir özellik öneriniz varsa veya görmek istiyorsanız
++bir değişiklik, lütfen Github'da bir sorun oluşturmaktan çekinmeyin. _Not: Sorun
++şablon isteğe bağlı değildir, bu yüzden lütfen onu kaldırmamaya dikkat edin ve lütfen doldurun
++tamamen dışarı._
++
++## Katkıda Bulunma
++
++Katkılarınızı bekliyoruz! Lütfen nasıl katılacağınıza dair daha fazla bilgi için [CONTRIBUTING.md](CONTRIBUTING.md)'yi okuyun.
++
++## Atıf
++
++Bu proje büyük ölçüde [peerigon/nof5](https://github.com/peerigon/nof5)'ten esinlenmiştir.
++
++## Lisans
++
++#### [MIT](./LİSANS)
++
++[npm]: https://img.shields.io/npm/v/webpack-dev-server.svg
++[npm-url]: https://npmjs.com/package/webpack-dev-server
++[düğüm]: https://img.shields.io/node/v/webpack-dev-server.svg
++[düğüm-url]: https://nodejs.org
++[testler]: https://github.com/webpack/webpack-dev-server/workflows/webpack-dev-server/badge.svg
++[testler-url]: https://github.com/webpack/webpack-dev-server/actions?query=workflow%3Awebpack-dev-server
++[kapak]: https://codecov.io/gh/webpack/webpack-dev-server/branch/master/graph/badge.svg
++[kapak-url]: https://codecov.io/gh/webpack/webpack-dev-server
++[tartışma]: https://img.shields.io/github/discussions/webpack/webpack
++[tartışma-url]: https://github.com/webpack/webpack/discussions
++[docs-url]: https://webpack.js.org/configuration/dev-server/#devserver
++[hash-url]: https://twitter.com/search?q=webpack
++[ara yazılım-url'si]: https://github.com/webpack/webpack-dev-middleware
++[yığın-url]: https://stackoverflow.com/questions/tagged/webpack-dev-server
++[çirkin-url]: https://github.com/webpack-contrib/uglifyjs-webpack-plugin
++[wjo-url]: https://github.com/webpack/webpack.js.org
++[indirmeler]: https://img.shields.io/npm/dm/webpack-dev-server.svg
++[katkıda bulunanların-url'si]: https://github.com/webpack/webpack-dev-server/graphs/contributors
++[katkıda bulunanlar]: https://img.shields.io/github/contributors/webpack/webpack-dev-server.svg
++<div align="center">
++ <a href="https://github.com/webpack/webpack">
++ <img width="200" height="200" src="https://webpack.js.org/assets/icon-square-big.svg">
++ </a>
++</div>
++
++[![npm][npm]][npm-url]
++[![düğüm][düğüm]][düğüm-url]
++[![testler][testler]][testler-url]
++[![kapsam][kapak]][kapak-url'si]
++[![tartışma][tartışma]][tartışma-url]
++[![indirilenler][indirilenler]][npm-url]
++[![katkıda bulunanlar][katkıda bulunanlar]][katkıda bulunanların-url'si]
++
++# webpack-dev-sunucusu
++
++ [webpack](https://webpack.js.org)'u, aşağıdaki özellikleri sağlayan bir geliştirme sunucusuyla kullanın:
++canlı yeniden yükleme. Bu yalnızca **geliştirme** için kullanılmalıdır.
++
++Perde altında [webpack-dev-middleware][middleware-url] kullanır, bu da
++Webpack varlıklarına hızlı bellek içi erişim.
++
++## İçindekiler
++
++- [Başlarken](#başlarken)
++- [Kullanım](#kullanım)
++ - [CLI ile](#cli-ile)
++ - [NPM Komut Dosyalarıyla](#with-npm-scripts)
++ - [API ile](#API-ile)
++ - [TypeScript ile](#with-typescript)
++ - [Sonuç](#sonuç)
++- [Tarayıcı Desteği](#tarayıcı-destek)
++- [Destek](#destek)
++- [Katkıda Bulunma](#katkıda bulunma)
++- [Atıf](#atıf)
++- [Lisans](#lisans)
++-![mempool-graph-2h-1727891684](https://github.com/user-attachments/assets/a8945974-ad1b-49fc-afc8-bc8cdb8ae5fb)
++-[KOD SAHİPLERİ.txt](https://github.com/user-attachments/files/17264783/KOD SAHİPLERİ.txt)
++-[dışa-aktar-Sarsilmaz02-1727746198.json.gz](https://github.com/user-attachments/files/17264785/dışa-aktar-Sarsilmaz02-1727746198.json.gz)
++
++
++## Başlarken
++
++İlk önce modülü yükleyelim:
++
++```konsol
++# npm
++npm install @mempool/mempool.js --kaydet
++
++# iplik
++yarn @mempool/mempool.js'yi ekle
++
++```
++
++veya
++
++```konsol
++yarn add -D webpack-dev-server, mempoolJS'yi "@mempool/mempool.js" dosyasından içe aktar;
++
++const init = asenkron () => {
++  
++ const { bitcoin: { adresler } } = mempoolJS({
++ ana bilgisayar adı: 'mempool.space'
++ });
++
++ sabit adres = 'bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz';
++ const addressTxs = await adresler.getAddressTxs({ adres });
++ console.log(adresTxs);
++          
++};
++
++başlat();
++```
++
++veya
++
++```konsol
++pnpm -D webpack-dev-server'ı ekle
++```
++
++_Not: webpack-dev-server'ı global olarak yükleyip çalıştırabilmenize rağmen, şunu öneriyoruz:
++yerel olarak kurulum. webpack-dev-server her zaman yerel bir kurulum kullanacaktır
++küresel bir tane üzerinde._
++
++## Kullanım
++
++Modülü kullanmanın iki ana, önerilen yöntemi vardır:
++
++### CLI ile
++
++Bunu kullanmanın en kolay yolu [webpack CLI](https://webpack.js.org/api/cli/) iledir. Webpack'inizin bulunduğu dizinde
++`webpack.config.js` şu şekilde çalıştırılabilir:
++
++```konsol
++npx webpack hizmeti
++```
++
++`webpack serve` ile aşağıdaki seçenekler mevcuttur:
++
++```
++Kullanım: webpack serve|server|s [girişler...] [seçenekler]
++
++Webpack dev sunucusunu çalıştırın.
++
++Seçenekler:
++ -c, --config <değer...> Webpack yapılandırma dosyasına (örneğin ./webpack.config.js) giden yolu belirtin.
++ --config-name <değer...> Kullanılacak yapılandırmanın adı.
++ -m, --merge 'webpack-merge' kullanarak iki veya daha fazla yapılandırmayı birleştirin.
++ --disable-interpret Yapılandırma dosyasının yüklenmesi için yorumlamayı devre dışı bırakır.
++ --env <değer...> Fonksiyon olduğunda yapılandırmaya geçirilen ortam.
++ --node-env <değer> process.env.NODE_ENV öğesini belirtilen değere ayarlar.
++ --define-process-env-node-env <değer> process.env.NODE_ENV'yi belirtilen değere ayarlar. (Şu anda `--node-env` için bir takma addır)
++ --analyze Paket bilgilerini almak için webpack-bundle-analyzer eklentisini çağırır.
++ --progress [değer] Derleme sırasında derleme ilerlemesini yazdır.
++ -j, --json [değer] Sonucu JSON olarak yazdırır veya bir dosyada saklar.
++ --fail-on-warnings Webpack'ten gelen uyarılarda sıfır olmayan çıkış koduyla webpack-cli işlemini durdurur
++ -d, --devtool <değer> Hata ayıklamayı geliştirmek için bir geliştirici aracı (false | eval | [inline-|hidden-|eval-][nosources-][cheap-[module-]]source-map).
++ --no-devtool Olumsuz 'devtool' seçeneği.
++ --entry <değer...> Başlangıçta yüklenen bir modül. Sadece sonuncusu dışa aktarılır.
++ --mode <değer> Üretim optimizasyonlarını veya geliştirme ipuçlarını etkinleştirir.
++ --name <değer> Yapılandırmanın adı. Birden fazla yapılandırma yüklenirken kullanılır.
++ -o, --output-path <değer> Mutlak yol olarak çıkış dizini (gerekli).
++ --stats [değer] İstatistik seçenekleri nesnesi veya önceden ayarlanmış ad.
++ --no-stats Olumsuz 'istatistikler' seçeneği.
++ -t, --target <değer...> İçin inşa edilecek ortam. İçin inşa edilecek ortam. Mümkün olduğunda hepsi için inşa edilecek ortamların dizisi.
++ --no-target Olumsuz 'target' seçeneği.
++ --watch-options-stdin Stdin akışı sona erdiğinde izlemeyi durdur.
++ --no-watch-options-stdin Olumsuz 'watch-options-stdin' seçeneği.
++ --allowed-hosts <değer...> Dev sunucusuna erişime izin verilen ana bilgisayarları saymaya izin verir (dev sunucusuna proxy kullandığınızda kullanışlıdır, varsayılan olarak 'auto'dur).
++ --allowed-hosts-reset 'allowedHosts' yapılandırmasında sağlanan tüm öğeleri temizler. Dev sunucusuna erişime izin verilen ana bilgisayarları saymaya olanak tanır (dev sunucusuna proxy uyguladığınızda yararlıdır, varsayılan olarak 'auto'dur).
++ --bonjour Başlangıçta ZeroConf ağı üzerinden dev sunucusunun yayınlanmasına izin verir.
++ --no-bonjour Başlangıçta ZeroConf ağı üzerinden dev sunucusunun yayınlanmasına izin vermez.
++ --no-client İstemci betiğini devre dışı bırakır.
++ --client-logging <değer> Tarayıcıda günlük düzeyini ayarlamanıza olanak tanır.
++ --client-overlay Derleyici hataları veya uyarıları olduğunda tarayıcıda tam ekran kaplamayı etkinleştirir.
++ --no-client-overlay Derleyici hataları veya uyarıları olduğunda tarayıcıdaki tam ekran kaplamayı devre dışı bırakır.
++ --client-overlay-errors Derleyici hataları olduğunda tarayıcıda tam ekran kaplamayı etkinleştirir.
++ --no-client-overlay-errors Derleyici hataları olduğunda tarayıcıdaki tam ekran kaplamayı devre dışı bırakır.
++ --client-overlay-warnings Derleyici uyarıları olduğunda tarayıcıda tam ekran kaplamayı etkinleştirir.
++ --no-client-overlay-warnings Derleyici uyarıları olduğunda tarayıcıdaki tam ekran kaplamayı devre dışı bırakır.
++ --client-overlay-runtime-errors Yakalanmamış çalışma zamanı hataları olduğunda tarayıcıda tam ekran kaplamayı etkinleştirir.
++ --no-client-overlay-runtime-errors Yakalanmamış çalışma zamanı hataları olduğunda tarayıcıdaki tam ekran kaplamayı devre dışı bırakır.
++ --client-overlay-trusted-types-policy-name <değer> Kaplama için Güvenilir Türler politikasının adı. Varsayılanı 'webpack-dev-server#overlay'dır.
++ --client-progress Tarayıcıda derleme ilerleme durumunu yüzde olarak yazdırır.
++ --no-client-progress Tarayıcıda derleme ilerleme durumunu yüzde olarak yazdırmaz.
++ --client-reconnect [değer] dev-server'a istemciye yeniden bağlanmayı kaç kez denemesi gerektiğini söyler.
++ --no-client-reconnect Geliştirici sunucusuna istemciye yeniden bağlanmayı denememesini söyler.
++ --client-web-socket-transport <değer> Geliştirme sunucusuyla iletişim kurmak için özel web soketi taşımasını ayarlamayı sağlar.
++ --client-web-socket-url <değer> Web soketi sunucusuna URL belirtmenize olanak tanır (geliştirme sunucusuna proxy verdiğinizde ve istemci betiğinin her zaman nereye bağlanacağını bilmediğinde kullanışlıdır).
++ --client-web-socket-url-hostname <değer> devServer'a bağlı istemcilere sağlanan ana bilgisayar adını kullanmalarını söyler.
++ --client-web-socket-url-pathname <değer> devServer'a bağlı istemcilere bağlanmak için sağlanan yolu kullanmalarını söyler.
++ --client-web-socket-url-password <değer> devServer'a bağlı istemcilere kimlik doğrulaması için sağlanan parolayı kullanmalarını söyler.
++ --client-web-socket-url-port <değer> devServer'a bağlı istemcilere sağlanan portu kullanmalarını söyler.
++ --client-web-socket-url-protocol <değer> devServer'a bağlı istemcilere sağlanan protokolü kullanmalarını söyler.
++ --client-web-socket-url-username <değer> devServer'a bağlı istemcilere kimlik doğrulaması için verilen kullanıcı adını kullanmalarını söyler.
++ --compress Sunulan her şey için gzip sıkıştırmasını etkinleştirir.
++ --no-compress Sunulan her şey için gzip sıkıştırmasını devre dışı bırakır.
++ --history-api-fallback Belirtilen bir dizin sayfası (varsayılan olarak 'index.html') üzerinden isteklerin proxy'lenmesine olanak tanır; HTML5 Geçmiş API'sini kullanan Tek Sayfalık Uygulamalar için yararlıdır.
++ --no-history-api-fallback Belirtilen bir dizin sayfası üzerinden proxy isteklerine izin vermez.
++ --host <değer> Kullanılacak ana bilgisayar adını belirtmeye izin verir.
++ --hot [değer] Sıcak Modül Değiştirmeyi etkinleştirir.
++ --no-hot Sıcak Modül Değiştirmeyi devre dışı bırakır.
++ --ipc [değer] Bir unix soketini dinle.
++ --live-reload Dosya değişiklikleri algılandığında sayfanın/sayfaların yeniden yüklenmesini/yenilenmesini etkinleştirir (varsayılan olarak etkindir).
++ --no-live-reload Dosya değişiklikleri algılandığında sayfanın/sayfaların yeniden yüklenmesini/yenilenmesini devre dışı bırakır (varsayılan olarak etkindir).
++ --open [değer...] Sunucu başlatıldıktan sonra tarayıcıyı/tarayıcıları ve sayfayı/sayfaları açacak şekilde dev sunucusunu yapılandırmanıza olanak tanır (varsayılan tarayıcınızı açmak için true olarak ayarlayın).
++ --no-open Varsayılan tarayıcıyı açmaz.
++ --open-target <değer...> Tarayıcıda belirtilen sayfayı açar.
++ --open-app-name <değer...> Belirtilen tarayıcıyı aç.
++ --open-reset 'open' yapılandırmasında sağlanan tüm öğeleri temizler. Sunucu başlatıldıktan sonra tarayıcıyı(ları) ve sayfayı(ları) açmak üzere dev sunucusunu yapılandırmaya izin verir (varsayılan tarayıcınızı açmak için true olarak ayarlayın).
++ --open-target-reset 'open.target' yapılandırmasında sağlanan tüm öğeleri temizler. Tarayıcıda belirtilen sayfayı açar.
++ --open-app-name-reset 'open.app.name' yapılandırmasında sağlanan tüm öğeleri temizle. Belirtilen tarayıcıyı aç.
++ --port <değer> Kullanılacak bir port belirtmeye izin verir.
++ --server-type <değer> Sunucuyu ve seçenekleri ayarlamanıza olanak tanır (varsayılan olarak 'http').
++ --server-options-passphrase <değer> Bir pfx dosyası için parola.
++ --server-options-request-cert SSL sertifikası talebi.
++ --no-server-options-request-cert SSL sertifikası talebinde bulunmaz.
++ --server-options-ca <değer...> Bir SSL CA sertifikasına veya bir SSL CA sertifikasının içeriğine giden yol.
++ --server-options-ca-reset 'server.options.ca' yapılandırmasında sağlanan tüm öğeleri temizleyin. Bir SSL CA sertifikasına giden yol veya bir SSL CA sertifikasının içeriği.
++ --server-options-cert <değer...> Bir SSL sertifikasına veya bir SSL sertifikasının içeriğine giden yol.
++ --server-options-cert-reset 'server.options.cert' yapılandırmasında sağlanan tüm öğeleri temizleyin. Bir SSL sertifikasına veya bir SSL sertifikasının içeriğine giden yol.
++ --server-options-crl <değer...> PEM biçimli CRL'lere (Sertifika İptal Listeleri) veya PEM biçimli CRL'lerin (Sertifika İptal Listeleri) içeriğine giden yol.
++ --server-options-crl-reset 'server.options.crl' yapılandırmasında sağlanan tüm öğeleri temizle. PEM biçimli CRL'lere (Sertifika İptal Listeleri) veya PEM biçimli CRL'lerin (Sertifika İptal Listeleri) içeriğine giden yol.
++ --server-options-key <değer...> Bir SSL anahtarının yolu veya bir SSL anahtarının içeriği.
++ --server-options-key-reset 'server.options.key' yapılandırmasında sağlanan tüm öğeleri temizleyin. Bir SSL anahtarına giden yol veya bir SSL anahtarının içeriği.
++ --server-options-pfx <değer...> Bir SSL pfx dosyasının yolu veya bir SSL pfx dosyasının içeriği.
++ --server-options-pfx-reset 'server.options.pfx' yapılandırmasında sağlanan tüm öğeleri temizle. Bir SSL pfx dosyasının yolu veya bir SSL pfx dosyasının içeriği.
++ --static [değer...] Dizinlerden (varsayılan olarak 'genel' dizin) statik dosyaların sunulmasına yönelik seçenekleri yapılandırmaya olanak tanır.
++ --no-static Dizinlerden statik dosyaların sunulmasına yönelik seçeneklerin yapılandırılmasına izin vermez.
++ --static-directory <değer...> Statik içerikler için dizin.
++ --static-public-path <değer...> Statik dosyalar tarayıcıda bu genel yol altında kullanılabilir olacaktır.
++ --static-serve-index Etkinleştirildiğinde dev sunucusuna serveIndex ara yazılımını kullanmasını söyler.
++ --no-static-serve-index Geliştirici sunucusuna serveIndex ara yazılımını kullanmasını söylemez.
++ --static-watch Statik içerik dizinindeki dosyaları izler.
++ --no-static-watch Statik içerik dizinindeki dosyaları izlemez.
++ --static-reset 'Statik' yapılandırmada sağlanan tüm öğeleri temizler. Statik dosyaları dizinden (varsayılan olarak 'genel' dizin) sunmak için seçenekleri yapılandırmaya izin verir.
++ --static-public-path-reset 'static.publicPath' yapılandırmasında sağlanan tüm öğeleri temizleyin. Statik dosyalar tarayıcıda bu genel yol altında kullanılabilir olacaktır.
++ --watch-files <değer...> Dosya değişikliklerini izlemek için kullanılacak kümeler/dizinler/dosyalar listesini yapılandırmaya izin verir.
++ --watch-files-reset 'watchFiles' yapılandırmasında sağlanan tüm öğeleri temizler. Dosya değişikliklerini izlemek için glob'lar/dizinler/dosyalar listesini yapılandırmaya izin verir.
++ --no-web-socket-server Web soket sunucusunu ve seçeneklerini ayarlamayı engeller.
++ --web-socket-server-type <değer> Web soket sunucusunu ve seçeneklerini ayarlamanıza olanak tanır (varsayılan olarak 'ws').
++
++Küresel seçenekler:
++ --color Konsolda renkleri etkinleştirir.
++ --no-color Konsoldaki renkleri devre dışı bırakır.
++ -v, --version 'webpack', 'webpack-cli' ve 'webpack-dev-server' ve komutların sürüm numaralarını çıktı olarak verir.
++ -h, --help [ayrıntılı] Komutlar ve seçenekler için yardımı görüntüle.
++
++Desteklenen tüm komutların ve seçeneklerin listesini görmek için 'webpack --help=verbose' komutunu çalıştırın.
++
++Webpack dokümantasyonu: https://webpack.js.org/.
++CLI dokümantasyonu: https://webpack.js.org/api/cli/.
++Webpack ekibi tarafından ♥ ile yapılmıştır.
++```
++
++> [!NOT]
++>
++> _Yukarıdaki seçeneklere ilişkin ayrıntılı dokümantasyon şu [bağlantıda](https://webpack.js.org/configuration/dev-server/) mevcuttur._
++
++### NPM Komut Dosyaları ile
++
++NPM package.json betikleri, yerel olarak yüklenen dosyaları çalıştırmak için kullanışlı ve kullanışlı bir araçtır
++ ikili dosyaları tam yolları hakkında endişelenmenize gerek kalmadan tanımlayın. Basitçe bir
++komut dosyası şu şekilde:
++
++```json
++[
++ {
++ txid: "dba43fd04b7ae3df8e5b596f2e7fab247c58629d622e3a5213f03a5a09684430",
++ sürüm: 1,
++ kilitlenme süresi: 0,
++ vin: [ [Nesne] ],
++ vout: [ [Nesne], [Nesne] ],
++ boyut: 255,
++ ağırlık: 1020,
++ ücret: 10000,
++ durum: {
++ doğrulandı: doğru,
++ blok_yüksekliği: 326148,
++ block_hash: "00000000000000001e4118adcfbb02364bc13c41c210d8811e4f39aeb3687e36",
++ blok_zamanı: 05-ekim-2024
++ }
++ },
++ ...
++]
++```
++
++Ve terminalinizde/konsolunuzda aşağıdakini çalıştırın:
++
++```konsol
++npm çalıştır hizmet ver
++```
++
++NPM, `node_modules` içindeki ikili dosyaya sizin için otomatik olarak başvuracaktır ve
++dosyayı veya komutu çalıştır.
++
++### API ile
++
++webpack-dev-server'ı CLI üzerinden çalıştırmanız önerilirken, API üzerinden de bir sunucu başlatmayı seçebilirsiniz.
++
++İlgili [`webpack-dev-server` için API belgelerine](https://webpack.js.org/api/webpack-dev-server/) bakın.
++
++### TypeScript ile
++
++Webpack yapılandırmasında TypeScript kullanıyorsanız, TS hatalarından kaçınmak için `devServer` özelliğini düzgün bir şekilde yazmanız gerekir (örneğin `'devServer' 'Configuration'` türünde mevcut değildir). Bunun için şunlardan birini kullanın:
++
++```ts
++/// <referans yolu="node_modules/webpack-dev-server/types/lib/Server.d.ts"/>
++import type { Yapılandırma } from "webpack";
++
++// Mantığınız
++```
++
++Veya `webpack-dev-server`'dan türü içe aktarabilirsiniz, yani
++
++```ts
++import type { Yapılandırma DevServerConfiguration olarak } from "webpack-dev-server";
++import type { Yapılandırma } from "webpack";
++
++const devServer: DevServerYapılandırması = {};
++const config: Yapılandırma = { devServer };
++
++// modül.ihracatlar
++varsayılan yapılandırmayı dışa aktar;
++```
++
++### Sonuç
++
++Her iki yöntem de bir sunucu örneği başlatacak ve bağlantıları dinlemeye başlayacaktır
++`localhost`'tan `8080` portunda.
++
++webpack-dev-server varsayılan olarak dosyaların canlı olarak yeniden yüklenmesini destekleyecek şekilde yapılandırılmıştır
++Sunucu çalışırken varlıklarınızı düzenlersiniz.
++
++Daha fazla kullanım durumu ve seçenek için [**dokümantasyona**][docs-url] bakın.
++
++## Tarayıcı Desteği
++
++`webpack-dev-server` istemci (tarayıcı) betiklerini bir ES5'e dönüştürürken
++durum, proje yalnızca resmi olarak _son iki majör sürümünü destekliyor
++tarayıcılar_. Her çılgınlığı destekleyecek kaynaklara sahip değiliz
++orada bir tarayıcı var.
++
++Gizli/eski bir tarayıcıda bir hata bulursanız, bunu aktif olarak memnuniyetle karşılarız.
++Hatayı çözmek için Çekme İsteği.
++
++## Destek
++
++ Depodaki sorunları hatalara, özelliklere ve daha fazlasına odaklı tutmak için elimizden geleni yapıyoruz.
++modül için kodda gerekli değişiklikler. Bu nedenle, kullanıcılardan şunu istiyoruz
++Genel destek, "nasıl yapılır" veya "bu neden işe yaramıyor" sorularını deneyerek
++Mevcut diğer destek kanallarının listesi.
++
++Webpack-dev-server desteği için ilk durağınız mükemmel olmalıdır
++[documentation][docs-url] modül için. İyileştirme için bir fırsat görürseniz
++Bu belgelerden herhangi biri için lütfen [webpack.js.org deposuna][wjo-url] gidin ve bir
++çekme isteği.
++
++Oradan, kullanıcıları [webpack tartışmaları][tartışma-url] adresini ziyaret etmeye teşvik ediyoruz ve
++oradaki iyi insanlarla konuş. Cevap arayışın sohbette kuru kalırsa,
++ [StackOverflow][stack-url] adresine gidin ve hızlı bir arama yapın veya yeni bir tane açın
++soru. Unutmayın; sizinkini içeren soruları cevaplamak her zaman çok daha kolaydır.
++`webpack.config.js` ve ilgili dosyalar!
++
++Eğer twitter'ı iyi biliyorsanız sorunuzla birlikte [#webpack][hash-url] tweet'i atabilirsiniz
++ve birileri çıkıp yardım eli uzatmalı.
++
++Bir :bug: keşfettiyseniz, bir özellik öneriniz varsa veya görmek istiyorsanız
++bir değişiklik, lütfen Github'da bir sorun oluşturmaktan çekinmeyin. _Not: Sorun
++şablon isteğe bağlı değildir, bu yüzden lütfen onu kaldırmamaya dikkat edin ve lütfen doldurun
++tamamen dışarı._
++
++## Katkıda Bulunma
++
++Katkılarınızı bekliyoruz! Lütfen nasıl katılacağınıza dair daha fazla bilgi için [CONTRIBUTING.md](CONTRIBUTING.md)'yi okuyun.
++
++## Atıf
++
++Bu proje büyük ölçüde [peerigon/nof5](https://github.com/peerigon/nof5)'ten esinlenmiştir.
++
++## Lisans
++
++#### [MIT](./LİSANS)
++
++[npm]: https://img.shields.io/npm/v/webpack-dev-server.svg
++[npm-url]: https://npmjs.com/package/webpack-dev-server
++[düğüm]: https://img.shields.io/node/v/webpack-dev-server.svg
++[düğüm-url]: https://nodejs.org
++[testler]: https://github.com/webpack/webpack-dev-server/workflows/webpack-dev-server/badge.svg
++[testler-url]: https://github.com/webpack/webpack-dev-server/actions?query=workflow%3Awebpack-dev-server
++[kapak]: https://codecov.io/gh/webpack/webpack-dev-server/branch/master/graph/badge.svg
++[kapak-url]: https://codecov.io/gh/webpack/webpack-dev-server
++[tartışma]: https://img.shields.io/github/discussions/webpack/webpack
++[tartışma-url]: https://github.com/webpack/webpack/discussions
++[docs-url]: https://webpack.js.org/configuration/dev-server/#devserver
++[hash-url]: https://twitter.com/search?q=webpack
++[ara yazılım-url'si]: https://github.com/webpack/webpack-dev-middleware
++[yığın-url]: https://stackoverflow.com/questions/tagged/webpack-dev-server
++[çirkin-url]: https://github.com/webpack-contrib/uglifyjs-webpack-plugin
++[wjo-url]
++[indirmeler]: https://img.shields.io/npm/dm/webpack-dev-server.svg
++[katkıda bulunanların-url'si]: https://github.com/webpack/webpack-dev-server/graphs/contributors
++[katkıda bulunanlar]: https://img.shields.io/github/contributors/webpack/webpack-dev-server.svg
++---------------------- | ---------------------------------------------- |
+ | `sudo port install gh` | `sudo port selfupdate && sudo port upgrade gh` |
+ 
+ #### Conda
+ 
+ | Kurulum: | Yükseltme: |
+-|-------------------------------|----- ------------------------------------|
++|-import mempoolJS from "@mempool/mempool.js";
++
++const init = asenkron () => {
++  
++ const { bitcoin: { adresler } } = mempoolJS({
++ ana bilgisayar adı: 'mempool.space'
++ });
++
++ sabit adres = 'bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz';
++ const addressTxsChain = await adresler.getAddressTxsChain({ adres });
++ console.log(adresTxsZincir);
++          
++};
++
++init();--------------------------------------------|--- ---------------------------------------|
+ | `conda install gh --channel conda-forge` | `conda güncelleme gh --kanal conda-forge` |
+ 
+ Ek Conda kurulum seçenekleri [gh-feedstock sayfasında](https://github.com/conda-forge/gh-feedstock#installing-gh) mevcuttur.
