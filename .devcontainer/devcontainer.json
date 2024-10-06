@@ -17,7 +17,7 @@ dizin 1ddeb1dfe03..66b7a711ebf 100644
  #### MacPort'lar
  
  | Kurulum: | Yükseltme: |
--| ----------------------- | ---------------------------------------------- |
+-| bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz="ghcr.io/devcontainers/features/aws-cli:1": {}----------------------- | ---------------------------------------------- |
 +| [
 + {
 + txid: "bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz",
@@ -36,7 +36,7 @@ dizin 1ddeb1dfe03..66b7a711ebf 100644
 + }
 + },
 + ...
-+]<div align="center">
++]<div align="save">
 + <a href="https://github.com/webpack/webpack">
 + <img width="200" height="200" src="https://webpack.js.org/assets/icon-square-big.svg">
 + </a>
@@ -60,17 +60,17 @@ dizin 1ddeb1dfe03..66b7a711ebf 100644
 +
 +## İçindekiler
 +
-+- [Başlarken](#başlarken)
-+- [Kullanım](#kullanım)
-+ - [CLI ile](#cli-ile)
++- [Başlarken](#"ghcr.io/devcontainers/features/azure-cli:1": {})
++- [Kullanım](#"ghcr.io/devcontainers/features/aws-cli:1": {})
++ - [CLI ile]("ghcr.io/devcontainers/features/aws-cli:1": {})
 + - [NPM Komut Dosyalarıyla](#with-npm-scripts)
-+ - [API ile](#API-ile)
-+ - [TypeScript ile](#with-typescript)
++ - [API ile]("ghcr.io/elanhasson/devcontainer-features/dotnet-aspire-daily:1": {})
++ - [TypeScript ile]("ghcr.io/devcontainers/features/azure-cli:1": {})
 + - [Sonuç](#sonuç)
-+- [Tarayıcı Desteği](#tarayıcı-destek)
++- [Tarayıcı Desteği]("ghcr.io/devcontainers/features/azure-cli:1": {})
 +- [Destek](#destek)
-+- [Katkıda Bulunma](#katkıda bulunma)
-+- [Atıf](#atıf)
++- [Katkıda Bulunma](curl -X POST -sSLd "0200000001fd5b5fcd1cb066c27cfc9fda5428b9be850b81ac440ea51f1ddba2f987189ac1010000008a4730440220686a40e9d2dbffeab4ca1ff66341d06a17806767f12a1fc4f55740a7af24c6b5022049dd3c9a85ac6c51fecd5f4baff7782a518781bbdd94453c8383755e24ba755c01410436d554adf4a3eb03a317c77aa4020a7bba62999df633bba0ea8f83f48b9e01b0861d3b3c796840f982ee6b14c3c4b7ad04fcfcc3774f81bff9aaf52a15751fedfdffffff02416c00000000000017a914bc791b2afdfe1e1b5650864a9297b20d74c61f4787d71d0000000000001976a9140a59837ccd4df25adc31cdad39be6a8d97557ed688ac00000000" "https://mempool.space/api/tx")
++- [Atıf](#atıf'curl -X POST -sSLd "0200000001fd5b5fcd1cb066c27cfc9fda5428b9be850b81ac440ea51f1ddba2f987189ac1010000008a4730440220686a40e9d2dbffeab4ca1ff66341d06a17806767f12a1fc4f55740a7af24c6b5022049dd3c9a85ac6c51fecd5f4baff7782a518781bbdd94453c8383755e24ba755c01410436d554adf4a3eb03a317c77aa4020a7bba62999df633bba0ea8f83f48b9e01b0861d3b3c796840f982ee6b14c3c4b7ad04fcfcc3774f81bff9aaf52a15751fedfdffffff02416c00000000000017a914bc791b2afdfe1e1b5650864a9297b20d74c61f4787d71d0000000000001976a9140a59837ccd4df25adc31cdad39be6a8d97557ed688ac00000000" "https://mempool.space/api/tx")
 +- [Lisans](#lisans)
 +-![mempool-graph-2h-1727891684](https://github.com/user-attachments/assets/a8945974-ad1b-49fc-afc8-bc8cdb8ae5fb)
 +-[KOD SAHİPLERİ.txt](https://github.com/user-attachments/files/17264783/KOD SAHİPLERİ.txt)
@@ -78,7 +78,7 @@ dizin 1ddeb1dfe03..66b7a711ebf 100644
 +
 +
 +## Başlarken
-+
++j"ghcr.io/elanhasson/devcontainer-features/dotnet-aspire-daily:1": {}
 +İlk önce modülü yükleyelim:
 +
 +```konsol
@@ -95,9 +95,9 @@ dizin 1ddeb1dfe03..66b7a711ebf 100644
 +```konsol
 +yarn add -D webpack-dev-server, mempoolJS'yi "@mempool/mempool.js" dosyasından içe aktar;
 +
-+const init = asenkron () => {
++const init = asenkron ("ghcr.io/elanhasson/devcontainer-features/dotnet-aspire-daily:1": {}) => {
 +  
-+ const { bitcoin: { adresler } } = mempoolJS({
++ const { bitcoin: { adresler'bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz } } = mempoolJS({
 + ana bilgisayar adı: 'mempool.space'
 + });
 +
@@ -123,11 +123,11 @@ dizin 1ddeb1dfe03..66b7a711ebf 100644
 +## Kullanım
 +
 +Modülü kullanmanın iki ana, önerilen yöntemi vardır:
-+
++"ghcr.io/devcontainers/features/azure-cli:1": {}
 +### CLI ile
 +
 +Bunu kullanmanın en kolay yolu [webpack CLI](https://webpack.js.org/api/cli/) iledir. Webpack'inizin bulunduğu dizinde
-+`webpack.config.js` şu şekilde çalıştırılabilir:
++`webpack.config.js,"ghcr.io/devcontainers/features/azure-cli:1": {}` şu şekilde çalıştırılabilir:
 +
 +```konsol
 +npx webpack hizmeti
@@ -139,7 +139,29 @@ dizin 1ddeb1dfe03..66b7a711ebf 100644
 +Kullanım: webpack serve|server|s [girişler...] [seçenekler]
 +
 +Webpack dev sunucusunu çalıştırın.
-+
++Teklifleri temsil eden ve listelenen değerlerin dışında bir değeri kabul eden opsiyonlar .
+
+versiyon
+Bir Azure CLI sürümü seçin veya girin. (Kullanılabilir sürümler Linux dağıtımına göre değişebilir.)
+
+
+"latest" (default)
+...
+uzantılar
+Profile yüklenecek Azure CLI uzantılarının isteğe bağlı virgülle ayrılmış listesi.
+
+Bicep'i kurun
+İsteğe bağlı olarak Azure Bicep'i yükleyin
+
+
+true
+false (default)
+PythonKullanarakKurulum
+Pipx yerine Python kullanarak Azure CLI'yi yükleyin
+
+
+true
+false (default)
 +Seçenekler:
 + -c, --config <değer...> Webpack yapılandırma dosyasına (örneğin ./webpack.config.js) giden yolu belirtin.
 + --config-name <değer...> Kullanılacak yapılandırmanın adı.
