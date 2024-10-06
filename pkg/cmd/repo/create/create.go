@@ -20,7 +20,6 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared/format"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -228,7 +227,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			return nil, cobra.ShellCompDirectiveError
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		results, err := queries.ListGitIgnoreTemplates(httpClient, hostname)
+		results, err := api.ListGitIgnoreTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -245,7 +244,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			return nil, cobra.ShellCompDirectiveError
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		licenses, err := queries.ListLicenseTemplates(httpClient, hostname)
+		licenses, err := api.ListLicenseTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -812,7 +811,7 @@ func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompt
 		return "", nil
 	}
 
-	templates, err := queries.ListGitIgnoreTemplates(client, hostname)
+	templates, err := api.ListGitIgnoreTemplates(client, hostname)
 	if err != nil {
 		return "", err
 	}
@@ -831,7 +830,7 @@ func interactiveLicense(client *http.Client, hostname string, prompter iprompter
 		return "", nil
 	}
 
-	licenses, err := queries.ListLicenseTemplates(client, hostname)
+	licenses, err := api.ListLicenseTemplates(client, hostname)
 	if err != nil {
 		return "", err
 	}

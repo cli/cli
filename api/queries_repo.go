@@ -219,6 +219,7 @@ type License struct {
 	Conditions     []string `json:"conditions"`
 	Limitations    []string `json:"limitations"`
 	Body           string   `json:"body"`
+	Featured       bool     `json:"featured"`
 }
 
 type GitIgnore struct {
@@ -1405,4 +1406,52 @@ func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
 	default:
 		return false, ghAPI.HandleHTTPError(resp)
 	}
+}
+
+// ListLicenseTemplates fetches available repository license templates.
+// It uses API v3 because license template isn't supported by GraphQL.
+func ListLicenseTemplates(httpClient *http.Client, hostname string) ([]License, error) {
+	var licenseTemplates []License
+	client := NewClientFromHTTP(httpClient)
+	err := client.REST(hostname, "GET", "licenses", nil, &licenseTemplates)
+	if err != nil {
+		return nil, err
+	}
+	return licenseTemplates, nil
+}
+
+// LicenseTemplate fetches an available repository license template.
+// It uses API v3 because license template isn't supported by GraphQL.
+func LicenseTemplate(httpClient *http.Client, hostname string, licenseTemplateName string) (License, error) {
+	var licenseTemplates License
+	client := NewClientFromHTTP(httpClient)
+	err := client.REST(hostname, "GET", fmt.Sprintf("licenses/%v", licenseTemplateName), nil, &licenseTemplates)
+	if err != nil {
+		return License{}, err
+	}
+	return licenseTemplates, nil
+}
+
+// ListGitIgnoreTemplates fetches available repository gitignore templates.
+// It uses API v3 here because gitignore template isn't supported by GraphQL.
+func ListGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string, error) {
+	var gitIgnoreTemplates []string
+	client := NewClientFromHTTP(httpClient)
+	err := client.REST(hostname, "GET", "gitignore/templates", nil, &gitIgnoreTemplates)
+	if err != nil {
+		return []string{}, err
+	}
+	return gitIgnoreTemplates, nil
+}
+
+// ViewGitIgnoreTemplate fetches available repository gitignore templates.
+// It uses API v3 here because gitignore template isn't supported by GraphQL.
+func GitIgnoreTemplate(httpClient *http.Client, hostname string, gitIgnoreTemplateName string) (GitIgnore, error) {
+	var gitIgnoreTemplateResponse GitIgnore
+	client := NewClientFromHTTP(httpClient)
+	err := client.REST(hostname, "GET", fmt.Sprintf("gitignore/templates/%v", gitIgnoreTemplateName), nil, &gitIgnoreTemplateResponse)
+	if err != nil {
+		return GitIgnore{}, err
+	}
+	return gitIgnoreTemplateResponse, nil
 }

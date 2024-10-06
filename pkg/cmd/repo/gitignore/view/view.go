@@ -9,7 +9,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -72,7 +71,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	gitIgnore, err := queries.GitIgnoreTemplate(client, hostname, opts.Template)
+	gitIgnore, err := api.GitIgnoreTemplate(client, hostname, opts.Template)
 	if err != nil {
 		if strings.Contains(err.Error(), "HTTP 404") {
 			return fmt.Errorf("'%s' is not a valid gitignore template. Run `gh repo gitignore list` for options", opts.Template)
