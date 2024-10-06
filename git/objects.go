@@ -71,7 +71,11 @@ type Commit struct {
 }
 
 type BranchConfig struct {
+	// LocalName of the branch.
+	LocalName  string
 	RemoteName string
 	RemoteURL  *url.URL
-	MergeRef   string
+	// MergeBase is the optional base branch to target in a new PR if `--base` is not specified.
+	MergeBase string
+	MergeRef  string
 }

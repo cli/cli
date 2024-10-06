@@ -326,7 +326,7 @@ func (c *Client) lookupCommit(ctx context.Context, sha, format string) ([]byte, 
 // ReadBranchConfig parses the `branch.BRANCH.(remote|merge)` part of git config.
 func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg BranchConfig) {
 	prefix := regexp.QuoteMeta(fmt.Sprintf("branch.%s.", branch))
-	args := []string{"config", "--get-regexp", fmt.Sprintf("^%s(remote|merge)$", prefix)}
+	args := []string{"config", "--get-regexp", fmt.Sprintf("^%s(remote|merge|gh-merge-base)$", prefix)}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return
@@ -335,6 +335,8 @@ func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg Branc
 	if err != nil {
 		return
 	}
+
+	cfg.LocalName = branch
 	for _, line := range outputLines(out) {
 		parts := strings.SplitN(line, " ", 2)
 		if len(parts) < 2 {
@@ -354,6 +356,8 @@ func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg Branc
 			}
 		case "merge":
 			cfg.MergeRef = parts[1]
+		case "gh-merge-base":
+			cfg.MergeBase = parts[1]
 		}
 	}
 	return

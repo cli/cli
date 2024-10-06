@@ -510,11 +510,10 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 	return nil
 }
 
-func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, headBranch string) *git.TrackingRef {
+func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, headBranchConfig *git.BranchConfig) *git.TrackingRef {
 	refsForLookup := []string{"HEAD"}
 	var trackingRefs []git.TrackingRef
 
-	headBranchConfig := gitClient.ReadBranchConfig(context.Background(), headBranch)
 	if headBranchConfig.RemoteName != "" {
 		tr := git.TrackingRef{
 			RemoteName: headBranchConfig.RemoteName,
@@ -527,7 +526,7 @@ func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, h
 	for _, remote := range remotes {
 		tr := git.TrackingRef{
 			RemoteName: remote.Name,
-			BranchName: headBranch,
+			BranchName: headBranchConfig.LocalName,
 		}
 		trackingRefs = append(trackingRefs, tr)
 		refsForLookup = append(refsForLookup, tr.String())
@@ -637,9 +636,10 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	var headRepo ghrepo.Interface
 	var headRemote *ghContext.Remote
 
+	headBranchConfig := gitClient.ReadBranchConfig(context.Background(), headBranch)
 	if isPushEnabled {
 		// determine whether the head branch is already pushed to a remote
-		if pushedTo := determineTrackingBranch(gitClient, remotes, headBranch); pushedTo != nil {
+		if pushedTo := determineTrackingBranch(gitClient, remotes, &headBranchConfig); pushedTo != nil {
 			isPushEnabled = false
 			if r, err := remotes.FindByName(pushedTo.RemoteName); err == nil {
 				headRepo = r
@@ -712,6 +712,9 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 
 	baseBranch := opts.BaseBranch
+	if baseBranch == "" {
+		baseBranch = headBranchConfig.MergeBase
+	}
 	if baseBranch == "" {
 		baseBranch = baseRepo.DefaultBranchRef.Name
 	}
