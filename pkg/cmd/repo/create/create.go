@@ -112,6 +112,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			# create a remote repository from the current directory
 			gh repo create my-project --private --source=. --remote=upstream
+
+			# create a remote repository in an organization
+			gh repo create org-name/repo-name
 		`),
 		Args:    cobra.MaximumNArgs(1),
 		Aliases: []string{"new"},
