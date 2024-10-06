@@ -126,6 +126,12 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options) error {
 	// Disable local caching, so we get up-to-date response from TUF repository
 	tufOpt.CacheValidity = 0
 
+	// Target will be either the default trusted root, or the trust domain-qualified one
+	ghTR := defaultTR
+	if opts.TrustDomain != "" {
+		ghTR = fmt.Sprintf("%s.%s", opts.TrustDomain, defaultTR)
+	}
+
 	if opts.TufUrl != "" && opts.TufRootPath != "" {
 		tufRoot, err := os.ReadFile(opts.TufRootPath)
 		if err != nil {
@@ -136,7 +142,7 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options) error {
 		tufOpt.RepositoryBaseURL = opts.TufUrl
 		tufOptions = append(tufOptions, tufConfig{
 			tufOptions: tufOpt,
-			targets:    []string{defaultTR},
+			targets:    []string{ghTR},
 		})
 	} else {
 		// Get from both Sigstore public good and GitHub private instance
@@ -147,14 +153,9 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options) error {
 
 		tufOpt = verification.GitHubTUFOptions()
 		tufOpt.CacheValidity = 0
-		targets := []string{defaultTR}
-		if opts.TrustDomain != "" {
-			targets = append(targets, fmt.Sprintf("%s.%s",
-				opts.TrustDomain, defaultTR))
-		}
 		tufOptions = append(tufOptions, tufConfig{
 			tufOptions: tufOpt,
-			targets:    targets,
+			targets:    []string{ghTR},
 		})
 	}
 

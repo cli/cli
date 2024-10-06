@@ -92,7 +92,7 @@ func (p *surveyPrompter) InputHostname() (string, error) {
 	var result string
 	err := p.ask(
 		&survey.Input{
-			Message: "GHE hostname:",
+			Message: "Hostname:",
 		}, &result, survey.WithValidator(func(v interface{}) error {
 			return ghinstance.HostnameValidator(v.(string))
 		}))

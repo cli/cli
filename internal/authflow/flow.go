@@ -72,7 +72,7 @@ func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 				return nil
 			}
 
-			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
+			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), authURL)
 			_ = waitForEnter(IO.In)
 
 			if err := b.Browse(authURL); err != nil {

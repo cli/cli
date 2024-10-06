@@ -2,6 +2,7 @@ package login
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"regexp"
 	"runtime"
@@ -546,7 +547,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://rebecca.chambers/settings/tokens"),
 		},
 		{
-			name: "choose enterprise",
+			name: "choose Other",
 			wantHosts: heredoc.Doc(`
                 brad.vickers:
                     users:
@@ -563,8 +564,8 @@ func Test_loginRun_Survey(t *testing.T) {
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
-					case "What account do you want to log into?":
-						return prompter.IndexFor(opts, "GitHub Enterprise Server")
+					case "Where do you use GitHub?":
+						return prompter.IndexFor(opts, "Other")
 					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
@@ -606,7 +607,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
-					case "What account do you want to log into?":
+					case "Where do you use GitHub?":
 						return prompter.IndexFor(opts, "GitHub.com")
 					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "HTTPS")
@@ -640,7 +641,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
-					case "What account do you want to log into?":
+					case "Where do you use GitHub?":
 						return prompter.IndexFor(opts, "GitHub.com")
 					case "What is your preferred protocol for Git operations on this host?":
 						return prompter.IndexFor(opts, "SSH")
@@ -800,6 +801,53 @@ func Test_loginRun_Survey(t *testing.T) {
 				assert.Regexp(t, tt.wantErrOut, stderr.String())
 			}
 			reg.Verify(t)
+		})
+	}
+}
+
+func Test_promptForHostname(t *testing.T) {
+	tests := []struct {
+		name          string
+		options       []string
+		selectedIndex int
+		// This is so we can test that the options in the function don't change
+		expectedSelection string
+		inputHostname     string
+		expect            string
+	}{
+		{
+			name:              "select 'GitHub.com'",
+			selectedIndex:     0,
+			expectedSelection: "GitHub.com",
+			expect:            "github.com",
+		},
+		{
+			name:              "select 'Other'",
+			selectedIndex:     1,
+			expectedSelection: "Other",
+			inputHostname:     "github.enterprise.com",
+			expect:            "github.enterprise.com",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			promptMock := &prompter.PrompterMock{
+				SelectFunc: func(_ string, _ string, options []string) (int, error) {
+					if options[tt.selectedIndex] != tt.expectedSelection {
+						return 0, fmt.Errorf("expected %s at index %d, but got %s", tt.expectedSelection, tt.selectedIndex, options[tt.selectedIndex])
+					}
+					return tt.selectedIndex, nil
+				},
+				InputHostnameFunc: func() (string, error) {
+					return tt.inputHostname, nil
+				},
+			}
+			opts := &LoginOptions{
+				Prompter: promptMock,
+			}
+			hostname, err := promptForHostname(opts)
+			require.NoError(t, err)
+			require.Equal(t, tt.expect, hostname)
 		})
 	}
 }

@@ -14,7 +14,7 @@ require (
 	github.com/cli/go-gh/v2 v2.10.0
 	github.com/cli/oauth v1.0.1
 	github.com/cli/safeexec v1.0.1
-	github.com/cpuguy83/go-md2man/v2 v2.0.4
+	github.com/cpuguy83/go-md2man/v2 v2.0.5
 	github.com/creack/pty v1.1.23
 	github.com/distribution/reference v0.5.0
 	github.com/gabriel-vasile/mimetype v1.4.5
@@ -143,7 +143,7 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/theupdateframework/go-tuf v0.7.0 // indirect
-	github.com/theupdateframework/go-tuf/v2 v2.0.0 // indirect
+	github.com/theupdateframework/go-tuf/v2 v2.0.1 // indirect
 	github.com/thlib/go-timezone-local v0.0.0-20210907160436-ef149e42d28e // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect
