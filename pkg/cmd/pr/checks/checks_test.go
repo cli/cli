@@ -160,7 +160,7 @@ func Test_checksRun(t *testing.T) {
 			},
 			wantOut:    "",
 			wantErrMsg: "no checks reported on the 'trunk' branch",
-			wantErrAs:  &cmdutil.NoResultsError{},
+			wantErrAs:  &cmdutil.UnknownResultsError{},
 		},
 		{
 			name: "some failing tty",
@@ -462,7 +462,7 @@ func Test_checksRun(t *testing.T) {
 			},
 			wantOut:    "",
 			wantErrMsg: "no required checks reported on the 'trunk' branch",
-			wantErrAs:  &cmdutil.NoResultsError{},
+			wantErrAs:  &cmdutil.UnknownResultsError{},
 		},
 		{
 			name:     "only required but no required checks",
