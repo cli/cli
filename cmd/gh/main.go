@@ -40,6 +40,7 @@ const (
 	exitCancel  exitCode = 2
 	exitAuth    exitCode = 4
 	exitPending exitCode = 8
+	exitUnkown  exitCode = 16
 )
 
 func main() {
@@ -119,6 +120,7 @@ func mainRun() exitCode {
 	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
 		var pagerPipeError *iostreams.ErrClosedPagerPipe
 		var noResultsError cmdutil.NoResultsError
+		var unkownResultsError cmdutil.UnknownResultsError
 		var extError *root.ExternalCommandExitError
 		var authError *root.AuthError
 		if err == cmdutil.SilentError {
@@ -142,6 +144,13 @@ func mainRun() exitCode {
 			}
 			// no results is not a command failure
 			return exitOK
+		} else if errors.As(err, &unkownResultsError) {
+			if cmdFactory.IOStreams.IsStdoutTTY() {
+				fmt.Fprintln(stderr, unkownResultsError.Error())
+			}
+			// Unknown results should exit uniquely as
+			// it's not really a failure or a success
+			return exitUnkown
 		} else if errors.As(err, &extError) {
 			// pass on exit codes from extensions and shell aliases
 			return exitCode(extError.ExitCode())

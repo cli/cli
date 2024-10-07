@@ -68,3 +68,15 @@ func (e NoResultsError) Error() string {
 func NewNoResultsError(message string) NoResultsError {
 	return NoResultsError{message: message}
 }
+
+type UnknownResultsError struct {
+	message string
+}
+
+func (e UnknownResultsError) Error() string {
+	return e.message
+}
+
+func NewUnknownResultsError(message string) UnknownResultsError {
+	return UnknownResultsError{message: message}
+}
