@@ -29,6 +29,8 @@ import (
 // ErrInitialCommitFailed indicates the initial commit when making a new extension failed.
 var ErrInitialCommitFailed = errors.New("initial commit failed")
 
+const darwinAmd64 = "darwin-amd64"
+
 type Manager struct {
 	dataDir    func() string
 	lookPath   func(string) (string, error)
@@ -266,12 +268,15 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	// if using an ARM-based Mac and an arm64 binary is unavailable, fall back to amd64 if a relevant binary is available and Rosetta 2 is installed
 	if asset == nil && isMacARM {
 		for _, a := range r.Assets {
-			if strings.HasSuffix(a.Name, "darwin-amd64") {
+			if strings.HasSuffix(a.Name, darwinAmd64) {
 				if !hasRosetta() {
 					return fmt.Errorf(
-						"%[1]s unsupported for %[2]s. Install Rosetta with `softwareupdate --install-rosetta` to use the available darwin-amd64 binary, or open an issue: `gh issue create -R %[3]s/%[1]s -t'Support %[2]s'`",
-						repo.RepoName(), platform, repo.RepoOwner())
+						"%[1]s unsupported for %[2]s. Install Rosetta with `softwareupdate --install-rosetta` to use the available %[3]s binary, or open an issue: `gh issue create -R %[4]s/%[1]s -t'Support %[2]s'`",
+						repo.RepoName(), platform, darwinAmd64, repo.RepoOwner())
 				}
+
+				fallbackMessage := fmt.Sprintf("%[1]s not available for %[2]s. Falling back to compatible %[3]s binary", repo.RepoName(), platform, darwinAmd64)
+				fmt.Fprintln(m.io.Out, fallbackMessage)
 
 				asset = &a
 				break
