@@ -24,7 +24,7 @@ func TestNewCmdView(t *testing.T) {
 		tty      bool
 	}{
 		{
-			name:    "No license name or SPDX ID provided",
+			name:    "No license key or SPDX ID provided",
 			args:    []string{},
 			wantErr: true,
 			wantOpts: &ViewOptions{
@@ -32,7 +32,7 @@ func TestNewCmdView(t *testing.T) {
 			},
 		},
 		{
-			name:    "Happy path single license name",
+			name:    "Happy path single license key",
 			args:    []string{"mit"},
 			wantErr: false,
 			wantOpts: &ViewOptions{
@@ -40,7 +40,7 @@ func TestNewCmdView(t *testing.T) {
 			},
 		},
 		{
-			name:    "Happy path too many license names",
+			name:    "Happy path too many license keys",
 			args:    []string{"mit", "apache-2.0"},
 			wantErr: true,
 			wantOpts: &ViewOptions{

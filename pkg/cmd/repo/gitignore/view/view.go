@@ -64,11 +64,10 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	if err := opts.IO.StartPager(); err == nil {
-		defer opts.IO.StopPager()
-	} else {
-		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	if err := opts.IO.StartPager(); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "starting pager failed: %v\n", err)
 	}
+	defer opts.IO.StopPager()
 
 	hostname, _ := cfg.Authentication().DefaultHost()
 	gitIgnore, err := api.GitIgnoreTemplate(client, hostname, opts.Template)

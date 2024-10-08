@@ -1425,7 +1425,8 @@ func ListLicenseTemplates(httpClient *http.Client, hostname string) ([]License, 
 func LicenseTemplate(httpClient *http.Client, hostname string, licenseTemplateName string) (License, error) {
 	var licenseTemplates License
 	client := NewClientFromHTTP(httpClient)
-	err := client.REST(hostname, "GET", fmt.Sprintf("licenses/%v", licenseTemplateName), nil, &licenseTemplates)
+	path := fmt.Sprintf("licenses/%s", licenseTemplateName)
+	err := client.REST(hostname, "GET", path, nil, &licenseTemplates)
 	if err != nil {
 		return License{}, err
 	}
@@ -1449,7 +1450,8 @@ func ListGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string,
 func GitIgnoreTemplate(httpClient *http.Client, hostname string, gitIgnoreTemplateName string) (GitIgnore, error) {
 	var gitIgnoreTemplateResponse GitIgnore
 	client := NewClientFromHTTP(httpClient)
-	err := client.REST(hostname, "GET", fmt.Sprintf("gitignore/templates/%v", gitIgnoreTemplateName), nil, &gitIgnoreTemplateResponse)
+	path := fmt.Sprintf("gitignore/templates/%s", gitIgnoreTemplateName)
+	err := client.REST(hostname, "GET", path, nil, &gitIgnoreTemplateResponse)
 	if err != nil {
 		return GitIgnore{}, err
 	}

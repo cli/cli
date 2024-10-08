@@ -27,7 +27,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:     "list",
-		Short:   "List available repository gitignore templates",
+		Short:   "List gitignore templates used in creating repositories",
 		Aliases: []string{"ls"},
 		Args:    cmdutil.ExactArgs(0, "gh repo gitignore list takes no arguments"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,11 +52,10 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	if err := opts.IO.StartPager(); err == nil {
-		defer opts.IO.StopPager()
-	} else {
-		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	if err := opts.IO.StartPager(); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "starting pager failed: %v\n", err)
 	}
+	defer opts.IO.StopPager()
 
 	hostname, _ := cfg.Authentication().DefaultHost()
 	gitIgnoreTemplates, err := api.ListGitIgnoreTemplates(client, hostname)
