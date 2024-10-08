@@ -49,6 +49,8 @@ var sharedSetup = func(ts *testscript.Env) error {
 
 	ts.Setenv("GH_TOKEN", os.Getenv("GH_TOKEN"))
 
+	ts.Setenv("GH_HOST", os.Getenv("GH_HOST"))
+
 	ts.Setenv("ORG", os.Getenv("GH_ACCEPTANCE_ORG"))
 
 	ts.Setenv("RANDOM_STRING", randomString(10))
