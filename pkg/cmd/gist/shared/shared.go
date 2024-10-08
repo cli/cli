@@ -75,9 +75,9 @@ func GistIDFromURL(gistURL string) (string, error) {
 	return "", fmt.Errorf("Invalid gist URL %s", u)
 }
 
-const MaxPerPage = 100
+const maxPerPage = 100
 
-func ListGists(client *http.Client, hostname string, limit int, visibility string, includeText bool) ([]Gist, error) {
+func ListGists(client *http.Client, hostname string, limit int, visibility string, includeText bool, filter func(*Gist) bool) ([]Gist, error) {
 	type response struct {
 		Viewer struct {
 			Gists struct {
@@ -100,8 +100,8 @@ func ListGists(client *http.Client, hostname string, limit int, visibility strin
 	}
 
 	perPage := limit
-	if perPage > MaxPerPage {
-		perPage = MaxPerPage
+	if perPage > maxPerPage {
+		perPage = maxPerPage
 	}
 
 	variables := map[string]interface{}{
@@ -131,16 +131,18 @@ pagination:
 				}
 			}
 
-			gists = append(
-				gists,
-				Gist{
-					ID:          gist.Name,
-					Description: gist.Description,
-					Files:       files,
-					UpdatedAt:   gist.UpdatedAt,
-					Public:      gist.IsPublic,
-				},
-			)
+			gist := Gist{
+				ID:          gist.Name,
+				Description: gist.Description,
+				Files:       files,
+				UpdatedAt:   gist.UpdatedAt,
+				Public:      gist.IsPublic,
+			}
+
+			if filter == nil || filter(&gist) {
+				gists = append(gists, gist)
+			}
+
 			if len(gists) == limit {
 				break pagination
 			}
@@ -183,7 +185,7 @@ func IsBinaryContents(contents []byte) bool {
 }
 
 func PromptGists(prompter prompter.Prompter, client *http.Client, host string, cs *iostreams.ColorScheme) (gistID string, err error) {
-	gists, err := ListGists(client, host, 10, "all", false)
+	gists, err := ListGists(client, host, 10, "all", false, nil)
 	if err != nil {
 		return "", err
 	}

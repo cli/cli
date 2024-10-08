@@ -20,9 +20,10 @@ import (
 
 func TestNewCmdSearch(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants SearchOptions
+		name     string
+		cli      string
+		wants    SearchOptions
+		wantsErr bool
 	}{
 		{
 			name: "pattern only",
@@ -89,6 +90,11 @@ func TestNewCmdSearch(t *testing.T) {
 				Visibility: "secret",
 			},
 		},
+		{
+			name:     "invalid regexp pattern",
+			cli:      `invalid(\\`,
+			wantsErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -109,6 +115,10 @@ func TestNewCmdSearch(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			}
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.Pattern.String(), gotOpts.Pattern.String())

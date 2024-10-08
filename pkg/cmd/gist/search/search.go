@@ -38,7 +38,7 @@ func NewCmdSearch(f *cmdutil.Factory, runF func(*SearchOptions) error) *cobra.Co
 		Use:   "search <pattern>",
 		Short: "Search your gists",
 		Long: heredoc.Docf(`
-			Search your gists' for the given POSIX regular expression.
+			Search your gists' for a case-sensitive POSIX regular expression.
 
 			By default, all gists' descriptions are searched. Pass %[1]s--filename%[1]s to search
 			file names, or %[1]s--code%[1]s to search content as well.
@@ -95,36 +95,27 @@ func searchRun(opts *SearchOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
-	// Query as many as possible. Limit will apply to search results.
-	allGists, err := shared.ListGists(client, host, shared.MaxPerPage, opts.Visibility, opts.Code)
-	if err != nil {
-		return err
-	}
-
-	gists := make([]shared.Gist, 0, opts.Limit)
-	for _, gist := range allGists {
-		if len(gists) == opts.Limit {
-			break
-		}
-
+	gists, err := shared.ListGists(client, host, opts.Limit, opts.Visibility, opts.Code, func(gist *shared.Gist) bool {
 		if opts.Pattern.MatchString(gist.Description) {
-			gists = append(gists, gist)
-			continue
+			return true
 		}
 
 		if opts.Filename || opts.Code {
 			for _, file := range gist.Files {
 				if opts.Filename && opts.Pattern.MatchString(file.Filename) {
-					gists = append(gists, gist)
-					continue
+					return true
 				}
 
 				if opts.Code && opts.Pattern.MatchString(file.Content) {
-					gists = append(gists, gist)
-					continue
+					return true
 				}
 			}
 		}
+
+		return false
+	})
+	if err != nil {
+		return err
 	}
 
 	if len(gists) == 0 {

@@ -73,7 +73,7 @@ func listRun(opts *ListOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
-	gists, err := shared.ListGists(client, host, opts.Limit, opts.Visibility, false)
+	gists, err := shared.ListGists(client, host, opts.Limit, opts.Visibility, false, nil)
 	if err != nil {
 		return err
 	}
