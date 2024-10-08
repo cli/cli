@@ -3,8 +3,10 @@ package acceptance_test
 import (
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"math/rand"
 
@@ -24,6 +26,10 @@ func TestMain(m *testing.M) {
 
 func TestPullRequests(t *testing.T) {
 	testscript.Run(t, params("pr"))
+}
+
+func TestWorkflow(t *testing.T) {
+	testscript.Run(t, params("workflow"))
 }
 
 func params(dir string) testscript.Params {
@@ -72,6 +78,23 @@ var sharedCmds = map[string]func(ts *testscript.TestScript, neg bool, args []str
 		}
 
 		ts.Setenv(args[0], strings.TrimRight(ts.ReadFile("stdout"), "\n"))
+	},
+	"sleep": func(ts *testscript.TestScript, neg bool, args []string) {
+		if neg {
+			ts.Fatalf("unsupported: ! sleep")
+		}
+		if len(args) != 1 {
+			ts.Fatalf("usage: sleep seconds")
+		}
+
+		// sleep for the given number of seconds
+		seconds, err := strconv.Atoi(args[0])
+		if err != nil {
+			ts.Fatalf("invalid number of seconds: %v", err)
+		}
+
+		d := time.Duration(seconds) * time.Second
+		time.Sleep(d)
 	},
 }
 
