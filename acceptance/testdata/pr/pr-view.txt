@@ -1,0 +1,24 @@
+# Setup git
+exec gh auth setup-git
+
+# Create a repo
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --private --add-readme
+
+# Defer cleanup
+defer gh repo delete $ORG/$SCRIPT_NAME-$RANDOM_STRING --yes
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Prepare a branch for PR
+cd $SCRIPT_NAME-$RANDOM_STRING
+exec git checkout -b feature-branch
+exec git commit --allow-empty -m 'Empty commit'
+exec git push -u origin feature-branch
+
+# Create a PR
+exec gh pr create --title 'Feature Title' --body 'Feature Body'
+
+# View the PR (TODO: can we somehow get the stdout of the last command)
+exec gh pr view
+stdout 'Feature Title'
