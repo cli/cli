@@ -58,11 +58,20 @@ var sharedSetup = func(ts *testscript.Env) error {
 var sharedCmds = map[string]func(ts *testscript.TestScript, neg bool, args []string){
 	"defer": func(ts *testscript.TestScript, neg bool, args []string) {
 		ts.Defer(func() {
-			if err := ts.Exec(args[0], args[1:]...); err != nil {
-				ts.Fatalf("deferred command failed: %v", err)
-			}
+			ts.Check(ts.Exec(args[0], args[1:]...))
 		})
-	}}
+	},
+	"stdout2env": func(ts *testscript.TestScript, neg bool, args []string) {
+		if neg {
+			ts.Fatalf("unsupported: ! stdout2env")
+		}
+		if len(args) != 1 {
+			ts.Fatalf("usage: stdout2env name")
+		}
+
+		ts.Setenv(args[0], strings.TrimRight(ts.ReadFile("stdout"), "\n"))
+	},
+}
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 

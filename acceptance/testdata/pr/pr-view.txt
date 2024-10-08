@@ -18,7 +18,8 @@ exec git push -u origin feature-branch
 
 # Create the PR
 exec gh pr create --title 'Feature Title' --body 'Feature Body'
+stdout2env PR_URL
 
 # View the PR
-exec gh pr view 1
+exec gh pr view $PR_URL
 stdout 'Feature Title'
