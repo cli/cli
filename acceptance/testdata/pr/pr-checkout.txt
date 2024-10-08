@@ -19,6 +19,11 @@ exec git push -u origin feature-branch
 # Create the PR
 exec gh pr create --title 'Feature Title' --body 'Feature Body'
 
-# View the PR
-exec gh pr view 1
-stdout 'Feature Title'
+# Remove the local branch
+exec git checkout main
+exec git branch -D feature-branch
+stdout 'Deleted branch feature-branch'
+
+# Checkout the PR
+exec gh pr checkout 1
+stderr 'Switched to a new branch ''feature-branch'''
