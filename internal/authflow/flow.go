@@ -48,8 +48,13 @@ func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 		callbackURI = "http://localhost/"
 	}
 
+	host, err := oauth.NewGitHubHost(ghinstance.HostPrefix(oauthHost))
+	if err != nil {
+		return "", "", err
+	}
+
 	flow := &oauth.Flow{
-		Host:         oauth.GitHubHost(ghinstance.HostPrefix(oauthHost)),
+		Host:         host,
 		ClientID:     oauthClientID,
 		ClientSecret: oauthClientSecret,
 		CallbackURI:  callbackURI,
