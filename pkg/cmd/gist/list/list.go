@@ -1,14 +1,9 @@
 package list
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/tableprinter"
-	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -78,7 +73,7 @@ func listRun(opts *ListOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
-	gists, err := shared.ListGists(client, host, opts.Limit, opts.Visibility)
+	gists, err := shared.ListGists(client, host, opts.Limit, opts.Visibility, false)
 	if err != nil {
 		return err
 	}
@@ -87,45 +82,5 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no gists found")
 	}
 
-	if err := opts.IO.StartPager(); err == nil {
-		defer opts.IO.StopPager()
-	} else {
-		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
-	}
-
-	cs := opts.IO.ColorScheme()
-	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("ID", "DESCRIPTION", "FILES", "VISIBILITY", "UPDATED"))
-
-	for _, gist := range gists {
-		fileCount := len(gist.Files)
-
-		visibility := "public"
-		visColor := cs.Green
-		if !gist.Public {
-			visibility = "secret"
-			visColor = cs.Red
-		}
-
-		description := gist.Description
-		if description == "" {
-			for filename := range gist.Files {
-				if !strings.HasPrefix(filename, "gistfile") {
-					description = filename
-					break
-				}
-			}
-		}
-
-		tp.AddField(gist.ID)
-		tp.AddField(
-			text.RemoveExcessiveWhitespace(description),
-			tableprinter.WithColor(cs.Bold),
-		)
-		tp.AddField(text.Pluralize(fileCount, "file"))
-		tp.AddField(visibility, tableprinter.WithColor(visColor))
-		tp.AddTimeField(time.Now(), gist.UpdatedAt, cs.Gray)
-		tp.EndRow()
-	}
-
-	return tp.Render()
+	return shared.PrintGists(opts.IO, gists)
 }
