@@ -110,7 +110,7 @@ func BodySurvey(p Prompt, state *IssueMetadataState, templateContent string) err
 	return nil
 }
 
-func TitleSurvey(p Prompt, state *IssueMetadataState) error {
+func TitleSurvey(p Prompt, io *iostreams.IOStreams, state *IssueMetadataState) error {
 	var err error
 	result := ""
 	for result == "" {
@@ -119,7 +119,10 @@ func TitleSurvey(p Prompt, state *IssueMetadataState) error {
 			return err
 		}
 		if result == "" {
-			fmt.Println("X Title cannot be blank.")
+			colorizeRed := io.ColorScheme().ColorFromString("red")
+			msg := fmt.Sprintf("%s Title cannot be blank.", colorizeRed("X"))
+			// For some reason, only Fprintln and Println work here. I can't use Fprintf or Printf to eliminate the line above
+			fmt.Fprintln(io.ErrOut, msg)
 		}
 	}
 
