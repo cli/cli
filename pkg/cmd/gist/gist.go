@@ -8,7 +8,6 @@ import (
 	gistEditCmd "github.com/cli/cli/v2/pkg/cmd/gist/edit"
 	gistListCmd "github.com/cli/cli/v2/pkg/cmd/gist/list"
 	gistRenameCmd "github.com/cli/cli/v2/pkg/cmd/gist/rename"
-	gistSearchCmd "github.com/cli/cli/v2/pkg/cmd/gist/search"
 	gistViewCmd "github.com/cli/cli/v2/pkg/cmd/gist/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -36,7 +35,6 @@ func NewCmdGist(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(gistEditCmd.NewCmdEdit(f, nil))
 	cmd.AddCommand(gistDeleteCmd.NewCmdDelete(f, nil))
 	cmd.AddCommand(gistRenameCmd.NewCmdRename(f, nil))
-	cmd.AddCommand(gistSearchCmd.NewCmdSearch(f, nil))
 
 	return cmd
 }

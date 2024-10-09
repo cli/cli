@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"regexp"
 	"testing"
 	"time"
 
@@ -19,9 +20,10 @@ import (
 
 func TestNewCmdList(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants ListOptions
+		name     string
+		cli      string
+		wants    ListOptions
+		wantsErr bool
 	}{
 		{
 			name: "no arguments",
@@ -70,6 +72,26 @@ func TestNewCmdList(t *testing.T) {
 				Visibility: "all",
 			},
 		},
+		{
+			name:     "invalid limit",
+			cli:      "--limit 0",
+			wantsErr: true,
+		},
+		{
+			name: "filter and include-content",
+			cli:  "--filter octo --include-content",
+			wants: ListOptions{
+				Limit:          10,
+				Filter:         regexp.MustCompilePOSIX("octo"),
+				IncludeContent: true,
+				Visibility:     "all",
+			},
+		},
+		{
+			name:     "invalid filter",
+			cli:      "--filter octo(",
+			wantsErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -90,6 +112,10 @@ func TestNewCmdList(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			}
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.Visibility, gotOpts.Visibility)
@@ -357,6 +383,58 @@ func Test_listRun(t *testing.T) {
 				3456789012	short desc	11 files	secret	2020-07-30T15:24:28Z
 			`),
 			nontty: true,
+		},
+		{
+			name: "with content filter",
+			opts: &ListOptions{
+				Filter:         regexp.MustCompile("octo"),
+				IncludeContent: true,
+				Visibility:     "all",
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(fmt.Sprintf(
+						`{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "1234",
+								"files": [
+									{ "name": "main.txt", "text": "foo" }
+								],
+								"description": "octo match in the description",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							},
+							{
+								"name": "2345",
+								"files": [
+									{ "name": "main.txt", "text": "foo" },
+									{ "name": "octo.txt", "text": "bar" }
+								],
+								"description": "match in the file name",
+								"updatedAt": "%[1]v",
+								"isPublic": false
+							},
+							{
+								"name": "3456",
+								"files": [
+									{ "name": "main.txt", "text": "octo in the text" }
+								],
+								"description": "match in the file text",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							}
+						] } } } }`,
+						sixHoursAgo.Format(time.RFC3339),
+					)),
+				)
+			},
+			wantOut: heredoc.Doc(`
+				ID    DESCRIPTION                    FILES    VISIBILITY  UPDATED
+				1234  octo match in the description  1 file   public      about 6 hours ago
+				2345  match in the file name         2 files  secret      about 6 hours ago
+				3456  match in the file text         1 file   public      about 6 hours ago
+			`),
 		},
 	}
 

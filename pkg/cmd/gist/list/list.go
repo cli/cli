@@ -1,9 +1,15 @@
 package list
 
 import (
+	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -15,8 +21,10 @@ type ListOptions struct {
 	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 
-	Limit      int
-	Visibility string // all, secret, public
+	Limit          int
+	Filter         *regexp.Regexp
+	IncludeContent bool
+	Visibility     string // all, secret, public
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -28,6 +36,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	var flagPublic bool
 	var flagSecret bool
+	var flagFilter string
 
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -37,6 +46,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Limit < 1 {
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
+			}
+
+			if filter, err := regexp.CompilePOSIX(flagFilter); err != nil {
+				return err
+			} else {
+				opts.Filter = filter
 			}
 
 			opts.Visibility = "all"
@@ -56,6 +71,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 10, "Maximum number of gists to fetch")
 	cmd.Flags().BoolVar(&flagPublic, "public", false, "Show only public gists")
 	cmd.Flags().BoolVar(&flagSecret, "secret", false, "Show only secret gists")
+	cmd.Flags().StringVar(&flagFilter, "filter", "", "Filter gists using a regular expression")
+	cmd.Flags().BoolVar(&opts.IncludeContent, "include-content", false, "Include gists' file content when filtering")
 
 	return cmd
 }
@@ -73,7 +90,7 @@ func listRun(opts *ListOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
-	gists, err := shared.ListGists(client, host, opts.Limit, opts.Visibility, false, nil)
+	gists, err := shared.ListGists(client, host, opts.Limit, opts.Filter, opts.IncludeContent, opts.Visibility)
 	if err != nil {
 		return err
 	}
@@ -82,5 +99,45 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no gists found")
 	}
 
-	return shared.PrintGists(opts.IO, gists)
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
+	cs := opts.IO.ColorScheme()
+	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("ID", "DESCRIPTION", "FILES", "VISIBILITY", "UPDATED"))
+
+	for _, gist := range gists {
+		fileCount := len(gist.Files)
+
+		visibility := "public"
+		visColor := cs.Green
+		if !gist.Public {
+			visibility = "secret"
+			visColor = cs.Red
+		}
+
+		description := gist.Description
+		if description == "" {
+			for filename := range gist.Files {
+				if !strings.HasPrefix(filename, "gistfile") {
+					description = filename
+					break
+				}
+			}
+		}
+
+		tp.AddField(gist.ID)
+		tp.AddField(
+			text.RemoveExcessiveWhitespace(description),
+			tableprinter.WithColor(cs.Bold),
+		)
+		tp.AddField(text.Pluralize(fileCount, "file"))
+		tp.AddField(visibility, tableprinter.WithColor(visColor))
+		tp.AddTimeField(time.Now(), gist.UpdatedAt, cs.Gray)
+		tp.EndRow()
+	}
+
+	return tp.Render()
 }
