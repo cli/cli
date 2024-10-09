@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
@@ -39,8 +40,24 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	var flagFilter string
 
 	cmd := &cobra.Command{
-		Use:     "list",
-		Short:   "List your gists",
+		Use:   "list",
+		Short: "List your gists",
+		Long: heredoc.Docf(`
+			List gists from your user account.
+
+			You can use a regular expression to filter the description, file names,
+			or even the content of files in the gist. See https://pkg.go.dev/regexp/syntax
+			for the regular expression syntax you can pass to %[1]s--filter%[1]s. Pass
+			%[1]s--include-content%[1]s to also search the content of files noting that
+			this will take longer since all files' content is fetched.
+		`, "`"),
+		Example: heredoc.Doc(`
+			# list all secret gists from your user account
+			$ gh gist list --secret
+
+			# find all gists from your user account mentioning "octo" anywhere
+			$ gh gist list --filter octo --include-content
+		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -71,7 +88,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 10, "Maximum number of gists to fetch")
 	cmd.Flags().BoolVar(&flagPublic, "public", false, "Show only public gists")
 	cmd.Flags().BoolVar(&flagSecret, "secret", false, "Show only secret gists")
-	cmd.Flags().StringVar(&flagFilter, "filter", "", "Filter gists using a regular expression")
+	cmd.Flags().StringVar(&flagFilter, "filter", "", "Filter gists using a regular `expression`")
 	cmd.Flags().BoolVar(&opts.IncludeContent, "include-content", false, "Include gists' file content when filtering")
 
 	return cmd
