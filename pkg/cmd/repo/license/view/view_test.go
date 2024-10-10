@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -80,21 +81,22 @@ func TestNewCmdView(t *testing.T) {
 
 func TestViewRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		opts       *ViewOptions
-		isTTY      bool
-		httpStubs  func(t *testing.T, reg *httpmock.Registry)
-		wantStdout string
-		wantStderr string
-		wantErr    bool
-		errMsg     string
+		name           string
+		opts           *ViewOptions
+		isTTY          bool
+		httpStubs      func(reg *httpmock.Registry)
+		wantStdout     string
+		wantStderr     string
+		wantErr        bool
+		errMsg         string
+		wantBrowsedURL string
 	}{
 		{
 			name:    "happy path with license no tty",
 			opts:    &ViewOptions{License: "mit"},
 			wantErr: false,
 			isTTY:   false,
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "licenses/mit"),
 					httpmock.StringResponse(`{
@@ -152,7 +154,7 @@ func TestViewRun(t *testing.T) {
 			opts:    &ViewOptions{License: "mit"},
 			wantErr: false,
 			isTTY:   true,
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "licenses/mit"),
 					httpmock.StringResponse(`{
@@ -216,8 +218,11 @@ func TestViewRun(t *testing.T) {
 			name:    "License not found",
 			opts:    &ViewOptions{License: "404"},
 			wantErr: true,
-			errMsg:  "'404' is not a valid license template name or SPDX ID. Run `gh repo license list` for options",
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+			errMsg: heredoc.Docf(`
+				'404' is not a valid license template name or SPDX ID.
+				
+				Run %[1]sgh repo license list%[1]s to see available commonly used licenses. For even more licenses, visit https://choosealicense.com/appendix`, "`"),
+			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "licenses/404"),
 					httpmock.StatusStringResponse(404, `{
@@ -228,11 +233,51 @@ func TestViewRun(t *testing.T) {
 					))
 			},
 		},
+		{
+			name: "web flag happy path",
+			opts: &ViewOptions{
+				License: "mit",
+				Web:     true,
+			},
+			wantErr: false,
+			isTTY:   true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "licenses/mit"),
+					httpmock.StringResponse(`{
+						"key": "mit",
+						"name": "MIT License",
+						"spdx_id": "MIT",
+						"url": "https://api.github.com/licenses/mit",
+						"node_id": "MDc6TGljZW5zZTEz",
+						"html_url": "http://choosealicense.com/licenses/mit/",
+						"description": "A short and simple permissive license with conditions only requiring preservation of copyright and license notices. Licensed works, modifications, and larger works may be distributed under different terms and without source code.",
+						"implementation": "Create a text file (typically named LICENSE or LICENSE.txt) in the root of your source code and copy the text of the license into the file. Replace [year] with the current year and [fullname] with the name (or names) of the copyright holders.",
+						"permissions": [
+							"commercial-use",
+							"modifications",
+							"distribution",
+							"private-use"
+						],
+						"conditions": [
+							"include-copyright"
+						],
+						"limitations": [
+							"liability",
+							"warranty"
+						],
+						"body": "MIT License\n\nCopyright (c) [year] [fullname]\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+						"featured": true
+						}`))
+			},
+			wantBrowsedURL: "https://choosealicense.com/licenses/mit",
+			wantStdout:     "Opening https://choosealicense.com/licenses/mit in your browser.\n",
+		},
 	}
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
 		if tt.httpStubs != nil {
-			tt.httpStubs(t, reg)
+			tt.httpStubs(reg)
 		}
 		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
@@ -246,6 +291,9 @@ func TestViewRun(t *testing.T) {
 		ios.SetStderrTTY(tt.isTTY)
 		tt.opts.IO = ios
 
+		browser := &browser.Stub{}
+		tt.opts.Browser = browser
+
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
 			err := viewRun(tt.opts)
@@ -258,6 +306,7 @@ func TestViewRun(t *testing.T) {
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
+			assert.Equal(t, tt.wantBrowsedURL, browser.BrowsedURL())
 		})
 	}
 }

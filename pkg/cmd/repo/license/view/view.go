@@ -8,7 +8,9 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -19,6 +21,8 @@ type ViewOptions struct {
 	HTTPClient func() (*http.Client, error)
 	Config     func() (gh.Config, error)
 	License    string
+	Web        bool
+	Browser    browser.Browser
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -26,6 +30,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HTTPClient: f.HttpClient,
 		Config:     f.Config,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -60,6 +65,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			return viewRun(opts)
 		},
 	}
+
+	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open https://choosealicense.com/ in the browser")
+
 	return cmd
 }
 
@@ -87,9 +95,17 @@ func viewRun(opts *ViewOptions) error {
 	license, err := api.RepoLicense(client, hostname, opts.License)
 	if err != nil {
 		if strings.Contains(err.Error(), "HTTP 404") {
-			return fmt.Errorf("'%s' is not a valid license template name or SPDX ID. Run `gh repo license list` for options", opts.License)
+			return fmt.Errorf("'%s' is not a valid license template name or SPDX ID.\n\nRun `gh repo license list` to see available commonly used licenses. For even more licenses, visit %s", opts.License, text.DisplayURL("https://choosealicense.com/appendix"))
 		}
 		return err
+	}
+
+	if opts.Web {
+		url := fmt.Sprintf("https://choosealicense.com/licenses/%s", license.Key)
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(url))
+		}
+		return opts.Browser.Browse(url)
 	}
 
 	return renderLicense(license, opts)
