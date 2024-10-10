@@ -39,14 +39,17 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			Run %[1]sgh repo license list%[1]s to see available commonly used licenses. For even more licenses, visit <https://choosealicense.com/appendix>.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# View the MIT license template
+			# View the MIT license
 			gh repo license view MIT
 
-			# View the GNU AGPL-3.0 license template
+			# View the GNU AGPL-3.0 license
 			gh repo license view AGPL-3.0
 
-			# View the Apache-2.0 license template
+			# View the Apache-2.0 license
 			gh repo license view Apache-2.0
+
+			# Create a LICENSE.md with the MIT license
+			gh repo license view MIT > LICENSE.md
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
