@@ -58,7 +58,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	licenseTemplates, err := api.ListLicenseTemplates(client, hostname)
+	licenseTemplates, err := api.RepoLicenses(client, hostname)
 	if err != nil {
 		return err
 	}

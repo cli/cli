@@ -736,7 +736,7 @@ func TestListLicenseTemplatesReturnsLicenses(t *testing.T) {
 	client, _ := httpClient()
 	defer reg.Verify(t)
 
-	gotLicenses, err := ListLicenseTemplates(client, hostname)
+	gotLicenses, err := RepoLicenses(client, hostname)
 
 	assert.NoError(t, err, "Expected no error while fetching /licenses")
 	assert.Equal(t, wantLicenses, gotLicenses, "Licenses fetched is not as expected")
@@ -810,7 +810,7 @@ func TestLicenseTemplateReturnsLicense(t *testing.T) {
 	client, _ := httpClient()
 	defer reg.Verify(t)
 
-	gotLicenseTemplate, err := LicenseTemplate(client, hostname, licenseTemplateName)
+	gotLicenseTemplate, err := RepoLicense(client, hostname, licenseTemplateName)
 
 	assert.NoError(t, err, fmt.Sprintf("Expected no error while fetching /licenses/%v", licenseTemplateName))
 	assert.Equal(t, wantLicenseTemplate, gotLicenseTemplate, fmt.Sprintf("License \"%v\" fetched is not as expected", licenseTemplateName))
@@ -840,7 +840,7 @@ func TestLicenseTemplateReturnsErrorWhenLicenseTemplateNotFound(t *testing.T) {
 	client, _ := httpClient()
 	defer reg.Verify(t)
 
-	_, err := LicenseTemplate(client, hostname, licenseTemplateName)
+	_, err := RepoLicense(client, hostname, licenseTemplateName)
 
 	assert.Error(t, err, fmt.Sprintf("Expected error while fetching /licenses/%v", licenseTemplateName))
 }
@@ -916,7 +916,7 @@ func TestListGitIgnoreTemplatesReturnsGitIgnoreTemplates(t *testing.T) {
 	client, _ := httpClient()
 	defer reg.Verify(t)
 
-	gotGitIgnoreTemplates, err := ListGitIgnoreTemplates(client, hostname)
+	gotGitIgnoreTemplates, err := RepoGitIgnoreTemplates(client, hostname)
 
 	assert.NoError(t, err, "Expected no error while fetching /gitignore/templates")
 	assert.Equal(t, wantGitIgnoreTemplates, gotGitIgnoreTemplates, "GitIgnore templates fetched is not as expected")
@@ -947,7 +947,7 @@ func TestGitIgnoreTemplateReturnsGitIgnoreTemplate(t *testing.T) {
 	client, _ := httpClient()
 	defer reg.Verify(t)
 
-	gotGitIgnoreTemplate, err := GitIgnoreTemplate(client, "api.github.com", gitIgnoreTemplateName)
+	gotGitIgnoreTemplate, err := RepoGitIgnoreTemplate(client, "api.github.com", gitIgnoreTemplateName)
 
 	assert.NoError(t, err, fmt.Sprintf("Expected no error while fetching /gitignore/templates/%v", gitIgnoreTemplateName))
 	assert.Equal(t, wantGitIgnoreTemplate, gotGitIgnoreTemplate, fmt.Sprintf("GitIgnore template \"%v\" fetched is not as expected", gitIgnoreTemplateName))
@@ -976,7 +976,7 @@ func TestGitIgnoreTemplateReturnsErrorWhenGitIgnoreTemplateNotFound(t *testing.T
 	client, _ := httpClient()
 	defer reg.Verify(t)
 
-	_, err := GitIgnoreTemplate(client, "api.github.com", gitIgnoreTemplateName)
+	_, err := RepoGitIgnoreTemplate(client, "api.github.com", gitIgnoreTemplateName)
 
 	assert.Error(t, err, fmt.Sprintf("Expected error while fetching /gitignore/templates/%v", gitIgnoreTemplateName))
 }

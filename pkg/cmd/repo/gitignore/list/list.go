@@ -58,7 +58,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	gitIgnoreTemplates, err := api.ListGitIgnoreTemplates(client, hostname)
+	gitIgnoreTemplates, err := api.RepoGitIgnoreTemplates(client, hostname)
 	if err != nil {
 		return err
 	}

@@ -70,7 +70,7 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	gitIgnore, err := api.GitIgnoreTemplate(client, hostname, opts.Template)
+	gitIgnore, err := api.RepoGitIgnoreTemplate(client, hostname, opts.Template)
 	if err != nil {
 		if strings.Contains(err.Error(), "HTTP 404") {
 			return fmt.Errorf("'%s' is not a valid gitignore template. Run `gh repo gitignore list` for options", opts.Template)

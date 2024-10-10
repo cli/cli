@@ -69,7 +69,7 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	license, err := api.LicenseTemplate(client, hostname, opts.License)
+	license, err := api.RepoLicense(client, hostname, opts.License)
 	if err != nil {
 		if strings.Contains(err.Error(), "HTTP 404") {
 			return fmt.Errorf("'%s' is not a valid license template name or SPDX ID. Run `gh repo license list` for options", opts.License)
