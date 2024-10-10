@@ -133,15 +133,15 @@ func TestListRun(t *testing.T) {
 					))
 			},
 			wantStdout: heredoc.Doc(`
-				LICENSE KEY  LICENSE NAME
-				mit          MIT License
-				lgpl-3.0     GNU Lesser General Public License v3.0
-				mpl-2.0      Mozilla Public License 2.0
-				agpl-3.0     GNU Affero General Public License v3.0
-				unlicense    The Unlicense
-				apache-2.0   Apache License 2.0
-				gpl-3.0      GNU General Public License v3.0
-				`),
+				LICENSE KEY  SPDX ID     LICENSE NAME
+				mit          MIT         MIT License
+				lgpl-3.0     LGPL-3.0    GNU Lesser General Public License v3.0
+				mpl-2.0      MPL-2.0     Mozilla Public License 2.0
+				agpl-3.0     AGPL-3.0    GNU Affero General Public License v3.0
+				unlicense    Unlicense   The Unlicense
+				apache-2.0   Apache-2.0  Apache License 2.0
+				gpl-3.0      GPL-3.0     GNU General Public License v3.0
+			`),
 			wantStderr: "",
 			opts:       &ListOptions{},
 		},
