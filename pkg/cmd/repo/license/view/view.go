@@ -36,7 +36,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		
 		%[1]s<license>%[1]s is a license name or SPDX ID.
 		`, "`"),
-		Args: cmdutil.ExactArgs(1, "gh repo licese view only takes a single license argument"),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.License = args[0]
 			if runF != nil {

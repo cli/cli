@@ -37,7 +37,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		
 		%[1]s<template>%[1]s is a case-sensitive %[1]s.gitignore%[1]s template name.
 		`, "`"),
-		Args: cmdutil.ExactArgs(1, "gh repo gitignore view only takes a single template argument"),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Template = args[0]
 			if runF != nil {

@@ -29,7 +29,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:     "list",
 		Short:   "List gitignore templates used in creating repositories",
 		Aliases: []string{"ls"},
-		Args:    cmdutil.ExactArgs(0, "gh repo gitignore list takes no arguments"),
+		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if runF != nil {

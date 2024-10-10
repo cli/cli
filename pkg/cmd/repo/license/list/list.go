@@ -35,7 +35,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Only the most commonly used licenses templates are returned. For even more licenses, visit <https://choosealicense.com/appendix>
 		`),
 		Aliases: []string{"ls"},
-		Args:    cmdutil.ExactArgs(0, "gh repo license list takes no arguments"),
+		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if runF != nil {
