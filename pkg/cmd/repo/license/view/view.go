@@ -34,24 +34,27 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view <license>",
+		Use:   "view {<license-key> | <SPDX-ID>}",
 		Short: "View an available repository license template",
 		Long: heredoc.Docf(`
 			View an available repository license template.
 			
-			%[1]s<license>%[1]s can be a case-insensitive license name or SPDX ID.
+			Argument can be a case-insensitive license key or SPDX ID.
 
 			Run %[1]sgh repo license list%[1]s to see available commonly used licenses. For even more licenses, visit <https://choosealicense.com/appendix>.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# View the MIT license
+			# View the MIT license from SPDX ID
 			gh repo license view MIT
 
-			# View the GNU AGPL-3.0 license
+			# View the MIT license from license key
+			gh repo license view mit
+
+			# View the GNU AGPL-3.0 license from SPDX ID
 			gh repo license view AGPL-3.0
 
-			# View the Apache-2.0 license
-			gh repo license view Apache-2.0
+			# View the GNU AGPL-3.0 license from license key
+			gh repo license view agpl-3.0
 
 			# Create a LICENSE.md with the MIT license
 			gh repo license view MIT > LICENSE.md
