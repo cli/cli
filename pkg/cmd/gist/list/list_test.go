@@ -92,6 +92,11 @@ func TestNewCmdList(t *testing.T) {
 			cli:      "--filter octo(",
 			wantsErr: true,
 		},
+		{
+			name:     "include content without filter",
+			cli:      "--include-content",
+			wantsErr: true,
+		},
 	}
 
 	for _, tt := range tests {

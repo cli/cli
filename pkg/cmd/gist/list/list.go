@@ -65,6 +65,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
+			if flagFilter == "" {
+				if opts.IncludeContent {
+					return cmdutil.FlagErrorf("cannot use --include-content without --filter")
+				}
+			}
+
 			if filter, err := regexp.CompilePOSIX(flagFilter); err != nil {
 				return err
 			} else {
