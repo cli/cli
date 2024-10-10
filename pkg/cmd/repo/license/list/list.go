@@ -30,9 +30,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List available repository license templates",
 		Long: heredoc.Doc(`
-		List available repository license templates.
-		
-		Only the most commonly used licenses templates are returned. For even more licenses, visit <https://choosealicense.com/appendix>
+			List available repository license templates.
+			
+			Only the most commonly used licenses templates are returned. For even more licenses, visit <https://choosealicense.com/appendix>
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.ExactArgs(0),

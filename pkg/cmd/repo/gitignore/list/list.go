@@ -27,7 +27,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:     "list",
-		Short:   "List gitignore templates used in creating repositories",
+		Short:   "List available repository gitignore templates",
 		Aliases: []string{"ls"},
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {

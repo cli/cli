@@ -32,10 +32,22 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		Use:   "view <license>",
 		Short: "View an available repository license template",
 		Long: heredoc.Docf(`
-		View an available repository license template.
-		
-		%[1]s<license>%[1]s is a license name or SPDX ID.
+			View an available repository license template.
+			
+			%[1]s<license>%[1]s can be a case-insensitive license name or SPDX ID.
+
+			Run %[1]sgh repo license list%[1]s to see available commonly used licenses. For even more licenses, visit <https://choosealicense.com/appendix>.
 		`, "`"),
+		Example: heredoc.Doc(`
+			# View the MIT license template
+			gh repo license view MIT
+
+			# View the GNU AGPL-3.0 license template
+			gh repo license view AGPL-3.0
+
+			# View the Apache-2.0 license template
+			gh repo license view Apache-2.0
+		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.License = args[0]
