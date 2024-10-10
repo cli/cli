@@ -94,8 +94,11 @@ func viewRun(opts *ViewOptions) error {
 	hostname, _ := cfg.Authentication().DefaultHost()
 	license, err := api.RepoLicense(client, hostname, opts.License)
 	if err != nil {
-		if strings.Contains(err.Error(), "HTTP 404") {
-			return fmt.Errorf("'%s' is not a valid license template name or SPDX ID.\n\nRun `gh repo license list` to see available commonly used licenses. For even more licenses, visit %s", opts.License, text.DisplayURL("https://choosealicense.com/appendix"))
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) {
+			if httpErr.StatusCode == 404 {
+				return fmt.Errorf("'%s' is not a valid license template name or SPDX ID.\n\nRun `gh repo license list` to see available commonly used licenses. For even more licenses, visit %s", opts.License, text.DisplayURL("https://choosealicense.com/appendix"))
+			}
 		}
 		return err
 	}
