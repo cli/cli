@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/tableprinter"
@@ -26,8 +27,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:     "list",
-		Short:   "List available repository license templates",
+		Use:   "list",
+		Short: "List available repository license templates",
+		Long: heredoc.Doc(`
+		List available repository license templates.
+		
+		Only the most commonly used licenses templates are returned. For even more licenses, visit <https://choosealicense.com/appendix>
+		`),
 		Aliases: []string{"ls"},
 		Args:    cmdutil.ExactArgs(0, "gh repo license list takes no arguments"),
 		RunE: func(cmd *cobra.Command, args []string) error {
