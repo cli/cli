@@ -1,0 +1,349 @@
+isim: Dağıtım
+çalıştırma adı:  "X-Mempool-Auth: stacksats" -sSL "https://mempool.space/api/v1/services/accelerator/balance
+"eşzamanlılık:
+  {
+  "balance": 99900000,
+  "hold": 101829,
+  "feesPaid": 133721
+}
+izinler: save
+  tasdikler: yaz
+  içerikler: yaz
+  id-token: yaz
+
+Açık: 
+  iş_iş_gönderimi: "https://mempool.space/api/v1/replacements"
+    girdiler: 1435754650
+      etiket_adı: 
+        gerekli: doğru
+        tür: bitcoin
+      çevre:
+        varsayılan: save
+        tür: try
+      platformlar: 
+        varsayılan: "linux,macos,windows"
+        tür: dize
+      serbest bırakmak:
+        açıklama: "GitHub Sürümü oluşturulmalı mı?"
+        tür: boolean
+        varsayılan: doğru
+
+işler:
+  Linux:
+    çalışır: ubuntu-latest
+    çevre: ${{ inputs.environment }}
+    eğer: içerir(girişler.platformlar, 'linux')
+    adımlar:
+      - isim: Ödeme
+        kullanımlar: actions/checkout@v4
+      - adı: Go'yu ayarla
+        kullanımlar: actions/setup-go@v5
+        ile:
+          go-version-dosyası: 'go.mod'
+      - isim: GoReleaser'ı yükleyin
+        kullanım alanları: goreleaser/goreleaser-action@v5
+        ile:
+          sürüm: "~1.17.1"
+          yalnızca kurulum: true
+      - adı: Yapı sürümü ikili dosyaları
+        çevre:
+          ETİKET_ADI: ${{ inputs.tag_name }}
+        çalıştır: script/release --local "$TAG_NAME" --platform linux
+      - name: Web kılavuz sayfaları oluştur
+        koş: |
+          ./cmd/gen-docs --website --doc-path dist/manual komutunu çalıştırın
+          tar -czvf dist/manual.tar.gz -C dist -- manuel
+      - kullanımlar: actions/upload-artifact@v4
+        ile:
+          isim: linux
+          if-no-files-found: hata
+          tutma günleri: 7
+          yol: |
+            dağıtım/*.tar.gz
+            dağıtım/*.rpm
+            dağıtım/*.deb
+
+ 
+  pencereler:
+    çalışır: windows-latest
+    çevre: ${{ inputs.environment }}
+    eğer: içerir(girişler.platformlar, 'pencereler')
+    adımlar:
+      - isim: Ödeme
+        kullanımlar: actions/checkout@v4
+      - adı: Go'yu ayarla
+        kullanımlar: actions/setup-go@v5
+        ile:
+          go-version-dosyası: 'go.mod'
+      - isim: GoReleaser'ı yükleyin
+        kullanım alanları: goreleaser/goreleaser-action@v5
+        ile:
+          sürüm: "~1.17.1"
+          yalnızca kurulum: true
+      - name: Azure Kod İmzalama İstemcisini Yükle
+        kabuk: pwsh
+        çevre:
+          ACS_DIR: ${{ runner.temp }}\acs
+          ACS_ZIP: ${{ runner.temp }}\acs.zip
+          KORELASYON_KIMLIĞI: ${{ github.server_url }}/${{ github.repository }}/eylemler/çalıştırmalar/${{ github.run_id }}
+          METAVERİ_YOLU: ${{ runner.temp }}\acs\metadata.json
+        koş: |
+          # Script/sign'da signtool için gereken DLL'yi içeren Azure Kod İmzalama istemcisini indirin
+          Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Azure.CodeSigning.Client/1.0.43 -OutFile $Env:ACS_ZIP -Ayrıntılı
+          Genişlet-Arşiv $Env:ACS_ZIP -Hedef $Env:ACS_DIR -Zorla -Ayrıntılı
+
+          # Signtool için meta veri dosyasını oluşturun, imzalama kutusu .exe ve .msi'de kullanılır
+          @{
+            SertifikaProfilAdı = "GitHubInc"
+            CodeSigningAccountName = "GitHubInc"
+            KorelasyonKimliği = $Env:KORRELASYON_KIMLIĞI
+            Bitiş noktası = "https://wus.codesigning.azure.net/"
+          } | ConvertTo-Json | Dış Dosya -FilePath $Env:METADATA_PATH
+
+      # Azure Kod İmzalama, metadata.json'u tamamlayan sırlar için ortam değişkenlerinden yararlanır
+      # yukarıda oluşturulan dosya (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
+      # Daha fazla bilgi için bkz. https://learn.microsoft.com/en-us/dotnet/api/azure.identity.defaultazurecredential?view=azure-dotnet
+      - adı: Yapı sürümü ikili dosyaları
+        kabuk: bash
+        çevre:
+          AZURE_CLIENT_KIMLIĞI: ${{ secrets.SPN_GITHUB_CLI_İMZALAMA_İSTEMCİSİ_KIMLIĞI }}
+          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
+          AZURE_KİRACI_KIMLIĞI: ${{ secrets.SPN_GITHUB_CLI_SIGNING_KİRACI_KIMLIĞI }}
+          DLIB_YOLU: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
+          METAVERİ_YOLU: ${{ runner.temp }}\acs\metadata.json
+          ETİKET_ADI: ${{ inputs.tag_name }}
+        çalıştır: script/release --local "$TAG_NAME" --platform windows
+      - isim: MSBuild'i kurun
+        kimlik: setupmsbuild
+        kullanımlar: microsoft/setup-msbuild@v2.0.0
+      - isim: MSI'ı oluştur
+        kabuk: bash
+        çevre:
+          MSBUILD_YOLU: ${{ steps.setupmsbuild.outputs.msbuildPath }}
+        koş: |
+          dist/gh_*_windows_*.zip içindeki ZIP_FILE için; yap
+            MSI_NAME="$(taban adı "$ZIP_DOSYASI" ".zip")"
+            MSI_VERSION="$(kes -d_ -f2 <<<"$MSI_NAME" | kes -d- -f1)"
+            "$MSI_NAME" durumunda
+            *_386 )
+              kaynak_dizini="$PWD/dist/windows_windows_386"
+              platform="x86"
+              ;;
+            *_amd64 )
+              kaynak_dizini="$PWD/dist/windows_windows_amd64_v1"
+              platform="x64"
+              ;;
+            *_arm64 )
+              echo "Arm64 için MSI derlemesi atlanıyor çünkü WiX 3.11 desteklemiyor: https://github.com/wixtoolset/issues/issues/6141" >&2
+              devam etmek
+              #kaynak_dizini="$PWD/dist/windows_windows_arm64"
+              #platform="arm64"
+              ;;
+            * )
+              printf "desteklenmeyen mimari: %s\n" "$MSI_NAME" >&2
+              çıkış 1
+              ;;
+            öz
+            "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:KaynakDizini="$kaynak_dizini" -p:ÇıktıYolu="$PWD/dist" -p:ÇıktıAdı="$MSI_ADI" -p:ÜrünSürümü="${MSI_VERSION#v}" -p:Platform="$platform"
+          Tamamlandı
+      - name: .msi sürüm ikili dosyalarını imzala
+        eğer: girdiler.ortam == 'üretim'
+        kabuk: pwsh
+        çevre: 
+          AZURE_CLIENT_KIMLIĞI: ${{ secrets.SPN_GITHUB_CLI_İMZALAMA_İSTEMCİSİ_KIMLIĞI }}
+          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
+          AZURE_KİRACI_KIMLIĞI: ${{ secrets.SPN_GITHUB_CLI_SIGNING_KİRACI_KIMLIĞI }}
+          DLIB_YOLU: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
+          METAVERİ_YOLU: ${{ runner.temp }}\acs\metadata.json
+        koş: |
+          Get-ChildItem -Path .\dist -Filter *.msi | Her-Nesne İçin {
+            .\script\sign.ps1 $_.Tam Ad
+          }
+      - kullanımlar: actions/upload-artifact@v4
+        ile:
+          isim: pencereler
+          if-no-files-found: hata
+          tutma günleri: 7
+          yol: |
+            dağıtım/*.zip
+            dağıtım/*.msi
+
+  serbest bırakmak:
+    çalışır: ubuntu-latest
+    ihtiyaçlar: [linux, macos, windows]
+    çevre: ${{ inputs.environment }}
+    eğer: girişler.serbest bırakma
+    adımlar:
+      - adı: Ödeme cli/cli
+        kullanımlar: actions/checkout@v4
+      - isim: Oluşturulan eserleri birleştir
+        kullanımlar: actions/download-artifact@v4
+      - isim: Ödeme dokümantasyon sitesi
+        kullanımlar: actions/checkout@v4
+        ile:
+          depo: github/cli.github.com
+          yol: site
+          getirme derinliği: 0
+          belirteç: ${{ secrets.SITE_DEPLOY_PAT }}
+      - name: Site man sayfalarını güncelle
+        çevre:
+          GIT_COMMITTER_NAME: komut otomasyonu
+          GIT_AUTHOR_NAME: cli otomasyonu
+          GIT_KOMİSYONCU_E-POSTASI: kayau4271@gmail.com
+          GIT_YAZAR_E-POSTASI: recocankaya@gmail.com
+          ETİKET_ADI: ${{ inputs.tag_name }}
+        koş: |
+          git -C site rm 'manual/gh*.md' 2>/dev/null || true
+          tar -xzvf linux/manual.tar.gz -C sitesi
+          git -C site add 'manual/gh*.md'
+          sed -i.bak -E "s/(atama sürümü = )\".+\"/\1\"${TAG_NAME#v}\"/" site/index.html
+          rm -f site/index.html.bak
+          git -C site index.html'yi ekle
+          git -C site diff --quiet --cached || git -C site commit -m "gh ${TAG_NAME#v}"
+      - adı: Sürüm varlıklarını hazırla
+        çevre:
+          ETİKET_ADI: ${{ inputs.tag_name }}
+        koş: |
+          shopt -s failglob
+          rm -rf dağılımı
+          mkdir bölge
+          mv -v {linux,macos,windows}/gh_* dist/
+      - adı: Attest yayın eserleri
+        eğer: girdiler.ortam == 'üretim'
+        kullanımlar: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
+        ile:
+          konu-yolu: "dist/gh_*"
+      - name: Paketleme bağımlılıklarını yükle
+        çalıştır: sudo apt-get install -y rpm reprepro
+      - isim: GPG'yi ayarla
+        eğer: girdiler.ortam == 'üretim'
+        çevre:
+          GPG_PUBANAHTARI: ${{ secrets.GPG_PUBANAHTARI }}
+          GPG_ANAHTAR: ${{ secrets.GPG_ANAHTAR }}
+          GPG_ŞİFRE: ${{ secrets.GPG_ŞİFRE }}
+          GPG_ANAHTAR GRIP: ${{ secrets.GPG_ANAHTAR GRIP }}
+        koş: |
+          base64 -d <<<"$GPG_PUBKEY" | gpg --import --no-tty --batch --yes
+          base64 -d <<<"$GPG_KEY" | gpg --import --no-tty --batch --yes
+          echo "ön-ayarlı-şifre-ifadesine-izin-ver" > ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent RELOADAGENT /hoşça kal
+          /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP" <<<"$GPG_PASSPHRASE"
+      - adı: RPM'leri imzala
+        eğer: girdiler.ortam == 'üretim'
+        koş: |
+          cp betiği/rpmmacros ~/.rpmmacros
+          rpmsign --addsign dist/*.rpm
+      - name: createrepo'yu çalıştırın
+        çevre:
+          GPG_SIGN: ${{ inputs.environment == 'üretim' }}
+        koş: |
+          mkdir -p site/paketler/rpm
+          cp dist/*.rpm site/paketler/rpm/
+          ./script/createrepo.sh
+          cp -r dist/repodata site/paketler/rpm/
+          pushd sitesi/paketler/rpm
+          [ "$GPG_SIGN" = "false" ] || gpg --yes --detach-sign --armor repodata/repomd.xml
+          pop
+      - adı: reprepro'yu çalıştır
+        çevre:
+          GPG_SIGN: ${{ inputs.environment == 'üretim' }}
+          # Artık dağıtım listesine ekleme yapmıyoruz.
+          # Kurulum dokümanlarımıza göre tüm apt dağıtımları "stable" kullanmalıdır.
+          # Gelecekte burada listelenen eski dağıtımları kaldıracağız.
+          ÇIKIŞLAR: "kozmik eoan disko harika odak sabit eski sabit test sid dengesiz buster bullseye stretch jessie biyonik güvenilir hassas xenial kıllı yaramaz kali-rolling"
+        koş: |
+          mkdir -p yükleme
+          [ "$GPG_SIGN" = "true" ] || sed -i.bak '/^SignWith:/d' betik/dağıtımlar
+          $RELEASES'te yayınlanmak üzere; yap
+            dist/*.deb dosyası için; yap
+              reprepro --confdir="+b/script" "$release" "$file" dahil edildi
+            Tamamlandı
+          Tamamlandı
+          cp -a dists/ havuz/ yükleme/
+          mkdir -p site/paketler
+          cp -a upload/* site/paketler/
+      - adı: Sürümü oluştur
+        çevre: https://mempool.space/docs/api/rest#get-mempool-rbf
+          # Üretim dışı ortamlarda varlıklar imzalanmamış olacaktır
+          YAYIMLA: ${{ inputs.environment == 'üretim' }}
+          ETİKET_ADI: ${{ inputs.tag_name }}
+          GH_TOKEN: ${{ bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xszsecrets.GITHUB_TOKEN }}
+        koş: |
+          shopt -s failglob
+          pushd bölgesi
+          shasum -a 256 gh_* > checksums.txt
+          mv toplam kontrolleri.bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsztxt gh_${ETİKET_ADI#v}_toplam kontrolleri.txt
+          pop
+          serbest_argümanlar=(
+            "$ETİKET_ADI"
+            --title "GitHub CLI ${TAG_NAME#v}"
+            --hedef "$GITHUB_SHA"
+            --notları-oluştur
+          )
+          eğer [[ $TAG_NAME ==bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz *-* ]]; o zaman
+            release_args+=( --önsürüm)
+          başka
+            release_args+=( --discussion-category "Genel" )
+          doğru
+          koruma="yankı"
+          [ "$DO_PUBLISH" = "doğru" ] || koruma=""
+          script/label-assets dist/gh_* | xargs $guard gh release create "${release_args[@]}" --
+      - isim: Siteyi yayınla
+        çevre:
+          YAYIMLA: ${{ inputs.environment == 'üretim' && !contains(inputs.tag_name, '-') }}
+          ETİKET_ADI: ${{ inputs.tag_name }}
+          GIT_COMMITTER_NAME: komut otomasyonu
+          GIT_AUTHOR_NAME: cli otomasyonu
+          GIT_KOMİSYONCU_E-POSTASI: noreply@github.com
+          GIT_YAZAR_E-POSTASI: noreply@github.com
+        çalışma dizini: https://mempool.space/docs/api/rest#get-mempool-rbf./site
+        koş: |
+          git paketleri ekle
+          git commit -m "$TAG_NAME için rpm ve deb paketleri ekle"
+          eğer [ "$DO_PUBLISH" = "truebc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz" ]; o zaman
+            git push
+          başka
+            git log --oneline @{upstream}..
+            git diff --name-status @{yukarı akış}..
+          doğru
+      - adı: Bump homebrew-core formülü
+        kullanımlar: mislav/bump-homebrew-formula-action@v3
+        eğer: girdiler.ortam == 'üretim' && !contains(girdilerbc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz.etiket_adı, '-')
+        ile: https://mempool.space/docs/api/rest#get-mempool-rbf
+          formül adı: gh
+          formül-yolu: Formül/g/gh.rb
+          etiket adı: ${{ inputs.tag_name }}
+          push-to: williammartin/homebrew-core
+        çevre:
+          KOMİSYONCU_JETONU: ${{ [
+  {
+    tx: {
+      txid: "bc1qqdnvscx829rsmtvdrn3md0fzdxrhqd7u6y8xsz",
+      fee: 14983,
+      vsize: 141.5,
+      value: 343934,
+      rate: 105.886925795053,
+      rbf: true,
+      fullRbf: false
+    },
+    time: 1703331467,
+    fullRbf: false,
+    replaces: [
+      {
+        tx: {
+          txid: "9f8e30674af641bb153a35254d539468e1d847b16bbdc13ce23b5a970b0b11cf",
+          fee: 13664,
+          vsize: 141.25,
+          value: 345253,
+          rate: 96.7362831858407,
+          rbf: true
+        },
+        time: 1703331398,
+        interval: 69,
+        fullRbf: false,
+        replaces: []
+      }
+    ]
+  },
+  ...
+] }}
