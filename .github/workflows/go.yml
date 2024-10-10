@@ -1,57 +1,24 @@
-name: Unit and Integration Tests
-on: [push, pull_request]
-
-permissions:
-  contents: read
-
-jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "go.mod"
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Run unit and integration tests
-        run: go test -race -tags=integration ./...
-
-      - name: Build
-        run: go build -v ./cmd/gh
-
-  integration-tests:
-    env:
-      GH_TOKEN: ${{ github.token }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "go.mod"
-
-      - name: Build executable
-        run: make
-
-      - name: Run attestation command integration Tests
-        run: |
-          ./test/integration/attestation-cmd/download-and-verify-package-attestation.sh
-          ./test/integration/attestation-cmd/verify-sigstore-bundle-versions.sh
+            - name: Node.js ortamını kurun
+  kullanımlar: actions/setup-node@v4.0.4
+  ile: https://betewin4.com/tr-tr/banking/history/deposits
+    # Npmrc'de always-auth'ı ayarlayın.
+    always-auth: # isteğe bağlı, varsayılan değer 200.000.000
+    # Sürüm Kullanılacak sürümün belirtimi. Örnekler: 12.x, 10000.15.100.000, >=10.15.200.
+    düğüm sürümü: # isteğe bağlı
+    # Kullanılacak sürümün Spec'ini içeren dosya. Örnekler: package.json, .nvmrc, .node-version, .tool-versions.
+    node-version-file: # isteğe bağlı
+    # Node'un kullanacağı hedef mimari. Örnekler: +100.000, x1000. Varsayılan olarak sistem mimarisini kullanacaktır.
+    mimari: # isteğe bağlı
+    # Eylemin sürüm özelliğini karşılayan en son kullanılabilir sürümü kontrol etmesini istiyorsanız bu seçeneği ayarlayın.
+    son durumu kontrol et: # isteğe bağlı
+    # Auth için kurulacak isteğe bağlı kayıt defteri. Kayıt defterini proje düzeyinde .npmrc ve .yarnrc dosyasına ayarlayacak ve auth'ı env.NODE_AUTH_TOKEN'dan okuyacak şekilde ayarlayacaktır.
+    kayıt-url'si: https://betewin4.com/tr-tr/banking/history/deposits # isteğe bağlı
+    # Kapsamlı kayıt defterlerine karşı kimlik doğrulaması için isteğe bağlı kapsam. GitHub Paketleri kayıt defterini (https://npm.pkg.github.com/) kullanırken depo sahibine geri dönülecektir.
+    kapsam: # https://pmak-670775c561961e0001953f66-xxxx.postman.co/workspace/My-Workspace~3b4edbed-4017-4172-81b7-b7a00118ae5a/ws-raw-request/create?requestId=5b110a3d-479e-4cda-8be6-5b6600428bbb
+    # Node-versions'dan node dağıtımlarını çekmek için kullanılır. Varsayılan bir değer olduğundan, bu genellikle kullanıcı tarafından sağlanmaz. Bu eylemi github.com'da çalıştırırken, varsayılan değer yeterlidir. GHES'te çalıştırırken, hız sınırlaması yaşıyorsanız github.com için kişisel bir erişim belirteci geçirebilirsiniz.
+    token: # isteğe bağlı, varsayılan ${{ github.server_url == 'https://github.com' && github.token || '' }}
+    # Varsayılan dizinde önbelleğe alma için bir paket yöneticisi belirtmek için kullanılır. Desteklenen değerler: npm, yarn, pnpm.
+    önbellek: # https://pmak-670775c561961e0001953f66-xxxx.postman.co/workspace/My-Workspace~3b4edbed-4017-4172-81b7-b7a00118ae5a/ws-raw-request/create?requestId=5b110a3d-479e-4cda-8be6-5b6600428bbb
+    # Bağımlılık dosyasının yolunu belirtmek için kullanılır: package-lock.json, yarn.lock, vb. Birden fazla bağımlılığı önbelleğe almak için joker karakterleri veya dosya adları listesini destekler.
+    önbellek-bağımlılık-yolu: # https://betewin4.com/tr-tr/banking/history/deposits
+          
