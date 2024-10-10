@@ -16,12 +16,19 @@ func VerifyCertExtensions(results []*AttestationProcessingResult, tenant, owner,
 		return errors.New("no attestations proccessing results")
 	}
 
+	var atLeastOneVerified bool
 	for _, attestation := range results {
 		if err := verifyCertExtensions(attestation, tenant, owner, repo, issuer); err != nil {
 			return err
 		}
+		atLeastOneVerified = true
 	}
-	return nil
+
+	if atLeastOneVerified {
+		return nil
+	} else {
+		return ErrNoAttestationsVerified
+	}
 }
 
 func verifyCertExtensions(attestation *AttestationProcessingResult, tenant, owner, repo, issuer string) error {
