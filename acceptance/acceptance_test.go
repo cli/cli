@@ -141,6 +141,10 @@ func (e *testScriptEnv) fromEnv() error {
 		return missingEnvError{missingEnvs: missingEnvs}
 	}
 
+	if envMap["GH_ACCEPTANCE_ORG"] == "github" || envMap["GH_ACCEPTANCE_ORG"] == "cli" {
+		return fmt.Errorf("GH_ACCEPTANCE_ORG cannot be 'github' or 'cli'")
+	}
+
 	e.host = envMap["GH_ACCEPTANCE_HOST"]
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
 	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
