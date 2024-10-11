@@ -99,7 +99,7 @@ func viewRun(opts *ViewOptions) error {
 	return renderGitIgnore(gitIgnore, opts)
 }
 
-func renderGitIgnore(licenseTemplate api.GitIgnore, opts *ViewOptions) error {
+func renderGitIgnore(licenseTemplate *api.GitIgnore, opts *ViewOptions) error {
 	// I wanted to render this in a markdown code block and benefit
 	// from .gitignore syntax highlighting. But, the upstream syntax highlighter
 	// does not currently support .gitignore.

@@ -115,7 +115,7 @@ func viewRun(opts *ViewOptions) error {
 	return renderLicense(license, opts)
 }
 
-func renderLicense(license api.License, opts *ViewOptions) error {
+func renderLicense(license *api.License, opts *ViewOptions) error {
 	cs := opts.IO.ColorScheme()
 	var out strings.Builder
 	if opts.IO.IsStdoutTTY() {
