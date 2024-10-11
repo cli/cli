@@ -25,6 +25,20 @@ A full example invocation can be found below:
 GH_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_TOKEN=<token> test -tags=acceptance ./acceptance
 ```
 
+### Writing Tests
+
+This section is to be expanded over time as we write more tests and learn more.
+
+#### Environment Variables
+
+The following custom environment variables are made available to the scripts:
+ * `GH_TOKEN`: Set to the value of the `GH_TOKEN` env var provided to `go test`
+ * `ORG`: Set to the value of the `GH_ACCEPTANCE_ORG` env var provided to `go test`
+ * `RANDOM_STRING`: Set to a length 10 random string of letters to help isolate globally visible resources
+ * `SCRIPT_NAME`: Set to the name of the `testscript` currently running, without extension e.g. `pr-view`
+ * `HOME`: Set to the initial working directory. Required for `git` operations
+ * `GH_CONFIG_DIR`: Set to the initial working directory. Required for `gh` operations
+
 ### Acceptance Test VS Code Support
 
 Due to the `//go:build acceptance` build constraint, some functionality is limited because `gopls` isn't being informed about the tag. To resolve this, set the following in your `settings.json`:
