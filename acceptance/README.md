@@ -37,6 +37,8 @@ Due to the `//go:build acceptance` build constraint, some functionality is limit
   },
 ```
 
+You can install the `txtar` or `vscode-testscript` extensions to get syntax highlighting.
+
 ### Effective Test Authoring
 
 This section will likely extend over time.
