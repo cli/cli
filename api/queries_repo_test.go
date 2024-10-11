@@ -775,7 +775,7 @@ func TestLicenseTemplateReturnsLicense(t *testing.T) {
 						}`,
 			))
 	}
-	wantLicenseTemplate := License{
+	wantLicense := &License{
 		Key:            "mit",
 		Name:           "MIT License",
 		SPDXID:         "MIT",
@@ -813,7 +813,7 @@ func TestLicenseTemplateReturnsLicense(t *testing.T) {
 	gotLicenseTemplate, err := RepoLicense(client, hostname, licenseTemplateName)
 
 	assert.NoError(t, err, fmt.Sprintf("Expected no error while fetching /licenses/%v", licenseTemplateName))
-	assert.Equal(t, wantLicenseTemplate, gotLicenseTemplate, fmt.Sprintf("License \"%v\" fetched is not as expected", licenseTemplateName))
+	assert.Equal(t, wantLicense, gotLicenseTemplate, fmt.Sprintf("License \"%v\" fetched is not as expected", licenseTemplateName))
 }
 
 func TestLicenseTemplateReturnsErrorWhenLicenseTemplateNotFound(t *testing.T) {
@@ -933,7 +933,7 @@ func TestGitIgnoreTemplateReturnsGitIgnoreTemplate(t *testing.T) {
 						}`,
 			))
 	}
-	wantGitIgnoreTemplate := GitIgnore{
+	wantGitIgnoreTemplate := &GitIgnore{
 		Name:   "Go",
 		Source: "# If you prefer the allow list template instead of the deny list, see community template:\n# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore\n#\n# Binaries for programs and plugins\n*.exe\n*.exe~\n*.dll\n*.so\n*.dylib\n\n# Test binary, built with go test -c\n*.test\n\n# Output of the go coverage tool, specifically when used with LiteIDE\n*.out\n\n# Dependency directories (remove the comment below to include it)\n# vendor/\n\n# Go workspace file\ngo.work\ngo.work.sum\n\n# env file\n.env\n",
 	}
