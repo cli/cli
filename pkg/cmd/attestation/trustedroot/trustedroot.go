@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
@@ -68,7 +67,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 				return err
 			}
 
-			if ghinstance.IsTenancy(opts.Hostname) {
+			if ghauth.IsTenancy(opts.Hostname) {
 				c, err := f.Config()
 				if err != nil {
 					return err

@@ -15,7 +15,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -123,7 +123,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			}
 
 			if opts.Hostname == "" && (!opts.Interactive || opts.Web) {
-				opts.Hostname, _ = ghAuth.DefaultHost()
+				opts.Hostname, _ = ghauth.DefaultHost()
 			}
 
 			opts.MainExecutable = f.Executable()

@@ -15,7 +15,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -109,7 +109,7 @@ func listRun(opts *ListOptions) error {
 		}
 	}
 
-	hostname, _ := ghAuth.DefaultHost()
+	hostname, _ := ghauth.DefaultHost()
 
 	if opts.WebMode {
 		var rulesetURL string

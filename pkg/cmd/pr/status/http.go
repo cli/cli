@@ -6,9 +6,10 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/set"
+
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 type requestOptions struct {
@@ -186,7 +187,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 }
 
 func getCurrentUsername(username string, hostname string, apiClient *api.Client) (string, error) {
-	if username == "@me" && ghinstance.IsEnterprise(hostname) {
+	if username == "@me" && ghauth.IsEnterprise(hostname) {
 		var err error
 		username, err = api.CurrentLoginName(apiClient, hostname)
 		if err != nil {

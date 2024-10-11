@@ -16,6 +16,8 @@ import (
 	"github.com/cli/cli/v2/utils"
 	"github.com/cli/oauth"
 	"github.com/henvic/httpretty"
+
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 var (
@@ -105,7 +107,7 @@ func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 
 func getCallbackURI(oauthHost string) string {
 	callbackURI := "http://127.0.0.1/callback"
-	if ghinstance.IsEnterprise(oauthHost) {
+	if ghauth.IsEnterprise(oauthHost) {
 		// the OAuth app on Enterprise hosts is still registered with a legacy callback URL
 		// see https://github.com/cli/cli/pull/222, https://github.com/cli/cli/pull/650
 		callbackURI = "http://localhost/"
