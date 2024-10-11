@@ -35,11 +35,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "view {<license-key> | <SPDX-ID>}",
-		Short: "View an available repository license template",
+		Short: "View a specific repository license",
 		Long: heredoc.Docf(`
-			View an available repository license template.
-			
-			Argument can be a case-insensitive license key or SPDX ID.
+			View a specific repository license by license key or SPDX ID.
 
 			Run %[1]sgh repo license list%[1]s to see available commonly used licenses. For even more licenses, visit <https://choosealicense.com/appendix>.
 		`, "`"),
@@ -100,7 +98,7 @@ func viewRun(opts *ViewOptions) error {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) {
 			if httpErr.StatusCode == 404 {
-				return fmt.Errorf("'%s' is not a valid license template name or SPDX ID.\n\nRun `gh repo license list` to see available commonly used licenses. For even more licenses, visit %s", opts.License, text.DisplayURL("https://choosealicense.com/appendix"))
+				return fmt.Errorf("'%s' is not a valid license name or SPDX ID.\n\nRun `gh repo license list` to see available commonly used licenses. For even more licenses, visit %s", opts.License, text.DisplayURL("https://choosealicense.com/appendix"))
 			}
 		}
 		return err
@@ -117,15 +115,15 @@ func viewRun(opts *ViewOptions) error {
 	return renderLicense(license, opts)
 }
 
-func renderLicense(licenseTemplate api.License, opts *ViewOptions) error {
+func renderLicense(license api.License, opts *ViewOptions) error {
 	cs := opts.IO.ColorScheme()
 	var out strings.Builder
 	if opts.IO.IsStdoutTTY() {
-		out.WriteString(fmt.Sprintf("\n%s\n", cs.Gray(licenseTemplate.Description)))
-		out.WriteString(fmt.Sprintf("\n%s\n", cs.Grayf("To implement: %s", licenseTemplate.Implementation)))
-		out.WriteString(fmt.Sprintf("\n%s\n\n", cs.Grayf("For more information, see: %s", licenseTemplate.HTMLURL)))
+		out.WriteString(fmt.Sprintf("\n%s\n", cs.Gray(license.Description)))
+		out.WriteString(fmt.Sprintf("\n%s\n", cs.Grayf("To implement: %s", license.Implementation)))
+		out.WriteString(fmt.Sprintf("\n%s\n\n", cs.Grayf("For more information, see: %s", license.HTMLURL)))
 	}
-	out.WriteString(licenseTemplate.Body)
+	out.WriteString(license.Body)
 	_, err := opts.IO.Out.Write([]byte(out.String()))
 	if err != nil {
 		return err

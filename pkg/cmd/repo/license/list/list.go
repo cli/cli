@@ -28,11 +28,11 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List available repository license templates",
+		Short: "List common repository licenses",
 		Long: heredoc.Doc(`
-			List available repository license templates.
+			List common repository licenses.
 			
-			Only the most commonly used licenses templates are returned. For even more licenses, visit <https://choosealicense.com/appendix>
+			For even more licenses, visit <https://choosealicense.com/appendix>
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.ExactArgs(0),
@@ -64,21 +64,21 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	hostname, _ := cfg.Authentication().DefaultHost()
-	licenseTemplates, err := api.RepoLicenses(client, hostname)
+	licenses, err := api.RepoLicenses(client, hostname)
 	if err != nil {
 		return err
 	}
 
-	if len(licenseTemplates) == 0 {
-		return cmdutil.NewNoResultsError("No repository license templates found")
+	if len(licenses) == 0 {
+		return cmdutil.NewNoResultsError("No repository licenses found")
 	}
 
-	return renderLicenseTemplatesTable(licenseTemplates, opts)
+	return renderLicensesTable(licenses, opts)
 }
 
-func renderLicenseTemplatesTable(licenseTemplates []api.License, opts *ListOptions) error {
+func renderLicensesTable(licenses []api.License, opts *ListOptions) error {
 	t := tableprinter.New(opts.IO, tableprinter.WithHeader("LICENSE KEY", "SPDX ID", "LICENSE NAME"))
-	for _, l := range licenseTemplates {
+	for _, l := range licenses {
 		t.AddField(l.Key)
 		t.AddField(l.SPDXID)
 		t.AddField(l.Name)
