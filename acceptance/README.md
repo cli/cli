@@ -30,6 +30,14 @@ A full example invocation can be found below:
 GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> test -tags=acceptance ./acceptance
 ```
 
+#### Code Coverage
+
+To get code coverage, `go test` can be invoked with `coverpkg` and `coverprofile` like so:
+
+```
+GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> test -tags=acceptance -coverprofile=coverage.out -coverpkg=./... ./acceptance
+```
+
 ### Writing Tests
 
 This section is to be expanded over time as we write more tests and learn more.
