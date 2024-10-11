@@ -46,10 +46,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			List gists from your user account.
 
 			You can use a regular expression to filter the description, file names,
-			or even the content of files in the gist. See https://pkg.go.dev/regexp/syntax
-			for the regular expression syntax you can pass to %[1]s--filter%[1]s. Pass
-			%[1]s--include-content%[1]s to also search the content of files noting that
-			this will take longer since all files' content is fetched.
+			or even the content of files in the gist using %[1]s--filter%[1]s.
+
+			Use %[1]s--include-content%[1]s to include content of files, noting that
+			this will be slower and increase the rate limit used.
+
+			For supported regular expression syntax, see https://pkg.go.dev/regexp/syntax
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list all secret gists from your user account
