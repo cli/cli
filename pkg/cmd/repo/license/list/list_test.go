@@ -157,7 +157,7 @@ func TestListRun(t *testing.T) {
 			wantStdout: "",
 			wantStderr: "",
 			wantErr:    true,
-			errMsg:     "No repository license templates found",
+			errMsg:     "No repository licenses found",
 			opts:       &ListOptions{},
 		},
 	}

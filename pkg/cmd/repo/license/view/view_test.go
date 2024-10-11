@@ -219,7 +219,7 @@ func TestViewRun(t *testing.T) {
 			opts:    &ViewOptions{License: "404"},
 			wantErr: true,
 			errMsg: heredoc.Docf(`
-				'404' is not a valid license template name or SPDX ID.
+				'404' is not a valid license name or SPDX ID.
 				
 				Run %[1]sgh repo license list%[1]s to see available commonly used licenses. For even more licenses, visit https://choosealicense.com/appendix`, "`"),
 			httpStubs: func(reg *httpmock.Registry) {
