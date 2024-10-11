@@ -108,7 +108,7 @@ type missingEnvError struct {
 }
 
 func (e missingEnvError) Error() string {
-	return fmt.Sprintf("missing environment variables: %s", strings.Join(e.missingEnvs, ", "))
+	return fmt.Sprintf("environment variables %s must be set and non-empty", strings.Join(e.missingEnvs, ", "))
 }
 
 type testScriptEnv struct {
@@ -129,7 +129,7 @@ func (e *testScriptEnv) fromEnv() error {
 	var missingEnvs []string
 	for _, key := range requiredEnvVars {
 		val, ok := os.LookupEnv(key)
-		if !ok {
+		if val == "" || !ok {
 			missingEnvs = append(missingEnvs, key)
 			continue
 		}
