@@ -74,6 +74,7 @@ type Repository struct {
 	DeleteBranchOnMerge           bool
 	DiskUsage                     int
 	FundingLinks                  []FundingLink
+	ArchivedAt                    *time.Time
 	IsArchived                    bool
 	IsEmpty                       bool
 	IsFork                        bool

@@ -417,6 +417,7 @@ var RepositoryFields = []string{
 	"issues",
 	"pullRequests",
 
+	"archivedAt",
 	"codeOfConduct",
 	"contactLinks",
 	"defaultBranchRef",
