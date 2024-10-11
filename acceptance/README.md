@@ -27,7 +27,7 @@ The token to use for authenticatin with the `GH_HOST`. This must already have th
 A full example invocation can be found below:
 
 ```
-GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> test -tags=acceptance ./acceptance
+GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance ./acceptance
 ```
 
 #### Code Coverage
@@ -35,7 +35,7 @@ GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> te
 To get code coverage, `go test` can be invoked with `coverpkg` and `coverprofile` like so:
 
 ```
-GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> test -tags=acceptance -coverprofile=coverage.out -coverpkg=./... ./acceptance
+GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -coverprofile=coverage.out -coverpkg=./... ./acceptance
 ```
 
 ### Writing Tests
