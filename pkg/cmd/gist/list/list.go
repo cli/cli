@@ -71,12 +71,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				if opts.IncludeContent {
 					return cmdutil.FlagErrorf("cannot use --include-content without --filter")
 				}
-			}
-
-			if filter, err := regexp.CompilePOSIX(flagFilter); err != nil {
-				return err
 			} else {
-				opts.Filter = filter
+				if filter, err := regexp.CompilePOSIX(flagFilter); err != nil {
+					return err
+				} else {
+					opts.Filter = filter
+				}
 			}
 
 			opts.Visibility = "all"
@@ -115,7 +115,13 @@ func listRun(opts *ListOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
+	// Filtering can take a while so start the progress indicator. StopProgressIndicator will no-op if not running.
+	if opts.Filter != nil {
+		opts.IO.StartProgressIndicator()
+	}
 	gists, err := shared.ListGists(client, host, opts.Limit, opts.Filter, opts.IncludeContent, opts.Visibility)
+	opts.IO.StopProgressIndicator()
+
 	if err != nil {
 		return err
 	}
