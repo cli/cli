@@ -6,23 +6,28 @@ The acceptance tests are blackbox* tests that are expected to interact with reso
 
 ### Running the Acceptance Tests
 
-The acceptance tests currently require three environment variables to be set:
- * `GH_HOST`
- * `GH_ACCEPTANCE_ORG`
- * `GH_TOKEN`
-
-While `GH_HOST` may not strictly be necessary because `gh` can choose a host, it is required to avoid ambiguity and unexpected results depending on the state of `gh`.
-
-The `GH_ACCEPTANCE_ORG` is an organization that the tests can manage resources in.
-
-The `GH_TOKEN` must already have the necessary scopes for each test, and must have permissions to act in the `GH_ACCEPTANCE_ORG`. See [Effective Test Authoring](#effective-test-authoring) for how tests must handle tokens without sufficient scopes.
-
 The acceptance tests have a build constraint of `//go:build acceptance`, this means that `go test ./...` will continue to work without any modifications. The `acceptance` tag must therefore be provided when running `go test`.
+
+The following environment variables are required:
+
+#### `GH_ACCEPTANCE_HOST`
+
+The GitHub host to target e.g. `github.com`
+
+#### `GH_ACCEPTANCE_ORG`
+
+The organization in which the acceptance tests can manage resources in.
+
+#### `GH_ACCEPTANCE_TOKEN`
+
+The token to use for authenticatin with the `GH_HOST`. This must already have the necessary scopes for each test, and must have permissions to act in the `GH_ACCEPTANCE_ORG`. See [Effective Test Authoring](#effective-test-authoring) for how tests must handle tokens without sufficient scopes.
+
+---
 
 A full example invocation can be found below:
 
 ```
-GH_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_TOKEN=<token> test -tags=acceptance ./acceptance
+GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> test -tags=acceptance ./acceptance
 ```
 
 ### Writing Tests
@@ -32,8 +37,9 @@ This section is to be expanded over time as we write more tests and learn more.
 #### Environment Variables
 
 The following custom environment variables are made available to the scripts:
- * `GH_TOKEN`: Set to the value of the `GH_TOKEN` env var provided to `go test`
+ * `GH_HOST`: Set to value of the `GH_ACCEPTANCE_ORG` env var provided to `go test`
  * `ORG`: Set to the value of the `GH_ACCEPTANCE_ORG` env var provided to `go test`
+ * `GH_TOKEN`: Set to the value of the `GH_ACCEPTANCE_TOKEN` env var provided to `go test`
  * `RANDOM_STRING`: Set to a length 10 random string of letters to help isolate globally visible resources
  * `SCRIPT_NAME`: Set to the name of the `testscript` currently running, without extension e.g. `pr-view`
  * `HOME`: Set to the initial working directory. Required for `git` operations

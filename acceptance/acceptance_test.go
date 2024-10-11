@@ -32,38 +32,37 @@ func TestPullRequests(t *testing.T) {
 		os.Exit(1)
 	}
 
-	testscript.Run(t, testScriptParamsFor("pr"))
+	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
 }
 
-func testScriptParamsFor(dir string) testscript.Params {
+func testScriptParamsFor(tsEnv testScriptEnv, dir string) testscript.Params {
 	return testscript.Params{
 		Dir:                 path.Join("testdata", dir),
 		Files:               []string{},
-		Setup:               sharedSetup,
+		Setup:               sharedSetup(tsEnv),
 		Cmds:                sharedCmds,
 		RequireExplicitExec: true,
 		RequireUniqueNames:  true,
 	}
 }
 
-var sharedSetup = func(ts *testscript.Env) error {
-	scriptName, ok := extractScriptName(ts.Vars)
-	if !ok {
-		ts.T().Fatal("script name not found")
+func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
+	return func(ts *testscript.Env) error {
+		scriptName, ok := extractScriptName(ts.Vars)
+		if !ok {
+			ts.T().Fatal("script name not found")
+		}
+		ts.Setenv("SCRIPT_NAME", scriptName)
+		ts.Setenv("HOME", ts.Cd)
+		ts.Setenv("GH_CONFIG_DIR", ts.Cd)
+
+		ts.Setenv("GH_HOST", tsEnv.host)
+		ts.Setenv("ORG", tsEnv.org)
+		ts.Setenv("GH_TOKEN", tsEnv.token)
+
+		ts.Setenv("RANDOM_STRING", randomString(10))
+		return nil
 	}
-	ts.Setenv("SCRIPT_NAME", scriptName)
-
-	ts.Setenv("HOME", ts.Cd)
-	ts.Setenv("GH_CONFIG_DIR", ts.Cd)
-
-	ts.Setenv("GH_TOKEN", os.Getenv("GH_TOKEN"))
-
-	ts.Setenv("GH_HOST", os.Getenv("GH_HOST"))
-
-	ts.Setenv("ORG", os.Getenv("GH_ACCEPTANCE_ORG"))
-
-	ts.Setenv("RANDOM_STRING", randomString(10))
-	return nil
 }
 
 var sharedCmds = map[string]func(ts *testscript.TestScript, neg bool, args []string){
@@ -121,8 +120,14 @@ type testScriptEnv struct {
 func (e *testScriptEnv) fromEnv() error {
 	envMap := map[string]string{}
 
+	requiredEnvVars := []string{
+		"GH_ACCEPTANCE_HOST",
+		"GH_ACCEPTANCE_ORG",
+		"GH_ACCEPTANCE_TOKEN",
+	}
+
 	var missingEnvs []string
-	for _, key := range []string{"GH_HOST", "GH_ACCEPTANCE_ORG", "GH_TOKEN"} {
+	for _, key := range requiredEnvVars {
 		val, ok := os.LookupEnv(key)
 		if !ok {
 			missingEnvs = append(missingEnvs, key)
@@ -136,9 +141,9 @@ func (e *testScriptEnv) fromEnv() error {
 		return missingEnvError{missingEnvs: missingEnvs}
 	}
 
-	e.host = envMap["GH_HOST"]
+	e.host = envMap["GH_ACCEPTANCE_HOST"]
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
-	e.token = envMap["GH_TOKEN"]
+	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
 
 	return nil
 }
