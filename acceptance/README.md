@@ -25,6 +25,18 @@ A full example invocation can be found below:
 GH_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_TOKEN=<token> test -tags=acceptance ./acceptance
 ```
 
+### Acceptance Test VS Code Support
+
+Due to the `//go:build acceptance` build constraint, some functionality is limited because `gopls` isn't being informed about the tag. To resolve this, set the following in your `settings.json`:
+
+```json
+  "gopls": {
+    "buildFlags": [
+        "-tags=acceptance"
+    ]
+  },
+```
+
 ### Effective Test Authoring
 
 This section will likely extend over time.

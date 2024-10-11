@@ -3,6 +3,7 @@
 package acceptance_test
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -25,10 +26,16 @@ func TestMain(m *testing.M) {
 }
 
 func TestPullRequests(t *testing.T) {
-	testscript.Run(t, params("pr"))
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	testscript.Run(t, testScriptParamsFor("pr"))
 }
 
-func params(dir string) testscript.Params {
+func testScriptParamsFor(dir string) testscript.Params {
 	return testscript.Params{
 		Dir:                 path.Join("testdata", dir),
 		Files:               []string{},
@@ -95,4 +102,43 @@ func extractScriptName(vars []string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+type missingEnvError struct {
+	missingEnvs []string
+}
+
+func (e missingEnvError) Error() string {
+	return fmt.Sprintf("missing environment variables: %s", strings.Join(e.missingEnvs, ", "))
+}
+
+type testScriptEnv struct {
+	host  string
+	org   string
+	token string
+}
+
+func (e *testScriptEnv) fromEnv() error {
+	envMap := map[string]string{}
+
+	var missingEnvs []string
+	for _, key := range []string{"GH_HOST", "GH_ACCEPTANCE_ORG", "GH_TOKEN"} {
+		val, ok := os.LookupEnv(key)
+		if !ok {
+			missingEnvs = append(missingEnvs, key)
+			continue
+		}
+
+		envMap[key] = val
+	}
+
+	if len(missingEnvs) > 0 {
+		return missingEnvError{missingEnvs: missingEnvs}
+	}
+
+	e.host = envMap["GH_HOST"]
+	e.org = envMap["GH_ACCEPTANCE_ORG"]
+	e.token = envMap["GH_TOKEN"]
+
+	return nil
 }
