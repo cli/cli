@@ -136,7 +136,7 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
-	if opts.IO.ColorEnabled() && opts.Filter != nil {
+	if opts.Filter != nil {
 		return printHighlights(opts.IO, gists, opts.Filter)
 	}
 
@@ -188,9 +188,13 @@ func printHighlights(io *iostreams.IOStreams, gists []shared.Gist, filter *regex
 	out := &strings.Builder{}
 	var filename, description string
 	var err error
+	split := func(r rune) bool {
+		return r == '\n' || r == '\r'
+	}
 	text := func(s string) string {
 		return s
 	}
+
 	for _, gist := range gists {
 		for _, file := range gist.Files {
 			found := false
@@ -209,7 +213,7 @@ func printHighlights(io *iostreams.IOStreams, gists []shared.Gist, filter *regex
 			}
 
 			if file.Content != "" {
-				for _, line := range strings.Split(file.Content, "\n") {
+				for _, line := range strings.FieldsFunc(file.Content, split) {
 					if filter.MatchString(line) {
 						if line, err = highlightMatch(line, filter, &found, text, cs.Highlight); err != nil {
 							return err
@@ -248,8 +252,6 @@ func highlightMatch(s string, filter *regexp.Regexp, found *bool, color, highlig
 		}
 	}
 
-	if found != nil {
-		*found = *found || true
-	}
+	*found = *found || true
 	return out.String(), nil
 }
