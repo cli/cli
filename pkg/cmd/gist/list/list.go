@@ -136,8 +136,16 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
-	cs := opts.IO.ColorScheme()
-	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("ID", "DESCRIPTION", "FILES", "VISIBILITY", "UPDATED"))
+	if opts.IO.ColorEnabled() && opts.Filter != nil {
+		return printHighlights(opts.IO, gists, opts.Filter)
+	}
+
+	return printTable(opts.IO, gists)
+}
+
+func printTable(io *iostreams.IOStreams, gists []shared.Gist) error {
+	cs := io.ColorScheme()
+	tp := tableprinter.New(io, tableprinter.WithHeader("ID", "DESCRIPTION", "FILES", "VISIBILITY", "UPDATED"))
 
 	for _, gist := range gists {
 		fileCount := len(gist.Files)
@@ -171,4 +179,77 @@ func listRun(opts *ListOptions) error {
 	}
 
 	return tp.Render()
+}
+
+func printHighlights(io *iostreams.IOStreams, gists []shared.Gist, filter *regexp.Regexp) error {
+	const tab string = "    "
+	cs := io.ColorScheme()
+
+	out := &strings.Builder{}
+	var filename, description string
+	var err error
+	text := func(s string) string {
+		return s
+	}
+	for _, gist := range gists {
+		for _, file := range gist.Files {
+			found := false
+			out.Reset()
+
+			if filename, err = highlightMatch(file.Filename, filter, &found, cs.Green, cs.Highlight); err != nil {
+				return err
+			}
+			fmt.Fprintln(out, cs.Blue(gist.ID), filename)
+
+			if gist.Description != "" {
+				if description, err = highlightMatch(gist.Description, filter, &found, cs.Bold, cs.Highlight); err != nil {
+					return err
+				}
+				fmt.Fprintln(out, tab, description)
+			}
+
+			if file.Content != "" {
+				for _, line := range strings.Split(file.Content, "\n") {
+					if filter.MatchString(line) {
+						if line, err = highlightMatch(line, filter, &found, text, cs.Highlight); err != nil {
+							return err
+						}
+						fmt.Fprintln(out, tab, tab, line)
+					}
+				}
+			}
+
+			if found {
+				fmt.Fprintln(io.Out, out.String())
+			}
+		}
+	}
+
+	return nil
+}
+
+func highlightMatch(s string, filter *regexp.Regexp, found *bool, color, highlight func(string) string) (string, error) {
+	matches := filter.FindAllStringIndex(s, -1)
+	if matches == nil {
+		return color(s), nil
+	}
+
+	out := strings.Builder{}
+	if _, err := out.WriteString(color(s[:matches[0][0]])); err != nil {
+		return "", err
+	}
+
+	for _, match := range matches {
+		if _, err := out.WriteString(highlight(s[match[0]:match[1]])); err != nil {
+			return "", err
+		}
+		if _, err := out.WriteString(color(s[match[1]:])); err != nil {
+			return "", nil
+		}
+	}
+
+	if found != nil {
+		*found = *found || true
+	}
+	return out.String(), nil
 }
