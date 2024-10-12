@@ -49,7 +49,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			or even the content of files in the gist using %[1]s--filter%[1]s.
 
 			Use %[1]s--include-content%[1]s to include content of files, noting that
-			this will be slower and increase the rate limit used.
+			this will be slower and increase the rate limit used. Instead of printing a table,
+			code will be printed with highlights.
 
 			For supported regular expression syntax, see https://pkg.go.dev/regexp/syntax
 		`, "`"),
@@ -136,16 +137,38 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
-	if opts.Filter != nil {
-		return printHighlights(opts.IO, gists, opts.Filter)
+	if opts.Filter != nil && opts.IncludeContent {
+		return printContent(opts.IO, gists, opts.Filter)
 	}
 
-	return printTable(opts.IO, gists)
+	return printTable(opts.IO, gists, opts.Filter)
 }
 
-func printTable(io *iostreams.IOStreams, gists []shared.Gist) error {
+func printTable(io *iostreams.IOStreams, gists []shared.Gist, filter *regexp.Regexp) error {
 	cs := io.ColorScheme()
 	tp := tableprinter.New(io, tableprinter.WithHeader("ID", "DESCRIPTION", "FILES", "VISIBILITY", "UPDATED"))
+
+	// Highlight filter matches in the description when printing the table.
+	highlightDescription := func(s string) string {
+		if filter != nil {
+			if str, err := highlightMatch(s, filter, nil, cs.Bold, cs.Highlight); err == nil {
+				return str
+			}
+		}
+		return cs.Bold(s)
+	}
+
+	// Highlight the files column when any file name matches the filter.
+	highlightFilesFunc := func(gist *shared.Gist) func(string) string {
+		if filter != nil {
+			for _, file := range gist.Files {
+				if filter.MatchString(file.Filename) {
+					return cs.Highlight
+				}
+			}
+		}
+		return normal
+	}
 
 	for _, gist := range gists {
 		fileCount := len(gist.Files)
@@ -170,9 +193,12 @@ func printTable(io *iostreams.IOStreams, gists []shared.Gist) error {
 		tp.AddField(gist.ID)
 		tp.AddField(
 			text.RemoveExcessiveWhitespace(description),
-			tableprinter.WithColor(cs.Bold),
+			tableprinter.WithColor(highlightDescription),
 		)
-		tp.AddField(text.Pluralize(fileCount, "file"))
+		tp.AddField(
+			text.Pluralize(fileCount, "file"),
+			tableprinter.WithColor(highlightFilesFunc(&gist)),
+		)
 		tp.AddField(visibility, tableprinter.WithColor(visColor))
 		tp.AddTimeField(time.Now(), gist.UpdatedAt, cs.Gray)
 		tp.EndRow()
@@ -181,7 +207,7 @@ func printTable(io *iostreams.IOStreams, gists []shared.Gist) error {
 	return tp.Render()
 }
 
-func printHighlights(io *iostreams.IOStreams, gists []shared.Gist, filter *regexp.Regexp) error {
+func printContent(io *iostreams.IOStreams, gists []shared.Gist, filter *regexp.Regexp) error {
 	const tab string = "    "
 	cs := io.ColorScheme()
 
@@ -191,39 +217,36 @@ func printHighlights(io *iostreams.IOStreams, gists []shared.Gist, filter *regex
 	split := func(r rune) bool {
 		return r == '\n' || r == '\r'
 	}
-	text := func(s string) string {
-		return s
-	}
 
 	for _, gist := range gists {
 		for _, file := range gist.Files {
-			found := false
+			matched := false
 			out.Reset()
 
-			if filename, err = highlightMatch(file.Filename, filter, &found, cs.Green, cs.Highlight); err != nil {
+			if filename, err = highlightMatch(file.Filename, filter, &matched, cs.Green, cs.Highlight); err != nil {
 				return err
 			}
 			fmt.Fprintln(out, cs.Blue(gist.ID), filename)
 
 			if gist.Description != "" {
-				if description, err = highlightMatch(gist.Description, filter, &found, cs.Bold, cs.Highlight); err != nil {
+				if description, err = highlightMatch(gist.Description, filter, &matched, cs.Bold, cs.Highlight); err != nil {
 					return err
 				}
-				fmt.Fprintln(out, tab, description)
+				fmt.Fprintf(out, "%s%s\n", tab, description)
 			}
 
 			if file.Content != "" {
 				for _, line := range strings.FieldsFunc(file.Content, split) {
 					if filter.MatchString(line) {
-						if line, err = highlightMatch(line, filter, &found, text, cs.Highlight); err != nil {
+						if line, err = highlightMatch(line, filter, &matched, normal, cs.Highlight); err != nil {
 							return err
 						}
-						fmt.Fprintln(out, tab, tab, line)
+						fmt.Fprintf(out, "%[1]s%[1]s%[2]s\n", tab, line)
 					}
 				}
 			}
 
-			if found {
+			if matched {
 				fmt.Fprintln(io.Out, out.String())
 			}
 		}
@@ -232,7 +255,7 @@ func printHighlights(io *iostreams.IOStreams, gists []shared.Gist, filter *regex
 	return nil
 }
 
-func highlightMatch(s string, filter *regexp.Regexp, found *bool, color, highlight func(string) string) (string, error) {
+func highlightMatch(s string, filter *regexp.Regexp, matched *bool, color, highlight func(string) string) (string, error) {
 	matches := filter.FindAllStringIndex(s, -1)
 	if matches == nil {
 		return color(s), nil
@@ -252,6 +275,13 @@ func highlightMatch(s string, filter *regexp.Regexp, found *bool, color, highlig
 		}
 	}
 
-	*found = *found || true
+	if matched != nil {
+		*matched = *matched || true
+	}
+
 	return out.String(), nil
+}
+
+func normal(s string) string {
+	return s
 }
