@@ -262,15 +262,23 @@ func highlightMatch(s string, filter *regexp.Regexp, matched *bool, color, highl
 	}
 
 	out := strings.Builder{}
+
+	// Color up to the first match. If an empty string, no ANSI color sequence is added.
 	if _, err := out.WriteString(color(s[:matches[0][0]])); err != nil {
 		return "", err
 	}
 
-	for _, match := range matches {
+	// Highlight each match, then color the remaining text which, if an empty string, no ANSI color sequence is added.
+	for i, match := range matches {
 		if _, err := out.WriteString(highlight(s[match[0]:match[1]])); err != nil {
 			return "", err
 		}
-		if _, err := out.WriteString(color(s[match[1]:])); err != nil {
+
+		text := s[match[1]:]
+		if i+1 < len(matches) {
+			text = s[match[1]:matches[i+1][0]]
+		}
+		if _, err := out.WriteString(color(text)); err != nil {
 			return "", nil
 		}
 	}

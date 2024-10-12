@@ -648,3 +648,59 @@ func Test_listRun(t *testing.T) {
 		})
 	}
 }
+
+func Test_highlightMatch(t *testing.T) {
+	regex := regexp.MustCompilePOSIX(`[Oo]cto`)
+	tests := []struct {
+		name  string
+		input string
+		color bool
+		want  string
+	}{
+		{
+			name:  "single match",
+			input: "Octo",
+			want:  "Octo",
+		},
+		{
+			name:  "single match (color)",
+			input: "Octo",
+			color: true,
+			want:  "\x1b[0;30;43mOcto\x1b[0m",
+		},
+		{
+			name:  "single match with extra",
+			input: "Hello, Octocat!",
+			want:  "Hello, Octocat!",
+		},
+		{
+			name:  "single match with extra (color)",
+			input: "Hello, Octocat!",
+			color: true,
+			want:  "\x1b[0;34mHello, \x1b[0m\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat!\x1b[0m",
+		},
+		{
+			name:  "multiple matches",
+			input: "Octocat/octo",
+			want:  "Octocat/octo",
+		},
+		{
+			name:  "multiple matches (color)",
+			input: "Octocat/octo",
+			color: true,
+			want:  "\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat/\x1b[0m\x1b[0;30;43mocto\x1b[0m",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := iostreams.NewColorScheme(tt.color, false, false)
+
+			matched := false
+			got, err := highlightMatch(tt.input, regex, &matched, cs.Blue, cs.Highlight)
+			assert.NoError(t, err)
+			assert.True(t, matched)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
