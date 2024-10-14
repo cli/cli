@@ -66,6 +66,7 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 	}
 }
 
+// sharedCmds defines a collection of custom testscript commands for our use.
 func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, neg bool, args []string) {
 	return map[string]func(ts *testscript.TestScript, neg bool, args []string){
 		"defer": func(ts *testscript.TestScript, neg bool, args []string) {
