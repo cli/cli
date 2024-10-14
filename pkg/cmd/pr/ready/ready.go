@@ -31,7 +31,7 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 
 	cmd := &cobra.Command{
 		Use:   "ready [<number> | <url> | <branch>]",
-		Short: "Mark a pull request as ready for review",
+		Short: "Mark a pull request as ready for review (mark as draft with --undo)",
 		Long: heredoc.Docf(`
 			Mark a pull request as ready for review.
 
