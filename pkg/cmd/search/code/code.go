@@ -188,10 +188,10 @@ func formatMatch(t string, matches []search.Match, io *iostreams.IOStreams) []st
 			continue
 		}
 		if _, ok := startIndices[i]; ok {
-			b.WriteString(cs.HighlightStart()) // black text on yellow background
+			b.WriteString(cs.HighlightStart())
 			found = true
 		} else if _, ok := endIndices[i]; ok {
-			b.WriteString(cs.Reset()) // color reset
+			b.WriteString(cs.Reset())
 		}
 		b.WriteRune(c)
 	}

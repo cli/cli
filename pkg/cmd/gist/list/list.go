@@ -52,7 +52,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			this will be slower and increase the rate limit used. Instead of printing a table,
 			code will be printed with highlights.
 
-			For supported regular expression syntax, see https://pkg.go.dev/regexp/syntax
+			For supported regular expression syntax, see <https://pkg.go.dev/regexp/syntax>
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list all secret gists from your user account
