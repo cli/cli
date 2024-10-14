@@ -67,7 +67,7 @@ Due to the `//go:build acceptance` build constraint, some functionality is limit
   },
 ```
 
-You can install the `txtar` or `vscode-testscript` extensions to get syntax highlighting.
+You can install the [`txtar`](https://marketplace.visualstudio.com/items?itemName=brody715.txtar) or [`vscode-testscript`](https://marketplace.visualstudio.com/items?itemName=twpayne.vscode-testscript) extensions to get syntax highlighting.
 
 ### Debugging Tests
 
