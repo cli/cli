@@ -22,5 +22,5 @@ stdout2env PR_URL
 
 # Check the PR is indeed created
 exec gh pr view $PR_URL
-stdout 'assignees:\t.*$'
+stdout 'assignees:\t.+$'
 stdout 'labels:\tbug$'
