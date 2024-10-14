@@ -113,9 +113,7 @@ This is generally enough information to understand why a test has failed. Howeve
 > [!WARNING]
 > Verbose mode dumps the `testscript` environment variables, including the `GH_TOKEN`, so be careful.
 
-Finally, the `testscript.Params` struct has a `TestWork` field; when `TestWork` is set to true, the `WORK` directory will not be cleaned up, allowing for manual investigation of state in the shell. However, `defer` statements will still be run.
-
-TODO: Probably we want to add a `NO_CLEANUP` flag so `defer` is not run. Maybe this implies we want `defer` to be called `cleanup`? It might not be so clear in its intent though. Maybe `NO_CLEANUP_WORK` and `NO_DEFER`?
+By default `testscript` removes the directory in which it was running the script, and if you've been a conscientious engineer, you should be cleaning up resources using the `defer` statement. However, this can be an impediment to debugging. As such you can set `GH_ACCEPTANCE_PRESERVE_WORK_DIR=true` and `GH_ACCEPTANCE_SKIP_DEFER=true` to skip these cleanup steps.
 
 ### Effective Test Authoring
 

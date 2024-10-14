@@ -40,9 +40,10 @@ func testScriptParamsFor(tsEnv testScriptEnv, dir string) testscript.Params {
 		Dir:                 path.Join("testdata", dir),
 		Files:               []string{},
 		Setup:               sharedSetup(tsEnv),
-		Cmds:                sharedCmds,
+		Cmds:                sharedCmds(tsEnv),
 		RequireExplicitExec: true,
 		RequireUniqueNames:  true,
+		TestWork:            tsEnv.preserveWorkDir,
 	}
 }
 
@@ -65,22 +66,32 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 	}
 }
 
-var sharedCmds = map[string]func(ts *testscript.TestScript, neg bool, args []string){
-	"defer": func(ts *testscript.TestScript, neg bool, args []string) {
-		ts.Defer(func() {
-			ts.Check(ts.Exec(args[0], args[1:]...))
-		})
-	},
-	"stdout2env": func(ts *testscript.TestScript, neg bool, args []string) {
-		if neg {
-			ts.Fatalf("unsupported: ! stdout2env")
-		}
-		if len(args) != 1 {
-			ts.Fatalf("usage: stdout2env name")
-		}
+func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, neg bool, args []string) {
+	return map[string]func(ts *testscript.TestScript, neg bool, args []string){
+		"defer": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! defer")
+			}
 
-		ts.Setenv(args[0], strings.TrimRight(ts.ReadFile("stdout"), "\n"))
-	},
+			if tsEnv.skipDefer {
+				return
+			}
+
+			ts.Defer(func() {
+				ts.Check(ts.Exec(args[0], args[1:]...))
+			})
+		},
+		"stdout2env": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! stdout2env")
+			}
+			if len(args) != 1 {
+				ts.Fatalf("usage: stdout2env name")
+			}
+
+			ts.Setenv(args[0], strings.TrimRight(ts.ReadFile("stdout"), "\n"))
+		},
+	}
 }
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -115,6 +126,9 @@ type testScriptEnv struct {
 	host  string
 	org   string
 	token string
+
+	skipDefer       bool
+	preserveWorkDir bool
 }
 
 func (e *testScriptEnv) fromEnv() error {
@@ -148,6 +162,9 @@ func (e *testScriptEnv) fromEnv() error {
 	e.host = envMap["GH_ACCEPTANCE_HOST"]
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
 	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
+
+	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
+	e.skipDefer = os.Getenv("GH_ACCEPTANCE_SKIP_DEFER") == "true"
 
 	return nil
 }
