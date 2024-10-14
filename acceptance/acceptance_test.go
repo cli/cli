@@ -35,10 +35,20 @@ func TestPullRequests(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
 }
 
-func testScriptParamsFor(tsEnv testScriptEnv, dir string) testscript.Params {
+func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
+	var files []string
+	if tsEnv.script != "" {
+		files = []string{path.Join("testdata", command, tsEnv.script)}
+	}
+
+	var dir string
+	if len(files) == 0 {
+		dir = path.Join("testdata", command)
+	}
+
 	return testscript.Params{
-		Dir:                 path.Join("testdata", dir),
-		Files:               []string{},
+		Dir:                 dir,
+		Files:               files,
 		Setup:               sharedSetup(tsEnv),
 		Cmds:                sharedCmds(tsEnv),
 		RequireExplicitExec: true,
@@ -128,6 +138,8 @@ type testScriptEnv struct {
 	org   string
 	token string
 
+	script string
+
 	skipDefer       bool
 	preserveWorkDir bool
 }
@@ -164,6 +176,7 @@ func (e *testScriptEnv) fromEnv() error {
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
 	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
 
+	e.script = os.Getenv("GH_ACCEPTANCE_SCRIPT")
 	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
 	e.skipDefer = os.Getenv("GH_ACCEPTANCE_SKIP_DEFER") == "true"
 
