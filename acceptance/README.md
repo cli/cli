@@ -1,6 +1,6 @@
 ## Acceptance Tests
 
-The acceptance tests are blackbox* tests that are expected to interact with resources on a real GitHub instance.
+The acceptance tests are blackbox* tests that are expected to interact with resources on a real GitHub instance.  They are built on top of [`go-internal/testscript` module](https://pkg.go.dev/github.com/rogpeppe/go-internal/testscript), which supports a variety of commands for defining filesystem-based tests.
 
 *Note: they aren't strictly blackbox because `exec gh` commands delegate to a binary set up by `testscript` that calls into `ghcmd.Main`. However, since our real `func main` is an extremely thin adapter over `ghcmd.Main`, this is reasonable. This tradeoff avoids us building the binary ourselves for the tests, and allows us to get code coverage metrics.
 
