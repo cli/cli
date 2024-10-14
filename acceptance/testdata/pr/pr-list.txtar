@@ -19,6 +19,6 @@ exec git push -u origin feature-branch
 # Create the PR
 exec gh pr create --title 'Feature Title' --body 'Feature Body'
 
-# Check the PR is indeed created
-exec gh pr view
-stdout 'Feature Title'
+# List PRs and see the new PR is in the list
+exec gh pr list
+stdout 'Feature Title\tfeature-branch\tOPEN'
