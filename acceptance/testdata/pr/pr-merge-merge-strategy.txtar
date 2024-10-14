@@ -31,7 +31,7 @@ exec gh pr merge $PR_URL --merge
 
 # Check that the state of the PR is now merged
 exec gh pr view $PR_URL
-stdout 'state:\tMERGED'
+stdout 'state:\tMERGED$'
 
 # Pull and check the file exists on the main branch
 exec git pull -r
