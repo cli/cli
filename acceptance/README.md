@@ -16,7 +16,7 @@ The GitHub host to target e.g. `github.com`
 
 #### `GH_ACCEPTANCE_ORG`
 
-The organization in which the acceptance tests can manage resources in.
+The organization in which the acceptance tests can manage resources in. Consider using `gh-acceptance-testing` on `github.com`.
 
 #### `GH_ACCEPTANCE_TOKEN`
 
