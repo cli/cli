@@ -47,6 +47,8 @@ func testScriptParamsFor(tsEnv testScriptEnv, dir string) testscript.Params {
 	}
 }
 
+var keyT struct{}
+
 func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 	return func(ts *testscript.Env) error {
 		scriptName, ok := extractScriptName(ts.Vars)
@@ -62,6 +64,8 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 		ts.Setenv("GH_TOKEN", tsEnv.token)
 
 		ts.Setenv("RANDOM_STRING", randomString(10))
+
+		ts.Values[keyT] = ts.T()
 		return nil
 	}
 }
@@ -78,8 +82,21 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 				return
 			}
 
+			tt, ok := ts.Value(keyT).(testscript.T)
+			if !ok {
+				ts.Fatalf("%v is not a testscript.T", ts.Value(keyT))
+			}
+
 			ts.Defer(func() {
-				ts.Check(ts.Exec(args[0], args[1:]...))
+				// If you're wondering why we're not using ts.Check here, it's because it raises a panic, and testscript
+				// only catches the panics directly from commands, not from the deferred functions. So what we do
+				// instead is grab the `t` in the setup function and store it as a value. It's important that we use
+				// `t` from the setup function because it represents the subtest created for each individual script,
+				// rather than each top-level test.
+				// See: https://github.com/rogpeppe/go-internal/issues/276
+				if err := ts.Exec(args[0], args[1:]...); err != nil {
+					tt.FailNow()
+				}
 			})
 		},
 		"stdout2env": func(ts *testscript.TestScript, neg bool, args []string) {
