@@ -24,6 +24,10 @@ func TestIsEnterprise(t *testing.T) {
 			want: false,
 		},
 		{
+			host: "github.localhost:8080",
+			want: false,
+		},
+		{
 			host: "api.github.localhost",
 			want: false,
 		},
@@ -60,6 +64,10 @@ func TestIsTenancy(t *testing.T) {
 		},
 		{
 			host: "github.localhost",
+			want: false,
+		},
+		{
+			host: "github.localhost:8080",
 			want: false,
 		},
 		{
@@ -103,6 +111,10 @@ func TestTenantName(t *testing.T) {
 			wantTenant: "github.localhost",
 		},
 		{
+			host:       "github.localhost:8080",
+			wantTenant: "github.localhost:8080",
+		},
+		{
 			host:       "garage.github.com",
 			wantTenant: "github.com",
 		},
@@ -125,6 +137,41 @@ func TestTenantName(t *testing.T) {
 		t.Run(tt.host, func(t *testing.T) {
 			if tenant, found := TenantName(tt.host); tenant != tt.wantTenant || found != tt.wantFound {
 				t.Errorf("TenantName(%v) = %v %v, want %v %v", tt.host, tenant, found, tt.wantTenant, tt.wantFound)
+			}
+		})
+	}
+}
+
+func TestIsLocal(t *testing.T) {
+	tests := []struct {
+		host string
+		want bool
+	}{
+		{
+			host: "github.com",
+			want: false,
+		},
+		{
+			host: "garage.github.com",
+			want: false,
+		},
+		{
+			host: "ghe.com",
+			want: false,
+		},
+		{
+			host: "github.localhost",
+			want: true,
+		},
+		{
+			host: "github.localhost:8080",
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.host, func(t *testing.T) {
+			if got := IsLocal(tt.host); got != tt.want {
+				t.Errorf("IsLocal() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -158,6 +205,10 @@ func TestNormalizeHostname(t *testing.T) {
 		{
 			host: "api.github.localhost",
 			want: "github.localhost",
+		},
+		{
+			host: "gitHub.LocalHost:8080",
+			want: "github.localhost:8080",
 		},
 		{
 			host: "garage.github.com",
@@ -247,6 +298,10 @@ func TestGraphQLEndpoint(t *testing.T) {
 			want: "http://api.github.localhost/graphql",
 		},
 		{
+			host: "github.localhost:8080",
+			want: "http://api.github.localhost:8080/graphql",
+		},
+		{
 			host: "garage.github.com",
 			want: "https://garage.github.com/api/graphql",
 		},
@@ -280,6 +335,10 @@ func TestRESTPrefix(t *testing.T) {
 		{
 			host: "github.localhost",
 			want: "http://api.github.localhost/",
+		},
+		{
+			host: "github.localhost:8080",
+			want: "http://api.github.localhost:8080/",
 		},
 		{
 			host: "garage.github.com",
