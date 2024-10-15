@@ -48,11 +48,17 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			You can use a regular expression to filter the description, file names,
 			or even the content of files in the gist using %[1]s--filter%[1]s.
 
+			For supported regular expression syntax, see <https://pkg.go.dev/regexp/syntax>.
+
 			Use %[1]s--include-content%[1]s to include content of files, noting that
 			this will be slower and increase the rate limit used. Instead of printing a table,
-			code will be printed with highlights.
+			code will be printed with highlights similar to %[1]sgh search code%[1]s:
 
-			For supported regular expression syntax, see <https://pkg.go.dev/regexp/syntax>
+				{{gist ID}} {{file name}}
+				    {{description}}
+				        {{matching lines from content}}
+
+			No highlights or other color is printed when output is redirected.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list all secret gists from your user account
@@ -207,6 +213,14 @@ func printTable(io *iostreams.IOStreams, gists []shared.Gist, filter *regexp.Reg
 	return tp.Render()
 }
 
+// printContent prints a gist with optional description and content similar to `gh search code`
+// including highlighted matches in the form:
+//
+//	{{gist ID}} {{file name}}
+//	    {{description, if any}}
+//	        {{content lines with matches, if any}}
+//
+// If printing to a non-TTY stream the format will be the same but without highlights.
 func printContent(io *iostreams.IOStreams, gists []shared.Gist, filter *regexp.Regexp) error {
 	const tab string = "    "
 	cs := io.ColorScheme()
