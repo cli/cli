@@ -15,5 +15,5 @@ stdout2env ISSUE_URL
 # Check the issue was create
 exec gh issue view $ISSUE_URL
 stdout 'title:\tFeature Request$'
-stdout 'assignees:\t.*$'
+stdout 'assignees:\t.+$'
 stdout 'labels:\tbug$'
