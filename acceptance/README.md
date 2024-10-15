@@ -32,6 +32,12 @@ A full example invocation can be found below:
 GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance ./acceptance
 ```
 
+While writing a new test, it can be useful to target that specific script by providing the `GH_ACCEPTANCE_SCRIPT` env var in combination with the `-run` flag, for example:
+
+```
+GH_ACCEPTANCE_SCRIPT=pr-view.txtar GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -run ^TestPullRequests$ ./acceptance
+```
+
 #### Code Coverage
 
 To get code coverage, `go test` can be invoked with `coverpkg` and `coverprofile` like so:

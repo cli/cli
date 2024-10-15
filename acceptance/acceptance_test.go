@@ -28,17 +28,35 @@ func TestMain(m *testing.M) {
 func TestPullRequests(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		t.Fatal(err)
 	}
 
 	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
 }
 
-func testScriptParamsFor(tsEnv testScriptEnv, dir string) testscript.Params {
+func TestIssues(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
+}
+
+func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
+	var files []string
+	if tsEnv.script != "" {
+		files = []string{path.Join("testdata", command, tsEnv.script)}
+	}
+
+	var dir string
+	if len(files) == 0 {
+		dir = path.Join("testdata", command)
+	}
+
 	return testscript.Params{
-		Dir:                 path.Join("testdata", dir),
-		Files:               []string{},
+		Dir:                 dir,
+		Files:               files,
 		Setup:               sharedSetup(tsEnv),
 		Cmds:                sharedCmds(tsEnv),
 		RequireExplicitExec: true,
@@ -46,6 +64,8 @@ func testScriptParamsFor(tsEnv testScriptEnv, dir string) testscript.Params {
 		TestWork:            tsEnv.preserveWorkDir,
 	}
 }
+
+var keyT struct{}
 
 func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 	return func(ts *testscript.Env) error {
@@ -62,6 +82,8 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 		ts.Setenv("GH_TOKEN", tsEnv.token)
 
 		ts.Setenv("RANDOM_STRING", randomString(10))
+
+		ts.Values[keyT] = ts.T()
 		return nil
 	}
 }
@@ -78,8 +100,21 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 				return
 			}
 
+			tt, ok := ts.Value(keyT).(testscript.T)
+			if !ok {
+				ts.Fatalf("%v is not a testscript.T", ts.Value(keyT))
+			}
+
 			ts.Defer(func() {
-				ts.Check(ts.Exec(args[0], args[1:]...))
+				// If you're wondering why we're not using ts.Check here, it's because it raises a panic, and testscript
+				// only catches the panics directly from commands, not from the deferred functions. So what we do
+				// instead is grab the `t` in the setup function and store it as a value. It's important that we use
+				// `t` from the setup function because it represents the subtest created for each individual script,
+				// rather than each top-level test.
+				// See: https://github.com/rogpeppe/go-internal/issues/276
+				if err := ts.Exec(args[0], args[1:]...); err != nil {
+					tt.FailNow()
+				}
 			})
 		},
 		"stdout2env": func(ts *testscript.TestScript, neg bool, args []string) {
@@ -120,13 +155,15 @@ type missingEnvError struct {
 }
 
 func (e missingEnvError) Error() string {
-	return fmt.Sprintf("environment variables %s must be set and non-empty", strings.Join(e.missingEnvs, ", "))
+	return fmt.Sprintf("environment variable(s) %s must be set and non-empty", strings.Join(e.missingEnvs, ", "))
 }
 
 type testScriptEnv struct {
 	host  string
 	org   string
 	token string
+
+	script string
 
 	skipDefer       bool
 	preserveWorkDir bool
@@ -164,6 +201,7 @@ func (e *testScriptEnv) fromEnv() error {
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
 	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
 
+	e.script = os.Getenv("GH_ACCEPTANCE_SCRIPT")
 	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
 	e.skipDefer = os.Getenv("GH_ACCEPTANCE_SKIP_DEFER") == "true"
 
