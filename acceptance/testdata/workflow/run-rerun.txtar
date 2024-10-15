@@ -43,8 +43,6 @@ exec gh run list --json databaseId --jq '.[0].databaseId'
 stdout2env RUN_ID
 
 # Rerun the workflow run
-# There's some inconsistency here compared to `run delete` and other `run`
-# commands because run rerun doesn't return output in non-tty.
 exec gh run rerun $RUN_ID
 stdout ''
 
