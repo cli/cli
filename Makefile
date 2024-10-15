@@ -38,10 +38,15 @@ completions: bin/gh$(EXE)
 	bin/gh$(EXE) completion -s fish > ./share/fish/vendor_completions.d/gh.fish
 	bin/gh$(EXE) completion -s zsh > ./share/zsh/site-functions/_gh
 
-# just a convenience task around `go test`
+# just convenience tasks around `go test`
 .PHONY: test
 test:
 	go test ./...
+
+# For more information, see https://github.com/cli/cli/blob/trunk/acceptance/README.md
+.PHONY: acceptance
+acceptance:
+	go test -tags acceptance ./acceptance
 
 ## Site-related tasks are exclusively intended for use by the GitHub CLI team and for our release automation.
 

@@ -11,8 +11,8 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/charmbracelet/glamour v0.7.0
 	github.com/charmbracelet/lipgloss v0.10.1-0.20240413172830-d0be07ea6b9c
-	github.com/cli/go-gh/v2 v2.10.0
-	github.com/cli/oauth v1.0.1
+	github.com/cli/go-gh/v2 v2.11.0
+	github.com/cli/oauth v1.1.1
 	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.5
 	github.com/creack/pty v1.1.23
@@ -125,6 +125,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rodaine/table v1.0.1 // indirect
+	github.com/rogpeppe/go-internal v1.13.1
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
@@ -159,7 +160,8 @@ require (
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/net v0.27.0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/tools v0.22.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240520151616-dc85e6b867a5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240520151616-dc85e6b867a5 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
