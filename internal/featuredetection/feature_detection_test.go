@@ -26,7 +26,7 @@ func TestIssueFeatures(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:     "ghec data residency",
+			name:     "ghec data residency (ghe.com)",
 			hostname: "stampname.ghe.com",
 			wantFeatures: IssueFeatures{
 				StateReason: true,
@@ -280,7 +280,7 @@ func TestRepositoryFeatures(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:     "ghec data residency",
+			name:     "ghec data residency (ghe.com)",
 			hostname: "stampname.ghe.com",
 			wantFeatures: RepositoryFeatures{
 				PullRequestTemplateQuery: true,

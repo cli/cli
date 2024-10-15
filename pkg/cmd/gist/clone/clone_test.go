@@ -150,7 +150,7 @@ func Test_formatRemoteURL(t *testing.T) {
 			want: "git@gist.github.com:ID.git",
 		},
 		{
-			name: "ghec data residency HTTPS",
+			name: "ghec data residency (ghe.com) HTTPS",
 			args: args{
 				hostname: "stampname.ghe.com",
 				protocol: "https",
@@ -159,7 +159,7 @@ func Test_formatRemoteURL(t *testing.T) {
 			want: "https://stampname.ghe.com/gist/ID.git",
 		},
 		{
-			name: "ghec data residency SSH",
+			name: "ghec data residency (ghe.com) SSH",
 			args: args{
 				hostname: "stampname.ghe.com",
 				protocol: "ssh",

@@ -24,7 +24,7 @@ func Test_getCurrentUsername(t *testing.T) {
 			currentUsername: "@me",
 		},
 		{
-			name:            "ghec data residency",
+			name:            "ghec data residency (ghe.com)",
 			username:        "@me",
 			hostname:        "stampname.ghe.com",
 			currentUsername: "@me",

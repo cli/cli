@@ -23,7 +23,7 @@ func Test_getCallbackURI(t *testing.T) {
 			want:      "http://localhost/",
 		},
 		{
-			name:      "ghec data residency",
+			name:      "ghec data residency (ghe.com)",
 			oauthHost: "stampname.ghe.com",
 			want:      "http://127.0.0.1/callback",
 		},
