@@ -94,7 +94,7 @@ func cloneRun(opts *CloneOptions) error {
 }
 
 func formatRemoteURL(hostname string, gistID string, protocol string) string {
-	if ghauth.IsEnterprise(hostname) || ghauth.IsTenancy(hostname) {
+	if ghauth.IsEnterprise(hostname) {
 		if protocol == "ssh" {
 			return fmt.Sprintf("git@%s:gist/%s.git", hostname, gistID)
 		}
