@@ -10,8 +10,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cli/cli/v2/internal/ghinstance"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 const (
@@ -249,7 +249,7 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 		return fmt.Sprintf(
 			"This API operation needs the %[1]q scope. To request it, run:  gh auth refresh -h %[2]s -s %[1]s",
 			s,
-			ghinstance.NormalizeHostname(hostname),
+			ghauth.NormalizeHostname(hostname),
 		)
 	}
 

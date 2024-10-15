@@ -138,7 +138,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			}
 
 			// Prepare for tenancy if detected
-			if ghinstance.IsTenancy(opts.Hostname) {
+			if ghauth.IsTenancy(opts.Hostname) {
 				td, err := opts.APIClient.GetTrustDomain()
 				if err != nil {
 					return fmt.Errorf("error getting trust domain, make sure you are authenticated against the host: %w", err)
