@@ -8,6 +8,10 @@ import (
 	"github.com/mgutz/ansi"
 )
 
+const (
+	highlightStyle = "black:yellow"
+)
+
 var (
 	magenta            = ansi.ColorFunc("magenta")
 	cyan               = ansi.ColorFunc("cyan")
@@ -20,6 +24,8 @@ var (
 	bold               = ansi.ColorFunc("default+b")
 	cyanBold           = ansi.ColorFunc("cyan+b")
 	greenBold          = ansi.ColorFunc("green+b")
+	highlightStart     = ansi.ColorCode(highlightStyle)
+	highlight          = ansi.ColorFunc(highlightStyle)
 
 	gray256 = func(t string) string {
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
@@ -174,6 +180,30 @@ func (c *ColorScheme) FailureIcon() string {
 
 func (c *ColorScheme) FailureIconWithColor(colo func(string) string) string {
 	return colo("X")
+}
+
+func (c *ColorScheme) HighlightStart() string {
+	if !c.enabled {
+		return ""
+	}
+
+	return highlightStart
+}
+
+func (c *ColorScheme) Highlight(t string) string {
+	if !c.enabled {
+		return t
+	}
+
+	return highlight(t)
+}
+
+func (c *ColorScheme) Reset() string {
+	if !c.enabled {
+		return ""
+	}
+
+	return ansi.Reset
 }
 
 func (c *ColorScheme) ColorFromString(s string) func(string) string {
