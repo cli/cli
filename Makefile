@@ -43,6 +43,7 @@ completions: bin/gh$(EXE)
 test:
 	go test ./...
 
+# For more information, see https://github.com/cli/cli/blob/trunk/acceptance/README.md
 .PHONY: acceptance
 acceptance:
 	go test -tags acceptance ./acceptance
