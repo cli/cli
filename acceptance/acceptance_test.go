@@ -28,8 +28,16 @@ func TestMain(m *testing.M) {
 func TestPullRequests(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
+}
+
+func TestIssues(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
 	}
 
 	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
@@ -147,7 +155,7 @@ type missingEnvError struct {
 }
 
 func (e missingEnvError) Error() string {
-	return fmt.Sprintf("environment variables %s must be set and non-empty", strings.Join(e.missingEnvs, ", "))
+	return fmt.Sprintf("environment variable(s) %s must be set and non-empty", strings.Join(e.missingEnvs, ", "))
 }
 
 type testScriptEnv struct {
