@@ -29,7 +29,7 @@ stdout 'Test Workflow Name'
 exec gh workflow run 'Test Workflow Name'
 
 # It takes some time for a workflow run to register
-sleep 5
+sleep 10
 
 # Get the run ID we want to rerun
 exec gh run list --json databaseId --jq '.[0].databaseId'
@@ -38,16 +38,12 @@ stdout2env RUN_ID
 # Wait for workflow to complete
 exec gh run watch $RUN_ID --exit-status
 
-# Get the run ID we want to rerun
-exec gh run list --json databaseId --jq '.[0].databaseId'
-stdout2env RUN_ID
-
 # Rerun the workflow run
 exec gh run rerun $RUN_ID
 stdout ''
 
 # It takes some time for a workflow run to register
-sleep 5
+sleep 10
 
 # Wait for workflow to complete
 exec gh run watch $RUN_ID --exit-status

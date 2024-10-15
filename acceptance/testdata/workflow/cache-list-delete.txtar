@@ -29,7 +29,7 @@ stdout 'Test Workflow Name'
 exec gh workflow run 'Test Workflow Name'
 
 # It takes some time for a workflow run to register
-sleep 5
+sleep 10
 
 # Get the run ID we want to watch
 exec gh run list --json databaseId --jq '.[0].databaseId'

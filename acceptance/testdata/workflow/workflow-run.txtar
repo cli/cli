@@ -29,7 +29,7 @@ stdout 'Test Workflow Name'
 exec gh workflow run 'Test Workflow Name'
 
 # It takes some time for a workflow run to register
-sleep 5
+sleep 10
 
 # Check the workflow run exists
 exec gh run list
