@@ -121,7 +121,6 @@ func TitleSurvey(p Prompt, io *iostreams.IOStreams, state *IssueMetadataState) e
 		if result == "" {
 			colorizeRed := io.ColorScheme().ColorFromString("red")
 			msg := fmt.Sprintf("%s Title cannot be blank.", colorizeRed("X"))
-			// For some reason, only Fprintln and Println work here. I can't use Fprintf or Printf to eliminate the line above
 			fmt.Fprintln(io.ErrOut, msg)
 		}
 	}
