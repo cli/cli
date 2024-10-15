@@ -47,13 +47,6 @@ func GraphQLEndpoint(hostname string) string {
 	if isGarage(hostname) {
 		return fmt.Sprintf("https://%s/api/graphql", hostname)
 	}
-	// Once we change Tenancy to no longer be treated as Enterprise, this
-	// conditional can be removed as the flow will fall through to the bottom.
-	// However, we can't do that until we've investigated all places in which
-	// Tenancy is currently treated as Enterprise.
-	if ghauth.IsTenancy(hostname) {
-		return fmt.Sprintf("https://api.%s/graphql", hostname)
-	}
 	if ghauth.IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/graphql", hostname)
 	}
@@ -66,13 +59,6 @@ func GraphQLEndpoint(hostname string) string {
 func RESTPrefix(hostname string) string {
 	if isGarage(hostname) {
 		return fmt.Sprintf("https://%s/api/v3/", hostname)
-	}
-	// Once we change Tenancy to no longer be treated as Enterprise, this
-	// conditional can be removed as the flow will fall through to the bottom.
-	// However, we can't do that until we've investigated all places in which
-	// Tenancy is currently treated as Enterprise.
-	if ghauth.IsTenancy(hostname) {
-		return fmt.Sprintf("https://api.%s/", hostname)
 	}
 	if ghauth.IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/v3/", hostname)
