@@ -48,8 +48,7 @@ func TestIssues(t *testing.T) {
 func TestWorkflows(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		t.Fatal(err)
 	}
 
 	testscript.Run(t, testScriptParamsFor(tsEnv, "workflow"))
@@ -62,6 +61,15 @@ func TestAPI(t *testing.T) {
 	}
 
 	testscript.Run(t, testScriptParamsFor(tsEnv, "api"))
+}
+
+func TestReleases(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "release"))
 }
 
 func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
