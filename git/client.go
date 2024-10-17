@@ -19,6 +19,9 @@ import (
 	"github.com/cli/safeexec"
 )
 
+// MergeBaseConfig is the configuration setting to keep track of the PR target branch.
+const MergeBaseConfig = "gh-merge-base"
+
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
 // This regexp exists to match lines of the following form:
@@ -326,7 +329,7 @@ func (c *Client) lookupCommit(ctx context.Context, sha, format string) ([]byte, 
 // ReadBranchConfig parses the `branch.BRANCH.(remote|merge)` part of git config.
 func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg BranchConfig) {
 	prefix := regexp.QuoteMeta(fmt.Sprintf("branch.%s.", branch))
-	args := []string{"config", "--get-regexp", fmt.Sprintf("^%s(remote|merge)$", prefix)}
+	args := []string{"config", "--get-regexp", fmt.Sprintf("^%s(remote|merge|%s)$", prefix, MergeBaseConfig)}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return
@@ -335,6 +338,8 @@ func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg Branc
 	if err != nil {
 		return
 	}
+
+	cfg.LocalName = branch
 	for _, line := range outputLines(out) {
 		parts := strings.SplitN(line, " ", 2)
 		if len(parts) < 2 {
@@ -354,9 +359,24 @@ func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg Branc
 			}
 		case "merge":
 			cfg.MergeRef = parts[1]
+		case MergeBaseConfig:
+			cfg.MergeBase = parts[1]
 		}
 	}
 	return
+}
+
+// SetBranchConfig sets the named value on the given branch.
+func (c *Client) SetBranchConfig(ctx context.Context, branch, name, value string) error {
+	name = fmt.Sprintf("branch.%s.%s", branch, name)
+	args := []string{"config", name, value}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	// No output expected but check for any printed git error.
+	_, err = cmd.Output()
+	return err
 }
 
 func (c *Client) DeleteLocalTag(ctx context.Context, tag string) error {
