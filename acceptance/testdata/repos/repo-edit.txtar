@@ -9,7 +9,7 @@ defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
 
 # Check that the repo description is empty
 exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING --json description --jq '.description'
-stdout ''
+! stdout '.'
 
 # Edit the repo description
 exec gh repo edit $ORG/$SCRIPT_NAME-$RANDOM_STRING --description 'newDescription'
