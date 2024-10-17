@@ -238,7 +238,7 @@ func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	lines := strings.Split(string(out), "\n")
+	lines := outputLines(out)
 	count := 0
 	for _, l := range lines {
 		if l != "" {
@@ -324,6 +324,7 @@ func (c *Client) lookupCommit(ctx context.Context, sha, format string) ([]byte, 
 }
 
 // ReadBranchConfig parses the `branch.BRANCH.(remote|merge)` part of git config.
+// This is the upstream associated with a branch.
 func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg BranchConfig) {
 	prefix := regexp.QuoteMeta(fmt.Sprintf("branch.%s.", branch))
 	args := []string{"config", "--get-regexp", fmt.Sprintf("^%s(remote|merge)$", prefix)}
@@ -417,6 +418,47 @@ func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
 	return err == nil
 }
 
+// LocalBranches returns all local branches.
+func (c *Client) LocalBranches(ctx context.Context) []Branch {
+	args := []string{"branch", "--format", "%(objectname) %(refname) %(upstream)"}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return nil
+	}
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	lines := outputLines(output)
+
+	var branches []Branch
+	for _, line := range lines {
+		sections := strings.Split(line, " ")
+		objectname := sections[0]
+		refname := sections[1]
+		upstream := sections[2]
+		branch := Branch{
+			Local: Ref{
+				Hash: objectname,
+				Name: strings.TrimPrefix(refname, "refs/heads/"),
+			},
+		}
+		if upstream != "" {
+			trimmed := strings.TrimPrefix(sections[2], "refs/remotes/")
+			remoteSections := strings.SplitN(trimmed, "/", 2)
+			branch.Upstream = TrackingRef{
+				RemoteName: remoteSections[0],
+				BranchName: remoteSections[1],
+			}
+		}
+		branches = append(branches, branch)
+	}
+
+	return branches
+}
+
+// TrackingBranchNames returns the names of all remote branches of all remotes,
+// optionally filtered to branch names that match a prefix.
 func (c *Client) TrackingBranchNames(ctx context.Context, prefix string) []string {
 	args := []string{"branch", "-r", "--format", "%(refname:strip=3)"}
 	if prefix != "" {
@@ -430,7 +472,7 @@ func (c *Client) TrackingBranchNames(ctx context.Context, prefix string) []strin
 	if err != nil {
 		return nil
 	}
-	return strings.Split(string(output), "\n")
+	return outputLines(output)
 }
 
 // ToplevelDir returns the top-level directory path of the current repository.

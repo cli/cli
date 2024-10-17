@@ -354,6 +354,9 @@ func findForBranch(httpClient *http.Client, repo ghrepo.Interface, baseBranch, h
 		return prs[a].State == "OPEN" && prs[b].State != "OPEN"
 	})
 
+	// There can be multiple PRs for each (base, head) combination, but only one
+	// open PR at a time. If an open PR exists for the combination, return that
+	// PR. Otherwise, return the latest one.
 	for _, pr := range prs {
 		if pr.HeadLabel() == headBranch && (baseBranch == "" || pr.BaseRefName == baseBranch) && (pr.State == "OPEN" || resp.Repository.DefaultBranchRef.Name != headBranch) {
 			return &pr, nil
