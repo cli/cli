@@ -28,11 +28,6 @@ stdout 'Test Workflow Name'
 # disable the workflow
 exec gh workflow disable 'Test Workflow Name'
 
-# Check the workflow is indeed disabled
-# Disabled workflows are hidden by default.
-exec gh workflow list
-stdout ''
-
 # Check that the listing shows it is disabled
 exec gh workflow list --all
 stdout 'Test\s+Workflow\s+Name\s+disabled_manually\s+\d+'
@@ -42,7 +37,7 @@ exec gh workflow enable 'Test Workflow Name'
 
 # Check the workflow is indeed enabled
 exec gh workflow list
-stdout 'Test Workflow Name'
+stdout 'Test\s+Workflow\s+Name\s+active\s+\d+'
 
 -- workflow.yml --
 # This is a basic workflow to help you get started with Actions
