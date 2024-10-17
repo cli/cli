@@ -119,9 +119,7 @@ func TitleSurvey(p Prompt, io *iostreams.IOStreams, state *IssueMetadataState) e
 			return err
 		}
 		if result == "" {
-			colorizeRed := io.ColorScheme().ColorFromString("red")
-			msg := fmt.Sprintf("%s Title cannot be blank.", colorizeRed("X"))
-			fmt.Fprintln(io.ErrOut, msg)
+			fmt.Fprintf(io.ErrOut, "%s Title cannot be blank\n", io.ColorScheme().FailureIcon())
 		}
 	}
 
