@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -94,7 +95,66 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 
 // sharedCmds defines a collection of custom testscript commands for our use.
 func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, neg bool, args []string) {
+	// some retryable exec state
+	var retryableCommandAndArgs []string
+
 	return map[string]func(ts *testscript.TestScript, neg bool, args []string){
+		"retryableexec": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! retryableexec")
+			}
+
+			if len(args) == 0 {
+				ts.Fatalf("usage: retryableexec command [args...]")
+			}
+
+			if len(retryableCommandAndArgs) > 0 {
+				ts.Fatalf("retryableexec: previous command has not finished")
+			}
+
+			retryableCommandAndArgs = args
+		},
+		"eventuallystdout": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! eventuallystdout")
+			}
+
+			if len(args) == 0 {
+				ts.Fatalf("usage: eventuallystdout pattern")
+			}
+
+			if len(retryableCommandAndArgs) == 0 {
+				ts.Fatalf("eventuallystdout: no previous command to run")
+			}
+
+			pattern := args[0]
+			re, err := regexp.Compile(`(?m)` + pattern)
+			ts.Check(err)
+
+			maxRetries := 5
+			retryCount := 0
+			// loop the command until stdout matches the pattern, sleeping in between
+			for {
+				ts.Logf("eventuallystdout: running %v", retryableCommandAndArgs)
+				if err := ts.Exec(retryableCommandAndArgs[0], retryableCommandAndArgs[1:]...); err != nil {
+					// TODO: think about what to do with the errors
+				}
+
+				stdout := ts.ReadFile("stdout")
+				if re.MatchString(stdout) {
+					break
+				}
+
+				if retryCount >= maxRetries {
+					ts.Fatalf("no match for %#q found in stdout", pattern)
+				}
+
+				retryCount += 1
+				time.Sleep(time.Second)
+			}
+
+			retryableCommandAndArgs = nil
+		},
 		"defer": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
 				ts.Fatalf("unsupported: ! defer")

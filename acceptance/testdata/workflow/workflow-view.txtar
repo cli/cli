@@ -19,11 +19,16 @@ exec git commit -m 'Create workflow file'
 exec git push -u origin main
 
 # Sleep because it takes a second for the workflow to register
-sleep 1
+# sleep 1
+
+retryableexec gh workflow view 'Test Workflow Name'
+eventuallystdout 'Test Workflow Name - workflow.yml'
+
+fail
 
 # Check the workflow is indeed created
-exec gh workflow view 'Test Workflow Name'
-stdout 'Test Workflow Name - workflow.yml'
+#exec gh workflow view 'Test Workflow Name'
+#stdout 'Test Workflow Name - workflow.yml'
 
 -- workflow.yml --
 # This is a basic workflow to help you get started with Actions
