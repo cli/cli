@@ -52,6 +52,15 @@ func TestSecrets(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "secret"))
 }
 
+func TestVariables(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "variable"))
+}
+
 func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
 	var files []string
 	if tsEnv.script != "" {
