@@ -130,21 +130,35 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 			if neg {
 				ts.Fatalf("unsupported: ! env2lower")
 			}
-			if len(args) != 2 {
-				ts.Fatalf("usage: env2lower old new")
+			if len(args) == 0 {
+				ts.Fatalf("usage: env2lower name=value ...")
 			}
+			for _, env := range args {
+				i := strings.Index(env, "=")
 
-			ts.Setenv(args[1], strings.ToLower(ts.Getenv(args[0])))
+				if i < 0 {
+					ts.Fatalf("env2lower: argument does not match name=value")
+				}
+
+				ts.Setenv(env[:i], strings.ToLower(env[i+1:]))
+			}
 		},
 		"env2upper": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
 				ts.Fatalf("unsupported: ! env2upper")
 			}
-			if len(args) != 2 {
-				ts.Fatalf("usage: env2upper old new")
+			if len(args) == 0 {
+				ts.Fatalf("usage: env2upper name=value ...")
 			}
+			for _, env := range args {
+				i := strings.Index(env, "=")
 
-			ts.Setenv(args[1], strings.ToUpper(ts.Getenv(args[0])))
+				if i < 0 {
+					ts.Fatalf("env2upper: argument does not match name=value")
+				}
+
+				ts.Setenv(env[:i], strings.ToUpper(env[i+1:]))
+			}
 		},
 		"stdout2env": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {

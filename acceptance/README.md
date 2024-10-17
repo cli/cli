@@ -61,6 +61,39 @@ The following custom environment variables are made available to the scripts:
  * `HOME`: Set to the initial working directory. Required for `git` operations
  * `GH_CONFIG_DIR`: Set to the initial working directory. Required for `gh` operations
 
+#### Custom Commands
+
+The following custom commands are defined within [`acceptance_test.go`](./acceptance_test.go) to help with writing tests:
+
+- `defer`: register a command to run after the testscript completes
+
+  ```txtar
+  # Defer repo cleanup
+  defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+  ```
+
+- `env2lower`: set environment variable to the lowercase version of another environment variable
+
+  ```txtar
+  # Prepare repository name, which is only lowercase
+  env2lower REPO_NAME=$RANDOM_STRING
+  ```
+
+- `env2uooer`: set environment variable to the uppercase version of another environment variable
+
+  ```txtar
+  # Prepare organization secret, GitHub Actions uppercases secret names
+  env2upper ORG_SECRET_NAME=$RANDOM_STRING
+  ```
+
+- `stdout2env`: set environment variable containing standard output from previous command
+
+  ```txtar
+  # Create the PR
+  exec gh pr create --title 'Feature Title' --body 'Feature Body' --assignee '@me' --label 'bug'
+  stdout2env PR_URL
+  ```
+
 ### Acceptance Test VS Code Support
 
 Due to the `//go:build acceptance` build constraint, some functionality is limited because `gopls` isn't being informed about the tag. To resolve this, set the following in your `settings.json`:
