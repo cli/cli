@@ -32,4 +32,3 @@ exec gh repo deploy-key list --json=id --jq='.[].id'
 
 -- deployKey.pub --
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAZmdeRNskfpvYL5YHB/YJaW8hTEXpnvPMkx5Ri+YwUr myTitle
-
