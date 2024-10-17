@@ -194,7 +194,7 @@ func TestTitleSurvey(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedTitle, state.Title)
 			if tt.expectStderr {
-				assert.Equal(t, "X Title cannot be blank.\n", stderr.String())
+				assert.Equal(t, "X Title cannot be blank\n", stderr.String())
 			}
 		})
 	}
