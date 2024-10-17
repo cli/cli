@@ -44,7 +44,6 @@ stdout 'Linux-values'
 
 # Delete the cache
 exec gh cache delete 'Linux-values'
-stdout ''
 
 -- workflow.yml --
 name: Test Workflow Name

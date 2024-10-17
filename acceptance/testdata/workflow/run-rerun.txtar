@@ -40,7 +40,6 @@ exec gh run watch $RUN_ID --exit-status
 
 # Rerun the workflow run
 exec gh run rerun $RUN_ID
-stdout ''
 
 # It takes some time for a workflow run to register
 sleep 10

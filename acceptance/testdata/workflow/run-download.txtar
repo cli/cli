@@ -40,7 +40,6 @@ exec gh run watch $RUN_ID --exit-status
 
 # Download the artifact
 exec gh run download $RUN_ID
-stdout '' 
 
 # Check if we downloaded the artifact
 exists ./my-artifact/world.txt

@@ -45,7 +45,7 @@ stdout '✓ Request to delete workflow submitted.'
 # It takes some time for a workflow run to be deleted
 sleep 5
 
-# Check the workflow run is cancelled
+# Check the workflow run is cancelled, which is implied by an empty list
 exec gh run list
 stdout ''
 
