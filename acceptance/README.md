@@ -79,7 +79,7 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
   env2lower REPO_NAME=$RANDOM_STRING
   ```
 
-- `env2uooer`: set environment variable to the uppercase version of another environment variable
+- `env2upper`: set environment variable to the uppercase version of another environment variable
 
   ```txtar
   # Prepare organization secret, GitHub Actions uppercases secret names
