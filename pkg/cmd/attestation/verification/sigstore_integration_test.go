@@ -85,6 +85,21 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 		require.Len(t, res.VerifyResults, 0)
 		require.ErrorContains(t, res.Error, "unsupported bundle version")
 	})
+
+	t.Run("with no attestations", func(t *testing.T) {
+		attestations := []*api.Attestation{}
+		require.Len(t, attestations, 0)
+
+		verifier := NewLiveSigstoreVerifier(SigstoreConfig{
+			Logger:      io.NewTestHandler(),
+			TrustedRoot: test.NormalizeRelativePath("../test/data/trusted_root.json"),
+		})
+
+		res := verifier.Verify(attestations, publicGoodPolicy(t))
+		require.Len(t, res.VerifyResults, 0)
+		require.NotNil(t, res.Error)
+	})
+
 }
 
 func publicGoodPolicy(t *testing.T) verify.PolicyBuilder {
