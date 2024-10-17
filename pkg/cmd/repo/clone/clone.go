@@ -8,10 +8,12 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/charmbracelet/huh"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	org "github.com/cli/cli/v2/pkg/cmd/org/list"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -165,9 +167,21 @@ func cloneRun(opts *CloneOptions) error {
 	// Load the repo from the API to get the username/repo name in its
 	// canonical capitalization
 	canonicalRepo, err := api.GitHubRepo(apiClient, repo)
+	if err != nil && repositoryIsFullName {
+		return err
+	}
+
+	org, err := promptForOrg(apiClient, repo)
 	if err != nil {
 		return err
 	}
+
+	repo = ghrepo.NewWithHost(org, repo.RepoName(), repo.RepoHost())
+	canonicalRepo, err = api.GitHubRepo(apiClient, repo)
+	if err != nil {
+		return err
+	}
+
 	canonicalCloneURL := ghrepo.FormatRemoteURL(canonicalRepo, protocol)
 
 	// If repo HasWikiEnabled and wantsWiki is true then create a new clone URL
@@ -221,6 +235,34 @@ func cloneRun(opts *CloneOptions) error {
 		}
 	}
 	return nil
+}
+
+const orgsQueryLimit = 5
+
+func promptForOrg(apiClient *api.Client, repo ghrepo.Interface) (string, error) {
+	orgs, err := org.ListOrgs(apiClient.HTTP(), repo.RepoHost(), orgsQueryLimit)
+	if err != nil || orgs.TotalCount == 0 {
+		return "", err
+	}
+
+	var org string
+	var orgOptions []huh.Option[string]
+
+	for _, org := range orgs.Organizations {
+		orgOptions = append(orgOptions, huh.NewOption(org.Login, org.Login))
+	}
+
+	err = huh.NewSelect[string]().
+		Value(&org).
+		Title("Repository owner").
+		Description(fmt.Sprintf("'%s/%s' not found. Clone from organization?", repo.RepoOwner(), repo.RepoName())).
+		Options(orgOptions...).
+		Run()
+
+	if err != nil {
+		return "", err
+	}
+	return org, nil
 }
 
 // simplifyURL strips given URL of extra parts like extra path segments (i.e.,
