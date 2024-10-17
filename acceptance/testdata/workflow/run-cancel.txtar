@@ -39,8 +39,8 @@ stdout2env RUN_ID
 exec gh run cancel $RUN_ID
 stdout '✓ Request to cancel workflow [0-9]+ submitted.'
 
-# It takes some time for a workflow run to be cancelled
-sleep 5
+# Wait for workflow to complete
+exec gh run watch $RUN_ID
 
 # Check the workflow run is cancelled
 exec gh run list --json conclusion --jq '.[0].conclusion'
