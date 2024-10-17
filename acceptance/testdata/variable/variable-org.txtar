@@ -1,0 +1,20 @@
+# Prepare organization variable, GitHub Actions uppercases names
+env2upper ORG_VARIABLE_NAME=$RANDOM_STRING
+
+# Confirm organization variable does not exist, will fail admin:org scope missing
+! exec gh variable get $ORG_VARIABLE_NAME --org $ORG
+stderr 'variable .+ was not found'
+
+# Create an organization variable
+exec gh variable set $ORG_VARIABLE_NAME --org $ORG --body 'just an org variable'
+
+# Defer organization variable cleanup
+defer gh variable delete $ORG_VARIABLE_NAME --org $ORG
+
+# Confirm organization variable exists
+exec gh variable list --org $ORG
+stdout $ORG_VARIABLE_NAME
+
+# Verify repository environment variable can be retrieved
+exec gh variable get $ORG_VARIABLE_NAME --org $ORG
+stdout 'just an org variable'
