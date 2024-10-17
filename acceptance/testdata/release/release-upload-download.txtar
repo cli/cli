@@ -13,11 +13,12 @@ exec gh release create v1.2.3 --notes 'awesome release' --latest
 
 # Upload an asset to the release
 exec gh release upload v1.2.3 ../asset.txt
-stdout ''
 
 # Download the asset from the release
 exec gh release download v1.2.3
 exists asset.txt
+
+# Download the asset in archive form
 exec gh release download v1.2.3 --archive=zip
 exists $SCRIPT_NAME-$RANDOM_STRING-1.2.3.zip
 
