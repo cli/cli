@@ -63,7 +63,6 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      - run: mkdir -p path/to/artifact
       - run: echo hello > world.txt
       - uses: actions/upload-artifact@v4
         with:
