@@ -43,6 +43,15 @@ func TestIssues(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
 }
 
+func TestSecrets(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "secret"))
+}
+
 func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
 	var files []string
 	if tsEnv.script != "" {
@@ -116,6 +125,26 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 					tt.FailNow()
 				}
 			})
+		},
+		"env2lower": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! env2lower")
+			}
+			if len(args) != 2 {
+				ts.Fatalf("usage: env2lower old new")
+			}
+
+			ts.Setenv(args[1], strings.ToLower(ts.Getenv(args[0])))
+		},
+		"env2upper": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! env2upper")
+			}
+			if len(args) != 2 {
+				ts.Fatalf("usage: env2upper old new")
+			}
+
+			ts.Setenv(args[1], strings.ToUpper(ts.Getenv(args[0])))
 		},
 		"stdout2env": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
