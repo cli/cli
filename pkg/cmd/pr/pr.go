@@ -5,6 +5,7 @@ import (
 	cmdLock "github.com/cli/cli/v2/pkg/cmd/issue/lock"
 	cmdCheckout "github.com/cli/cli/v2/pkg/cmd/pr/checkout"
 	cmdChecks "github.com/cli/cli/v2/pkg/cmd/pr/checks"
+	cmdCleanup "github.com/cli/cli/v2/pkg/cmd/pr/cleanup"
 	cmdClose "github.com/cli/cli/v2/pkg/cmd/pr/close"
 	cmdComment "github.com/cli/cli/v2/pkg/cmd/pr/comment"
 	cmdCreate "github.com/cli/cli/v2/pkg/cmd/pr/create"
@@ -49,6 +50,7 @@ func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 		cmdList.NewCmdList(f, nil),
 		cmdCreate.NewCmdCreate(f, nil),
 		cmdStatus.NewCmdStatus(f, nil),
+		cmdCleanup.NewCmdCleanup(f, nil),
 	)
 
 	cmdutil.AddGroup(cmd, "Targeted commands",
