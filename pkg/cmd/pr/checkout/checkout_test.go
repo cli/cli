@@ -58,6 +58,7 @@ func stubPR(repo, prHead string) (ghrepo.Interface, *api.PullRequest) {
 		HeadRepository:      &api.PRRepository{Name: headRepo.RepoName()},
 		IsCrossRepository:   !ghrepo.IsSame(baseRepo, headRepo),
 		MaintainerCanModify: false,
+		Title:               "Blueberries are a good fruit",
 	}
 }
 
@@ -483,6 +484,32 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
+}
+
+func TestPRCheckout_forceMessage(t *testing.T) {
+	http := &httpmock.Registry{}
+
+	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
+	shared.RunCommandFinder("123", pr, baseRepo)
+
+	pr.Commits.Nodes = append(pr.Commits.Nodes, api.PullRequestCommit{
+		Commit: api.PullRequestCommitCommit{OID: "SHA1"},
+	})
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git .+ show .+ HEAD`, 0, "SHA2,title")
+	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+	cs.Register(`git checkout feature`, 0, "")
+	cs.Register(`git merge --ff-only refs/remotes/origin/feature`, 0, "")
+
+	output, err := runCommand(http, nil, "master", `123`)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "! Pull request #123 (Blueberries are a good fruit) has diverged from local branch\nRun the same command with `--force` to reset the local branch to this PR\n", output.Stderr())
 }
 
 func TestPRCheckout_force(t *testing.T) {
