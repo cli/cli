@@ -1,6 +1,3 @@
-# Use gh as a credential helper
-exec gh auth setup-git
-
 # Create and clone a repository with a file so it has a default branch
 exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private --clone
 
