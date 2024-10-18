@@ -30,15 +30,13 @@ exec git push
 # Checkout the forked repo and ensure asset.txt is not present
 cd ../$SCRIPT_NAME-$RANDOM_STRING-fork
 exec git checkout main
-exec ls
-! stdout asset.txt
+! exists asset.txt
 
 # Sync the forked repo with the original repo
 exec gh repo sync
 
 # Check that asset.txt now exists in the fork
-exec ls
-stdout asset.txt
+exists asset.txt
 
 -- asset.txt --
 Hello, world!

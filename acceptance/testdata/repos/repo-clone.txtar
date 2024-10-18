@@ -8,5 +8,4 @@ defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
 exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
 
 # Ensure the repo was cloned
-exec ls $SCRIPT_NAME-$RANDOM_STRING
-stdout README.md
+exists $SCRIPT_NAME-$RANDOM_STRING/README.md
