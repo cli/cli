@@ -63,6 +63,15 @@ func TestAPI(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "api"))
 }
 
+func TestAuth(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "auth"))
+}
+
 func TestReleases(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
