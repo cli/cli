@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"math/rand"
 
@@ -50,6 +52,34 @@ func TestSecrets(t *testing.T) {
 	}
 
 	testscript.Run(t, testScriptParamsFor(tsEnv, "secret"))
+}
+
+func TestWorkflows(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "workflow"))
+}
+
+func TestAPI(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "api"))
+}
+
+func TestReleases(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "release"))
+>>>>>>> trunk
 }
 
 func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
@@ -169,6 +199,23 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 			}
 
 			ts.Setenv(args[0], strings.TrimRight(ts.ReadFile("stdout"), "\n"))
+		},
+		"sleep": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! sleep")
+			}
+			if len(args) != 1 {
+				ts.Fatalf("usage: sleep seconds")
+			}
+
+			// sleep for the given number of seconds
+			seconds, err := strconv.Atoi(args[0])
+			if err != nil {
+				ts.Fatalf("invalid number of seconds: %v", err)
+			}
+
+			d := time.Duration(seconds) * time.Second
+			time.Sleep(d)
 		},
 	}
 }

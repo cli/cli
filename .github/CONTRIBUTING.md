@@ -6,7 +6,7 @@ We accept pull requests for bug fixes and features where we've discussed the app
 
 Please do:
 
-* Check existing issues to verify that an existing [bug][bug issues] or [feature request][feature request issues] issue does not already exist for the same problem or feature.
+* Check issues to verify that a [bug][bug issues] or [feature request][feature request issues] issue does not already exist for the same problem or feature.
 * Open an issue if things aren't working as expected.
 * Open an issue to propose a significant change.
 * Open an issue to propose a design for an issue labelled [`needs-design` and `help wanted`][needs design and help wanted], following the [proposing a design guidelines](#proposing-a-design) instructions below.
