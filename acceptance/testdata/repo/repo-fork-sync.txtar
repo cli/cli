@@ -18,7 +18,7 @@ sleep 5
 
 # Check that the repo was forked
 exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING-fork --json='isFork' --jq='.isFork'
-stdout true
+stdout 'true'
 
 # Modify original repo
 cd $SCRIPT_NAME-$RANDOM_STRING
