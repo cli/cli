@@ -1,0 +1,29 @@
+# We aren't logged in at the moment, but GH_HOST will override the
+# need to login. We are going to clear GH_HOST first to ensure no
+# overrides are happening
+
+# Copy $GH_TOKEN to a new env var
+setEnvVar LOGIN_TOKEN $GH_TOKEN
+exec echo $LOGIN_TOKEN
+stdout $GH_TOKEN
+
+# Remove GH_TOKEN env var so we don't fall back to it
+deleteEnvVar GH_TOKEN
+
+# Ensure the token was deleted
+exec echo $GH_TOKEN
+! stdout '.'
+
+# Login to the host
+exec gh auth login --hostname=$GH_HOST --with-token --token=$LOGIN_TOKEN --insecure-storage
+
+# Check that we are logged in
+exec gh auth status --hostname $GH_HOST
+stdout $GH_HOST
+
+# Logout of the host
+exec gh auth logout --hostname $GH_HOST
+stderr 'Logged out of'
+
+# Check that we are logged out
+! exec gh auth status --hostname $GH_HOST

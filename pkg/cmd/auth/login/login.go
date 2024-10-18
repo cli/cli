@@ -104,14 +104,18 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			}
 
 			if tokenStdin {
-				defer opts.IO.In.Close()
-				token, err := io.ReadAll(opts.IO.In)
-				if err != nil {
-					return fmt.Errorf("failed to read token from standard input: %w", err)
+				if opts.Token == "" {
+					defer opts.IO.In.Close()
+					token, err := io.ReadAll(opts.IO.In)
+					if err != nil {
+						return fmt.Errorf("failed to read token from standard input: %w", err)
+					}
+					opts.Token = strings.TrimSpace(string(token))
 				}
-				opts.Token = strings.TrimSpace(string(token))
 			}
 
+			// I think this is dead code because the token will always be set if we make it past
+			// the conditional above (lines 106-115)
 			if opts.IO.CanPrompt() && opts.Token == "" {
 				opts.Interactive = true
 			}
@@ -139,6 +143,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes to request")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
+	cmd.Flags().StringVarP(&opts.Token, "token", "t", "", "Authenticate using a personal access token")
 	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations on this host")
 
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
