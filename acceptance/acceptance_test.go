@@ -27,13 +27,13 @@ func TestMain(m *testing.M) {
 	}))
 }
 
-func TestPullRequests(t *testing.T) {
+func TestAPI(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
+	testscript.Run(t, testScriptParamsFor(tsEnv, "api"))
 }
 
 func TestIssues(t *testing.T) {
@@ -43,6 +43,24 @@ func TestIssues(t *testing.T) {
 	}
 
 	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
+}
+
+func TestPullRequests(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
+}
+
+func TestReleases(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "release"))
 }
 
 func TestSecrets(t *testing.T) {
@@ -61,25 +79,6 @@ func TestWorkflows(t *testing.T) {
 	}
 
 	testscript.Run(t, testScriptParamsFor(tsEnv, "workflow"))
-}
-
-func TestAPI(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(tsEnv, "api"))
-}
-
-func TestReleases(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(tsEnv, "release"))
->>>>>>> trunk
 }
 
 func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
@@ -156,23 +155,6 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 				}
 			})
 		},
-		"env2lower": func(ts *testscript.TestScript, neg bool, args []string) {
-			if neg {
-				ts.Fatalf("unsupported: ! env2lower")
-			}
-			if len(args) == 0 {
-				ts.Fatalf("usage: env2lower name=value ...")
-			}
-			for _, env := range args {
-				i := strings.Index(env, "=")
-
-				if i < 0 {
-					ts.Fatalf("env2lower: argument does not match name=value")
-				}
-
-				ts.Setenv(env[:i], strings.ToLower(env[i+1:]))
-			}
-		},
 		"env2upper": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
 				ts.Fatalf("unsupported: ! env2upper")
@@ -189,6 +171,41 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 
 				ts.Setenv(env[:i], strings.ToUpper(env[i+1:]))
 			}
+		},
+		"replace": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! replace")
+			}
+			if len(args) < 2 {
+				ts.Fatalf("usage: replace file env...")
+			}
+
+			src := ts.MkAbs(args[0])
+			ts.Logf("replace src: %s", src)
+			info, err := os.Stat(src)
+			ts.Check(err)
+			mode := info.Mode() & 0o777
+			data, err := os.ReadFile(src)
+			ts.Check(err)
+
+			for _, arg := range args[1:] {
+				i := strings.Index(arg, "=")
+				if i < 0 {
+					ts.Fatalf("replace: %s argument does not match name=value", arg)
+				}
+
+				name := fmt.Sprintf("$%s", arg[:i])
+				value := arg[i+1:]
+				ts.Logf("replace %s: %s", name, value)
+
+				// `replace` was originally built similar to `cmpenv`, expanding environment variables within a file.
+				// However files with content that looks like environments variable such as GitHub Actions workflows
+				// were being modified unexpectedly. Thus `replace` has been designed to using string replacement
+				// looking for `$KEY` specifically.
+				data = []byte(strings.ReplaceAll(string(data), name, value))
+			}
+
+			ts.Check(os.WriteFile(src, data, mode))
 		},
 		"stdout2env": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {

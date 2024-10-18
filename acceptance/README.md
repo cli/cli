@@ -72,18 +72,27 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
   defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
   ```
 
-- `env2lower`: set environment variable to the lowercase version of another environment variable
-
-  ```txtar
-  # Prepare repository name, which is only lowercase
-  env2lower REPO_NAME=$RANDOM_STRING
-  ```
-
 - `env2upper`: set environment variable to the uppercase version of another environment variable
 
   ```txtar
   # Prepare organization secret, GitHub Actions uppercases secret names
   env2upper ORG_SECRET_NAME=$RANDOM_STRING
+  ```
+
+- `replace`: replace placeholders in file with interpolated content provided
+
+  ```txtar
+  env2upper SECRET_NAME=$SCRIPT_NAME_$RANDOM_STRING
+
+  # Modify workflow file to use generated organization secret name
+  mv ../workflow.yml .github/workflows/workflow.yml
+  replace .github/workflows/workflow.yml SECRET_NAME=$SECRET_NAME
+
+  -- workflow.yml --
+  on:
+    workflow_dispatch:
+  env:
+    ORG_SECRET: ${{ secrets.$SECRET_NAME }}
   ```
 
 - `stdout2env`: set environment variable containing standard output from previous command
