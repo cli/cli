@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	ghContext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -417,6 +419,8 @@ func Test_setRun_org(t *testing.T) {
 	}
 }
 
+// TOOD: add test for getRemote_prompt
+
 func Test_getBody_prompt(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	ios.SetStdinTTY(true)
@@ -556,6 +560,139 @@ func Test_getVariablesFromOptions(t *testing.T) {
 			for k, v := range gotVariables {
 				assert.Equal(t, tt.want[k], v)
 			}
+		})
+	}
+}
+
+func Test_setRun_remote_validation(t *testing.T) {
+	tests := []struct {
+		name      string
+		opts      *SetOptions
+		httpStubs func(*httpmock.Registry)
+		wantOut   string
+		wantErr   bool
+		errMsg    string
+	}{
+		{
+			name: "single repo detected",
+			opts: &SetOptions{
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+					}, nil
+				},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/owner/repo/actions/variables"),
+					httpmock.StatusStringResponse(201, `{}`))
+			},
+		},
+		{
+			name: "multi repo detected",
+			opts: &SetOptions{
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+					remote2 := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "upstream",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+						remote2,
+					}, nil
+				},
+			},
+			wantErr: true,
+			errMsg:  "multiple remotes detected [origin upstream]. please specify which repo to use by providing the -R or --repo argument",
+		},
+		{
+			name: "multi repo detected - single repo given",
+			opts: &SetOptions{
+				HasRepoOverride: true,
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+					remote2 := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "upstream",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+						remote2,
+					}, nil
+				},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/owner/repo/actions/variables"),
+					httpmock.StatusStringResponse(201, `{}`))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+
+			ios, _, _, _ := iostreams.Test()
+
+			opts := &SetOptions{
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("owner/repo")
+				},
+				IO:              ios,
+				VariableName:    "cool_variable",
+				Body:            "a variable",
+				HasRepoOverride: tt.opts.HasRepoOverride,
+				Remotes:         tt.opts.Remotes,
+			}
+
+			err := setRun(opts)
+			if tt.wantErr {
+				assert.EqualError(t, err, tt.errMsg)
+
+				return
+			}
+
+			assert.NoError(t, err)
+
+			data, err := io.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
+			assert.NoError(t, err)
+
+			var payload setPayload
+			err = json.Unmarshal(data, &payload)
+			assert.NoError(t, err)
+			assert.Equal(t, payload.Value, "a variable")
 		})
 	}
 }

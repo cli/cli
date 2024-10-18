@@ -30,7 +30,8 @@ func explainer() string {
 		 - viewing and creating issues
 		 - viewing and creating releases
 		 - working with GitHub Actions
-		 - adding repository and environment secrets`)
+
+		### NOTE: gh does not use the default repository for managing repository and environment secrets or variables.`)
 }
 
 type iprompter interface {

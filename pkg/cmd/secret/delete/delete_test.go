@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	ghContext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -350,4 +352,120 @@ func Test_removeRun_user(t *testing.T) {
 	assert.NoError(t, err)
 
 	reg.Verify(t)
+}
+
+func Test_removeRun_remote_validation(t *testing.T) {
+	tests := []struct {
+		name     string
+		opts     *DeleteOptions
+		wantPath string
+		wantErr  bool
+		errMsg   string
+	}{
+		{
+			name: "single repo detected",
+			opts: &DeleteOptions{
+				Application: "actions",
+				SecretName:  "cool_secret",
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+					}, nil
+				}},
+			wantPath: "repos/owner/repo/actions/secrets/cool_secret",
+		},
+		{
+			name: "multi repo detected",
+			opts: &DeleteOptions{
+				Application: "actions",
+				SecretName:  "cool_secret",
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+					remote2 := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "upstream",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+						remote2,
+					}, nil
+				}},
+			wantErr: true,
+			errMsg:  "multiple remotes detected [origin upstream]. please specify which repo to use by providing the -R or --repo argument",
+		},
+		{
+			name: "multi repo detected - single repo given",
+			opts: &DeleteOptions{
+				Application:     "actions",
+				SecretName:      "cool_secret",
+				HasRepoOverride: true,
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+					remote2 := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "upstream",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+						remote2,
+					}, nil
+				}},
+			wantPath: "repos/owner/repo/actions/secrets/cool_secret",
+		},
+	}
+
+	for _, tt := range tests {
+		reg := &httpmock.Registry{}
+
+		if tt.wantPath != "" {
+			reg.Register(
+				httpmock.REST("DELETE", tt.wantPath),
+				httpmock.StatusStringResponse(204, "No Content"))
+		}
+
+		ios, _, _, _ := iostreams.Test()
+
+		tt.opts.IO = ios
+		tt.opts.HttpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+		tt.opts.Config = func() (gh.Config, error) {
+			return config.NewBlankConfig(), nil
+		}
+		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName("owner/repo")
+		}
+
+		err := removeRun(tt.opts)
+		if tt.wantErr {
+			assert.EqualError(t, err, tt.errMsg)
+		} else {
+			assert.NoError(t, err)
+		}
+
+		reg.Verify(t)
+	}
 }
