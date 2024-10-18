@@ -72,12 +72,12 @@ func TestReleases(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "release"))
 }
 
-func TestRepos(t *testing.T) {
+func TestRepo(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
 		t.Fatal(err)
 	}
-	testscript.Run(t, testScriptParamsFor(tsEnv, "repos"))
+	testscript.Run(t, testScriptParamsFor(tsEnv, "repo"))
 }
 
 func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
