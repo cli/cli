@@ -400,6 +400,7 @@ var RepositoryFields = []string{
 	"createdAt",
 	"pushedAt",
 	"updatedAt",
+	"archivedAt",
 
 	"isBlankIssuesEnabled",
 	"isSecurityPolicyEnabled",
