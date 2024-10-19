@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
@@ -1081,6 +1082,72 @@ func Test_createRun(t *testing.T) {
 			},
 			runStubs: defaultRunStubs,
 			wantErr:  "cannot generate release notes from tag v1.2.3 as it does not exist locally",
+		},
+		{
+			name:  "API returns 404, OAuth token has no workflow scope",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName: "Does not matter",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(contentCmd, 0, "some tag message")
+				rs.Register(signatureCmd, 0, "")
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+					httpmock.StatusScopesResponder(404, `repo,read:org`))
+			},
+			wantErr: heredoc.Doc(`
+				HTTP 404: Failed to create release, "workflow" scope may be required
+				To request it, run gh auth refresh -h github.com -s workflow
+			`),
+		},
+		{
+			name:  "API returns 404, OAuth token has workflow scope",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName: "Does not matter",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(contentCmd, 0, "some tag message")
+				rs.Register(signatureCmd, 0, "")
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+					httpmock.StatusScopesResponder(404, `repo,read:org,workflow`))
+			},
+			wantErr: "HTTP 404 (https://api.github.com/repos/OWNER/REPO/releases)",
+		},
+		{
+			name:  "API returns 404, not an OAuth token",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName: "Does not matter",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(contentCmd, 0, "some tag message")
+				rs.Register(signatureCmd, 0, "")
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+					httpmock.StatusStringResponse(404, `HTTP 404 (https://api.github.com/repos/OWNER/REPO/releases)`))
+			},
+			wantErr: "HTTP 404 (https://api.github.com/repos/OWNER/REPO/releases)",
 		},
 	}
 	for _, tt := range tests {

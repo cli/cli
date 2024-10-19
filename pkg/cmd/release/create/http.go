@@ -8,12 +8,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/shurcooL/githubv4"
+
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 type tag struct {
@@ -174,6 +178,20 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	}
 	defer resp.Body.Close()
 
+	// Releases with workflow files can be created without the workflow scope,
+	// if the same file (with both the same path and contents) exists
+	// on another branch in the repo. Otherwise, the workflow scope is required.
+	oAuthTokenMissingWorkflowScope := isOAuthToken(resp) && !oAuthTokenHasWorkflowScope(resp)
+	if resp.StatusCode == 404 && oAuthTokenMissingWorkflowScope {
+		normalizedHostname := ghauth.NormalizeHostname(resp.Request.URL.Hostname())
+		errMissingRequiredWorkflowScope := errors.New(heredoc.Docf(`
+				HTTP 404: Failed to create release, "workflow" scope may be required
+				To request it, run gh auth refresh -h %[1]s -s workflow
+			`, normalizedHostname))
+
+		return nil, errMissingRequiredWorkflowScope
+	}
+
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if !success {
 		return nil, api.HandleHTTPError(resp)
@@ -253,4 +271,21 @@ func deleteRelease(httpClient *http.Client, release *shared.Release) error {
 		_, _ = io.Copy(io.Discard, resp.Body)
 	}
 	return nil
+}
+
+func isOAuthToken(resp *http.Response) bool {
+	scopes := resp.Header.Get("X-Oauth-Scopes")
+	return scopes != ""
+}
+
+func oAuthTokenHasWorkflowScope(resp *http.Response) bool {
+	scopes := resp.Header.Get("X-Oauth-Scopes")
+
+	for _, s := range strings.Split(scopes, ",") {
+		if s == "workflow" {
+			return true
+		}
+	}
+
+	return false
 }
