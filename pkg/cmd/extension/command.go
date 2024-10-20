@@ -5,6 +5,7 @@ import (
 	"fmt"
 	gio "io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -314,6 +315,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 							return fmt.Errorf("local extensions cannot be pinned")
 						}
 						wd, err := os.Getwd()
+						if err != nil {
+							return err
+						}
+						err = checkValidLocalExtension(cmd.Root(), m, wd)
 						if err != nil {
 							return err
 						}
@@ -637,6 +642,26 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	return &extCmd
+}
+
+func checkValidLocalExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extDir string) error {
+	extName := filepath.Base(extDir)
+	if !strings.HasPrefix(extName, "gh-") {
+		return errors.New("extension directory name must start with `gh-`")
+	}
+
+	commandName := strings.TrimPrefix(extName, "gh-")
+	if c, _, _ := rootCmd.Find([]string{commandName}); c != rootCmd && c.GroupID != "extension" {
+		return fmt.Errorf("%q matches the name of a built-in command or alias", commandName)
+	}
+
+	for _, ext := range m.List() {
+		if ext.Name() == commandName {
+			return fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
+		}
+	}
+
+	return nil
 }
 
 func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName, extOwner string) (extensions.Extension, error) {
