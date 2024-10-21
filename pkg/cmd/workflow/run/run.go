@@ -280,6 +280,19 @@ func runRun(opts *RunOptions) error {
 		return err
 	}
 
+	defaultBranch, err := api.RepoDefaultBranch(client, repo)
+	if err != nil {
+		return fmt.Errorf("unable to determine default branch for %s: %w", ghrepo.FullName(repo), err)
+	}
+
+	_, err = shared.GetWorkflowContent(client, repo, *workflow, defaultBranch)
+	if err != nil {
+		if ref != defaultBranch {
+			return fmt.Errorf("the workflow is %s not found on %s, and workflows are required to exist on the default branch to be triggered by workflow_dispatch", workflow.Base(), defaultBranch)
+		}
+		return fmt.Errorf("unable to fetch workflow file content: %w", err)
+	}
+
 	providedInputs := map[string]string{}
 
 	if len(opts.MagicFields)+len(opts.RawFields) > 0 {
