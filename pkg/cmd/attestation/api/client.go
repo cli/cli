@@ -1,11 +1,14 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	ioconfig "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 )
@@ -69,6 +72,9 @@ func (c *LiveClient) GetTrustDomain() (string, error) {
 	return c.getTrustDomain(MetaPath)
 }
 
+// Allow injecting backoff interval in tests.
+var getAttestationRetryInterval = time.Millisecond * 200
+
 func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*Attestation, error) {
 	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
 
@@ -87,14 +93,31 @@ func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*At
 	var attestations []*Attestation
 	var resp AttestationsResponse
 	var err error
+	bo := backoff.NewConstantBackOff(getAttestationRetryInterval)
+
 	// if no attestation or less than limit, then keep fetching
 	for url != "" && len(attestations) < limit {
-		url, err = c.api.RESTWithNext(c.host, http.MethodGet, url, nil, &resp)
+		err = backoff.Retry(func() error {
+			newURL, err := c.api.RESTWithNext(c.host, http.MethodGet, url, nil, &resp)
+
+			if err != nil {
+				if shouldRetry(err) {
+					return err
+				} else {
+					return backoff.Permanent(err)
+				}
+			}
+
+			url = newURL
+			attestations = append(attestations, resp.Attestations...)
+
+			return nil
+		}, backoff.WithMaxRetries(bo, 3))
+
+		// bail if RESTWithNext errored out
 		if err != nil {
 			return nil, err
 		}
-
-		attestations = append(attestations, resp.Attestations...)
 	}
 
 	if len(attestations) == 0 {
@@ -106,6 +129,17 @@ func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*At
 	}
 
 	return attestations, nil
+}
+
+func shouldRetry(err error) bool {
+	var httpError api.HTTPError
+	if errors.As(err, &httpError) {
+		if httpError.StatusCode >= 500 && httpError.StatusCode <= 599 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (c *LiveClient) getTrustDomain(url string) (string, error) {

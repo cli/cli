@@ -206,6 +206,9 @@ func TestGetTrustDomain(t *testing.T) {
 }
 
 func TestGetAttestationsRetries(t *testing.T) {
+	oldInterval := getAttestationRetryInterval
+	getAttestationRetryInterval = 0
+
 	fetcher := mockDataGenerator{
 		NumAttestations: 5,
 	}
@@ -229,4 +232,6 @@ func TestGetAttestationsRetries(t *testing.T) {
 	require.Equal(t, 10, len(attestations))
 	bundle := (attestations)[0].Bundle
 	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
+
+	getAttestationRetryInterval = oldInterval
 }
