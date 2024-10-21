@@ -45,6 +45,14 @@ type EditableProjects struct {
 	ProjectItems map[string]string
 }
 
+func (s *EditableSlice) ReplaceValue(v []string) {
+	s.Value = v
+	vSet := set.NewFromSlice(v)
+	defaultSet := set.NewFromSlice(s.Default)
+	s.Add = vSet.Difference(defaultSet).ToSlice()
+	s.Remove = defaultSet.Difference(vSet).ToSlice()
+}
+
 func (e Editable) Dirty() bool {
 	return e.Title.Edited ||
 		e.Body.Edited ||
@@ -99,30 +107,6 @@ func (e Editable) ReviewerIds() (*[]string, *[]string, error) {
 		return nil, nil, err
 	}
 	return &userIds, &teamIds, nil
-}
-
-func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]string, error) {
-	if !e.Assignees.Edited {
-		return nil, nil
-	}
-	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
-		meReplacer := NewMeReplacer(client, repo.RepoHost())
-		s := set.NewStringSet()
-		s.AddValues(e.Assignees.Default)
-		add, err := meReplacer.ReplaceSlice(e.Assignees.Add)
-		if err != nil {
-			return nil, err
-		}
-		s.AddValues(add)
-		remove, err := meReplacer.ReplaceSlice(e.Assignees.Remove)
-		if err != nil {
-			return nil, err
-		}
-		s.RemoveValues(remove)
-		e.Assignees.Value = s.ToSlice()
-	}
-	a, err := e.Metadata.MembersToIDs(e.Assignees.Value)
-	return &a, err
 }
 
 // ProjectIds returns a slice containing IDs of projects v1 that the issue or a PR has to be linked to.
@@ -275,37 +259,28 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 		}
 	}
 	if editable.Reviewers.Edited {
-		editable.Reviewers.Value, err = multiSelectSurvey(
+		selectedReviewers, err := multiSelectSurvey(
 			p, "Reviewers", editable.Reviewers.Default, editable.Reviewers.Options)
 		if err != nil {
 			return err
 		}
+		editable.Reviewers.ReplaceValue(selectedReviewers)
 	}
 	if editable.Assignees.Edited {
-		editable.Assignees.Value, err = multiSelectSurvey(
+		selectedAssignees, err := multiSelectSurvey(
 			p, "Assignees", editable.Assignees.Default, editable.Assignees.Options)
 		if err != nil {
 			return err
 		}
+		editable.Assignees.ReplaceValue(selectedAssignees)
 	}
 	if editable.Labels.Edited {
-		editable.Labels.Add, err = multiSelectSurvey(
+		selectedLabels, err := multiSelectSurvey(
 			p, "Labels", editable.Labels.Default, editable.Labels.Options)
 		if err != nil {
 			return err
 		}
-		for _, prev := range editable.Labels.Default {
-			var found bool
-			for _, selected := range editable.Labels.Add {
-				if prev == selected {
-					found = true
-					break
-				}
-			}
-			if !found {
-				editable.Labels.Remove = append(editable.Labels.Remove, prev)
-			}
-		}
+		editable.Labels.ReplaceValue(selectedLabels)
 	}
 	if editable.Projects.Edited {
 		editable.Projects.Value, err = multiSelectSurvey(

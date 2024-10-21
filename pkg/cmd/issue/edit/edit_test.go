@@ -298,7 +298,7 @@ func Test_editRun(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     *EditOptions
-		httpStubs func(*testing.T, *httpmock.Registry)
+		httpStubs func(*httpmock.Registry)
 		stdout    string
 		stderr    string
 		wantErr   bool
@@ -346,13 +346,14 @@ func Test_editRun(t *testing.T) {
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueGet(t, reg)
-				mockIssueProjectItemsGet(t, reg)
-				mockRepoMetadata(t, reg)
-				mockIssueUpdate(t, reg)
-				mockIssueUpdateLabels(t, reg)
-				mockProjectV2ItemUpdate(t, reg)
+			httpStubs: func(reg *httpmock.Registry) {
+				mockIssueGet(reg)
+				mockIssueProjectItemsGet(reg)
+				mockRepoMetadata(reg)
+				mockIssueUpdate(reg)
+				mockIssueUpdateAssignee(reg)
+				mockIssueUpdateLabels(reg)
+				mockProjectV2ItemUpdate(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
@@ -386,20 +387,22 @@ func Test_editRun(t *testing.T) {
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+			httpStubs: func(reg *httpmock.Registry) {
 				// Should only be one fetch of metadata.
-				mockRepoMetadata(t, reg)
+				mockRepoMetadata(reg)
 				// All other queries and mutations should be doubled.
-				mockIssueNumberGet(t, reg, 123)
-				mockIssueNumberGet(t, reg, 456)
-				mockIssueProjectItemsGet(t, reg)
-				mockIssueProjectItemsGet(t, reg)
-				mockIssueUpdate(t, reg)
-				mockIssueUpdate(t, reg)
-				mockIssueUpdateLabels(t, reg)
-				mockIssueUpdateLabels(t, reg)
-				mockProjectV2ItemUpdate(t, reg)
-				mockProjectV2ItemUpdate(t, reg)
+				mockIssueNumberGet(reg, 123)
+				mockIssueNumberGet(reg, 456)
+				mockIssueProjectItemsGet(reg)
+				mockIssueProjectItemsGet(reg)
+				mockIssueUpdate(reg)
+				mockIssueUpdate(reg)
+				mockIssueUpdateAssignee(reg)
+				mockIssueUpdateAssignee(reg)
+				mockIssueUpdateLabels(reg)
+				mockIssueUpdateLabels(reg)
+				mockProjectV2ItemUpdate(reg)
+				mockProjectV2ItemUpdate(reg)
 			},
 			stdout: heredoc.Doc(`
 				https://github.com/OWNER/REPO/issue/123
@@ -436,8 +439,8 @@ func Test_editRun(t *testing.T) {
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueNumberGet(t, reg, 123)
+			httpStubs: func(reg *httpmock.Registry) {
+				mockIssueNumberGet(reg, 123)
 				reg.Register(
 					httpmock.GraphQL(`query IssueByNumber\b`),
 					httpmock.StringResponse(`
@@ -469,7 +472,7 @@ func Test_editRun(t *testing.T) {
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+			httpStubs: func(reg *httpmock.Registry) {
 				// Should only be one fetch of metadata.
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
@@ -477,6 +480,7 @@ func Test_editRun(t *testing.T) {
 					{ "data": { "repository": { "assignableUsers": {
 						"nodes": [
 							{ "login": "hubot", "id": "HUBOTID" },
+							{ "login": "octocat", "id": "OCTOCATID" },
 							{ "login": "MonaLisa", "id": "MONAID" }
 						],
 						"pageInfo": { "hasNextPage": false }
@@ -494,8 +498,8 @@ func Test_editRun(t *testing.T) {
 					} } } }
 					`))
 				// All other queries should be doubled.
-				mockIssueNumberGet(t, reg, 123)
-				mockIssueNumberGet(t, reg, 456)
+				mockIssueNumberGet(reg, 123)
+				mockIssueNumberGet(reg, 456)
 				// Updating 123 should succeed.
 				reg.Register(
 					httpmock.GraphQLMutationMatcher(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
@@ -514,6 +518,9 @@ func Test_editRun(t *testing.T) {
 							{ "errors": [ { "message": "test error" } ] }`,
 						func(inputs map[string]interface{}) {}),
 				)
+
+				mockIssueUpdateAssignee(reg)
+				mockIssueUpdateAssignee(reg)
 			},
 			stdout: heredoc.Doc(`
 				https://github.com/OWNER/REPO/issue/123
@@ -549,13 +556,13 @@ func Test_editRun(t *testing.T) {
 				FetchOptions:    prShared.FetchOptions,
 				DetermineEditor: func() (string, error) { return "vim", nil },
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueGet(t, reg)
-				mockIssueProjectItemsGet(t, reg)
-				mockRepoMetadata(t, reg)
-				mockIssueUpdate(t, reg)
-				mockIssueUpdateLabels(t, reg)
-				mockProjectV2ItemUpdate(t, reg)
+			httpStubs: func(reg *httpmock.Registry) {
+				mockIssueGet(reg)
+				mockIssueProjectItemsGet(reg)
+				mockRepoMetadata(reg)
+				mockIssueUpdate(reg)
+				mockIssueUpdateLabels(reg)
+				mockProjectV2ItemUpdate(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
@@ -569,7 +576,7 @@ func Test_editRun(t *testing.T) {
 
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
-			tt.httpStubs(t, reg)
+			tt.httpStubs(reg)
 
 			httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 			baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
@@ -591,11 +598,11 @@ func Test_editRun(t *testing.T) {
 	}
 }
 
-func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {
-	mockIssueNumberGet(nil, reg, 123)
+func mockIssueGet(reg *httpmock.Registry) {
+	mockIssueNumberGet(reg, 123)
 }
 
-func mockIssueNumberGet(_ *testing.T, reg *httpmock.Registry, number int) {
+func mockIssueNumberGet(reg *httpmock.Registry, number int) {
 	reg.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(fmt.Sprintf(`
@@ -617,7 +624,7 @@ func mockIssueNumberGet(_ *testing.T, reg *httpmock.Registry, number int) {
 	)
 }
 
-func mockIssueProjectItemsGet(_ *testing.T, reg *httpmock.Registry) {
+func mockIssueProjectItemsGet(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`query IssueProjectItems\b`),
 		httpmock.StringResponse(`
@@ -631,13 +638,14 @@ func mockIssueProjectItemsGet(_ *testing.T, reg *httpmock.Registry) {
 	)
 }
 
-func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
+func mockRepoMetadata(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "assignableUsers": {
 			"nodes": [
 				{ "login": "hubot", "id": "HUBOTID" },
+				{ "login": "octocat", "id": "OCTOCATID" },
 				{ "login": "MonaLisa", "id": "MONAID" }
 			],
 			"pageInfo": { "hasNextPage": false }
@@ -721,7 +729,7 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 		`))
 }
 
-func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
+func mockIssueUpdate(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation IssueUpdate\b`),
 		httpmock.GraphQLMutation(`
@@ -730,7 +738,7 @@ func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
 	)
 }
 
-func mockIssueUpdateLabels(t *testing.T, reg *httpmock.Registry) {
+func mockIssueUpdateLabels(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation LabelAdd\b`),
 		httpmock.GraphQLMutation(`
@@ -745,7 +753,16 @@ func mockIssueUpdateLabels(t *testing.T, reg *httpmock.Registry) {
 	)
 }
 
-func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
+func mockIssueUpdateAssignee(reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation AssigneeAdd\b`),
+		httpmock.StringResponse(`{}`))
+	reg.Register(
+		httpmock.GraphQL(`mutation AssigneeRemove\b`),
+		httpmock.StringResponse(`{}`))
+}
+
+func mockProjectV2ItemUpdate(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
 		httpmock.GraphQLMutation(`
