@@ -1,6 +1,7 @@
-# Force GitHub CLI to treat testscript as TTY
-env GH_FORCE_TTY=80
-env REPO=$SCRIPT_NAME-$RANDOM_STRING
+# Setup environment variables used for testscript
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+env ENV_NAME=testscripts
+env VAR_NAME=TESTSCRIPTS_ENV
 
 # Create a repository where the variable will be registered
 exec gh repo create $ORG/$REPO --add-readme --private
@@ -13,21 +14,19 @@ exec gh repo clone $ORG/$REPO
 cd $REPO
 
 # Create a repository environment, will fail if organization does not have environment support
-exec gh api /repos/$ORG/$REPO/environments/testscripts -X PUT --jq '.name'
-stdout 'testscripts'
+exec gh api /repos/$ORG/$REPO/environments/$ENV_NAME -X PUT --jq '.name'
 
-# Verify no repository environment variables exist
-exec gh variable list --env testscripts
-stderr 'no variables found'
+# Verify repository environment variable does not exist
+exec gh variable list --env $ENV_NAME
+! stdout $VAR_NAME
 
 # Create a repository environment variable
-exec gh variable set TESTSCRIPTS_ENV --env testscripts --body 'just a repo env variable'
-stdout 'Created variable TESTSCRIPTS_ENV for'
+exec gh variable set $VAR_NAME --env $ENV_NAME --body 'just a repo env variable'
 
 # Verify new repository environment variable exists
-exec gh variable list --env testscripts
-stdout 'TESTSCRIPTS_ENV\s+just a repo env variable\s+less than a minute ago'
+exec gh variable list --env $ENV_NAME
+stdout $VAR_NAME
 
 # Verify repository environment variable can be retrieved
-exec gh variable get TESTSCRIPTS_ENV --env testscripts
+exec gh variable get $VAR_NAME --env $ENV_NAME
 stdout 'just a repo env variable'

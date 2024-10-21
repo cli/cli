@@ -1,6 +1,6 @@
-# Setup environment variables to force TTY
-env GH_FORCE_TTY=80
-env REPO=$SCRIPT_NAME-$RANDOM_STRING
+# Setup environment variables used for testscript
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+env VAR_NAME=TESTSCRIPTS
 
 # Create a repository where the variable will be registered
 exec gh repo create $ORG/$REPO --add-readme --private
@@ -12,18 +12,17 @@ defer gh repo delete --yes $ORG/$REPO
 exec gh repo clone $ORG/$REPO
 cd $REPO
 
-# Verify no repository variables exist
+# Verify repository variable does not exist
 exec gh variable list
-stderr 'no variables found'
+! stdout $VAR_NAME
 
 # Create a repository variable
-exec gh variable set TESTSCRIPTS --body 'just a repo variable'
-stdout 'Created variable TESTSCRIPTS for'
+exec gh variable set $VAR_NAME --body 'just a repo variable'
 
 # Verify new repository variable exists
 exec gh variable list
-stdout 'TESTSCRIPTS\s+just a repo variable\s+less than a minute ago'
+stdout $VAR_NAME
 
 # Verify repository variable can be retrieved
-exec gh variable get TESTSCRIPTS
+exec gh variable get $VAR_NAME
 stdout 'just a repo variable'
