@@ -111,7 +111,11 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 		if !ok {
 			ts.T().Fatal("script name not found")
 		}
-		ts.Setenv("SCRIPT_NAME", scriptName)
+
+		// When using script name to uniquely identify where test data comes from,
+		// some places like GitHub Actions secret names don't accept hyphens.
+		// Replace them with underscores until such a time this becomes a problem.
+		ts.Setenv("SCRIPT_NAME", strings.ReplaceAll(scriptName, "-", "_"))
 		ts.Setenv("HOME", ts.Cd)
 		ts.Setenv("GH_CONFIG_DIR", ts.Cd)
 
@@ -182,6 +186,8 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 
 			src := ts.MkAbs(args[0])
 			ts.Logf("replace src: %s", src)
+
+			// Preserve the existing file mode while replacing the contents similar to native cp behavior
 			info, err := os.Stat(src)
 			ts.Check(err)
 			mode := info.Mode() & 0o777
@@ -198,7 +204,7 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 				value := arg[i+1:]
 				ts.Logf("replace %s: %s", name, value)
 
-				// `replace` was originally built similar to `cmpenv`, expanding environment variables within a file.
+				// `replace` was originally built similar to `cp` and `cmpenv`, expanding environment variables within a file.
 				// However files with content that looks like environments variable such as GitHub Actions workflows
 				// were being modified unexpectedly. Thus `replace` has been designed to using string replacement
 				// looking for `$KEY` specifically.

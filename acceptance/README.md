@@ -57,7 +57,7 @@ The following custom environment variables are made available to the scripts:
  * `ORG`: Set to the value of the `GH_ACCEPTANCE_ORG` env var provided to `go test`
  * `GH_TOKEN`: Set to the value of the `GH_ACCEPTANCE_TOKEN` env var provided to `go test`
  * `RANDOM_STRING`: Set to a length 10 random string of letters to help isolate globally visible resources
- * `SCRIPT_NAME`: Set to the name of the `testscript` currently running, without extension e.g. `pr-view`
+ * `SCRIPT_NAME`: Set to the name of the `testscript` currently running, without extension and replacing hyphens with underscores e.g. `pr_view`
  * `HOME`: Set to the initial working directory. Required for `git` operations
  * `GH_CONFIG_DIR`: Set to the initial working directory. Required for `gh` operations
 
