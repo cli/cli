@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -27,7 +28,9 @@ import (
 func TestNewCmdExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	oldWd, _ := os.Getwd()
-	assert.NoError(t, os.Chdir(tempDir))
+	localExtensionTempDir := filepath.Join(tempDir, "gh-hello")
+	assert.NoError(t, os.MkdirAll(localExtensionTempDir, 0755))
+	assert.NoError(t, os.Chdir(localExtensionTempDir))
 	t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 	tests := []struct {
@@ -270,13 +273,16 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "install local extension",
 			args: []string{"install", "."},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{}
+				}
 				em.InstallLocalFunc = func(dir string) error {
 					return nil
 				}
 				return func(t *testing.T) {
 					calls := em.InstallLocalCalls()
 					assert.Equal(t, 1, len(calls))
-					assert.Equal(t, tempDir, normalizeDir(calls[0].Dir))
+					assert.Equal(t, localExtensionTempDir, normalizeDir(calls[0].Dir))
 				}
 			},
 		},
@@ -979,7 +985,7 @@ func Test_checkValidExtension(t *testing.T) {
 				extOwner: "monalisa",
 				extName:  "gherkins",
 			},
-			wantError: "extension repository name must start with `gh-`",
+			wantError: "extension name must start with `gh-`",
 		},
 		{
 			name: "clashes with built-in command",
@@ -1015,6 +1021,86 @@ func Test_checkValidExtension(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := checkValidExtension(tt.args.rootCmd, tt.args.manager, tt.args.extName, tt.args.extOwner)
+			if tt.wantError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantError)
+			}
+		})
+	}
+}
+
+func Test_checkValidExtensionWithLocalExtension(t *testing.T) {
+	fakeRootCmd := &cobra.Command{}
+	fakeRootCmd.AddCommand(&cobra.Command{Use: "help"})
+	fakeRootCmd.AddCommand(&cobra.Command{Use: "auth"})
+
+	m := &extensions.ExtensionManagerMock{
+		ListFunc: func() []extensions.Extension {
+			return []extensions.Extension{
+				&extensions.ExtensionMock{
+					OwnerFunc: func() string { return "monalisa" },
+					NameFunc:  func() string { return "screensaver" },
+					PathFunc:  func() string { return "some/install/dir/gh-screensaver" },
+				},
+				&extensions.ExtensionMock{
+					OwnerFunc: func() string { return "monalisa" },
+					NameFunc:  func() string { return "triage" },
+					PathFunc:  func() string { return "some/install/dir/gh-triage" },
+				},
+			}
+		},
+	}
+
+	type args struct {
+		rootCmd *cobra.Command
+		manager extensions.ExtensionManager
+		dir     string
+	}
+	tests := []struct {
+		name      string
+		args      args
+		wantError string
+	}{
+		{
+			name: "valid extension",
+			args: args{
+				rootCmd: fakeRootCmd,
+				manager: m,
+				dir:     "some/install/dir/gh-hello",
+			},
+		},
+		{
+			name: "invalid extension name",
+			args: args{
+				rootCmd: fakeRootCmd,
+				manager: m,
+				dir:     "some/install/dir/hello",
+			},
+			wantError: "extension name must start with `gh-`",
+		},
+		{
+			name: "clashes with built-in command",
+			args: args{
+				rootCmd: fakeRootCmd,
+				manager: m,
+				dir:     "some/install/dir/gh-auth",
+			},
+			wantError: "\"auth\" matches the name of a built-in command or alias",
+		},
+		{
+			name: "clashes with an installed extension",
+			args: args{
+				rootCmd: fakeRootCmd,
+				manager: m,
+				dir:     "some/different/install/dir/gh-triage",
+			},
+			wantError: "there is already an installed extension that provides the \"triage\" command",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := checkValidExtension(tt.args.rootCmd, tt.args.manager, filepath.Base(tt.args.dir), "")
 			if tt.wantError == "" {
 				assert.NoError(t, err)
 			} else {

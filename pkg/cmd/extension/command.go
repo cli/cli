@@ -5,6 +5,7 @@ import (
 	"fmt"
 	gio "io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -314,6 +315,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 							return fmt.Errorf("local extensions cannot be pinned")
 						}
 						wd, err := os.Getwd()
+						if err != nil {
+							return err
+						}
+						_, err = checkValidExtension(cmd.Root(), m, filepath.Base(wd), "")
 						if err != nil {
 							return err
 						}
@@ -641,7 +646,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, extName, extOwner string) (extensions.Extension, error) {
 	if !strings.HasPrefix(extName, "gh-") {
-		return nil, errors.New("extension repository name must start with `gh-`")
+		return nil, errors.New("extension name must start with `gh-`")
 	}
 
 	commandName := strings.TrimPrefix(extName, "gh-")
@@ -651,7 +656,7 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 
 	for _, ext := range m.List() {
 		if ext.Name() == commandName {
-			if ext.Owner() == extOwner {
+			if extOwner != "" && ext.Owner() == extOwner {
 				return ext, alreadyInstalledError
 			}
 			return ext, fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
