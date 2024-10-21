@@ -238,6 +238,20 @@ func ScopesResponder(scopes string) func(*http.Request) (*http.Response, error) 
 	}
 }
 
+// StatusScopesResponder returns a response with the given status code and OAuth scopes.
+func StatusScopesResponder(status int, scopes string) func(*http.Request) (*http.Response, error) {
+	return func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: status,
+			Request:    req,
+			Header: map[string][]string{
+				"X-Oauth-Scopes": {scopes},
+			},
+			Body: io.NopCloser(bytes.NewBufferString("")),
+		}, nil
+	}
+}
+
 func httpResponse(status int, req *http.Request, body io.Reader) *http.Response {
 	return httpResponseWithHeader(status, req, body, http.Header{})
 }
