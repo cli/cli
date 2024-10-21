@@ -1,11 +1,13 @@
 package cmdutil
 
 import (
+	ghContext "github.com/cli/cli/v2/context"
 	"os"
 	"sort"
 	"strings"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/spf13/cobra"
 )
 
@@ -67,4 +69,35 @@ func OverrideBaseRepoFunc(f *Factory, override string) func() (ghrepo.Interface,
 		}
 	}
 	return f.BaseRepo
+}
+
+func PromptForRepo(baseRepo ghrepo.Interface, remotes func() (ghContext.Remotes, error), survey prompter.Prompter) (ghrepo.Interface, error) {
+	var defaultRepo string
+	var remoteArray []string
+
+	if remotes, _ := remotes(); remotes != nil {
+		if defaultRemote, _ := remotes.ResolvedRemote(); defaultRemote != nil {
+			// this is a remote explicitly chosen via `repo set-default`
+			defaultRepo = ghrepo.FullName(defaultRemote)
+		} else if len(remotes) > 0 {
+			// as a fallback, just pick the first remote
+			defaultRepo = ghrepo.FullName(remotes[0])
+		}
+
+		for _, remote := range remotes {
+			remoteArray = append(remoteArray, ghrepo.FullName(remote))
+		}
+	}
+
+	baseRepoInput, errInput := survey.Select("Select a base repo", defaultRepo, remoteArray)
+	if errInput != nil {
+		return baseRepo, errInput
+	}
+
+	selectedRepo, errSelectedRepo := ghrepo.FromFullName(remoteArray[baseRepoInput])
+	if errSelectedRepo != nil {
+		return baseRepo, errSelectedRepo
+	}
+
+	return selectedRepo, nil
 }

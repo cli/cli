@@ -6,6 +6,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
@@ -19,10 +20,13 @@ type DeleteOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Remotes    func() (ghContext.Remotes, error)
 
 	VariableName string
 	OrgName      string
 	EnvName      string
+
+	HasRepoOverride bool
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
@@ -30,6 +34,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Remotes:    f.Remotes,
 	}
 
 	cmd := &cobra.Command{
@@ -51,6 +56,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			}
 
 			opts.VariableName = args[0]
+			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
 			if runF != nil {
 				return runF(opts)
@@ -86,6 +92,11 @@ func removeRun(opts *DeleteOptions) error {
 	var baseRepo ghrepo.Interface
 	if variableEntity == shared.Repository || variableEntity == shared.Environment {
 		baseRepo, err = opts.BaseRepo()
+		if err != nil {
+			return err
+		}
+
+		err = cmdutil.ValidateHasOnlyOneRemote(opts.HasRepoOverride, opts.Remotes)
 		if err != nil {
 			return err
 		}
