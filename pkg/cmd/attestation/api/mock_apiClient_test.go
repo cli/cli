@@ -6,6 +6,10 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	cliAPI "github.com/cli/cli/v2/api"
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
+	"github.com/stretchr/testify/mock"
 )
 
 type mockAPIClient struct {
@@ -22,6 +26,7 @@ func (m mockAPIClient) REST(hostname, method, p string, body io.Reader, data int
 }
 
 type mockDataGenerator struct {
+	mock.Mock
 	NumAttestations int
 }
 
@@ -38,6 +43,26 @@ func (m mockDataGenerator) OnRESTSuccessWithNextPage(hostname, method, p string,
 
 	// if path contain after, it means second time hitting the mock server and will not return the link header
 	return m.OnRESTWithNextSuccessHelper(hostname, method, p, body, data, false)
+}
+
+// Returns a func that just calls OnRESTSuccessWithNextPage but half the time
+// it returns a 500 error.
+func (m *mockDataGenerator) FlakyOnRESTSuccessWithNextPageHandler() func(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+	// set up the flake counter
+	m.On("FlakyOnRESTSuccessWithNextPage:error").Return()
+
+	count := 0
+	return func(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+		if count%2 == 0 {
+			m.MethodCalled("FlakyOnRESTSuccessWithNextPage:error")
+
+			count = count + 1
+			return "", cliAPI.HTTPError{HTTPError: &ghAPI.HTTPError{StatusCode: 500}}
+		} else {
+			count = count + 1
+			return m.OnRESTSuccessWithNextPage(hostname, method, p, body, data)
+		}
+	}
 }
 
 func (m mockDataGenerator) OnRESTWithNextSuccessHelper(hostname, method, p string, body io.Reader, data interface{}, hasNext bool) (string, error) {

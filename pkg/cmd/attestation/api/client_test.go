@@ -204,3 +204,29 @@ func TestGetTrustDomain(t *testing.T) {
 	})
 
 }
+
+func TestGetAttestationsRetries(t *testing.T) {
+	fetcher := mockDataGenerator{
+		NumAttestations: 5,
+	}
+	l := io.NewTestHandler()
+
+	c := &LiveClient{
+		api: mockAPIClient{
+			OnRESTWithNext: fetcher.FlakyOnRESTSuccessWithNextPageHandler(),
+		},
+		logger: l,
+	}
+
+	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
+	require.NoError(t, err)
+
+	// assert the error path was executed; because this is a paged
+	// request, it should have errored twice
+	fetcher.AssertNumberOfCalls(t, "FlakyOnRESTSuccessWithNextPage:error", 2)
+
+	// but we still successfully got the right data
+	require.Equal(t, 10, len(attestations))
+	bundle := (attestations)[0].Bundle
+	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
+}
