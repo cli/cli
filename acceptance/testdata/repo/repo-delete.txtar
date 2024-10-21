@@ -1,0 +1,13 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Check that the repo exists
+exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING --json name --jq '.name'
+stdout $SCRIPT_NAME-$RANDOM_STRING
+
+# Delete the repo
+exec gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Ensure that the repo was deleted
+! exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING
+stderr 'Could not resolve to a Repository with the name'

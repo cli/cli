@@ -27,13 +27,13 @@ func TestMain(m *testing.M) {
 	}))
 }
 
-func TestAPI(t *testing.T) {
+func TestPullRequests(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "api"))
+	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
 }
 
 func TestIssues(t *testing.T) {
@@ -45,13 +45,22 @@ func TestIssues(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
 }
 
-func TestPullRequests(t *testing.T) {
+func TestWorkflows(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
+	testscript.Run(t, testScriptParamsFor(tsEnv, "workflow"))
+}
+
+func TestAPI(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "api"))
 }
 
 func TestReleases(t *testing.T) {
@@ -63,6 +72,24 @@ func TestReleases(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "release"))
 }
 
+func TestSearches(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "search"))
+}
+
+func TestRepo(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+  
+	testscript.Run(t, testScriptParamsFor(tsEnv, "repo"))
+}
+
 func TestSecrets(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
@@ -70,15 +97,6 @@ func TestSecrets(t *testing.T) {
 	}
 
 	testscript.Run(t, testScriptParamsFor(tsEnv, "secret"))
-}
-
-func TestWorkflows(t *testing.T) {
-	var tsEnv testScriptEnv
-	if err := tsEnv.fromEnv(); err != nil {
-		t.Fatal(err)
-	}
-
-	testscript.Run(t, testScriptParamsFor(tsEnv, "workflow"))
 }
 
 func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
