@@ -92,19 +92,18 @@ func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*At
 
 	var attestations []*Attestation
 	var resp AttestationsResponse
-	var err error
 	bo := backoff.NewConstantBackOff(getAttestationRetryInterval)
 
 	// if no attestation or less than limit, then keep fetching
 	for url != "" && len(attestations) < limit {
-		err = backoff.Retry(func() error {
-			newURL, err := c.api.RESTWithNext(c.host, http.MethodGet, url, nil, &resp)
+		err := backoff.Retry(func() error {
+			newURL, restErr := c.api.RESTWithNext(c.host, http.MethodGet, url, nil, &resp)
 
-			if err != nil {
-				if shouldRetry(err) {
-					return err
+			if restErr != nil {
+				if shouldRetry(restErr) {
+					return restErr
 				} else {
-					return backoff.Permanent(err)
+					return backoff.Permanent(restErr)
 				}
 			}
 
@@ -145,7 +144,20 @@ func shouldRetry(err error) bool {
 func (c *LiveClient) getTrustDomain(url string) (string, error) {
 	var resp MetaResponse
 
-	err := c.api.REST(c.host, http.MethodGet, url, nil, &resp)
+	bo := backoff.NewConstantBackOff(getAttestationRetryInterval)
+	err := backoff.Retry(func() error {
+		restErr := c.api.REST(c.host, http.MethodGet, url, nil, &resp)
+		if restErr != nil {
+			if shouldRetry(restErr) {
+				return restErr
+			} else {
+				return backoff.Permanent(restErr)
+			}
+		}
+
+		return nil
+	}, backoff.WithMaxRetries(bo, 3))
+
 	if err != nil {
 		return "", err
 	}

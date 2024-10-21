@@ -206,7 +206,6 @@ func TestGetTrustDomain(t *testing.T) {
 }
 
 func TestGetAttestationsRetries(t *testing.T) {
-	oldInterval := getAttestationRetryInterval
 	getAttestationRetryInterval = 0
 
 	fetcher := mockDataGenerator{
@@ -242,13 +241,10 @@ func TestGetAttestationsRetries(t *testing.T) {
 	require.Equal(t, len(attestations), 10)
 	bundle = (attestations)[0].Bundle
 	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
-
-	getAttestationRetryInterval = oldInterval
 }
 
 // test total retries
 func TestGetAttestationsMaxRetries(t *testing.T) {
-	oldInterval := getAttestationRetryInterval
 	getAttestationRetryInterval = 0
 
 	fetcher := mockDataGenerator{
@@ -266,5 +262,4 @@ func TestGetAttestationsMaxRetries(t *testing.T) {
 	require.Error(t, err)
 
 	fetcher.AssertNumberOfCalls(t, "OnREST500Error", 4)
-	getAttestationRetryInterval = oldInterval
 }
