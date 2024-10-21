@@ -72,11 +72,21 @@ func TestReleases(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "release"))
 }
 
+func TestSearches(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "search"))
+}
+
 func TestRepo(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
 		t.Fatal(err)
 	}
+  
 	testscript.Run(t, testScriptParamsFor(tsEnv, "repo"))
 }
 
