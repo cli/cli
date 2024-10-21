@@ -58,7 +58,6 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to log out of")
-	// This flag doesn't seem to be working with --user but it is working with -u in acceptance testing
 	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to log out of")
 
 	return cmd
