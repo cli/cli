@@ -1210,7 +1210,7 @@ func Test_createRun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.InputFunc = func(p, d string) (string, error) {
-					if p == "Title" {
+					if p == "Title (required)" {
 						return d, nil
 					} else {
 						return "", prompter.NoSuchPromptErr(p)
@@ -1316,7 +1316,7 @@ func Test_createRun(t *testing.T) {
 				}
 
 				pm.InputFunc = func(p, d string) (string, error) {
-					if p == "Title" {
+					if p == "Title (required)" {
 						return d, nil
 					} else if p == "Body" {
 						return d, nil

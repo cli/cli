@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"math/rand"
 
@@ -41,6 +43,51 @@ func TestIssues(t *testing.T) {
 	}
 
 	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
+}
+
+func TestWorkflows(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "workflow"))
+}
+
+func TestAPI(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "api"))
+}
+
+func TestReleases(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "release"))
+}
+
+func TestSearches(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "search"))
+}
+
+func TestRepo(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+  
+	testscript.Run(t, testScriptParamsFor(tsEnv, "repo"))
 }
 
 func TestSecrets(t *testing.T) {
@@ -91,7 +138,11 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 		if !ok {
 			ts.T().Fatal("script name not found")
 		}
-		ts.Setenv("SCRIPT_NAME", scriptName)
+
+		// When using script name to uniquely identify where test data comes from,
+		// some places like GitHub Actions secret names don't accept hyphens.
+		// Replace them with underscores until such a time this becomes a problem.
+		ts.Setenv("SCRIPT_NAME", strings.ReplaceAll(scriptName, "-", "_"))
 		ts.Setenv("HOME", ts.Cd)
 		ts.Setenv("GH_CONFIG_DIR", ts.Cd)
 
@@ -135,23 +186,6 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 				}
 			})
 		},
-		"env2lower": func(ts *testscript.TestScript, neg bool, args []string) {
-			if neg {
-				ts.Fatalf("unsupported: ! env2lower")
-			}
-			if len(args) == 0 {
-				ts.Fatalf("usage: env2lower name=value ...")
-			}
-			for _, env := range args {
-				i := strings.Index(env, "=")
-
-				if i < 0 {
-					ts.Fatalf("env2lower: argument does not match name=value")
-				}
-
-				ts.Setenv(env[:i], strings.ToLower(env[i+1:]))
-			}
-		},
 		"env2upper": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
 				ts.Fatalf("unsupported: ! env2upper")
@@ -169,6 +203,43 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 				ts.Setenv(env[:i], strings.ToUpper(env[i+1:]))
 			}
 		},
+		"replace": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! replace")
+			}
+			if len(args) < 2 {
+				ts.Fatalf("usage: replace file env...")
+			}
+
+			src := ts.MkAbs(args[0])
+			ts.Logf("replace src: %s", src)
+
+			// Preserve the existing file mode while replacing the contents similar to native cp behavior
+			info, err := os.Stat(src)
+			ts.Check(err)
+			mode := info.Mode() & 0o777
+			data, err := os.ReadFile(src)
+			ts.Check(err)
+
+			for _, arg := range args[1:] {
+				i := strings.Index(arg, "=")
+				if i < 0 {
+					ts.Fatalf("replace: %s argument does not match name=value", arg)
+				}
+
+				name := fmt.Sprintf("$%s", arg[:i])
+				value := arg[i+1:]
+				ts.Logf("replace %s: %s", name, value)
+
+				// `replace` was originally built similar to `cp` and `cmpenv`, expanding environment variables within a file.
+				// However files with content that looks like environments variable such as GitHub Actions workflows
+				// were being modified unexpectedly. Thus `replace` has been designed to using string replacement
+				// looking for `$KEY` specifically.
+				data = []byte(strings.ReplaceAll(string(data), name, value))
+			}
+
+			ts.Check(os.WriteFile(src, data, mode))
+		},
 		"stdout2env": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
 				ts.Fatalf("unsupported: ! stdout2env")
@@ -178,6 +249,23 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 			}
 
 			ts.Setenv(args[0], strings.TrimRight(ts.ReadFile("stdout"), "\n"))
+		},
+		"sleep": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! sleep")
+			}
+			if len(args) != 1 {
+				ts.Fatalf("usage: sleep seconds")
+			}
+
+			// sleep for the given number of seconds
+			seconds, err := strconv.Atoi(args[0])
+			if err != nil {
+				ts.Fatalf("invalid number of seconds: %v", err)
+			}
+
+			d := time.Duration(seconds) * time.Second
+			time.Sleep(d)
 		},
 	}
 }
