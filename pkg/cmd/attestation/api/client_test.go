@@ -212,13 +212,12 @@ func TestGetAttestationsRetries(t *testing.T) {
 	fetcher := mockDataGenerator{
 		NumAttestations: 5,
 	}
-	l := io.NewTestHandler()
 
 	c := &LiveClient{
 		api: mockAPIClient{
 			OnRESTWithNext: fetcher.FlakyOnRESTSuccessWithNextPageHandler(),
 		},
-		logger: l,
+		logger: io.NewTestHandler(),
 	}
 
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
@@ -229,9 +228,43 @@ func TestGetAttestationsRetries(t *testing.T) {
 	fetcher.AssertNumberOfCalls(t, "FlakyOnRESTSuccessWithNextPage:error", 2)
 
 	// but we still successfully got the right data
-	require.Equal(t, 10, len(attestations))
+	require.Equal(t, len(attestations), 10)
 	bundle := (attestations)[0].Bundle
 	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
 
+	// same test as above, but for GetByOwnerAndDigest:
+	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
+	require.NoError(t, err)
+
+	// because we haven't reset the mock, we have added 2 more failed requests
+	fetcher.AssertNumberOfCalls(t, "FlakyOnRESTSuccessWithNextPage:error", 4)
+
+	require.Equal(t, len(attestations), 10)
+	bundle = (attestations)[0].Bundle
+	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
+
+	getAttestationRetryInterval = oldInterval
+}
+
+// test total retries
+func TestGetAttestationsMaxRetries(t *testing.T) {
+	oldInterval := getAttestationRetryInterval
+	getAttestationRetryInterval = 0
+
+	fetcher := mockDataGenerator{
+		NumAttestations: 5,
+	}
+
+	c := &LiveClient{
+		api: mockAPIClient{
+			OnRESTWithNext: fetcher.OnREST500ErrorHandler(),
+		},
+		logger: io.NewTestHandler(),
+	}
+
+	_, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
+	require.Error(t, err)
+
+	fetcher.AssertNumberOfCalls(t, "OnREST500Error", 4)
 	getAttestationRetryInterval = oldInterval
 }

@@ -65,6 +65,16 @@ func (m *mockDataGenerator) FlakyOnRESTSuccessWithNextPageHandler() func(hostnam
 	}
 }
 
+// always returns a 500
+func (m *mockDataGenerator) OnREST500ErrorHandler() func(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+	m.On("OnREST500Error").Return()
+	return func(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+		m.MethodCalled("OnREST500Error")
+
+		return "", cliAPI.HTTPError{HTTPError: &ghAPI.HTTPError{StatusCode: 500}}
+	}
+}
+
 func (m mockDataGenerator) OnRESTWithNextSuccessHelper(hostname, method, p string, body io.Reader, data interface{}, hasNext bool) (string, error) {
 	atts := make([]*Attestation, m.NumAttestations)
 	for j := 0; j < m.NumAttestations; j++ {
