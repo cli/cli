@@ -656,7 +656,7 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 
 	for _, ext := range m.List() {
 		if ext.Name() == commandName {
-			if ext.Owner() != "" && ext.Owner() == extOwner {
+			if extOwner != "" && ext.Owner() == extOwner {
 				return ext, alreadyInstalledError
 			}
 			return ext, fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
