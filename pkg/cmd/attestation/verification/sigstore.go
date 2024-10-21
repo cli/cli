@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"os"
 
@@ -47,6 +48,8 @@ type SigstoreVerifier interface {
 type LiveSigstoreVerifier struct {
 	config SigstoreConfig
 }
+
+var ErrNoAttestationsVerified = errors.New("no attestations were verified")
 
 // NewLiveSigstoreVerifier creates a new LiveSigstoreVerifier struct
 // that is used to verify artifacts and attestations against the
@@ -170,18 +173,20 @@ func getLowestCertInChain(ca *root.CertificateAuthority) (*x509.Certificate, err
 }
 
 func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy verify.PolicyBuilder) *SigstoreResults {
-	// initialize the processing results before attempting to verify
+	// initialize the processing apResults before attempting to verify
 	// with multiple verifiers
-	results := make([]*AttestationProcessingResult, len(attestations))
+	apResults := make([]*AttestationProcessingResult, len(attestations))
 	for i, att := range attestations {
 		apr := &AttestationProcessingResult{
 			Attestation: att,
 		}
-		results[i] = apr
+		apResults[i] = apr
 	}
 
+	var atLeastOneVerified bool
+
 	totalAttestations := len(attestations)
-	for i, apr := range results {
+	for i, apr := range apResults {
 		v.config.Logger.VerbosePrintf("Verifying attestation %d/%d against the configured Sigstore trust roots\n", i+1, totalAttestations)
 
 		// determine which verifier should attempt verification against the bundle
@@ -212,10 +217,15 @@ func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy ve
 			"SUCCESS - attestation signature verified with \"%s\"\n", issuer,
 		))
 		apr.VerificationResult = result
+		atLeastOneVerified = true
 	}
 
-	return &SigstoreResults{
-		VerifyResults: results,
+	if atLeastOneVerified {
+		return &SigstoreResults{
+			VerifyResults: apResults,
+		}
+	} else {
+		return &SigstoreResults{Error: ErrNoAttestationsVerified}
 	}
 }
 
