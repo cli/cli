@@ -1,0 +1,13 @@
+# Setup the credential key name string
+formattedStringToEnv CREDENTIAL_HELPER_KEY 'credential.https://%s.helper' $GH_HOST
+
+# Check that the credential helper is unset for the host. This command is
+# expected to fail before gh auth setup-git is run.
+! exec git config --get $CREDENTIAL_HELPER_KEY
+
+# Run the setup-git command
+exec gh auth setup-git
+
+# Check that the credential helper is set to gh
+exec git config --get $CREDENTIAL_HELPER_KEY
+stdout gh

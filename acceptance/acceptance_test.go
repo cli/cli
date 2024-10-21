@@ -203,6 +203,17 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 				ts.Setenv(env[:i], strings.ToUpper(env[i+1:]))
 			}
 		},
+		// Creates a formatted string using standard fmt.Sprintf syntax
+		// and sets it as an environment variable of the given name.
+		"formattedStringToEnv": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! formattedStringToEnv")
+			}
+			if len(args) < 3 {
+				ts.Fatalf("usage: formattedStringToEnv name string args...")
+			}
+			ts.Setenv(args[0], fmt.Sprintf(args[1], toAnySlice(args[2:])...))
+		},
 		"replace": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
 				ts.Fatalf("unsupported: ! replace")
@@ -268,6 +279,14 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 			time.Sleep(d)
 		},
 	}
+}
+
+func toAnySlice(strings []string) []any {
+	anys := make([]any, len(strings))
+	for i, s := range strings {
+		anys[i] = s
+	}
+	return anys
 }
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
