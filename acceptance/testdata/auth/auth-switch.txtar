@@ -1,0 +1,58 @@
+# This requires a second account to log in to, meaning the GH_USER, 
+# GH_HOST_ALT, GH_USER_ALT, and GH_TOKEN_ALT env vars must be set.
+
+# Ensure that the GH_USER, GH_USER_ALT, and GH_TOKEN_ALT are available
+exec echo $GH_USER
+stdout '.+'
+
+exec echo $GH_HOST_ALT
+stdout '.+'
+
+exec echo $GH_USER_ALT
+stdout '.+'
+
+exec echo $GH_TOKEN_ALT
+stdout '.+'
+
+# Copy $GH_TOKEN to a new env var
+env LOGIN_TOKEN=$GH_TOKEN
+
+# Remove GH_TOKEN env var so we don't fall back to it
+env GH_TOKEN=''
+
+# Login to GH_HOST by feeding the GH_TOKEN to stdin
+exec echo $LOGIN_TOKEN
+stdin stdout
+exec gh auth login --hostname=$GH_HOST --with-token --insecure-storage
+
+# Confirm that the active user is GH_USER
+exec gh auth status --active
+stdout $GH_USER
+
+# Confirm that the active host is GH_HOST
+exec gh auth status --active
+stdout $GH_HOST
+
+# Login to GH_HOST_ALT by feeding the GH_TOKEN_ALT to stdin
+exec echo $GH_TOKEN_ALT
+stdin stdout
+exec gh auth login --hostname=$GH_HOST_ALT --with-token --insecure-storage
+
+# Confirm the active user is GH_USER_ALT
+exec gh auth status --active
+stdout $GH_USER_ALT
+
+# Confirm that the active host is GH_HOST_ALT
+exec gh auth status --active
+stdout $GH_HOST_ALT
+
+# Switch to the original user
+exec gh auth switch -h=$GH_HOST -u=$GH_USER
+
+# Confirm that the active user is GH_USER
+exec gh auth status --active
+stdout $GH_USER
+
+# Confirm that the active host is GH_HOST
+exec gh auth status --active
+stdout $GH_HOST

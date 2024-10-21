@@ -38,6 +38,24 @@ While writing a new test, it can be useful to target that specific script by pro
 GH_ACCEPTANCE_SCRIPT=pr-view.txtar GH_ACCEPTANCE_HOST=<host> GH_ACCEPTANCE_ORG=<org> GH_ACCEPTANCE_TOKEN=<token> go test -tags=acceptance -run ^TestPullRequests$ ./acceptance
 ```
 
+#### `gh auth switch`
+
+The `gh auth switch` command requires a user to be logged in to two accounts for testing. The `ALT` env vars have the same setup as their non-`ALT` counterparts, and are NOT required for any tests except `gh auth switch`.
+
+To test `gh auth switch`, use the following command:
+
+```sh
+GH_ACCEPTANCE_SCRIPT=auth-switch.txtar \
+GH_ACCEPTANCE_HOST=<HOST> \
+GH_ACCEPTANCE_ORG=<ORG> \
+GH_ACCEPTANCE_USER=<USER>
+GH_ACCEPTANCE_TOKEN=<TOKEN> \
+GH_ACCEPTANCE_HOST_ALT=<ALT_HOST> \
+GH_ACCEPTANCE_USER_ALT=<ALT_USER> \
+GH_ACCEPTANCE_TOKEN_ALT=<ALT_TOKEN> \
+go test -tags=acceptance -run ^TestAuth$ ./acceptance
+```
+
 #### Code Coverage
 
 To get code coverage, `go test` can be invoked with `coverpkg` and `coverprofile` like so:

@@ -150,6 +150,12 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 		ts.Setenv("ORG", tsEnv.org)
 		ts.Setenv("GH_TOKEN", tsEnv.token)
 
+		// Used for gh auth testing
+		ts.Setenv("GH_USER", tsEnv.user)
+		ts.Setenv("GH_HOST_ALT", tsEnv.altHost)
+		ts.Setenv("GH_USER_ALT", tsEnv.altUser)
+		ts.Setenv("GH_TOKEN_ALT", tsEnv.altToken)
+
 		ts.Setenv("RANDOM_STRING", randomString(10))
 
 		ts.Values[keyT] = ts.T()
@@ -303,6 +309,12 @@ type testScriptEnv struct {
 	org   string
 	token string
 
+	// Used for gh auth testing
+	user     string
+	altHost  string
+	altUser  string
+	altToken string
+
 	script string
 
 	skipDefer       bool
@@ -333,6 +345,22 @@ func (e *testScriptEnv) fromEnv() error {
 		return missingEnvError{missingEnvs: missingEnvs}
 	}
 
+	// Used for gh auth testing
+	optionalEnvVars := []string{
+		"GH_ACCEPTANCE_USER",
+		"GH_ACCEPTANCE_HOST_ALT",
+		"GH_ACCEPTANCE_USER_ALT",
+		"GH_ACCEPTANCE_TOKEN_ALT",
+	}
+
+	for _, key := range optionalEnvVars {
+		val, ok := os.LookupEnv(key)
+		if val == "" || !ok {
+			continue
+		}
+		envMap[key] = val
+	}
+
 	if envMap["GH_ACCEPTANCE_ORG"] == "github" || envMap["GH_ACCEPTANCE_ORG"] == "cli" {
 		return fmt.Errorf("GH_ACCEPTANCE_ORG cannot be 'github' or 'cli'")
 	}
@@ -340,6 +368,12 @@ func (e *testScriptEnv) fromEnv() error {
 	e.host = envMap["GH_ACCEPTANCE_HOST"]
 	e.org = envMap["GH_ACCEPTANCE_ORG"]
 	e.token = envMap["GH_ACCEPTANCE_TOKEN"]
+
+	// Alt account is optional but used for gh auth testing
+	e.user = envMap["GH_ACCEPTANCE_USER"]
+	e.altHost = envMap["GH_ACCEPTANCE_HOST_ALT"]
+	e.altUser = envMap["GH_ACCEPTANCE_USER_ALT"]
+	e.altToken = envMap["GH_ACCEPTANCE_TOKEN_ALT"]
 
 	e.script = os.Getenv("GH_ACCEPTANCE_SCRIPT")
 	e.preserveWorkDir = os.Getenv("GH_ACCEPTANCE_PRESERVE_WORK_DIR") == "true"
