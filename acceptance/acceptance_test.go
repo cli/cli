@@ -240,30 +240,6 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 
 			ts.Check(os.WriteFile(src, data, mode))
 		},
-		// perhaps these need to be extracted to different files, soon?
-		// I'm prompted to ask because "deleteEnvVar" could just be
-		// syntactic sugar for setEnvVar with an empty value. Can't do that
-		// with the current implementation
-		"deleteEnvVar": func(ts *testscript.TestScript, neg bool, args []string) {
-			if neg {
-				ts.Fatalf("unsupported: ! deleteEnvVar")
-			}
-			if len(args) != 1 {
-				ts.Fatalf("usage: deleteEnvVar name")
-			}
-
-			ts.Setenv(args[0], "")
-		},
-		"setEnvVar": func(ts *testscript.TestScript, neg bool, args []string) {
-			if neg {
-				ts.Fatalf("unsupported: ! setEnvVar")
-			}
-			if len(args) != 2 {
-				ts.Fatalf("usage: setEnvVar name value")
-			}
-
-			ts.Setenv(args[0], args[1])
-		},
 		"stdout2env": func(ts *testscript.TestScript, neg bool, args []string) {
 			if neg {
 				ts.Fatalf("unsupported: ! stdout2env")
