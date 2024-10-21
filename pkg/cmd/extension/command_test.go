@@ -1030,7 +1030,7 @@ func Test_checkValidExtension(t *testing.T) {
 	}
 }
 
-func Test_checkValidLocalExtension(t *testing.T) {
+func Test_checkValidExtensionWithLocalExtension(t *testing.T) {
 	fakeRootCmd := &cobra.Command{}
 	fakeRootCmd.AddCommand(&cobra.Command{Use: "help"})
 	fakeRootCmd.AddCommand(&cobra.Command{Use: "auth"})
@@ -1077,7 +1077,7 @@ func Test_checkValidLocalExtension(t *testing.T) {
 				manager: m,
 				dir:     "some/install/dir/hello",
 			},
-			wantError: "extension directory name must start with `gh-`",
+			wantError: "extension name must start with `gh-`",
 		},
 		{
 			name: "clashes with built-in command",
@@ -1100,7 +1100,7 @@ func Test_checkValidLocalExtension(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := checkValidLocalExtension(tt.args.rootCmd, tt.args.manager, tt.args.dir)
+			_, err := checkValidExtension(tt.args.rootCmd, tt.args.manager, filepath.Base(tt.args.dir), "")
 			if tt.wantError == "" {
 				assert.NoError(t, err)
 			} else {
