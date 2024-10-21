@@ -69,7 +69,7 @@ func listRun(opts *ListOptions) error {
 
 	host, _ := cfg.Authentication().DefaultHost()
 
-	listResult, err := listOrgs(httpClient, host, opts.Limit)
+	listResult, err := ListOrgs(httpClient, host, opts.Limit)
 	if err != nil {
 		return err
 	}
