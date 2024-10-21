@@ -85,7 +85,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 				Logger: opts.Logger,
 			}
 			// Prepare for tenancy if detected
-			if ghinstance.IsTenancy(opts.Hostname) {
+			if ghauth.IsTenancy(opts.Hostname) {
 				hc, err := f.HttpClient()
 				if err != nil {
 					return err

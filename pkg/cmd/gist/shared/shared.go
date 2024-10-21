@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -74,7 +75,9 @@ func GistIDFromURL(gistURL string) (string, error) {
 	return "", fmt.Errorf("Invalid gist URL %s", u)
 }
 
-func ListGists(client *http.Client, hostname string, limit int, visibility string) ([]Gist, error) {
+const maxPerPage = 100
+
+func ListGists(client *http.Client, hostname string, limit int, filter *regexp.Regexp, includeContent bool, visibility string) ([]Gist, error) {
 	type response struct {
 		Viewer struct {
 			Gists struct {
@@ -82,6 +85,7 @@ func ListGists(client *http.Client, hostname string, limit int, visibility strin
 					Description string
 					Files       []struct {
 						Name string
+						Text string `graphql:"text @include(if: $includeContent)"`
 					}
 					IsPublic  bool
 					Name      string
@@ -96,14 +100,33 @@ func ListGists(client *http.Client, hostname string, limit int, visibility strin
 	}
 
 	perPage := limit
-	if perPage > 100 {
-		perPage = 100
+	if perPage > maxPerPage {
+		perPage = maxPerPage
 	}
 
 	variables := map[string]interface{}{
-		"per_page":   githubv4.Int(perPage),
-		"endCursor":  (*githubv4.String)(nil),
-		"visibility": githubv4.GistPrivacy(strings.ToUpper(visibility)),
+		"per_page":       githubv4.Int(perPage),
+		"endCursor":      (*githubv4.String)(nil),
+		"visibility":     githubv4.GistPrivacy(strings.ToUpper(visibility)),
+		"includeContent": githubv4.Boolean(includeContent),
+	}
+
+	filterFunc := func(gist *Gist) bool {
+		if filter.MatchString(gist.Description) {
+			return true
+		}
+
+		for _, file := range gist.Files {
+			if filter.MatchString(file.Filename) {
+				return true
+			}
+
+			if includeContent && filter.MatchString(file.Content) {
+				return true
+			}
+		}
+
+		return false
 	}
 
 	gql := api.NewClientFromHTTP(client)
@@ -122,19 +145,22 @@ pagination:
 			for _, file := range gist.Files {
 				files[file.Name] = &GistFile{
 					Filename: file.Name,
+					Content:  file.Text,
 				}
 			}
 
-			gists = append(
-				gists,
-				Gist{
-					ID:          gist.Name,
-					Description: gist.Description,
-					Files:       files,
-					UpdatedAt:   gist.UpdatedAt,
-					Public:      gist.IsPublic,
-				},
-			)
+			gist := Gist{
+				ID:          gist.Name,
+				Description: gist.Description,
+				Files:       files,
+				UpdatedAt:   gist.UpdatedAt,
+				Public:      gist.IsPublic,
+			}
+
+			if filter == nil || filterFunc(&gist) {
+				gists = append(gists, gist)
+			}
+
 			if len(gists) == limit {
 				break pagination
 			}
@@ -177,7 +203,7 @@ func IsBinaryContents(contents []byte) bool {
 }
 
 func PromptGists(prompter prompter.Prompter, client *http.Client, host string, cs *iostreams.ColorScheme) (gistID string, err error) {
-	gists, err := ListGists(client, host, 10, "all")
+	gists, err := ListGists(client, host, 10, nil, false, "all")
 	if err != nil {
 		return "", err
 	}

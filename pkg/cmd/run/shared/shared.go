@@ -180,16 +180,22 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 			for _, j := range r.Jobs {
 				steps := make([]interface{}, 0, len(j.Steps))
 				for _, s := range j.Steps {
+					var stepCompletedAt time.Time
+					if !s.CompletedAt.IsZero() {
+						stepCompletedAt = s.CompletedAt
+					}
 					steps = append(steps, map[string]interface{}{
-						"name":       s.Name,
-						"status":     s.Status,
-						"conclusion": s.Conclusion,
-						"number":     s.Number,
+						"name":        s.Name,
+						"status":      s.Status,
+						"conclusion":  s.Conclusion,
+						"number":      s.Number,
+						"startedAt":   s.StartedAt,
+						"completedAt": stepCompletedAt,
 					})
 				}
-				var completedAt time.Time
+				var jobCompletedAt time.Time
 				if !j.CompletedAt.IsZero() {
-					completedAt = j.CompletedAt
+					jobCompletedAt = j.CompletedAt
 				}
 				jobs = append(jobs, map[string]interface{}{
 					"databaseId":  j.ID,
@@ -198,7 +204,7 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 					"name":        j.Name,
 					"steps":       steps,
 					"startedAt":   j.StartedAt,
-					"completedAt": completedAt,
+					"completedAt": jobCompletedAt,
 					"url":         j.URL,
 				})
 			}
@@ -225,11 +231,13 @@ type Job struct {
 }
 
 type Step struct {
-	Name       string
-	Status     Status
-	Conclusion Conclusion
-	Number     int
-	Log        *zip.File
+	Name        string
+	Status      Status
+	Conclusion  Conclusion
+	Number      int
+	StartedAt   time.Time `json:"started_at"`
+	CompletedAt time.Time `json:"completed_at"`
+	Log         *zip.File
 }
 
 type Steps []Step

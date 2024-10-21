@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"regexp"
 	"testing"
 	"time"
 
@@ -19,9 +20,10 @@ import (
 
 func TestNewCmdList(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants ListOptions
+		name     string
+		cli      string
+		wants    ListOptions
+		wantsErr bool
 	}{
 		{
 			name: "no arguments",
@@ -70,6 +72,31 @@ func TestNewCmdList(t *testing.T) {
 				Visibility: "all",
 			},
 		},
+		{
+			name:     "invalid limit",
+			cli:      "--limit 0",
+			wantsErr: true,
+		},
+		{
+			name: "filter and include-content",
+			cli:  "--filter octo --include-content",
+			wants: ListOptions{
+				Limit:          10,
+				Filter:         regexp.MustCompilePOSIX("octo"),
+				IncludeContent: true,
+				Visibility:     "all",
+			},
+		},
+		{
+			name:     "invalid filter",
+			cli:      "--filter octo(",
+			wantsErr: true,
+		},
+		{
+			name:     "include content without filter",
+			cli:      "--include-content",
+			wantsErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -90,6 +117,10 @@ func TestNewCmdList(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			}
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.Visibility, gotOpts.Visibility)
@@ -110,6 +141,7 @@ func Test_listRun(t *testing.T) {
 		wantErr bool
 		wantOut string
 		stubs   func(*httpmock.Registry)
+		color   bool
 		nontty  bool
 	}{
 		{
@@ -358,6 +390,225 @@ func Test_listRun(t *testing.T) {
 			`),
 			nontty: true,
 		},
+		{
+			name: "filtered",
+			opts: &ListOptions{
+				Filter:     regexp.MustCompile("octo"),
+				Visibility: "all",
+			},
+			nontty: true,
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(fmt.Sprintf(
+						`{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "1234",
+								"files": [
+									{ "name": "main.txt", "text": "foo" }
+								],
+								"description": "octo match in the description",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							},
+							{
+								"name": "2345",
+								"files": [
+									{ "name": "main.txt", "text": "foo" },
+									{ "name": "octo.txt", "text": "bar" }
+								],
+								"description": "match in the file name",
+								"updatedAt": "%[1]v",
+								"isPublic": false
+							},
+							{
+								"name": "3456",
+								"files": [
+									{ "name": "main.txt", "text": "octo in the text" }
+								],
+								"description": "match in the file text",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							}
+						] } } } }`,
+						absTime.Format(time.RFC3339),
+					)),
+				)
+			},
+			wantOut: heredoc.Docf(`
+				1234%[1]socto match in the description%[1]s1 file%[1]spublic%[1]s2020-07-30T15:24:28Z
+				2345%[1]smatch in the file name%[1]s2 files%[1]ssecret%[1]s2020-07-30T15:24:28Z
+			`, "\t"),
+		},
+		{
+			name: "filtered (tty)",
+			opts: &ListOptions{
+				Filter:     regexp.MustCompile("octo"),
+				Visibility: "all",
+			},
+			color: true,
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(fmt.Sprintf(
+						`{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "1234",
+								"files": [
+									{ "name": "main.txt", "text": "foo" }
+								],
+								"description": "octo match in the description",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							},
+							{
+								"name": "2345",
+								"files": [
+									{ "name": "main.txt", "text": "foo" },
+									{ "name": "octo.txt", "text": "bar" }
+								],
+								"description": "match in the file name",
+								"updatedAt": "%[1]v",
+								"isPublic": false
+							},
+							{
+								"name": "3456",
+								"files": [
+									{ "name": "main.txt", "text": "octo in the text" }
+								],
+								"description": "match in the file text",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							}
+						] } } } }`,
+						sixHoursAgo.Format(time.RFC3339),
+					)),
+				)
+			},
+			wantOut: heredoc.Docf(`
+				%[1]s[0;2;4;37mID  %[1]s[0m  %[1]s[0;2;4;37mDESCRIPTION                  %[1]s[0m  %[1]s[0;2;4;37mFILES  %[1]s[0m  %[1]s[0;2;4;37mVISIBILITY%[1]s[0m  %[1]s[0;2;4;37mUPDATED          %[1]s[0m
+				1234  %[1]s[0;30;43mocto%[1]s[0m%[1]s[0;1;39m match in the description%[1]s[0m  1 file   %[1]s[0;32mpublic    %[1]s[0m  %[1]s[38;5;242mabout 6 hours ago%[1]s[m
+				2345  %[1]s[0;1;39mmatch in the file name       %[1]s[0m  %[1]s[0;30;43m2 files%[1]s[0m  %[1]s[0;31msecret    %[1]s[0m  %[1]s[38;5;242mabout 6 hours ago%[1]s[m
+			`, "\x1b"),
+		},
+		{
+			name: "filtered with content",
+			opts: &ListOptions{
+				Filter:         regexp.MustCompile("octo"),
+				IncludeContent: true,
+				Visibility:     "all",
+			},
+			nontty: true,
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(fmt.Sprintf(
+						`{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "1234",
+								"files": [
+									{ "name": "main.txt", "text": "foo" }
+								],
+								"description": "octo match in the description",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							},
+							{
+								"name": "2345",
+								"files": [
+									{ "name": "main.txt", "text": "foo" },
+									{ "name": "octo.txt", "text": "bar" }
+								],
+								"description": "match in the file name",
+								"updatedAt": "%[1]v",
+								"isPublic": false
+							},
+							{
+								"name": "3456",
+								"files": [
+									{ "name": "main.txt", "text": "octo in the text" }
+								],
+								"description": "match in the file text",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							}
+						] } } } }`,
+						absTime.Format(time.RFC3339),
+					)),
+				)
+			},
+			wantOut: heredoc.Doc(`
+				1234 main.txt
+				    octo match in the description
+				
+				2345 octo.txt
+				    match in the file name
+
+				3456 main.txt
+				    match in the file text
+				        octo in the text
+				
+			`),
+		},
+		{
+			name: "filtered with content (tty)",
+			opts: &ListOptions{
+				Filter:         regexp.MustCompile("octo"),
+				IncludeContent: true,
+				Visibility:     "all",
+			},
+			color: true,
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(query),
+					httpmock.StringResponse(fmt.Sprintf(
+						`{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "1234",
+								"files": [
+									{ "name": "main.txt", "text": "foo" }
+								],
+								"description": "octo match in the description",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							},
+							{
+								"name": "2345",
+								"files": [
+									{ "name": "main.txt", "text": "foo" },
+									{ "name": "octo.txt", "text": "bar" }
+								],
+								"description": "match in the file name",
+								"updatedAt": "%[1]v",
+								"isPublic": false
+							},
+							{
+								"name": "3456",
+								"files": [
+									{ "name": "main.txt", "text": "octo in the text" }
+								],
+								"description": "match in the file text",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							}
+						] } } } }`,
+						sixHoursAgo.Format(time.RFC3339),
+					)),
+				)
+			},
+			wantOut: heredoc.Docf(`
+				%[1]s[0;34m1234%[1]s[0m %[1]s[0;32mmain.txt%[1]s[0m
+				    %[1]s[0;30;43mocto%[1]s[0m%[1]s[0;1;39m match in the description%[1]s[0m
+				
+				%[1]s[0;34m2345%[1]s[0m %[1]s[0;30;43mocto%[1]s[0m%[1]s[0;32m.txt%[1]s[0m
+				    %[1]s[0;1;39mmatch in the file name%[1]s[0m
+				
+				%[1]s[0;34m3456%[1]s[0m %[1]s[0;32mmain.txt%[1]s[0m
+				    %[1]s[0;1;39mmatch in the file text%[1]s[0m
+				        %[1]s[0;30;43mocto%[1]s[0m in the text
+				
+			`, "\x1b"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -373,6 +624,7 @@ func Test_listRun(t *testing.T) {
 		}
 
 		ios, _, stdout, _ := iostreams.Test()
+		ios.SetColorEnabled(tt.color)
 		ios.SetStdoutTTY(!tt.nontty)
 		tt.opts.IO = ios
 
@@ -393,6 +645,62 @@ func Test_listRun(t *testing.T) {
 
 			assert.Equal(t, tt.wantOut, stdout.String())
 			reg.Verify(t)
+		})
+	}
+}
+
+func Test_highlightMatch(t *testing.T) {
+	regex := regexp.MustCompilePOSIX(`[Oo]cto`)
+	tests := []struct {
+		name  string
+		input string
+		color bool
+		want  string
+	}{
+		{
+			name:  "single match",
+			input: "Octo",
+			want:  "Octo",
+		},
+		{
+			name:  "single match (color)",
+			input: "Octo",
+			color: true,
+			want:  "\x1b[0;30;43mOcto\x1b[0m",
+		},
+		{
+			name:  "single match with extra",
+			input: "Hello, Octocat!",
+			want:  "Hello, Octocat!",
+		},
+		{
+			name:  "single match with extra (color)",
+			input: "Hello, Octocat!",
+			color: true,
+			want:  "\x1b[0;34mHello, \x1b[0m\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat!\x1b[0m",
+		},
+		{
+			name:  "multiple matches",
+			input: "Octocat/octo",
+			want:  "Octocat/octo",
+		},
+		{
+			name:  "multiple matches (color)",
+			input: "Octocat/octo",
+			color: true,
+			want:  "\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat/\x1b[0m\x1b[0;30;43mocto\x1b[0m",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := iostreams.NewColorScheme(tt.color, false, false)
+
+			matched := false
+			got, err := highlightMatch(tt.input, regex, &matched, cs.Blue, cs.Highlight)
+			assert.NoError(t, err)
+			assert.True(t, matched)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

@@ -98,7 +98,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			For language or platform .gitignore templates to use with %[1]s--gitignore%[1]s, <https://github.com/github/gitignore>.
 
-			For license keywords to use with %[1]s--license%[1]s, <https://choosealicense.com/>.
+			For license keywords to use with %[1]s--license%[1]s, run %[1]sgh repo license list%[1]s or visit <https://choosealicense.com>.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# create a repository interactively
@@ -227,7 +227,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			return nil, cobra.ShellCompDirectiveError
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		results, err := listGitIgnoreTemplates(httpClient, hostname)
+		results, err := api.RepoGitIgnoreTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -244,7 +244,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			return nil, cobra.ShellCompDirectiveError
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		licenses, err := listLicenseTemplates(httpClient, hostname)
+		licenses, err := api.RepoLicenses(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -811,7 +811,7 @@ func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompt
 		return "", nil
 	}
 
-	templates, err := listGitIgnoreTemplates(client, hostname)
+	templates, err := api.RepoGitIgnoreTemplates(client, hostname)
 	if err != nil {
 		return "", err
 	}
@@ -830,7 +830,7 @@ func interactiveLicense(client *http.Client, hostname string, prompter iprompter
 		return "", nil
 	}
 
-	licenses, err := listLicenseTemplates(client, hostname)
+	licenses, err := api.RepoLicenses(client, hostname)
 	if err != nil {
 		return "", err
 	}
