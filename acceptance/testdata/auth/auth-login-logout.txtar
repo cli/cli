@@ -3,19 +3,21 @@
 # overrides are happening
 
 # Copy $GH_TOKEN to a new env var
-setEnvVar LOGIN_TOKEN $GH_TOKEN
+env LOGIN_TOKEN=$GH_TOKEN
 exec echo $LOGIN_TOKEN
 stdout $GH_TOKEN
 
 # Remove GH_TOKEN env var so we don't fall back to it
-deleteEnvVar GH_TOKEN
+env GH_TOKEN=''
 
 # Ensure the token was deleted
 exec echo $GH_TOKEN
 ! stdout '.'
 
-# Login to the host
-exec gh auth login --hostname=$GH_HOST --with-token --token=$LOGIN_TOKEN --insecure-storage
+# Login to the host by feeding the token to stdin
+exec echo $LOGIN_TOKEN
+stdin stdout
+exec gh auth login --hostname=$GH_HOST --with-token --insecure-storage
 
 # Check that we are logged in
 exec gh auth status --hostname $GH_HOST
