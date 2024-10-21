@@ -41,9 +41,10 @@ type Repository struct {
 	MirrorURL                string
 	SecurityPolicyURL        string
 
-	CreatedAt time.Time
-	PushedAt  *time.Time
-	UpdatedAt time.Time
+	CreatedAt  time.Time
+	PushedAt   *time.Time
+	UpdatedAt  time.Time
+	ArchivedAt *time.Time
 
 	IsBlankIssuesEnabled    bool
 	IsSecurityPolicyEnabled bool
