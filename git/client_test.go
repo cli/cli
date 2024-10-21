@@ -717,9 +717,9 @@ func TestClientReadBranchConfig(t *testing.T) {
 	}{
 		{
 			name:             "read branch config",
-			cmdStdout:        "branch.trunk.remote origin\nbranch.trunk.merge refs/heads/trunk",
-			wantCmdArgs:      `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge)$`,
-			wantBranchConfig: BranchConfig{RemoteName: "origin", MergeRef: "refs/heads/trunk"},
+			cmdStdout:        "branch.trunk.remote origin\nbranch.trunk.merge refs/heads/trunk\nbranch.trunk.gh-merge-base trunk",
+			wantCmdArgs:      `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|gh-merge-base)$`,
+			wantBranchConfig: BranchConfig{LocalName: "trunk", RemoteName: "origin", MergeRef: "refs/heads/trunk", MergeBase: "trunk"},
 		},
 	}
 	for _, tt := range tests {
