@@ -24,7 +24,7 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 		Args:  cmdutil.ExactArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
 		Short: "Download an artifact's attestations for offline use",
 		Long: heredoc.Docf(`
-			### NOTE: This feature is currently in beta, and subject to change.
+			### NOTE: This feature is currently in public preview, and subject to change.
 
 			Download attestations associated with an artifact for offline use.
 
