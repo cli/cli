@@ -26,7 +26,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 		Hidden: true,
 		Short:  "Inspect a sigstore bundle",
 		Long: heredoc.Docf(`
-			### NOTE: This feature is currently in beta, and subject to change.
+			### NOTE: This feature is currently in public preview, and subject to change.
 
 			Inspect a downloaded Sigstore bundle for a given artifact.
 
