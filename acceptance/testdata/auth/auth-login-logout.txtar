@@ -1,18 +1,12 @@
-# We aren't logged in at the moment, but GH_HOST will override the
-# need to login. We are going to clear GH_HOST first to ensure no
+# We aren't logged in at the moment, but GH_TOKEN will override the
+# need to login. We are going to clear GH_TOKEN first to ensure no
 # overrides are happening
 
 # Copy $GH_TOKEN to a new env var
 env LOGIN_TOKEN=$GH_TOKEN
-exec echo $LOGIN_TOKEN
-stdout $GH_TOKEN
 
 # Remove GH_TOKEN env var so we don't fall back to it
 env GH_TOKEN=''
-
-# Ensure the token was deleted
-exec echo $GH_TOKEN
-! stdout '.'
 
 # Login to the host by feeding the token to stdin
 exec echo $LOGIN_TOKEN
