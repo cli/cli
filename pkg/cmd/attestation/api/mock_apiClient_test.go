@@ -6,6 +6,10 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	cliAPI "github.com/cli/cli/v2/api"
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
+	"github.com/stretchr/testify/mock"
 )
 
 type mockAPIClient struct {
@@ -22,14 +26,15 @@ func (m mockAPIClient) REST(hostname, method, p string, body io.Reader, data int
 }
 
 type mockDataGenerator struct {
+	mock.Mock
 	NumAttestations int
 }
 
-func (m mockDataGenerator) OnRESTSuccess(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+func (m *mockDataGenerator) OnRESTSuccess(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
 	return m.OnRESTWithNextSuccessHelper(hostname, method, p, body, data, false)
 }
 
-func (m mockDataGenerator) OnRESTSuccessWithNextPage(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+func (m *mockDataGenerator) OnRESTSuccessWithNextPage(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
 	// if path doesn't contain after, it means first time hitting the mock server
 	// so return the first page and return the link header in the response
 	if !strings.Contains(p, "after") {
@@ -40,7 +45,37 @@ func (m mockDataGenerator) OnRESTSuccessWithNextPage(hostname, method, p string,
 	return m.OnRESTWithNextSuccessHelper(hostname, method, p, body, data, false)
 }
 
-func (m mockDataGenerator) OnRESTWithNextSuccessHelper(hostname, method, p string, body io.Reader, data interface{}, hasNext bool) (string, error) {
+// Returns a func that just calls OnRESTSuccessWithNextPage but half the time
+// it returns a 500 error.
+func (m *mockDataGenerator) FlakyOnRESTSuccessWithNextPageHandler() func(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+	// set up the flake counter
+	m.On("FlakyOnRESTSuccessWithNextPage:error").Return()
+
+	count := 0
+	return func(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+		if count%2 == 0 {
+			m.MethodCalled("FlakyOnRESTSuccessWithNextPage:error")
+
+			count = count + 1
+			return "", cliAPI.HTTPError{HTTPError: &ghAPI.HTTPError{StatusCode: 500}}
+		} else {
+			count = count + 1
+			return m.OnRESTSuccessWithNextPage(hostname, method, p, body, data)
+		}
+	}
+}
+
+// always returns a 500
+func (m *mockDataGenerator) OnREST500ErrorHandler() func(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+	m.On("OnREST500Error").Return()
+	return func(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+		m.MethodCalled("OnREST500Error")
+
+		return "", cliAPI.HTTPError{HTTPError: &ghAPI.HTTPError{StatusCode: 500}}
+	}
+}
+
+func (m *mockDataGenerator) OnRESTWithNextSuccessHelper(hostname, method, p string, body io.Reader, data interface{}, hasNext bool) (string, error) {
 	atts := make([]*Attestation, m.NumAttestations)
 	for j := 0; j < m.NumAttestations; j++ {
 		att := makeTestAttestation()
@@ -70,7 +105,7 @@ func (m mockDataGenerator) OnRESTWithNextSuccessHelper(hostname, method, p strin
 	return "", nil
 }
 
-func (m mockDataGenerator) OnRESTWithNextNoAttestations(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+func (m *mockDataGenerator) OnRESTWithNextNoAttestations(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
 	resp := AttestationsResponse{
 		Attestations: make([]*Attestation, 0),
 	}
@@ -89,7 +124,7 @@ func (m mockDataGenerator) OnRESTWithNextNoAttestations(hostname, method, p stri
 	return "", nil
 }
 
-func (m mockDataGenerator) OnRESTWithNextError(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
+func (m *mockDataGenerator) OnRESTWithNextError(hostname, method, p string, body io.Reader, data interface{}) (string, error) {
 	return "", errors.New("failed to get attestations")
 }
 
