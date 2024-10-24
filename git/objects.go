@@ -64,6 +64,14 @@ func (r TrackingRef) String() string {
 	return "refs/remotes/" + r.RemoteName + "/" + r.BranchName
 }
 
+// A Branch is a local git branch with a possible upstream remote tracking
+// branch. If the branch has no upstream, then TrackingRef will be its zero
+// value.
+type Branch struct {
+	Local    Ref
+	Upstream TrackingRef
+}
+
 type Commit struct {
 	Sha   string
 	Title string
