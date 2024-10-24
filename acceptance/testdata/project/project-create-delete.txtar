@@ -1,0 +1,12 @@
+# Create a project
+exec gh project create --owner=$ORG --title='acceptance-test-project-title'
+
+# Confirm the project has been created and get the project number
+exec gh project list --owner=$ORG --format=json --jq='.projects[] | select(.title == "acceptance-test-project-title") | .number'
+stdout2env PROJECT_NUMBER
+
+# Delete the project
+exec gh project delete --owner=$ORG $PROJECT_NUMBER
+
+# Confirm the project has been deleted
+! exec gh project view --owner=$ORG $PROJECT_NUMBER
