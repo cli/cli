@@ -41,17 +41,18 @@ var HelpTopics = []helpTopic{
 	{
 		name:  "environment",
 		short: "Environment variables that can be used with gh",
-		long: heredoc.Docf(`
-			%[1]sGH_TOKEN%[1]s, %[1]sGITHUB_TOKEN%[1]s (in order of precedence): an authentication token for github.com
-			API requests. Setting this avoids being prompted to authenticate and takes precedence over
-			previously stored credentials.
+		long: heredoc.Docf(`	
+			%[1]sGH_TOKEN%[1]s, %[1]sGITHUB_TOKEN%[1]s (in order of precedence): an authentication token that will be used when
+			a command targets either github.com or a subdomain of ghe.com. Setting this avoids being prompted to
+			authenticate and takes precedence over previously stored credentials.
 
-			%[1]sGH_ENTERPRISE_TOKEN%[1]s, %[1]sGITHUB_ENTERPRISE_TOKEN%[1]s (in order of precedence): an authentication
-			token for API requests to GitHub Enterprise. When setting this, also set %[1]sGH_HOST%[1]s.
+			%[1]sGH_ENTERPRISE_TOKEN%[1]s, %[1]sGITHUB_ENTERPRISE_TOKEN%[1]s (in order of precedence): an authentication 
+			token that will be used when a command targets a GitHub Enterprise Server host.
 
-			%[1]sGH_HOST%[1]s: specify the GitHub hostname for commands that would otherwise assume the
-			"github.com" host when not in a context of an existing repository. When setting this, 
-			also set %[1]sGH_ENTERPRISE_TOKEN%[1]s.
+			%[1]sGH_HOST%[1]s: specify the GitHub hostname for commands where a hostname has not been provided, or
+			cannot be inferred from the context of a local Git repository. If this host was previously
+			authenticated with, the stored credentials will be used. Otherwise, setting %[1]sGH_TOKEN%[1]s or
+			%[1]sGH_ENTERPRISE_TOKEN%[1]s is required, depending on the targeted host.
 
 			%[1]sGH_REPO%[1]s: specify the GitHub repository in the %[1]s[HOST/]OWNER/REPO%[1]s format for commands
 			that otherwise operate on a local repository.
