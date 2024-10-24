@@ -695,6 +695,27 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 	return client.Mutate(repo.RepoHost(), "PullRequestReadyForReview", &mutation, variables)
 }
 
+func PullRequestRevert(client *Client, repo ghrepo.Interface, params githubv4.RevertPullRequestInput) (*PullRequest, error) {
+	var mutation struct {
+		RevertPullRequest struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+			RevertPullRequest PullRequest
+		} `graphql:"revertPullRequest(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": params,
+	}
+	err := client.Mutate(repo.RepoHost(), "PullRequestRevert", &mutation, variables)
+	if err != nil {
+		return nil, err
+	}
+	revertPR := &mutation.RevertPullRequest.RevertPullRequest
+	return revertPR, err
+}
+
 func ConvertPullRequestToDraft(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
 	var mutation struct {
 		ConvertPullRequestToDraft struct {
