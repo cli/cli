@@ -168,4 +168,4 @@ require (
 	k8s.io/klog/v2 v2.120.1 // indirect
 )
 
-replace github.com/rogpeppe/go-internal => github.com/cli/go-internal v0.0.0-20241023114740-7e305b22223e
+replace github.com/rogpeppe/go-internal => github.com/cli/go-internal v0.0.0-20241024130215-fa3c22e38b9b
