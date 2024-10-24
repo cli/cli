@@ -162,7 +162,7 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 		if opts.Force {
 			cmds = append(cmds, []string{"reset", "--hard", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 		} else {
-			// TODO: check if non-fast-forward and suggest to use `--force`
+			warnIfDiverged(opts, pr)
 			cmds = append(cmds, []string{"merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 		}
 	default:
@@ -197,14 +197,14 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 		if opts.Force {
 			cmds = append(cmds, []string{"reset", "--hard", "FETCH_HEAD"})
 		} else {
-			// TODO: check if non-fast-forward and suggest to use `--force`
+			warnIfDiverged(opts, pr)
 			cmds = append(cmds, []string{"merge", "--ff-only", "FETCH_HEAD"})
 		}
 	} else {
 		if opts.Force {
 			cmds = append(cmds, []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--force"})
 		} else {
-			// TODO: check if non-fast-forward and suggest to use `--force`
+			warnIfDiverged(opts, pr)
 			cmds = append(cmds, []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch)})
 		}
 
@@ -238,6 +238,24 @@ func missingMergeConfigForBranch(client *git.Client, b string) bool {
 func localBranchExists(client *git.Client, b string) bool {
 	_, err := client.ShowRefs(context.Background(), []string{"refs/heads/" + b})
 	return err == nil
+}
+
+// Warn if the pull request and the remote branch have diverged.
+func warnIfDiverged(opts *CheckoutOptions, pr *api.PullRequest) {
+	if len(pr.Commits.Nodes) == 0 {
+		return
+	}
+
+	localBranchLastCommit, err := opts.GitClient.LastCommit(context.Background())
+	if err != nil {
+		return
+	}
+
+	if localBranchLastCommit.Sha == pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.OID {
+		return
+	}
+	cs := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) has diverged from local branch\nRun the same command with `--force` to reset the local branch to this PR\n", cs.Yellow("!"), pr.Number, pr.Title)
 }
 
 func executeCmds(client *git.Client, cmdQueue [][]string) error {
