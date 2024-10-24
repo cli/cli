@@ -38,6 +38,7 @@ type finder struct {
 	remotesFn    func() (remotes.Remotes, error)
 	httpClient   func() (*http.Client, error)
 	branchConfig func(string) git.BranchConfig
+	pushDefault  func() (string, error)
 	progress     progressIndicator
 
 	repo       ghrepo.Interface
@@ -57,7 +58,10 @@ func NewFinder(factory *cmdutil.Factory) PRFinder {
 		branchFn:   factory.Branch,
 		remotesFn:  factory.Remotes,
 		httpClient: factory.HttpClient,
-		progress:   factory.IOStreams,
+		pushDefault: func() (string, error) {
+			return factory.GitClient.Config(context.Background(), "push.default")
+		},
+		progress: factory.IOStreams,
 		branchConfig: func(s string) git.BranchConfig {
 			return factory.GitClient.ReadBranchConfig(context.Background(), s)
 		},
@@ -247,21 +251,23 @@ func (f *finder) parseCurrentBranch() (string, int, error) {
 	}
 
 	var branchOwner string
-	if branchConfig.RemoteURL != nil {
+	if branchConfig.PushRemoteURL != nil {
 		// the branch merges from a remote specified by URL
 		if r, err := ghrepo.FromURL(branchConfig.RemoteURL); err == nil {
 			branchOwner = r.RepoOwner()
 		}
-	} else if branchConfig.RemoteName != "" {
-		// the branch merges from a remote specified by name
+	} else if branchConfig.PushRemoteName != "" {
 		rem, _ := f.remotesFn()
-		if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
+		if r, err := rem.FindByName(branchConfig.PushRemoteName); err == nil {
 			branchOwner = r.RepoOwner()
 		}
 	}
 
 	if branchOwner != "" {
-		if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
+		if branchConfig.Push != "" {
+			prHeadRef = strings.TrimPrefix(branchConfig.Push, branchConfig.PushRemoteName+"/")
+		} else if pushDefault, _ := f.pushDefault(); (pushDefault == "upstream" || pushDefault == "tracking") &&
+			strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
 			prHeadRef = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
 		}
 		// prepend `OWNER:` if this branch is pushed to a fork

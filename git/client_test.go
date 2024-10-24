@@ -707,30 +707,174 @@ func TestClientCommitBody(t *testing.T) {
 }
 
 func TestClientReadBranchConfig(t *testing.T) {
+	type cmdTest struct {
+		exitStatus int
+		stdOut     string
+		stdErr     string
+		wantArgs   string
+	}
 	tests := []struct {
 		name             string
-		cmdExitStatus    int
-		cmdStdout        string
-		cmdStderr        string
-		wantCmdArgs      string
+		cmds             []cmdTest
 		wantBranchConfig BranchConfig
 	}{
 		{
-			name:             "read branch config",
-			cmdStdout:        "branch.trunk.remote origin\nbranch.trunk.merge refs/heads/trunk",
-			wantCmdArgs:      `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge)$`,
-			wantBranchConfig: BranchConfig{RemoteName: "origin", MergeRef: "refs/heads/trunk"},
+			name: "read branch config, central",
+			cmds: []cmdTest{
+				{
+					stdOut:   "branch.trunk.remote origin\nbranch.trunk.merge refs/heads/trunk",
+					wantArgs: `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote)$`,
+				},
+				{
+					wantArgs: `path/to/git config remote.pushDefault`,
+				},
+				{
+					stdOut:   "origin/trunk",
+					wantArgs: `path/to/git rev-parse --verify --quiet --abbrev-ref trunk@{push}`,
+				},
+			},
+			wantBranchConfig: BranchConfig{RemoteName: "origin", MergeRef: "refs/heads/trunk", PushRemoteName: "origin", Push: "origin/trunk"},
+		},
+		{
+			name: "read branch config, central, push.default = upstream",
+			cmds: []cmdTest{
+				{
+					stdOut:   "branch.trunk.remote origin\nbranch.trunk.merge refs/heads/trunk-remote",
+					wantArgs: `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote)$`,
+				},
+				{
+					wantArgs: `path/to/git config remote.pushDefault`,
+				},
+				{
+					stdOut:   "origin/trunk-remote",
+					wantArgs: `path/to/git rev-parse --verify --quiet --abbrev-ref trunk@{push}`,
+				},
+			},
+			wantBranchConfig: BranchConfig{RemoteName: "origin", MergeRef: "refs/heads/trunk-remote", PushRemoteName: "origin", Push: "origin/trunk-remote"},
+		},
+		{
+			name: "read branch config, central, push.default = current",
+			cmds: []cmdTest{
+				{
+					stdOut:   "branch.trunk.remote origin\nbranch.trunk.merge refs/heads/main",
+					wantArgs: `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote)$`,
+				},
+				{
+					wantArgs: `path/to/git config remote.pushDefault`,
+				},
+				{
+					stdOut:   "origin/trunk",
+					wantArgs: `path/to/git rev-parse --verify --quiet --abbrev-ref trunk@{push}`,
+				},
+			},
+			wantBranchConfig: BranchConfig{RemoteName: "origin", MergeRef: "refs/heads/main", PushRemoteName: "origin", Push: "origin/trunk"},
+		},
+		{
+			name: "read branch config, central, push.default = current, target branch not pushed, no existing remote branch",
+			cmds: []cmdTest{
+				{
+					stdOut:   "branch.trunk.remote .\nbranch.trunk.merge refs/heads/trunk-middle",
+					wantArgs: `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote)$`,
+				},
+				{
+					stdOut:   "origin",
+					wantArgs: `path/to/git config remote.pushDefault`,
+				},
+				{
+					exitStatus: 1,
+					wantArgs:   `path/to/git rev-parse --verify --quiet --abbrev-ref trunk@{push}`,
+				},
+			},
+			wantBranchConfig: BranchConfig{MergeRef: "refs/heads/trunk-middle", PushRemoteName: "origin"},
+		},
+		{
+			name: "read branch config, triangular, push.default = current, has existing remote branch, branch.trunk.pushremote effective",
+			cmds: []cmdTest{
+				{
+					stdOut:   "branch.trunk.remote upstream\nbranch.trunk.merge refs/heads/main\nbranch.trunk.pushremote origin",
+					wantArgs: `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote)$`,
+				},
+				{
+					stdOut:   "origin/trunk",
+					wantArgs: `path/to/git rev-parse --verify --quiet --abbrev-ref trunk@{push}`,
+				},
+			},
+			wantBranchConfig: BranchConfig{RemoteName: "upstream", MergeRef: "refs/heads/main", PushRemoteName: "origin", Push: "origin/trunk"},
+		},
+		{
+			name: "read branch config, triangular, push.default = current, has existing remote branch, remote.pushDefault effective",
+			cmds: []cmdTest{
+				{
+					stdOut:   "branch.trunk.remote upstream\nbranch.trunk.merge refs/heads/main",
+					wantArgs: `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote)$`,
+				},
+				{
+					stdOut:   "origin",
+					wantArgs: `path/to/git config remote.pushDefault`,
+				},
+				{
+					stdOut:   "origin/trunk",
+					wantArgs: `path/to/git rev-parse --verify --quiet --abbrev-ref trunk@{push}`,
+				},
+			},
+			wantBranchConfig: BranchConfig{RemoteName: "upstream", MergeRef: "refs/heads/main", PushRemoteName: "origin", Push: "origin/trunk"},
+		},
+		{
+			name: "read branch config, triangular, push.default = current, no existing remote branch, branch.trunk.pushremote effective",
+			cmds: []cmdTest{
+				{
+					stdOut:   "branch.trunk.remote upstream\nbranch.trunk.merge refs/heads/main\nbranch.trunk.pushremote origin",
+					wantArgs: `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote)$`,
+				},
+				{
+					exitStatus: 1,
+					wantArgs:   `path/to/git rev-parse --verify --quiet --abbrev-ref trunk@{push}`,
+				},
+			},
+			wantBranchConfig: BranchConfig{RemoteName: "upstream", MergeRef: "refs/heads/main", PushRemoteName: "origin"},
+		},
+		{
+			name: "read branch config, triangular, push.default = current, no existing remote branch, remote.pushDefault effective",
+			cmds: []cmdTest{
+				{
+					stdOut:   "branch.trunk.remote upstream\nbranch.trunk.merge refs/heads/main",
+					wantArgs: `path/to/git config --get-regexp ^branch\.trunk\.(remote|merge|pushremote)$`,
+				},
+				{
+					stdOut:   "origin",
+					wantArgs: `path/to/git config remote.pushDefault`,
+				},
+				{
+					exitStatus: 1,
+					wantArgs:   `path/to/git rev-parse --verify --quiet --abbrev-ref trunk@{push}`,
+				},
+			},
+			wantBranchConfig: BranchConfig{RemoteName: "upstream", MergeRef: "refs/heads/main", PushRemoteName: "origin"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd, cmdCtx := createCommandContext(t, tt.cmdExitStatus, tt.cmdStdout, tt.cmdStderr)
+			var cmds []*exec.Cmd
+			var cmdCtxs []commandCtx
+			for _, c := range tt.cmds {
+				cmd, cmdCtx := createCommandContext(t, c.exitStatus, c.stdOut, c.stdErr)
+				cmds = append(cmds, cmd)
+				cmdCtxs = append(cmdCtxs, cmdCtx)
+
+			}
+			i := -1
 			client := Client{
-				GitPath:        "path/to/git",
-				commandContext: cmdCtx,
+				GitPath: "path/to/git",
+				commandContext: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+					i++
+					cmdCtxs[i](ctx, name, args...)
+					return cmds[i]
+				},
 			}
 			branchConfig := client.ReadBranchConfig(context.Background(), "trunk")
-			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
+			for i := 0; i < len(tt.cmds); i++ {
+				assert.Equal(t, tt.cmds[i].wantArgs, strings.Join(cmds[i].Args[3:], " "))
+			}
 			assert.Equal(t, tt.wantBranchConfig, branchConfig)
 		})
 	}
