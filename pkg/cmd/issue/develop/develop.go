@@ -171,6 +171,14 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 		return err
 	}
 
+	// Remember which branch to target when creating a PR.
+	if opts.BaseBranch != "" {
+		err = opts.GitClient.SetBranchConfig(ctx.Background(), branchName, git.MergeBaseConfig, opts.BaseBranch)
+		if err != nil {
+			return err
+		}
+	}
+
 	fmt.Fprintf(opts.IO.Out, "%s/%s/tree/%s\n", branchRepo.RepoHost(), ghrepo.FullName(branchRepo), branchName)
 
 	return checkoutBranch(opts, branchRepo, branchName)
