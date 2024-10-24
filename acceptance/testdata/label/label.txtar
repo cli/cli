@@ -1,0 +1,25 @@
+# Setup useful env vars
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Create a repository
+exec gh repo create ${ORG}/${REPO} --private
+
+# Defer repo cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# Set the GH_REPO env var to reduce redunant flags
+env GH_REPO=${ORG}/${REPO}
+
+# Create a custom label
+exec gh label create 'acceptance-test' --description 'First Description'
+
+# List the labels and check our custom label is there
+exec gh label list
+stdout 'acceptance-test\tFirst Description'
+
+# Edit the label
+exec gh label edit 'acceptance-test' --description 'Edited Description'
+
+# List the labels and check our custom label has been updated
+exec gh label list
+stdout 'acceptance-test\tEdited Description'
