@@ -8,12 +8,16 @@ skip 'it modifies the user''s personal GitHub account GPG keys'
 # Add the gpg key to GH account
 exec gh gpg-key add gpg-key.pub
 
-# Defer deleting the gpg key from GH account
-defer gh gpg-key delete --yes 24C30F9C9115E747
-
 # Verify the gpg key was added to GH account
 exec gh gpg-key list
-stdout 24C30F9C9115E747
+stdout '24C30F9C9115E747'
+
+# Delete the gpg key from GH account
+exec gh gpg-key delete --yes '24C30F9C9115E747'
+
+# Check the key is deleted
+exec gh gpg-key list
+! stdout '24C30F9C9115E747'
 
 -- gpg-key.pub --
 -----BEGIN PGP PUBLIC KEY BLOCK-----
