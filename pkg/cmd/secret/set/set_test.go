@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	ghContext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -547,6 +549,8 @@ func Test_setRun_shouldNotStore(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+// TOOD: add test for getRemote_prompt
+
 func Test_getBody(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -695,6 +699,143 @@ func Test_getSecretsFromOptions(t *testing.T) {
 				if tt.want[k] != string(v) {
 					t.Errorf("getSecretsFromOptions() %s = got %q, want %q", k, string(v), tt.want[k])
 				}
+			}
+		})
+	}
+}
+
+func Test_setRun_remote_validation(t *testing.T) {
+	tests := []struct {
+		name    string
+		opts    *SetOptions
+		wantApp string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "single repo detected",
+			opts: &SetOptions{
+				Application: "actions",
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+					}, nil
+				},
+			},
+			wantApp: "actions",
+		},
+		{
+			name: "multi repo detected",
+			opts: &SetOptions{
+				Application: "actions",
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+					remote2 := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "upstream",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+						remote2,
+					}, nil
+				},
+			},
+			wantErr: true,
+			errMsg:  "multiple remotes detected [origin upstream]. please specify which repo to use by providing the -R or --repo argument",
+		},
+		{
+			name: "multi repo detected - single repo given",
+			opts: &SetOptions{
+				Application:     "actions",
+				HasRepoOverride: true,
+				Remotes: func() (ghContext.Remotes, error) {
+					remote := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "origin",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+					remote2 := &ghContext.Remote{
+						Remote: &git.Remote{
+							Name: "upstream",
+						},
+						Repo: ghrepo.New("owner", "repo"),
+					}
+
+					return ghContext.Remotes{
+						remote,
+						remote2,
+					}, nil
+				},
+			},
+			wantApp: "actions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+
+			if tt.wantApp != "" {
+				reg.Register(httpmock.REST("GET", fmt.Sprintf("repos/owner/repo/%s/secrets/public-key", tt.wantApp)),
+					httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
+
+				reg.Register(httpmock.REST("PUT", fmt.Sprintf("repos/owner/repo/%s/secrets/cool_secret", tt.wantApp)),
+					httpmock.StatusStringResponse(201, `{}`))
+			}
+
+			ios, _, _, _ := iostreams.Test()
+
+			opts := &SetOptions{
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("owner/repo")
+				},
+				IO:              ios,
+				SecretName:      "cool_secret",
+				Body:            "a secret",
+				RandomOverride:  fakeRandom,
+				Application:     tt.opts.Application,
+				HasRepoOverride: tt.opts.HasRepoOverride,
+				Remotes:         tt.opts.Remotes,
+			}
+
+			err := setRun(opts)
+			if tt.wantErr {
+				assert.EqualError(t, err, tt.errMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			reg.Verify(t)
+
+			if tt.wantApp != "" && !tt.wantErr {
+				data, err := io.ReadAll(reg.Requests[1].Body)
+				assert.NoError(t, err)
+
+				var payload SecretPayload
+				err = json.Unmarshal(data, &payload)
+				assert.NoError(t, err)
+				assert.Equal(t, payload.KeyID, "123")
+				assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
 			}
 		})
 	}

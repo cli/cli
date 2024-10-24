@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2/terminal"
+	ghContext "github.com/cli/cli/v2/context"
 )
 
 // FlagErrorf returns a new FlagError that wraps an error produced by
@@ -54,6 +55,21 @@ func MutuallyExclusive(message string, conditions ...bool) error {
 	if numTrue > 1 {
 		return FlagErrorf("%s", message)
 	}
+	return nil
+}
+
+func ValidateHasOnlyOneRemote(hasRepoOverride bool, remotes func() (ghContext.Remotes, error)) error {
+	if !hasRepoOverride && remotes != nil {
+		remotes, err := remotes()
+		if err != nil {
+			return err
+		}
+
+		if remotes.Len() > 1 {
+			return fmt.Errorf("multiple remotes detected %v. please specify which repo to use by providing the -R or --repo argument", remotes)
+		}
+	}
+
 	return nil
 }
 

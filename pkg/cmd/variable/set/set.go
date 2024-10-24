@@ -3,6 +3,7 @@ package set
 import (
 	"bytes"
 	"fmt"
+	"github.com/cli/cli/v2/internal/prompter"
 	"io"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
@@ -20,16 +22,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type iprompter interface {
-	Input(string, string) (string, error)
-}
-
 type SetOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
-	Prompter   iprompter
+	Remotes    func() (ghContext.Remotes, error)
+	Prompter   prompter.Prompter
 
 	VariableName    string
 	OrgName         string
@@ -38,6 +37,9 @@ type SetOptions struct {
 	Visibility      string
 	RepositoryNames []string
 	EnvFile         string
+
+	HasRepoOverride bool
+	Interactive     bool
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -45,6 +47,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Remotes:    f.Remotes,
 		Prompter:   f.Prompter,
 	}
 
@@ -67,6 +70,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			# Read variable value from an environment variable
 			$ gh variable set MYVARIABLE --body "$ENV_VALUE"
 
+			# Set secret for a specific remote repository
+			$ gh variable set MYVARIABLE --repo origin/repo --body "$ENV_VALUE"
+
 			# Read variable value from a file
 			$ gh variable set MYVARIABLE < myfile.txt
 
@@ -87,6 +93,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
+			flagCount := cmdutil.CountSetFlags(cmd.Flags())
+
 			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
 				return err
 			}
@@ -101,6 +109,10 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				}
 			} else {
 				opts.VariableName = args[0]
+
+				if flagCount == 0 {
+					opts.Interactive = true
+				}
 			}
 
 			if cmd.Flags().Changed("visibility") {
@@ -120,6 +132,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 					opts.Visibility = shared.Selected
 				}
 			}
+
+			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
 			if runF != nil {
 				return runF(opts)
@@ -161,6 +175,22 @@ func setRun(opts *SetOptions) error {
 		if err != nil {
 			return err
 		}
+
+		err = cmdutil.ValidateHasOnlyOneRemote(opts.HasRepoOverride, opts.Remotes)
+		if err != nil {
+			if opts.Interactive {
+				selectedRepo, errSelectedRepo := cmdutil.PromptForRepo(baseRepo, opts.Remotes, opts.Prompter)
+
+				if errSelectedRepo != nil {
+					return errSelectedRepo
+				}
+
+				baseRepo = selectedRepo
+			} else {
+				return err
+			}
+		}
+
 		host = baseRepo.RepoHost()
 	} else {
 		cfg, err := opts.Config()
