@@ -135,6 +135,15 @@ func TestSSHKeys(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "ssh-key"))
 }
 
+func TestOrg(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "org"))
+}
+
 func testScriptParamsFor(tsEnv testScriptEnv, command string) testscript.Params {
 	var files []string
 	if tsEnv.script != "" {
