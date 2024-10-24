@@ -50,7 +50,7 @@ var HelpTopics = []helpTopic{
 			token that will be used when a command targets a GitHub Enterprise Server host.
 
 			%[1]sGH_HOST%[1]s: specify the GitHub hostname for commands where a hostname has not been provided, or
-			cannot be inferred from the context of a local git repository. If this host was previously
+			cannot be inferred from the context of a local Git repository. If this host was previously
 			authenticated with, the stored credentials will be used. Otherwise, setting %[1]sGH_TOKEN%[1]s or
 			%[1]sGH_ENTERPRISE_TOKEN%[1]s is required, depending on the targeted host.
 
