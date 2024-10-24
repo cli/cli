@@ -159,7 +159,9 @@ When tests fail they fail like this:
 This is generally enough information to understand why a test has failed. However, we can get more information by providing the `-v` flag to `go test`, which turns on verbose mode and shows each command and any associated `stdio`.
 
 > [!WARNING]
-> Verbose mode dumps the `testscript` environment variables, including the `GH_TOKEN`, so be careful.
+> Verbose mode dumps the `testscript` environment variables, so make sure there is nothing sensitive in there.
+> We have taken steps to [redact tokens](https://github.com/cli/cli/pull/9804) in log output but there's no
+> guarantee it's comprehensive.
 
 By default `testscript` removes the directory in which it was running the script, and if you've been a conscientious engineer, you should be cleaning up resources using the `defer` statement. However, this can be an impediment to debugging. As such you can set `GH_ACCEPTANCE_PRESERVE_WORK_DIR=true` and `GH_ACCEPTANCE_SKIP_DEFER=true` to skip these cleanup steps.
 
