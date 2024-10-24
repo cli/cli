@@ -81,6 +81,15 @@ func TestOrg(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "org"))
 }
 
+func TestProject(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "project"))
+}
+
 func TestPullRequests(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
