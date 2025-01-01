@@ -123,6 +123,7 @@ jobs:
         run: |
           shopt -s failglob
           script/pkgmacos "$TAG_NAME"
+          script/sign dist/gh_*_macOS_*.pkg
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -132,7 +133,7 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
             dist/*.pkg
- 
+
   windows:
     runs-on: windows-latest
     environment: ${{ inputs.environment }}

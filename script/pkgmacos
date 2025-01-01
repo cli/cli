@@ -117,6 +117,18 @@ build_pkg() {
     --package-path "./dist" \
     "${PRODUCTBUILD_ARGS[@]}" \
     "./dist/gh_${tag_name}_macOS_universal.pkg"
+
+  # sign the .pkg file if APPLE_DEVELOPER_INSTALLER_ID is set
+  if [ -n "$APPLE_DEVELOPER_INSTALLER_ID" ]; then
+    productsign --sign "$APPLE_DEVELOPER_INSTALLER_ID" "./dist/gh_${tag_name}_macOS_universal.pkg" "./dist/gh_${tag_name}_macOS_universal_signed.pkg"
+    mv "./dist/gh_${tag_name}_macOS_universal_signed.pkg" "./dist/gh_${tag_name}_macOS_universal.pkg"
+  fi
+
+  # notarize the .pkg file if APPLE_DEVELOPER_INSTALLER_ID is set
+  if [ -n "$APPLE_DEVELOPER_INSTALLER_ID" ]; then
+    xcrun notarytool submit "./dist/gh_${tag_name}_macOS_universal.pkg" --apple-id "${APPLE_ID?}" --team-id "${APPLE_DEVELOPER_ID?}" --password "${APPLE_ID_PASSWORD?}"
+    xcrun stapler staple "./dist/gh_${tag_name}_macOS_universal.pkg"
+  fi
 }
 
 cleanup() {
