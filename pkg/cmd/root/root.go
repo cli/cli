@@ -2,6 +2,7 @@ package root
 
 import (
 	"fmt"
+	"github.com/cli/cli/v2/pkg/cmd/commit"
 	"os"
 	"strings"
 
@@ -149,6 +150,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(orgCmd.NewCmdOrg(&repoResolvingCmdFactory))
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
+	cmd.AddCommand(commit.NewCmdCommit(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 	cmd.AddCommand(rulesetCmd.NewCmdRuleset(&repoResolvingCmdFactory))
 	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
