@@ -21,4 +21,4 @@
 		"--security-opt",
 		"seccomp=unconfined"
 	]
-}
+}"ghcr.io/devcontainers-extra/features/amplify-cli:2": {}
