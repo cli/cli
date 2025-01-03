@@ -1,0 +1,145 @@
+Descripción general
+Xcode se encarga de muchos escenarios comunes para la distribución de software de Mac, como la carga de su aplicación en la Mac App Store. Algunos productos que crea con Xcode o con herramientas de desarrollo de terceros requieren otros pasos para su distribución. Estos productos incluyen los siguientes:
+
+Productos que no son aplicaciones
+
+Productos que incluyen múltiples componentes, por ejemplo, una aplicación con un demonio asociado
+
+Productos que distribuyes directamente
+
+Productos que crea con herramientas de desarrollo de terceros
+
+Si no puedes crear y distribuir tu producto solo con Xcode, elige un formato de contenedor y empaqueta tu producto para su distribución. Si distribuyes tu producto directamente (en otras palabras, a través de un canal distinto a Mac App Store), firmas tu código para su distribución y creas un archivo de contenedor de distribución; luego, certificas el archivo de contenedor. Puedes considerar automatizar este proceso para repetirlo para cada versión de tu aplicación. Para obtener más información, consulta Crear código firmado para distribución para macOS .
+
+Nota
+
+Si utiliza una herramienta de desarrollo de terceros para crear su aplicación, consulte su documentación para obtener consejos específicos sobre esa herramienta.
+
+Decidir el formato del contenedor
+Para comenzar, decida el formato del contenedor. Los productos Mac admiten dos canales de distribución:
+
+Puedes distribuir aplicaciones en la Mac App Store.
+
+Puede utilizar la firma de ID de desarrollador para distribuir aplicaciones y otros productos directamente, fuera de la Mac App Store.
+
+Para distribuir una aplicación en la Mac App Store, debes enviarla como un paquete de instalación. Para la distribución directa, puedes elegir entre varios formatos de contenedor, los más comunes son:
+
+Archivo zip ( .zip)
+No se puede firmar un archivo zip, por lo que cualquier archivo o carpeta que incluya que no esté cubierto por su firma de código puede ser manipulado por un atacante. La persona que recibe su archivo zip lo abre con Finder para descomprimir el contenido y, opcionalmente, moverlo a la ubicación que prefiera.
+
+Imagen de disco ( .dmg)
+Puedes firmar una imagen de disco, lo que protege todos los archivos y carpetas que incluyas contra modificaciones después de firmarla. La persona que reciba tu imagen de disco la abrirá en Finder para acceder a su contenido y podrá elegir ejecutar tu aplicación desde la imagen de disco o moverla a su ubicación preferida. Esta experiencia es más sencilla si tu producto es un solo archivo o paquete.
+
+Paquete de instalación ( .pkg)
+Debe firmar un paquete de instalación, que protege todos los archivos y carpetas que incluya contra modificaciones después de firmarlo. La persona que recibe el paquete de instalación lo abre en Finder para iniciar la aplicación de instalación, que la guía a través de los pasos necesarios para instalar el producto. Un paquete de instalación es la mejor opción si el producto contiene varios componentes, se debe copiar en ubicaciones específicas o si necesita ejecutar código personalizado durante la instalación.
+
+Puedes anidar estos contenedores. Por ejemplo, es posible que quieras enviar una aplicación dentro de un paquete de instalación en una imagen de disco. Para anidar contenedores, trabaja desde el contenedor de nivel más bajo hasta el contenedor de nivel más alto, siguiendo las instrucciones para cada contenedor en cada paso.
+
+Firma tu código y firma cada contenedor anidado que admita la firma. Por ejemplo, si envías una aplicación dentro de un paquete de instalación en una imagen de disco, firma la aplicación, crea el paquete de instalación, firma ese paquete, crea la imagen de disco y, luego, firma la imagen de disco. Para obtener más información sobre cómo firmar código para distribución, consulta Crear código firmado para distribución para macOS .
+
+Crear un archivo zip
+Si decide distribuir su producto en un archivo zip, utilice la dittoherramienta de línea de comandos para crear ese archivo:
+
+Crea un directorio que contenga todo lo que deseas distribuir.
+
+Ejecute la dittoherramienta como se muestra a continuación:
+
+% ditto -c -k --keepParent <PathToDirectory> <PathToZip>
+En este comando de ejemplo, es la ruta al directorio que creaste en el paso 1 y es la ubicación donde debería crearse el archivo zip. No puedes firmar archivos zip, pero sí su contenido.<PathToDirectory><PathToZip>ditto
+
+Construir un paquete de instalación
+Si decide distribuir su producto en un paquete de instalación, comience por determinar la identidad de firma de su instalador. Elija la identidad adecuada para su canal de distribución:
+
+Si distribuye una aplicación en la Mac App Store, utilice una identidad de firma de distribución de instaladores de Mac. Esta se denomina , donde identifica a su equipo.3rd Party Mac Developer Installer: <TeamID><TeamID>
+
+Si distribuye un producto de forma independiente, utilice una identidad de firma del instalador con ID de desarrollador. Esta se denomina , donde identifica a su equipo.Developer ID Installer: <TeamID><TeamID>
+
+Para obtener información sobre cómo configurar estas identidades de firma del instalador, consulte la Ayuda de la cuenta de desarrollador .
+
+Ejecute el siguiente comando para confirmar que su identidad de firma del instalador está presente y es correcta:
+
+% security find-identity -v               
+  1) 6210ECCC616B6A72F238DE6FDDFDA1A06DEFF9FB "3rd Party Mac Developer Installer: …"
+  2) C32E0E68CE92936D5532E21BAAD8CFF4A6D9BAA1 "Developer ID Installer: …"
+     2 valid identities found
+El -vargumento filtra solo las identidades válidas. Si la identidad de firma del instalador que necesita no aparece en la lista, consulte la Ayuda de la cuenta de desarrollador .
+
+Importante
+
+No utilice la -p codesigningopción para filtrar las identidades de firma de código. Las identidades de firma del instalador son diferentes de las identidades de firma de código, por lo que la -p codesigningopción filtra las identidades de firma del instalador.
+
+Si su producto consta de una sola aplicación, utilice la productbuildherramienta para crear un paquete de instalación simple para ella. El siguiente es el uso más simple de productbuild, suficiente para enviar su aplicación a la Mac App Store:
+
+% productbuild --sign <Identity> --component <PathToApp> /Applications <PathToPackage>
+Realice las siguientes sustituciones a este comando:
+
+<Identity>
+Su identidad de firma del instalador.
+
+<PathToApp>
+La ruta a tu aplicación.
+
+<PathToPackage>
+La ruta donde productbuildse crea el paquete de instalación.
+
+Si tiene un producto más complejo, necesitará un paquete de instalación más complejo. Para obtener más detalles sobre cómo trabajar con paquetes de instalación, consulte las páginas del manual de productbuild, productsign, pkgbuildy pkgutil. Para obtener instrucciones sobre cómo leer una página del manual, consulte Cómo leer páginas del manual de UNIX .
+
+Crear un archivo de imagen de disco
+Si decide distribuir su producto en un archivo de imagen de disco ( .dmg), siga estos pasos:
+
+Cree un directorio que actúe como fuente para el directorio raíz del volumen de su imagen de disco.
+
+Rellene ese directorio con los elementos que desea distribuir. Si está creando un script para automatizar este proceso, utilice dittoen lugar de cpporque dittoconserva los enlaces simbólicos.
+
+Utilice el hdiutilsiguiente comando para crear el archivo de imagen de disco:
+
+% hdiutil create -srcFolder <ProductDirectory> -o <DiskImageFile>
+En este comando, es el directorio que creaste en el paso 1 y es la ruta donde se crea el archivo de imagen de disco.<ProductDirectory><DiskImageFile>hdiutil
+
+Decide un identificador de firma de código para esta imagen de disco. Si estás firmando código empaquetado, construye un identificador de firma de código usando el ID de paquete de tu código como prefijo seguido de una cadena única. De lo contrario, construye el prefijo siguiendo los pasos que se indican en Firmar cada elemento de código en Crear código firmado por distribución para macOS . Usa un identificador de firma de código único que sea diferente de los identificadores de tus otros productos, incluidos los identificadores de paquete de código.
+
+Utilice el codesignsiguiente comando para firmar la imagen del disco:
+
+% codesign -s <CodeSigningIdentity> --timestamp -i <Identifier> <DiskImageFile>
+En este comando, es la identidad de firma de código de su aplicación Developer ID (por ejemplo, ), es el identificador de firma de código que eligió en el paso 4 y es la ruta a la imagen de disco que creó en el paso 3. Utilice una identidad de firma de código, no una identidad de firma de instalador.<CodeSigningIdentity>Developer ID Application: <TeamID><Identifier><DiskImageFile>
+
+Para obtener más información sobre las identidades de firma de código, consulte “Confirmar su identidad de firma de código” en Creación de código firmado por distribución para macOS .
+
+Puede utilizar una herramienta de terceros para configurar una imagen de disco para su distribución. Por ejemplo, la herramienta puede organizar los iconos, establecer una imagen de fondo y agregar un enlace simbólico a la carpeta Aplicaciones. Si utiliza una herramienta de terceros, asegúrese de que la imagen de disco resultante:
+
+Está firmado con su ID de desarrollador Identidad de firma de código de aplicación
+
+Es una imagen de disco comprimida en zip de solo lectura con formato UDIF (tipo UDZO)
+
+Envíe su aplicación a la Mac App Store
+Si estás creando una aplicación para la Mac App Store, envía el paquete de instalación firmado mediante la altoolherramienta de línea de comandos o la aplicación Transporter. Para obtener instrucciones detalladas, consulta Ayuda de App Store Connect > Referencia > Herramientas de carga .
+
+Certifique su producto
+Si distribuye su producto directamente, certifique ante notario el archivo que desea distribuir a sus usuarios. Para obtener más información, consulte Personalización del flujo de trabajo de certificación ante notario . Omita la sección “Exportar un paquete para certificación ante notario” porque ya tiene el archivo que desea enviar.
+
+Si distribuye su producto mediante contenedores anidados, solo certifique el contenedor más externo. Por ejemplo, si tiene una aplicación dentro de un paquete de instalación en una imagen de disco, firme la aplicación, firme el paquete de instalación y firme la imagen de disco, pero solo certifique la imagen de disco.
+
+Si utiliza una herramienta de instalación de terceros, consulte Personalizar el flujo de trabajo de notarización .
+
+Grapa tu producto
+Una vez que hayas certificado tu producto, engrapa el ticket resultante al archivo que deseas distribuir. Para obtener información sobre cómo hacer esto para una aplicación dentro de un archivo zip, consulta “Engrapar el ticket a tu distribución” en Personalización del flujo de trabajo de certificación . Los demás formatos de contenedor comunes, paquetes de instalación e imágenes de disco, admiten el engrapado directo. Por ejemplo, para engrapar un ticket a una imagen de disco:
+
+% xcrun stapler staple FlyingAnimals.dmg
+Si no engrapa el ticket a su archivo de distribución, Gatekeeper podría impedir que un usuario instale o use su producto mientras su Mac esté desconectado.
+
+Pruebe su producto distribuido
+En el caso de los productos que distribuye directamente, pruebe que el producto funcione correctamente cuando lo utilice desde el paquete de instalación, la imagen de disco o el archivo zip que creó. Si es posible, realice esta prueba en un Mac distinto al que utiliza para desarrollar el software, de modo que los datos de desarrollo no afecten los resultados de la prueba. Considere estos escenarios:
+
+Una nueva distribución, en un Mac donde su producto no se ha utilizado antes
+
+Una distribución de actualización, en una Mac donde la persona ya ha usado una versión anterior de su producto (considere ambas situaciones en las que la nueva versión reemplaza a la versión anterior y la nueva versión está en una ubicación diferente a la versión anterior)
+
+Una distribución duplicada, en una Mac que ya contiene la misma versión de su producto en una ubicación diferente
+
+Una distribución en la que la persona que usa su aplicación inicia sesión en una cuenta diferente en Mac que la persona que instaló la aplicación
+
+Para los productos que distribuye como archivos zip o archivos de imagen de disco, considere estos escenarios adicionales:
+
+La persona abre tu aplicación sin moverla a una ubicación diferente. En esta situación, cuando la persona abre tu aplicación por primera vez, Gatekeeper aleatoriza su ruta como se devuelve desde y otra API. Esta medida evita que tu aplicación acceda a recursos fuera de su paquete (y, por lo tanto, no sellados por su firma de código) utilizando una ruta relativa, ya que un atacante podría controlar esos recursos para cambiar el comportamiento de tu aplicación. Gatekeeper solo realiza esta translocación en el primer lanzamiento, por lo que también debes probar el comportamiento en un lanzamiento posterior.bundleURL
+
+La persona mueve tu aplicación a una ubicación diferente y luego la inicia. Gatekeeper no traslada la ruta de tu aplicación en este caso.
