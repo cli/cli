@@ -1,0 +1,40 @@
+Cómo agregar funciones a un archivo devcontainer.json
+Con funciones, puede agregar rápidamente herramientas, tiempos de ejecución o bibliotecas a su configuración de contenedor de desarrollo.
+
+Navegación de herramientas
+Código de Visual Studio
+Navegador web
+Las características son unidades autónomas de código de instalación y configuración de contenedor de desarrollo, diseñadas para funcionar en una amplia gama de imágenes de contenedor base. Puede usar las características para agregar rápidamente herramientas, entornos de ejecución o bibliotecas a su imagen de espacio de código. Para obtener más información, consulte las características disponibles y la especificación de características en el sitio web de Contenedores de desarrollo.
+
+Puedes agregar funciones a un devcontainer.jsonarchivo desde VS Code o desde tu repositorio en GitHub. Usa las pestañas de este artículo para ver instrucciones sobre cada una de estas formas de agregar funciones.
+
+Agregar características a un devcontainer.jsonarchivo
+Navega a tu repositorio en GitHub, busca tu devcontainer.jsonarchivo y haz clic para editarlo.
+
+Si aún no tienes un devcontainer.jsonarchivo, puedes crear uno ahora. Para obtener más información, consulta Introducción a los contenedores de desarrollo .
+
+A la derecha del editor de archivos, en la pestaña Marketplace , busque la función que desea agregar y luego haga clic en el nombre de la función.
+
+Captura de pantalla de la pestaña "Mercado" con "Terra" en el cuadro de búsqueda y la función Terraform incluida en los resultados de la búsqueda.
+En "Instalación", haga clic en el fragmento de código para copiarlo en su portapapeles y luego péguelo en el featuresobjeto en su devcontainer.jsonarchivo.
+
+Captura de pantalla de la pestaña "Mercado" que muestra el fragmento de código de instalación de Terraform.
+"features": {
+     // ...
+     "ghcr.io/devcontainers/features/terraform:1": {},
+     // ...
+ }
+De forma predeterminada, se utilizará la última versión de la función. Para elegir una versión diferente o configurar otras opciones para la función, expanda las propiedades que se enumeran en "Opciones" para ver los valores disponibles y, luego, agregue las opciones editando manualmente el objeto en su devcontainer.jsonarchivo.
+
+Captura de pantalla de la sección "Opciones" de la pestaña "Mercado", con las propiedades "versión" y "tflint" expandidas.
+"features": {
+     // ...
+     "ghcr.io/devcontainers/features/terraform:1": {
+         "version": "1.1",
+         "tflint": "latest"
+     },
+     // ...
+ }
+Confirme los cambios en su devcontainer.jsonarchivo.
+
+Los cambios de configuración surtirán efecto en los nuevos espacios de código creados desde el repositorio. Para que los cambios surtan efecto en los espacios de código existentes, deberás extraer las actualizaciones del devcontainer.jsonarchivo en tu espacio de código y, luego, reconstruir el contenedor para el espacio de código. Para obtener má
