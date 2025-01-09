@@ -3,6 +3,7 @@ package repo
 import (
 	"github.com/MakeNowJust/heredoc"
 	repoArchiveCmd "github.com/cli/cli/v2/pkg/cmd/repo/archive"
+	repoAutolinkCmd "github.com/cli/cli/v2/pkg/cmd/repo/autolink"
 	repoCloneCmd "github.com/cli/cli/v2/pkg/cmd/repo/clone"
 	repoCreateCmd "github.com/cli/cli/v2/pkg/cmd/repo/create"
 	creditsCmd "github.com/cli/cli/v2/pkg/cmd/repo/credits"
@@ -19,6 +20,7 @@ import (
 	repoSyncCmd "github.com/cli/cli/v2/pkg/cmd/repo/sync"
 	repoUnarchiveCmd "github.com/cli/cli/v2/pkg/cmd/repo/unarchive"
 	repoViewCmd "github.com/cli/cli/v2/pkg/cmd/repo/view"
+
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -64,6 +66,7 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 		repoDeleteCmd.NewCmdDelete(f, nil),
 		creditsCmd.NewCmdRepoCredits(f, nil),
 		gardenCmd.NewCmdGarden(f, nil),
+		repoAutolinkCmd.NewCmdAutolink(f),
 	)
 
 	return cmd

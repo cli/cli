@@ -201,6 +201,65 @@ func Test_editRun(t *testing.T) {
 					}))
 			},
 		},
+		{
+			name: "enable/disable security and analysis settings",
+			opts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					SecurityAndAnalysis: &SecurityAndAnalysisInput{
+						EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
+							Status: sp("enabled"),
+						},
+						EnableSecretScanning: &SecurityAndAnalysisStatus{
+							Status: sp("enabled"),
+						},
+						EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
+							Status: sp("disabled"),
+						},
+					},
+				},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data": { "repository": { "viewerCanAdminister": true } } }`))
+
+				r.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, 1, len(payload))
+						securityAndAnalysis := payload["security_and_analysis"].(map[string]interface{})
+						assert.Equal(t, "enabled", securityAndAnalysis["advanced_security"].(map[string]interface{})["status"])
+						assert.Equal(t, "enabled", securityAndAnalysis["secret_scanning"].(map[string]interface{})["status"])
+						assert.Equal(t, "disabled", securityAndAnalysis["secret_scanning_push_protection"].(map[string]interface{})["status"])
+					}))
+			},
+		},
+		{
+			name: "does not have sufficient permissions for security edits",
+			opts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					SecurityAndAnalysis: &SecurityAndAnalysisInput{
+						EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
+							Status: sp("enabled"),
+						},
+						EnableSecretScanning: &SecurityAndAnalysisStatus{
+							Status: sp("enabled"),
+						},
+						EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
+							Status: sp("disabled"),
+						},
+					},
+				},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data": { "repository": { "viewerCanAdminister": false } } }`))
+			},
+			wantsErr: "you do not have sufficient permissions to edit repository security and analysis features",
+		},
 	}
 
 	for _, tt := range tests {
@@ -666,6 +725,95 @@ func Test_editRun_interactive(t *testing.T) {
 			}
 
 			assert.Contains(t, stderr.String(), tt.wantsStderr)
+		})
+	}
+}
+
+func Test_transformSecurityAndAnalysisOpts(t *testing.T) {
+	tests := []struct {
+		name string
+		opts EditOptions
+		want *SecurityAndAnalysisInput
+	}{
+		{
+			name: "Enable all security and analysis settings",
+			opts: EditOptions{
+				Edits: EditRepositoryInput{
+					enableAdvancedSecurity:             bp(true),
+					enableSecretScanning:               bp(true),
+					enableSecretScanningPushProtection: bp(true),
+				},
+			},
+			want: &SecurityAndAnalysisInput{
+				EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
+					Status: sp("enabled"),
+				},
+				EnableSecretScanning: &SecurityAndAnalysisStatus{
+					Status: sp("enabled"),
+				},
+				EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
+					Status: sp("enabled"),
+				},
+			},
+		},
+		{
+			name: "Disable all security and analysis settings",
+			opts: EditOptions{
+				Edits: EditRepositoryInput{
+					enableAdvancedSecurity:             bp(false),
+					enableSecretScanning:               bp(false),
+					enableSecretScanningPushProtection: bp(false),
+				},
+			},
+			want: &SecurityAndAnalysisInput{
+				EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
+					Status: sp("disabled"),
+				},
+				EnableSecretScanning: &SecurityAndAnalysisStatus{
+					Status: sp("disabled"),
+				},
+				EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
+					Status: sp("disabled"),
+				},
+			},
+		},
+		{
+			name: "Enable only advanced security",
+			opts: EditOptions{
+				Edits: EditRepositoryInput{
+					enableAdvancedSecurity: bp(true),
+				},
+			},
+			want: &SecurityAndAnalysisInput{
+				EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
+					Status: sp("enabled"),
+				},
+				EnableSecretScanning:               nil,
+				EnableSecretScanningPushProtection: nil,
+			},
+		},
+		{
+			name: "Disable only secret scanning",
+			opts: EditOptions{
+				Edits: EditRepositoryInput{
+					enableSecretScanning: bp(false),
+				},
+			},
+			want: &SecurityAndAnalysisInput{
+				EnableAdvancedSecurity: nil,
+				EnableSecretScanning: &SecurityAndAnalysisStatus{
+					Status: sp("disabled"),
+				},
+				EnableSecretScanningPushProtection: nil,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := &tt.opts
+			transformed := transformSecurityAndAnalysisOpts(opts)
+			assert.Equal(t, tt.want, transformed)
 		})
 	}
 }

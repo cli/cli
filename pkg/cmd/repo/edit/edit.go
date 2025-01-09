@@ -66,22 +66,27 @@ type EditOptions struct {
 }
 
 type EditRepositoryInput struct {
-	AllowForking        *bool   `json:"allow_forking,omitempty"`
-	AllowUpdateBranch   *bool   `json:"allow_update_branch,omitempty"`
-	DefaultBranch       *string `json:"default_branch,omitempty"`
-	DeleteBranchOnMerge *bool   `json:"delete_branch_on_merge,omitempty"`
-	Description         *string `json:"description,omitempty"`
-	EnableAutoMerge     *bool   `json:"allow_auto_merge,omitempty"`
-	EnableIssues        *bool   `json:"has_issues,omitempty"`
-	EnableMergeCommit   *bool   `json:"allow_merge_commit,omitempty"`
-	EnableProjects      *bool   `json:"has_projects,omitempty"`
-	EnableDiscussions   *bool   `json:"has_discussions,omitempty"`
-	EnableRebaseMerge   *bool   `json:"allow_rebase_merge,omitempty"`
-	EnableSquashMerge   *bool   `json:"allow_squash_merge,omitempty"`
-	EnableWiki          *bool   `json:"has_wiki,omitempty"`
-	Homepage            *string `json:"homepage,omitempty"`
-	IsTemplate          *bool   `json:"is_template,omitempty"`
-	Visibility          *string `json:"visibility,omitempty"`
+	enableAdvancedSecurity             *bool
+	enableSecretScanning               *bool
+	enableSecretScanningPushProtection *bool
+
+	AllowForking        *bool                     `json:"allow_forking,omitempty"`
+	AllowUpdateBranch   *bool                     `json:"allow_update_branch,omitempty"`
+	DefaultBranch       *string                   `json:"default_branch,omitempty"`
+	DeleteBranchOnMerge *bool                     `json:"delete_branch_on_merge,omitempty"`
+	Description         *string                   `json:"description,omitempty"`
+	EnableAutoMerge     *bool                     `json:"allow_auto_merge,omitempty"`
+	EnableIssues        *bool                     `json:"has_issues,omitempty"`
+	EnableMergeCommit   *bool                     `json:"allow_merge_commit,omitempty"`
+	EnableProjects      *bool                     `json:"has_projects,omitempty"`
+	EnableDiscussions   *bool                     `json:"has_discussions,omitempty"`
+	EnableRebaseMerge   *bool                     `json:"allow_rebase_merge,omitempty"`
+	EnableSquashMerge   *bool                     `json:"allow_squash_merge,omitempty"`
+	EnableWiki          *bool                     `json:"has_wiki,omitempty"`
+	Homepage            *string                   `json:"homepage,omitempty"`
+	IsTemplate          *bool                     `json:"is_template,omitempty"`
+	SecurityAndAnalysis *SecurityAndAnalysisInput `json:"security_and_analysis,omitempty"`
+	Visibility          *string                   `json:"visibility,omitempty"`
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobra.Command {
@@ -157,6 +162,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				return cmdutil.FlagErrorf("use of --visibility flag requires --accept-visibility-change-consequences flag")
 			}
 
+			if hasSecurityEdits(opts.Edits) {
+				opts.Edits.SecurityAndAnalysis = transformSecurityAndAnalysisOpts(opts)
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -177,6 +186,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableSquashMerge, "enable-squash-merge", "", "Enable merging pull requests via squashed commit")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableRebaseMerge, "enable-rebase-merge", "", "Enable merging pull requests via rebase")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableAutoMerge, "enable-auto-merge", "", "Enable auto-merge functionality")
+	cmdutil.NilBoolFlag(cmd, &opts.Edits.enableAdvancedSecurity, "enable-advanced-security", "", "Enable advanced security in the repository")
+	cmdutil.NilBoolFlag(cmd, &opts.Edits.enableSecretScanning, "enable-secret-scanning", "", "Enable secret scanning in the repository")
+	cmdutil.NilBoolFlag(cmd, &opts.Edits.enableSecretScanningPushProtection, "enable-secret-scanning-push-protection", "", "Enable secret scanning push protection in the repository. Secret scanning must be enabled first")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.DeleteBranchOnMerge, "delete-branch-on-merge", "", "Delete head branch when pull requests are merged")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.AllowForking, "allow-forking", "", "Allow forking of an organization repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.AllowUpdateBranch, "allow-update-branch", "", "Allow a pull request head branch that is behind its base branch to be updated")
@@ -237,6 +249,17 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		err = interactiveRepoEdit(opts, fetchedRepo)
 		if err != nil {
 			return err
+		}
+	}
+
+	if opts.Edits.SecurityAndAnalysis != nil {
+		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
+		repo, err := api.FetchRepository(apiClient, opts.Repository, []string{"viewerCanAdminister"})
+		if err != nil {
+			return err
+		}
+		if !repo.ViewerCanAdminister {
+			return fmt.Errorf("you do not have sufficient permissions to edit repository security and analysis features")
 		}
 	}
 
@@ -559,4 +582,50 @@ func isIncluded(value string, opts []string) bool {
 		}
 	}
 	return false
+}
+
+func boolToStatus(status bool) *string {
+	var result string
+	if status {
+		result = "enabled"
+	} else {
+		result = "disabled"
+	}
+	return &result
+}
+
+func hasSecurityEdits(edits EditRepositoryInput) bool {
+	return edits.enableAdvancedSecurity != nil || edits.enableSecretScanning != nil || edits.enableSecretScanningPushProtection != nil
+}
+
+type SecurityAndAnalysisInput struct {
+	EnableAdvancedSecurity             *SecurityAndAnalysisStatus `json:"advanced_security,omitempty"`
+	EnableSecretScanning               *SecurityAndAnalysisStatus `json:"secret_scanning,omitempty"`
+	EnableSecretScanningPushProtection *SecurityAndAnalysisStatus `json:"secret_scanning_push_protection,omitempty"`
+}
+
+type SecurityAndAnalysisStatus struct {
+	Status *string `json:"status,omitempty"`
+}
+
+// Transform security and analysis parameters to properly serialize EditRepositoryInput
+// See API Docs: https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#update-a-repository
+func transformSecurityAndAnalysisOpts(opts *EditOptions) *SecurityAndAnalysisInput {
+	securityOptions := &SecurityAndAnalysisInput{}
+	if opts.Edits.enableAdvancedSecurity != nil {
+		securityOptions.EnableAdvancedSecurity = &SecurityAndAnalysisStatus{
+			Status: boolToStatus(*opts.Edits.enableAdvancedSecurity),
+		}
+	}
+	if opts.Edits.enableSecretScanning != nil {
+		securityOptions.EnableSecretScanning = &SecurityAndAnalysisStatus{
+			Status: boolToStatus(*opts.Edits.enableSecretScanning),
+		}
+	}
+	if opts.Edits.enableSecretScanningPushProtection != nil {
+		securityOptions.EnableSecretScanningPushProtection = &SecurityAndAnalysisStatus{
+			Status: boolToStatus(*opts.Edits.enableSecretScanningPushProtection),
+		}
+	}
+	return securityOptions
 }

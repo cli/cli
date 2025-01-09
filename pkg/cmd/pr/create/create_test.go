@@ -1622,12 +1622,13 @@ func Test_createRun(t *testing.T) {
 	}
 }
 
-func Test_determineTrackingBranch(t *testing.T) {
+func Test_tryDetermineTrackingRef(t *testing.T) {
 	tests := []struct {
-		name     string
-		cmdStubs func(*run.CommandStubber)
-		remotes  context.Remotes
-		assert   func(ref *git.TrackingRef, t *testing.T)
+		name                string
+		cmdStubs            func(*run.CommandStubber)
+		remotes             context.Remotes
+		expectedTrackingRef trackingRef
+		expectedFound       bool
 	}{
 		{
 			name: "empty",
@@ -1635,54 +1636,53 @@ func Test_determineTrackingBranch(t *testing.T) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD`, 0, "abc HEAD")
 			},
-			assert: func(ref *git.TrackingRef, t *testing.T) {
-				assert.Nil(t, ref)
-			},
+			expectedTrackingRef: trackingRef{},
+			expectedFound:       false,
 		},
 		{
 			name: "no match",
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-				cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature", 0, "abc HEAD\nbca refs/remotes/origin/feature")
+				cs.Register("git show-ref --verify -- HEAD refs/remotes/upstream/feature refs/remotes/origin/feature", 0, "abc HEAD\nbca refs/remotes/upstream/feature")
 			},
 			remotes: context.Remotes{
-				&context.Remote{
-					Remote: &git.Remote{Name: "origin"},
-					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
-				},
 				&context.Remote{
 					Remote: &git.Remote{Name: "upstream"},
 					Repo:   ghrepo.New("octocat", "Spoon-Knife"),
 				},
+				&context.Remote{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+				},
 			},
-			assert: func(ref *git.TrackingRef, t *testing.T) {
-				assert.Nil(t, ref)
-			},
+			expectedTrackingRef: trackingRef{},
+			expectedFound:       false,
 		},
 		{
 			name: "match",
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature$`, 0, heredoc.Doc(`
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/upstream/feature refs/remotes/origin/feature$`, 0, heredoc.Doc(`
 		deadbeef HEAD
-		deadb00f refs/remotes/origin/feature
-		deadbeef refs/remotes/upstream/feature
+		deadb00f refs/remotes/upstream/feature
+		deadbeef refs/remotes/origin/feature
 	`))
 			},
 			remotes: context.Remotes{
 				&context.Remote{
-					Remote: &git.Remote{Name: "origin"},
-					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
-				},
-				&context.Remote{
 					Remote: &git.Remote{Name: "upstream"},
 					Repo:   ghrepo.New("octocat", "Spoon-Knife"),
 				},
+				&context.Remote{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+				},
 			},
-			assert: func(ref *git.TrackingRef, t *testing.T) {
-				assert.Equal(t, "upstream", ref.RemoteName)
-				assert.Equal(t, "feature", ref.BranchName)
+			expectedTrackingRef: trackingRef{
+				remoteName: "origin",
+				branchName: "feature",
 			},
+			expectedFound: true,
 		},
 		{
 			name: "respect tracking config",
@@ -1702,9 +1702,8 @@ func Test_determineTrackingBranch(t *testing.T) {
 					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
 				},
 			},
-			assert: func(ref *git.TrackingRef, t *testing.T) {
-				assert.Nil(t, ref)
-			},
+			expectedTrackingRef: trackingRef{},
+			expectedFound:       false,
 		},
 	}
 	for _, tt := range tests {
@@ -1719,8 +1718,10 @@ func Test_determineTrackingBranch(t *testing.T) {
 				GitPath: "some/path/git",
 			}
 			headBranchConfig := gitClient.ReadBranchConfig(ctx.Background(), "feature")
-			ref := determineTrackingBranch(gitClient, tt.remotes, &headBranchConfig)
-			tt.assert(ref, t)
+			ref, found := tryDetermineTrackingRef(gitClient, tt.remotes, "feature", headBranchConfig)
+
+			assert.Equal(t, tt.expectedTrackingRef, ref)
+			assert.Equal(t, tt.expectedFound, found)
 		})
 	}
 }

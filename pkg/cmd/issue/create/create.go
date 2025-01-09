@@ -72,7 +72,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --assignee monalisa,hubot
 			$ gh issue create --assignee "@me"
 			$ gh issue create --project "Roadmap"
-			$ gh issue create --template "bug_report.md"
+			$ gh issue create --template "Bug Report"
 		`),
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
@@ -129,7 +129,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the issue to projects by `title`")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Add the issue to a milestone by `name`")
 	cmd.Flags().StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
-	cmd.Flags().StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
+	cmd.Flags().StringVarP(&opts.Template, "template", "T", "", "Template `name` to use as starting body text")
 
 	return cmd
 }

@@ -389,7 +389,6 @@ func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg Branc
 		return
 	}
 
-	cfg.LocalName = branch
 	for _, line := range outputLines(out) {
 		parts := strings.SplitN(line, " ", 2)
 		if len(parts) < 2 {
