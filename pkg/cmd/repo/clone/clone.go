@@ -172,7 +172,7 @@ func cloneRun(opts *CloneOptions) error {
 
 	// If repo HasWikiEnabled and wantsWiki is true then create a new clone URL
 	if wantsWiki {
-		if !canonicalRepo.HasWikiEnabled {
+		if (!canonicalRepo.HasWikiEnabled) {
 			return fmt.Errorf("The '%s' repository does not have a wiki", ghrepo.FullName(canonicalRepo))
 		}
 		canonicalCloneURL = strings.TrimSuffix(canonicalCloneURL, ".git") + ".wiki.git"
