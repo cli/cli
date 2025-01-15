@@ -1,0 +1,74 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 12,
+        "title": "Blueberries are from a fork",
+        "state": "OPEN",
+        "body": "**blueberries taste good**",
+        "url": "https://github.com/OWNER/REPO/pull/12",
+        "author": {
+          "login": "nobody"
+        },
+        "additions": 100,
+        "deletions": 10,
+        "reviewRequests": {
+          "nodes": [
+            {
+              "requestedReviewer": {
+                "__typename": "user",
+                "login": "123"
+              }
+            },
+            {
+              "requestedReviewer": {
+                "__typename": "Team",
+                "name": "Team 1",
+                "slug": "team-1",
+                "organization": {"login": "my-org"}
+              }
+            },
+            {
+              "requestedReviewer": {
+                "__typename": "user",
+                "login": "abc"
+              }
+            }
+          ],
+          "totalcount": 1
+        },
+        "assignees": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "labels": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "projectcards": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "milestone": {},
+        "participants": {
+          "nodes": [
+            {
+              "login": "marseilles"
+            }
+          ],
+          "totalcount": 1
+        },
+        "commits": {
+          "totalCount": 12
+        },
+        "baseRefName": "master",
+        "headRefName": "blueberries",
+        "headRepositoryOwner": {
+          "login": "hubot"
+        },
+        "isCrossRepository": true,
+        "isDraft": false
+      }
+    }
+  }
+}

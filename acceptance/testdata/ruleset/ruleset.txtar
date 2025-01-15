@@ -1,0 +1,62 @@
+# Setup environment variables used for testscript
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$REPO --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$REPO
+
+# Clone the repo
+exec gh repo clone $ORG/$REPO
+cd $REPO
+
+# Verify repository ruleset does not exist
+env LIST_MATCH=testscript\s+$ORG/$REPO (repo)
+exec gh ruleset list
+! stdout $LIST_MATCH
+
+# Verify no repository ruleset applies to default branch
+exec gh ruleset check
+stdout '0 rules apply'
+
+# Create a repository ruleset
+exec gh api /repos/{owner}/{repo}/rulesets -X POST --input ../create-repo-ruleset.json
+
+# Verify repository ruleset does exist
+exec gh ruleset list
+stdout $LIST_MATCH
+
+# Verify repository ruleset associated with branch
+exec gh ruleset check
+stdout '- pull_request:.+dismiss_stale_reviews_on_push: false.+require_code_owner_review: true.+require_last_push_approval: false.+required_approving_review_count: 1.+required_review_thread_resolution: false'
+
+-- create-repo-ruleset.json --
+{
+    "name": "testscript",
+    "target": "branch",
+    "enforcement": "active",
+    "conditions": {
+        "ref_name": {
+            "include": [
+                "~DEFAULT_BRANCH"
+            ],
+            "exclude": []
+        }
+    },
+    "rules": [
+        {
+            "type": "pull_request",
+            "parameters": {
+                "dismiss_stale_reviews_on_push": false,
+                "require_code_owner_review": true,
+                "require_last_push_approval": false,
+                "required_approving_review_count": 1,
+                "required_review_thread_resolution": false
+            }
+        }
+    ]
+}

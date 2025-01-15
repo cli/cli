@@ -1,0 +1,142 @@
+{
+  "data": {
+    "repository": {
+      "hasIssuesEnabled": true,
+      "issue": {
+        "number": 123,
+        "body": "**bold story**",
+        "title": "ix of coins",
+        "state": "OPEN",
+        "createdAt": "2011-01-26T19:01:12Z",
+        "author": {
+          "login": "marseilles"
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "marseilles"
+            },
+            {
+              "login": "monaco"
+            }
+          ],
+          "totalCount": 2
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "Closed: Won't Fix"
+            },
+            {
+              "name": "Status: In Progress"
+            },
+            {
+              "name": "Type: Bug"
+            },
+            {
+              "name": "help wanted"
+            },
+            {
+              "name": "Closed: Duplicate"
+            }
+          ],
+          "totalCount": 5
+        },
+        "projectcards": {
+          "nodes": [
+            {
+              "project": {
+                "name": "Project 1"
+              },
+              "column": {
+                "name": "column A"
+              }
+            },
+            {
+              "project": {
+                "name": "Project 2"
+              },
+              "column": {
+                "name": "column B"
+              }
+            },
+            {
+              "project": {
+                "name": "Project 3"
+              },
+              "column": {
+                "name": "column C"
+              }
+            },
+            {
+              "project": {
+                "name": "Project 4"
+              },
+              "column": {
+                "name": ""
+              }
+            }
+          ],
+          "totalCount": 3
+        },
+        "milestone": {
+          "title": "uluru"
+        },
+        "reactionGroups": [
+          {
+            "content": "CONFUSED",
+            "users": {
+              "totalCount": 8
+            }
+          },
+          {
+            "content": "EYES",
+            "users": {
+              "totalCount": 7
+            }
+          },
+          {
+            "content": "HEART",
+            "users": {
+              "totalCount": 6
+            }
+          },
+          {
+            "content": "HOORAY",
+            "users": {
+              "totalCount": 5
+            }
+          },
+          {
+            "content": "LAUGH",
+            "users": {
+              "totalCount": 4
+            }
+          },
+          {
+            "content": "ROCKET",
+            "users": {
+              "totalCount": 3
+            }
+          },
+          {
+            "content": "THUMBS_DOWN",
+            "users": {
+              "totalCount": 2
+            }
+          },
+          {
+            "content": "THUMBS_UP",
+            "users": {
+              "totalCount": 1
+            }
+          }
+        ],
+        "comments": {
+          "totalCount": 9
+        },
+        "url": "https://github.com/OWNER/REPO/issues/123"
+      }
+    }
+  }
+}

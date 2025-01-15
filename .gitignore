@@ -1,11 +1,19 @@
 /bin
+/share/bash-completion/completions
+/share/fish/vendor_completions.d
 /share/man/man1
+/share/zsh/site-functions
 /gh-cli
 .envrc
 /dist
 /site
 .github/**/node_modules
 /CHANGELOG.md
+/.goreleaser.generated.yml
+/script/build
+/script/build.exe
+/pkg_payload
+/build/macOS/resources
 
 # VS Code
 .vscode
@@ -15,5 +23,11 @@
 
 # macOS
 .DS_Store
+
+# vim
+*.swp
+
+# Emacs
+*~
 
 vendor/

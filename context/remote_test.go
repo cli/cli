@@ -1,42 +1,102 @@
 package context
 
 import (
-	"bytes"
-	"errors"
 	"net/url"
-	"reflect"
 	"testing"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/stretchr/testify/assert"
 )
-
-func eq(t *testing.T, got interface{}, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("expected: %v, got: %v", expected, got)
-	}
-}
 
 func Test_Remotes_FindByName(t *testing.T) {
 	list := Remotes{
-		&Remote{Remote: &git.Remote{Name: "mona"}, Owner: "monalisa", Repo: "myfork"},
-		&Remote{Remote: &git.Remote{Name: "origin"}, Owner: "monalisa", Repo: "octo-cat"},
-		&Remote{Remote: &git.Remote{Name: "upstream"}, Owner: "hubot", Repo: "tools"},
+		&Remote{Remote: &git.Remote{Name: "mona"}, Repo: ghrepo.New("monalisa", "myfork")},
+		&Remote{Remote: &git.Remote{Name: "origin"}, Repo: ghrepo.New("monalisa", "octo-cat")},
+		&Remote{Remote: &git.Remote{Name: "upstream"}, Repo: ghrepo.New("hubot", "tools")},
 	}
 
 	r, err := list.FindByName("upstream", "origin")
-	eq(t, err, nil)
-	eq(t, r.Name, "upstream")
+	assert.NoError(t, err)
+	assert.Equal(t, "upstream", r.Name)
 
-	r, err = list.FindByName("nonexist", "*")
-	eq(t, err, nil)
-	eq(t, r.Name, "mona")
+	r, err = list.FindByName("nonexistent", "*")
+	assert.NoError(t, err)
+	assert.Equal(t, "mona", r.Name)
 
-	_, err = list.FindByName("nonexist")
-	eq(t, err, errors.New(`no GitHub remotes found`))
+	_, err = list.FindByName("nonexistent")
+	assert.Error(t, err, "no GitHub remotes found")
+}
+
+func Test_Remotes_FindByRepo(t *testing.T) {
+	list := Remotes{
+		&Remote{Remote: &git.Remote{Name: "remote-0"}, Repo: ghrepo.New("owner", "repo")},
+		&Remote{Remote: &git.Remote{Name: "remote-1"}, Repo: ghrepo.New("another-owner", "another-repo")},
+	}
+
+	tests := []struct {
+		name        string
+		owner       string
+		repo        string
+		wantsRemote *Remote
+		wantsError  string
+	}{
+		{
+			name:        "exact match (owner/repo)",
+			owner:       "owner",
+			repo:        "repo",
+			wantsRemote: list[0],
+		},
+		{
+			name:        "exact match (another-owner/another-repo)",
+			owner:       "another-owner",
+			repo:        "another-repo",
+			wantsRemote: list[1],
+		},
+		{
+			name:        "case-insensitive match",
+			owner:       "OWNER",
+			repo:        "REPO",
+			wantsRemote: list[0],
+		},
+		{
+			name:       "non-match (owner)",
+			owner:      "unknown-owner",
+			repo:       "repo",
+			wantsError: "no matching remote found; looking for unknown-owner/repo",
+		},
+		{
+			name:       "non-match (repo)",
+			owner:      "owner",
+			repo:       "unknown-repo",
+			wantsError: "no matching remote found; looking for owner/unknown-repo",
+		},
+		{
+			name:       "non-match (owner, repo)",
+			owner:      "unknown-owner",
+			repo:       "unknown-repo",
+			wantsError: "no matching remote found; looking for unknown-owner/unknown-repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := list.FindByRepo(tt.owner, tt.repo)
+			if tt.wantsError != "" {
+				assert.Error(t, err, tt.wantsError)
+				assert.Nil(t, r)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, r, tt.wantsRemote)
+			}
+		})
+	}
+}
+
+type identityTranslator struct{}
+
+func (it identityTranslator) Translate(u *url.URL) *url.URL {
+	return u
 }
 
 func Test_translateRemotes(t *testing.T) {
@@ -54,10 +114,7 @@ func Test_translateRemotes(t *testing.T) {
 		},
 	}
 
-	identityURL := func(u *url.URL) *url.URL {
-		return u
-	}
-	result := translateRemotes(gitRemotes, identityURL)
+	result := TranslateRemotes(gitRemotes, identityTranslator{})
 
 	if len(result) != 1 {
 		t.Errorf("got %d results", len(result))
@@ -70,166 +127,13 @@ func Test_translateRemotes(t *testing.T) {
 	}
 }
 
-func Test_resolvedRemotes_triangularSetup(t *testing.T) {
-	http := &httpmock.Registry{}
-	apiClient := api.NewClient(api.ReplaceTripper(http))
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "forks": { "nodes": [
-	] } } } }
-	`))
-
-	resolved := ResolvedRemotes{
-		BaseOverride: nil,
-		Remotes: Remotes{
-			&Remote{
-				Remote: &git.Remote{Name: "origin"},
-				Owner:  "OWNER",
-				Repo:   "REPO",
-			},
-			&Remote{
-				Remote: &git.Remote{Name: "fork"},
-				Owner:  "MYSELF",
-				Repo:   "REPO",
-			},
-		},
-		Network: api.RepoNetworkResult{
-			Repositories: []*api.Repository{
-				{
-					Name:             "NEWNAME",
-					Owner:            api.RepositoryOwner{Login: "NEWOWNER"},
-					ViewerPermission: "READ",
-				},
-				{
-					Name:             "REPO",
-					Owner:            api.RepositoryOwner{Login: "MYSELF"},
-					ViewerPermission: "ADMIN",
-				},
-			},
-		},
-		apiClient: apiClient,
-	}
-
-	baseRepo, err := resolved.BaseRepo()
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	eq(t, ghrepo.FullName(baseRepo), "NEWOWNER/NEWNAME")
-	baseRemote, err := resolved.RemoteForRepo(baseRepo)
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	if baseRemote.Name != "origin" {
-		t.Errorf("got remote %q", baseRemote.Name)
-	}
-
-	headRepo, err := resolved.HeadRepo()
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	eq(t, ghrepo.FullName(headRepo), "MYSELF/REPO")
-	headRemote, err := resolved.RemoteForRepo(headRepo)
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	if headRemote.Name != "fork" {
-		t.Errorf("got remote %q", headRemote.Name)
-	}
-}
-
-func Test_resolvedRemotes_forkLookup(t *testing.T) {
-	http := &httpmock.Registry{}
-	apiClient := api.NewClient(api.ReplaceTripper(http))
-
-	http.StubResponse(200, bytes.NewBufferString(`
-	{ "data": { "repository": { "forks": { "nodes": [
-		{ "id": "FORKID",
-		  "url": "https://github.com/FORKOWNER/REPO",
-		  "name": "REPO",
-		  "owner": { "login": "FORKOWNER" },
-		  "viewerPermission": "WRITE"
-		}
-	] } } } }
-	`))
-
-	resolved := ResolvedRemotes{
-		BaseOverride: nil,
-		Remotes: Remotes{
-			&Remote{
-				Remote: &git.Remote{Name: "origin"},
-				Owner:  "OWNER",
-				Repo:   "REPO",
-			},
-		},
-		Network: api.RepoNetworkResult{
-			Repositories: []*api.Repository{
-				{
-					Name:             "NEWNAME",
-					Owner:            api.RepositoryOwner{Login: "NEWOWNER"},
-					ViewerPermission: "READ",
-				},
-			},
-		},
-		apiClient: apiClient,
-	}
-
-	headRepo, err := resolved.HeadRepo()
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	eq(t, ghrepo.FullName(headRepo), "FORKOWNER/REPO")
-	_, err = resolved.RemoteForRepo(headRepo)
-	if err == nil {
-		t.Fatal("expected to not find a matching remote")
-	}
-}
-
-func Test_resolvedRemotes_clonedFork(t *testing.T) {
-	resolved := ResolvedRemotes{
-		BaseOverride: nil,
-		Remotes: Remotes{
-			&Remote{
-				Remote: &git.Remote{Name: "origin"},
-				Owner:  "OWNER",
-				Repo:   "REPO",
-			},
-		},
-		Network: api.RepoNetworkResult{
-			Repositories: []*api.Repository{
-				{
-					Name:             "REPO",
-					Owner:            api.RepositoryOwner{Login: "OWNER"},
-					ViewerPermission: "ADMIN",
-					Parent: &api.Repository{
-						Name:             "REPO",
-						Owner:            api.RepositoryOwner{Login: "PARENTOWNER"},
-						ViewerPermission: "READ",
-					},
-				},
-			},
-		},
-	}
-
-	baseRepo, err := resolved.BaseRepo()
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	eq(t, ghrepo.FullName(baseRepo), "PARENTOWNER/REPO")
-	baseRemote, err := resolved.RemoteForRepo(baseRepo)
-	if baseRemote != nil || err == nil {
-		t.Error("did not expect any remote for base")
-	}
-
-	headRepo, err := resolved.HeadRepo()
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	eq(t, ghrepo.FullName(headRepo), "OWNER/REPO")
-	headRemote, err := resolved.RemoteForRepo(headRepo)
-	if err != nil {
-		t.Fatalf("got %v", err)
-	}
-	if headRemote.Name != "origin" {
-		t.Errorf("got remote %q", headRemote.Name)
-	}
+func Test_FilterByHosts(t *testing.T) {
+	r1 := &Remote{Remote: &git.Remote{Name: "mona"}, Repo: ghrepo.NewWithHost("monalisa", "myfork", "test.com")}
+	r2 := &Remote{Remote: &git.Remote{Name: "origin"}, Repo: ghrepo.NewWithHost("monalisa", "octo-cat", "example.com")}
+	r3 := &Remote{Remote: &git.Remote{Name: "upstream"}, Repo: ghrepo.New("hubot", "tools")}
+	list := Remotes{r1, r2, r3}
+	f := list.FilterByHosts([]string{"example.com", "test.com"})
+	assert.Equal(t, 2, len(f))
+	assert.Equal(t, r1, f[0])
+	assert.Equal(t, r2, f[1])
 }

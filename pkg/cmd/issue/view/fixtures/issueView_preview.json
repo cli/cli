@@ -1,0 +1,36 @@
+{
+  "data": {
+    "repository": {
+      "hasIssuesEnabled": true,
+      "issue": {
+        "number": 123,
+        "body": "**bold story**",
+        "title": "ix of coins",
+        "state": "OPEN",
+        "createdAt": "2011-01-26T19:01:12Z",
+        "author": {
+          "login": "marseilles"
+        },
+        "assignees": {
+          "nodes": [],
+          "totalCount": 0
+        },
+        "labels": {
+          "nodes": [],
+          "totalCount": 0
+        },
+        "projectcards": {
+          "nodes": [],
+          "totalCount": 0
+        },
+        "milestone": {
+          "title": ""
+        },
+        "comments": {
+          "totalCount": 9
+        },
+        "url": "https://github.com/OWNER/REPO/issues/123"
+      }
+    }
+  }
+}

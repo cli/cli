@@ -1,0 +1,45 @@
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Prepare a branch to PR with a single file
+cd $SCRIPT_NAME-$RANDOM_STRING
+exec git checkout -b feature-branch
+mv ../file.txt file.txt
+exec git add .
+exec git commit -m 'Add file.txt'
+exec git push -u origin feature-branch
+
+# Create the PR
+exec gh pr create --title 'Feature Title' --body 'Feature Body'
+stdout2env PR_URL
+
+# Check that the file doesn't exist on the main branch
+exec git checkout main
+! exists file.txt
+
+# Merge the PR
+exec gh pr merge $PR_URL --merge
+
+# Check that the state of the PR is now merged
+exec gh pr view $PR_URL
+stdout 'state:\tMERGED$'
+
+# Pull and check the file exists on the main branch
+exec git pull -r
+exists file.txt
+
+# And check we had a merge commit
+exec git show HEAD
+stdout 'Merge pull request #1'
+
+-- file.txt --
+Unimportant contents

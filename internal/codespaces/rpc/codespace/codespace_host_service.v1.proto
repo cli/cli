@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+option go_package = "./codespace";
+
+package Codespaces.Grpc.CodespaceHostService.v1;
+
+service CodespaceHost {
+  rpc NotifyCodespaceOfClientActivity (NotifyCodespaceOfClientActivityRequest) returns (NotifyCodespaceOfClientActivityResponse);
+  rpc RebuildContainerAsync (RebuildContainerRequest) returns (RebuildContainerResponse);
+}
+
+message NotifyCodespaceOfClientActivityRequest {
+  string ClientId = 1;
+  repeated string ClientActivities = 2;
+}
+message NotifyCodespaceOfClientActivityResponse {
+  bool Result = 1;
+  string Message = 2;
+}
+
+message RebuildContainerRequest {
+  optional bool Incremental = 1;
+}
+
+message RebuildContainerResponse {
+  bool RebuildContainer = 1;
+}

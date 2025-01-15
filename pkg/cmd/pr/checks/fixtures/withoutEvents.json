@@ -1,0 +1,53 @@
+{
+  "data": {
+    "node": {
+      "statusCheckRollup": {
+        "nodes": [
+          {
+            "commit": {
+              "oid": "abc",
+              "statusCheckRollup": {
+                "contexts": {
+                  "nodes": [
+                    {
+                      "conclusion": "SUCCESS",
+                      "status": "COMPLETED",
+                      "name": "cool tests",
+                      "description": "cool description",
+                      "completedAt": "2020-08-27T19:00:12Z",
+                      "startedAt": "2020-08-27T18:58:46Z",
+                      "detailsUrl": "sweet link",
+                      "checkSuite": {
+                        "workflowRun": {
+                          "workflow": {
+                            "name": "tests"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "conclusion": "SUCCESS",
+                      "status": "COMPLETED",
+                      "name": "cool tests",
+                      "description": "cool description",
+                      "completedAt": "2020-08-27T19:00:12Z",
+                      "startedAt": "2020-08-27T18:58:46Z",
+                      "detailsUrl": "sweet link",
+                      "checkSuite": {
+                        "workflowRun": {
+                          "workflow": {
+                            "name": "tests"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

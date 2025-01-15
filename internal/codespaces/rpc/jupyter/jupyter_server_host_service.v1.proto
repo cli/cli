@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option go_package = "./jupyter";
+
+package Codespaces.Grpc.JupyterServerHostService.v1;
+
+service JupyterServerHost {
+  rpc GetRunningServer (GetRunningServerRequest) returns (GetRunningServerResponse);
+}
+
+message GetRunningServerRequest {
+}
+
+message GetRunningServerResponse {
+  bool Result = 1;
+  string Message = 2;
+  string Port = 3;
+  string ServerUrl = 4;
+}

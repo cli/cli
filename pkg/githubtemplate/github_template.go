@@ -1,7 +1,9 @@
 package githubtemplate
 
 import (
-	"io/ioutil"
+	"fmt"
+	"io/fs"
+	"os"
 	"path"
 	"regexp"
 	"sort"
@@ -23,20 +25,20 @@ func FindNonLegacy(rootDir string, name string) []string {
 
 mainLoop:
 	for _, dir := range candidateDirs {
-		files, err := ioutil.ReadDir(dir)
+		files, err := os.ReadDir(dir)
 		if err != nil {
 			continue
 		}
-
 		// detect multiple templates in a subdirectory
 		for _, file := range files {
 			if strings.EqualFold(file.Name(), name) && file.IsDir() {
-				templates, err := ioutil.ReadDir(path.Join(dir, file.Name()))
+				templates, err := os.ReadDir(path.Join(dir, file.Name()))
 				if err != nil {
 					break
 				}
 				for _, tf := range templates {
-					if strings.HasSuffix(tf.Name(), ".md") {
+					if strings.HasSuffix(tf.Name(), ".md") &&
+						file.Type() != fs.ModeSymlink {
 						results = append(results, path.Join(dir, file.Name(), tf.Name()))
 					}
 				}
@@ -47,38 +49,43 @@ mainLoop:
 			}
 		}
 	}
+
 	sort.Strings(results)
 	return results
 }
 
 // FindLegacy returns the file path of the default(legacy) template
-func FindLegacy(rootDir string, name string) *string {
+func FindLegacy(rootDir string, name string) string {
+	namePattern := regexp.MustCompile(fmt.Sprintf(`(?i)^%s(\.|$)`, strings.ReplaceAll(name, "_", "[_-]")))
+
 	// https://help.github.com/en/github/building-a-strong-community/creating-a-pull-request-template-for-your-repository
 	candidateDirs := []string{
 		path.Join(rootDir, ".github"),
 		rootDir,
 		path.Join(rootDir, "docs"),
 	}
+
 	for _, dir := range candidateDirs {
-		files, err := ioutil.ReadDir(dir)
+		files, err := os.ReadDir(dir)
 		if err != nil {
 			continue
 		}
-
 		// detect a single template file
 		for _, file := range files {
-			if strings.EqualFold(file.Name(), name+".md") {
-				result := path.Join(dir, file.Name())
-				return &result
+			if namePattern.MatchString(file.Name()) &&
+				!file.IsDir() &&
+				file.Type() != fs.ModeSymlink {
+				return path.Join(dir, file.Name())
 			}
 		}
 	}
-	return nil
+
+	return ""
 }
 
 // ExtractName returns the name of the template from YAML front-matter
 func ExtractName(filePath string) string {
-	contents, err := ioutil.ReadFile(filePath)
+	contents, err := os.ReadFile(filePath)
 	frontmatterBoundaries := detectFrontmatter(contents)
 	if err == nil && frontmatterBoundaries[0] == 0 {
 		templateData := struct {
@@ -91,9 +98,24 @@ func ExtractName(filePath string) string {
 	return path.Base(filePath)
 }
 
+// ExtractTitle returns the title of the template from YAML front-matter
+func ExtractTitle(filePath string) string {
+	contents, err := os.ReadFile(filePath)
+	frontmatterBoundaries := detectFrontmatter(contents)
+	if err == nil && frontmatterBoundaries[0] == 0 {
+		templateData := struct {
+			Title string
+		}{}
+		if err := yaml.Unmarshal(contents[0:frontmatterBoundaries[1]], &templateData); err == nil && templateData.Title != "" {
+			return templateData.Title
+		}
+	}
+	return ""
+}
+
 // ExtractContents returns the template contents without the YAML front-matter
 func ExtractContents(filePath string) []byte {
-	contents, err := ioutil.ReadFile(filePath)
+	contents, err := os.ReadFile(filePath)
 	if err != nil {
 		return []byte{}
 	}

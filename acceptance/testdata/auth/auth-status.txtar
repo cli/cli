@@ -1,0 +1,3 @@
+# Check the authentication status
+exec gh auth status --hostname $GH_HOST
+stdout '✓ Logged in to '

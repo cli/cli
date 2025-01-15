@@ -1,0 +1,36 @@
+skip 'it modifies the user''s personal GitHub account GPG keys'
+
+# This test requires the admin:gpg_key scope to add and delete GPG keys to and
+# from the user's personal GitHub account. 
+# This test uses a GPG key that generated for this test only. The private key
+# has been deleted
+
+# Add the gpg key to GH account
+exec gh gpg-key add gpg-key.pub
+
+# Verify the gpg key was added to GH account
+exec gh gpg-key list
+stdout '24C30F9C9115E747'
+
+# Delete the gpg key from GH account
+exec gh gpg-key delete --yes '24C30F9C9115E747'
+
+# Check the key is deleted
+exec gh gpg-key list
+! stdout '24C30F9C9115E747'
+
+-- gpg-key.pub --
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEZxpWhhYJKwYBBAHaRw8BAQdAmYiobR2ai/lVWOBtlAPRG1ZEMG5Effavpt5w
+n+wQ//W0R0dIIENMSSBhY2NlcHRhbmNlIHRlc3QgKGZvciBHSCBDTEkgYWNjZXB0
+YW5jZSB0ZXN0aW5nKSA8Y2xpQGdpdGh1Yi5jb20+iJkEExYKAEEWIQTEAQLLUl1x
+MDSmbL0kww+ckRXnRwUCZxpWhgIbAwUJAAFRgAULCQgHAgIiAgYVCgkICwIEFgID
+AQIeBwIXgAAKCRAkww+ckRXnRxkuAP9GiFi/etWxRjnkomdTaOU8Ccd6oHspuEzB
+PFxOJdYslQD+MXgY5UhM/q2iEVj0tiVsfRzDqB+g2weaF5EpqIwWcQ+4OARnGlaG
+EgorBgEEAZdVAQUBAQdA3D1vnVTc9URDQw/oAd1mG/zRX7vF4QrjFqFIt7uMf2gD
+AQgHiH4EGBYKACYWIQTEAQLLUl1xMDSmbL0kww+ckRXnRwUCZxpWhgIbDAUJAAFR
+gAAKCRAkww+ckRXnRxVuAQCngnR11jh2mob0FN0rPWce2juoJsh5gPB2d7LS4r5P
+VwEA6F2FeetcP51EyKyQGTp3GpmZgk0uCGJa1G5uqT+9mgc=
+=RLWi
+-----END PGP PUBLIC KEY BLOCK-----

@@ -1,0 +1,76 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "totalCount": 1,
+        "edges": [
+          {
+            "node": {
+              "number": 10,
+              "title": "Blueberries are a good fruit",
+              "state": "OPEN",
+              "url": "https://github.com/cli/cli/pull/10",
+              "headRefName": "blueberries",
+              "isDraft": false,
+              "headRepositoryOwner": {
+                "login": "OWNER"
+              },
+              "isCrossRepository": false,
+              "autoMergeRequest": null
+            }
+          }
+        ]
+      }
+    },
+    "viewerCreated": {
+      "totalCount": 1,
+      "edges": [
+        {
+          "node": {
+            "number": 8,
+            "title": "Strawberries are not actually berries",
+            "state": "OPEN",
+            "url": "https://github.com/cli/cli/pull/8",
+            "headRefName": "strawberries",
+            "isDraft": false,
+            "autoMergeRequest": null
+          }
+        }
+      ]
+    },
+    "reviewRequested": {
+      "totalCount": 2,
+      "edges": [
+        {
+          "node": {
+            "number": 9,
+            "title": "Apples are tasty",
+            "state": "OPEN",
+            "url": "https://github.com/cli/cli/pull/9",
+            "headRefName": "apples",
+            "isDraft": false,
+            "autoMergeRequest": {
+              "authorEmail": null,
+              "commitBody": null,
+              "commitHeadline": null,
+              "mergeMethod": "SQUASH",
+              "enabledAt": "2020-08-27T19:00:12Z",
+              "enabledBy": {
+                "login": "hubot"
+              }
+            }
+          } }, {
+          "node": {
+            "number": 11,
+            "title": "Figs are my favorite",
+            "state": "OPEN",
+            "url": "https://github.com/cli/cli/pull/1",
+            "headRefName": "figs",
+            "isDraft": true,
+            "autoMergeRequest": null
+          }
+        }
+      ]
+    }
+  }
+}

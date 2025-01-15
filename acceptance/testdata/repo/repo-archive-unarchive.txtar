@@ -1,0 +1,23 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Check that the repo exists and isn't archived
+exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING --json=isArchived --jq='.isArchived'
+stdout 'false'
+
+# Archive the repo
+exec gh repo archive $ORG/$SCRIPT_NAME-$RANDOM_STRING --yes
+
+# Check that the repo is archived
+exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING --json=isArchived --jq='.isArchived'
+stdout 'true'
+
+# Unarchive the repo
+exec gh repo unarchive $ORG/$SCRIPT_NAME-$RANDOM_STRING --yes
+
+# Check that the repo is unarchived
+exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING --json=isArchived --jq='.isArchived'
+stdout 'false'

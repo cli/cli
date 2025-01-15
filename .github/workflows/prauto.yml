@@ -1,0 +1,90 @@
+name: PR Automation
+on:
+  pull_request_target:
+    types: [ready_for_review, opened, reopened]
+
+permissions:
+  contents: none
+  issues: write
+  pull-requests: write
+
+jobs:
+  pr-auto:
+    runs-on: ubuntu-latest
+    steps:
+      - name: lint pr
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+          PRID: ${{ github.event.pull_request.node_id }}
+          PRBODY: ${{ github.event.pull_request.body }}
+          PRNUM: ${{ github.event.pull_request.number }}
+          PRHEAD: ${{ github.event.pull_request.head.label }}
+          PRAUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+        if: "!github.event.pull_request.draft"
+        run: |
+          commentPR () {
+            gh pr comment $PRNUM -b "${1}"
+          }
+
+          closePR () {
+            gh pr close $PRNUM
+          }
+
+          colID () {
+            gh api graphql -f query='query($owner:String!, $repo:String!) {
+              repository(owner:$owner, name:$repo) {
+                project(number:1) {
+                  columns(first:10) { nodes {id,name} }
+                }
+              }
+            }' -f owner="${GH_REPO%/*}" -f repo="${GH_REPO#*/}" \
+              -q ".data.repository.project.columns.nodes[] | select(.name | startswith(\"$1\")) | .id"
+          }
+
+          addToBoard () {
+            gh api graphql --silent -f query='
+              mutation($colID:ID!, $prID:ID!) { addProjectCard(input: { projectColumnId: $colID, contentId: $prID }) { clientMutationId } }
+            ' -f colID="$(colID "Needs review")" -f prID="$PRID"
+          }
+
+          if [ "$PR_AUTHOR_TYPE" = "Bot" ] || gh api orgs/cli/public_members/$PRAUTHOR --silent 2>/dev/null
+          then
+            if [ "$PR_AUTHOR_TYPE" != "Bot" ]
+            then
+              gh pr edit $PRNUM --add-assignee $PRAUTHOR
+            fi
+            if ! errtext="$(addToBoard 2>&1)"
+            then
+              cat <<<"$errtext" >&2
+              if ! grep -iq 'project already has the associated issue' <<<"$errtext"
+              then
+                exit 1
+              fi
+            fi
+            exit 0
+          fi
+
+          gh pr edit $PRNUM --add-label "external"
+
+          if [ "$PRHEAD" = "cli:trunk" ]
+          then
+            closePR
+            exit 0
+          fi
+
+          if [ $(wc -c <<<"$PRBODY") -lt 10 ]
+          then
+            commentPR "Thanks for the pull request! We're a small team and it's helpful to have context around community submissions in order to review them appropriately. Our automation has closed this pull request since it does not have an adequate description. Please edit the body of this pull request to describe what this does, then reopen it."
+            closePR
+            exit 0
+          fi
+
+          if ! grep -Eq '(#|issues/)[0-9]+' <<<"$PRBODY"
+          then
+            commentPR "Hi! Thanks for the pull request. Please ensure that this change is linked to an issue by mentioning an issue number in the description of the pull request. If this pull request would close the issue, please put the word 'Fixes' before the issue number somewhere in the pull request body. If this is a tiny change like fixing a typo, feel free to ignore this message."
+          fi
+
+          addToBoard
+          exit 0

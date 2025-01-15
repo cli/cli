@@ -1,0 +1,41 @@
+{
+  "data": {
+    "level": {
+      "rulesets": {
+        "totalCount": 2,
+        "nodes": [
+          {
+            "databaseId": 74,
+            "name": "My Org Ruleset",
+            "target": "BRANCH",
+            "enforcement": "EVALUATE",
+            "source": {
+              "__typename": "Organization",
+              "owner": "my-owner"
+            },
+            "rules": {
+              "totalCount": 3
+            }
+          },
+          {
+            "databaseId": 42,
+            "name": "Test Ruleset",
+            "target": "BRANCH",
+            "enforcement": "ACTIVE",
+            "source": {
+              "__typename": "Repository",
+              "owner": "my-owner/repo-name"
+            },
+            "rules": {
+              "totalCount": 3
+            }
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "Mg"
+        }
+      }
+    }
+  }
+}

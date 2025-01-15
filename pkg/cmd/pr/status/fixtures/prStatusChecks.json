@@ -1,0 +1,171 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "totalCount": 0,
+        "edges": []
+      }
+    },
+    "viewerCreated": {
+      "totalCount": 4,
+      "edges": [
+        {
+          "node": {
+            "number": 8,
+            "title": "Strawberries are not actually berries",
+            "state": "OPEN",
+            "url": "https://github.com/cli/cli/pull/8",
+            "headRefName": "strawberries",
+            "mergeable": "UNKNOWN",
+            "reviewDecision": "CHANGES_REQUESTED",
+            "statusCheckRollup": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typeName": "StatusContext",
+                            "state": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "node": {
+            "number": 7,
+            "title": "Bananas are berries",
+            "state": "OPEN",
+            "url": "https://github.com/cli/cli/pull/7",
+            "headRefName": "banananana",
+            "reviewDecision": "APPROVED",
+            "baseRef": {
+              "branchProtectionRule": {
+                "requiredApprovingReviewCount": 0
+              }
+            },
+            "latestReviews": {
+              "nodes": [
+                {
+                  "author": {
+                    "login": "bob"
+                  },
+                  "state": "APPROVED"
+                },
+                {
+                  "author": {
+                    "login": "stella"
+                  },
+                  "state": "CHANGES_REQUESTED"
+                },
+                {
+                  "author": {
+                    "login": "alice"
+                  },
+                  "state": "APPROVED"
+                }
+              ]
+            },
+            "statusCheckRollup": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typeName": "CheckRun",
+                            "status": "IN_PROGRESS",
+                            "conclusion": ""
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "node": {
+            "number": 6,
+            "title": "Avocado is probably not a berry",
+            "state": "OPEN",
+            "url": "https://github.com/cli/cli/pull/6",
+            "headRefName": "avo",
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "REVIEW_REQUIRED",
+            "statusCheckRollup": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typeName": "CheckRun",
+                            "status": "IN_PROGRESS",
+                            "conclusion": ""
+                          },
+                          {
+                            "__typeName": "StatusContext",
+                            "state": "FAILURE"
+                          },
+                          {
+                            "__typeName": "CheckRun",
+                            "status": "COMPLETED",
+                            "conclusion": "NEUTRAL"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "node": {
+            "number": 5,
+            "title": "Why can't berries get along?",
+            "state": "OPEN",
+            "url": "https://github.com/cli/cli/pull/5",
+            "headRefName": "strawberries",
+            "mergeable": "CONFLICTING",
+            "statusCheckRollup": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "__typeName": "StatusContext",
+                            "state": "SUCCESS"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "reviewRequested": {
+      "totalCount": 0,
+      "edges": []
+    }
+  }
+}

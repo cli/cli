@@ -1,0 +1,67 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviews": {
+          "nodes": [
+            {
+              "author": {
+                "login": "123"
+              },
+              "state": "COMMENTED"
+            },
+            {
+              "author": {
+                "login": "def"
+              },
+              "state": "CHANGES_REQUESTED"
+            },
+            {
+              "author": {
+                "login": "abc"
+              },
+              "state": "APPROVED"
+            },
+            {
+              "author": {
+                "login": "DEF"
+              },
+              "state": "COMMENTED"
+            },
+            {
+              "author": {
+                "login": "xyz"
+              },
+              "state": "APPROVED"
+            },
+            {
+              "author": {
+                "login": ""
+              },
+              "state": "APPROVED"
+            },
+            {
+              "author": {
+                "login": "hubot"
+              },
+              "state": "CHANGES_REQUESTED"
+            },
+            {
+              "author": {
+                "login": "hubot"
+              },
+              "state": "DISMISSED"
+            },
+            {
+              "author": {
+                "login": "monalisa"
+              },
+              "state": "PENDING"
+            }
+          ],
+          "totalCount": 9
+        }
+      }
+    }
+  }
+}

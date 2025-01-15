@@ -1,0 +1,36 @@
+# It's unclear what we want to do with these acceptance tests beyond our GHEC discovery, so skip new ones by default
+skip
+
+# Set up env vars
+env REPO=${ORG}/${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${REPO} --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes ${REPO}
+
+# Set the repo to be targeted by all following commands
+env GH_REPO=${REPO}
+
+# Listing the cache non-interactively shows nothing
+exec gh cache list
+! stdout '.'
+
+# Listing the cache non-interactively with --json shows an empty array
+exec gh cache list --json id
+stdout '\[\]'
+
+# Now set an env var so the commands run interactively and without colour for stdout matching
+# Unfortunately testscript provides no way to turn them off again, and since this
+# script is for discovery, we're not adding a new command.
+env GH_FORCE_TTY=true
+env CLICOLOR=0
+
+# Listing the cache interactively shows an informative message on stderr
+exec gh cache list
+stderr 'No caches found in'
+
+# Listing the cache interactively with --json shows an empty array
+exec gh cache list --json id
+stdout '\[\]'

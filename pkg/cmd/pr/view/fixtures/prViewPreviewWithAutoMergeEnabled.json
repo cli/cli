@@ -1,0 +1,55 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 12,
+        "title": "Blueberries are from a fork",
+        "state": "OPEN",
+        "body": "**blueberries taste good**",
+        "url": "https://github.com/OWNER/REPO/pull/12",
+        "author": {
+          "login": "nobody"
+        },
+        "autoMergeRequest": {
+          "authorEmail": null,
+          "commitBody": null,
+          "commitHeadline": null,
+          "mergeMethod": "SQUASH",
+          "enabledAt": "2020-08-27T19:00:12Z",
+          "enabledBy": {
+            "login": "hubot"
+          }
+        },
+        "additions": 100,
+        "deletions": 10,
+        "reviewRequests": {
+            "nodes": [],
+            "totalcount": 0
+        },
+        "assignees": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "labels": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "projectcards": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "milestone": {},
+        "commits": {
+          "totalCount": 12
+        },
+        "baseRefName": "master",
+        "headRefName": "blueberries",
+        "headRepositoryOwner": {
+          "login": "hubot"
+        },
+        "isCrossRepository": true,
+        "isDraft": false
+      }
+    }
+  }
+}

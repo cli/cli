@@ -1,0 +1,16 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Check that the repo description is empty
+exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING --json description --jq '.description'
+! stdout '.'
+
+# Edit the repo description
+exec gh repo edit $ORG/$SCRIPT_NAME-$RANDOM_STRING --description 'newDescription'
+
+# Check that the repo description is updated
+exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING --json description --jq '.description'
+stdout 'newDescription'

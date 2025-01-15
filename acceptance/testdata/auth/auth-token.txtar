@@ -1,0 +1,3 @@
+# Check authentication token
+exec gh auth token --hostname $GH_HOST
+stdout $GH_TOKEN

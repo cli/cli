@@ -1,0 +1,37 @@
+# Set up env vars
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# Clone the repo
+exec gh repo clone ${ORG}/${REPO}
+
+# Create a branch to act as the merge base branch
+cd ${REPO}
+exec git checkout -b long-lived-feature-branch
+exec git push -u origin long-lived-feature-branch
+
+# Create an issue to develop against
+exec gh issue create --title 'Feature Request' --body 'Request Body'
+stdout2env ISSUE_URL
+
+# Create a new branch using issue develop with the long lived branch as the base
+exec gh issue develop --name 'feature-branch' --base 'long-lived-feature-branch' --checkout ${ISSUE_URL}
+
+# Prepare a PR on the develop branch
+exec git commit --allow-empty -m 'Empty Commit'
+exec git push -u origin feature-branch
+
+# Create the PR
+exec gh pr create --title 'Feature Title' --body 'Feature Body'
+
+# Check the PR is created against the base branch we specified
+exec gh pr view --json 'baseRefName' --jq '.baseRefName'
+stdout 'long-lived-feature-branch'

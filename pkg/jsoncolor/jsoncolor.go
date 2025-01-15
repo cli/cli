@@ -1,6 +1,7 @@
 package jsoncolor
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,10 +11,14 @@ import (
 const (
 	colorDelim  = "1;38" // bright white
 	colorKey    = "1;34" // bright blue
-	colorNull   = "1;30" // gray
+	colorNull   = "36"   // cyan
 	colorString = "32"   // green
 	colorBool   = "33"   // yellow
 )
+
+type JsonWriter interface {
+	Preface() []json.Delim
+}
 
 // Write colorized JSON output parsed from reader
 func Write(w io.Writer, r io.Reader, indent string) error {
@@ -22,6 +27,10 @@ func Write(w io.Writer, r io.Reader, indent string) error {
 
 	var idx int
 	var stack []json.Delim
+
+	if jsonWriter, ok := w.(JsonWriter); ok {
+		stack = append(stack, jsonWriter.Preface()...)
+	}
 
 	for {
 		t, err := dec.Token()
@@ -49,7 +58,7 @@ func Write(w io.Writer, r io.Reader, indent string) error {
 				fmt.Fprintf(w, "\x1b[%sm%s\x1b[m", colorDelim, tt)
 			}
 		default:
-			b, err := json.Marshal(tt)
+			b, err := marshalJSON(tt)
 			if err != nil {
 				return err
 			}
@@ -93,4 +102,34 @@ func Write(w io.Writer, r io.Reader, indent string) error {
 	}
 
 	return nil
+}
+
+// WriteDelims writes delims in color and with the appropriate indent
+// based on the stack size returned from an io.Writer that implements JsonWriter.Preface().
+func WriteDelims(w io.Writer, delims, indent string) error {
+	var stack []json.Delim
+	if jaw, ok := w.(JsonWriter); ok {
+		stack = jaw.Preface()
+	}
+
+	fmt.Fprintf(w, "\x1b[%sm%s\x1b[m", colorDelim, delims)
+	fmt.Fprint(w, "\n", strings.Repeat(indent, len(stack)))
+
+	return nil
+}
+
+// marshalJSON works like json.Marshal but with HTML-escaping disabled
+func marshalJSON(v interface{}) ([]byte, error) {
+	buf := bytes.Buffer{}
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	bb := buf.Bytes()
+	// omit trailing newline added by json.Encoder
+	if len(bb) > 0 && bb[len(bb)-1] == '\n' {
+		return bb[:len(bb)-1], nil
+	}
+	return bb, nil
 }

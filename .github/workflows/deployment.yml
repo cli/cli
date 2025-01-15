@@ -1,0 +1,385 @@
+name: Deployment
+run-name: ${{ inputs.tag_name }} / ${{ inputs.environment }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  attestations: write
+  contents: write
+  id-token: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        required: true
+        type: string
+      environment:
+        default: production
+        type: environment
+      platforms:
+        default: "linux,macos,windows"
+        type: string
+      release:
+        description: "Whether to create a GitHub Release"
+        type: boolean
+        default: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    if: contains(inputs.platforms, 'linux')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~1.17.1"
+          install-only: true
+      - name: Build release binaries
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: script/release --local "$TAG_NAME" --platform linux
+      - name: Generate web manual pages
+        run: |
+          go run ./cmd/gen-docs --website --doc-path dist/manual
+          tar -czvf dist/manual.tar.gz -C dist -- manual
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/*.tar.gz
+            dist/*.rpm
+            dist/*.deb
+
+  macos:
+    runs-on: macos-latest
+    environment: ${{ inputs.environment }}
+    if: contains(inputs.platforms, 'macos')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+      - name: Configure macOS signing
+        if: inputs.environment == 'production'
+        env:
+          APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
+          APPLE_APPLICATION_CERT: ${{ secrets.APPLE_APPLICATION_CERT }}
+          APPLE_APPLICATION_CERT_PASSWORD: ${{ secrets.APPLE_APPLICATION_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/buildagent.keychain"
+          keychain_password="password1"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          security default-keychain -s "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+
+          base64 -D <<<"$APPLE_APPLICATION_CERT" > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_APPLICATION_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
+          rm "$RUNNER_TEMP/cert.p12"
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~1.17.1"
+          install-only: true
+      - name: Build release binaries
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+          APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
+        run: script/release --local "$TAG_NAME" --platform macos
+      - name: Notarize macOS archives
+        if: inputs.environment == 'production'
+        env:
+          APPLE_ID: ${{ vars.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_DEVELOPER_ID: ${{ vars.APPLE_DEVELOPER_ID }}
+        run: |
+          shopt -s failglob
+          script/sign dist/gh_*_macOS_*.zip
+      - name: Build universal macOS pkg installer
+        if: inputs.environment != 'production'
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: script/pkgmacos "$TAG_NAME"
+      - name: Build & notarize universal macOS pkg installer
+        if: inputs.environment == 'production'
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+          APPLE_DEVELOPER_INSTALLER_ID: ${{ vars.APPLE_DEVELOPER_INSTALLER_ID }}
+        run: |
+          shopt -s failglob
+          script/pkgmacos "$TAG_NAME"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.pkg
+ 
+  windows:
+    runs-on: windows-latest
+    environment: ${{ inputs.environment }}
+    if: contains(inputs.platforms, 'windows')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~1.17.1"
+          install-only: true
+      - name: Install Azure Code Signing Client
+        shell: pwsh
+        env:
+          ACS_DIR: ${{ runner.temp }}\acs
+          ACS_ZIP: ${{ runner.temp }}\acs.zip
+          CORRELATION_ID: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
+        run: |
+          # Download Azure Code Signing client containing the DLL needed for signtool in script/sign
+          Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Azure.CodeSigning.Client/1.0.43 -OutFile $Env:ACS_ZIP -Verbose
+          Expand-Archive $Env:ACS_ZIP -Destination $Env:ACS_DIR -Force -Verbose
+
+          # Generate metadata file for signtool, used in signing box .exe and .msi
+          @{
+            CertificateProfileName = "GitHubInc"
+            CodeSigningAccountName = "GitHubInc"
+            CorrelationId = $Env:CORRELATION_ID
+            Endpoint =  "https://wus.codesigning.azure.net/"
+          } | ConvertTo-Json | Out-File -FilePath $Env:METADATA_PATH
+
+      # Azure Code Signing leverages the environment variables for secrets that complement the metadata.json
+      # file generated above (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
+      # For more information, see https://learn.microsoft.com/en-us/dotnet/api/azure.identity.defaultazurecredential?view=azure-dotnet
+      - name: Build release binaries
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
+          AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
+          DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
+          METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: script/release --local "$TAG_NAME" --platform windows
+      - name: Set up MSBuild
+        id: setupmsbuild
+        uses: microsoft/setup-msbuild@v2.0.0
+      - name: Build MSI
+        shell: bash
+        env:
+          MSBUILD_PATH: ${{ steps.setupmsbuild.outputs.msbuildPath }}
+        run: |
+          for ZIP_FILE in dist/gh_*_windows_*.zip; do
+            MSI_NAME="$(basename "$ZIP_FILE" ".zip")"
+            MSI_VERSION="$(cut -d_ -f2 <<<"$MSI_NAME" | cut -d- -f1)"
+            case "$MSI_NAME" in
+            *_386 )
+              source_dir="$PWD/dist/windows_windows_386"
+              platform="x86"
+              ;;
+            *_amd64 )
+              source_dir="$PWD/dist/windows_windows_amd64_v1"
+              platform="x64"
+              ;;
+            *_arm64 )
+              echo "skipping building MSI for arm64 because WiX 3.11 doesn't support it: https://github.com/wixtoolset/issues/issues/6141" >&2
+              continue
+              #source_dir="$PWD/dist/windows_windows_arm64"
+              #platform="arm64"
+              ;;
+            * )
+              printf "unsupported architecture: %s\n" "$MSI_NAME" >&2
+              exit 1
+              ;;
+            esac
+            "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$source_dir" -p:OutputPath="$PWD/dist" -p:OutputName="$MSI_NAME" -p:ProductVersion="${MSI_VERSION#v}" -p:Platform="$platform"
+          done
+      - name: Sign .msi release binaries
+        if: inputs.environment == 'production'
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
+          AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
+          DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
+          METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
+        run: |
+          Get-ChildItem -Path .\dist -Filter *.msi | ForEach-Object {
+            .\script\sign.ps1 $_.FullName
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/*.zip
+            dist/*.msi
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [linux, macos, windows]
+    environment: ${{ inputs.environment }}
+    if: inputs.release
+    steps:
+      - name: Checkout cli/cli
+        uses: actions/checkout@v4
+      - name: Merge built artifacts
+        uses: actions/download-artifact@v4
+      - name: Checkout documentation site
+        uses: actions/checkout@v4
+        with:
+          repository: github/cli.github.com
+          path: site
+          fetch-depth: 0
+          token: ${{ secrets.SITE_DEPLOY_PAT }}
+      - name: Update site man pages
+        env:
+          GIT_COMMITTER_NAME: cli automation
+          GIT_AUTHOR_NAME: cli automation
+          GIT_COMMITTER_EMAIL: noreply@github.com
+          GIT_AUTHOR_EMAIL: noreply@github.com
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          git -C site rm 'manual/gh*.md' 2>/dev/null || true
+          tar -xzvf linux/manual.tar.gz -C site
+          git -C site add 'manual/gh*.md'
+          sed -i.bak -E "s/(assign version = )\".+\"/\1\"${TAG_NAME#v}\"/" site/index.html
+          rm -f site/index.html.bak
+          git -C site add index.html
+          git -C site diff --quiet --cached || git -C site commit -m "gh ${TAG_NAME#v}"
+      - name: Prepare release assets
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          shopt -s failglob
+          rm -rf dist
+          mkdir dist
+          mv -v {linux,macos,windows}/gh_* dist/
+      - name: Install packaging dependencies
+        run: sudo apt-get install -y rpm reprepro
+      - name: Set up GPG
+        if: inputs.environment == 'production'
+        env:
+          GPG_PUBKEY: ${{ secrets.GPG_PUBKEY }}
+          GPG_KEY: ${{ secrets.GPG_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEYGRIP: ${{ secrets.GPG_KEYGRIP }}
+        run: |
+          base64 -d <<<"$GPG_PUBKEY" | gpg --import --no-tty --batch --yes
+          base64 -d <<<"$GPG_KEY" | gpg --import --no-tty --batch --yes
+          echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent RELOADAGENT /bye
+          /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP" <<<"$GPG_PASSPHRASE"
+      - name: Sign RPMs
+        if: inputs.environment == 'production'
+        run: |
+          cp script/rpmmacros ~/.rpmmacros
+          rpmsign --addsign dist/*.rpm
+      - name: Attest release artifacts
+        if: inputs.environment == 'production'
+        uses: actions/attest-build-provenance@7668571508540a607bdfd90a87a560489fe372eb # v2.1.0
+        with:
+          subject-path: "dist/gh_*"
+      - name: Run createrepo
+        env:
+          GPG_SIGN: ${{ inputs.environment == 'production' }}
+        run: |
+          mkdir -p site/packages/rpm
+          cp dist/*.rpm site/packages/rpm/
+          ./script/createrepo.sh
+          cp -r dist/repodata site/packages/rpm/
+          pushd site/packages/rpm
+          [ "$GPG_SIGN" = "false" ] || gpg --yes --detach-sign --armor repodata/repomd.xml
+          popd
+      - name: Run reprepro
+        env:
+          GPG_SIGN: ${{ inputs.environment == 'production' }}
+          # We are no longer adding to the distribution list.
+          # All apt distributions should use "stable" according to our install documentation.
+          # In the future we will remove legacy distributions listed here.
+          RELEASES: "cosmic eoan disco groovy focal stable oldstable testing sid unstable buster bullseye stretch jessie bionic trusty precise xenial hirsute impish kali-rolling"
+        run: |
+          mkdir -p upload
+          [ "$GPG_SIGN" = "true" ] || sed -i.bak '/^SignWith:/d' script/distributions
+          for release in $RELEASES; do
+            for file in dist/*.deb; do
+              reprepro --confdir="+b/script" includedeb "$release" "$file"
+            done
+          done
+          cp -a dists/ pool/ upload/
+          mkdir -p site/packages
+          cp -a upload/* site/packages/
+      - name: Create the release
+        env:
+          # In non-production environments, the assets will not have been signed
+          DO_PUBLISH: ${{ inputs.environment == 'production' }}
+          TAG_NAME: ${{ inputs.tag_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s failglob
+          pushd dist
+          shasum -a 256 gh_* > checksums.txt
+          mv checksums.txt gh_${TAG_NAME#v}_checksums.txt
+          popd
+          release_args=(
+            "$TAG_NAME"
+            --title "GitHub CLI ${TAG_NAME#v}"
+            --target "$GITHUB_SHA"
+            --generate-notes
+          )
+          if [[ $TAG_NAME == *-* ]]; then
+            release_args+=( --prerelease )
+          fi
+          guard="echo"
+          [ "$DO_PUBLISH" = "false" ] || guard=""
+          script/label-assets dist/gh_* | xargs $guard gh release create "${release_args[@]}" --
+      - name: Publish site
+        env:
+          DO_PUBLISH: ${{ inputs.environment == 'production' && !contains(inputs.tag_name, '-') }}
+          TAG_NAME: ${{ inputs.tag_name }}
+          GIT_COMMITTER_NAME: cli automation
+          GIT_AUTHOR_NAME: cli automation
+          GIT_COMMITTER_EMAIL: noreply@github.com
+          GIT_AUTHOR_EMAIL: noreply@github.com
+        working-directory: ./site
+        run: |
+          git add packages
+          git commit -m "Add rpm and deb packages for $TAG_NAME"
+          if [ "$DO_PUBLISH" = "true" ]; then
+            git push
+          else
+            git log --oneline @{upstream}..
+            git diff --name-status @{upstream}..
+          fi
+      - name: Bump homebrew-core formula
+        uses: mislav/bump-homebrew-formula-action@v3
+        if: inputs.environment == 'production' && !contains(inputs.tag_name, '-')
+        with:
+          formula-name: gh
+          formula-path: Formula/g/gh.rb
+          tag-name: ${{ inputs.tag_name }}
+          push-to: williammartin/homebrew-core
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_PR_PAT }}

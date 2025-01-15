@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<installer-gui-script minSpecVersion="2">
+    <title>GitHub CLI</title>
+    <license file="LICENSE" mime-type="text/plain"/>
+    <options hostArchitectures="arm64,x86_64" customize="never" require-scripts="true" allow-external-scripts="false"/>
+    <domains enable_localSystem="true"/>
+    <installation-check script="installCheck();"/>
+    <script>
+    function installCheck() {
+        // this check is redundant, but it produces a user friendly error message
+        // compared to a disabled install button caused by allowed-os-versions
+        if (!(system.compareVersions(system.version.ProductVersion, '12') &gt;= 0)) {
+            my.result.title = 'Unable to install';
+            my.result.message = 'GitHub CLI requires macOS 12 or later.';
+            my.result.type = 'Fatal';
+            return false;
+        }
+        return true;
+    }
+    </script>
+    <allowed-os-versions>
+        <os-version min="12.0" />
+    </allowed-os-versions>
+
+    <choices-outline>
+        <line choice="gh-cli"/>
+    </choices-outline>
+    <choice id="gh-cli" title="GitHub CLI (universal)">
+        <pkg-ref id="com.github.cli.pkg"/>
+    </choice>
+
+    <pkg-ref id="com.github.cli.pkg" auth="root">#com.github.cli.pkg</pkg-ref>
+</installer-gui-script>

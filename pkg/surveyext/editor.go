@@ -5,10 +5,7 @@ package surveyext
 // To see what we extended, search through for EXTENDED comments.
 
 import (
-	"bytes"
-	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -23,14 +20,14 @@ var (
 )
 
 func init() {
-	if runtime.GOOS == "windows" {
-		defaultEditor = "notepad"
-	} else if g := os.Getenv("GIT_EDITOR"); g != "" {
+	if g := os.Getenv("GIT_EDITOR"); g != "" {
 		defaultEditor = g
 	} else if v := os.Getenv("VISUAL"); v != "" {
 		defaultEditor = v
 	} else if e := os.Getenv("EDITOR"); e != "" {
 		defaultEditor = e
+	} else if runtime.GOOS == "windows" {
+		defaultEditor = "notepad"
 	}
 }
 
@@ -39,14 +36,8 @@ type GhEditor struct {
 	*survey.Editor
 	EditorCommand string
 	BlankAllowed  bool
-}
 
-func (e *GhEditor) editorCommand() string {
-	if e.EditorCommand == "" {
-		return defaultEditor
-	}
-
-	return e.EditorCommand
+	lookPath func(string) ([]string, []string, error)
 }
 
 // EXTENDED to change prompt text
@@ -55,10 +46,10 @@ var EditorQuestionTemplate = `
 {{- color .Config.Icons.Question.Format }}{{ .Config.Icons.Question.Text }} {{color "reset"}}
 {{- color "default+hb"}}{{ .Message }} {{color "reset"}}
 {{- if .ShowAnswer}}
-  {{- color "cyan"}}{{.Answer}}{{color "reset"}}{{"\n"}}
+	{{- color "cyan"}}{{.Answer}}{{color "reset"}}{{"\n"}}
 {{- else }}
-  {{- if and .Help (not .ShowHelp)}}{{color "cyan"}}[{{ .Config.HelpInput }} for help]{{color "reset"}} {{end}}
-  {{- if and .Default (not .HideDefault)}}{{color "white"}}({{.Default}}) {{color "reset"}}{{end}}
+	{{- if and .Help (not .ShowHelp)}}{{color "cyan"}}[{{ .Config.HelpInput }} for help]{{color "reset"}} {{end}}
+	{{- if and .Default (not .HideDefault)}}{{color "white"}}({{.Default}}) {{color "reset"}}{{end}}
 	{{- color "cyan"}}[(e) to launch {{ .EditorCommand }}{{- if .BlankAllowed }}, enter to skip{{ end }}] {{color "reset"}}
 {{- end}}`
 
@@ -81,7 +72,7 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 		EditorTemplateData{
 			Editor:        *e.Editor,
 			BlankAllowed:  e.BlankAllowed,
-			EditorCommand: filepath.Base(e.editorCommand()),
+			EditorCommand: EditorName(e.EditorCommand),
 			Config:        config,
 		},
 	)
@@ -95,8 +86,10 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 	defer func() { _ = rr.RestoreTermMode() }()
 
 	cursor := e.NewCursor()
-	cursor.Hide()
-	defer cursor.Show()
+	_ = cursor.Hide()
+	defer func() {
+		_ = cursor.Show()
+	}()
 
 	for {
 		// EXTENDED to handle the e to edit / enter to skip behavior + BlankAllowed
@@ -109,7 +102,7 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 		}
 		if r == '\r' || r == '\n' {
 			if e.BlankAllowed {
-				return "", nil
+				return initialValue, nil
 			} else {
 				continue
 			}
@@ -127,7 +120,7 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 					// EXTENDED to support printing editor in prompt, BlankAllowed
 					Editor:        *e.Editor,
 					BlankAllowed:  e.BlankAllowed,
-					EditorCommand: filepath.Base(e.editorCommand()),
+					EditorCommand: EditorName(e.EditorCommand),
 					ShowHelp:      true,
 					Config:        config,
 				},
@@ -139,63 +132,15 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 		continue
 	}
 
-	// prepare the temp file
-	pattern := e.FileName
-	if pattern == "" {
-		pattern = "survey*.txt"
-	}
-	f, err := ioutil.TempFile("", pattern)
-	if err != nil {
-		return "", err
-	}
-	defer os.Remove(f.Name())
-
-	// write utf8 BOM header
-	// The reason why we do this is because notepad.exe on Windows determines the
-	// encoding of an "empty" text file by the locale, for example, GBK in China,
-	// while golang string only handles utf8 well. However, a text file with utf8
-	// BOM header is not considered "empty" on Windows, and the encoding will then
-	// be determined utf8 by notepad.exe, instead of GBK or other encodings.
-	if _, err := f.Write(bom); err != nil {
-		return "", err
-	}
-
-	// write initial value
-	if _, err := f.WriteString(initialValue); err != nil {
-		return "", err
-	}
-
-	// close the fd to prevent the editor unable to save file
-	if err := f.Close(); err != nil {
-		return "", err
-	}
-
 	stdio := e.Stdio()
-
-	args, err := shellquote.Split(e.editorCommand())
+	lookPath := e.lookPath
+	if lookPath == nil {
+		lookPath = defaultLookPath
+	}
+	text, err := edit(e.EditorCommand, e.FileName, initialValue, stdio.In, stdio.Out, stdio.Err, cursor, lookPath)
 	if err != nil {
 		return "", err
 	}
-	args = append(args, f.Name())
-
-	// open the editor
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stdin = stdio.In
-	cmd.Stdout = stdio.Out
-	cmd.Stderr = stdio.Err
-	cursor.Show()
-	if err := cmd.Run(); err != nil {
-		return "", err
-	}
-
-	// raw is a BOM-unstripped UTF8 byte slice
-	raw, err := ioutil.ReadFile(f.Name())
-	if err != nil {
-		return "", err
-	}
-
-	// strip BOM header
-	text := string(bytes.TrimPrefix(raw, bom))
 
 	// check length, return default value on empty
 	if len(text) == 0 && !e.AppendDefault {
@@ -212,4 +157,14 @@ func (e *GhEditor) Prompt(config *survey.PromptConfig) (interface{}, error) {
 		initialValue = e.Default
 	}
 	return e.prompt(initialValue, config)
+}
+
+func EditorName(editorCommand string) string {
+	if editorCommand == "" {
+		editorCommand = defaultEditor
+	}
+	if args, err := shellquote.Split(editorCommand); err == nil {
+		editorCommand = args[0]
+	}
+	return filepath.Base(editorCommand)
 }

@@ -1,0 +1,157 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 12,
+        "title": "some title",
+        "state": "OPEN",
+        "body": "some body",
+        "url": "https://github.com/OWNER/REPO/pull/12",
+        "author": {
+          "login": "nobody"
+        },
+        "additions": 100,
+        "deletions": 10,
+        "assignees": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "labels": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "projectcards": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "milestone": {
+          "title": ""
+        },
+        "commits": {
+          "totalCount": 12
+        },
+        "baseRefName": "master",
+        "headRefName": "blueberries",
+        "headRepositoryOwner": {
+          "login": "hubot"
+        },
+        "isCrossRepository": true,
+        "isDraft": false,
+        "reactionGroups": [
+          {
+            "content": "CONFUSED",
+            "users": {
+              "totalCount": 1
+            }
+          },
+          {
+            "content": "EYES",
+            "users": {
+              "totalCount": 2
+            }
+          },
+          {
+            "content": "HEART",
+            "users": {
+              "totalCount": 3
+            }
+          },
+          {
+            "content": "HOORAY",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "LAUGH",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "ROCKET",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "THUMBS_DOWN",
+            "users": {
+              "totalCount": 0
+            }
+          },
+          {
+            "content": "THUMBS_UP",
+            "users": {
+              "totalCount": 0
+            }
+          }
+        ],
+        "comments": {
+          "nodes": [
+            {
+              "author": {
+                "login": "marseilles"
+              },
+              "authorAssociation": "COLLABORATOR",
+              "body": "Comment 5",
+              "createdAt": "2020-01-09T12:00:00Z",
+              "includesCreatedEdit": false,
+              "reactionGroups": [
+                {
+                  "content": "CONFUSED",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "EYES",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HEART",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "HOORAY",
+                  "users": {
+                    "totalCount": 4
+                  }
+                },
+                {
+                  "content": "LAUGH",
+                  "users": {
+                    "totalCount": 5
+                  }
+                },
+                {
+                  "content": "ROCKET",
+                  "users": {
+                    "totalCount": 6
+                  }
+                },
+                {
+                  "content": "THUMBS_DOWN",
+                  "users": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "content": "THUMBS_UP",
+                  "users": {
+                    "totalCount": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "totalCount": 6
+        }
+      }
+    }
+  }
+}

@@ -1,17 +1,17 @@
-param (
-    [string]$Certificate = $(throw "-Certificate is required."),
-    [string]$Executable = $(throw "-Executable is required.")
-)
+#!/usr/bin/env pwsh
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
+if ($null -eq $Env:DLIB_PATH) {
+	Write-Host "Skipping Windows code signing; DLIB_PATH not set"
+	exit
+}
 
-$thumbprint = "fb713a60a7fa79dfc03cb301ca05d4e8c1bdd431"
-$passwd = $env:GITHUB_CERT_PASSWORD
-$ProgramName = "GitHub CLI"
+if ($null -eq $Env:METADATA_PATH) {
+	Write-Host "Skipping Windows code signing; METADATA_PATH not set"
+	exit
+}
 
-$scriptPath = split-path -parent $MyInvocation.MyCommand.Definition
+$signtool = Resolve-Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -Last 1
+Write-Host "Using signtool from $signtool"
 
-& $scriptPath\signtool.exe sign /d $ProgramName /f $Certificate /p $passwd `
-    /sha1 $thumbprint /fd sha256 /tr http://timestamp.digicert.com /td sha256 /v `
-    $Executable
+& $signtool sign /d "GitHub CLI" /fd sha256 /td sha256 /tr http://timestamp.acs.microsoft.com /v /dlib "$Env:DLIB_PATH" /dmdf "$Env:METADATA_PATH" $Args[0]
+exit $LASTEXITCODE
