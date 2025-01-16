@@ -804,6 +804,7 @@ func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
 
 func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
 	client := ctx.Client
+	headRepo := ctx.HeadRepo
 
 	params := map[string]interface{}{
 		"title":               state.Title,
@@ -812,6 +813,18 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		"baseRefName":         ctx.BaseBranch,
 		"headRefName":         ctx.HeadBranchLabel,
 		"maintainerCanModify": opts.MaintainerCanModify,
+	}
+
+	if (headRepo != nil) {
+		if r, ok := headRepo.(*api.Repository); ok {
+			params["headRepositoryId"] = r.ID
+		} else {
+			r, err = api.GitHubRepo(client, headRepo)
+			if err != nil {
+				return fmt.Errorf("head repository ID lookup failed: %w", err)
+			}
+			params["headRepositoryId"] = r.ID
+		}
 	}
 
 	if params["title"] == "" {
