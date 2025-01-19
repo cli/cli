@@ -206,45 +206,29 @@ func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
 		return err
 	}
 
-	w := io.Writer(ios.Out)
-	if e.filter != "" {
-		color := ios.ColorEnabled()
+	w := ios.Out
+	if e.filter != "" && e.template == "" {
 		indent := ""
-
-		var writeBuf bytes.Buffer
-		if e.template != "" {
-			color = false
-			writeBuf = bytes.Buffer{}
-			w = &writeBuf
-		} else if ios.IsStdoutTTY() {
+		if ios.IsStdoutTTY() {
 			indent = "  "
 		}
-		if err := jq.EvaluateFormatted(&buf, w, e.filter, indent, color); err != nil {
+		if err := jq.EvaluateFormatted(&buf, w, e.filter, indent, ios.ColorEnabled()); err != nil {
 			return err
 		}
-
-		if writeBuf.Len() != 0 {
-			buf.Reset()
-			if _, err := io.Copy(&buf, &writeBuf); err != nil {
-				return err
-			}
-		}
-	}
-
-	if e.template != "" {
-		t := template.New(ios.Out, ios.TerminalWidth(), ios.ColorEnabled())
+	} else if e.template != "" {
+		t := template.New(w, ios.TerminalWidth(), ios.ColorEnabled())
 		if err := t.Parse(e.template); err != nil {
 			return err
 		}
-		if err := t.Execute(&buf); err != nil {
+		if err := t.ExecuteFiltered(&buf, e.filter); err != nil {
 			return err
 		}
 		return t.Flush()
 	} else if ios.ColorEnabled() {
-		return jsoncolor.Write(ios.Out, &buf, "  ")
+		return jsoncolor.Write(w, &buf, "  ")
 	}
 
-	_, err := io.Copy(ios.Out, &buf)
+	_, err := io.Copy(w, &buf)
 	return err
 }
 
