@@ -93,6 +93,16 @@ func TestAddJSONFlags(t *testing.T) {
 				template: "{{.number}}",
 			},
 		},
+		{
+			name:   "with filter and template",
+			fields: []string{"id", "number", "title"},
+			args:   []string{"--json", "number", "-q", "sort_by(.number)", "-t", "{{.number}}"},
+			wantsExport: &jsonExporter{
+				fields:   []string{"number"},
+				filter:   "sort_by(.number)",
+				template: "{{.number}}",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -234,6 +244,14 @@ func TestAddFormatFlags(t *testing.T) {
 				template: "{{.number}}",
 			},
 		},
+		{
+			name: "with filter and template",
+			args: []string{"--format", "json", "-q", "sort_by(.number)", "-t", "{{.number}}"},
+			wantsExport: &jsonExporter{
+				filter:   "sort_by(.number)",
+				template: "{{.number}}",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -334,6 +352,17 @@ func Test_exportFormat_Write(t *testing.T) {
 			wantW:   "hubot",
 			wantErr: false,
 			istty:   false,
+		},
+		{
+			name: "with filter and template",
+			exporter: jsonExporter{
+				filter:   "{name: .name | ascii_upcase}",
+				template: "hello, {{.name}}!",
+			},
+			args: args{
+				data: map[string]string{"name": "hubot"},
+			},
+			wantW: "hello, HUBOT!",
 		},
 	}
 	for _, tt := range tests {
