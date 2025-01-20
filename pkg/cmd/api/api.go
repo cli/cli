@@ -57,6 +57,7 @@ type ApiOptions struct {
 	Template            string
 	CacheTTL            time.Duration
 	FilterOutput        string
+	LibraryPaths        []string
 	Verbose             bool
 }
 
@@ -282,6 +283,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
+	cmd.Flags().StringSliceVar(&opts.LibraryPaths, "library-path", nil, "Prepend `paths` to the \"jq\" search path")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 	return cmd
@@ -480,7 +482,15 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 		if opts.IO.IsStdoutTTY() {
 			indent = ttyIndent
 		}
-		err = jq.EvaluateFormatted(responseBody, bodyWriter, opts.FilterOutput, indent, opts.IO.ColorEnabled())
+		err = jq.EvaluateFormatted(
+			responseBody,
+			bodyWriter,
+			opts.FilterOutput,
+			indent,
+			opts.IO.ColorEnabled(),
+			jq.WithModulePaths(opts.LibraryPaths),
+			jq.WithTemplateFunctions(),
+		)
 		if err != nil {
 			return
 		}

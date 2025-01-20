@@ -19,6 +19,12 @@ import (
 	"github.com/spf13/pflag"
 )
 
+var DefaultLibraryPaths = []string{
+	"~/.jq",
+	"$ORIGIN/../gh",
+	"$ORIGIN/..",
+}
+
 type JSONFlagError struct {
 	error
 }
@@ -27,6 +33,7 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	f := cmd.Flags()
 	f.StringSlice("json", nil, "Output JSON with the specified `fields`")
 	f.StringP("jq", "q", "", "Filter JSON output using a jq `expression`")
+	f.StringSlice("library-path", nil, "Prepend `paths` to the \"jq\" search path")
 	f.StringP("template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 
 	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -98,6 +105,7 @@ func checkJSONFlags(cmd *cobra.Command) (*jsonExporter, error) {
 	f := cmd.Flags()
 	jsonFlag := f.Lookup("json")
 	jqFlag := f.Lookup("jq")
+	libraryPathFlag := f.Lookup("library-path")
 	tplFlag := f.Lookup("template")
 	webFlag := f.Lookup("web")
 
@@ -106,10 +114,12 @@ func checkJSONFlags(cmd *cobra.Command) (*jsonExporter, error) {
 			return nil, errors.New("cannot use `--web` with `--json`")
 		}
 		jv := jsonFlag.Value.(pflag.SliceValue)
+		libraryPath := libraryPathFlag.Value.(pflag.SliceValue)
 		return &jsonExporter{
-			fields:   jv.GetSlice(),
-			filter:   jqFlag.Value.String(),
-			template: tplFlag.Value.String(),
+			fields:       jv.GetSlice(),
+			filter:       jqFlag.Value.String(),
+			libraryPaths: libraryPath.GetSlice(),
+			template:     tplFlag.Value.String(),
 		}, nil
 	} else if jqFlag.Changed {
 		return nil, errors.New("cannot use `--jq` without specifying `--json`")
@@ -124,6 +134,7 @@ func AddFormatFlags(cmd *cobra.Command, exportTarget *Exporter) {
 	StringEnumFlag(cmd, &format, "format", "", "", []string{"json"}, "Output format")
 	f := cmd.Flags()
 	f.StringP("jq", "q", "", "Filter JSON output using a jq `expression`")
+	f.StringSlice("library-path", nil, "Prepend `paths` to the \"jq\" search path")
 	f.StringP("template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 
 	oldPreRun := cmd.PreRunE
@@ -152,6 +163,7 @@ func checkFormatFlags(cmd *cobra.Command) (*jsonExporter, error) {
 	formatFlag := f.Lookup("format")
 	formatValue := formatFlag.Value.String()
 	jqFlag := f.Lookup("jq")
+	libraryPathFlag := f.Lookup("library-path")
 	tplFlag := f.Lookup("template")
 	webFlag := f.Lookup("web")
 
@@ -159,9 +171,11 @@ func checkFormatFlags(cmd *cobra.Command) (*jsonExporter, error) {
 		if webFlag != nil && webFlag.Changed {
 			return nil, errors.New("cannot use `--web` with `--format`")
 		}
+		libraryPath := libraryPathFlag.Value.(pflag.SliceValue)
 		return &jsonExporter{
-			filter:   jqFlag.Value.String(),
-			template: tplFlag.Value.String(),
+			filter:       jqFlag.Value.String(),
+			libraryPaths: libraryPath.GetSlice(),
+			template:     tplFlag.Value.String(),
 		}, nil
 	} else if jqFlag.Changed && formatValue != "json" {
 		return nil, errors.New("cannot use `--jq` without specifying `--format json`")
@@ -177,9 +191,10 @@ type Exporter interface {
 }
 
 type jsonExporter struct {
-	fields   []string
-	filter   string
-	template string
+	fields       []string
+	filter       string
+	libraryPaths []string
+	template     string
 }
 
 // NewJSONExporter returns an Exporter to emit JSON.
@@ -212,7 +227,16 @@ func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
 		if ios.IsStdoutTTY() {
 			indent = "  "
 		}
-		if err := jq.EvaluateFormatted(&buf, w, e.filter, indent, ios.ColorEnabled()); err != nil {
+		libraryPaths := append(e.libraryPaths, DefaultLibraryPaths...)
+		if err := jq.EvaluateFormatted(
+			&buf,
+			w,
+			e.filter,
+			indent,
+			ios.ColorEnabled(),
+			jq.WithModulePaths(libraryPaths),
+			jq.WithTemplateFunctions(),
+		); err != nil {
 			return err
 		}
 	} else if e.template != "" {

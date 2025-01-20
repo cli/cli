@@ -134,10 +134,20 @@ var HelpTopics = []helpTopic{
 			array, fields from an object, create a new array, and more. The %[1]sjq%[1]s utility does not need
 			to be installed on the system to use this formatting directive. When connected to a terminal,
 			the output is automatically pretty-printed. To learn about jq query syntax, see:
-			<https://jqlang.github.io/jq/manual/>
+			<https://jqlang.github.io/jq/manual/>.
+			
+			In addition to the built-in jq functions, the following template functions are also available:
+			- %[1]stimeago%[1]s: renders a timestamp as relative to now
+			- %[1]stimefmt(<format>)%[1]s: formats a timestamp using Go's %[1]sTime.Format%[1]s function
+
+			You can prepend jq module paths using %[1]s--library-path%[1]s to the following defaults:
+			1. ~/.jq
+			2. $ORIGIN/../gh
+			3. $ORIGIN/..
 
 			The %[1]s--template%[1]s flag requires a string argument in Go template syntax, and will only print
 			those JSON values which match the query.
+
 			In addition to the Go template functions in the standard library, the following functions can be used
 			with this formatting directive:
 			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals

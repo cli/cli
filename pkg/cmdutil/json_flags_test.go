@@ -93,6 +93,23 @@ func TestAddJSONFlags(t *testing.T) {
 				template: "{{.number}}",
 			},
 		},
+		{
+			name:   "with library paths",
+			fields: []string{"number", "title", "createdAt"},
+			args: []string{
+				"--json", "number,title,createdAt",
+				"--library-path", "testdata,~/.gojq",
+				"--jq", "map(.createdAt | timeago)",
+			},
+			wantsExport: &jsonExporter{
+				fields: []string{"number", "title", "createdAt"},
+				filter: "map(.createdAt | timeago)",
+				libraryPaths: []string{
+					"testdata",
+					"~/.gojq",
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -234,6 +251,21 @@ func TestAddFormatFlags(t *testing.T) {
 				template: "{{.number}}",
 			},
 		},
+		{
+			name: "with library paths",
+			args: []string{
+				"--format", "json",
+				"--library-path", "testdata,~/.gojq",
+				"--jq", "map(.createdAt | timeago)",
+			},
+			wantsExport: &jsonExporter{
+				filter: "map(.createdAt | timeago)",
+				libraryPaths: []string{
+					"testdata",
+					"~/.gojq",
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -260,7 +292,7 @@ func TestAddFormatFlags(t *testing.T) {
 	}
 }
 
-func Test_exportFormat_Write(t *testing.T) {
+func Test_jsonExporter_Write(t *testing.T) {
 	type args struct {
 		data interface{}
 	}
@@ -334,6 +366,17 @@ func Test_exportFormat_Write(t *testing.T) {
 			wantW:   "hubot",
 			wantErr: false,
 			istty:   false,
+		},
+		{
+			name: "with library path",
+			exporter: jsonExporter{
+				libraryPaths: []string{"testdata"},
+				filter:       `import "mod" as m; map(m::inc)`,
+			},
+			args: args{
+				data: []int{1, 2},
+			},
+			wantW: "[2,3]\n",
 		},
 	}
 	for _, tt := range tests {
