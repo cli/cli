@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/repo/autolink/shared"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,19 +16,19 @@ func TestAutoLinkLister_List(t *testing.T) {
 	tests := []struct {
 		name   string
 		repo   ghrepo.Interface
-		resp   []autolink
+		resp   []shared.Autolink
 		status int
 	}{
 		{
 			name:   "no autolinks",
 			repo:   ghrepo.New("OWNER", "REPO"),
-			resp:   []autolink{},
+			resp:   []shared.Autolink{},
 			status: 200,
 		},
 		{
 			name: "two autolinks",
 			repo: ghrepo.New("OWNER", "REPO"),
-			resp: []autolink{
+			resp: []shared.Autolink{
 				{
 					ID:             1,
 					IsAlphanumeric: true,
@@ -54,7 +55,7 @@ func TestAutoLinkLister_List(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 			reg.Register(
-				httpmock.REST("GET", fmt.Sprintf("repos/%s/%s/autolinks", tt.repo.RepoOwner(), tt.repo.RepoName())),
+				httpmock.REST(http.MethodGet, fmt.Sprintf("repos/%s/%s/autolinks", tt.repo.RepoOwner(), tt.repo.RepoName())),
 				httpmock.StatusJSONResponse(tt.status, tt.resp),
 			)
 			defer reg.Verify(t)

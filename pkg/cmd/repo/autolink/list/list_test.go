@@ -8,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/repo/autolink/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsonfieldstest"
@@ -96,11 +97,11 @@ func TestNewCmdList(t *testing.T) {
 }
 
 type stubAutoLinkLister struct {
-	autolinks []autolink
+	autolinks []shared.Autolink
 	err       error
 }
 
-func (g stubAutoLinkLister) List(repo ghrepo.Interface) ([]autolink, error) {
+func (g stubAutoLinkLister) List(repo ghrepo.Interface) ([]shared.Autolink, error) {
 	return g.autolinks, g.err
 }
 
@@ -125,7 +126,7 @@ func TestListRun(t *testing.T) {
 			opts:  &listOptions{},
 			isTTY: true,
 			stubLister: stubAutoLinkLister{
-				autolinks: []autolink{
+				autolinks: []shared.Autolink{
 					{
 						ID:             1,
 						KeyPrefix:      "TICKET-",
@@ -161,7 +162,7 @@ func TestListRun(t *testing.T) {
 			},
 			isTTY: true,
 			stubLister: stubAutoLinkLister{
-				autolinks: []autolink{
+				autolinks: []shared.Autolink{
 					{
 						ID:             1,
 						KeyPrefix:      "TICKET-",
@@ -184,7 +185,7 @@ func TestListRun(t *testing.T) {
 			opts:  &listOptions{},
 			isTTY: false,
 			stubLister: stubAutoLinkLister{
-				autolinks: []autolink{
+				autolinks: []shared.Autolink{
 					{
 						ID:             1,
 						KeyPrefix:      "TICKET-",
@@ -210,7 +211,7 @@ func TestListRun(t *testing.T) {
 			opts:  &listOptions{},
 			isTTY: true,
 			stubLister: stubAutoLinkLister{
-				autolinks: []autolink{},
+				autolinks: []shared.Autolink{},
 			},
 			expectedErr: cmdutil.NewNoResultsError("no autolinks found in OWNER/REPO"),
 			wantStderr:  "",
@@ -220,7 +221,7 @@ func TestListRun(t *testing.T) {
 			opts:  &listOptions{},
 			isTTY: true,
 			stubLister: stubAutoLinkLister{
-				autolinks: []autolink{},
+				autolinks: []shared.Autolink{},
 				err:       testAutolinkClientListError{},
 			},
 			expectedErr: testAutolinkClientListError{},

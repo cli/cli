@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/pkg/cmd/repo/autolink/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -21,29 +22,18 @@ var autolinkFields = []string{
 	"urlTemplate",
 }
 
-type autolink struct {
-	ID             int    `json:"id"`
-	IsAlphanumeric bool   `json:"is_alphanumeric"`
-	KeyPrefix      string `json:"key_prefix"`
-	URLTemplate    string `json:"url_template"`
-}
-
-func (s *autolink) ExportData(fields []string) map[string]interface{} {
-	return cmdutil.StructExportData(s, fields)
-}
-
 type listOptions struct {
 	BaseRepo       func() (ghrepo.Interface, error)
 	Browser        browser.Browser
-	AutolinkClient AutolinkClient
+	AutolinkClient AutolinkListClient
 	IO             *iostreams.IOStreams
 
 	Exporter cmdutil.Exporter
 	WebMode  bool
 }
 
-type AutolinkClient interface {
-	List(repo ghrepo.Interface) ([]autolink, error)
+type AutolinkListClient interface {
+	List(repo ghrepo.Interface) ([]shared.Autolink, error)
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Command {
