@@ -17,7 +17,7 @@ const (
 	execMode os.FileMode = 0755
 )
 
-func extractZip(zr *zip.Reader, destDir safepaths.Absolute) error {
+func extractZip(zr *zip.Reader, destDir safepaths.Absolute, force bool, skip bool) error {
 	for _, zf := range zr.File {
 		fpath, err := destDir.Join(zf.Name)
 		if err != nil {
@@ -28,14 +28,14 @@ func extractZip(zr *zip.Reader, destDir safepaths.Absolute) error {
 			return err
 		}
 
-		if err := extractZipFile(zf, fpath); err != nil {
+		if err := extractZipFile(zf, fpath, force, skip); err != nil {
 			return fmt.Errorf("error extracting %q: %w", zf.Name, err)
 		}
 	}
 	return nil
 }
 
-func extractZipFile(zf *zip.File, dest safepaths.Absolute) (extractErr error) {
+func extractZipFile(zf *zip.File, dest safepaths.Absolute, force bool, skip bool) (extractErr error) {
 	zm := zf.Mode()
 	if zm.IsDir() {
 		extractErr = os.MkdirAll(dest.String(), dirMode)
@@ -54,7 +54,22 @@ func extractZipFile(zf *zip.File, dest safepaths.Absolute) (extractErr error) {
 	}
 
 	var df *os.File
-	if df, extractErr = os.OpenFile(dest.String(), os.O_WRONLY|os.O_CREATE|os.O_EXCL, getPerm(zm)); extractErr != nil {
+	flag := os.O_WRONLY | os.O_CREATE
+	if !force {
+		flag = flag | os.O_EXCL
+	}
+
+	if df, extractErr = os.OpenFile(dest.String(), flag, getPerm(zm)); extractErr != nil {
+		errExist := errors.Is(extractErr, os.ErrExist)
+		if errExist && skip {
+			return nil
+		}
+		if errExist {
+			return fmt.Errorf(
+				"%s already exists ((use `--clobber` to override or `--skip-existing` to skip))",
+				dest,
+			)
+		}
 		return
 	}
 

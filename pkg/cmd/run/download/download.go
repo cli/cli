@@ -19,16 +19,18 @@ type DownloadOptions struct {
 	Platform platform
 	Prompter iprompter
 
-	DoPrompt       bool
-	RunID          string
-	DestinationDir string
-	Names          []string
-	FilePatterns   []string
+	DoPrompt          bool
+	RunID             string
+	DestinationDir    string
+	Names             []string
+	FilePatterns      []string
+	OverwriteExisting bool
+	SkipExisting      bool
 }
 
 type platform interface {
 	List(runID string) ([]shared.Artifact, error)
-	Download(url string, dir safepaths.Absolute) error
+	Download(url string, dir safepaths.Absolute, force bool, skip bool) error
 }
 
 type iprompter interface {
@@ -77,6 +79,9 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				opts.IO.CanPrompt() {
 				opts.DoPrompt = true
 			}
+			if opts.OverwriteExisting && opts.SkipExisting {
+				return errors.New("specify either --clobber or --skip-existing. you cannot use both of them simultaneously")
+			}
 			// support `-R, --repo` override
 			baseRepo, err := f.BaseRepo()
 			if err != nil {
@@ -101,6 +106,8 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.DestinationDir, "dir", "D", ".", "The directory to download artifacts into")
 	cmd.Flags().StringArrayVarP(&opts.Names, "name", "n", nil, "Download artifacts that match any of the given names")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download artifacts that match a glob pattern")
+	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing files of the same name")
+	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip downloading when files of the same name exist")
 
 	return cmd
 }
@@ -187,7 +194,7 @@ func runDownload(opts *DownloadOptions) error {
 			}
 		}
 
-		err := opts.Platform.Download(a.DownloadURL, destDir)
+		err := opts.Platform.Download(a.DownloadURL, destDir, opts.OverwriteExisting, opts.SkipExisting)
 		if err != nil {
 			return fmt.Errorf("error downloading %s: %w", a.Name, err)
 		}

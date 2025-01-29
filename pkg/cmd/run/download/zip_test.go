@@ -19,7 +19,7 @@ func Test_extractZip(t *testing.T) {
 	require.NoError(t, err)
 	defer zipFile.Close()
 
-	err = extractZip(&zipFile.Reader, extractPath)
+	err = extractZip(&zipFile.Reader, extractPath, false, false)
 	require.NoError(t, err)
 
 	_, err = os.Stat(filepath.Join(extractPath.String(), "src", "main.go"))

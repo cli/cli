@@ -186,7 +186,7 @@ func (f *fakePlatform) List(runID string) ([]shared.Artifact, error) {
 	return artifacts, nil
 }
 
-func (f *fakePlatform) Download(url string, dir safepaths.Absolute) error {
+func (f *fakePlatform) Download(url string, dir safepaths.Absolute, force bool, skip bool) error {
 	if err := os.MkdirAll(dir.String(), 0755); err != nil {
 		return err
 	}
