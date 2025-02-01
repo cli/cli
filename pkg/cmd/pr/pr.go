@@ -33,12 +33,12 @@ func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 			$ gh pr view --web
 		`),
 		Annotations: map[string]string{
-			"help:arguments": heredoc.Doc(`
+			"help:arguments": heredoc.Docf(`
 				A pull request can be supplied as argument in any of the following formats:
-				- by number, e.g. "123";
-				- by URL, e.g. "https://github.com/OWNER/REPO/pull/123"; or
-				- by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".
-			`),
+				- by number, e.g. %[1]s123%[1]s;
+				- by URL, e.g. %[1]shttps://github.com/OWNER/REPO/pull/123%[1]s; or
+				- by the name of its head branch, e.g. %[1]spatch-1%[1]s or %[1]sOWNER:patch-1%[1]s.
+			`, "`"),
 		},
 		GroupID: "core",
 	}

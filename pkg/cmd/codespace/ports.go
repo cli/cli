@@ -219,7 +219,7 @@ func newPortsVisibilityCmd(app *App, selector *CodespaceSelector) *cobra.Command
 	return &cobra.Command{
 		Use:     "visibility <port>:{public|private|org}...",
 		Short:   "Change the visibility of the forwarded port",
-		Example: "gh codespace ports visibility 80:org 3000:private 8000:public",
+		Example: "$ gh codespace ports visibility 80:org 3000:private 8000:public",
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.UpdatePortVisibility(cmd.Context(), selector, args)

@@ -22,7 +22,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 	var bodyFile string
 
 	cmd := &cobra.Command{
-		Use:   "comment {<number> | <url>}",
+		Use:   "comment [<number> | <url>]",
 		Short: "Add a comment to an issue",
 		Long: heredoc.Doc(`
 			Add a comment to a GitHub issue.

@@ -98,37 +98,35 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmd := &cobra.Command{
 		Use:   "edit [<repository>]",
 		Short: "Edit repository settings",
-		Annotations: map[string]string{
-			"help:arguments": heredoc.Doc(`
-				A repository can be supplied as an argument in any of the following formats:
-				- "OWNER/REPO"
-				- by URL, e.g. "https://github.com/OWNER/REPO"
-			`),
-		},
 		Long: heredoc.Docf(`
 			Edit repository settings.
 
 			To toggle a setting off, use the %[1]s--<flag>=false%[1]s syntax.
 
 			Changing repository visibility can have unexpected consequences including but not limited to:
-
 			- Losing stars and watchers, affecting repository ranking
 			- Detaching public forks from the network
 			- Disabling push rulesets
 			- Allowing access to GitHub Actions history and logs
 
 			When the %[1]s--visibility%[1]s flag is used, %[1]s--accept-visibility-change-consequences%[1]s flag is required.
-
-			For information on all the potential consequences, see <https://gh.io/setting-repository-visibility>
+			For information on all the potential consequences, see <https://gh.io/setting-repository-visibility>.
 		`, "`"),
-		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
-			# enable issues and wiki
-			gh repo edit --enable-issues --enable-wiki
+			# Enable issues and wiki
+			$ gh repo edit --enable-issues --enable-wiki
 
-			# disable projects
-			gh repo edit --enable-projects=false
+			# Disable projects
+			$ gh repo edit --enable-projects=false
 		`),
+		Annotations: map[string]string{
+			"help:arguments": heredoc.Docf(`
+				A repository can be supplied as an argument in any of the following formats:
+				- %[1]sOWNER/REPO%[1]s
+				- by URL, e.g. %[1]shttps://github.com/OWNER/REPO%[1]s
+			`, "`"),
+		},
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				var err error

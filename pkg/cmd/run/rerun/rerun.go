@@ -51,7 +51,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			However, this %[1]s<number>%[1]s should not be used with the %[1]s--job%[1]s flag and will result in the
 			API returning %[1]s404 NOT FOUND%[1]s. Instead, you can get the correct job IDs using the following command:
 			
-				gh run view <run-id> --json jobs --jq '.jobs[] | {name, databaseId}'
+			    gh run view <run-id> --json jobs --jq '.jobs[] | {name, databaseId}'
 
 			You will need to use databaseId field for triggering job re-runs.
 		`, "`"),

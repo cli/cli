@@ -56,7 +56,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "edit {<id> | <url>} [<filename>]",
+		Use:   "edit [<id> | <url>] <filename>",
 		Short: "Edit one of your gists",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 2 {

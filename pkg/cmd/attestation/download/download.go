@@ -21,7 +21,6 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 	opts := &Options{}
 	downloadCmd := &cobra.Command{
 		Use:   "download [<file-path> | oci://<image-uri>] [--owner | --repo]",
-		Args:  cmdutil.ExactArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
 		Short: "Download an artifact's attestations for offline use",
 		Long: heredoc.Docf(`
 			### NOTE: This feature is currently in public preview, and subject to change.
@@ -29,14 +28,14 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 			Download attestations associated with an artifact for offline use.
 
 			The command requires either:
-			* a file path to an artifact, or
-			* a container image URI (e.g. %[1]soci://<image-uri>%[1]s)
-			  * (note that if you provide an OCI URL, you must already be authenticated with
-			its container registry)
+			- a file path to an artifact, or
+			- a container image URI (e.g. %[1]soci://<image-uri>%[1]s)
+			  - (note that if you provide an OCI URL, you must already be authenticated with
+			    its container registry)
 
 			In addition, the command requires either:
-			* the %[1]s--repo%[1]s flag (e.g. --repo github/example).
-			* the %[1]s--owner%[1]s flag (e.g. --owner github), or
+			- the %[1]s--repo%[1]s flag (e.g. %[1]s--repo github/example%[1]s).
+			- the %[1]s--owner%[1]s flag (e.g. %[1]s--owner github%[1]s), or
 
 			The %[1]s--repo%[1]s flag value must match the name of the GitHub repository
 			that the artifact is linked with.
@@ -46,12 +45,12 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 
 			Any associated bundle(s) will be written to a file in the
 			current directory named after the artifact's digest. For example, if the
-			digest is "sha256:1234", the file will be named "sha256:1234.jsonl".
+			digest is %[1]ssha256:1234%[1]s, the file will be named %[1]ssha256:1234.jsonl%[1]s.
 
 			Colons are special characters on Windows and cannot be used in
 			file names. To accommodate, a dash will be used to separate the algorithm
 			from the digest in the attestations file name. For example, if the digest
-			is "sha256:1234", the file will be named "sha256-1234.jsonl".
+			is %[1]ssha256:1234%[1]s, the file will be named %[1]ssha256-1234.jsonl%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Download attestations for a local artifact linked with an organization
@@ -63,6 +62,7 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 			# Download attestations for an OCI image linked with an organization
 			$ gh attestation download oci://example.com/foo/bar:latest -o github
 		`),
+		Args: cmdutil.ExactArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
 		// PreRunE is used to validate flags before the command is run
 		// If an error is returned, its message will be printed to the terminal
 		// along with information about how use the command

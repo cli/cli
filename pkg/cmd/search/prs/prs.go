@@ -38,25 +38,25 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			<https://docs.github.com/search-github/searching-on-github/searching-issues-and-pull-requests>
 		`),
 		Example: heredoc.Doc(`
-			# search pull requests matching set of keywords "fix" and "bug"
+			# Search pull requests matching set of keywords "fix" and "bug"
 			$ gh search prs fix bug
 
-			# search draft pull requests in cli repository
+			# Search draft pull requests in cli repository
 			$ gh search prs --repo=cli/cli --draft
 
-			# search open pull requests requesting your review
+			# Search open pull requests requesting your review
 			$ gh search prs --review-requested=@me --state=open
 
-			# search merged pull requests assigned to yourself
+			# Search merged pull requests assigned to yourself
 			$ gh search prs --assignee=@me --merged
 
-			# search pull requests with numerous reactions
+			# Search pull requests with numerous reactions
 			$ gh search prs --reactions=">100"
 
-			# search pull requests without label "bug"
+			# Search pull requests without label "bug"
 			$ gh search prs -- -label:bug
 
-			# search pull requests only from un-archived repositories (default is all repositories)
+			# Search pull requests only from un-archived repositories (default is all repositories)
 			$ gh search prs --owner github --archived=false
 		`),
 		RunE: func(c *cobra.Command, args []string) error {

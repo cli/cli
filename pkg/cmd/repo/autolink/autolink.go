@@ -17,7 +17,8 @@ func NewCmdAutolink(f *cmdutil.Factory) *cobra.Command {
 
 			Autolinks require %[1]sadmin%[1]s role to view or manage.
 
-			For more information, see <https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/configuring-autolinks-to-reference-external-resources>
+			For more information, see
+			<https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/configuring-autolinks-to-reference-external-resources>.
 		`, "`"),
 	}
 	cmdutil.EnableRepoOverride(cmd, f)

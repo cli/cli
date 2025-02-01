@@ -56,11 +56,11 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 		Long: heredoc.Docf(`
 			Create a %[1]sworkflow_dispatch%[1]s event for a given workflow.
 
-			This command will trigger GitHub Actions to run a given workflow file. The given workflow file must
-			support an %[1]son.workflow_dispatch%[1]s trigger in order to be run in this way.
+			This command will trigger GitHub Actions to run a given workflow file.
+			The given workflow file must support an %[1]son.workflow_dispatch%[1]s
+			trigger in order to be run in this way.
 
 			If the workflow file supports inputs, they can be specified in a few ways:
-
 			- Interactively
 			- Via %[1]s-f/--raw-field%[1]s or %[1]s-F/--field%[1]s flags
 			- As JSON, via standard input

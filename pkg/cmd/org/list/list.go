@@ -29,8 +29,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Args:  cobra.MaximumNArgs(1),
-		Short: "List organizations for the authenticated user.",
+		Short: "List organizations for the authenticated user",
 		Example: heredoc.Doc(`
 			# List the first 30 organizations
 			$ gh org list
@@ -38,6 +37,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			# List more organizations
 			$ gh org list --limit 100
 		`),
+		Args:    cobra.MaximumNArgs(1),
 		Aliases: []string{"ls"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Limit < 1 {

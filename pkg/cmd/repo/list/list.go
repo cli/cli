@@ -59,9 +59,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Long: heredoc.Docf(`
 			List repositories owned by a user or organization.
 
-			Note that the list will only include repositories owned by the provided argument,
-			and the %[1]s--fork%[1]s or %[1]s--source%[1]s flags will not traverse ownership boundaries. For example,
-			when listing the forks in an organization, the output would not include those owned by individual users.
+			Note that the list will only include repositories owned by the provided argument, and
+			the %[1]s--fork%[1]s or %[1]s--source%[1]s flags will not traverse ownership boundaries.
+			For example, when listing the forks in an organization, the output would not include those
+			owned by individual users.
 		`, "`"),
 		Aliases: []string{"ls"},
 		RunE: func(c *cobra.Command, args []string) error {
@@ -69,7 +70,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--public`, `--private`, or `--visibility`", flagPublic, flagPrivate, opts.Visibility != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--public`, `--private`, or `--visibility`",
+				flagPublic,
+				flagPrivate,
+				opts.Visibility != "",
+			); err != nil {
 				return err
 			}
 			if opts.Source && opts.Fork {

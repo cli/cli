@@ -29,18 +29,18 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "repo <command>",
 		Short: "Manage repositories",
-		Long:  `Work with GitHub repositories.`,
+		Long:  "Work with GitHub repositories.",
 		Example: heredoc.Doc(`
 			$ gh repo create
 			$ gh repo clone cli/cli
 			$ gh repo view --web
 		`),
 		Annotations: map[string]string{
-			"help:arguments": heredoc.Doc(`
+			"help:arguments": heredoc.Docf(`
 				A repository can be supplied as an argument in any of the following formats:
-				- "OWNER/REPO"
-				- by URL, e.g. "https://github.com/OWNER/REPO"
-			`),
+				- %[1]sOWNER/REPO%[1]s
+				- by URL, e.g. %[1]shttps://github.com/OWNER/REPO%[1]s
+			`, "`"),
 		},
 		GroupID: "core",
 	}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/config"
@@ -23,13 +22,10 @@ func NewCmdConfigClearCache(f *cmdutil.Factory, runF func(*ClearCacheOptions) er
 	}
 
 	cmd := &cobra.Command{
-		Use:   "clear-cache",
-		Short: "Clear the cli cache",
-		Example: heredoc.Doc(`
-			# Clear the cli cache
-			$ gh config clear-cache
-		`),
-		Args: cobra.ExactArgs(0),
+		Use:     "clear-cache",
+		Short:   "Clear the cli cache",
+		Example: "$ gh config clear-cache",
+		Args:    cobra.ExactArgs(0),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if runF != nil {
 				return runF(opts)

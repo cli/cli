@@ -61,13 +61,13 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			specific repositories.
 		`),
 		Example: heredoc.Doc(`
-			# Add variable value for the current repository in an interactive prompt
+			# Set variable value for the current repository in an interactive prompt
 			$ gh variable set MYVARIABLE
 
-			# Read variable value from an environment variable
+			# Set variable value from an environment variable
 			$ gh variable set MYVARIABLE --body "$ENV_VALUE"
 
-			# Read variable value from a file
+			# Set variable value from a file
 			$ gh variable set MYVARIABLE < myfile.txt
 
 			# Set variable for a deployment environment in the current repository

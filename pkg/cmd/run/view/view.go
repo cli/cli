@@ -119,7 +119,6 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			This command does not support authenticating via fine grained PATs
 			as it is not currently possible to create a PAT with the %[1]schecks:read%[1]s permission.
 		`, "`"),
-		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
 			# Interactively select a run to view, optionally selecting a single job
 			$ gh run view
@@ -139,6 +138,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			# Exit non-zero if a run failed
 			$ gh run view 0451 --exit-status && echo "run pending or passed"
 		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo

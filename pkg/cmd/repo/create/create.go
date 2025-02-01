@@ -100,20 +100,21 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			For license keywords to use with %[1]s--license%[1]s, run %[1]sgh repo license list%[1]s or visit <https://choosealicense.com>.
 
-			The repo is created with the configured repository default branch, see <https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-personal-account-on-github/managing-user-account-settings/managing-the-default-branch-name-for-your-repositories>.
+			The repo is created with the configured repository default branch, see
+			<https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-personal-account-on-github/managing-user-account-settings/managing-the-default-branch-name-for-your-repositories>.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# create a repository interactively
-			gh repo create
+			# Create a repository interactively
+			$ gh repo create
 
-			# create a new remote repository and clone it locally
-			gh repo create my-project --public --clone
+			# Create a new remote repository and clone it locally
+			$ gh repo create my-project --public --clone
 
-			# create a new remote repository in a different organization
-			gh repo create my-org/my-project --public
+			# Create a new remote repository in a different organization
+			$ gh repo create my-org/my-project --public
 
-			# create a remote repository from the current directory
-			gh repo create my-project --private --source=. --remote=upstream
+			# Create a remote repository from the current directory
+			$ gh repo create my-project --private --source=. --remote=upstream
 		`),
 		Args:    cobra.MaximumNArgs(1),
 		Aliases: []string{"new"},

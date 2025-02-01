@@ -31,8 +31,8 @@ type deleteProjectV2FieldMutation struct {
 func NewCmdDeleteField(f *cmdutil.Factory, runF func(config deleteFieldConfig) error) *cobra.Command {
 	opts := deleteFieldOpts{}
 	deleteFieldCmd := &cobra.Command{
-		Short: "Delete a field in a project",
 		Use:   "field-delete",
+		Short: "Delete a field in a project",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := client.New(f)
 			if err != nil {

@@ -31,14 +31,14 @@ type viewConfig struct {
 func NewCmdView(f *cmdutil.Factory, runF func(config viewConfig) error) *cobra.Command {
 	opts := viewOpts{}
 	viewCmd := &cobra.Command{
-		Short: "View a project",
 		Use:   "view [<number>]",
+		Short: "View a project",
 		Example: heredoc.Doc(`
-			# view the current user's project "1"
-			gh project view 1
+			# View the current user's project "1"
+			$ gh project view 1
 
-			# open user monalisa's project "1" in the browser
-			gh project view 1 --owner monalisa --web
+			# Open user monalisa's project "1" in the browser
+			$ gh project view 1 --owner monalisa --web
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

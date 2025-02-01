@@ -35,7 +35,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	}
 
 	cmd := &cobra.Command{
-		Use:   "close {<number> | <url>}",
+		Use:   "close [<number> | <url>]",
 		Short: "Close issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

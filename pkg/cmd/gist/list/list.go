@@ -54,17 +54,17 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			this will be slower and increase the rate limit used. Instead of printing a table,
 			code will be printed with highlights similar to %[1]sgh search code%[1]s:
 
-				{{gist ID}} {{file name}}
-				    {{description}}
-				        {{matching lines from content}}
+			    {{gist ID}} {{file name}}
+			        {{description}}
+			            {{matching lines from content}}
 
 			No highlights or other color is printed when output is redirected.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# list all secret gists from your user account
+			# List all secret gists from your user account
 			$ gh gist list --secret
 
-			# find all gists from your user account mentioning "octo" anywhere
+			# Find all gists from your user account mentioning "octo" anywhere
 			$ gh gist list --filter octo --include-content
 		`),
 		Aliases: []string{"ls"},

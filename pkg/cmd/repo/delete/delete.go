@@ -42,10 +42,11 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Delete a GitHub repository.
 			
-			With no argument, deletes the current repository. Otherwise, deletes the specified repository.
+			With no argument, deletes the current repository.
+			Otherwise, deletes the specified repository.
 
 			Deletion requires authorization with the %[1]sdelete_repo%[1]s scope. 
-			To authorize, run %[1]sgh auth refresh -s delete_repo%[1]s
+			To authorize, run %[1]sgh auth refresh -s delete_repo%[1]s.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

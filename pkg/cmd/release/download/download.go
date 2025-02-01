@@ -57,16 +57,16 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			is required.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# download all assets from a specific release
+			# Download all assets from a specific release
 			$ gh release download v1.2.3
 
-			# download only Debian packages for the latest release
+			# Download only Debian packages for the latest release
 			$ gh release download --pattern '*.deb'
 
-			# specify multiple file patterns
+			# Specify multiple file patterns
 			$ gh release download -p '*.deb' -p '*.rpm'
 
-			# download the archive of the source code for a release
+			# Download the archive of the source code for a release
 			$ gh release download v1.2.3 --archive=zip
 		`),
 		Args: cobra.MaximumNArgs(1),

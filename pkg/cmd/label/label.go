@@ -9,7 +9,7 @@ func NewCmdLabel(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "label <command>",
 		Short: "Manage labels",
-		Long:  `Work with GitHub labels.`,
+		Long:  "Work with GitHub labels.",
 	}
 	cmdutil.EnableRepoOverride(cmd, f)
 

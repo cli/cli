@@ -124,39 +124,39 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			into an outer JSON array.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# list releases in the current repository
+			# List releases in the current repository
 			$ gh api repos/{owner}/{repo}/releases
 
-			# post an issue comment
+			# Post an issue comment
 			$ gh api repos/{owner}/{repo}/issues/123/comments -f body='Hi from CLI'
 
-			# post nested parameter read from a file
+			# Post nested parameter read from a file
 			$ gh api gists -F 'files[myfile.txt][content]=@myfile.txt'
 
-			# add parameters to a GET request
+			# Add parameters to a GET request
 			$ gh api -X GET search/issues -f q='repo:cli/cli is:open remote'
 
-			# set a custom HTTP header
+			# Set a custom HTTP header
 			$ gh api -H 'Accept: application/vnd.github.v3.raw+json' ...
 
-			# opt into GitHub API previews
+			# Opt into GitHub API previews
 			$ gh api --preview baptiste,nebula ...
 
-			# print only specific fields from the response
+			# Print only specific fields from the response
 			$ gh api repos/{owner}/{repo}/issues --jq '.[].title'
 
-			# use a template for the output
+			# Use a template for the output
 			$ gh api repos/{owner}/{repo}/issues --template \
 			  '{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " | color "yellow"}}){{"\n"}}{{end}}'
 
-			# update allowed values of the "environment" custom property in a deeply nested array
+			# Update allowed values of the "environment" custom property in a deeply nested array
 			gh api -X PATCH /orgs/{org}/properties/schema \
 			   -F 'properties[][property_name]=environment' \
 			   -F 'properties[][default_value]=production' \
 			   -F 'properties[][allowed_values][]=staging' \
 			   -F 'properties[][allowed_values][]=production'
 
-			# list releases with GraphQL
+			# List releases with GraphQL
 			$ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
 			  query($name: String!, $owner: String!) {
 			    repository(owner: $owner, name: $name) {
@@ -167,7 +167,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			  }
 			'
 
-			# list all repositories for a user
+			# List all repositories for a user
 			$ gh api graphql --paginate -f query='
 			  query($endCursor: String) {
 			    viewer {
@@ -182,7 +182,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			  }
 			'
 
-			# get the percentage of forks for the current user
+			# Get the percentage of forks for the current user
 			$ gh api graphql --paginate --slurp -f query='
 			  query($endCursor: String) {
 			    viewer {
@@ -199,15 +199,15 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			[.[].data.viewer.repositories.nodes[]] as $r | count(select($r[].isFork))/count($r[])'
 		`),
 		Annotations: map[string]string{
-			"help:environment": heredoc.Doc(`
-				GH_TOKEN, GITHUB_TOKEN (in order of precedence): an authentication token for
-				github.com API requests.
+			"help:environment": heredoc.Docf(`
+				%[1]sGH_TOKEN%[1]s, %[1]sGITHUB_TOKEN%[1]s (in order of precedence): an authentication token for
+				%[1]sgithub.com%[1]s API requests.
 
-				GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an
+				%[1]sGH_ENTERPRISE_TOKEN%[1]s, %[1]sGITHUB_ENTERPRISE_TOKEN%[1]s (in order of precedence): an
 				authentication token for API requests to GitHub Enterprise.
 
-				GH_HOST: make the request to a GitHub host other than github.com.
-			`),
+				%[1]sGH_HOST%[1]s: make the request to a GitHub host other than %[1]sgithub.com%[1]s.
+			`, "`"),
 		},
 		Args: cobra.ExactArgs(1),
 		PreRun: func(c *cobra.Command, args []string) {

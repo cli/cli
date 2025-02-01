@@ -34,8 +34,8 @@ var HelpTopics = []helpTopic{
 			  You can run %[1]sC:\Program Files\Git\bin\bash.exe%[1]s from any terminal emulator to continue
 			  using all of the tooling in Git For Windows without MinTTY.
 
-			- Prefix invocations of gh with %[1]swinpty%[1]s, eg: %[1]swinpty gh auth login%[1]s.
-			  NOTE: this can lead to some UI bugs.
+			- Prefix invocations of gh with %[1]swinpty%[1]s, e.g. %[1]swinpty gh auth login%[1]s.
+			  NOTE: This can lead to some UI bugs.
 		`, "`"),
 	},
 	{
@@ -43,7 +43,7 @@ var HelpTopics = []helpTopic{
 		short: "Environment variables that can be used with gh",
 		long: heredoc.Docf(`
 			%[1]sGH_TOKEN%[1]s, %[1]sGITHUB_TOKEN%[1]s (in order of precedence): an authentication token that will be used when
-			a command targets either github.com or a subdomain of ghe.com. Setting this avoids being prompted to
+			a command targets either <github.com> or a subdomain of <ghe.com>. Setting this avoids being prompted to
 			authenticate and takes precedence over previously stored credentials.
 
 			%[1]sGH_ENTERPRISE_TOKEN%[1]s, %[1]sGITHUB_ENTERPRISE_TOKEN%[1]s (in order of precedence): an authentication
@@ -57,8 +57,8 @@ var HelpTopics = []helpTopic{
 			%[1]sGH_REPO%[1]s: specify the GitHub repository in the %[1]s[HOST/]OWNER/REPO%[1]s format for commands
 			that otherwise operate on a local repository.
 
-			%[1]sGH_EDITOR%[1]s, %[1]sGIT_EDITOR%[1]s, %[1]sVISUAL%[1]s, %[1]sEDITOR%[1]s (in order of precedence): the editor tool to use
-			for authoring text.
+			%[1]sGH_EDITOR%[1]s, %[1]sGIT_EDITOR%[1]s, %[1]sVISUAL%[1]s, %[1]sEDITOR%[1]s (in order of precedence):
+			the editor tool to use for authoring text.
 
 			%[1]sGH_BROWSER%[1]s, %[1]sBROWSER%[1]s (in order of precedence): the web browser to use for opening links.
 
@@ -72,7 +72,7 @@ var HelpTopics = []helpTopic{
 			to, e.g. %[1]sless%[1]s.
 
 			%[1]sGLAMOUR_STYLE%[1]s: the style to use for rendering Markdown. See
-			<https://github.com/charmbracelet/glamour#styles>
+			<https://github.com/charmbracelet/glamour#styles>.
 
 			%[1]sNO_COLOR%[1]s: set to any value to avoid printing ANSI escape sequences for color output.
 
@@ -96,9 +96,9 @@ var HelpTopics = []helpTopic{
 
 			%[1]sGH_CONFIG_DIR%[1]s: the directory where gh will store configuration files. If not specified,
 			the default value will be one of the following paths (in order of precedence):
-			  - %[1]s$XDG_CONFIG_HOME/gh%[1]s (if %[1]s$XDG_CONFIG_HOME%[1]s is set),
-			  - %[1]s$AppData/GitHub CLI%[1]s (on Windows if %[1]s$AppData%[1]s is set), or
-			  - %[1]s$HOME/.config/gh%[1]s.
+			- %[1]s$XDG_CONFIG_HOME/gh%[1]s (if %[1]s$XDG_CONFIG_HOME%[1]s is set),
+			- %[1]s$AppData/GitHub CLI%[1]s (on Windows if %[1]s$AppData%[1]s is set), or
+			- %[1]s$HOME/.config/gh%[1]s.
 
 			%[1]sGH_PROMPT_DISABLED%[1]s: set to any value to disable interactive prompting in the terminal.
 
@@ -133,8 +133,8 @@ var HelpTopics = []helpTopic{
 			those JSON values which match the query. jq queries can be used to select elements from an
 			array, fields from an object, create a new array, and more. The %[1]sjq%[1]s utility does not need
 			to be installed on the system to use this formatting directive. When connected to a terminal,
-			the output is automatically pretty-printed. To learn about jq query syntax, see:
-			<https://jqlang.github.io/jq/manual/>
+			the output is automatically pretty-printed. To learn about jq query syntax, see
+			<https://jqlang.github.io/jq/manual/>.
 
 			The %[1]s--template%[1]s flag requires a string argument in Go template syntax, and will only print
 			those JSON values which match the query.
@@ -154,7 +154,7 @@ var HelpTopics = []helpTopic{
 			To learn more about Go templates, see: <https://golang.org/pkg/text/template/>.
 		`, "`"),
 		example: heredoc.Doc(`
-			# default output format
+			# Default output format
 			$ gh pr list
 			Showing 23 of 23 open pull requests in cli/cli
 
@@ -163,7 +163,7 @@ var HelpTopics = []helpTopic{
 			#125  An exciting new feature         feature-branch                   about 2 days ago
 
 
-			# adding the --json flag with a list of field names
+			# Adding the --json flag with a list of field names
 			$ gh pr list --json number,title,author
 			[
 			  {
@@ -190,13 +190,13 @@ var HelpTopics = []helpTopic{
 			]
 
 
-			# adding the --jq flag and selecting fields from the array
+			# Adding the --jq flag and selecting fields from the array
 			$ gh pr list --json author --jq '.[].author.login'
 			monalisa
 			codercat
 			cli-maintainer
 
-			# --jq can be used to implement more complex filtering and output changes:
+			# --jq can be used to implement more complex filtering and output changes
 			$ gh issue list --json number,title,labels --jq \
 			  'map(select((.labels | length) > 0))    # must have labels
 			  | map(.labels = (.labels | map(.name))) # show only the label names
@@ -227,20 +227,22 @@ var HelpTopics = []helpTopic{
 			      "title": "An exciting new feature"
 			    }
 			  ]
-			# using the --template flag with the hyperlink helper
+
+
+			# Using the --template flag with the hyperlink helper
 			gh issue list --json title,url --template '{{range .}}{{hyperlink .url .title}}{{"\n"}}{{end}}'
 
 
-			# adding the --template flag and modifying the display format
+			# Adding the --template flag and modifying the display format
 			$ gh pr list --json number,title,headRefName,updatedAt --template \
-				'{{range .}}{{tablerow (printf "#%v" .number | autocolor "green") .title .headRefName (timeago .updatedAt)}}{{end}}'
+			    '{{range .}}{{tablerow (printf "#%v" .number | autocolor "green") .title .headRefName (timeago .updatedAt)}}{{end}}'
 
 			#123  A helpful contribution      contribution-branch       about 1 day ago
 			#124  Improve the docs            docs-branch               about 2 days ago
 			#125  An exciting new feature     feature-branch            about 2 days ago
 
 
-			# a more complex example with the --template flag which formats a pull request using multiple tables with headers:
+			# A more complex example with the --template flag which formats a pull request using multiple tables with headers
 			$ gh pr view 3519 --json number,title,body,reviews,assignees --template \
 			'{{printf "#%v" .number}} {{.title}}
 
@@ -269,11 +271,8 @@ var HelpTopics = []helpTopic{
 			gh follows normal conventions regarding exit codes.
 
 			- If a command completes successfully, the exit code will be 0
-
 			- If a command fails for any reason, the exit code will be 1
-
 			- If a command is running but gets cancelled, the exit code will be 2
-
 			- If a command requires authentication, the exit code will be 4
 
 			NOTE: It is possible that a particular command may have more exit codes, so it is a good

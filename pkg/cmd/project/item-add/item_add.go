@@ -37,11 +37,11 @@ type addProjectItemMutation struct {
 func NewCmdAddItem(f *cmdutil.Factory, runF func(config addItemConfig) error) *cobra.Command {
 	opts := addItemOpts{}
 	addItemCmd := &cobra.Command{
-		Short: "Add a pull request or an issue to a project",
 		Use:   "item-add [<number>]",
+		Short: "Add a pull request or an issue to a project",
 		Example: heredoc.Doc(`
-			# add an item to monalisa's project "1"
-			gh project item-add 1 --owner monalisa --url https://github.com/monalisa/myproject/issues/23
+			# Add an item to monalisa's project "1"
+			$ gh project item-add 1 --owner monalisa --url https://github.com/monalisa/myproject/issues/23
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -19,11 +19,11 @@ func NewCmdGist(f *cmdutil.Factory) *cobra.Command {
 		Short: "Manage gists",
 		Long:  `Work with GitHub gists.`,
 		Annotations: map[string]string{
-			"help:arguments": heredoc.Doc(`
+			"help:arguments": heredoc.Docf(`
 				A gist can be supplied as argument in either of the following formats:
-				- by ID, e.g. 5b0e0062eb8e9654adad7bb1d81cc75f
-				- by URL, e.g. "https://gist.github.com/OWNER/5b0e0062eb8e9654adad7bb1d81cc75f"
-			`),
+				- by ID, e.g. %[1]s5b0e0062eb8e9654adad7bb1d81cc75f%[1]s
+				- by URL, e.g. %[1]shttps://gist.github.com/OWNER/5b0e0062eb8e9654adad7bb1d81cc75f%[1]s
+			`, "`"),
 		},
 		GroupID: "core",
 	}

@@ -32,13 +32,13 @@ func NewCmdPin(f *cmdutil.Factory, runF func(*PinOptions) error) *cobra.Command 
 	}
 
 	cmd := &cobra.Command{
-		Use:   "pin {<number> | <url>}",
+		Use:   "pin [<number> | <url>]",
 		Short: "Pin a issue",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Pin an issue to a repository.
 
-			The issue can be specified by issue number or URL.
-		`),
+			The issue can be specified by issue %[1]snumber%[1]s or %[1]surl%[1]s.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Pin an issue to the current repository
 			$ gh issue pin 23

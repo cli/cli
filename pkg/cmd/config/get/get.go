@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -25,13 +24,10 @@ func NewCmdConfigGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "get <key>",
-		Short: "Print the value of a given configuration key",
-		Example: heredoc.Doc(`
-			$ gh config get git_protocol
-			https
-		`),
-		Args: cobra.ExactArgs(1),
+		Use:     "get <key>",
+		Short:   "Print the value of a given configuration key",
+		Example: "$ gh config get git_protocol",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config, err := f.Config()
 			if err != nil {

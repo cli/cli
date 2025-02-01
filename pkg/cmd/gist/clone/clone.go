@@ -39,7 +39,6 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		DisableFlagsInUseLine: true,
 
 		Use:   "clone <gist> [<directory>] [-- <gitflags>...]",
-		Args:  cmdutil.MinimumArgs(1, "cannot clone: gist argument required"),
 		Short: "Clone a gist locally",
 		Long: heredoc.Docf(`
 			Clone a GitHub gist locally.
@@ -50,6 +49,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 
 			Pass additional %[1]sgit clone%[1]s flags by listing them after %[1]s--%[1]s.
 		`, "`"),
+		Args: cmdutil.MinimumArgs(1, "cannot clone: gist argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Gist = args[0]
 			opts.GitArgs = args[1:]

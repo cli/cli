@@ -53,10 +53,10 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Watch a run until it's done
-			gh run watch
+			$ gh run watch
 
 			# Run some other command when the run is finished
-			gh run watch && notify-send 'run is done!'
+			$ gh run watch && notify-send 'run is done!'
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override

@@ -125,7 +125,7 @@ func NewCmdLock(f *cmdutil.Factory, parentName string, runF func(string, *LockOp
 	short := fmt.Sprintf("Lock %s conversation", strings.ToLower(c.FullName))
 
 	cmd := &cobra.Command{
-		Use:   "lock {<number> | <url>}",
+		Use:   "lock [<number> | <url>]",
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -168,7 +168,7 @@ func NewCmdUnlock(f *cmdutil.Factory, parentName string, runF func(string, *Lock
 	short := fmt.Sprintf("Unlock %s conversation", strings.ToLower(c.FullName))
 
 	cmd := &cobra.Command{
-		Use:   "unlock {<number> | <url>}",
+		Use:   "unlock [<number> | <url>]",
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

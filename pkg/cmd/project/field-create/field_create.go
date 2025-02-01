@@ -38,14 +38,14 @@ type createProjectV2FieldMutation struct {
 func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) error) *cobra.Command {
 	opts := createFieldOpts{}
 	createFieldCmd := &cobra.Command{
-		Short: "Create a field in a project",
 		Use:   "field-create [<number>]",
+		Short: "Create a field in a project",
 		Example: heredoc.Doc(`
-			# create a field in the current user's project "1"
-			gh project field-create 1 --owner "@me" --name "new field" --data-type "text"
+			# Create a field in the current user's project "1"
+			$ gh project field-create 1 --owner "@me" --name "new field" --data-type "text"
 
-			# create a field with three options to select from for owner monalisa
-			gh project field-create 1 --owner monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
+			# Create a field with three options to select from for owner monalisa
+			$ gh project field-create 1 --owner monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

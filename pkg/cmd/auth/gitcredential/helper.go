@@ -39,8 +39,8 @@ func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *
 
 	cmd := &cobra.Command{
 		Use:    "git-credential",
-		Args:   cobra.ExactArgs(1),
 		Short:  "Implements git credential helper protocol",
+		Args:   cobra.ExactArgs(1),
 		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Operation = args[0]

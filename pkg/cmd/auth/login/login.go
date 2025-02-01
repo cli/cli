@@ -54,7 +54,6 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 	cmd := &cobra.Command{
 		Use:   "login",
-		Args:  cobra.ExactArgs(0),
 		Short: "Log in to a GitHub account",
 		Long: heredoc.Docf(`
 			Authenticate with a GitHub host.
@@ -71,14 +70,17 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			Alternatively, use %[1]s--with-token%[1]s to pass in a personal access token (classic) on standard input.
 			The minimum required scopes for the token are: %[1]srepo%[1]s, %[1]sread:org%[1]s, and %[1]sgist%[1]s.
 			Take care when passing a fine-grained personal access token to %[1]s--with-token%[1]s
-			as the inherent scoping to certain resources may cause confusing behaviour when interacting with other
-			resources. Favour setting %[1]sGH_TOKEN$%[1]s for fine-grained personal access token usage. 
+			as the inherent scoping to certain resources may cause confusing behavior when interacting with other
+			resources. Favour setting %[1]sGH_TOKEN%[1]s for fine-grained personal access token usage.
 
 			Alternatively, gh will use the authentication token found in environment variables.
 			This method is most suitable for "headless" use of gh such as in automation. See
 			%[1]sgh help environment%[1]s for more info.
 
-			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to %[1]senv%[1]s.
+			To use %[1]sgh%[1]s in GitHub Actions, set %[1]sGH_TOKEN%[1]s environment variable like this:
+
+			    env:
+			      GH_TOKEN: ${{ github.token }}
 
 			The git protocol to use for git operations on this host can be set with %[1]s--git-protocol%[1]s,
 			or during the interactive prompting. Although login is for a single account on a host, setting
@@ -88,7 +90,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			prompting to create and upload a new key if one is not found. This can be skipped with
 			%[1]s--skip-ssh-key%[1]s flag.
 
-			For more information on OAuth scopes, <https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps/>.
+			For more information on OAuth scopes, please refer to
+			<https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps/>.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Start interactive setup
@@ -100,6 +103,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			# Authenticate with specific host
 			$ gh auth login --hostname enterprise.internal
 		`),
+		Args: cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if tokenStdin && opts.Web {
 				return cmdutil.FlagErrorf("specify only one of `--web` or `--with-token`")

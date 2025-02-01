@@ -32,12 +32,11 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 	opts := &Options{}
 	trustedRootCmd := cobra.Command{
 		Use:   "trusted-root [--tuf-url <url> --tuf-root <file-path>] [--verify-only]",
-		Args:  cobra.ExactArgs(0),
 		Short: "Output trusted_root.jsonl contents, likely for offline verification",
 		Long: heredoc.Docf(`
 			### NOTE: This feature is currently in public preview, and subject to change.
 
-			Output contents for a trusted_root.jsonl file, likely for offline verification.
+			Output contents for a %[1]strusted_root.jsonl%[1]s file, likely for offline verification.
 
 			When using %[1]sgh attestation verify%[1]s, if your machine is on the internet,
 			this will happen automatically. But to do offline verification, you need to
@@ -52,12 +51,13 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 			%[1]sroot.json%[1]s file that you securely obtained out-of-band.
 
 			If you just want to verify the integrity of your local TUF repository, and don't
-			want the contents of a trusted_root.jsonl file, use %[1]s--verify-only%[1]s.
+			want the contents of a %[1]strusted_root.jsonl%[1]s file, use %[1]s--verify-only%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Get a trusted_root.jsonl for both Sigstore Public Good and GitHub's instance
-			gh attestation trusted-root
+			$ gh attestation trusted-root
 		`),
+		Args: cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Hostname == "" {
 				opts.Hostname, _ = ghauth.DefaultHost()

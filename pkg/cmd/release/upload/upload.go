@@ -41,8 +41,7 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Upload asset files to a GitHub Release.
 
-			To define a display label for an asset, append text starting with %[1]s#%[1]s after the
-			file name.
+			To define a display label for an asset, append text starting with %[1]s#%[1]s after the filename.
 		`, "`"),
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {

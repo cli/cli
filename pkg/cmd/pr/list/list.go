@@ -61,16 +61,16 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			<https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests>
 		`),
 		Example: heredoc.Doc(`
-			List PRs authored by you
+			# List PRs authored by you
 			$ gh pr list --author "@me"
 
-			List only PRs with all of the given labels
+			# List only PRs with all of the given labels
 			$ gh pr list --label bug --label "priority 1"
 
-			Filter PRs using search syntax
+			# Filter PRs using search syntax
 			$ gh pr list --search "status:success review:required"
 
-			Find a PR that introduced a given commit
+			# Find a PR that introduced a given commit
 			$ gh pr list --search "<SHA>" --state merged
 		`),
 		Aliases: []string{"ls"},

@@ -29,7 +29,7 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "reopen {<number> | <url> | <branch>}",
+		Use:   "reopen [<number> | <url> | <branch>]",
 		Short: "Reopen a pull request",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

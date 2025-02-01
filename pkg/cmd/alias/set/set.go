@@ -51,7 +51,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			invoked. This allows for chaining multiple commands via piping and redirection.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# note: Command Prompt on Windows requires using double quotes for arguments
+			# Note: Command Prompt on Windows requires using double quotes for arguments
 			$ gh alias set pv 'pr view'
 			$ gh pv -w 123  #=> gh pr view -w 123
 

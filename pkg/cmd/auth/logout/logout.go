@@ -30,7 +30,6 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 
 	cmd := &cobra.Command{
 		Use:   "logout",
-		Args:  cobra.ExactArgs(0),
 		Short: "Log out of a GitHub account",
 		Long: heredoc.Doc(`
 			Remove authentication for a GitHub account.
@@ -48,11 +47,11 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 			# Log out of a specific host and specific account
 			$ gh auth logout --hostname enterprise.internal --user monalisa
 		`),
+		Args: cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(opts)
 			}
-
 			return logoutRun(opts)
 		},
 	}

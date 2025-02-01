@@ -38,7 +38,7 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 			Without an argument, the pull request that belongs to the current branch
 			is marked as ready.
 
-			If supported by your plan, convert to draft with %[1]s--undo%[1]s
+			If supported by your plan, convert to draft with %[1]s--undo%[1]s.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

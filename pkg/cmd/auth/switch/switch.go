@@ -30,7 +30,6 @@ func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Co
 
 	cmd := &cobra.Command{
 		Use:   "switch",
-		Args:  cobra.ExactArgs(0),
 		Short: "Switch active GitHub account",
 		Long: heredoc.Docf(`
 			Switch the active account for a GitHub host.
@@ -51,6 +50,7 @@ func NewCmdSwitch(f *cmdutil.Factory, runF func(*SwitchOptions) error) *cobra.Co
 			# Switch the active account on a specific host to a specific user
 			$ gh auth switch --hostname enterprise.internal --user monalisa
 		`),
+		Args: cobra.ExactArgs(0),
 		RunE: func(c *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(&opts)

@@ -24,18 +24,18 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "issue <command>",
 		Short: "Manage issues",
-		Long:  `Work with GitHub issues.`,
+		Long:  "Work with GitHub issues.",
 		Example: heredoc.Doc(`
 			$ gh issue list
 			$ gh issue create --label bug
 			$ gh issue view 123 --web
 		`),
 		Annotations: map[string]string{
-			"help:arguments": heredoc.Doc(`
+			"help:arguments": heredoc.Docf(`
 				An issue can be supplied as argument in any of the following formats:
-				- by number, e.g. "123"; or
-				- by URL, e.g. "https://github.com/OWNER/REPO/issues/123".
-			`),
+				- by number, e.g. %[1]s123%[1]s; or
+				- by URL, e.g. %[1]shttps://github.com/OWNER/REPO/issues/123%[1]s.
+			`, "`"),
 		},
 		GroupID: "core",
 	}

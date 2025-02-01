@@ -30,10 +30,9 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 		Use:   "token",
 		Short: "Print the authentication token gh uses for a hostname and account",
 		Long: heredoc.Docf(`
-			This command outputs the authentication token for an account on a given GitHub host.
+			Output the authentication token for an account on a given GitHub host.
 
 			Without the %[1]s--hostname%[1]s flag, the default host is chosen.
-
 			Without the %[1]s--user%[1]s flag, the active account for the host is chosen.
 		`, "`"),
 		Args: cobra.ExactArgs(0),

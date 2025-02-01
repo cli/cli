@@ -49,7 +49,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	var removeMilestone bool
 
 	cmd := &cobra.Command{
-		Use:   "edit {<numbers> | <urls>}",
+		Use:   "edit [<numbers> | <urls>]",
 		Short: "Edit issues",
 		Long: heredoc.Docf(`
 			Edit one or more issues within the same repository.

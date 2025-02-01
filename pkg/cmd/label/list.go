@@ -36,16 +36,16 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List labels in a repository",
 		Long: heredoc.Docf(`
-			Display labels in a GitHub repository.
+			List labels in a GitHub repository.
 
 			When using the %[1]s--search%[1]s flag results are sorted by best match of the query.
 			This behavior cannot be configured with the %[1]s--order%[1]s or %[1]s--sort%[1]s flags.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# sort labels by name
+			# List labels sorted by name
 			$ gh label list --sort name
 
-			# find labels with "bug" in the name or description
+			# Find labels with "bug" in the name or description
 			$ gh label list --search bug
 		`),
 		Args:    cobra.NoArgs,

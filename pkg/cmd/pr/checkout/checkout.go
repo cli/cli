@@ -45,8 +45,8 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 	}
 
 	cmd := &cobra.Command{
-		Use:   "checkout {<number> | <url> | <branch>}",
-		Short: "Check out a pull request in git",
+		Use:   "checkout [<number> | <url> | <branch>]",
+		Short: "Checkout a pull request in git",
 		Args:  cmdutil.ExactArgs(1, "argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)

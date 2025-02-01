@@ -42,7 +42,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:   "develop {<number> | <url>}",
+		Use:   "develop [<number> | <url>]",
 		Short: "Manage linked branches for an issue",
 		Long: heredoc.Docf(`
 			Manage linked branches for an issue.

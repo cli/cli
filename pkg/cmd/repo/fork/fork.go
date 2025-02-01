@@ -74,19 +74,13 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use: "fork [<repository>] [-- <gitflags>...]",
-		Args: func(cmd *cobra.Command, args []string) error {
-			if cmd.ArgsLenAtDash() == 0 && len(args[1:]) > 0 {
-				return cmdutil.FlagErrorf("repository argument required when passing git clone flags")
-			}
-			return nil
-		},
-		Short: "Create a fork of a repository",
+		Use:   "fork [<repository>] [-- <gitflags>...]",
+		Short: "Fork a repository",
 		Long: heredoc.Docf(`
 			Create a fork of a repository.
 
-			With no argument, creates a fork of the current repository. Otherwise, forks
-			the specified repository.
+			With no argument, creates a fork of the current repository.
+			Otherwise, forks the specified repository.
 
 			By default, the new fork is set to be your %[1]sorigin%[1]s remote and any existing
 			origin remote is renamed to %[1]supstream%[1]s. To alter this behavior, you can set
@@ -96,6 +90,12 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 
 			Additional %[1]sgit clone%[1]s flags can be passed after %[1]s--%[1]s.
 		`, "`"),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if cmd.ArgsLenAtDash() == 0 && len(args[1:]) > 0 {
+				return cmdutil.FlagErrorf("repository argument required when passing git clone flags")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptOk := opts.IO.CanPrompt()
 			if len(args) > 0 {

@@ -1,7 +1,6 @@
 package attestation
 
 import (
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/download"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/inspect"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/trustedroot"
@@ -16,9 +15,7 @@ func NewCmdAttestation(f *cmdutil.Factory) *cobra.Command {
 		Use:     "attestation [subcommand]",
 		Short:   "Work with artifact attestations",
 		Aliases: []string{"at"},
-		Long: heredoc.Doc(`
-			Download and verify artifact attestations.
-		`),
+		Long:    "Download and verify artifact attestations.",
 	}
 
 	root.AddCommand(download.NewDownloadCmd(f, nil))

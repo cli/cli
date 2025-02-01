@@ -50,8 +50,8 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		Use:   "status",
 		Short: "Print information about relevant issues, pull requests, and notifications across repositories",
 		Long: heredoc.Doc(`
-			The status command prints information about your work on GitHub across all the repositories you're subscribed to, including:
-
+			The status command prints information about your work on GitHub across all
+			the repositories you're subscribed to, including:
 			- Assigned Issues
 			- Assigned Pull Requests
 			- Review Requests

@@ -46,7 +46,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List autolink references for a GitHub repository",
 		Long: heredoc.Doc(`
-			Gets all autolink references that are configured for a repository.
+			List all autolink references that are configured for a repository.
 
 			Information about autolinks is only available to repository administrators.
 		`),

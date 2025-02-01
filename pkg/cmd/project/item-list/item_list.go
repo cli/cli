@@ -29,11 +29,11 @@ type listConfig struct {
 func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.Command {
 	opts := listOpts{}
 	listCmd := &cobra.Command{
-		Short: "List the items in a project",
 		Use:   "item-list [<number>]",
+		Short: "List the items in a project",
 		Example: heredoc.Doc(`
-			# list the items in the current users's project "1"
-			gh project item-list 1 --owner "@me"
+			# List the items in the current users's project "1"
+			$ gh project item-list 1 --owner "@me"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

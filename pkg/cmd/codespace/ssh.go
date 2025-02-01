@@ -55,7 +55,7 @@ func newSSHCmd(app *App) *cobra.Command {
 		Long: heredoc.Docf(`
 			The %[1]sssh%[1]s command is used to SSH into a codespace. In its simplest form, you can
 			run %[1]sgh cs ssh%[1]s, select a codespace interactively, and connect.
-			
+
 			The %[1]sssh%[1]s command will automatically create a public/private ssh key pair in the
 			%[1]s~/.ssh%[1]s directory if you do not have an existing valid key pair. When selecting the
 			key pair to use, the preferred order is:
@@ -79,15 +79,14 @@ func newSSHCmd(app *App) *cobra.Command {
 			install it in your %[1]sDockerfile%[1]s or, for codespaces that use Debian-based images,
 			you can add the following to your %[1]sdevcontainer.json%[1]s:
 
-				"features": {
-					"ghcr.io/devcontainers/features/sshd:1": {
-						"version": "latest"
-					}
-				}
+			    "features": {
+			        "ghcr.io/devcontainers/features/sshd:1": {
+			             "version": "latest"
+			        }
+			    }
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh codespace ssh
-
 			$ gh codespace ssh --config > ~/.ssh/codespaces
 			$ printf 'Match all\nInclude ~/.ssh/codespaces\n' >> ~/.ssh/config
 		`),
@@ -732,8 +731,8 @@ func newCpCmd(app *App) *cobra.Command {
 			be evaluated on the remote machine, subject to expansion of tildes, braces, globs,
 			environment variables, and backticks. For security, do not use this flag with arguments
 			provided by untrusted users; see <https://lwn.net/Articles/835962/> for discussion.
-			
-			By default, the %[1]scp%[1]s command will create a public/private ssh key pair to authenticate with 
+
+			By default, the %[1]scp%[1]s command will create a public/private ssh key pair to authenticate with
 			the codespace inside the %[1]s~/.ssh directory%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`

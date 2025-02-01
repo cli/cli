@@ -37,14 +37,14 @@ type updateProjectMutation struct {
 func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra.Command {
 	opts := closeOpts{}
 	closeCmd := &cobra.Command{
-		Short: "Close a project",
 		Use:   "close [<number>]",
+		Short: "Close a project",
 		Example: heredoc.Doc(`
-			# close project "1" owned by monalisa
-			gh project close 1 --owner monalisa
+			# Close project "1" owned by monalisa
+			$ gh project close 1 --owner monalisa
 
-			# reopen closed project "1" owned by github
-			gh project close 1 --owner github --undo
+			# Reopen closed project "1" owned by github
+			$ gh project close 1 --owner github --undo
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

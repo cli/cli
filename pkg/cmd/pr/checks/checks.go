@@ -71,7 +71,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 			the %[1]sstate%[1]s field into %[1]spass%[1]s, %[1]sfail%[1]s, %[1]spending%[1]s, %[1]sskipping%[1]s, or %[1]scancel%[1]s.
 
 			Additional exit codes:
-				8: Checks pending
+			- 8: Checks pending
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

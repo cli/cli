@@ -111,7 +111,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					support as many search qualifiers. For a finer grained search of
 					extensions, try using:
 
-						gh search repos --topic "gh-extension"
+					    gh search repos --topic "gh-extension"
 
 					and adding qualifiers as needed. See %[1]sgh help search repos%[1]s to learn
 					more about repository search.
@@ -119,7 +119,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					For listing just the extensions that are already installed locally,
 					see:
 
-						gh ext list
+					    gh ext list
 				`, "`"),
 				Example: heredoc.Doc(`
 					# List the first 30 extensions sorted by star count, descending
@@ -298,22 +298,23 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Long: heredoc.Docf(`
 					Install a GitHub CLI extension from a GitHub or local repository.
 
-					For GitHub repositories, the repository argument can be specified in %[1]sOWNER/REPO%[1]s format or as a full repository URL.
-					The URL format is useful when the repository is not hosted on github.com.
+					For GitHub repositories, the repository argument can be specified
+					in %[1]sOWNER/REPO%[1]s format or as a full repository URL.
+					The URL format is useful when the repository is not hosted on <github.com>.
 
 					For local repositories, often used while developing extensions, use %[1]s.%[1]s as the
 					value of the repository argument. Note the following:
 
 					- After installing an extension from a locally cloned repository, the GitHub CLI will
-					manage this extension as a symbolic link (or equivalent mechanism on Windows) pointing
-					to an executable file with the same name as the repository in the repository's root.
-					For example, if the repository is named %[1]sgh-foobar%[1]s, the symbolic link will point
-					to %[1]sgh-foobar%[1]s in the extension repository's root.
+					  manage this extension as a symbolic link (or equivalent mechanism on Windows) pointing
+					  to an executable file with the same name as the repository in the repository's root.
+					  For example, if the repository is named %[1]sgh-foobar%[1]s, the symbolic link will point
+					  to %[1]sgh-foobar%[1]s in the extension repository's root.
 					- When executing the extension, the GitHub CLI will run the executable file found
-					by following the symbolic link. If no executable file is found, the extension
-					will fail to execute.
+					  by following the symbolic link. If no executable file is found, the extension
+					  will fail to execute.
 					- If the extension is precompiled, the executable file must be built manually and placed
-					in the repository's root.
+					  in the repository's root.
 
 					For the list of available extensions, see <https://github.com/topics/gh-extension>.
 				`, "`"),
@@ -411,7 +412,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			var flagForce bool
 			var flagDryRun bool
 			cmd := &cobra.Command{
-				Use:   "upgrade {<name> | --all}",
+				Use:   "upgrade [<name> | --all]",
 				Short: "Upgrade installed extensions",
 				Args: func(cmd *cobra.Command, args []string) error {
 					if len(args) == 0 && !flagAll {
@@ -479,7 +480,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					For a more traditional way to discover extensions, see:
 
-						gh ext search
+					    gh ext search
 
 					along with %[1]sgh ext install%[1]s, %[1]sgh ext remove%[1]s, and %[1]sgh repo view%[1]s.
 				`, "`"),
@@ -533,7 +534,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				of the extension.
 			`, "`"),
 			Example: heredoc.Doc(`
-				# execute a label extension instead of the core gh label command
+				# Execute a label extension instead of the core gh label command
 				$ gh extension exec label
 			`),
 			Args:               cobra.MinimumNArgs(1),
@@ -564,16 +565,16 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Short: "Create a new extension",
 				Example: heredoc.Doc(`
 					# Use interactively
-					gh extension create
+					$ gh extension create
 
 					# Create a script-based extension
-					gh extension create foobar
+					$ gh extension create foobar
 
 					# Create a Go extension
-					gh extension create --precompiled=go foobar
+					$ gh extension create --precompiled=go foobar
 
 					# Create a non-Go precompiled extension
-					gh extension create --precompiled=other foobar
+					$ gh extension create --precompiled=other foobar
 				`),
 				Args: cobra.MaximumNArgs(1),
 				RunE: func(cmd *cobra.Command, args []string) error {

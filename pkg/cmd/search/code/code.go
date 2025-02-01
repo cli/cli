@@ -40,26 +40,26 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 			<https://docs.github.com/search-github/searching-on-github/searching-code>
 
 			Note that these search results are powered by what is now a legacy GitHub code search engine.
-			The results might not match what is seen on github.com, and new features like regex search
+			The results might not match what is seen on <github.com>, and new features like regex search
 			are not yet available via the GitHub API.
 		`),
 		Example: heredoc.Doc(`
-			# search code matching "react" and "lifecycle"
+			# Search code matching "react" and "lifecycle"
 			$ gh search code react lifecycle
 
-			# search code matching "error handling" 
+			# Search code matching "error handling"
 			$ gh search code "error handling"
-	
-			# search code matching "deque" in Python files
+
+			# Search code matching "deque" in Python files
 			$ gh search code deque --language=python
 
-			# search code matching "cli" in repositories owned by microsoft organization
+			# Search code matching "cli" in repositories owned by microsoft organization
 			$ gh search code cli --owner=microsoft
 
-			# search code matching "panic" in the GitHub CLI repository
+			# Search code matching "panic" in the GitHub CLI repository
 			$ gh search code panic --repo cli/cli
 
-			# search code matching keyword "lint" in package.json files
+			# Search code matching keyword "lint" in package.json files
 			$ gh search code lint --filename package.json
 		`),
 		RunE: func(c *cobra.Command, args []string) error {

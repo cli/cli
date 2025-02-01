@@ -19,8 +19,8 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 			Generate shell completion scripts for GitHub CLI commands.
 
 			When installing GitHub CLI through a package manager, it's possible that
-			no additional shell configuration is necessary to gain completion support. For
-			Homebrew, see <https://docs.brew.sh/Shell-Completion>
+			no additional shell configuration is necessary to gain completion support.
+			For Homebrew, see <https://docs.brew.sh/Shell-Completion>.
 
 			If you need to set up completions manually, follow the instructions below. The exact
 			config file locations might vary based on your system. Make sure to restart your
@@ -32,37 +32,37 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 
 			After, add this to your %[1]s~/.bash_profile%[1]s:
 
-				eval "$(gh completion -s bash)"
-			
+			    eval "$(gh completion -s bash)"
+
 			### zsh
 
 			Generate a %[1]s_gh%[1]s completion script and put it somewhere in your %[1]s$fpath%[1]s:
 
-				gh completion -s zsh > /usr/local/share/zsh/site-functions/_gh
+			    gh completion -s zsh > /usr/local/share/zsh/site-functions/_gh
 
 			Ensure that the following is present in your %[1]s~/.zshrc%[1]s:
 
-				autoload -U compinit
-				compinit -i
-			
+			    autoload -U compinit
+			    compinit -i
+
 			Zsh version 5.7 or later is recommended.
 
 			### fish
 
 			Generate a %[1]sgh.fish%[1]s completion script:
 
-				gh completion -s fish > ~/.config/fish/completions/gh.fish
+			    gh completion -s fish > ~/.config/fish/completions/gh.fish
 
 			### PowerShell
 
 			Open your profile script with:
 
-				mkdir -Path (Split-Path -Parent $profile) -ErrorAction SilentlyContinue
-				notepad $profile
-			
+			    mkdir -Path (Split-Path -Parent $profile) -ErrorAction SilentlyContinue
+			    notepad $profile
+
 			Add the line and save the file:
 
-				Invoke-Expression -Command $(gh completion -s powershell | Out-String)
+			    Invoke-Expression -Command $(gh completion -s powershell | Out-String)
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if shellType == "" {

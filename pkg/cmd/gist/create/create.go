@@ -53,25 +53,25 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Create a new GitHub gist with given contents.
 
-			Gists can be created from one or multiple files. Alternatively, pass %[1]s-%[1]s as
-			file name to read from standard input.
+			Gists can be created from one or multiple files.
+			Alternatively, pass %[1]s-%[1]s as file name to read from standard input.
 
 			By default, gists are secret; use %[1]s--public%[1]s to make publicly listed ones.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# publish file 'hello.py' as a public gist
+			# Publish file 'hello.py' as a public gist
 			$ gh gist create --public hello.py
 
-			# create a gist with a description
+			# Create a gist with a description
 			$ gh gist create hello.py -d "my Hello-World program in Python"
 
-			# create a gist containing several files
+			# Create a gist containing several files
 			$ gh gist create hello.py world.py cool.txt
 
-			# read from standard input to create a gist
+			# Read from standard input to create a gist
 			$ gh gist create -
 
-			# create a gist from output piped from another command
+			# Create a gist from output piped from another command
 			$ cat cool.txt | gh gist create
 		`),
 		Args: func(cmd *cobra.Command, args []string) error {
