@@ -326,9 +326,25 @@ func Test_NewCmdApi(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name:     "--jq with --template",
-			cli:      "user --jq .foo -t '{{.foo}}'",
-			wantsErr: true,
+			name: "--jq with --template",
+			cli:  "user --jq .foo -t '{{.foo}}'",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "{{.foo}}",
+				FilterOutput:        ".foo",
+				Verbose:             false,
+			},
 		},
 		{
 			name:     "--slurp without --paginate",
@@ -655,6 +671,32 @@ func Test_apiRun(t *testing.T) {
 			stdout: "[\n  {\n    \"name\": \"Mona\"\n  },\n  {\n    \"name\": \"Hubot\"\n  }\n]\n",
 			stderr: ``,
 			isatty: true,
+		},
+		{
+			name: "jq filtered output template",
+			options: ApiOptions{
+				FilterOutput: `sort_by(.title)`,
+				Template:     `{{range .}}{{tablerow .number .title}}{{end}}`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body: io.NopCloser(bytes.NewBufferString(heredoc.Doc(`
+				[
+					{
+						"number": 123,
+						"title": "foo"
+					},
+					{
+						"number": 456,
+						"title": "bar"
+					}
+				]`))),
+			},
+			stdout: heredoc.Doc(`
+			456  bar
+			123  foo
+			`),
 		},
 	}
 

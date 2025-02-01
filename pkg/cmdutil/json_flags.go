@@ -207,7 +207,7 @@ func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
 	}
 
 	w := ios.Out
-	if e.filter != "" {
+	if e.filter != "" && e.template == "" {
 		indent := ""
 		if ios.IsStdoutTTY() {
 			indent = "  "
@@ -220,7 +220,7 @@ func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
 		if err := t.Parse(e.template); err != nil {
 			return err
 		}
-		if err := t.Execute(&buf); err != nil {
+		if err := t.ExecuteFiltered(&buf, e.filter); err != nil {
 			return err
 		}
 		return t.Flush()

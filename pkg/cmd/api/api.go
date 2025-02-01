@@ -246,18 +246,16 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			if err := cmdutil.MutuallyExclusive(
 				"the `--slurp` option is not supported with `--jq` or `--template`",
 				opts.Slurp,
-				opts.FilterOutput != "",
-				opts.Template != "",
+				opts.FilterOutput != "" || opts.Template != "",
 			); err != nil {
 				return err
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"only one of `--template`, `--jq`, `--silent`, or `--verbose` may be used",
+				"the `--silent` or `--verbose` options cannot be used together or with `--jq` or `--template`",
 				opts.Verbose,
 				opts.Silent,
-				opts.FilterOutput != "",
-				opts.Template != "",
+				opts.FilterOutput != "" || opts.Template != "",
 			); err != nil {
 				return err
 			}
@@ -474,7 +472,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
-	if opts.FilterOutput != "" && serverError == "" {
+	if opts.FilterOutput != "" && opts.Template == "" && serverError == "" {
 		// TODO: reuse parsed query across pagination invocations
 		indent := ""
 		if opts.IO.IsStdoutTTY() {
@@ -485,7 +483,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 			return
 		}
 	} else if opts.Template != "" && serverError == "" {
-		err = template.Execute(responseBody)
+		err = template.ExecuteFiltered(responseBody, opts.FilterOutput)
 		if err != nil {
 			return
 		}
