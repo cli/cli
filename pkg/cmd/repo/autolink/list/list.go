@@ -15,13 +15,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var autolinkFields = []string{
-	"id",
-	"isAlphanumeric",
-	"keyPrefix",
-	"urlTemplate",
-}
-
 type listOptions struct {
 	BaseRepo       func() (ghrepo.Interface, error)
 	Browser        browser.Browser
@@ -70,7 +63,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List autolink references in the web browser")
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, autolinkFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.AutolinkFields)
 
 	return cmd
 }
@@ -111,8 +104,10 @@ func listRun(opts *listOptions) error {
 
 	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("ID", "KEY PREFIX", "URL TEMPLATE", "ALPHANUMERIC"))
 
+	cs := opts.IO.ColorScheme()
+
 	for _, autolink := range autolinks {
-		tp.AddField(fmt.Sprintf("%d", autolink.ID))
+		tp.AddField(cs.Cyanf("%d", autolink.ID))
 		tp.AddField(autolink.KeyPrefix)
 		tp.AddField(autolink.URLTemplate)
 		tp.AddField(strconv.FormatBool(autolink.IsAlphanumeric))

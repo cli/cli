@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAutoLinkLister_List(t *testing.T) {
+func TestAutolinkLister_List(t *testing.T) {
 	tests := []struct {
 		name   string
 		repo   ghrepo.Interface

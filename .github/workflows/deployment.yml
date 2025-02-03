@@ -33,7 +33,7 @@ jobs:
     steps:
       - name: Validate tag name format
         run: |
-          if [[ ! "${{ inputs.tag_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$]]; then
+          if [[ ! "${{ inputs.tag_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid tag name format. Must be in the form v1.2.3"
             exit 1
           fi

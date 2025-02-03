@@ -120,6 +120,7 @@ func (s *PullRequestRefs) GetPRHeadLabel() string {
 }
 
 func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, error) {
+	// If we have a URL, we don't need git stuff
 	if len(opts.Fields) == 0 {
 		return nil, nil, errors.New("Find error: no fields specified")
 	}
@@ -137,37 +138,74 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		f.baseRefRepo = repo
 	}
 
-	if f.prNumber == 0 && opts.Selector != "" {
-		// If opts.Selector is a valid number then assume it is the
-		// PR number unless opts.BaseBranch is specified. This is a
-		// special case for PR create command which will always want
-		// to assume that a numerical selector is a branch name rather
-		// than PR number.
-		prNumber, err := strconv.Atoi(strings.TrimPrefix(opts.Selector, "#"))
-		if opts.BaseBranch == "" && err == nil {
-			f.prNumber = prNumber
-		} else {
-			f.branchName = opts.Selector
-		}
-	} else {
+	var prRefs PullRequestRefs
+	if opts.Selector == "" {
+		// You must be in a git repo for this case to work
 		currentBranchName, err := f.branchFn()
 		if err != nil {
 			return nil, nil, err
 		}
 		f.branchName = currentBranchName
-	}
 
-	// Get the branch config for the current branchName
-	branchConfig, err := f.branchConfig(f.branchName)
-	if err != nil {
-		return nil, nil, err
-	}
+		// Get the branch config for the current branchName
+		branchConfig, err := f.branchConfig(f.branchName)
+		if err != nil {
+			return nil, nil, err
+		}
 
-	// Determine if the branch is configured to merge to a special PR ref
-	prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
-	if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
-		prNumber, _ := strconv.Atoi(m[1])
-		f.prNumber = prNumber
+		// Determine if the branch is configured to merge to a special PR ref
+		prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
+		if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
+			prNumber, _ := strconv.Atoi(m[1])
+			f.prNumber = prNumber
+		}
+
+		// Determine the PullRequestRefs from config
+		if f.prNumber == 0 {
+			rems, err := f.remotesFn()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			// Suppressing these errors as we have other means of computing the PullRequestRefs when these fail.
+			parsedPushRevision, _ := f.parsePushRevision(f.branchName)
+
+			pushDefault, err := f.pushDefault()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			remotePushDefault, err := f.remotePushDefault()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			prRefs, err = ParsePRRefs(f.branchName, branchConfig, parsedPushRevision, pushDefault, remotePushDefault, f.baseRefRepo, rems)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+
+	} else if f.prNumber == 0 {
+		// You gave me a selector but I couldn't find a PR number (it wasn't a URL)
+
+		// Try to get a PR number from the selector
+		prNumber, err := strconv.Atoi(strings.TrimPrefix(opts.Selector, "#"))
+		// If opts.Selector is a valid number then assume it is the
+		// PR number unless opts.BaseBranch is specified. This is a
+		// special case for PR create command which will always want
+		// to assume that a numerical selector is a branch name rather
+		// than PR number.
+		if opts.BaseBranch == "" && err == nil {
+			f.prNumber = prNumber
+		} else {
+			f.branchName = opts.Selector
+			// We don't expect an error here because parsedPushRevision is empty
+			prRefs, err = ParsePRRefs(f.branchName, git.BranchConfig{}, "", "", "", f.baseRefRepo, remotes.Remotes{})
+			if err != nil {
+				return nil, nil, err
+			}
+		}
 	}
 
 	// Set up HTTP client
@@ -217,29 +255,6 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 			return pr, f.baseRefRepo, err
 		}
 	} else {
-		rems, err := f.remotesFn()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		pushDefault, err := f.pushDefault()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Suppressing these errors as we have other means of computing the PullRequestRefs when these fail.
-		parsedPushRevision, _ := f.parsePushRevision(f.branchName)
-
-		remotePushDefault, err := f.remotePushDefault()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		prRefs, err := ParsePRRefs(f.branchName, branchConfig, parsedPushRevision, pushDefault, remotePushDefault, f.baseRefRepo, rems)
-		if err != nil {
-			return nil, nil, err
-		}
-
 		pr, err = findForBranch(httpClient, f.baseRefRepo, opts.BaseBranch, prRefs.GetPRHeadLabel(), opts.States, fields.ToSlice())
 		if err != nil {
 			return pr, f.baseRefRepo, err

@@ -9,6 +9,13 @@ type Autolink struct {
 	URLTemplate    string `json:"url_template"`
 }
 
+var AutolinkFields = []string{
+	"id",
+	"isAlphanumeric",
+	"keyPrefix",
+	"urlTemplate",
+}
+
 func (a *Autolink) ExportData(fields []string) map[string]interface{} {
 	return cmdutil.StructExportData(a, fields)
 }

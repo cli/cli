@@ -87,6 +87,7 @@ func statusRun(opts *StatusOptions) error {
 	var currentHeadRefBranchName string
 
 	if !opts.HasRepoOverride {
+		// We must be in a repo without the override
 		currentBranchName, err = opts.Branch()
 		if err != nil && !errors.Is(err, git.ErrNotOnAnyBranch) {
 			return fmt.Errorf("could not query for pull request for current branch: %w", err)

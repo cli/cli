@@ -109,9 +109,9 @@ func createRun(opts *createOptions) error {
 
 	cs := opts.IO.ColorScheme()
 	fmt.Fprintf(opts.IO.Out,
-		"%s Created repository autolink %d on %s\n",
+		"%s Created repository autolink %s on %s\n",
 		cs.SuccessIconWithColor(cs.Green),
-		autolink.ID,
+		cs.Cyanf("%d", autolink.ID),
 		ghrepo.FullName(repo))
 
 	return nil
