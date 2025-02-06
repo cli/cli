@@ -222,7 +222,7 @@ func runVerify(opts *Options) error {
 
 	attestations, logMsg, err := getAttestations(opts, *artifact)
 	if err != nil {
-		if ok := errors.Is(err, api.ErrNoAttestations{}); ok {
+		if ok := errors.Is(err, api.ErrNoAttestationsFound); ok {
 			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), artifact.DigestWithAlg())
 			return err
 		}

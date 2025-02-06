@@ -1,8 +1,7 @@
 package api
 
 import (
-	"fmt"
-
+	"errors"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 )
 
@@ -11,18 +10,7 @@ const (
 	GetAttestationByOwnerAndSubjectDigestPath = "orgs/%s/attestations/%s"
 )
 
-type ErrNoAttestations struct {
-	name   string
-	digest string
-}
-
-func (e ErrNoAttestations) Error() string {
-	return fmt.Sprintf("no attestations found for digest %s in %s", e.name, e.digest)
-}
-
-func newErrNoAttestations(name, digest string) ErrNoAttestations {
-	return ErrNoAttestations{name, digest}
-}
+var ErrNoAttestationsFound = errors.New("no attestations found")
 
 type Attestation struct {
 	Bundle    *bundle.Bundle `json:"bundle"`

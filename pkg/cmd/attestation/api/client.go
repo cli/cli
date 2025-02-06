@@ -60,42 +60,24 @@ func NewLiveClient(hc *http.Client, host string, l *ioconfig.Handler) *LiveClien
 	}
 }
 
-func (c *LiveClient) BuildRepoAndDigestURL(repo, digest string) string {
-	repo = strings.Trim(repo, "/")
-	return fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, repo, digest)
-}
-
 // GetByRepoAndDigest fetches the attestation by repo and digest
 func (c *LiveClient) GetByRepoAndDigest(repo, digest string, limit int) ([]*Attestation, error) {
-	url := c.BuildRepoAndDigestURL(repo, digest)
-	attestations, err := c.getAttestations(url, repo, digest, limit)
-	if err != nil {
-		return nil, err
-	}
-
-	bundles, err := c.fetchBundleFromAttestations(attestations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch bundle with URL: %w", err)
-	}
-
-	return bundles, nil
-}
-
-func (c *LiveClient) BuildOwnerAndDigestURL(owner, digest string) string {
-	owner = strings.Trim(owner, "/")
-	return fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, owner, digest)
+	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
+	url := fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, repo, digest)
+	return c.getByURL(url, limit)
 }
 
 // GetByOwnerAndDigest fetches attestation by owner and digest
 func (c *LiveClient) GetByOwnerAndDigest(owner, digest string, limit int) ([]*Attestation, error) {
-	url := c.BuildOwnerAndDigestURL(owner, digest)
-	attestations, err := c.getAttestations(url, owner, digest, limit)
+	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
+	url := fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, owner, digest)
+	return c.getByURL(url, limit)
+}
+
+func (c *LiveClient) getByURL(url string, limit int) ([]*Attestation, error) {
+	attestations, err := c.getAttestations(url, limit)
 	if err != nil {
 		return nil, err
-	}
-
-	if len(attestations) == 0 {
-		return nil, newErrNoAttestations(owner, digest)
 	}
 
 	bundles, err := c.fetchBundleFromAttestations(attestations)
@@ -112,9 +94,7 @@ func (c *LiveClient) GetTrustDomain() (string, error) {
 	return c.getTrustDomain(MetaPath)
 }
 
-func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*Attestation, error) {
-	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
-
+func (c *LiveClient) getAttestations(url string, limit int) ([]*Attestation, error) {
 	perPage := limit
 	if perPage <= 0 || perPage > maxLimitForFlag {
 		return nil, fmt.Errorf("limit must be greater than 0 and less than or equal to %d", maxLimitForFlag)
@@ -157,7 +137,7 @@ func (c *LiveClient) getAttestations(url, name, digest string, limit int) ([]*At
 	}
 
 	if len(attestations) == 0 {
-		return nil, newErrNoAttestations(name, digest)
+		return nil, ErrNoAttestationsFound
 	}
 
 	if len(attestations) > limit {
@@ -176,23 +156,22 @@ func (c *LiveClient) fetchBundleFromAttestations(attestations []*Attestation) ([
 				return fmt.Errorf("attestation has no bundle or bundle URL")
 			}
 
-			// If the bundle field is nil, try to fetch the bundle with the provided URL
-			if a.Bundle == nil {
-				c.logger.VerbosePrintf("Bundle field is empty. Trying to fetch with bundle URL\n\n")
-				b, err := c.GetBundle(a.BundleURL)
-				if err != nil {
-					return fmt.Errorf("failed to fetch bundle with URL: %w", err)
-				}
+			// for now, we fall back to the bundle field if the bundle URL is empty
+			if a.BundleURL == "" {
+				c.logger.VerbosePrintf("Bundle URL is empty. Falling back to bundle field\n\n")
 				fetched[i] = &Attestation{
-					Bundle: b,
+					Bundle: a.Bundle,
 				}
 				return nil
 			}
 
-			// otherwise fall back to the bundle field
-			c.logger.VerbosePrintf("Fetching bundle from Bundle field\n\n")
+			// otherwise fetch the bundle with the provided URL
+			b, err := c.getBundle(a.BundleURL)
+			if err != nil {
+				return fmt.Errorf("failed to fetch bundle with URL: %w", err)
+			}
 			fetched[i] = &Attestation{
-				Bundle: a.Bundle,
+				Bundle: b,
 			}
 
 			return nil
@@ -206,38 +185,49 @@ func (c *LiveClient) fetchBundleFromAttestations(attestations []*Attestation) ([
 	return fetched, nil
 }
 
-func (c *LiveClient) GetBundle(url string) (*bundle.Bundle, error) {
+func (c *LiveClient) getBundle(url string) (*bundle.Bundle, error) {
 	c.logger.VerbosePrintf("Fetching attestation bundle with bundle URL\n\n")
 
-	resp, err := c.httpClient.Get(url)
-	if err != nil {
-		return nil, err
-	}
+	var sgBundle *bundle.Bundle
+	bo := backoff.NewConstantBackOff(getAttestationRetryInterval)
+	err := backoff.Retry(func() error {
+		resp, err := c.httpClient.Get(url)
+		if err != nil {
+			return fmt.Errorf("request to fetch bundle from URL failed: %w", err)
+		}
 
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
+		if resp.StatusCode >= 500 && resp.StatusCode <= 599 {
+			return fmt.Errorf("attestation bundle with URL %s returned status code %d", url, resp.StatusCode)
+		}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read blob storage response body: %w", err)
-	}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read blob storage response body: %w", err)
+		}
 
-	var out []byte
-	decompressed, err := snappy.Decode(out, body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decompress with snappy: %w", err)
-	}
+		var out []byte
+		decompressed, err := snappy.Decode(out, body)
+		if err != nil {
+			return backoff.Permanent(fmt.Errorf("failed to decompress with snappy: %w", err))
+		}
 
-	var pbBundle v1.Bundle
-	if err = protojson.Unmarshal(decompressed, &pbBundle); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal to bundle: %w", err)
-	}
+		var pbBundle v1.Bundle
+		if err = protojson.Unmarshal(decompressed, &pbBundle); err != nil {
+			return backoff.Permanent(fmt.Errorf("failed to unmarshal to bundle: %w", err))
+		}
 
-	c.logger.VerbosePrintf("Successfully fetched bundle\n\n")
+		c.logger.VerbosePrintf("Successfully fetched bundle\n\n")
 
-	return bundle.NewBundle(&pbBundle)
+		sgBundle, err = bundle.NewBundle(&pbBundle)
+		if err != nil {
+			return backoff.Permanent(fmt.Errorf("failed to create new bundle: %w", err))
+		}
+
+		return nil
+	}, backoff.WithMaxRetries(bo, 3))
+
+	return sgBundle, err
 }
 
 func shouldRetry(err error) bool {

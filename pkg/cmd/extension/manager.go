@@ -268,7 +268,7 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 		return err
 	}
 	if !hs {
-		return errors.New("extension is not installable: missing executable")
+		return fmt.Errorf("extension is not installable: no usable release artifact or script found in %s", repo)
 	}
 
 	return m.installGit(repo, target)

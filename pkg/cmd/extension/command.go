@@ -302,6 +302,14 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					in %[1]sOWNER/REPO%[1]s format or as a full repository URL.
 					The URL format is useful when the repository is not hosted on <github.com>.
 
+					For remote repositories, the GitHub CLI first looks for the release artifacts assuming
+					that it's a binary extension i.e. prebuilt binaries provided as part of the release.
+					In the absence of a release, the repository itself is cloned assuming that it's a
+					script extension i.e. prebuilt executable or script exists on its root.
+
+					The %[1]s--pin%[1]s flag may be used to specify a tag or commit for binary and script
+					extensions respectively, the latest version is used otherwise.
+
 					For local repositories, often used while developing extensions, use %[1]s.%[1]s as the
 					value of the repository argument. Note the following:
 
