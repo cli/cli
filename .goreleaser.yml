@@ -19,6 +19,8 @@ builds:
       post:
         - cmd: ./script/sign '{{ .Path }}'
           output: true
+        - cmd: ./script/pkgmacos '{{ .Version }}'
+          output: true
     binary: bin/gh
     main: ./cmd/gh
     ldflags:
