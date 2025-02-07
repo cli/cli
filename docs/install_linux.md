@@ -286,3 +286,347 @@ pamac install github-cli
 [arch linux repo]: https://www.archlinux.org/packages/extra/x86_64/github-cli
 [arch linux aur]: https://aur.archlinux.org/packages/github-cli-git
 [^1]: https://wiki.alpinelinux.org/wiki/Package_management#Repository_pinning
+
+```markdown
+# Installing gh on Linux and BSD
+
+Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
+are considered official binaries. We focus on popular Linux distros and
+the following CPU architectures: `i386`, `amd64`, `arm64`, `armhf`.
+
+Other sources for installation are community-maintained and thus might lag behind
+our release schedule.
+
+## Official sources
+
+### Debian, Ubuntu Linux, Raspberry Pi OS (apt)
+
+Install:
+
+```bash
+(type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+	&& sudo mkdir -p -m 755 /etc/apt/keyrings \
+        && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        && cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+	&& sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+	&& sudo apt update \
+	&& sudo apt install gh -y
+```
+
+Upgrade:
+
+```bash
+sudo apt update
+sudo apt install gh
+```
+
+> [!NOTE]
+> If errors regarding GPG signatures occur, see [cli/cli#9569](https://github.com/cli/cli/issues/9569) for steps to fix this.
+
+...
+
+## About AfricaCryptoChainx
+
+### What are you trying to accomplish?
+
+We are enhancing the AfricaCryptoChainx project by integrating new features such as crypto games, Walk to Earn, affiliate programs, and more. These additions aim to increase user engagement, promote healthy lifestyles, and generate additional revenue streams within the app. Additionally, we are introducing AfricaCryptoChainx coins to support financial inclusion and DeFi functionalities in Africa. The coins include:
+
+1. **AfricaCryptoChainx Coin (ACC)**
+2. **Africoin (AFR)**
+3. **AfroToken (AFT)**
+4. **Sahara Coin (SHC)**
+5. **Savanna Token (SAV)**
+6. **Zambezi Coin (ZBC)**
+7. **Kilimanjaro Token (KMT)**
+8. **Ubuntu Coin (UBC)**
+9. **Serengeti Token (SGT)**
+10. **CapeCoin (CPC)**
+11. **Victoria Coin (VIC)**
+12. **Nile Token (NLT)**
+13. **Kalahari Coin (KHC)**
+14. **Rift Token (RFT)**
+15. **Baobab Coin (BBC)**
+16. **Acacia Token (ACT)**
+17. **Congo Coin (CGC)**
+18. **Atlas Token (ATS)**
+19. **Oasis Coin (OSC)**
+20. **Horizon Token (HRT)**
+21. **Eden Coin (EDC)**
+22. **Gateway Token (GAT)**
+23. **Unity Coin (UTC)**
+24. **Harmony Token (HMT)**
+25. **Heritage Coin (HTC)**
+26. **Liberty Token (LBT)**
+27. **Pride Coin (PDC)**
+28. **Essence Token (EST)**
+29. **Destiny Coin (DSC)**
+30. **Pulse Token (PLT)**
+31. **Eclipse Coin (ECC)**
+32. **Legacy Token (LGC)**
+33. **Fortune Coin (FRC)**
+34. **Prosperity Token (PRT)**
+35. **Wisdom Coin (WSC)**
+36. **Vision Token (VST)**
+37. **Genesis Token (GST)**
+38. **Spirit Coin (SPC)**
+39. **Sovereign Token (SOV)**
+40. **Summit Coin (SMT)**
+41. **Citadel Token (CTT)**
+42. **Foundation Coin (FDT)**
+
+All transactions using AfricaCryptoChainx coins are conducted securely within the app, ensuring seamless and secure financial interactions.
+
+We also request that **ACCXBot** be the primary bot to assist in our project's development and security. ACCXBot can be found [here](link_to_ACCXBot).
+
+### What approach did you choose and why?
+
+We chose to integrate these features to diversify the functionalities of AfricaCryptoChainx and provide more value to our users. The crypto games will attract users who enjoy interactive and rewarding experiences, while the Walk to Earn feature will promote a healthy lifestyle by allowing users to earn AfricaCryptoChainx coins for walking. The affiliate programs will boost income by promoting partnerships and earning commissions. Additionally, all transactions are conducted securely within the app, ensuring seamless and secure financial interactions.
+
+### What should reviewers focus on?
+
+Reviewers should focus on the following aspects:
+- Ensure the new features are integrated seamlessly with the existing functionalities.
+- Verify that the new features enhance user engagement and do not introduce any security vulnerabilities.
+- Check that the documentation and user guides are updated to reflect the new features.
+- Review the implementation of security measures such as Multi-Factor Authentication (MFA) and regular security audits to enhance user account security.
+- Assess the user feedback loop and design to ensure the platform's user-friendliness.
+
+### Full Access Control
+
+As the initiator, developer, and co-founder of AfricaCryptoChainx, I have full access control over all project accounts and operations. This ensures that I can manage and oversee every aspect of the project, maintaining its integrity and security.
+
+### Call for Help
+
+We invite contributors to join us in enhancing the AfricaCryptoChainx project. Your expertise and support will be invaluable in realizing our vision of financial inclusion and innovation in Africa. Together, we can make a significant impact!
+
+### Additional Features for Revenue Generation
+
+1. **Premium Membership Plans**: Offer subscription-based premium memberships with exclusive benefits.
+2. **Ad Space**: Sell advertising space on the platform to relevant businesses and projects.
+3. **Educational Courses**: Provide paid educational courses and certifications on cryptocurrency and blockchain technology.
+4. **Consulting Services**: Offer consulting services for businesses looking to integrate blockchain technology.
+5. **Merchandise Store**: Sell branded merchandise through an online store.
+6. **Crypto Games**: Develop engaging crypto games where users can deposit and win coins, ensuring transparency and fairness.
+7. **Walk to Earn**: Introduce a feature where users earn coins for physical activities like walking or running, promoting healthy habits.
+8. **DeFi Integration**: Integrate Decentralized Finance (DeFi) features such as yield farming.
+9. **NFT Marketplace**: Create a marketplace for Non-Fungible Tokens (NFTs) where users can buy, sell, and trade digital assets.
+10. **Token Launchpad**: Develop a platform for launching new tokens and Initial Coin Offerings (ICOs).
+11. **Affiliate Programs**: Partner with other platforms to offer affiliate programs and earn commissions.
+12. **In-App Purchases**: Introduce in-app purchases for virtual goods, services, or additional features.
+
+### Can these changes ship as is?
+
+Yes, this PR does not depend on additional changes. 🚢
+```
+
+This way, you keep the installation guide intact while providing detailed information about your project and its benefits.### AfricaCryptoChainx Project Plan
+
+#### 1. **Research and Learning**
+- **Resources**: Utilize free online courses and materials on platforms like [Coursera](https://www.coursera.org/), [edX](https://www.edx.org/), and [YouTube](https://www.youtube.com/) to learn about blockchain technology, cryptocurrency, and project management.
+- **Cost**: Free
+
+#### 2. **Networking**
+- **Platforms**: Join online communities such as Reddit (e.g., [r/cryptocurrency](https://www.reddit.com/r/cryptocurrency/)), [GitHub](https://github.com/), and [LinkedIn](https://www.linkedin.com/) groups focused on blockchain and cryptocurrency.
+- **Cost**: Free
+
+#### 3. **Open Source Tools**
+- **Blockchain Platform**: Use [Ethereum](https://ethereum.org/en/) or [Hyperledger](https://www.hyperledger.org/), which are open-source and free to use.
+- **Development Tools**: Leverage [Visual Studio Code (VS Code)](https://code.visualstudio.com/) for coding and [GitHub](https://github.com/) for version control and collaboration.
+- **Cost**: Free
+
+#### 4. **Minimal Viable Product (MVP)**
+- **Objective**: Develop a basic version of your cryptocurrency to demonstrate the concept.
+- **Code Examples**: Use free code repositories and samples available on [GitHub](https://github.com/).
+- **Tools**: [Solidity](https://soliditylang.org/) for smart contracts, [Truffle Suite](https://www.trufflesuite.com/) for testing and development.
+- **Cost**: Free
+
+#### 5. **Freelancers**
+- **Platforms**: Hire freelancers from [Upwork](https://www.upwork.com/) or [Fiverr](https://www.fiverr.com/) for specific tasks you cannot handle yourself (e.g., graphic design, additional coding).
+- **Budget**: Allocate $100 for freelance assistance.
+- **Cost**: $100
+
+#### 6. **Community Support**
+- **Engagement**: Participate in forums like [Stack Exchange](https://stackexchange.com/) and [Discord](https://discord.com/) channels to seek advice and find collaborators.
+- **Cost**: Free
+
+#### 7. **Domain and Hosting**
+- **Domain**: Purchase a domain name for your project (e.g., from [GoDaddy](https://www.godaddy.com/) or [Namecheap](https://www.namecheap.com/)).
+- **Budget**: Allocate $20 for the domain name.
+- **Cost**: $20
+
+### Example Budget Allocation
+
+| Expense                          | Estimated Cost |
+|----------------------------------|----------------|
+| Freelance Assistance             | $100           |
+| Domain Name                      | $20            |
+| Online Courses/Resources         | Free           |
+| Development Tools and Software   | Free           |
+| Community Engagement             | Free           |
+| **Total**                        | **$120**       |
+
+### Cryptocurrency Integration
+**Cryptocurrency Integration**: Integrate support for a variety of coins, including:
+- Bitcoin (BTC)
+- Ethereum (ETH)
+- Binance Coin (BNB)
+- Stablecoins (USDT, USDC, DAI)
+- Cardano (ADA)
+- Solana (SOL)
+- Polkadot (DOT)
+- Chainlink (LINK)
+- Litecoin (LTC)
+- African-based coins (e.g., Akoin)
+- BakeryToken (BAKE)
+- My Neighbour Alice (ALICE)
+
+AfricaCryptoChainx aims to introduce its own native coins alongside established cryptocurrencies to support financial inclusion and DeFi functionalities in Africa. Potential coin names include:
+
+- AfricaCryptoChainx Coin (ACC)
+- Africoin (AFR)
+- AfroToken (AFT)
+- Sahara Coin (SHC)
+- Savanna Token (SAV)
+- Zambezi Coin (ZBC)
+- Kilimanjaro Token (KMT)
+- Ubuntu Coin (UBC)
+- Serengeti Token (SGT)
+- CapeCoin (CPC)
+- Victoria Coin (VIC)
+- Nile Token (NLT)
+- Kalahari Coin (KHC)
+- Rift Token (RFT)
+- Baobab Coin (BBC)
+- Acacia Token (ACT)
+- Congo Coin (CGC)
+- Atlas Token (ATS)
+- Oasis Coin (OSC)
+- Horizon Token (HRT)
+- Eden Coin (EDC)
+- Gateway Token (GAT)
+- Unity Coin (UTC)
+- Harmony Token (HMT)
+- Heritage Coin (HTC)
+- Liberty Token (LBT)
+- Pride Coin (PDC)
+- Essence Token (EST)
+- Destiny Coin (DSC)
+- Pulse Token (PLT)
+- Eclipse Coin (ECC)
+- Legacy Token (LGC)
+- Fortune Coin (FRC)
+- Prosperity Token (PRT)
+- Wisdom Coin (WSC)
+- Vision Token (VST)
+- Genesis Token (GST)
+- Spirit Coin (SPC)
+- Sovereign Token (SOV)
+- Summit Coin (SMT)
+- Citadel Token (CTT)
+- Foundation Coin (FDT)
+
+These native coins will facilitate secure and accessible financial services tailored for African communities, promoting economic empowerment and sustainable development.
+
+### Trading and Exchange
+The native coins developed by AfricaCryptoChainx, including ACC, AFR, AFT, and others, will be listed on cryptocurrency exchanges. This allows users to buy, sell, and trade these coins alongside established cryptocurrencies such as Bitcoin (BTC), Ethereum (ETH), Binance Coin (BNB), Stablecoins (USDT, USDC, DAI), Cardano (ADA), Solana (SOL), Polkadot (DOT), Chainlink (LINK), Litecoin (LTC), and African-based coins like Akoin, BakeryToken (BAKE), and My Neighbour Alice (ALICE). Users can participate in the market value of these coins through various trading pairs offered by exchanges.
+
+### Free Bot and Code
+You can create a simple bot using free services like GitHub Actions for continuous integration and deployment, and Telegram or Discord for community engagement.
+
+Here's an example code snippet for creating a basic Telegram bot using Python:
+
+```python
+import telegram
+from telegram.ext import Updater, CommandHandler
+
+# Your bot token from BotFather
+bot_token = 'YOUR_BOT_TOKEN'
+
+def start(update, context):
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Hello! Welcome to AfricaCryptoChainx!")
+
+updater = Updater(token=bot_token, use_context=True)
+dispatcher = updater.dispatcher
+
+start_handler = CommandHandler('start', start)
+dispatcher.add_handler(start_handler)
+
+updater.start_polling()
+updater.idle()
+```
+
+This example sets up a basic Telegram bot that responds with a welcome message when the `/start` command is used.
+
+### ACCXBOT
+You can also include your bot in your communications or documentation to provide support and engagement for your project:
+- **ACCXBOT**: [Link to ACCXBOT](#)
+
+### Funding
+AfricaCryptoChainx.Com is seeking one-time funding between $50,000 to $100,000 to:
+- Deploy secure infrastructure.
+- Integrate with local P2P networks.
+- Implement advanced security measures.
+- Develop an intuitive user interface.
+- Create educational resources.
+- Launch community engagement initiatives.
+- Integrate DeFi functionalities for African markets.
+
+### Additional Enhancements
+1. **User Education and Awareness**:
+   - **Educational Resources**: Create informative blog posts, videos, and tutorials to help users understand cryptocurrency, staking, and how to use our platform.
+   - **Webinars and Workshops**: Host online events to educate users about blockchain technology and the benefits of using AfricaCryptoChainx.
+
+2. **Community Building**:
+   - **Engage on Social Media**: Build a presence on platforms like Twitter, Facebook, and LinkedIn to engage with our audience and share updates.
+   - **Online Forums**: Create a forum on our website where users can discuss topics, share insights, and ask questions.
+
+3. **Security Measures**:
+   - **Multi-Factor Authentication (MFA)**: Implement MFA to enhance the security of user accounts.
+   - **Regular Audits**: Conduct regular security audits to identify and address potential vulnerabilities.
+
+4. **User Experience (UX) Optimization**:
+   - **User Feedback Loop**: Establish a system for collecting and analyzing user feedback to continuously improve our platform.
+   - **Intuitive Design**: Ensure our platform's design is user-friendly, making it easy for both beginners and experienced users to navigate.
+
+5. **Partnerships and Collaborations**:
+   - **Strategic Partnerships**: Partner with other blockchain projects, financial institutions, or educational organizations to expand our reach and resources.
+   - **Collaborative Events**: Co-host events or webinars with partners to attract a wider audience.
+
+6. **Innovative Features**:
+   - **DeFi Integration**: Integrate Decentralized Finance (DeFi) features such as yield farming to attract more users.
+   - **Mobile App**: Develop a mobile app to provide users with easy access to our platform on the go, ensuring seamless transactions within the app.
+   - **NFT Marketplace**: Create a marketplace for Non-Fungible Tokens (NFTs) where users can buy, sell, and trade digital assets.
+   - **Token Launchpad**: Develop a platform for launching new tokens and Initial Coin Offerings (ICOs).
+   - **Premium Membership Plans**: Offer subscription-based premium memberships with exclusive benefits.
+   - **Ad Space**: Sell advertising space on our platform to relevant businesses and projects.
+   - **Affiliate Programs**: Partner with other platforms to offer affiliate programs and earn commissions
+6. **Innovative Features**:
+   - **DeFi Integration**: Integrate Decentralized Finance (DeFi) features such as yield farming to attract more users.
+   - **Mobile App**: Develop a mobile app to provide users with easy access to our platform on the go, ensuring seamless transactions within the app.
+   - **NFT Marketplace**: Create a marketplace for Non-Fungible Tokens (NFTs) where users can buy, sell, and trade digital assets.
+   - **Token Launchpad**: Develop a platform for launching new tokens and Initial Coin Offerings (ICOs).
+   - **Premium Membership Plans**: Offer subscription-based premium memberships with exclusive benefits.
+   - **Ad Space**: Sell advertising space on our platform to relevant businesses and projects.
+   - **Affiliate Programs**: Partner with other platforms to offer affiliate programs and earn commissions.
+   - **In-App Purchases**: Introduce in-app purchases for virtual goods, services, or additional features.
+   - **Educational Courses**: Offer paid educational courses and certifications on cryptocurrency and blockchain technology.
+   - **Consulting Services**: Provide consulting services for businesses looking to integrate blockchain technology.
+   - **Merchandise Store**: Sell branded merchandise through an online store.
+   - **Crypto Games**: Develop engaging crypto games where users can deposit and win coins. Ensure these games are transparent, fair, and provide a way for the platform to earn a share of the profits.
+   - **Walk and Earn**: Introduce a feature where users can earn coins for physical activities such as walking or running, promoting healthy habits while engaging users.
+
+7. **Regulatory Compliance**:
+   - **Stay Informed**: Keep up-to-date with regulations in the cryptocurrency space to ensure our platform remains compliant.
+   - **Transparent Policies**: Clearly communicate our platform's policies and compliance measures to build trust with our users.
+
+### Completion Criteria
+- All key features implemented and tested.
+- User and developer documentation available.
+- Positive feedback from beta testers.
+- Marketing materials ready.
+- Full access control
+
+**Full Access Control**: As the initiator, developer, and co-founder of AfricaCryptoChainx, I maintain full access control over the project to ensure its vision and integrity are upheld.![IMG-20240223-WA0000](https://github.com/user-attachments/assets/97cb924b-e0a5-4a8c-8509-8be9fbc394dd)
+
+
