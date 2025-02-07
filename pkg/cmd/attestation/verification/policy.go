@@ -54,10 +54,7 @@ func (c EnforcementCriteria) Valid() error {
 func (c EnforcementCriteria) BuildPolicyInformation() string {
 	policyAttr := make([][]string, 0, 6)
 
-	policyAttr = appendStr(policyAttr, "- OIDC Issuer must match", c.Certificate.Issuer)
-	if c.Certificate.RunnerEnvironment == GitHubRunner {
-		policyAttr = appendStr(policyAttr, "- Action workflow Runner Environment must match ", GitHubRunner)
-	}
+	policyAttr = appendStr(policyAttr, "- Predicate type must match", c.PredicateType)
 
 	policyAttr = appendStr(policyAttr, "- Source Repository Owner URI must match", c.Certificate.SourceRepositoryOwnerURI)
 
@@ -65,12 +62,15 @@ func (c EnforcementCriteria) BuildPolicyInformation() string {
 		policyAttr = appendStr(policyAttr, "- Source Repository URI must match", c.Certificate.SourceRepositoryURI)
 	}
 
-	policyAttr = appendStr(policyAttr, "- Predicate type must match", c.PredicateType)
-
 	if c.SAN != "" {
 		policyAttr = appendStr(policyAttr, "- Subject Alternative Name must match", c.SAN)
 	} else if c.SANRegex != "" {
 		policyAttr = appendStr(policyAttr, "- Subject Alternative Name must match regex", c.SANRegex)
+	}
+
+	policyAttr = appendStr(policyAttr, "- OIDC Issuer must match", c.Certificate.Issuer)
+	if c.Certificate.RunnerEnvironment == GitHubRunner {
+		policyAttr = appendStr(policyAttr, "- Action workflow Runner Environment must match ", GitHubRunner)
 	}
 
 	maxColLen := 0

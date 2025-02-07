@@ -90,7 +90,7 @@ type Migration interface {
 }
 
 // AuthConfig is used for interacting with some persistent configuration for gh,
-// with knowledge on how to access encrypted storage when neccesarry.
+// with knowledge on how to access encrypted storage when necessary.
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig interface {
 	// HasActiveToken returns true when a token for the hostname is present.

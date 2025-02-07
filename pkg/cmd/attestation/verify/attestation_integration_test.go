@@ -83,7 +83,7 @@ func TestVerifyAttestations(t *testing.T) {
 		attestations := []*api.Attestation{sgjAttestation[0], reusableWorkflowAttestations[0], sgjAttestation[1]}
 		require.Len(t, attestations, 3)
 
-		rwfResult := verification.BuildMockResult(reusableWorkflowAttestations[0].Bundle, "", "https://github.com/malancas", "", verification.GitHubOIDCIssuer)
+		rwfResult := verification.BuildMockResult(reusableWorkflowAttestations[0].Bundle, "", "", "https://github.com/malancas", "", verification.GitHubOIDCIssuer)
 		sgjResult := verification.BuildSigstoreJsMockResult(t)
 		mockResults := []*verification.AttestationProcessingResult{&sgjResult, &rwfResult, &sgjResult}
 		mockSgVerifier := verification.NewMockSigstoreVerifierWithMockResults(t, mockResults)

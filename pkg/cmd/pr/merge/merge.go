@@ -384,13 +384,14 @@ func (m *mergeContext) deleteLocalBranch() error {
 
 	if m.merged {
 		if m.opts.IO.CanPrompt() && !m.opts.IsDeleteBranchIndicated {
-			confirmed, err := m.opts.Prompter.Confirm(fmt.Sprintf("Pull request %s#%d was already merged. Delete the branch locally?", ghrepo.FullName(m.baseRepo), m.pr.Number), false)
+			message := fmt.Sprintf("Pull request %s#%d was already merged. Delete the branch locally?", ghrepo.FullName(m.baseRepo), m.pr.Number)
+			confirmed, err := m.opts.Prompter.Confirm(message, false)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
 			m.deleteBranch = confirmed
 		} else {
-			_ = m.warnf(fmt.Sprintf("%s Pull request %s#%d was already merged\n", m.cs.WarningIcon(), ghrepo.FullName(m.baseRepo), m.pr.Number))
+			_ = m.warnf("%s Pull request %s#%d was already merged\n", m.cs.WarningIcon(), ghrepo.FullName(m.baseRepo), m.pr.Number)
 		}
 	}
 
@@ -431,7 +432,7 @@ func (m *mergeContext) deleteLocalBranch() error {
 		}
 
 		if err := m.opts.GitClient.Pull(ctx, baseRemote.Name, targetBranch); err != nil {
-			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
+			_ = m.warnf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch)
 		}
 
 		switchedToBranch = targetBranch

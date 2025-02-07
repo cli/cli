@@ -69,6 +69,7 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 		sort.Sort(resolvedRemotes)
 
 		// Filter remotes by hosts
+		// Note that this is not caching correctly: https://github.com/cli/cli/issues/10103
 		cachedRemotes := resolvedRemotes.FilterByHosts(hosts)
 
 		// Filter again by default host if one is set

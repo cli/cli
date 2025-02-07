@@ -46,8 +46,19 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
+			// If the user specified a repo directly, then we're using the OverrideBaseRepoFunc set by EnableRepoOverride
+			// So there's no reason to use the specialised BaseRepoFunc that requires remote disambiguation.
 			opts.BaseRepo = f.BaseRepo
+			if !cmd.Flags().Changed("repo") {
+				// If they haven't specified a repo directly, then we will wrap the BaseRepoFunc in one that errors if
+				// there might be multiple valid remotes.
+				opts.BaseRepo = shared.RequireNoAmbiguityBaseRepoFunc(opts.BaseRepo, f.Remotes)
+				// But if we are able to prompt, then we will wrap that up in a BaseRepoFunc that can prompt the user to
+				// resolve the ambiguity.
+				if opts.IO.CanPrompt() {
+					opts.BaseRepo = shared.PromptWhenAmbiguousBaseRepoFunc(opts.BaseRepo, f.IOStreams, f.Prompter)
+				}
+			}
 
 			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserSecrets); err != nil {
 				return err
@@ -88,6 +99,14 @@ func removeRun(opts *DeleteOptions) error {
 		return err
 	}
 
+	var baseRepo ghrepo.Interface
+	if secretEntity == shared.Repository || secretEntity == shared.Environment {
+		baseRepo, err = opts.BaseRepo()
+		if err != nil {
+			return err
+		}
+	}
+
 	secretApp, err := shared.GetSecretApp(opts.Application, secretEntity)
 	if err != nil {
 		return err
@@ -95,14 +114,6 @@ func removeRun(opts *DeleteOptions) error {
 
 	if !shared.IsSupportedSecretEntity(secretApp, secretEntity) {
 		return fmt.Errorf("%s secrets are not supported for %s", secretEntity, secretApp)
-	}
-
-	var baseRepo ghrepo.Interface
-	if secretEntity == shared.Repository || secretEntity == shared.Environment {
-		baseRepo, err = opts.BaseRepo()
-		if err != nil {
-			return err
-		}
 	}
 
 	cfg, err := opts.Config()

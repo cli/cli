@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	cliContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -25,8 +27,12 @@ type CheckoutOptions struct {
 	Remotes    func() (cliContext.Remotes, error)
 	Branch     func() (string, error)
 
-	Finder shared.PRFinder
+	Finder   shared.PRFinder
+	Prompter shared.Prompt
+	Lister   shared.PRLister
 
+	Interactive       bool
+	BaseRepo          func() (ghrepo.Interface, error)
 	SelectorArg       string
 	RecurseSubmodules bool
 	Force             bool
@@ -42,17 +48,33 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
+		Prompter:   f.Prompter,
+		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "checkout {<number> | <url> | <branch>}",
+		Use:   "checkout [<number> | <url> | <branch>]",
 		Short: "Check out a pull request in git",
-		Args:  cmdutil.ExactArgs(1, "argument required"),
+		Example: heredoc.Doc(`
+			# Interactively select a PR from the 10 most recent to check out
+			$ gh pr checkout
+
+			# Checkout a specific PR
+			$ gh pr checkout 32
+			$ gh pr checkout https://github.com/OWNER/REPO/pull/32
+			$ gh pr checkout feature
+		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
+			opts.Lister = shared.NewLister(f)
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
+			} else if !opts.IO.CanPrompt() {
+				return cmdutil.FlagErrorf("pull request number, URL, or branch required when not running interactively")
+			} else {
+				opts.Interactive = true
 			}
 
 			if runF != nil {
@@ -71,11 +93,12 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 }
 
 func checkoutRun(opts *CheckoutOptions) error {
-	findOptions := shared.FindOptions{
-		Selector: opts.SelectorArg,
-		Fields:   []string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository", "maintainerCanModify"},
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
 	}
-	pr, baseRepo, err := opts.Finder.Find(findOptions)
+
+	pr, err := resolvePR(baseRepo, opts.Prompter, opts.SelectorArg, opts.Interactive, opts.Finder, opts.Lister, opts.IO)
 	if err != nil {
 		return err
 	}
@@ -262,4 +285,78 @@ func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cm
 		}
 	}
 	return nil
+}
+
+func resolvePR(baseRepo ghrepo.Interface, prompter shared.Prompt, pullRequestSelector string, isInteractive bool, pullRequestFinder shared.PRFinder, prLister shared.PRLister, io *iostreams.IOStreams) (*api.PullRequest, error) {
+	// When non-interactive
+	if pullRequestSelector != "" {
+		pr, _, err := pullRequestFinder.Find(shared.FindOptions{
+			Selector: pullRequestSelector,
+			Fields: []string{
+				"number",
+				"headRefName",
+				"headRepository",
+				"headRepositoryOwner",
+				"isCrossRepository",
+				"maintainerCanModify",
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		return pr, nil
+	}
+	if !isInteractive {
+		return nil, cmdutil.FlagErrorf("pull request number, URL, or branch required when not running interactively")
+	}
+	// When interactive
+	io.StartProgressIndicator()
+	listResult, err := prLister.List(shared.ListOptions{
+		State: "open",
+		Fields: []string{
+			"number",
+			"title",
+			"state",
+			"isDraft",
+
+			"headRefName",
+			"headRepository",
+			"headRepositoryOwner",
+			"isCrossRepository",
+			"maintainerCanModify",
+		},
+		LimitResults: 10})
+	io.StopProgressIndicator()
+	if err != nil {
+		return nil, err
+	}
+	if len(listResult.PullRequests) == 0 {
+		return nil, shared.ListNoResults(ghrepo.FullName(baseRepo), "pull request", false)
+	}
+
+	pr, err := promptForPR(prompter, *listResult)
+	return pr, err
+}
+
+func promptForPR(prompter shared.Prompt, jobs api.PullRequestAndTotalCount) (*api.PullRequest, error) {
+	candidates := []string{}
+	for _, pr := range jobs.PullRequests {
+		candidates = append(candidates, fmt.Sprintf("%d\t%s %s [%s]",
+			pr.Number,
+			shared.PrStateWithDraft(&pr),
+			text.RemoveExcessiveWhitespace(pr.Title),
+			pr.HeadLabel(),
+		))
+	}
+
+	selected, err := prompter.Select("Select a pull request", "", candidates)
+	if err != nil {
+		return nil, err
+	}
+
+	if selected >= 0 {
+		return &jobs.PullRequests[selected], nil
+	}
+
+	return nil, nil
 }

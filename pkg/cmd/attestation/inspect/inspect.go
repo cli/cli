@@ -178,7 +178,7 @@ func runInspect(opts *Options) error {
 		}
 
 		// summarize cert if present
-		if leafCert := verificationContent.GetCertificate(); leafCert != nil {
+		if leafCert := verificationContent.Certificate(); leafCert != nil {
 
 			certSummary, err := certificate.SummarizeCertificate(leafCert)
 			if err != nil {

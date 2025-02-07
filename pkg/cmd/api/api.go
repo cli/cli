@@ -239,17 +239,19 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return err
 			}
 
-			if opts.Slurp && !opts.Paginate {
-				return cmdutil.FlagErrorf("`--paginate` required when passing `--slurp`")
-			}
+			if opts.Slurp {
+				if err := cmdutil.MutuallyExclusive(
+					"the `--slurp` option is not supported with `--jq` or `--template`",
+					opts.Slurp,
+					opts.FilterOutput != "",
+					opts.Template != "",
+				); err != nil {
+					return err
+				}
 
-			if err := cmdutil.MutuallyExclusive(
-				"the `--slurp` option is not supported with `--jq` or `--template`",
-				opts.Slurp,
-				opts.FilterOutput != "",
-				opts.Template != "",
-			); err != nil {
-				return err
+				if !opts.Paginate {
+					return cmdutil.FlagErrorf("`--paginate` required when passing `--slurp`")
+				}
 			}
 
 			if err := cmdutil.MutuallyExclusive(

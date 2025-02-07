@@ -2,8 +2,8 @@ package io
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 )
@@ -65,26 +65,24 @@ func (h *Handler) VerbosePrintf(f string, v ...interface{}) (int, error) {
 	if !h.debugEnabled || !h.IO.IsStdoutTTY() {
 		return 0, nil
 	}
-
 	return fmt.Fprintf(h.IO.ErrOut, f, v...)
 }
 
-func (h *Handler) PrintTable(headers []string, rows [][]string) error {
+func (h *Handler) PrintBulletPoints(rows [][]string) (int, error) {
 	if !h.IO.IsStdoutTTY() {
-		return nil
+		return 0, nil
 	}
-
-	t := tableprinter.New(h.IO, tableprinter.WithHeader(headers...))
-
+	maxColLen := 0
 	for _, row := range rows {
-		for _, field := range row {
-			t.AddField(field, tableprinter.WithTruncate(nil))
+		if len(row[0]) > maxColLen {
+			maxColLen = len(row[0])
 		}
-		t.EndRow()
 	}
 
-	if err := t.Render(); err != nil {
-		return fmt.Errorf("failed to print output: %v", err)
+	info := ""
+	for _, row := range rows {
+		dots := strings.Repeat(".", maxColLen-len(row[0]))
+		info += fmt.Sprintf("%s:%s %s\n", row[0], dots, row[1])
 	}
-	return nil
+	return fmt.Fprintln(h.IO.ErrOut, info)
 }

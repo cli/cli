@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
-	"github.com/cli/cli/v2/pkg/cmd/factory"
 
 	"github.com/stretchr/testify/require"
 )
@@ -263,14 +262,8 @@ func TestValidateSignerWorkflow(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		opts := &Options{
-			Config:         factory.New("test").Config,
-			SignerWorkflow: tc.providedSignerWorkflow,
-		}
-
 		// All host resolution is done verify.go:RunE
-		opts.Hostname = tc.host
-		workflowRegex, err := validateSignerWorkflow(opts)
+		workflowRegex, err := validateSignerWorkflow(tc.host, tc.providedSignerWorkflow)
 		require.Equal(t, tc.expectedWorkflowRegex, workflowRegex)
 
 		if tc.expectErr {

@@ -1,6 +1,7 @@
 package token
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
@@ -88,7 +89,7 @@ func tokenRun(opts *TokenOptions) error {
 		if opts.Username != "" {
 			errMsg += fmt.Sprintf(" account %s", opts.Username)
 		}
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	if val != "" {

@@ -276,7 +276,7 @@ func TestRunDownload(t *testing.T) {
 		opts := baseOpts
 		opts.APIClient = api.MockClient{
 			OnGetByOwnerAndDigest: func(repo, digest string, limit int) ([]*api.Attestation, error) {
-				return nil, api.ErrNoAttestations{}
+				return nil, api.ErrNoAttestationsFound
 			},
 		}
 

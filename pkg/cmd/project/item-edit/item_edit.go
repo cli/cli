@@ -23,7 +23,7 @@ type editItemOpts struct {
 	fieldID              string
 	projectID            string
 	text                 string
-	number               float32
+	number               float64
 	date                 string
 	singleSelectOptionID string
 	iterationID          string
@@ -123,7 +123,7 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	editItemCmd.Flags().StringVar(&opts.fieldID, "field-id", "", "ID of the field to update")
 	editItemCmd.Flags().StringVar(&opts.projectID, "project-id", "", "ID of the project to which the field belongs to")
 	editItemCmd.Flags().StringVar(&opts.text, "text", "", "Text value for the field")
-	editItemCmd.Flags().Float32Var(&opts.number, "number", 0, "Number value for the field")
+	editItemCmd.Flags().Float64Var(&opts.number, "number", 0, "Number value for the field")
 	editItemCmd.Flags().StringVar(&opts.date, "date", "", "Date value for the field (YYYY-MM-DD)")
 	editItemCmd.Flags().StringVar(&opts.singleSelectOptionID, "single-select-option-id", "", "ID of the single select option value to set on the field")
 	editItemCmd.Flags().StringVar(&opts.iterationID, "iteration-id", "", "ID of the iteration value to set on the field")

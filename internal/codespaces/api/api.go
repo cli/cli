@@ -240,6 +240,8 @@ const (
 	CodespaceStateAvailable = "Available"
 	// CodespaceStateShutdown is the state for a shutdown codespace environment.
 	CodespaceStateShutdown = "Shutdown"
+	// CodespaceStateShuttingDown is the state for a shutting down codespace environment.
+	CodespaceStateShuttingDown = "ShuttingDown"
 	// CodespaceStateStarting is the state for a starting codespace environment.
 	CodespaceStateStarting = "Starting"
 	// CodespaceStateRebuilding is the state for a rebuilding codespace environment.

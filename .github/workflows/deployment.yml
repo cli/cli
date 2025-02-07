@@ -28,7 +28,17 @@ on:
         default: true
 
 jobs:
+  validate-tag-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag name format
+        run: |
+          if [[ ! "${{ inputs.tag_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag name format. Must be in the form v1.2.3"
+            exit 1
+          fi
   linux:
+    needs: validate-tag-name
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     if: contains(inputs.platforms, 'linux')
@@ -63,6 +73,7 @@ jobs:
             dist/*.deb
 
   macos:
+    needs: validate-tag-name
     runs-on: macos-latest
     environment: ${{ inputs.environment }}
     if: contains(inputs.platforms, 'macos')
@@ -134,6 +145,7 @@ jobs:
             dist/*.pkg
  
   windows:
+    needs: validate-tag-name
     runs-on: windows-latest
     environment: ${{ inputs.environment }}
     if: contains(inputs.platforms, 'windows')
@@ -203,10 +215,8 @@ jobs:
               platform="x64"
               ;;
             *_arm64 )
-              echo "skipping building MSI for arm64 because WiX 3.11 doesn't support it: https://github.com/wixtoolset/issues/issues/6141" >&2
-              continue
-              #source_dir="$PWD/dist/windows_windows_arm64"
-              #platform="arm64"
+              source_dir="$PWD/dist/windows_windows_arm64"
+              platform="arm64"
               ;;
             * )
               printf "unsupported architecture: %s\n" "$MSI_NAME" >&2
@@ -299,7 +309,7 @@ jobs:
           rpmsign --addsign dist/*.rpm
       - name: Attest release artifacts
         if: inputs.environment == 'production'
-        uses: actions/attest-build-provenance@7668571508540a607bdfd90a87a560489fe372eb # v2.1.0
+        uses: actions/attest-build-provenance@520d128f165991a6c774bcb264f323e3d70747f4 # v2.2.0
         with:
           subject-path: "dist/gh_*"
       - name: Run createrepo

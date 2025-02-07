@@ -524,7 +524,7 @@ func (w *fdWriteCloser) Fd() uintptr {
 	return w.fd
 }
 
-// fdWriter represents a wrapped stdin ReadCloser that preserves the original file descriptor
+// fdReader represents a wrapped stdin ReadCloser that preserves the original file descriptor
 type fdReader struct {
 	io.ReadCloser
 	fd uintptr

@@ -124,7 +124,7 @@ func TestGenerateAutomaticSSHKeys(t *testing.T) {
 }
 
 func TestSelectSSHKeys(t *testing.T) {
-	// This string will be subsituted in sshArgs for test cases
+	// This string will be substituted in sshArgs for test cases
 	// This is to work around the temp test ssh dir not being known until the test is executing
 	substituteSSHDir := "SUB_SSH_DIR"
 

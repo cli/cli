@@ -86,7 +86,7 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 	}}
 }
 
-// AddAuthToken adds an authentication token header for the host specified by the request.
+// AddAuthTokenHeader adds an authentication token header for the host specified by the request.
 func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.

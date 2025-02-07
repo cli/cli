@@ -415,7 +415,7 @@ func TestRunVerify(t *testing.T) {
 		opts.BundlePath = ""
 		opts.Owner = "sigstore"
 
-		require.Nil(t, runVerify(&opts))
+		require.NoError(t, runVerify(&opts))
 	})
 
 	t.Run("with owner which not matches SourceRepositoryOwnerURI", func(t *testing.T) {

@@ -275,6 +275,13 @@ Void Linux users can install from the [official distribution repo](https://voidl
 sudo xbps-install github-cli
 ```
 
+### Manjaro Linux
+Manjaro Linux users can install from the [official extra repository](https://manjaristas.org/branch_compare?q=github-cli):
+
+```bash
+pamac install github-cli
+```
+
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/extra/x86_64/github-cli
 [arch linux aur]: https://aur.archlinux.org/packages/github-cli-git

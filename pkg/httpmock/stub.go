@@ -188,7 +188,11 @@ func RESTPayload(responseStatus int, responseBody string, cb func(payload map[st
 			return nil, err
 		}
 		cb(bodyData)
-		return httpResponse(responseStatus, req, bytes.NewBufferString(responseBody)), nil
+
+		header := http.Header{
+			"Content-Type": []string{"application/json"},
+		}
+		return httpResponseWithHeader(responseStatus, req, bytes.NewBufferString(responseBody), header), nil
 	}
 }
 

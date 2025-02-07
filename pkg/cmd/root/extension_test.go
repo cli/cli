@@ -1,10 +1,13 @@
 package root_test
 
 import (
+	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -46,15 +49,15 @@ func TestNewCmdExtension_Updates(t *testing.T) {
 		},
 		{
 			name:               "major update, pinned",
-			extName:            "major-update",
+			extName:            "major-update-pin",
 			extUpdateAvailable: true,
 			extCurrentVersion:  "1.0.0",
 			extLatestVersion:   "2.0.0",
 			extIsPinned:        true,
 			extURL:             "https//github.com/dne/major-update",
 			wantStderr: heredoc.Doc(`
-				A new release of major-update is available: 1.0.0 → 2.0.0
-				To upgrade, run: gh extension upgrade major-update --force
+				A new release of major-update-pin is available: 1.0.0 → 2.0.0
+				To upgrade, run: gh extension upgrade major-update-pin --force
 				https//github.com/dne/major-update
 			`),
 		},
@@ -73,15 +76,15 @@ func TestNewCmdExtension_Updates(t *testing.T) {
 		},
 		{
 			name:               "minor update, pinned",
-			extName:            "minor-update",
+			extName:            "minor-update-pin",
 			extUpdateAvailable: true,
 			extCurrentVersion:  "1.0.0",
 			extLatestVersion:   "1.1.0",
 			extURL:             "https//github.com/dne/minor-update",
 			extIsPinned:        true,
 			wantStderr: heredoc.Doc(`
-				A new release of minor-update is available: 1.0.0 → 1.1.0
-				To upgrade, run: gh extension upgrade minor-update --force
+				A new release of minor-update-pin is available: 1.0.0 → 1.1.0
+				To upgrade, run: gh extension upgrade minor-update-pin --force
 				https//github.com/dne/minor-update
 			`),
 		},
@@ -100,15 +103,15 @@ func TestNewCmdExtension_Updates(t *testing.T) {
 		},
 		{
 			name:               "patch update, pinned",
-			extName:            "patch-update",
+			extName:            "patch-update-pin",
 			extUpdateAvailable: true,
 			extCurrentVersion:  "1.0.0",
 			extLatestVersion:   "1.0.1",
 			extURL:             "https//github.com/dne/patch-update",
 			extIsPinned:        true,
 			wantStderr: heredoc.Doc(`
-				A new release of patch-update is available: 1.0.0 → 1.0.1
-				To upgrade, run: gh extension upgrade patch-update --force
+				A new release of patch-update-pin is available: 1.0.0 → 1.0.1
+				To upgrade, run: gh extension upgrade patch-update-pin --force
 				https//github.com/dne/patch-update
 			`),
 		},
@@ -120,6 +123,10 @@ func TestNewCmdExtension_Updates(t *testing.T) {
 		em := &extensions.ExtensionManagerMock{
 			DispatchFunc: func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error) {
 				// Assume extension executed / dispatched without problems as test is focused on upgrade checking.
+				// Sleep for 100 milliseconds to allow update checking logic to complete. This would be better
+				// served by making the behaviour controllable by channels, but it's a larger change than desired
+				// just to improve the test.
+				time.Sleep(100 * time.Millisecond)
 				return true, nil
 			},
 		}
@@ -145,7 +152,18 @@ func TestNewCmdExtension_Updates(t *testing.T) {
 			},
 		}
 
-		cmd := root.NewCmdExtension(ios, em, ext)
+		checkFunc := func(em extensions.ExtensionManager, ext extensions.Extension) (*update.ReleaseInfo, error) {
+			if !tt.extUpdateAvailable {
+				return nil, nil
+			}
+
+			return &update.ReleaseInfo{
+				Version: tt.extLatestVersion,
+				URL:     tt.extURL,
+			}, nil
+		}
+
+		cmd := root.NewCmdExtension(ios, em, ext, checkFunc)
 
 		_, err := cmd.ExecuteC()
 		require.NoError(t, err)
@@ -155,5 +173,64 @@ func TestNewCmdExtension_Updates(t *testing.T) {
 		} else {
 			assert.Containsf(t, stderr.String(), tt.wantStderr, "executing extension command should output message about upgrade to stderr")
 		}
+	}
+}
+
+func TestNewCmdExtension_UpdateCheckIsNonblocking(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	em := &extensions.ExtensionManagerMock{
+		DispatchFunc: func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error) {
+			// Assume extension executed / dispatched without problems as test is focused on upgrade checking.
+			return true, nil
+		},
+	}
+
+	ext := &extensions.ExtensionMock{
+		CurrentVersionFunc: func() string {
+			return "1.0.0"
+		},
+		IsPinnedFunc: func() bool {
+			return false
+		},
+		LatestVersionFunc: func() string {
+			return "2.0.0"
+		},
+		NameFunc: func() string {
+			return "major-update"
+		},
+		UpdateAvailableFunc: func() bool {
+			return true
+		},
+		URLFunc: func() string {
+			return "https//github.com/dne/major-update"
+		},
+	}
+
+	// When the extension command is executed, the checkFunc will run in the background longer than the extension dispatch.
+	// If the update check is non-blocking, then the extension command will complete immediately while checkFunc is still running.
+	checkFunc := func(em extensions.ExtensionManager, ext extensions.Extension) (*update.ReleaseInfo, error) {
+		time.Sleep(30 * time.Second)
+		return nil, fmt.Errorf("update check should not have completed")
+	}
+
+	cmd := root.NewCmdExtension(ios, em, ext, checkFunc)
+
+	// The test whether update check is non-blocking is based on how long it takes for the extension command execution.
+	// If there is no wait time as checkFunc is sleeping sufficiently long, we can trust update check is non-blocking.
+	// Otherwise, if any amount of wait is encountered, it is a decent indicator that update checking is blocking.
+	// This is not an ideal test and indicates the update design should be revisited to be easier to understand and manage.
+	completed := make(chan struct{})
+	go func() {
+		_, err := cmd.ExecuteC()
+		require.NoError(t, err)
+		close(completed)
+	}()
+
+	select {
+	case <-completed:
+		// Expected behavior assuming extension dispatch exits immediately while checkFunc is still running.
+	case <-time.After(1 * time.Second):
+		t.Fatal("extension update check should have exited")
 	}
 }

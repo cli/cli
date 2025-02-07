@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
@@ -220,7 +221,7 @@ func runVerify(opts *Options) error {
 
 	attestations, logMsg, err := getAttestations(opts, *artifact)
 	if err != nil {
-		if ok := errors.Is(err, api.ErrNoAttestations{}); ok {
+		if ok := errors.Is(err, api.ErrNoAttestationsFound); ok {
 			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), artifact.DigestWithAlg())
 			return err
 		}
@@ -261,19 +262,32 @@ func runVerify(opts *Options) error {
 		return nil
 	}
 
-	opts.Logger.Printf("%s was attested by:\n", artifact.DigestWithAlg())
+	opts.Logger.Printf("The following %s matched the policy criteria\n\n", text.Pluralize(len(verified), "attestation"))
 
-	// Otherwise print the results to the terminal in a table
-	tableContent, err := buildTableVerifyContent(opts.Tenant, verified)
-	if err != nil {
-		opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to parse results"))
-		return err
-	}
+	// Otherwise print the results to the terminal
+	for i, v := range verified {
+		buildConfigURI := v.VerificationResult.Signature.Certificate.Extensions.BuildConfigURI
+		sourceRepoAndOrg, sourceWorkflow, err := extractAttestationDetail(opts.Tenant, buildConfigURI)
+		if err != nil {
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to parse build config URI"))
+			return err
+		}
+		builderSignerURI := v.VerificationResult.Signature.Certificate.Extensions.BuildSignerURI
+		signerRepoAndOrg, signerWorkflow, err := extractAttestationDetail(opts.Tenant, builderSignerURI)
+		if err != nil {
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to parse build signer URI"))
+			return err
+		}
 
-	headers := []string{"repo", "predicate_type", "workflow"}
-	if err = opts.Logger.PrintTable(headers, tableContent); err != nil {
-		opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to print attestation details to table"))
-		return err
+		opts.Logger.Printf("- Attestation #%d\n", i+1)
+		rows := [][]string{
+			{"  - Build repo", sourceRepoAndOrg},
+			{"  - Build workflow", sourceWorkflow},
+			{"  - Signer repo", signerRepoAndOrg},
+			{"  - Signer workflow", signerWorkflow},
+		}
+		//nolint:errcheck
+		opts.Logger.PrintBulletPoints(rows)
 	}
 
 	// All attestations passed verification and policy evaluation
@@ -304,39 +318,15 @@ func extractAttestationDetail(tenant, builderSignerURI string) (string, string, 
 
 	match := orgAndRepoRegexp.FindStringSubmatch(builderSignerURI)
 	if len(match) < 2 {
-		return "", "", fmt.Errorf("no match found for org and repo")
+		return "", "", fmt.Errorf("no match found for org and repo: %s", builderSignerURI)
 	}
 	orgAndRepo := match[1]
 
 	match = workflowRegexp.FindStringSubmatch(builderSignerURI)
 	if len(match) < 2 {
-		return "", "", fmt.Errorf("no match found for workflow")
+		return "", "", fmt.Errorf("no match found for workflow: %s", builderSignerURI)
 	}
 	workflow := match[1]
 
 	return orgAndRepo, workflow, nil
-}
-
-func buildTableVerifyContent(tenant string, results []*verification.AttestationProcessingResult) ([][]string, error) {
-	content := make([][]string, len(results))
-
-	for i, res := range results {
-		if res.VerificationResult == nil ||
-			res.VerificationResult.Signature == nil ||
-			res.VerificationResult.Signature.Certificate == nil {
-			return nil, fmt.Errorf("bundle missing verification result fields")
-		}
-		builderSignerURI := res.VerificationResult.Signature.Certificate.Extensions.BuildSignerURI
-		repoAndOrg, workflow, err := extractAttestationDetail(tenant, builderSignerURI)
-		if err != nil {
-			return nil, err
-		}
-		if res.VerificationResult.Statement == nil {
-			return nil, fmt.Errorf("bundle missing attestation statement (bundle must originate from GitHub Artifact Attestations)")
-		}
-		predicateType := res.VerificationResult.Statement.PredicateType
-		content[i] = []string{repoAndOrg, predicateType, workflow}
-	}
-
-	return content, nil
 }

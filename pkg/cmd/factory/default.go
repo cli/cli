@@ -117,7 +117,7 @@ func BaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 // even more confusion because the API requests can be different, and FURTHERMORE this can be an issue for
 // services that don't handle renames correctly, like the ElasticSearch indexing.
 //
-// Assuming we have an interactive invocation, then the next step is to resolve a network of respositories. This
+// Assuming we have an interactive invocation, then the next step is to resolve a network of repositories. This
 // involves creating a dynamic GQL query requesting information about each repository (up to a limit of 5).
 // Each returned repo is added to a list, along with its parent, if present in the query response.
 // The repositories in the query retain the same ordering as previously outlined. Interestingly, the request is sent

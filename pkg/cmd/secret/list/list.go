@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -23,8 +24,10 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
-	Now        func() time.Time
-	Exporter   cmdutil.Exporter
+	Prompter   prompter.Prompter
+
+	Now      func() time.Time
+	Exporter cmdutil.Exporter
 
 	OrgName     string
 	EnvName     string
@@ -48,6 +51,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
 		Now:        time.Now,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -63,8 +67,19 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
+			// If the user specified a repo directly, then we're using the OverrideBaseRepoFunc set by EnableRepoOverride
+			// So there's no reason to use the specialised BaseRepoFunc that requires remote disambiguation.
 			opts.BaseRepo = f.BaseRepo
+			if !cmd.Flags().Changed("repo") {
+				// If they haven't specified a repo directly, then we will wrap the BaseRepoFunc in one that errors if
+				// there might be multiple valid remotes.
+				opts.BaseRepo = shared.RequireNoAmbiguityBaseRepoFunc(opts.BaseRepo, f.Remotes)
+				// But if we are able to prompt, then we will wrap that up in a BaseRepoFunc that can prompt the user to
+				// resolve the ambiguity.
+				if opts.IO.CanPrompt() {
+					opts.BaseRepo = shared.PromptWhenAmbiguousBaseRepoFunc(opts.BaseRepo, f.IOStreams, f.Prompter)
+				}
+			}
 
 			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserSecrets); err != nil {
 				return err

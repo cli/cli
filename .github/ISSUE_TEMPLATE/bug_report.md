@@ -9,7 +9,11 @@ assignees: ''
 
 ### Describe the bug
 
-A clear and concise description of what the bug is. Include version by typing `gh --version`.
+A clear and concise description of what the bug is. 
+
+### Affected version
+
+Please run `gh version` and paste the output below.
 
 ### Steps to reproduce the behavior
 

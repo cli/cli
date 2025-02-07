@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -16,16 +18,13 @@ type ExternalCommandExitError struct {
 	*exec.ExitError
 }
 
-type extensionReleaseInfo struct {
-	CurrentVersion string
-	LatestVersion  string
-	Pinned         bool
-	URL            string
-}
-
-func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ext extensions.Extension) *cobra.Command {
-	updateMessageChan := make(chan *extensionReleaseInfo)
+func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ext extensions.Extension, checkExtensionReleaseInfo func(extensions.ExtensionManager, extensions.Extension) (*update.ReleaseInfo, error)) *cobra.Command {
+	updateMessageChan := make(chan *update.ReleaseInfo)
 	cs := io.ColorScheme()
+	hasDebug, _ := utils.IsDebugEnabled()
+	if checkExtensionReleaseInfo == nil {
+		checkExtensionReleaseInfo = checkForExtensionUpdate
+	}
 
 	return &cobra.Command{
 		Use:   ext.Name(),
@@ -33,14 +32,11 @@ func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ex
 		// PreRun handles looking up whether extension has a latest version only when the command is ran.
 		PreRun: func(c *cobra.Command, args []string) {
 			go func() {
-				if ext.UpdateAvailable() {
-					updateMessageChan <- &extensionReleaseInfo{
-						CurrentVersion: ext.CurrentVersion(),
-						LatestVersion:  ext.LatestVersion(),
-						Pinned:         ext.IsPinned(),
-						URL:            ext.URL(),
-					}
+				releaseInfo, err := checkExtensionReleaseInfo(em, ext)
+				if err != nil && hasDebug {
+					fmt.Fprintf(io.ErrOut, "warning: checking for update failed: %v", err)
 				}
+				updateMessageChan <- releaseInfo
 			}()
 		},
 		RunE: func(c *cobra.Command, args []string) error {
@@ -62,9 +58,9 @@ func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ex
 					stderr := io.ErrOut
 					fmt.Fprintf(stderr, "\n\n%s %s → %s\n",
 						cs.Yellowf("A new release of %s is available:", ext.Name()),
-						cs.Cyan(strings.TrimPrefix(releaseInfo.CurrentVersion, "v")),
-						cs.Cyan(strings.TrimPrefix(releaseInfo.LatestVersion, "v")))
-					if releaseInfo.Pinned {
+						cs.Cyan(strings.TrimPrefix(ext.CurrentVersion(), "v")),
+						cs.Cyan(strings.TrimPrefix(releaseInfo.Version, "v")))
+					if ext.IsPinned() {
 						fmt.Fprintf(stderr, "To upgrade, run: gh extension upgrade %s --force\n", ext.Name())
 					} else {
 						fmt.Fprintf(stderr, "To upgrade, run: gh extension upgrade %s\n", ext.Name())
@@ -72,8 +68,9 @@ func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ex
 					fmt.Fprintf(stderr, "%s\n\n",
 						cs.Yellow(releaseInfo.URL))
 				}
-			case <-time.After(1 * time.Second):
-				// Bail on checking for new extension update as its taking too long
+			default:
+				// Do not make the user wait for extension update check if incomplete by this time.
+				// This is being handled in non-blocking default as there is no context to cancel like in gh update checks.
 			}
 		},
 		GroupID: "extension",
@@ -82,4 +79,12 @@ func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ex
 		},
 		DisableFlagParsing: true,
 	}
+}
+
+func checkForExtensionUpdate(em extensions.ExtensionManager, ext extensions.Extension) (*update.ReleaseInfo, error) {
+	if !update.ShouldCheckForExtensionUpdate() {
+		return nil, nil
+	}
+
+	return update.CheckForExtensionUpdate(em, ext, time.Now())
 }

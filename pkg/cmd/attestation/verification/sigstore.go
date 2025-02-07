@@ -70,7 +70,7 @@ func getBundleIssuer(b *bundle.Bundle) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get bundle verification content: %v", err)
 	}
-	leafCert := verifyContent.GetCertificate()
+	leafCert := verifyContent.Certificate()
 	if leafCert == nil {
 		return "", fmt.Errorf("leaf cert not found")
 	}
@@ -116,7 +116,11 @@ func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEnti
 		// Compare bundle leafCert issuer with trusted root cert authority
 		certAuthorities := trustedRoot.FulcioCertificateAuthorities()
 		for _, certAuthority := range certAuthorities {
-			lowestCert, err := getLowestCertInChain(&certAuthority)
+			fulcioCertAuthority, ok := certAuthority.(*root.FulcioCertificateAuthority)
+			if !ok {
+				return nil, fmt.Errorf("trusted root cert authority is not a FulcioCertificateAuthority")
+			}
+			lowestCert, err := getLowestCertInChain(fulcioCertAuthority)
 			if err != nil {
 				return nil, err
 			}
@@ -149,10 +153,8 @@ func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEnti
 	return nil, fmt.Errorf("unable to use provided trusted roots")
 }
 
-func getLowestCertInChain(ca *root.CertificateAuthority) (*x509.Certificate, error) {
-	if ca.Leaf != nil {
-		return ca.Leaf, nil
-	} else if len(ca.Intermediates) > 0 {
+func getLowestCertInChain(ca *root.FulcioCertificateAuthority) (*x509.Certificate, error) {
+	if len(ca.Intermediates) > 0 {
 		return ca.Intermediates[0], nil
 	} else if ca.Root != nil {
 		return ca.Root, nil

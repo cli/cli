@@ -59,7 +59,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List issues in a repository",
 		Long: heredoc.Doc(`
-			List issues in a GitHub repository.
+			List issues in a GitHub repository. By default, this only lists open issues.
 
 			The search query syntax is documented here:
 			<https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests>
@@ -70,6 +70,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			$ gh issue list --assignee "@me"
 			$ gh issue list --milestone "The big 1.0"
 			$ gh issue list --search "error no:assignee sort:created-asc"
+			$ gh issue list --state all
 		`),
 		Aliases: []string{"ls"},
 		Args:    cmdutil.NoArgsQuoteReminder,

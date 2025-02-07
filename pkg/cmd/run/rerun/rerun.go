@@ -202,6 +202,9 @@ func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFa
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
+			if httpError.Message == "Unable to retry this workflow run because it was created over a month ago" {
+				return fmt.Errorf("run %d cannot be rerun; %s", run.ID, httpError.Message)
+			}
 			return fmt.Errorf("run %d cannot be rerun; its workflow file may be broken", run.ID)
 		}
 		return fmt.Errorf("failed to rerun: %w", err)

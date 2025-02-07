@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -72,28 +71,63 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 }
 
 func statusRun(opts *StatusOptions) error {
+	ctx := context.Background()
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
 
-	baseRepo, err := opts.BaseRepo()
+	baseRefRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	var currentBranch string
+	var currentBranchName string
 	var currentPRNumber int
-	var currentPRHeadRef string
+	var currentHeadRefBranchName string
 
 	if !opts.HasRepoOverride {
-		currentBranch, err = opts.Branch()
+		// We must be in a repo without the override
+		currentBranchName, err = opts.Branch()
 		if err != nil && !errors.Is(err, git.ErrNotOnAnyBranch) {
 			return fmt.Errorf("could not query for pull request for current branch: %w", err)
 		}
 
-		remotes, _ := opts.Remotes()
-		currentPRNumber, currentPRHeadRef, err = prSelectorForCurrentBranch(opts.GitClient, baseRepo, currentBranch, remotes)
+		branchConfig, err := opts.GitClient.ReadBranchConfig(ctx, currentBranchName)
+		if err != nil {
+			return err
+		}
+		// Determine if the branch is configured to merge to a special PR ref
+		prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
+		if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
+			currentPRNumber, _ = strconv.Atoi(m[1])
+		}
+
+		if currentPRNumber == 0 {
+			remotes, err := opts.Remotes()
+			if err != nil {
+				return err
+			}
+			// Suppressing these errors as we have other means of computing the PullRequestRefs when these fail.
+			parsedPushRevision, _ := opts.GitClient.ParsePushRevision(ctx, currentBranchName)
+
+			remotePushDefault, err := opts.GitClient.RemotePushDefault(ctx)
+			if err != nil {
+				return err
+			}
+
+			pushDefault, err := opts.GitClient.PushDefault(ctx)
+			if err != nil {
+				return err
+			}
+
+			prRefs, err := shared.ParsePRRefs(currentBranchName, branchConfig, parsedPushRevision, pushDefault, remotePushDefault, baseRefRepo, remotes)
+			if err != nil {
+				return err
+			}
+			currentHeadRefBranchName = prRefs.BranchName
+		}
+
 		if err != nil {
 			return fmt.Errorf("could not query for pull request for current branch: %w", err)
 		}
@@ -102,7 +136,7 @@ func statusRun(opts *StatusOptions) error {
 	options := requestOptions{
 		Username:       "@me",
 		CurrentPR:      currentPRNumber,
-		HeadRef:        currentPRHeadRef,
+		HeadRef:        currentHeadRefBranchName,
 		ConflictStatus: opts.ConflictStatus,
 	}
 	if opts.Exporter != nil {
@@ -111,7 +145,7 @@ func statusRun(opts *StatusOptions) error {
 
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+		opts.Detector = fd.NewDetector(cachedClient, baseRefRepo.RepoHost())
 	}
 	prFeatures, err := opts.Detector.PullRequestFeatures()
 	if err != nil {
@@ -119,7 +153,7 @@ func statusRun(opts *StatusOptions) error {
 	}
 	options.CheckRunAndStatusContextCountsSupported = prFeatures.CheckRunAndStatusContextCounts
 
-	prPayload, err := pullRequestStatus(httpClient, baseRepo, options)
+	prPayload, err := pullRequestStatus(httpClient, baseRefRepo, options)
 	if err != nil {
 		return err
 	}
@@ -146,21 +180,21 @@ func statusRun(opts *StatusOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	fmt.Fprintln(out, "")
-	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
+	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRefRepo))
 	fmt.Fprintln(out, "")
 
 	if !opts.HasRepoOverride {
 		shared.PrintHeader(opts.IO, "Current branch")
 		currentPR := prPayload.CurrentPR
-		if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
+		if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranchName {
 			currentPR = nil
 		}
 		if currentPR != nil {
 			printPrs(opts.IO, 1, *currentPR)
-		} else if currentPRHeadRef == "" {
+		} else if currentHeadRefBranchName == "" {
 			shared.PrintMessage(opts.IO, "  There is no current branch")
 		} else {
-			shared.PrintMessage(opts.IO, fmt.Sprintf("  There is no pull request associated with %s", cs.Cyan("["+currentPRHeadRef+"]")))
+			shared.PrintMessage(opts.IO, fmt.Sprintf("  There is no pull request associated with %s", cs.Cyan("["+currentHeadRefBranchName+"]")))
 		}
 		fmt.Fprintln(out)
 	}
@@ -182,43 +216,6 @@ func statusRun(opts *StatusOptions) error {
 	fmt.Fprintln(out)
 
 	return nil
-}
-
-func prSelectorForCurrentBranch(gitClient *git.Client, baseRepo ghrepo.Interface, prHeadRef string, rem ghContext.Remotes) (prNumber int, selector string, err error) {
-	selector = prHeadRef
-	branchConfig := gitClient.ReadBranchConfig(context.Background(), prHeadRef)
-
-	// the branch is configured to merge a special PR head ref
-	prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
-	if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
-		prNumber, _ = strconv.Atoi(m[1])
-		return
-	}
-
-	var branchOwner string
-	if branchConfig.RemoteURL != nil {
-		// the branch merges from a remote specified by URL
-		if r, err := ghrepo.FromURL(branchConfig.RemoteURL); err == nil {
-			branchOwner = r.RepoOwner()
-		}
-	} else if branchConfig.RemoteName != "" {
-		// the branch merges from a remote specified by name
-		if r, err := rem.FindByName(branchConfig.RemoteName); err == nil {
-			branchOwner = r.RepoOwner()
-		}
-	}
-
-	if branchOwner != "" {
-		if strings.HasPrefix(branchConfig.MergeRef, "refs/heads/") {
-			selector = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
-		}
-		// prepend `OWNER:` if this branch is pushed to a fork
-		if !strings.EqualFold(branchOwner, baseRepo.RepoOwner()) {
-			selector = fmt.Sprintf("%s:%s", branchOwner, selector)
-		}
-	}
-
-	return
 }
 
 func totalApprovals(pr *api.PullRequest) int {
