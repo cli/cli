@@ -134,7 +134,7 @@ var HelpTopics = []helpTopic{
 			array, fields from an object, create a new array, and more. The %[1]sjq%[1]s utility does not need
 			to be installed on the system to use this formatting directive. When connected to a terminal,
 			the output is automatically pretty-printed. To learn about jq query syntax, see:
-			<https://jqlang.github.io/jq/manual/>
+			<https://jqlang.github.io/jq/manual/>.
 
 			The %[1]s--template%[1]s flag requires a string argument in Go template syntax, and will only print
 			those JSON values which match the query.
@@ -152,7 +152,11 @@ var HelpTopics = []helpTopic{
 			- %[1]shyperlink <url> <text>%[1]s: renders a terminal hyperlink
 
 			To learn more about Go templates, see: <https://golang.org/pkg/text/template/>.
-		`, "`"),
+
+			The sprig template functions such as %[1]scontains%[1]s, %[1]shasPrefix%[1]s, %[1]shasSuffix%[1]s, etc.
+			are also available for use in Go templates to manipulate and enhance the output.
+			To learn more about sprig template functions, see <https://masterminds.github.io/sprig/>.
+			`, "`"),
 		example: heredoc.Doc(`
 			# default output format
 			$ gh pr list

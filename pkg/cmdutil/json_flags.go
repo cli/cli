@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/cli/cli/v2/pkg/set"
@@ -216,7 +217,7 @@ func (e *jsonExporter) Write(ios *iostreams.IOStreams, data interface{}) error {
 			return err
 		}
 	} else if e.template != "" {
-		t := template.New(w, ios.TerminalWidth(), ios.ColorEnabled())
+		t := template.New(w, ios.TerminalWidth(), ios.ColorEnabled()).Funcs(sprig.TxtFuncMap())
 		if err := t.Parse(e.template); err != nil {
 			return err
 		}
