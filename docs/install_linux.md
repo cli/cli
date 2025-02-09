@@ -54,6 +54,14 @@ sudo dnf install gh --repo gh-cli
 
 > [!IMPORTANT]
 > **These commands apply to DNF4 only**. If you're using DNF5, please use [the DNF5 instructions](#dnf5).
+![Screenshot_2025-02-03-01-00-37-57](https://github.com/user-attachments/assets/9e1b54ee-61eb-4c68-a7a9-046ea7ae93d6)
+![Screenshot_2025-02-04-12-24-31-20](https://github.com/user-attachments/assets/945c3b2a-e625-491b-b3d0-fda929ba062b)
+![IMG_20250202_011844](https://github.com/user-attachments/assets/805311fd-4958-49c4-b1b4-3b53815242f6)
+![Screenshot_2025-02-09-09-43-29-21](https://github.com/user-attachments/assets/23c22eed-cc43-48a8-9917-1bd8fbecb7dc)
+![Screenshot_2025-02-09-14-34-47-90](https://github.com/user-attachments/assets/a97380e6-736e-4e1a-966a-c814de6d809f)
+![Screenshot_2025-02-09-18-57-11-64](https://github.com/user-attachments/assets/0efb17ba-9481-44b9-8874-7e6cd18ed154)
+![IMG_20250209_151505](https://github.com/user-attachments/assets/07881d4f-2604-44b2-bd7f-4558b6184b7f)
+![IMG_20250209_151505](https://github.com/user-attachments/assets/55e448cb-762b-4f39-aabc-e875ba48e453)
 
 ```bash
 # DNF4 installation commands
