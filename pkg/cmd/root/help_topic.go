@@ -154,7 +154,7 @@ var HelpTopics = []helpTopic{
 			To learn more about Go templates, see: <https://golang.org/pkg/text/template/>.
 
 			The sprig template functions such as %[1]scontains%[1]s, %[1]shasPrefix%[1]s, %[1]shasSuffix%[1]s, etc.
-			are also available for use in Go templates to manipulate and enhance the output.
+			are also available for use in Go templates to transform output.
 			To learn more about sprig template functions, see <https://masterminds.github.io/sprig/>.
 			`, "`"),
 		example: heredoc.Doc(`
