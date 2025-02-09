@@ -7,6 +7,7 @@ toolchain go1.23.5
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/MakeNowJust/heredoc v1.0.0
+	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/briandowns/spinner v1.18.1
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/charmbracelet/glamour v0.8.0
@@ -60,7 +61,6 @@ require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
-	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/alessio/shellescape v1.4.2 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
