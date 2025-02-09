@@ -265,7 +265,7 @@ var HelpTopics = []helpTopic{
 			REVIEWER  STATE              COMMENT
 			mislav    COMMENTED          This is going along great! Thanks for working on this ❤️
 
-			# List pull requests with title starting with "feat" (using hasSuffix from sprig)
+			# List pull requests with title starting with "feat" (using hasPrefix from sprig)
 			$ gh pr list --json title --template '
 			{{- range . -}}
 			    {{- if hasPrefix "feat" .title -}}
