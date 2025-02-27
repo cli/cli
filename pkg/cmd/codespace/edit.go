@@ -35,7 +35,7 @@ func newEditCmd(app *App) *cobra.Command {
 	opts.selector = AddCodespaceSelector(editCmd, app.apiClient)
 	editCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "Set the display name")
 	editCmd.Flags().StringVar(&opts.displayName, "displayName", "", "Display name")
-	if err := editCmd.Flags().MarkDeprecated("displayName", "Use `--display-name` instead"); err != nil {
+	if err := editCmd.Flags().MarkDeprecated("displayName", "use `--display-name` instead"); err != nil {
 		fmt.Fprintf(app.io.ErrOut, "error marking flag as deprecated: %v\n", err)
 	}
 	editCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "Set hardware specifications for the VM")

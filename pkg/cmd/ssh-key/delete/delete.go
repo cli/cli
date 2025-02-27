@@ -49,7 +49,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().BoolVar(&opts.Confirmed, "confirm", false, "Skip the confirmation prompt")
-	_ = cmd.Flags().MarkDeprecated("confirm", "Use `--yes` instead")
+	_ = cmd.Flags().MarkDeprecated("confirm", "use `--yes` instead")
 	cmd.Flags().BoolVarP(&opts.Confirmed, "yes", "y", false, "Skip the confirmation prompt")
 
 	return cmd
