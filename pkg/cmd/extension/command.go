@@ -411,8 +411,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return nil
 				},
 			}
-			cmd.Flags().BoolVar(&forceFlag, "force", false, "force upgrade extension, or ignore if latest already installed")
-			cmd.Flags().StringVar(&pinFlag, "pin", "", "pin extension to a release tag or commit ref")
+			cmd.Flags().BoolVar(&forceFlag, "force", false, "Force upgrade extension, or ignore if latest already installed")
+			cmd.Flags().StringVar(&pinFlag, "pin", "", "Pin extension to a release tag or commit ref")
 			return cmd
 		}(),
 		func() *cobra.Command {
@@ -526,7 +526,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return browse.ExtBrowse(opts)
 				},
 			}
-			cmd.Flags().BoolVar(&debug, "debug", false, "log to /tmp/extBrowse-*")
+			cmd.Flags().BoolVar(&debug, "debug", false, "Log to /tmp/extBrowse-*")
 			cmd.Flags().BoolVarP(&singleColumn, "single-column", "s", false, "Render TUI with only one column of text")
 			return cmd
 		}(),

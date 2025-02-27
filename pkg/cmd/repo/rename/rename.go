@@ -99,7 +99,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 
 	cmdutil.EnableRepoOverride(cmd, f)
 	cmd.Flags().BoolVar(&confirm, "confirm", false, "Skip confirmation prompt")
-	_ = cmd.Flags().MarkDeprecated("confirm", "use `--yes` instead")
+	_ = cmd.Flags().MarkDeprecated("confirm", "Use `--yes` instead")
 	cmd.Flags().BoolVarP(&confirm, "yes", "y", false, "Skip the confirmation prompt")
 
 	return cmd

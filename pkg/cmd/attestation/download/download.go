@@ -107,7 +107,7 @@ func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Comman
 		},
 	}
 
-	downloadCmd.Flags().StringVarP(&opts.Owner, "owner", "o", "", "a GitHub organization to scope attestation lookup by")
+	downloadCmd.Flags().StringVarP(&opts.Owner, "owner", "o", "", "GitHub organization to scope attestation lookup by")
 	downloadCmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Repository name in the format <owner>/<repo>")
 	downloadCmd.MarkFlagsMutuallyExclusive("owner", "repo")
 	downloadCmd.MarkFlagsOneRequired("owner", "repo")

@@ -105,8 +105,8 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.ViewMode, "view", "v", false, "view the current default repository")
-	cmd.Flags().BoolVarP(&opts.UnsetMode, "unset", "u", false, "unset the current default repository")
+	cmd.Flags().BoolVarP(&opts.ViewMode, "view", "v", false, "View the current default repository")
+	cmd.Flags().BoolVarP(&opts.UnsetMode, "unset", "u", false, "Unset the current default repository")
 
 	return cmd
 }

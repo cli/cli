@@ -120,7 +120,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 
 	var issueRepoSelector string
 	fl.StringVarP(&issueRepoSelector, "issue-repo", "i", "", "Name or URL of the issue's repository")
-	_ = cmd.Flags().MarkDeprecated("issue-repo", "use `--repo` instead")
+	_ = cmd.Flags().MarkDeprecated("issue-repo", "Use `--repo` instead")
 
 	return cmd
 }

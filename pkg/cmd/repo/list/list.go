@@ -108,8 +108,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVar(&flagPrivate, "private", false, "Show only private repositories")
 	cmd.Flags().BoolVar(&flagPublic, "public", false, "Show only public repositories")
-	_ = cmd.Flags().MarkDeprecated("public", "use `--visibility=public` instead")
-	_ = cmd.Flags().MarkDeprecated("private", "use `--visibility=private` instead")
+	_ = cmd.Flags().MarkDeprecated("public", "Use `--visibility=public` instead")
+	_ = cmd.Flags().MarkDeprecated("private", "Use `--visibility=private` instead")
 
 	return cmd
 }

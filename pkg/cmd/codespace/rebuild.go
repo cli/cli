@@ -35,7 +35,7 @@ func newRebuildCmd(app *App) *cobra.Command {
 
 	selector = AddCodespaceSelector(rebuildCmd, app.apiClient)
 
-	rebuildCmd.Flags().BoolVar(&fullRebuild, "full", false, "perform a full rebuild")
+	rebuildCmd.Flags().BoolVar(&fullRebuild, "full", false, "Perform a full rebuild")
 
 	return rebuildCmd
 }
