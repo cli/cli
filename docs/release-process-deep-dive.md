@@ -381,13 +381,49 @@ There are two levels of signing that occur in this job:
  * Signing of Go executables created by `GoReleaser` is performed in a [`GoReleaser` hook](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L43).
  * Signing of the MSI installers by executing `.\script\sign.ps1 $_.FullName`
 
-Signing of the Windows artifacts uses [Azure HSM](https://azure.microsoft.com/en-us/products/azure-dedicated-hsm).
+Signing of the Windows artifacts uses `signtool.exe` to request signing from [Azure HSM](https://azure.microsoft.com/en-us/products/azure-dedicated-hsm). This takes the following steps:
+
+Firstly, a package is downloaded that contains a DLL to allow `signtool.exe` to interact with Azure HSM.
+
+```pwsh
+# Download Azure Code Signing client containing the DLL needed for signtool in script/sign
+Invoke-WebRequest -Uri https://www.nuget.org/api/v2/package/Azure.CodeSigning.Client/1.0.43 -OutFile $Env:ACS_ZIP -Verbose
+Expand-Archive $Env:ACS_ZIP -Destination $Env:ACS_DIR -Force -Verbose
+```
+
+Secondly, we create a JSON file containing metadata required by HSM:
+
+```pwsh
+# Generate metadata file for signtool, used in signing box .exe and .msi
+@{
+  CertificateProfileName = "GitHubInc"
+  CodeSigningAccountName = "GitHubInc"
+  CorrelationId = $Env:CORRELATION_ID
+  Endpoint =  "https://wus.codesigning.azure.net/"
+} | ConvertTo-Json | Out-File -FilePath $Env:METADATA_PATH
+```
+
+Thirdly, in `./script/sign.ps1` we look for the `signtool` executable:
+
+```pwsh
+$signtool = Resolve-Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Select-Object -Last 1
+```
+
+Finally, in `./script/sign.ps`, we execute `signtool`:
+
+```pwsh
+& $signtool sign /d "GitHub CLI" /fd sha256 /td sha256 /tr http://timestamp.acs.microsoft.com /v /dlib "$Env:DLIB_PATH" /dmdf "$Env:METADATA_PATH" $Args[0]
+```
+
+Breaking this command down:
+ * `/fd` is the file digest algorithm
+ * `/td` is the timestamp digest algorithm
+ * `/tr` indicates the timestamp server so a timestamp can be added to the signature, proving when it was signed
+ * `/dlib` points to the previously extracted DLL
+ * `/dmdf` points to the previously created metadata file
 
 > [!WARNING]
 > The [`GoReleaser` signing hook](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L43) can currently call `./script/sign` on a non-windows machine, but this is an artifact from pre-HSM that should be removed.
-
-> [!NOTE]
-> TODO: Further Documentation required on the environment variables and CodeSigning.dll magic required to use Azure HSM.
 
 ## <a id="release">[release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L250-L395)</a>
 
