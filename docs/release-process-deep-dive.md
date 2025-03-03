@@ -209,24 +209,49 @@ There are three levels of "signing" that occur in this job:
 
 Signing of MacOS artifacts uses `codesign` and notarization uses `xcrun notarytool`, which submits the artifact to the Apple servers for additional checks.
 
-In order to perform signing, a keychain must be configured with the signing certificate.
+In order to perform signing, a keychain must be configured with the signing certificate. Comments have been added to provide clarity to the script:
 
 ```sh
 keychain="$RUNNER_TEMP/buildagent.keychain"
 keychain_password="password1"
 
+# Create a new keychain for credentials to be stored in.
 security create-keychain -p "$keychain_password" "$keychain"
+# Mark the keychain as the system default so that a later signing step doesn't require
+# referencing the keychain by name.
 security default-keychain -s "$keychain"
+# Unlock the keychain so that future operations can access the secrets without user interaction.
 security unlock-keychain -p "$keychain_password" "$keychain"
 
 base64 -D <<<"$APPLE_APPLICATION_CERT" > "$RUNNER_TEMP/cert.p12"
+
+# Import the certificate into the keychain so that a later signing step can use it.
+# `man security` snippet:
+# -k keychain     Specify keychain into which item(s) will be imported.
+# -P passphrase   Specify the unwrapping passphrase immediately. The default is to obtain a secure passphrase via GUI.
+# -T appPath      Specify an application which may access the imported key (multiple -T options are allowed)
 security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_APPLICATION_CERT_PASSWORD" -T /usr/bin/codesign
+
+# Enforce additional security requirements that only the applications used for signing can access the keychain. This allows for signing applications to access the keychain without user interaction.
+# The three values:
+#  * apple-tool: → Grants access to Apple's development tools.
+#  * apple: → Grants access to Apple’s general cryptographic tools.
+#  * codesign: → Grants access to the codesign tool, which is used to sign binaries and applications.
+#
+# `man security` snippet:
+# set-key-partition-list [-S partition-list] [-k password] [options...] [keychain] Sets the "partition list" for a key. The "partition list" is an extra parameter in the ACL which limits access to the key based on an application's code signature. You must present the keychain's password to change a partition list. If you'd like to run /usr/bin/codesign with the key, "apple:" must be an element of the partition
+# list.
+
+#       -S partition-list
+#                       Comma-separated partition list. See output of "security dump-keychain" for examples.
+#       -k password     Password for keychain
+#       -s              Match keys that can sign
 security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
+# Clean up the certificate so that it's not lying around for later jobs to leak.
 rm "$RUNNER_TEMP/cert.p12"
 ```
 
-> [!NOTE]
-> TODO: Further Documentation required on these lines.
+When `codesign` is executed, it looks into the default keychain to find a certificate that matches the `APPLE_DEVELOPER_ID` environment variable.
 
 > [!NOTE]
 > TODO: Further Documentation required on the difference between signing and notarization.
