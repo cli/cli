@@ -634,7 +634,9 @@ $ gh release create v1.2.3 '/path/to/asset.zip#My display label'
 ```
 
 > [!NOTE]
-> TODO: Further Investigation required on why they are labelled this way.
+> It's unclear why human readable display labels were used, beyond comments that it was intentional
+> https://github.com/cli/cli/pull/7324
+> https://github.com/cli/cli/issues/7470#issuecomment-1556986607
 
 #### Site
 
