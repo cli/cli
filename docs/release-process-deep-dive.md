@@ -654,7 +654,7 @@ Using [`mislav/bump-homebrew-formula-action`](https://github.com/mislav/bump-hom
 
 ### <a id="how-script-release-works">How script/release works</a>
 
-[`./script/release`](https://github.com/cli/cli/blob/trunk/script/release) is used by `gh` maintainers to [create a new release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/docs/releasing.md). When invoked it executes `gh workflow run` in order to kick off the workflow described in detail above. However, that workflow also calls back into `./script/release` with the `--local` flag resulting in release artifacts being created on the machine invoking it. Each OS specific job in the workflow additionally provides the `--platform` flag.
+[`./script/release`](https://github.com/cli/cli/blob/817eeb26e567de11007c8a82c25e61c7e20e4337/script/release) is used by `gh` maintainers to [create a new release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/docs/releasing.md). When invoked it executes `gh workflow run` in order to kick off the workflow described in detail above. However, that workflow also calls back into `./script/release` with the `--local` flag resulting in release artifacts being created on the machine invoking it. Each OS specific job in the workflow additionally provides the `--platform` flag.
 
 The surprising behaviour in `./script/release` is that it uses `sed` to modify the base [`.goreleaser.yml` ](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml) file, so that only platform specific sections are retained. For example, in the case of of `linux` only the [`linux` build](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L27) and [`npmfs`](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L78) section would be configured for `GoReleaser`. The `archive` sections are addressed by [requirements](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L52) on previous platform builds.
 
@@ -668,5 +668,9 @@ Each build entry in [`.goreleaser.yml` ](https://github.com/cli/cli/blob/756f4ec
 
 ### <a id="how-script-pkgmacos-works">How script/pkgmacos works</a>
 
-> [!NOTE]
-> TODO: Further Documentation required on how script/pkgmacos works
+[./script/pkgmacos](https://github.com/cli/cli/blob/817eeb26e567de11007c8a82c25e61c7e20e4337/script/pkgmacos) is used by the [macos job](#macos) to create a `.pkg` installer. It uses three main utilities:
+ * [`lipo`](https://developer.apple.com/documentation/apple-silicon/building-a-universal-macos-binary) to combine the `arm64` and `amd64` binaries into one
+ *  [`pkgbuild`](https://www.unix.com/man_page/osx/1/pkgbuild/) to build a "component package", which is the payload to be installed by a MacOS installer. For `gh`, this is `com.github.cli.pkg`. The contents of this package is the universal binary, zsh completions and man pages.
+ * [`productbuild`](https://www.unix.com/man_page/osx/1/productbuild/) creates a "product archive" which is used by the MacOS installer. In addition to the "component package", a product archive can contain customized installation elements. For `gh`, we include a `LICENSE` file. We include a [`distribution.xml`](https://github.com/cli/cli/blob/trunk/build/macOS/distribution.xml) file in our repo. which` productbuild` uses.
+
+A good explanation of the difference between `pkgbuild` and `productbuild` can be found on [this Stackoverflow answer](https://stackoverflow.com/questions/74422992/what-is-the-difference-between-pkgbuild-vs-productbuild).
