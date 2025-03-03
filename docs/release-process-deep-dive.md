@@ -587,22 +587,24 @@ A git commit is created in the `cli.github.com` site repository containing the c
 
 ### Site Package Repositories
 
-The `cli.github.com` website hosts RPM and Debian package repositories to support the [official sources installation instructions](https://github.com/cli/cli/blob/trunk/docs/install_linux.md#official-sources). In order to provide a secure installation method, artifacts in these repositories are signed by a GPG key, which must be loaded into `gpg` for use in later steps.
+The `cli.github.com` website hosts RPM and Debian package repositories to support the [official sources installation instructions](https://github.com/cli/cli/blob/trunk/docs/install_linux.md#official-sources). In order to provide a secure installation method, artifacts in these repositories are signed by a GPG key, which must be loaded into `gpg` for use in later steps. Comments have been added to provide clarity to the script:
 
 ```sh
+# Import the public and private keys into gpg non-interactively
 base64 -d <<<"$GPG_PUBKEY" | gpg --import --no-tty --batch --yes
 base64 -d <<<"$GPG_KEY" | gpg --import --no-tty --batch --yes
+# Confige gpg so that passphrases can be preset, so that they don't
+# have to be provided on every future operation.
 echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
+# Inform gpg that it should reload the configuration to apply the previous step
 gpg-connect-agent RELOADAGENT /bye
+# Store the passphrase for a specific key (referenced by keygrip) in memory.
 /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP" <<<"$GPG_PASSPHRASE"
 ```
 
-> [!NOTE]
-> TODO: Further Documentation on these lines.
-
 #### RPM
 
-The `.rpm` files uploaded by the [`linux`](#linux) job are signed using [`rpmsign`](https://man7.org/linux/man-pages/man8/rpmsign.8.html). The [`createrepo`](https://linux.die.net/man/8/createrepo) tool is used to generate a `repomd.xml` metadata file which describes the contents of a Red Hat repository. The artifacts and `repomd.xml` file are then copied into the site repository, and the `repomd.xml` is signed using `gpg --yes --detach-sign --armor repodata/repomd.xml`, producing a signature file.
+The `.rpm` files uploaded by the [`linux`](#linux) job are signed using [`rpmsign`](https://man7.org/linux/man-pages/man8/rpmsign.8.html). The [`createrepo`](https://linux.die.net/man/8/createrepo) tool is used to generate a `repomd.xml` metadata file which describes the contents of a Red Hat repository. The artifacts and `repomd.xml` file are then copied into the site repository, and the `repomd.xml` is signed using `gpg --yes --detach-sign --armor repodata/repomd.xml`, producing a signature file. Since there is only one private key imported into `gpg`, that key is used for the signing.
 
 > [!WARNING]
 > The `createrepo` tool is executed inside a [Docker container](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/script/createrepo.sh) for [package management reasons](https://github.com/cli/cli/pull/2856) that may no longer be true.
