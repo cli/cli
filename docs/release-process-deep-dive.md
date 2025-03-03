@@ -25,8 +25,8 @@ This section will deep dive into each job in the [`deployment.yml` workflow](htt
 - [release](#release)
 
 Although this workflow is used to do our production releases for Linux, MacOS and Windows, it is also possible to run subsets of the workflow. Specifically:
- * The workflow can be triggered with `inputs.release` set to `false`, resulting in the entre [release job](#release) being skipped. This is not exposed via `./script/release`.
- * Many sections are guarded by `if: inputs.environment == 'production'`. These guards protect sections that require secrets (e.g. signing) or that result in mutations (e.g. creating a GitHub release). `./script/release` accepts the `--staging` flag for this purpose. This differs from the previous bullet point as some steps in the [release job](#release) print debug information such as `git` diffs.
+ * The workflow can be triggered with `inputs.release` set to `false`, resulting in the entire [release job](#release) being skipped. This is not exposed via `./script/release`.
+ * Many sections are guarded by `if: inputs.environment == 'production'`. These guards protect sections that require secrets (e.g. signing) or that result in mutations (e.g. creating a GitHub release). `./script/release` accepts the `--staging` flag for this purpose. This differs from the previous bullet point as some steps in the [release job](#release) print debug information such as [`git` diffs](https://github.com/cli/cli/blob/5d2eadef8cccf2671f68aad05cd93215a4c01b48/.github/workflows/deployment.yml#L380-L384).
  * The workflow can be triggered for only `linux`, `MacOS` or `Windows` which allows for debugging single jobs. This is not exposed via `./script/release`. The [release job](#release) should not run in this case as it [requires all OS specific builds.](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L252)
 
 ## <a id="validate-tag-name">[validate-tag-name](https://github.com/cli/cli/blob/537a22228cd6b42b740d7f1c09f47c45bb1dab30/.github/workflows/deployment.yml#L31-L39)</a>
@@ -46,7 +46,7 @@ Although this workflow is used to do our production releases for Linux, MacOS an
 ```
 </details>
 
-The purpose of this job is to [prevent incorrectly tagged releases](https://github.com/cli/cli/pull/10121), by ensuring they conform to the `major.minor.patch` form of semantic versioning, preceeded by a `v`.
+The purpose of this job is to [prevent incorrectly tagged releases](https://github.com/cli/cli/pull/10121), by ensuring they conform to the `major.minor.patch` form of semantic versioning, preceded by a `v`.
 
 > [!WARNING]
 > The `release` job can [create the GitHub release as a pre-release based on the existence of a hyphen in the tag name](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L362-L364), but the later addition of `validate-tag-name` disallows this.
@@ -97,7 +97,7 @@ After validating the tag name, the workflow parallelises across `ubuntu`, `macos
 ```
 </details>
 
-In addition to building and signing release artifacts, the `linux` job builds the [CLI manual](https://cli.github.com/manual/) for use in the later `release` job.
+In addition to building release artifacts, the `linux` job builds the [CLI manual](https://cli.github.com/manual/) for use in the later `release` job.
 
 #### Building
 
@@ -105,7 +105,7 @@ This job executes `script/release --local "$TAG_NAME" --platform linux` which us
 
 #### Signing
 
-There is no signing of linux artifacts in this job. See the [release job](#release) for more information on signing linux artfiacts.
+There is no signing of linux artifacts in this job. See the [release job](#release) for more information on signing linux artifacts.
 
 ### <a id="macos">[macos](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L75-L145)</a>
 
@@ -353,7 +353,7 @@ There are two levels of signing that occur in this job:
  * Signing of Go executables created by `GoReleaser` is performed in a [`GoReleaser` hook](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L43).
  * Signing of the MSI installers by executing `.\script\sign.ps1 $_.FullName`
 
-Signing of the Windows artifcats uses [Azure HSM](https://azure.microsoft.com/en-us/products/azure-dedicated-hsm).
+Signing of the Windows artifacts uses [Azure HSM](https://azure.microsoft.com/en-us/products/azure-dedicated-hsm).
 
 > [!WARNING]
 > The [`GoReleaser` signing hook](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L43) can currently call `./script/sign` on a non-windows machine, but this is an artifact from pre-HSM that should be removed.
@@ -538,21 +538,21 @@ gpg-connect-agent RELOADAGENT /bye
 
 #### RPM
 
-The `.rpm` files uploaded by the [`linux`](#linux) job are signed using [`rpmsign`](https://man7.org/linux/man-pages/man8/rpmsign.8.html). The [`createrepo`](https://linux.die.net/man/8/createrepo) tool is used to generate a `repomd.xml` metadata file which describes the contents of a Red Hat repository. The artfiacts and `repomd.xml` file are then copied into the site repository, and the `repomd.xml` is signed using `gpg --yes --detach-sign --armor repodata/repomd.xml`, producing a signature file.
+The `.rpm` files uploaded by the [`linux`](#linux) job are signed using [`rpmsign`](https://man7.org/linux/man-pages/man8/rpmsign.8.html). The [`createrepo`](https://linux.die.net/man/8/createrepo) tool is used to generate a `repomd.xml` metadata file which describes the contents of a Red Hat repository. The artifacts and `repomd.xml` file are then copied into the site repository, and the `repomd.xml` is signed using `gpg --yes --detach-sign --armor repodata/repomd.xml`, producing a signature file.
 
 > [!WARNING]
 > The `createrepo` tool is executed inside a [Docker container](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/script/createrepo.sh) for [package management reasons](https://github.com/cli/cli/pull/2856) that may no longer be true.
 
 #### Debian
 
-The `.deb` files uplaoded by the [`linux`](#linux) job are iterated per Debian release (see warning below), using [`reprepro`](https://manpages.debian.org/bookworm/reprepro/reprepro.1.en.html) which produces a directory and file structure for a Debian package repository. The [`./script/distributions`](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/script/distributions) `SignWith` lines indicate the GPG Key ID that `reprepro` should use to sign packages in the created repository. The generated directories are then copied to the site repository.
+The `.deb` files uploaded by the [`linux`](#linux) job are iterated per Debian release (see warning below), using [`reprepro`](https://manpages.debian.org/bookworm/reprepro/reprepro.1.en.html) which produces a directory and file structure for a Debian package repository. The [`./script/distributions`](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/script/distributions) `SignWith` lines indicate the GPG Key ID that `reprepro` should use to sign packages in the created repository. The generated directories are then copied to the site repository.
 
 > [!WARNING]
 > There is a note that we should remove [legacy distributions from our list](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L329-L332) but no indication of when that would happen.
 
 ### Attest Artifacts
 
-Attestations are created for each of the release artifacts. For an example see: https://github.com/cli/cli/attestations/4920729
+[Attestations](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds) are created for each of the release artifacts. For an example see: https://github.com/cli/cli/attestations/4920729
 
 ### Publish Release
 
@@ -572,23 +572,32 @@ $ gh release create v1.2.3 '/path/to/asset.zip#My display label'
 
 #### Site
 
-In previous steps, a git commit was made for the manual, and files had moved into place for the RPM and Debian package repositories. The package repository structure is commited and pushed, which kicks off a deployment workflow in site repository.
+In previous steps, a git commit was made for the manual, and files had moved into place for the RPM and Debian package repositories. The package repository structure is committed and pushed, which kicks off a deployment workflow in site repository.
 
 > [!NOTE]
 > TODO: Further Documentation required on cleaning up the package repository.
 
 #### Homebrew Formula
 
-Using [`mislav/bump-homebrew-formula-action`](https://github.com/mislav/bump-homebrew-formula-action), a PR for the `gh` [`homebrew-core` formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/g/gh.rb) is created. The fork repository is currenty owned by `williammartin` as PRs are [not accepted from organizations.](https://github.com/cli/cli/pull/7953)
+Using [`mislav/bump-homebrew-formula-action`](https://github.com/mislav/bump-homebrew-formula-action), a PR for the `gh` [`homebrew-core` formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/g/gh.rb) is created. The fork repository is currently owned by `williammartin` as PRs are [not accepted from organizations.](https://github.com/cli/cli/pull/7953)
+
+`Homebrew/formulae.brew.sh` makes new formula versions available every 15 minutes through scheduled CI workflow. For more information, see https://docs.brew.sh/Formula-Cookbook#an-introduction
 
 ## <a id="deepest-dive">Deepest Dive</a>
 
 ### <a id="how-script-release-works">How script/release works</a>
 
-[`./script/release`](https://github.com/cli/cli/blob/trunk/script/release) is used by `gh` maintainers to [create a new release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/docs/releasing.md). When invoked it executes `gh workflow run` in order to kick off the workflow described in detail above. However, that workflow also calls back into `./script/release` with the `--local` flag resulting in release artifacts being created on the machine invoking it. Each OS specific job in the worklow additionally provides the `--platform` flag.
+[`./script/release`](https://github.com/cli/cli/blob/trunk/script/release) is used by `gh` maintainers to [create a new release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/docs/releasing.md). When invoked it executes `gh workflow run` in order to kick off the workflow described in detail above. However, that workflow also calls back into `./script/release` with the `--local` flag resulting in release artifacts being created on the machine invoking it. Each OS specific job in the workflow additionally provides the `--platform` flag.
 
 The surprising behaviour in `./script/release` is that it uses `sed` to modify the base [`.goreleaser.yml` ](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml) file, so that only platform specific sections are retained. For example, in the case of of `linux` only the [`linux` build](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L27) and [`npmfs`](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L78) section would be configured for `GoReleaser`. The `archive` sections are addressed by [requirements](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L52) on previous platform builds.
 
+Each build entry in [`.goreleaser.yml` ](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml) specifies the platforms that are supported, for example:
+
+```yml
+  - id: linux #build:linux
+    goos: [linux]
+    goarch: [386, arm, amd64, arm64]
+```
 
 ### <a id="how-script-pkgmacos-works">How script/pkgmacos works</a>
 
