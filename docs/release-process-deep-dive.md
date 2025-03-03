@@ -642,8 +642,7 @@ $ gh release create v1.2.3 '/path/to/asset.zip#My display label'
 
 In previous steps, a git commit was made for the manual, and files had moved into place for the RPM and Debian package repositories. The package repository structure is committed and pushed, which kicks off a deployment workflow in site repository.
 
-> [!NOTE]
-> TODO: Further Documentation required on cleaning up the package repository.
+Occasionally, the repository can become unwieldy due to hosting so many large binary artifacts. Instructions can be found in the README for that repository.
 
 #### Homebrew Formula
 
