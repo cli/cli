@@ -373,7 +373,13 @@ windows:
 
 This job executes `script/release --local "$TAG_NAME" --platform windows` to use `GoReleaser` to create the Go executables and `.zip` archives. See [how ./script/release works](#how-script-release-works) for further information.
 
-This job also executes `MSBuild.exe` to build MSI Installers, wrapping each architecture dependent `.zip` produced by GoReleaser.
+This job also executes `MSBuild.exe` to build MSI Installers, wrapping each architecture dependent `.zip` produced by GoReleaser. This is done via the command:
+
+```pwsh
+"${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$source_dir" -p:OutputPath="$PWD/dist" -p:OutputName="$MSI_NAME" -p:ProductVersion="${MSI_VERSION#v}" -p:Platform="$platform"
+```
+
+This references a number of [pretty inscrutable files](https://github.com/cli/cli/tree/817eeb26e567de11007c8a82c25e61c7e20e4337/build/windows) in our repository that form a kind of manifest.
 
 #### Signing
 
