@@ -599,7 +599,7 @@ The `cli.github.com` website hosts RPM and Debian package repositories to suppor
 # Import the public and private keys into gpg non-interactively
 base64 -d <<<"$GPG_PUBKEY" | gpg --import --no-tty --batch --yes
 base64 -d <<<"$GPG_KEY" | gpg --import --no-tty --batch --yes
-# Confige gpg so that passphrases can be preset, so that they don't
+# Configure gpg so that passphrases can be preset, so that they don't
 # have to be provided on every future operation.
 echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
 # Inform gpg that it should reload the configuration to apply the previous step
