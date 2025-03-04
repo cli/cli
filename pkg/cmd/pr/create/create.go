@@ -280,8 +280,17 @@ func createRun(opts *CreateOptions) error {
 
 	if opts.WebMode {
 
-		state.Title = opts.Title
-		state.Body = opts.Body
+		if !(opts.Autofill || opts.FillFirst) {
+			state.Title = opts.Title
+			state.Body = opts.Body
+		}
+
+		if opts.TitleProvided {
+			state.Title = opts.Title
+		}
+		if opts.BodyProvided {
+			state.Body = opts.Body
+		}
 
 		if opts.Template != "" {
 			state.Template = opts.Template
