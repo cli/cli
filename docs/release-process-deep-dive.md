@@ -379,7 +379,7 @@ This job also executes `MSBuild.exe` to build MSI Installers, wrapping each arch
 "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$source_dir" -p:OutputPath="$PWD/dist" -p:OutputName="$MSI_NAME" -p:ProductVersion="${MSI_VERSION#v}" -p:Platform="$platform"
 ```
 
-This references a number of [pretty inscrutable files](https://github.com/cli/cli/tree/817eeb26e567de11007c8a82c25e61c7e20e4337/build/windows) in our repository that form a kind of manifest.
+This references a number of [pretty inscrutable files](https://github.com/cli/cli/tree/817eeb26e567de11007c8a82c25e61c7e20e4337/build/windows) in our repository that form a kind of manifest. Some of the details and motivation for the contents of these files is described in the [PR](https://github.com/cli/cli/pull/4276) that introduced them.
 
 #### Signing
 
