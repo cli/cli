@@ -15,6 +15,8 @@ var githubRoot []byte
 
 const GitHubTUFMirror = "https://tuf-repo.github.com"
 
+var testCacheDir string
+
 func DefaultOptionsWithCacheSetting(tufMetadataDir o.Option[string]) *tuf.Options {
 	opts := tuf.DefaultOptions()
 
@@ -26,13 +28,36 @@ func DefaultOptionsWithCacheSetting(tufMetadataDir o.Option[string]) *tuf.Option
 		opts.DisableLocalCache = true
 	}
 
-	// Set the cache path to the provided dir, or a directory owned by the CLI
-	opts.CachePath = tufMetadataDir.UnwrapOr(filepath.Join(config.CacheDir(), ".sigstore", "root"))
+	// During tests, use a temporary directory that will be cleaned up
+	if os.Getenv("GO_INTEGRATION_TEST") == "1" {
+		if testCacheDir == "" {
+			var err error
+			testCacheDir, err = os.MkdirTemp("", "gh-tuf-cache-*")
+			if err == nil {
+				opts.CachePath = testCacheDir
+			}
+		} else {
+			opts.CachePath = testCacheDir
+		}
+	} else {
+		// Set the cache path to the provided dir, or a directory owned by the CLI
+		opts.CachePath = tufMetadataDir.UnwrapOr(filepath.Join(config.CacheDir(), ".sigstore", "root"))
+	}
 
 	// Allow TUF cache for 1 day
 	opts.CacheValidity = 1
 
 	return opts
+}
+
+// CleanupTestCache removes the temporary test cache directory if it exists
+func CleanupTestCache() error {
+	if testCacheDir != "" {
+		err := os.RemoveAll(testCacheDir)
+		testCacheDir = ""
+		return err
+	}
+	return nil
 }
 
 func GitHubTUFOptions(tufMetadataDir o.Option[string]) *tuf.Options {

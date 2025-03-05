@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -163,6 +165,13 @@ var newTUFErrClient tufClientInstantiator = func(o *tuf.Options) (*tuf.Client, e
 }
 
 func TestGetTrustedRoot(t *testing.T) {
+	// Set integration test flag to use temp directory
+	os.Setenv("GO_INTEGRATION_TEST", "1")
+	defer func() {
+		os.Unsetenv("GO_INTEGRATION_TEST")
+		verification.CleanupTestCache()
+	}()
+
 	mirror := "https://tuf-repo.github.com"
 	root := test.NormalizeRelativePath("../verification/embed/tuf-repo.github.com/root.json")
 
@@ -183,7 +192,6 @@ func TestGetTrustedRoot(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to read root file")
 	})
-
 }
 
 type stubAuthConfig struct {
