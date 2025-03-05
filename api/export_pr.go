@@ -139,6 +139,12 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 				}
 			}
 			data[f] = &requests
+		case "closingIssuesReferences":
+			items := make([]int, 0, len(pr.ClosingIssuesReferences.Nodes))
+			for _, n := range pr.ClosingIssuesReferences.Nodes {
+				items = append(items, n.Number)
+			}
+			data[f] = items
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()

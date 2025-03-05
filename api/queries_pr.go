@@ -93,6 +93,12 @@ type PullRequest struct {
 	Reviews        PullRequestReviews
 	LatestReviews  PullRequestReviews
 	ReviewRequests ReviewRequests
+
+	ClosingIssuesReferences struct {
+		Nodes []struct {
+			Number int
+		}
+	}
 }
 
 type StatusCheckRollupNode struct {

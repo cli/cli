@@ -37,6 +37,7 @@ func TestJSONFields(t *testing.T) {
 		"changedFiles",
 		"closed",
 		"closedAt",
+		"closingIssuesReferences",
 		"comments",
 		"commits",
 		"createdAt",

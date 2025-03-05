@@ -287,6 +287,7 @@ var PullRequestFields = append(sharedIssuePRFields,
 	"baseRefName",
 	"baseRefOid",
 	"changedFiles",
+	"closingIssuesReferences",
 	"commits",
 	"deletions",
 	"files",
@@ -366,6 +367,8 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, StatusCheckRollupGraphQLWithoutCountByState(""))
 		case "statusCheckRollupWithCountByState": // pseudo-field
 			q = append(q, StatusCheckRollupGraphQLWithCountByState())
+		case "closingIssuesReferences":
+			q = append(q, `closingIssuesReferences(first:100){nodes{number}}`)
 		default:
 			q = append(q, field)
 		}

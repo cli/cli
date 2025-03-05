@@ -245,6 +245,31 @@ func TestPullRequest_ExportData(t *testing.T) {
 				}
 			`),
 		},
+		{
+			name:   "linked issues",
+			fields: []string{"closingIssuesReferences"},
+			inputJSON: heredoc.Doc(`
+				{ "closingIssuesReferences":
+				 	{ "nodes": [
+							{
+								"number": 123
+							},
+							{
+								"number": 456
+							}
+						]
+					}
+				}
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"closingIssuesReferences": [
+						123,
+						456
+					]
+				}
+			`),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
