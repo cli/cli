@@ -598,7 +598,7 @@ func preloadPrClosingIssuesReferences(client *http.Client, repo ghrepo.Interface
 		variables["endCursor"] = githubv4.String(query.Node.PullRequest.ClosingIssuesReferences.PageInfo.EndCursor)
 	}
 
-	pr.Comments.PageInfo.HasNextPage = false
+	pr.ClosingIssuesReferences.PageInfo.HasNextPage = false
 	return nil
 }
 

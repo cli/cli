@@ -249,25 +249,20 @@ func TestPullRequest_ExportData(t *testing.T) {
 			name:   "linked issues",
 			fields: []string{"closingIssuesReferences"},
 			inputJSON: heredoc.Doc(`
-				{ "closingIssuesReferences":
-				 	{ "nodes": [
-							{
-								"number": 123
-							},
-							{
-								"number": 456
-							}
-						]
-					}
-				}
+				{ "closingIssuesReferences": { "nodes": [
+						{
+							"number": 123
+						},
+						{
+							"number": 456
+						}
+				] } }
 			`),
 			outputJSON: heredoc.Doc(`
-				{
-					"closingIssuesReferences": [
-						123,
-						456
-					]
-				}
+				{ "closingIssuesReferences": [
+					123,
+					456
+				] }
 			`),
 		},
 	}
