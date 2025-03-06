@@ -1590,6 +1590,28 @@ func Test_createRun(t *testing.T) {
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
+		{
+			name: "web prioritize title and body over fill",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.WebMode = true
+				opts.HeadBranch = "feature"
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.Autofill = true
+				return func() {}
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(
+					"git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry origin/master...feature",
+					0,
+					"56b6f8bb7c9e3a30093cd17e48934ce354148e80\u0000second commit of pr\u0000\u0000\n"+
+						"3a9b48085046d156c5acce8f3b3a0532cd706a4a\u0000first commit of pr\u0000first commit description\u0000\n",
+				)
+			},
+			expectedBrowse: "https://github.com/OWNER/REPO/compare/master...feature?body=my+body&expand=1&title=my+title",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
