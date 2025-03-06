@@ -36,6 +36,11 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 
 			GitHub search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-issues-and-pull-requests>
+
+			When your search query starts with a hyphen (-), you must use "--" to separate the search terms
+			from the command flags. This indicates that any following arguments starting with "-" are part
+			of the search query, not command flags. For example, to search for PRs without the "bug" label:
+			  gh search prs -- -label:bug
 		`),
 		Example: heredoc.Doc(`
 			# Search pull requests matching set of keywords "fix" and "bug"

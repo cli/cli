@@ -39,6 +39,11 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 			The search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-code>
 
+			When your search query starts with a hyphen (-), you must use "--" to separate the search terms
+			from the command flags. This indicates that any following arguments starting with "-" are part
+			of the search query, not command flags. For example, to exclude test files:
+			  gh search code "func main" -- -path:test
+
 			Note that these search results are powered by what is now a legacy GitHub code search engine.
 			The results might not match what is seen on <github.com>, and new features like regex search
 			are not yet available via the GitHub API.

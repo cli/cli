@@ -46,6 +46,11 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 
 			GitHub search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-for-repositories>
+
+			When your search query starts with a hyphen (-), you must use "--" to separate the search terms
+			from the command flags. This indicates that any following arguments starting with "-" are part
+			of the search query, not command flags. For example, to exclude repositories with topic "legacy":
+			  gh search repos -- -topic:legacy
 		`),
 		Example: heredoc.Doc(`
 			# Search repositories matching set of keywords "cli" and "shell"

@@ -45,6 +45,11 @@ func NewCmdCommits(f *cmdutil.Factory, runF func(*CommitsOptions) error) *cobra.
 
 			GitHub search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-commits>
+
+			When your search query starts with a hyphen (-), you must use "--" to separate the search terms
+			from the command flags. This indicates that any following arguments starting with "-" are part
+			of the search query, not command flags. For example, to exclude commits from a specific author:
+			  gh search commits -- -author:hubot
 		`),
 		Example: heredoc.Doc(`
 			# Search commits matching set of keywords "readme" and "typo"
