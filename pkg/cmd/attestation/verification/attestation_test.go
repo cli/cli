@@ -92,7 +92,7 @@ func TestGetLocalAttestations(t *testing.T) {
 		path := "../test/data/not-found-bundle.json"
 		attestations, err := GetLocalAttestations(path)
 
-		require.ErrorContains(t, err, "bundle could not be loaded from JSON file")
+		require.ErrorContains(t, err, "could not load content from file path")
 		require.Nil(t, attestations)
 	})
 
@@ -100,7 +100,7 @@ func TestGetLocalAttestations(t *testing.T) {
 		path := "../test/data/not-found-bundle.jsonl"
 		attestations, err := GetLocalAttestations(path)
 
-		require.ErrorContains(t, err, "bundles could not be loaded from JSON lines file")
+		require.ErrorContains(t, err, "could not load content from file path")
 		require.Nil(t, attestations)
 	})
 

@@ -106,7 +106,7 @@ func Test_NewCmdList(t *testing.T) {
 }
 
 func TestNewCmdListBaseRepoFuncs(t *testing.T) {
-	remotes := ghContext.Remotes{
+	multipleRemotes := ghContext.Remotes{
 		&ghContext.Remote{
 			Remote: &git.Remote{
 				Name: "origin",
@@ -121,10 +121,20 @@ func TestNewCmdListBaseRepoFuncs(t *testing.T) {
 		},
 	}
 
+	singleRemote := ghContext.Remotes{
+		&ghContext.Remote{
+			Remote: &git.Remote{
+				Name: "origin",
+			},
+			Repo: ghrepo.New("owner", "repo"),
+		},
+	}
+
 	tests := []struct {
 		name          string
 		args          string
 		env           map[string]string
+		remotes       ghContext.Remotes
 		prompterStubs func(*prompter.MockPrompter)
 		wantRepo      ghrepo.Interface
 		wantErr       error
@@ -132,6 +142,7 @@ func TestNewCmdListBaseRepoFuncs(t *testing.T) {
 		{
 			name:     "when there is a repo flag provided, the factory base repo func is used",
 			args:     "--repo owner/repo",
+			remotes:  multipleRemotes,
 			wantRepo: ghrepo.New("owner", "repo"),
 		},
 		{
@@ -139,18 +150,27 @@ func TestNewCmdListBaseRepoFuncs(t *testing.T) {
 			env: map[string]string{
 				"GH_REPO": "owner/repo",
 			},
+			remotes:  multipleRemotes,
 			wantRepo: ghrepo.New("owner", "repo"),
 		},
 		{
-			name: "when there is no repo flag or GH_REPO env var provided, and no prompting, the base func requiring no ambiguity is used",
-			args: "",
+			name:    "when there is no repo flag or GH_REPO env var provided, and no prompting, the base func requiring no ambiguity is used",
+			args:    "",
+			remotes: multipleRemotes,
 			wantErr: shared.AmbiguousBaseRepoError{
-				Remotes: remotes,
+				Remotes: multipleRemotes,
 			},
 		},
 		{
-			name: "when there is no repo flag or GH_REPO env var provided, and can prompt, the base func resolving ambiguity is used",
-			args: "",
+			name:     "when there is no repo flag or GH_REPO env provided, and there is a single remote, the factory base repo func is used",
+			args:     "",
+			remotes:  singleRemote,
+			wantRepo: ghrepo.New("owner", "repo"),
+		},
+		{
+			name:    "when there is no repo flag or GH_REPO env var provided, and can prompt, the base func resolving ambiguity is used",
+			args:    "",
+			remotes: multipleRemotes,
 			prompterStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect(
 					"Select a repo",
@@ -183,7 +203,7 @@ func TestNewCmdListBaseRepoFuncs(t *testing.T) {
 				},
 				Prompter: pm,
 				Remotes: func() (ghContext.Remotes, error) {
-					return remotes, nil
+					return tt.remotes, nil
 				},
 			}
 

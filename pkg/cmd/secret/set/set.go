@@ -106,9 +106,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// If the user specified a repo directly, then we're using the OverrideBaseRepoFunc set by EnableRepoOverride
 			// So there's no reason to use the specialised BaseRepoFunc that requires remote disambiguation.
-			if cmd.Flags().Changed("repo") || os.Getenv("GH_REPO") != "" {
-				opts.BaseRepo = f.BaseRepo
-			} else {
+			opts.BaseRepo = f.BaseRepo
+			isRepoUserProvided := cmd.Flags().Changed("repo") || os.Getenv("GH_REPO") != ""
+			if !isRepoUserProvided {
 				// If they haven't specified a repo directly, then we will wrap the BaseRepoFunc in one that errors if
 				// there might be multiple valid remotes.
 				opts.BaseRepo = shared.RequireNoAmbiguityBaseRepoFunc(opts.BaseRepo, f.Remotes)
