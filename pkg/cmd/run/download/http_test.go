@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,7 +59,8 @@ func Test_List_perRepository(t *testing.T) {
 
 func Test_Download(t *testing.T) {
 	tmpDir := t.TempDir()
-	destDir := filepath.Join(tmpDir, "artifact")
+	destDir, err := safepaths.ParseAbsolute(filepath.Join(tmpDir, "artifact"))
+	require.NoError(t, err)
 
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
@@ -70,8 +72,7 @@ func Test_Download(t *testing.T) {
 	api := &apiPlatform{
 		client: &http.Client{Transport: reg},
 	}
-	err := api.Download("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip", destDir)
-	require.NoError(t, err)
+	require.NoError(t, api.Download("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip", destDir))
 
 	var paths []string
 	parentPrefix := tmpDir + string(filepath.Separator)

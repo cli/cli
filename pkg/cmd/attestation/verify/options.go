@@ -31,8 +31,11 @@ type Options struct {
 	Repo                  string
 	SAN                   string
 	SANRegex              string
+	SignerDigest          string
 	SignerRepo            string
 	SignerWorkflow        string
+	SourceDigest          string
+	SourceRef             string
 	APIClient             api.Client
 	Logger                *io.Handler
 	OCIClient             oci.Client
@@ -47,26 +50,6 @@ type Options struct {
 func (opts *Options) Clean() {
 	if opts.BundlePath != "" {
 		opts.BundlePath = filepath.Clean(opts.BundlePath)
-	}
-}
-
-func (opts *Options) SetPolicyFlags() {
-	// check that Repo is in the expected format if provided
-	if opts.Repo != "" {
-		// we expect the repo argument to be in the format <OWNER>/<REPO>
-		splitRepo := strings.Split(opts.Repo, "/")
-
-		// if Repo is provided but owner is not, set the OWNER portion of the Repo value
-		// to Owner
-		opts.Owner = splitRepo[0]
-
-		if !isSignerIdentityProvided(opts) {
-			opts.SANRegex = expandToGitHubURL(opts.Tenant, opts.Repo)
-		}
-		return
-	}
-	if !isSignerIdentityProvided(opts) {
-		opts.SANRegex = expandToGitHubURL(opts.Tenant, opts.Owner)
 	}
 }
 
@@ -106,11 +89,6 @@ func (opts *Options) AreFlagsValid() error {
 	}
 
 	return nil
-}
-
-// check if any of the signer identity flags have been provided
-func isSignerIdentityProvided(opts *Options) bool {
-	return opts.SAN != "" || opts.SANRegex != "" || opts.SignerRepo != "" || opts.SignerWorkflow != ""
 }
 
 func isProvidedRepoValid(repo string) bool {

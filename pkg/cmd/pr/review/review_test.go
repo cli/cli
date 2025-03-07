@@ -283,7 +283,7 @@ func TestPRReview_interactive(t *testing.T) {
 	assert.Equal(t, heredoc.Doc(`
 		Got:
 
-		  cool story                                                                  
+		  cool story                                                                      
 
 	`), output.String())
 	assert.Equal(t, "✓ Approved pull request OWNER/REPO#123\n", output.Stderr())

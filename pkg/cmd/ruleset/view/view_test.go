@@ -158,14 +158,14 @@ func Test_viewRun(t *testing.T) {
 	Source: my-owner/repo-name (Repository)
 	Enforcement: Active
 	You can bypass: pull requests only
-	
+
 	Bypass List
 	- OrganizationAdmin (ID: 1), mode: always
 	- RepositoryRole (ID: 5), mode: always
-	
+
 	Conditions
 	- ref_name: [exclude: []] [include: [~ALL]] 
-	
+
 	Rules
 	- commit_author_email_pattern: [name: ] [negate: false] [operator: ends_with] [pattern: @example.com] 
 	- commit_message_pattern: [name: ] [negate: false] [operator: contains] [pattern: asdf] 
@@ -212,14 +212,14 @@ func Test_viewRun(t *testing.T) {
 			ID: 74
 			Source: my-owner (Organization)
 			Enforcement: Evaluate Mode (not enforced)
-			
+
 			Bypass List
 			This ruleset cannot be bypassed
-			
+
 			Conditions
 			- ref_name: [exclude: []] [include: [~ALL]] 
 			- repository_name: [exclude: []] [include: [~ALL]] [protected: true] 
-			
+
 			Rules
 			- commit_author_email_pattern: [name: ] [negate: false] [operator: ends_with] [pattern: @example.com] 
 			- commit_message_pattern: [name: ] [negate: false] [operator: contains] [pattern: asdf] 

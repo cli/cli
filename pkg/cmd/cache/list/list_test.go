@@ -2,6 +2,7 @@ package list
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -243,7 +244,8 @@ ID  KEY  SIZE      CREATED            ACCESSED
 			wantErrMsg: "No caches found in OWNER/REPO",
 		},
 		{
-			name: "displays no results",
+			name: "displays no results when there is a tty",
+			tty:  true,
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/caches"),
@@ -266,6 +268,48 @@ ID  KEY  SIZE      CREATED            ACCESSED
 			},
 			wantErr:    true,
 			wantErrMsg: "X Failed to get caches: HTTP 404 (https://api.github.com/repos/OWNER/REPO/actions/caches?per_page=100)",
+		},
+		{
+			name: "calls the exporter when requested",
+			opts: ListOptions{
+				Exporter: &verboseExporter{},
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/caches"),
+					httpmock.JSONResponse(shared.CachePayload{
+						ActionsCaches: []shared.Cache{
+							{
+								Id:             1,
+								Key:            "foo",
+								CreatedAt:      time.Date(2021, 1, 1, 1, 1, 1, 1, time.UTC),
+								LastAccessedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+								SizeInBytes:    100,
+							},
+						},
+						TotalCount: 1,
+					}),
+				)
+			},
+			wantErr:    false,
+			wantStdout: "[{CreatedAt:2021-01-01 01:01:01.000000001 +0000 UTC Id:1 Key:foo LastAccessedAt:2022-01-01 01:01:01.000000001 +0000 UTC Ref: SizeInBytes:100 Version:}]",
+		},
+		{
+			name: "calls the exporter even when there are no results",
+			opts: ListOptions{
+				Exporter: &verboseExporter{},
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/caches"),
+					httpmock.JSONResponse(shared.CachePayload{
+						ActionsCaches: []shared.Cache{},
+						TotalCount:    0,
+					}),
+				)
+			},
+			wantErr:    false,
+			wantStdout: "[]",
 		},
 	}
 
@@ -303,6 +347,22 @@ ID  KEY  SIZE      CREATED            ACCESSED
 			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
+}
+
+// The verboseExporter just writes data formatted as %+v to stdout.
+// This allows for easy assertion on the data provided to the exporter.
+type verboseExporter struct{}
+
+func (e *verboseExporter) Fields() []string {
+	return nil
+}
+
+func (e *verboseExporter) Write(io *iostreams.IOStreams, data interface{}) error {
+	_, err := io.Out.Write([]byte(fmt.Sprintf("%+v", data)))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func Test_humanFileSize(t *testing.T) {

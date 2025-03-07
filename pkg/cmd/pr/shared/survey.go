@@ -110,10 +110,17 @@ func BodySurvey(p Prompt, state *IssueMetadataState, templateContent string) err
 	return nil
 }
 
-func TitleSurvey(p Prompt, state *IssueMetadataState) error {
-	result, err := p.Input("Title", state.Title)
-	if err != nil {
-		return err
+func TitleSurvey(p Prompt, io *iostreams.IOStreams, state *IssueMetadataState) error {
+	var err error
+	result := ""
+	for result == "" {
+		result, err = p.Input("Title (required)", state.Title)
+		if err != nil {
+			return err
+		}
+		if result == "" {
+			fmt.Fprintf(io.ErrOut, "%s Title cannot be blank\n", io.ColorScheme().FailureIcon())
+		}
 	}
 
 	if result != state.Title {

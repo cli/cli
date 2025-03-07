@@ -271,7 +271,7 @@ func TestPrClose_deleteBranch_notInGitRepo(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
 		✓ Closed pull request OWNER/REPO#96 (The title of the PR)
-		! Skipped deleting the local branch since current directory is not a git repository 
+		! Skipped deleting the local branch since current directory is not a git repository
 		✓ Deleted branch trunk
 	`), output.Stderr())
 }

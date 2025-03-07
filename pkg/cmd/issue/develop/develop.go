@@ -44,6 +44,13 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 	cmd := &cobra.Command{
 		Use:   "develop {<number> | <url>}",
 		Short: "Manage linked branches for an issue",
+		Long: heredoc.Docf(`
+			Manage linked branches for an issue.
+
+			When using the %[1]s--base%[1]s flag, the new development branch will be created from the specified
+			remote branch. The new branch will be configured as the base branch for pull requests created using
+			%[1]sgh pr create%[1]s.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# List branches for issue 123
 			$ gh issue develop --list 123
@@ -169,6 +176,14 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
+	}
+
+	// Remember which branch to target when creating a PR.
+	if opts.BaseBranch != "" {
+		err = opts.GitClient.SetBranchConfig(ctx.Background(), branchName, git.MergeBaseConfig, opts.BaseBranch)
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Fprintf(opts.IO.Out, "%s/%s/tree/%s\n", branchRepo.RepoHost(), ghrepo.FullName(branchRepo), branchName)

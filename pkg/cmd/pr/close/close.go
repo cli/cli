@@ -143,7 +143,7 @@ func closeRun(opts *CloseOptions) error {
 					branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
 				}
 			} else {
-				fmt.Fprintf(opts.IO.ErrOut, "%s Skipped deleting the local branch since current directory is not a git repository \n", cs.WarningIcon())
+				fmt.Fprintf(opts.IO.ErrOut, "%s Skipped deleting the local branch since current directory is not a git repository\n", cs.WarningIcon())
 			}
 		}
 

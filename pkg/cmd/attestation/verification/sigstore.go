@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	o "github.com/cli/cli/v2/pkg/option"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
@@ -27,140 +29,137 @@ type AttestationProcessingResult struct {
 	VerificationResult *verify.VerificationResult `json:"verificationResult"`
 }
 
-type SigstoreResults struct {
-	VerifyResults []*AttestationProcessingResult
-	Error         error
-}
-
 type SigstoreConfig struct {
 	TrustedRoot  string
 	Logger       *io.Handler
 	NoPublicGood bool
 	// If tenancy mode is not used, trust domain is empty
 	TrustDomain string
+	// TUFMetadataDir
+	TUFMetadataDir o.Option[string]
 }
 
 type SigstoreVerifier interface {
-	Verify(attestations []*api.Attestation, policy verify.PolicyBuilder) *SigstoreResults
+	Verify(attestations []*api.Attestation, policy verify.PolicyBuilder) ([]*AttestationProcessingResult, error)
 }
 
 type LiveSigstoreVerifier struct {
-	config SigstoreConfig
+	TrustedRoot  string
+	Logger       *io.Handler
+	NoPublicGood bool
+	// If tenancy mode is not used, trust domain is empty
+	TrustDomain    string
+	TUFMetadataDir o.Option[string]
 }
+
+var ErrNoAttestationsVerified = errors.New("no attestations were verified")
 
 // NewLiveSigstoreVerifier creates a new LiveSigstoreVerifier struct
 // that is used to verify artifacts and attestations against the
 // Public Good, GitHub, or a custom trusted root.
 func NewLiveSigstoreVerifier(config SigstoreConfig) *LiveSigstoreVerifier {
 	return &LiveSigstoreVerifier{
-		config: config,
+		TrustedRoot:    config.TrustedRoot,
+		Logger:         config.Logger,
+		NoPublicGood:   config.NoPublicGood,
+		TrustDomain:    config.TrustDomain,
+		TUFMetadataDir: config.TUFMetadataDir,
 	}
 }
 
-func (v *LiveSigstoreVerifier) chooseVerifier(b *bundle.Bundle) (*verify.SignedEntityVerifier, string, error) {
+func getBundleIssuer(b *bundle.Bundle) (string, error) {
 	if !b.MinVersion("0.2") {
-		return nil, "", fmt.Errorf("unsupported bundle version: %s", b.MediaType)
+		return "", fmt.Errorf("unsupported bundle version: %s", b.MediaType)
 	}
 	verifyContent, err := b.VerificationContent()
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to get bundle verification content: %v", err)
+		return "", fmt.Errorf("failed to get bundle verification content: %v", err)
 	}
-	leafCert := verifyContent.GetCertificate()
+	leafCert := verifyContent.Certificate()
 	if leafCert == nil {
-		return nil, "", fmt.Errorf("leaf cert not found")
+		return "", fmt.Errorf("leaf cert not found")
 	}
 	if len(leafCert.Issuer.Organization) != 1 {
-		return nil, "", fmt.Errorf("expected the leaf certificate issuer to only have one organization")
+		return "", fmt.Errorf("expected the leaf certificate issuer to only have one organization")
 	}
-	issuer := leafCert.Issuer.Organization[0]
-
-	if v.config.TrustedRoot != "" {
-		customTrustRoots, err := os.ReadFile(v.config.TrustedRoot)
-		if err != nil {
-			return nil, "", fmt.Errorf("unable to read file %s: %v", v.config.TrustedRoot, err)
-		}
-
-		reader := bufio.NewReader(bytes.NewReader(customTrustRoots))
-		var line []byte
-		var readError error
-		line, readError = reader.ReadBytes('\n')
-		for readError == nil {
-			// Load each trusted root
-			trustedRoot, err := root.NewTrustedRootFromJSON(line)
-			if err != nil {
-				return nil, "", fmt.Errorf("failed to create custom verifier: %v", err)
-			}
-
-			// Compare bundle leafCert issuer with trusted root cert authority
-			certAuthorities := trustedRoot.FulcioCertificateAuthorities()
-			for _, certAuthority := range certAuthorities {
-				lowestCert, err := getLowestCertInChain(&certAuthority)
-				if err != nil {
-					return nil, "", err
-				}
-
-				if len(lowestCert.Issuer.Organization) == 0 {
-					continue
-				}
-
-				if lowestCert.Issuer.Organization[0] == issuer {
-					// Determine what policy to use with this trusted root.
-					//
-					// Note that we are *only* inferring the policy with the
-					// issuer. We *must* use the trusted root provided.
-					if issuer == PublicGoodIssuerOrg {
-						if v.config.NoPublicGood {
-							return nil, "", fmt.Errorf("Detected public good instance but requested verification without public good instance")
-						}
-						verifier, err := newPublicGoodVerifierWithTrustedRoot(trustedRoot)
-						if err != nil {
-							return nil, "", err
-						}
-						return verifier, issuer, nil
-					} else if issuer == GitHubIssuerOrg {
-						verifier, err := newGitHubVerifierWithTrustedRoot(trustedRoot)
-						if err != nil {
-							return nil, "", err
-						}
-						return verifier, issuer, nil
-					} else {
-						// Make best guess at reasonable policy
-						customVerifier, err := newCustomVerifier(trustedRoot)
-						if err != nil {
-							return nil, "", fmt.Errorf("failed to create custom verifier: %v", err)
-						}
-						return customVerifier, issuer, nil
-					}
-				}
-			}
-			line, readError = reader.ReadBytes('\n')
-		}
-		return nil, "", fmt.Errorf("unable to use provided trusted roots")
-	}
-
-	if leafCert.Issuer.Organization[0] == PublicGoodIssuerOrg && !v.config.NoPublicGood {
-		publicGoodVerifier, err := newPublicGoodVerifier()
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to create Public Good Sigstore verifier: %v", err)
-		}
-
-		return publicGoodVerifier, issuer, nil
-	} else if leafCert.Issuer.Organization[0] == GitHubIssuerOrg || v.config.NoPublicGood {
-		ghVerifier, err := newGitHubVerifier(v.config.TrustDomain)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to create GitHub Sigstore verifier: %v", err)
-		}
-
-		return ghVerifier, issuer, nil
-	}
-
-	return nil, "", fmt.Errorf("leaf certificate issuer is not recognized")
+	return leafCert.Issuer.Organization[0], nil
 }
 
-func getLowestCertInChain(ca *root.CertificateAuthority) (*x509.Certificate, error) {
-	if ca.Leaf != nil {
-		return ca.Leaf, nil
-	} else if len(ca.Intermediates) > 0 {
+func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEntityVerifier, error) {
+	// if no custom trusted root is set, attempt to create a Public Good or
+	// GitHub Sigstore verifier
+	if v.TrustedRoot == "" {
+		switch issuer {
+		case PublicGoodIssuerOrg:
+			if v.NoPublicGood {
+				return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
+			}
+			return newPublicGoodVerifier(v.TUFMetadataDir)
+		case GitHubIssuerOrg:
+			return newGitHubVerifier(v.TrustDomain, v.TUFMetadataDir)
+		default:
+			return nil, fmt.Errorf("leaf certificate issuer is not recognized")
+		}
+	}
+
+	customTrustRoots, err := os.ReadFile(v.TrustedRoot)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read file %s: %v", v.TrustedRoot, err)
+	}
+
+	reader := bufio.NewReader(bytes.NewReader(customTrustRoots))
+	var line []byte
+	var readError error
+	line, readError = reader.ReadBytes('\n')
+	for readError == nil {
+		// Load each trusted root
+		trustedRoot, err := root.NewTrustedRootFromJSON(line)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create custom verifier: %v", err)
+		}
+
+		// Compare bundle leafCert issuer with trusted root cert authority
+		certAuthorities := trustedRoot.FulcioCertificateAuthorities()
+		for _, certAuthority := range certAuthorities {
+			fulcioCertAuthority, ok := certAuthority.(*root.FulcioCertificateAuthority)
+			if !ok {
+				return nil, fmt.Errorf("trusted root cert authority is not a FulcioCertificateAuthority")
+			}
+			lowestCert, err := getLowestCertInChain(fulcioCertAuthority)
+			if err != nil {
+				return nil, err
+			}
+
+			// if the custom trusted root issuer is not set or doesn't match the given issuer, skip it
+			if len(lowestCert.Issuer.Organization) == 0 || lowestCert.Issuer.Organization[0] != issuer {
+				continue
+			}
+
+			// Determine what policy to use with this trusted root.
+			//
+			// Note that we are *only* inferring the policy with the
+			// issuer. We *must* use the trusted root provided.
+			switch issuer {
+			case PublicGoodIssuerOrg:
+				if v.NoPublicGood {
+					return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
+				}
+				return newPublicGoodVerifierWithTrustedRoot(trustedRoot)
+			case GitHubIssuerOrg:
+				return newGitHubVerifierWithTrustedRoot(trustedRoot)
+			default:
+				// Make best guess at reasonable policy
+				return newCustomVerifier(trustedRoot)
+			}
+		}
+		line, readError = reader.ReadBytes('\n')
+	}
+
+	return nil, fmt.Errorf("unable to use provided trusted roots")
+}
+
+func getLowestCertInChain(ca *root.FulcioCertificateAuthority) (*x509.Certificate, error) {
+	if len(ca.Intermediates) > 0 {
 		return ca.Intermediates[0], nil
 	} else if ca.Root != nil {
 		return ca.Root, nil
@@ -169,54 +168,73 @@ func getLowestCertInChain(ca *root.CertificateAuthority) (*x509.Certificate, err
 	return nil, fmt.Errorf("certificate authority had no certificates")
 }
 
-func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy verify.PolicyBuilder) *SigstoreResults {
-	// initialize the processing results before attempting to verify
-	// with multiple verifiers
-	results := make([]*AttestationProcessingResult, len(attestations))
-	for i, att := range attestations {
-		apr := &AttestationProcessingResult{
-			Attestation: att,
-		}
-		results[i] = apr
+func (v *LiveSigstoreVerifier) verify(attestation *api.Attestation, policy verify.PolicyBuilder) (*AttestationProcessingResult, error) {
+	issuer, err := getBundleIssuer(attestation.Bundle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bundle issuer: %v", err)
 	}
 
-	totalAttestations := len(attestations)
-	for i, apr := range results {
-		v.config.Logger.VerbosePrintf("Verifying attestation %d/%d against the configured Sigstore trust roots\n", i+1, totalAttestations)
+	// determine which verifier should attempt verification against the bundle
+	verifier, err := v.chooseVerifier(issuer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find recognized issuer from bundle content: %v", err)
+	}
 
-		// determine which verifier should attempt verification against the bundle
-		verifier, issuer, err := v.chooseVerifier(apr.Attestation.Bundle)
-		if err != nil {
-			return &SigstoreResults{
-				Error: fmt.Errorf("failed to find recognized issuer from bundle content: %v", err),
-			}
-		}
-
-		v.config.Logger.VerbosePrintf("Attempting verification against issuer \"%s\"\n", issuer)
-		// attempt to verify the attestation
-		result, err := verifier.Verify(apr.Attestation.Bundle, policy)
-		// if verification fails, create the error and exit verification early
-		if err != nil {
-			v.config.Logger.VerbosePrint(v.config.Logger.ColorScheme.Redf(
-				"Failed to verify against issuer \"%s\" \n\n", issuer,
-			))
-
-			return &SigstoreResults{
-				Error: fmt.Errorf("verifying with issuer \"%s\"", issuer),
-			}
-		}
-
-		// if verification is successful, add the result
-		// to the AttestationProcessingResult entry
-		v.config.Logger.VerbosePrint(v.config.Logger.ColorScheme.Greenf(
-			"SUCCESS - attestation signature verified with \"%s\"\n", issuer,
+	v.Logger.VerbosePrintf("Attempting verification against issuer \"%s\"\n", issuer)
+	// attempt to verify the attestation
+	result, err := verifier.Verify(attestation.Bundle, policy)
+	// if verification fails, create the error and exit verification early
+	if err != nil {
+		v.Logger.VerbosePrint(v.Logger.ColorScheme.Redf(
+			"Failed to verify against issuer \"%s\" \n\n", issuer,
 		))
-		apr.VerificationResult = result
+
+		return nil, fmt.Errorf("verifying with issuer \"%s\"", issuer)
 	}
 
-	return &SigstoreResults{
-		VerifyResults: results,
+	// if verification is successful, add the result
+	// to the AttestationProcessingResult entry
+	v.Logger.VerbosePrint(v.Logger.ColorScheme.Greenf(
+		"SUCCESS - attestation signature verified with \"%s\"\n", issuer,
+	))
+
+	return &AttestationProcessingResult{
+		Attestation:        attestation,
+		VerificationResult: result,
+	}, nil
+}
+
+func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy verify.PolicyBuilder) ([]*AttestationProcessingResult, error) {
+	if len(attestations) == 0 {
+		return nil, ErrNoAttestationsVerified
 	}
+
+	results := make([]*AttestationProcessingResult, len(attestations))
+	var verifyCount int
+	var lastError error
+	totalAttestations := len(attestations)
+	for i, a := range attestations {
+		v.Logger.VerbosePrintf("Verifying attestation %d/%d against the configured Sigstore trust roots\n", i+1, totalAttestations)
+
+		apr, err := v.verify(a, policy)
+		if err != nil {
+			lastError = err
+			// move onto the next attestation in the for loop if verification fails
+			continue
+		}
+		// otherwise, add the result to the results slice and increment verifyCount
+		results[verifyCount] = apr
+		verifyCount++
+	}
+
+	if verifyCount == 0 {
+		return nil, lastError
+	}
+
+	// truncate the results slice to only include verified attestations
+	results = results[:verifyCount]
+
+	return results, nil
 }
 
 func newCustomVerifier(trustedRoot *root.TrustedRoot) (*verify.SignedEntityVerifier, error) {
@@ -242,10 +260,10 @@ func newCustomVerifier(trustedRoot *root.TrustedRoot) (*verify.SignedEntityVerif
 	return gv, nil
 }
 
-func newGitHubVerifier(trustDomain string) (*verify.SignedEntityVerifier, error) {
+func newGitHubVerifier(trustDomain string, tufMetadataDir o.Option[string]) (*verify.SignedEntityVerifier, error) {
 	var tr string
 
-	opts := GitHubTUFOptions()
+	opts := GitHubTUFOptions(tufMetadataDir)
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client: %v", err)
@@ -276,8 +294,8 @@ func newGitHubVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verify.Si
 	return gv, nil
 }
 
-func newPublicGoodVerifier() (*verify.SignedEntityVerifier, error) {
-	opts := DefaultOptionsWithCacheSetting()
+func newPublicGoodVerifier(tufMetadataDir o.Option[string]) (*verify.SignedEntityVerifier, error) {
+	opts := DefaultOptionsWithCacheSetting(tufMetadataDir)
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client: %v", err)

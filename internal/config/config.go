@@ -10,7 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
 	o "github.com/cli/cli/v2/pkg/option"
-	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
@@ -206,7 +206,7 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	if c.tokenOverride != nil {
 		return c.tokenOverride(hostname)
 	}
-	token, source := ghAuth.TokenFromEnvOrConfig(hostname)
+	token, source := ghauth.TokenFromEnvOrConfig(hostname)
 	if token == "" {
 		var err error
 		token, err = c.TokenFromKeyring(hostname)
@@ -240,7 +240,7 @@ func (c *AuthConfig) HasEnvToken() bool {
 	// It has to use a hostname that is not going to be found in the hosts so that it
 	// can guarantee that tokens will only be returned from a set env var.
 	// Discussed here, but maybe worth revisiting: https://github.com/cli/cli/pull/7169#discussion_r1136979033
-	token, _ := ghAuth.TokenFromEnvOrConfig(hostname)
+	token, _ := ghauth.TokenFromEnvOrConfig(hostname)
 	return token != ""
 }
 
@@ -282,7 +282,7 @@ func (c *AuthConfig) Hosts() []string {
 	if c.hostsOverride != nil {
 		return c.hostsOverride()
 	}
-	return ghAuth.KnownHosts()
+	return ghauth.KnownHosts()
 }
 
 // SetHosts will override any hosts resolution and return the given
@@ -297,7 +297,7 @@ func (c *AuthConfig) DefaultHost() (string, string) {
 	if c.defaultHostOverride != nil {
 		return c.defaultHostOverride()
 	}
-	return ghAuth.DefaultHost()
+	return ghauth.DefaultHost()
 }
 
 // SetDefaultHost will override any host resolution and return the given

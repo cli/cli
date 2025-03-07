@@ -218,7 +218,7 @@ func TestListRun(t *testing.T) {
 			wantStdout: heredoc.Doc(`
 
 				Showing 2 of 2 labels in OWNER/REPO
-				
+
 				NAME  DESCRIPTION           COLOR
 				bug   This is a bug label   #d73a4a
 				docs  This is a docs label  #ffa8da

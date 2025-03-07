@@ -1,0 +1,66 @@
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# commit the workflow file
+cd $SCRIPT_NAME-$RANDOM_STRING
+mkdir .github/workflows
+mv ../workflow.yml .github/workflows/workflow.yml
+exec git add .github/workflows/workflow.yml
+exec git commit -m 'Create workflow file'
+exec git push -u origin main
+
+# Sleep because it takes a second for the workflow to register
+sleep 1
+
+# Check the workflow is indeed created
+exec gh workflow list
+stdout 'Test Workflow Name'
+
+# Run the workflow
+exec gh workflow run 'Test Workflow Name'
+
+# It takes some time for a workflow run to register
+sleep 10
+
+# Get the run ID we want to view
+exec gh run list --json databaseId --jq '.[0].databaseId'
+stdout2env RUN_ID
+
+# Wait for workflow to complete
+exec gh run watch $RUN_ID --exit-status
+
+# View the workflow run
+exec gh run view $RUN_ID
+
+-- workflow.yml --
+# This is a basic workflow to help you get started with Actions
+
+name: Test Workflow Name
+
+# Controls when the workflow will run
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+
+      # Runs a single command using the runners shell
+      - name: Run a one-line script
+        run: echo Hello, world!

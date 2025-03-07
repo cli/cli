@@ -89,15 +89,20 @@ func viewRun(opts *ViewOptions) error {
 
 	cs := opts.IO.ColorScheme()
 	if gistID == "" {
-		gistID, err = shared.PromptGists(opts.Prompter, client, hostname, cs)
+		if !opts.IO.CanPrompt() {
+			return cmdutil.FlagErrorf("gist ID or URL required when not running interactively")
+		}
+
+		gist, err := shared.PromptGists(opts.Prompter, client, hostname, cs)
 		if err != nil {
 			return err
 		}
 
-		if gistID == "" {
+		if gist.ID == "" {
 			fmt.Fprintln(opts.IO.Out, "No gists found.")
 			return nil
 		}
+		gistID = gist.ID
 	}
 
 	if opts.Web {

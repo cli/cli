@@ -176,7 +176,7 @@ func TestDefaultRun(t *testing.T) {
 					Repo:   repo1,
 				},
 			},
-			wantStderr: "no default repository has been set; use `gh repo set-default` to select one\n",
+			wantStderr: "X No default remote repository has been set. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 		{
 			name: "view mode no current default",
@@ -188,7 +188,7 @@ func TestDefaultRun(t *testing.T) {
 					Repo:   repo1,
 				},
 			},
-			wantStderr: "no default repository has been set; use `gh repo set-default` to select one\n",
+			wantStderr: "X No default remote repository has been set. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 		{
 			name: "view mode with base resolved current default",
@@ -382,7 +382,7 @@ func TestDefaultRun(t *testing.T) {
 					}
 				}
 			},
-			wantStdout: "This command sets the default remote repository to use when querying the\nGitHub API for the locally cloned repository.\n\ngh uses the default repository for things like:\n\n - viewing and creating pull requests\n - viewing and creating issues\n - viewing and creating releases\n - working with GitHub Actions\n - adding repository and environment secrets\n\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
+			wantStdout: "This command sets the default remote repository to use when querying the\nGitHub API for the locally cloned repository.\n\ngh uses the default repository for things like:\n\n - viewing and creating pull requests\n - viewing and creating issues\n - viewing and creating releases\n - working with GitHub Actions\n\n### NOTE: gh does not use the default repository for managing repository and environment secrets.\n\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
 		},
 		{
 			name: "interactive mode only one known host",
@@ -456,7 +456,7 @@ func TestDefaultRun(t *testing.T) {
 					}
 				}
 			},
-			wantStdout: "This command sets the default remote repository to use when querying the\nGitHub API for the locally cloned repository.\n\ngh uses the default repository for things like:\n\n - viewing and creating pull requests\n - viewing and creating issues\n - viewing and creating releases\n - working with GitHub Actions\n - adding repository and environment secrets\n\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
+			wantStdout: "This command sets the default remote repository to use when querying the\nGitHub API for the locally cloned repository.\n\ngh uses the default repository for things like:\n\n - viewing and creating pull requests\n - viewing and creating issues\n - viewing and creating releases\n - working with GitHub Actions\n\n### NOTE: gh does not use the default repository for managing repository and environment secrets.\n\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
 		},
 	}
 

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -27,8 +28,9 @@ type DownloadOptions struct {
 
 type platform interface {
 	List(runID string) ([]shared.Artifact, error)
-	Download(url string, dir string) error
+	Download(url string, dir safepaths.Absolute) error
 }
+
 type iprompter interface {
 	MultiSelect(string, []string, []string) ([]int, error)
 }
@@ -151,8 +153,15 @@ func runDownload(opts *DownloadOptions) error {
 	opts.IO.StartProgressIndicator()
 	defer opts.IO.StopProgressIndicator()
 
-	// track downloaded artifacts and avoid re-downloading any of the same name
+	// track downloaded artifacts and avoid re-downloading any of the same name, isolate if multiple artifacts
 	downloaded := set.NewStringSet()
+	isolateArtifacts := isolateArtifacts(wantNames, wantPatterns)
+
+	absoluteDestinationDir, err := safepaths.ParseAbsolute(opts.DestinationDir)
+	if err != nil {
+		return fmt.Errorf("error parsing destination directory: %w", err)
+	}
+
 	for _, a := range artifacts {
 		if a.Expired {
 			continue
@@ -165,10 +174,19 @@ func runDownload(opts *DownloadOptions) error {
 				continue
 			}
 		}
-		destDir := opts.DestinationDir
-		if len(wantPatterns) != 0 || len(wantNames) != 1 {
-			destDir = filepath.Join(destDir, a.Name)
+
+		destDir := absoluteDestinationDir
+		if isolateArtifacts {
+			destDir, err = absoluteDestinationDir.Join(a.Name)
+			if err != nil {
+				var pathTraversalError safepaths.PathTraversalError
+				if errors.As(err, &pathTraversalError) {
+					return fmt.Errorf("error downloading %s: would result in path traversal", a.Name)
+				}
+				return err
+			}
 		}
+
 		err := opts.Platform.Download(a.DownloadURL, destDir)
 		if err != nil {
 			return fmt.Errorf("error downloading %s: %w", a.Name, err)
@@ -181,6 +199,25 @@ func runDownload(opts *DownloadOptions) error {
 	}
 
 	return nil
+}
+
+func isolateArtifacts(wantNames []string, wantPatterns []string) bool {
+	if len(wantPatterns) > 0 {
+		// Patterns can match multiple artifacts
+		return true
+	}
+
+	if len(wantNames) == 0 {
+		// All artifacts wanted regardless what they are named
+		return true
+	}
+
+	if len(wantNames) > 1 {
+		// Multiple, specific artifacts wanted
+		return true
+	}
+
+	return false
 }
 
 func matchAnyName(names []string, name string) bool {

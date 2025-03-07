@@ -42,8 +42,8 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 		Short: "Copy a project",
 		Use:   "copy [<number>]",
 		Example: heredoc.Doc(`
-			# copy project "1" owned by monalisa to github
-			gh project copy 1 --source-owner monalisa --target-owner github --title "a new project"
+			# Copy project "1" owned by monalisa to github
+			$ gh project copy 1 --source-owner monalisa --target-owner github --title "a new project"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

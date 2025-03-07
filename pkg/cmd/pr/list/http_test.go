@@ -10,7 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 )
 
-func Test_listPullRequests(t *testing.T) {
+func Test_ListPullRequests(t *testing.T) {
 	type args struct {
 		repo    ghrepo.Interface
 		filters prShared.FilterOptions
@@ -155,7 +155,7 @@ func Test_listPullRequests(t *testing.T) {
 
 			_, err := listPullRequests(httpClient, tt.args.repo, tt.args.filters, tt.args.limit)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("listPullRequests() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ListPullRequests() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 		})

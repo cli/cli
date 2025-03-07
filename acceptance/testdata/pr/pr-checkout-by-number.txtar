@@ -1,0 +1,33 @@
+# Set up env vars
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# Clone the repo
+exec gh repo clone ${ORG}/${REPO}
+
+# Prepare a branch to PR
+cd ${REPO}
+exec git checkout -b feature-branch
+exec git commit --allow-empty -m 'Empty Commit'
+exec git push -u origin feature-branch
+
+# Create the PR
+exec gh pr create --title 'Feature Title' --body 'Feature Body'
+stdout2env PR_URL
+
+# Remove the local branch
+exec git checkout main
+exec git branch -D feature-branch
+stdout 'Deleted branch feature-branch'
+
+# Checkout the PR
+exec gh pr checkout 1
+stderr 'Switched to a new branch ''feature-branch'''

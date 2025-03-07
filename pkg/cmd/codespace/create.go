@@ -99,22 +99,22 @@ func newCreateCmd(app *App) *cobra.Command {
 		},
 	}
 
-	createCmd.Flags().BoolVarP(&opts.useWeb, "web", "w", false, "create codespace from browser, cannot be used with --display-name, --idle-timeout, or --retention-period")
+	createCmd.Flags().BoolVarP(&opts.useWeb, "web", "w", false, "Create codespace from browser, cannot be used with --display-name, --idle-timeout, or --retention-period")
 
-	createCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "repository name with owner: user/repo")
+	createCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "Repository name with owner: user/repo")
 	if err := addDeprecatedRepoShorthand(createCmd, &opts.repo); err != nil {
 		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
 	}
 
-	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
-	createCmd.Flags().StringVarP(&opts.location, "location", "l", "", "location: {EastUs|SouthEastAsia|WestEurope|WestUs2} (determined automatically if not provided)")
-	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
-	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "do not prompt to accept additional permissions requested by the codespace")
-	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
-	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
-	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
-	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
-	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", fmt.Sprintf("display name for the codespace (%d characters or less)", displayNameMaxLength))
+	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "Repository branch")
+	createCmd.Flags().StringVarP(&opts.location, "location", "l", "", "Location: {EastUs|SouthEastAsia|WestEurope|WestUs2} (determined automatically if not provided)")
+	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "Hardware specifications for the VM")
+	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "Do not prompt to accept additional permissions requested by the codespace")
+	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "Show status of post-create command and dotfiles")
+	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "Allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
+	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "Allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
+	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "Path to the devcontainer.json file to use when creating codespace")
+	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", fmt.Sprintf("Display name for the codespace (%d characters or less)", displayNameMaxLength))
 
 	return createCmd
 }

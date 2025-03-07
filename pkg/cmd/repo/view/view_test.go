@@ -16,9 +16,82 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestJSONFields(t *testing.T) {
+	jsonfieldstest.ExpectCommandToSupportJSONFields(t, NewCmdView, []string{
+		"archivedAt",
+		"assignableUsers",
+		"codeOfConduct",
+		"contactLinks",
+		"createdAt",
+		"defaultBranchRef",
+		"deleteBranchOnMerge",
+		"description",
+		"diskUsage",
+		"forkCount",
+		"fundingLinks",
+		"hasDiscussionsEnabled",
+		"hasIssuesEnabled",
+		"hasProjectsEnabled",
+		"hasWikiEnabled",
+		"homepageUrl",
+		"id",
+		"isArchived",
+		"isBlankIssuesEnabled",
+		"isEmpty",
+		"isFork",
+		"isInOrganization",
+		"isMirror",
+		"isPrivate",
+		"isSecurityPolicyEnabled",
+		"isTemplate",
+		"isUserConfigurationRepository",
+		"issueTemplates",
+		"issues",
+		"labels",
+		"languages",
+		"latestRelease",
+		"licenseInfo",
+		"mentionableUsers",
+		"mergeCommitAllowed",
+		"milestones",
+		"mirrorUrl",
+		"name",
+		"nameWithOwner",
+		"openGraphImageUrl",
+		"owner",
+		"parent",
+		"primaryLanguage",
+		"projects",
+		"projectsV2",
+		"pullRequestTemplates",
+		"pullRequests",
+		"pushedAt",
+		"rebaseMergeAllowed",
+		"repositoryTopics",
+		"securityPolicyUrl",
+		"sshUrl",
+		"squashMergeAllowed",
+		"stargazerCount",
+		"templateRepository",
+		"updatedAt",
+		"url",
+		"usesCustomOpenGraphImage",
+		"viewerCanAdminister",
+		"viewerDefaultCommitEmail",
+		"viewerDefaultMergeMethod",
+		"viewerHasStarred",
+		"viewerPermission",
+		"viewerPossibleCommitEmails",
+		"viewerSubscription",
+		"visibility",
+		"watchers",
+	})
+}
 
 func TestNewCmdView(t *testing.T) {
 	tests := []struct {
@@ -187,7 +260,7 @@ func Test_ViewRun(t *testing.T) {
 				social distancing
 
 
-				  # truly cool readme check it out                                            
+				  # truly cool readme check it out                                                
 
 
 
@@ -206,7 +279,7 @@ func Test_ViewRun(t *testing.T) {
 				social distancing
 
 
-				  # truly cool readme check it out                                            
+				  # truly cool readme check it out                                                
 
 
 
@@ -224,7 +297,7 @@ func Test_ViewRun(t *testing.T) {
 				social distancing
 
 
-				  # truly cool readme check it out                                            
+				  # truly cool readme check it out                                                
 
 
 
@@ -239,7 +312,7 @@ func Test_ViewRun(t *testing.T) {
 				social distancing
 
 
-				  # truly cool readme check it out                                            
+				  # truly cool readme check it out                                                
 
 
 
@@ -577,7 +650,7 @@ func Test_ViewRun_HandlesSpecialCharacters(t *testing.T) {
 				Some basic special characters " & / < > '
 
 
-				  # < is always > than & ' and "                                              
+				  # < is always > than & ' and "                                                  
 
 
 

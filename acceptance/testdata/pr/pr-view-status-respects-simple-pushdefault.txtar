@@ -1,0 +1,35 @@
+# Setup environment variables used for testscript
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# Clone the repo
+exec gh repo clone ${ORG}/${REPO}
+cd ${REPO}
+
+# Configure default push behavior so local and remote branches have to be the same
+exec git config push.default simple
+
+# Prepare a branch where changes are pulled from the default branch instead of remote branch of same name
+exec git checkout -b feature-branch origin/main
+
+# Create the PR
+exec git commit --allow-empty -m 'Empty Commit'
+exec git push origin feature-branch
+exec gh pr create -H feature-branch --title 'Feature Title' --body 'Feature Body'
+
+# View the PR
+exec gh pr view
+stdout 'Feature Title'
+
+# Check the PR status
+env PR_STATUS_BRANCH=#1  Feature Title [feature-branch]
+exec gh pr status
+stdout $PR_STATUS_BRANCH

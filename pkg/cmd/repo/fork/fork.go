@@ -221,6 +221,8 @@ func forkRun(opts *ForkOptions) error {
 	} else {
 		if connectedToTerminal {
 			fmt.Fprintf(stderr, "%s Created fork %s\n", cs.SuccessIconWithColor(cs.Green), cs.Bold(ghrepo.FullName(forkedRepo)))
+		} else {
+			fmt.Fprintln(opts.IO.Out, ghrepo.GenerateRepoURL(forkedRepo, ""))
 		}
 	}
 
@@ -305,6 +307,10 @@ func forkRun(opts *ForkOptions) error {
 					_, err = renameCmd.Output()
 					if err != nil {
 						return err
+					}
+
+					if connectedToTerminal {
+						fmt.Fprintf(stderr, "%s Renamed remote %s to %s\n", cs.SuccessIcon(), cs.Bold(remoteName), cs.Bold(renameTarget))
 					}
 				} else {
 					return fmt.Errorf("a git remote named '%s' already exists", remoteName)

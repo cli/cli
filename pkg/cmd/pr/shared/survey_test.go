@@ -158,3 +158,44 @@ type testEditor struct {
 func (e testEditor) Edit(filename, text string) (string, error) {
 	return e.edit(text)
 }
+
+func TestTitleSurvey(t *testing.T) {
+	tests := []struct {
+		name               string
+		prompterMockInputs []string
+		expectedTitle      string
+		expectStderr       bool
+	}{
+		{
+			name:               "title provided",
+			prompterMockInputs: []string{"title"},
+			expectedTitle:      "title",
+		},
+		{
+			name:               "first input empty",
+			prompterMockInputs: []string{"", "title"},
+			expectedTitle:      "title",
+			expectStderr:       true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, stderr := iostreams.Test()
+			pm := prompter.NewMockPrompter(t)
+			for _, input := range tt.prompterMockInputs {
+				pm.RegisterInput("Title (required)", func(string, string) (string, error) {
+					return input, nil
+				})
+			}
+
+			state := &IssueMetadataState{}
+			err := TitleSurvey(pm, io, state)
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedTitle, state.Title)
+			if tt.expectStderr {
+				assert.Equal(t, "X Title cannot be blank\n", stderr.String())
+			}
+		})
+	}
+}

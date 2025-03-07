@@ -3,11 +3,13 @@ package edit
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
@@ -141,23 +143,31 @@ func Test_editRun(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name          string
-		opts          *EditOptions
-		gist          *shared.Gist
-		httpStubs     func(*httpmock.Registry)
-		prompterStubs func(*prompter.MockPrompter)
-		nontty        bool
-		stdin         string
-		wantErr       string
-		wantParams    map[string]interface{}
+		name                      string
+		opts                      *EditOptions
+		mockGist                  *shared.Gist
+		mockGistList              bool
+		httpStubs                 func(*httpmock.Registry)
+		prompterStubs             func(*prompter.MockPrompter)
+		isTTY                     bool
+		stdin                     string
+		wantErr                   string
+		wantLastRequestParameters map[string]interface{}
 	}{
 		{
 			name:    "no such gist",
 			wantErr: "gist not found: 1234",
+			opts: &EditOptions{
+				Selector: "1234",
+			},
 		},
 		{
-			name: "one file",
-			gist: &shared.Gist{
+			name:  "one file",
+			isTTY: false,
+			opts: &EditOptions{
+				Selector: "1234",
+			},
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"cicada.txt": {
@@ -172,7 +182,7 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantParams: map[string]interface{}{
+			wantLastRequestParameters: map[string]interface{}{
 				"description": "",
 				"files": map[string]interface{}{
 					"cicada.txt": map[string]interface{}{
@@ -183,7 +193,9 @@ func Test_editRun(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple files, submit",
+			name:         "multiple files, submit, with TTY",
+			isTTY:        true,
+			mockGistList: true,
 			prompterStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Edit which file?",
 					[]string{"cicada.txt", "unix.md"},
@@ -196,7 +208,7 @@ func Test_editRun(t *testing.T) {
 						return prompter.IndexFor(opts, "Submit")
 					})
 			},
-			gist: &shared.Gist{
+			mockGist: &shared.Gist{
 				ID:          "1234",
 				Description: "catbug",
 				Files: map[string]*shared.GistFile{
@@ -215,7 +227,7 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantParams: map[string]interface{}{
+			wantLastRequestParameters: map[string]interface{}{
 				"description": "catbug",
 				"files": map[string]interface{}{
 					"cicada.txt": map[string]interface{}{
@@ -230,7 +242,11 @@ func Test_editRun(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple files, cancel",
+			name:  "multiple files, cancel, with TTY",
+			isTTY: true,
+			opts: &EditOptions{
+				Selector: "1234",
+			},
 			prompterStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Edit which file?",
 					[]string{"cicada.txt", "unix.md"},
@@ -244,7 +260,7 @@ func Test_editRun(t *testing.T) {
 					})
 			},
 			wantErr: "CancelError",
-			gist: &shared.Gist{
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"cicada.txt": {
@@ -263,7 +279,10 @@ func Test_editRun(t *testing.T) {
 		},
 		{
 			name: "not change",
-			gist: &shared.Gist{
+			opts: &EditOptions{
+				Selector: "1234",
+			},
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"cicada.txt": {
@@ -277,7 +296,10 @@ func Test_editRun(t *testing.T) {
 		},
 		{
 			name: "another user's gist",
-			gist: &shared.Gist{
+			opts: &EditOptions{
+				Selector: "1234",
+			},
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"cicada.txt": {
@@ -292,7 +314,11 @@ func Test_editRun(t *testing.T) {
 		},
 		{
 			name: "add file to existing gist",
-			gist: &shared.Gist{
+			opts: &EditOptions{
+				AddFilename: fileToAdd,
+				Selector:    "1234",
+			},
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"sample.txt": {
@@ -307,16 +333,14 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			opts: &EditOptions{
-				AddFilename: fileToAdd,
-			},
 		},
 		{
 			name: "change description",
 			opts: &EditOptions{
 				Description: "my new description",
+				Selector:    "1234",
 			},
-			gist: &shared.Gist{
+			mockGist: &shared.Gist{
 				ID:          "1234",
 				Description: "my old description",
 				Files: map[string]*shared.GistFile{
@@ -331,7 +355,7 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			wantParams: map[string]interface{}{
+			wantLastRequestParameters: map[string]interface{}{
 				"description": "my new description",
 				"files": map[string]interface{}{
 					"sample.txt": map[string]interface{}{
@@ -343,7 +367,12 @@ func Test_editRun(t *testing.T) {
 		},
 		{
 			name: "add file to existing gist from source parameter",
-			gist: &shared.Gist{
+			opts: &EditOptions{
+				AddFilename: "from_source.txt",
+				SourceFile:  fileToAdd,
+				Selector:    "1234",
+			},
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"sample.txt": {
@@ -358,11 +387,7 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			opts: &EditOptions{
-				AddFilename: "from_source.txt",
-				SourceFile:  fileToAdd,
-			},
-			wantParams: map[string]interface{}{
+			wantLastRequestParameters: map[string]interface{}{
 				"description": "",
 				"files": map[string]interface{}{
 					"from_source.txt": map[string]interface{}{
@@ -374,7 +399,12 @@ func Test_editRun(t *testing.T) {
 		},
 		{
 			name: "add file to existing gist from stdin",
-			gist: &shared.Gist{
+			opts: &EditOptions{
+				AddFilename: "from_source.txt",
+				SourceFile:  "-",
+				Selector:    "1234",
+			},
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"sample.txt": {
@@ -389,12 +419,8 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			opts: &EditOptions{
-				AddFilename: "from_source.txt",
-				SourceFile:  "-",
-			},
 			stdin: "data from stdin",
-			wantParams: map[string]interface{}{
+			wantLastRequestParameters: map[string]interface{}{
 				"description": "",
 				"files": map[string]interface{}{
 					"from_source.txt": map[string]interface{}{
@@ -406,7 +432,11 @@ func Test_editRun(t *testing.T) {
 		},
 		{
 			name: "remove file, file does not exist",
-			gist: &shared.Gist{
+			opts: &EditOptions{
+				RemoveFilename: "sample2.txt",
+				Selector:       "1234",
+			},
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"sample.txt": {
@@ -417,14 +447,15 @@ func Test_editRun(t *testing.T) {
 				},
 				Owner: &shared.GistOwner{Login: "octocat"},
 			},
-			opts: &EditOptions{
-				RemoveFilename: "sample2.txt",
-			},
 			wantErr: "gist has no file \"sample2.txt\"",
 		},
 		{
 			name: "remove file from existing gist",
-			gist: &shared.Gist{
+			opts: &EditOptions{
+				RemoveFilename: "sample2.txt",
+				Selector:       "1234",
+			},
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"sample.txt": {
@@ -444,10 +475,7 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			opts: &EditOptions{
-				RemoveFilename: "sample2.txt",
-			},
-			wantParams: map[string]interface{}{
+			wantLastRequestParameters: map[string]interface{}{
 				"description": "",
 				"files": map[string]interface{}{
 					"sample.txt": map[string]interface{}{
@@ -460,7 +488,11 @@ func Test_editRun(t *testing.T) {
 		},
 		{
 			name: "edit gist using file from source parameter",
-			gist: &shared.Gist{
+			opts: &EditOptions{
+				SourceFile: fileToAdd,
+				Selector:   "1234",
+			},
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"sample.txt": {
@@ -475,10 +507,7 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			opts: &EditOptions{
-				SourceFile: fileToAdd,
-			},
-			wantParams: map[string]interface{}{
+			wantLastRequestParameters: map[string]interface{}{
 				"description": "",
 				"files": map[string]interface{}{
 					"sample.txt": map[string]interface{}{
@@ -490,7 +519,11 @@ func Test_editRun(t *testing.T) {
 		},
 		{
 			name: "edit gist using stdin",
-			gist: &shared.Gist{
+			opts: &EditOptions{
+				SourceFile: "-",
+				Selector:   "1234",
+			},
+			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{
 					"sample.txt": {
@@ -505,11 +538,8 @@ func Test_editRun(t *testing.T) {
 				reg.Register(httpmock.REST("POST", "gists/1234"),
 					httpmock.StatusStringResponse(201, "{}"))
 			},
-			opts: &EditOptions{
-				SourceFile: "-",
-			},
 			stdin: "data from stdin",
-			wantParams: map[string]interface{}{
+			wantLastRequestParameters: map[string]interface{}{
 				"description": "",
 				"files": map[string]interface{}{
 					"sample.txt": map[string]interface{}{
@@ -519,26 +549,72 @@ func Test_editRun(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "no arguments notty",
+			isTTY: false,
+			opts: &EditOptions{
+				Selector: "",
+			},
+			wantErr: "gist ID or URL required when not running interactively",
+		},
 	}
 
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
-		if tt.gist == nil {
+		pm := prompter.NewMockPrompter(t)
+
+		if tt.opts == nil {
+			tt.opts = &EditOptions{}
+		}
+
+		if tt.opts.Selector != "" {
+			// Only register the HTTP stubs for a direct gist lookup if a selector is provided.
+			if tt.mockGist == nil {
+				// If no gist is provided, we expect a 404.
+				reg.Register(httpmock.REST("GET", fmt.Sprintf("gists/%s", tt.opts.Selector)),
+					httpmock.StatusStringResponse(404, "Not Found"))
+			} else {
+				// If a gist is provided, we expect the gist to be fetched.
+				reg.Register(httpmock.REST("GET", fmt.Sprintf("gists/%s", tt.opts.Selector)),
+					httpmock.JSONResponse(tt.mockGist))
+				reg.Register(httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
+			}
+		}
+
+		if tt.mockGistList {
+			sixHours, _ := time.ParseDuration("6h")
+			sixHoursAgo := time.Now().Add(-sixHours)
+			reg.Register(httpmock.GraphQL(`query GistList\b`),
+				httpmock.StringResponse(
+					fmt.Sprintf(`{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"description": "whatever",
+								"files": [{ "name": "cicada.txt" }, { "name": "unix.md"	}],
+								"isPublic": true,
+								"name": "1234",
+								"updatedAt": "%s"
+							}
+							],
+							"pageInfo": {
+								"hasNextPage": false,
+								"endCursor": "somevaluedoesnotmatter"
+							} }	} }	}`, sixHoursAgo.Format(time.RFC3339))))
 			reg.Register(httpmock.REST("GET", "gists/1234"),
-				httpmock.StatusStringResponse(404, "Not Found"))
-		} else {
-			reg.Register(httpmock.REST("GET", "gists/1234"),
-				httpmock.JSONResponse(tt.gist))
+				httpmock.JSONResponse(tt.mockGist))
 			reg.Register(httpmock.GraphQL(`query UserCurrent\b`),
 				httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
+
+			gistList := "cicada.txt whatever about 6 hours ago"
+			pm.RegisterSelect("Select a gist",
+				[]string{gistList},
+				func(_, _ string, opts []string) (int, error) {
+					return prompter.IndexFor(opts, gistList)
+				})
 		}
 
 		if tt.httpStubs != nil {
 			tt.httpStubs(reg)
-		}
-
-		if tt.opts == nil {
-			tt.opts = &EditOptions{}
 		}
 
 		tt.opts.Edit = func(_, _, _ string, _ *iostreams.IOStreams) (string, error) {
@@ -550,17 +626,17 @@ func Test_editRun(t *testing.T) {
 		}
 		ios, stdin, stdout, stderr := iostreams.Test()
 		stdin.WriteString(tt.stdin)
-		ios.SetStdoutTTY(!tt.nontty)
-		ios.SetStdinTTY(!tt.nontty)
+		ios.SetStdoutTTY(tt.isTTY)
+		ios.SetStdinTTY(tt.isTTY)
+		ios.SetStderrTTY(tt.isTTY)
+
 		tt.opts.IO = ios
-		tt.opts.Selector = "1234"
 
 		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			pm := prompter.NewMockPrompter(t)
 			if tt.prompterStubs != nil {
 				tt.prompterStubs(pm)
 			}
@@ -574,14 +650,21 @@ func Test_editRun(t *testing.T) {
 			}
 			assert.NoError(t, err)
 
-			if tt.wantParams != nil {
-				bodyBytes, _ := io.ReadAll(reg.Requests[2].Body)
+			if tt.wantLastRequestParameters != nil {
+				// Currently only checking that the last request has
+				// the expected request parameters.
+				//
+				// This might need to be changed, if a test were to be added
+				// that needed to check that a request other than the last
+				// has the desired parameters.
+				lastRequest := reg.Requests[len(reg.Requests)-1]
+				bodyBytes, _ := io.ReadAll(lastRequest.Body)
 				reqBody := make(map[string]interface{})
 				err = json.Unmarshal(bodyBytes, &reqBody)
 				if err != nil {
 					t.Fatalf("error decoding JSON: %v", err)
 				}
-				assert.Equal(t, tt.wantParams, reqBody)
+				assert.Equal(t, tt.wantLastRequestParameters, reqBody)
 			}
 
 			assert.Equal(t, "", stdout.String())

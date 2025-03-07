@@ -2,18 +2,23 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
+	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/shurcooL/githubv4"
+
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 type tag struct {
@@ -26,6 +31,14 @@ type releaseNotes struct {
 }
 
 var notImplementedError = errors.New("not implemented")
+
+type errMissingRequiredWorkflowScope struct {
+	Hostname string
+}
+
+func (e errMissingRequiredWorkflowScope) Error() string {
+	return "workflow scope may be required"
+}
 
 func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
 	gql := api.NewClientFromHTTP(httpClient)
@@ -174,6 +187,24 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	}
 	defer resp.Body.Close()
 
+	// Check if we received a 404 while attempting to create a release without
+	// the workflow scope, and if so, return an error message that explains a possible
+	// solution to the user.
+	//
+	// If the same file (with both the same path and contents) exists
+	// on another branch in the repo, releases with workflow file changes can be
+	// created without the workflow scope. Otherwise, the workflow scope is
+	// required to create the release, but the API does not indicate this criteria
+	// beyond returning a 404.
+	//
+	// https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps#available-scopes
+	if resp.StatusCode == http.StatusNotFound && !tokenHasWorkflowScope(resp) {
+		normalizedHostname := ghauth.NormalizeHostname(resp.Request.URL.Hostname())
+		return nil, &errMissingRequiredWorkflowScope{
+			Hostname: normalizedHostname,
+		}
+	}
+
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if !success {
 		return nil, api.HandleHTTPError(resp)
@@ -253,4 +284,47 @@ func deleteRelease(httpClient *http.Client, release *shared.Release) error {
 		_, _ = io.Copy(io.Discard, resp.Body)
 	}
 	return nil
+}
+
+// tokenHasWorkflowScope checks if the given http.Response's token has the workflow scope.
+// Tokens that do not have OAuth scopes are assumed to have the workflow scope.
+func tokenHasWorkflowScope(resp *http.Response) bool {
+	scopes := resp.Header.Get("X-Oauth-Scopes")
+
+	// Return true when no scopes are present - no scopes in this header
+	// means that the user is probably authenticating with a token type other
+	// than an OAuth token, and we don't know what this token's scopes actually are.
+	if scopes == "" {
+		return true
+	}
+
+	return slices.Contains(strings.Split(scopes, ","), "workflow")
+}
+
+// isNewRelease checks if there are new commits since the latest release.
+func isNewRelease(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
+	ctx := context.Background()
+	release, err := shared.FetchLatestRelease(ctx, httpClient, repo)
+	if err != nil {
+		if errors.Is(err, shared.ErrReleaseNotFound) {
+			return true, nil
+		} else {
+			return false, err
+		}
+	}
+
+	tagName := release.TagName
+	path := fmt.Sprintf("repos/%s/%s/compare/%s...HEAD?per_page=1", repo.RepoOwner(), repo.RepoName(), tagName)
+
+	var comparisonStatus struct {
+		Status string `json:"status"`
+	}
+
+	apiClient := api.NewClientFromHTTP(httpClient)
+	if err := apiClient.REST(repo.RepoHost(), "GET", path, nil, &comparisonStatus); err != nil {
+		return false, err
+	}
+
+	isNew := comparisonStatus.Status == "ahead"
+	return isNew, nil
 }

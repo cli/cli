@@ -25,7 +25,7 @@ func (m MockClient) GetTrustDomain() (string, error) {
 }
 
 func makeTestAttestation() Attestation {
-	return Attestation{Bundle: data.SigstoreBundle(nil)}
+	return Attestation{Bundle: data.SigstoreBundle(nil), BundleURL: "https://example.com"}
 }
 
 func OnGetByRepoAndDigestSuccess(repo, digest string, limit int) ([]*Attestation, error) {

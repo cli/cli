@@ -241,7 +241,14 @@ func (m *mergeContext) warnIfDiverged() {
 // Check if the current state of the pull request allows for merging
 func (m *mergeContext) canMerge() error {
 	if m.mergeQueueRequired {
-		// a pull request can always be added to the merge queue
+		// Requesting branch deletion on a PR with a merge queue
+		// policy is not allowed. Doing so can unexpectedly
+		// delete branches before merging, close the PR, and remove
+		// the PR from the merge queue.
+		if m.opts.DeleteBranch {
+			return fmt.Errorf("%s Cannot use `-d` or `--delete-branch` when merge queue enabled", m.cs.FailureIcon())
+		}
+		// Otherwise, a pull request can always be added to the merge queue
 		return nil
 	}
 
@@ -377,13 +384,14 @@ func (m *mergeContext) deleteLocalBranch() error {
 
 	if m.merged {
 		if m.opts.IO.CanPrompt() && !m.opts.IsDeleteBranchIndicated {
-			confirmed, err := m.opts.Prompter.Confirm(fmt.Sprintf("Pull request %s#%d was already merged. Delete the branch locally?", ghrepo.FullName(m.baseRepo), m.pr.Number), false)
+			message := fmt.Sprintf("Pull request %s#%d was already merged. Delete the branch locally?", ghrepo.FullName(m.baseRepo), m.pr.Number)
+			confirmed, err := m.opts.Prompter.Confirm(message, false)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
 			m.deleteBranch = confirmed
 		} else {
-			_ = m.warnf(fmt.Sprintf("%s Pull request %s#%d was already merged\n", m.cs.WarningIcon(), ghrepo.FullName(m.baseRepo), m.pr.Number))
+			_ = m.warnf("%s Pull request %s#%d was already merged\n", m.cs.WarningIcon(), ghrepo.FullName(m.baseRepo), m.pr.Number)
 		}
 	}
 
@@ -424,7 +432,7 @@ func (m *mergeContext) deleteLocalBranch() error {
 		}
 
 		if err := m.opts.GitClient.Pull(ctx, baseRemote.Name, targetBranch); err != nil {
-			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
+			_ = m.warnf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch)
 		}
 
 		switchedToBranch = targetBranch

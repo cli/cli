@@ -41,23 +41,23 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List GitHub Actions caches",
 		Example: heredoc.Doc(`
-		# List caches for current repository
-		$ gh cache list
+			# List caches for current repository
+			$ gh cache list
 
-		# List caches for specific repository
-		$ gh cache list --repo cli/cli
+			# List caches for specific repository
+			$ gh cache list --repo cli/cli
 
-		# List caches sorted by least recently accessed
-		$ gh cache list --sort last_accessed_at --order asc
+			# List caches sorted by least recently accessed
+			$ gh cache list --sort last_accessed_at --order asc
 
-		# List caches that have keys matching a prefix (or that match exactly)
-		$ gh cache list --key key-prefix
+			# List caches that have keys matching a prefix (or that match exactly)
+			$ gh cache list --key key-prefix
 
-		# To list caches for a specific branch, replace <branch-name> with the actual branch name
-		$ gh cache list --ref refs/heads/<branch-name>
+			# List caches for a specific branch, replace <branch-name> with the actual branch name
+			$ gh cache list --ref refs/heads/<branch-name>
 
-		# To list caches for a specific pull request, replace <pr-number> with the actual pull request number
-		$ gh cache list --ref refs/pull/<pr-number>/merge
+			# List caches for a specific pull request, replace <pr-number> with the actual pull request number
+			$ gh cache list --ref refs/pull/<pr-number>/merge
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -106,7 +106,7 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("%s Failed to get caches: %w", opts.IO.ColorScheme().FailureIcon(), err)
 	}
 
-	if len(result.ActionsCaches) == 0 {
+	if len(result.ActionsCaches) == 0 && opts.Exporter == nil {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("No caches found in %s", ghrepo.FullName(repo)))
 	}
 

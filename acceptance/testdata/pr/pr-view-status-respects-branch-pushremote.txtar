@@ -1,0 +1,45 @@
+# Setup environment variables used for testscript
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+env FORK=${REPO}-fork
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository to act as upstream with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer repo cleanup of upstream
+defer gh repo delete --yes ${ORG}/${REPO}
+exec gh repo view ${ORG}/${REPO} --json id --jq '.id'
+stdout2env REPO_ID
+
+# Create a user fork of repository as opposed to private organization fork
+exec gh repo fork ${ORG}/${REPO} --org ${ORG} --fork-name ${FORK}
+
+# Defer repo cleanup of fork
+defer gh repo delete --yes ${ORG}/${FORK}
+sleep 5
+exec gh repo view ${ORG}/${FORK} --json id --jq '.id'
+stdout2env FORK_ID
+
+# Clone the repo
+exec gh repo clone ${ORG}/${FORK}
+cd ${FORK}
+
+# Prepare a branch where changes are pulled from the upstream default branch but pushed to fork
+exec git checkout -b feature-branch upstream/main
+exec git config branch.feature-branch.pushRemote origin
+exec git commit --allow-empty -m 'Empty Commit'
+exec git push
+
+# Create the PR spanning upstream and fork repositories, gh pr create does not support headRepositoryId needed for private forks
+exec gh api graphql -F repositoryId="${REPO_ID}" -F headRepositoryId="${FORK_ID}" -F query='mutation CreatePullRequest($headRepositoryId: ID!, $repositoryId: ID!) { createPullRequest(input:{ baseRefName: "main", body: "Feature Body", draft: false, headRefName: "feature-branch", headRepositoryId: $headRepositoryId, repositoryId: $repositoryId, title:"Feature Title" }){ pullRequest{ id url } } }'
+
+# View the PR
+exec gh pr view
+stdout 'Feature Title'
+
+# Check the PR status
+env PR_STATUS_BRANCH=#1  Feature Title [${ORG}:feature-branch]
+exec gh pr status
+stdout $PR_STATUS_BRANCH

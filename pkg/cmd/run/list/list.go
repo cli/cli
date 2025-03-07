@@ -119,6 +119,8 @@ func listRun(opts *ListOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
+	defer opts.IO.StopProgressIndicator()
+
 	if opts.WorkflowSelector != "" {
 		// initially the workflow state is limited to 'active'
 		states := []workflowShared.WorkflowState{workflowShared.Active}

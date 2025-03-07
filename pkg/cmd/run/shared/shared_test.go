@@ -110,8 +110,12 @@ func TestRun_Duration(t *testing.T) {
 
 func TestRunExportData(t *testing.T) {
 	oldestStartedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:20:13Z")
+	oldestStepStartedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:20:15Z")
+	oldestStepCompletedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:21:10Z")
 	oldestCompletedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:21:16Z")
 	newestStartedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:20:55Z")
+	newestStepStartedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:21:01Z")
+	newestStepCompletedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:23:10Z")
 	newestCompletedAt, _ := time.Parse(time.RFC3339, "2022-07-20T11:23:16Z")
 
 	tests := []struct {
@@ -132,10 +136,12 @@ func TestRunExportData(t *testing.T) {
 						Name:       "macos",
 						Steps: []Step{
 							{
-								Name:       "Checkout",
-								Status:     "completed",
-								Conclusion: "success",
-								Number:     1,
+								Name:        "Checkout",
+								Status:      "completed",
+								Conclusion:  "success",
+								Number:      1,
+								StartedAt:   oldestStepStartedAt,
+								CompletedAt: oldestStepCompletedAt,
 							},
 						},
 						StartedAt:   oldestStartedAt,
@@ -144,7 +150,7 @@ func TestRunExportData(t *testing.T) {
 					},
 				},
 			},
-			output: `{"jobs":[{"completedAt":"2022-07-20T11:21:16Z","conclusion":"success","databaseId":123456,"name":"macos","startedAt":"2022-07-20T11:20:13Z","status":"completed","steps":[{"conclusion":"success","name":"Checkout","number":1,"status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/123456"}]}`,
+			output: `{"jobs":[{"completedAt":"2022-07-20T11:21:16Z","conclusion":"success","databaseId":123456,"name":"macos","startedAt":"2022-07-20T11:20:13Z","status":"completed","steps":[{"completedAt":"2022-07-20T11:21:10Z","conclusion":"success","name":"Checkout","number":1,"startedAt":"2022-07-20T11:20:15Z","status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/123456"}]}`,
 		},
 		{
 			name:   "exports workflow run's multiple jobs",
@@ -158,10 +164,12 @@ func TestRunExportData(t *testing.T) {
 						Name:       "macos",
 						Steps: []Step{
 							{
-								Name:       "Checkout",
-								Status:     "completed",
-								Conclusion: "success",
-								Number:     1,
+								Name:        "Checkout",
+								Status:      "completed",
+								Conclusion:  "success",
+								Number:      1,
+								StartedAt:   oldestStepStartedAt,
+								CompletedAt: oldestStepCompletedAt,
 							},
 						},
 						StartedAt:   oldestStartedAt,
@@ -175,10 +183,12 @@ func TestRunExportData(t *testing.T) {
 						Name:       "windows",
 						Steps: []Step{
 							{
-								Name:       "Checkout",
-								Status:     "completed",
-								Conclusion: "error",
-								Number:     2,
+								Name:        "Checkout",
+								Status:      "completed",
+								Conclusion:  "error",
+								Number:      2,
+								StartedAt:   newestStepStartedAt,
+								CompletedAt: newestStepCompletedAt,
 							},
 						},
 						StartedAt:   newestStartedAt,
@@ -187,7 +197,7 @@ func TestRunExportData(t *testing.T) {
 					},
 				},
 			},
-			output: `{"jobs":[{"completedAt":"2022-07-20T11:21:16Z","conclusion":"success","databaseId":123456,"name":"macos","startedAt":"2022-07-20T11:20:13Z","status":"completed","steps":[{"conclusion":"success","name":"Checkout","number":1,"status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/123456"},{"completedAt":"2022-07-20T11:23:16Z","conclusion":"error","databaseId":234567,"name":"windows","startedAt":"2022-07-20T11:20:55Z","status":"completed","steps":[{"conclusion":"error","name":"Checkout","number":2,"status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/234567"}]}`,
+			output: `{"jobs":[{"completedAt":"2022-07-20T11:21:16Z","conclusion":"success","databaseId":123456,"name":"macos","startedAt":"2022-07-20T11:20:13Z","status":"completed","steps":[{"completedAt":"2022-07-20T11:21:10Z","conclusion":"success","name":"Checkout","number":1,"startedAt":"2022-07-20T11:20:15Z","status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/123456"},{"completedAt":"2022-07-20T11:23:16Z","conclusion":"error","databaseId":234567,"name":"windows","startedAt":"2022-07-20T11:20:55Z","status":"completed","steps":[{"completedAt":"2022-07-20T11:23:10Z","conclusion":"error","name":"Checkout","number":2,"startedAt":"2022-07-20T11:21:01Z","status":"completed"}],"url":"https://example.com/OWNER/REPO/actions/runs/234567"}]}`,
 		},
 		{
 			name:   "exports workflow run with attempt count",

@@ -34,6 +34,63 @@ func TestNewCmdEdit(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "deny public visibility change without accepting consequences",
+			args: "--visibility public",
+			wantOpts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits:      EditRepositoryInput{},
+			},
+			wantErr: "use of --visibility flag requires --accept-visibility-change-consequences flag",
+		},
+		{
+			name: "allow public visibility change with accepting consequences",
+			args: "--visibility public --accept-visibility-change-consequences",
+			wantOpts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					Visibility: sp("public"),
+				},
+			},
+		},
+		{
+			name: "deny private visibility change without accepting consequences",
+			args: "--visibility private",
+			wantOpts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits:      EditRepositoryInput{},
+			},
+			wantErr: "use of --visibility flag requires --accept-visibility-change-consequences flag",
+		},
+		{
+			name: "allow private visibility change with accepting consequences",
+			args: "--visibility private --accept-visibility-change-consequences",
+			wantOpts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					Visibility: sp("private"),
+				},
+			},
+		},
+		{
+			name: "deny internal visibility change without accepting consequences",
+			args: "--visibility internal",
+			wantOpts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits:      EditRepositoryInput{},
+			},
+			wantErr: "use of --visibility flag requires --accept-visibility-change-consequences flag",
+		},
+		{
+			name: "allow internal visibility change with accepting consequences",
+			args: "--visibility internal --accept-visibility-change-consequences",
+			wantOpts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					Visibility: sp("internal"),
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -144,6 +201,65 @@ func Test_editRun(t *testing.T) {
 					}))
 			},
 		},
+		{
+			name: "enable/disable security and analysis settings",
+			opts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					SecurityAndAnalysis: &SecurityAndAnalysisInput{
+						EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
+							Status: sp("enabled"),
+						},
+						EnableSecretScanning: &SecurityAndAnalysisStatus{
+							Status: sp("enabled"),
+						},
+						EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
+							Status: sp("disabled"),
+						},
+					},
+				},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data": { "repository": { "viewerCanAdminister": true } } }`))
+
+				r.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, 1, len(payload))
+						securityAndAnalysis := payload["security_and_analysis"].(map[string]interface{})
+						assert.Equal(t, "enabled", securityAndAnalysis["advanced_security"].(map[string]interface{})["status"])
+						assert.Equal(t, "enabled", securityAndAnalysis["secret_scanning"].(map[string]interface{})["status"])
+						assert.Equal(t, "disabled", securityAndAnalysis["secret_scanning_push_protection"].(map[string]interface{})["status"])
+					}))
+			},
+		},
+		{
+			name: "does not have sufficient permissions for security edits",
+			opts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					SecurityAndAnalysis: &SecurityAndAnalysisInput{
+						EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
+							Status: sp("enabled"),
+						},
+						EnableSecretScanning: &SecurityAndAnalysisStatus{
+							Status: sp("enabled"),
+						},
+						EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
+							Status: sp("disabled"),
+						},
+					},
+				},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data": { "repository": { "viewerCanAdminister": false } } }`))
+			},
+			wantsErr: "you do not have sufficient permissions to edit repository security and analysis features",
+		},
 	}
 
 	for _, tt := range tests {
@@ -242,6 +358,109 @@ func Test_editRun_interactive(t *testing.T) {
 			},
 		},
 		{
+			name: "skipping visibility without confirmation",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{8}, nil
+					})
+				pm.RegisterSelect("Visibility", []string{"public", "private", "internal"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "private")
+					})
+				pm.RegisterConfirm("Do you want to change visibility to private?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"visibility": "public",
+								"description": "description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"stargazerCount": 10,
+								"isInOrganization": false,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Exclude(t, httpmock.REST("PATCH", "repos/OWNER/REPO"))
+			},
+			wantsStderr: "Changing the repository visibility to private will cause permanent loss of 10 stars and 0 watchers.",
+		},
+		{
+			name: "changing visibility with confirmation",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{8}, nil
+					})
+				pm.RegisterSelect("Visibility", []string{"public", "private", "internal"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "private")
+					})
+				pm.RegisterConfirm("Do you want to change visibility to private?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"visibility": "public",
+								"description": "description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"stargazerCount": 10,
+								"watchers": {
+									"totalCount": 15
+								},
+								"isInOrganization": false,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "private", payload["visibility"])
+					}))
+			},
+			wantsStderr: "Changing the repository visibility to private will cause permanent loss of 10 stars and 15 watchers",
+		},
+		{
 			name: "the rest",
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
@@ -250,7 +469,7 @@ func Test_editRun_interactive(t *testing.T) {
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
 					func(_ string, _, opts []string) ([]int, error) {
-						return []int{0, 2, 3, 5, 6, 8, 9}, nil
+						return []int{0, 2, 3, 5, 6, 9}, nil
 					})
 				pm.RegisterInput("Default branch name", func(_, _ string) (string, error) {
 					return "trunk", nil
@@ -265,13 +484,6 @@ func Test_editRun_interactive(t *testing.T) {
 					return true, nil
 				})
 				pm.RegisterConfirm("Convert into a template repository?", func(_ string, _ bool) (bool, error) {
-					return true, nil
-				})
-				pm.RegisterSelect("Visibility", []string{"public", "private", "internal"},
-					func(_, _ string, opts []string) (int, error) {
-						return prompter.IndexFor(opts, "private")
-					})
-				pm.RegisterConfirm("Do you want to change visibility to private?", func(_ string, _ bool) (bool, error) {
 					return true, nil
 				})
 				pm.RegisterConfirm("Enable Wikis?", func(_ string, _ bool) (bool, error) {
@@ -310,7 +522,6 @@ func Test_editRun_interactive(t *testing.T) {
 						assert.Equal(t, "https://zombo.com", payload["homepage"])
 						assert.Equal(t, true, payload["has_issues"])
 						assert.Equal(t, true, payload["has_projects"])
-						assert.Equal(t, "private", payload["visibility"])
 						assert.Equal(t, true, payload["is_template"])
 						assert.Equal(t, true, payload["has_wiki"])
 					}))
@@ -484,7 +695,7 @@ func Test_editRun_interactive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, _, _ := iostreams.Test()
+			ios, _, _, stderr := iostreams.Test()
 			ios.SetStdoutTTY(true)
 			ios.SetStdinTTY(true)
 			ios.SetStderrTTY(true)
@@ -509,9 +720,100 @@ func Test_editRun_interactive(t *testing.T) {
 			if tt.wantsErr == "" {
 				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tt.wantsErr)
+				require.EqualError(t, err, tt.wantsErr)
 				return
 			}
+
+			assert.Contains(t, stderr.String(), tt.wantsStderr)
+		})
+	}
+}
+
+func Test_transformSecurityAndAnalysisOpts(t *testing.T) {
+	tests := []struct {
+		name string
+		opts EditOptions
+		want *SecurityAndAnalysisInput
+	}{
+		{
+			name: "Enable all security and analysis settings",
+			opts: EditOptions{
+				Edits: EditRepositoryInput{
+					enableAdvancedSecurity:             bp(true),
+					enableSecretScanning:               bp(true),
+					enableSecretScanningPushProtection: bp(true),
+				},
+			},
+			want: &SecurityAndAnalysisInput{
+				EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
+					Status: sp("enabled"),
+				},
+				EnableSecretScanning: &SecurityAndAnalysisStatus{
+					Status: sp("enabled"),
+				},
+				EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
+					Status: sp("enabled"),
+				},
+			},
+		},
+		{
+			name: "Disable all security and analysis settings",
+			opts: EditOptions{
+				Edits: EditRepositoryInput{
+					enableAdvancedSecurity:             bp(false),
+					enableSecretScanning:               bp(false),
+					enableSecretScanningPushProtection: bp(false),
+				},
+			},
+			want: &SecurityAndAnalysisInput{
+				EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
+					Status: sp("disabled"),
+				},
+				EnableSecretScanning: &SecurityAndAnalysisStatus{
+					Status: sp("disabled"),
+				},
+				EnableSecretScanningPushProtection: &SecurityAndAnalysisStatus{
+					Status: sp("disabled"),
+				},
+			},
+		},
+		{
+			name: "Enable only advanced security",
+			opts: EditOptions{
+				Edits: EditRepositoryInput{
+					enableAdvancedSecurity: bp(true),
+				},
+			},
+			want: &SecurityAndAnalysisInput{
+				EnableAdvancedSecurity: &SecurityAndAnalysisStatus{
+					Status: sp("enabled"),
+				},
+				EnableSecretScanning:               nil,
+				EnableSecretScanningPushProtection: nil,
+			},
+		},
+		{
+			name: "Disable only secret scanning",
+			opts: EditOptions{
+				Edits: EditRepositoryInput{
+					enableSecretScanning: bp(false),
+				},
+			},
+			want: &SecurityAndAnalysisInput{
+				EnableAdvancedSecurity: nil,
+				EnableSecretScanning: &SecurityAndAnalysisStatus{
+					Status: sp("disabled"),
+				},
+				EnableSecretScanningPushProtection: nil,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := &tt.opts
+			transformed := transformSecurityAndAnalysisOpts(opts)
+			assert.Equal(t, tt.want, transformed)
 		})
 	}
 }

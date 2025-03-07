@@ -8,143 +8,90 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func createSampleResult() *AttestationProcessingResult {
+	return &AttestationProcessingResult{
+		VerificationResult: &verify.VerificationResult{
+			Signature: &verify.SignatureVerificationResult{
+				Certificate: &certificate.Summary{
+					Extensions: certificate.Extensions{
+						SourceRepositoryOwnerURI: "https://github.com/owner",
+						SourceRepositoryURI:      "https://github.com/owner/repo",
+						Issuer:                   "https://token.actions.githubusercontent.com",
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestVerifyCertExtensions(t *testing.T) {
-	results := []*AttestationProcessingResult{
-		{
-			VerificationResult: &verify.VerificationResult{
-				Signature: &verify.SignatureVerificationResult{
-					Certificate: &certificate.Summary{
-						Extensions: certificate.Extensions{
-							SourceRepositoryOwnerURI: "https://github.com/owner",
-							SourceRepositoryURI:      "https://github.com/owner/repo",
-							Issuer:                   "https://token.actions.githubusercontent.com",
-						},
-					},
-				},
-			},
-		},
+	results := []*AttestationProcessingResult{createSampleResult()}
+
+	certSummary := certificate.Summary{}
+	certSummary.SourceRepositoryOwnerURI = "https://github.com/owner"
+	certSummary.SourceRepositoryURI = "https://github.com/owner/repo"
+	certSummary.Issuer = GitHubOIDCIssuer
+
+	c := EnforcementCriteria{
+		Certificate: certSummary,
 	}
 
-	t.Run("VerifyCertExtensions with owner and repo", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "owner", "owner/repo", GitHubOIDCIssuer)
+	t.Run("passes with one result", func(t *testing.T) {
+		verified, err := VerifyCertExtensions(results, c)
 		require.NoError(t, err)
+		require.Len(t, verified, 1)
 	})
 
-	t.Run("VerifyCertExtensions with owner and repo, but wrong tenant", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "foo", "owner", "owner/repo", GitHubOIDCIssuer)
-		require.ErrorContains(t, err, "expected SourceRepositoryOwnerURI to be https://foo.ghe.com/owner, got https://github.com/owner")
-	})
+	t.Run("passes with 1/2 valid results", func(t *testing.T) {
+		twoResults := []*AttestationProcessingResult{createSampleResult(), createSampleResult()}
+		require.Len(t, twoResults, 2)
+		twoResults[1].VerificationResult.Signature.Certificate.Extensions.SourceRepositoryOwnerURI = "https://github.com/wrong"
 
-	t.Run("VerifyCertExtensions with owner", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "owner", "", GitHubOIDCIssuer)
+		verified, err := VerifyCertExtensions(twoResults, c)
 		require.NoError(t, err)
+		require.Len(t, verified, 1)
 	})
 
-	t.Run("VerifyCertExtensions with wrong owner", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "wrong", "", GitHubOIDCIssuer)
+	t.Run("fails when all results fail verification", func(t *testing.T) {
+		twoResults := []*AttestationProcessingResult{createSampleResult(), createSampleResult()}
+		require.Len(t, twoResults, 2)
+		twoResults[0].VerificationResult.Signature.Certificate.Extensions.SourceRepositoryOwnerURI = "https://github.com/wrong"
+		twoResults[1].VerificationResult.Signature.Certificate.Extensions.SourceRepositoryOwnerURI = "https://github.com/wrong"
+
+		verified, err := VerifyCertExtensions(twoResults, c)
+		require.Error(t, err)
+		require.Nil(t, verified)
+	})
+
+	t.Run("with wrong SourceRepositoryOwnerURI", func(t *testing.T) {
+		expectedCriteria := c
+		expectedCriteria.Certificate.SourceRepositoryOwnerURI = "https://github.com/wrong"
+		verified, err := VerifyCertExtensions(results, expectedCriteria)
 		require.ErrorContains(t, err, "expected SourceRepositoryOwnerURI to be https://github.com/wrong, got https://github.com/owner")
+		require.Nil(t, verified)
 	})
 
-	t.Run("VerifyCertExtensions with wrong repo", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "owner", "wrong", GitHubOIDCIssuer)
-		require.ErrorContains(t, err, "expected SourceRepositoryURI to be https://github.com/wrong, got https://github.com/owner/repo")
+	t.Run("with wrong SourceRepositoryURI", func(t *testing.T) {
+		expectedCriteria := c
+		expectedCriteria.Certificate.SourceRepositoryURI = "https://github.com/foo/wrong"
+		verified, err := VerifyCertExtensions(results, expectedCriteria)
+		require.ErrorContains(t, err, "expected SourceRepositoryURI to be https://github.com/foo/wrong, got https://github.com/owner/repo")
+		require.Nil(t, verified)
 	})
 
-	t.Run("VerifyCertExtensions with wrong issuer", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "owner", "", "wrong")
+	t.Run("with wrong OIDCIssuer", func(t *testing.T) {
+		expectedCriteria := c
+		expectedCriteria.Certificate.Issuer = "wrong"
+		verified, err := VerifyCertExtensions(results, expectedCriteria)
 		require.ErrorContains(t, err, "expected Issuer to be wrong, got https://token.actions.githubusercontent.com")
-	})
-}
-
-func TestVerifyCertExtensionsCustomizedIssuer(t *testing.T) {
-	results := []*AttestationProcessingResult{
-		{
-			VerificationResult: &verify.VerificationResult{
-				Signature: &verify.SignatureVerificationResult{
-					Certificate: &certificate.Summary{
-						Extensions: certificate.Extensions{
-							SourceRepositoryOwnerURI: "https://github.com/owner",
-							SourceRepositoryURI:      "https://github.com/owner/repo",
-							Issuer:                   "https://token.actions.githubusercontent.com/foo-bar",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	t.Run("VerifyCertExtensions with exact issuer match", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "owner", "owner/repo", "https://token.actions.githubusercontent.com/foo-bar")
-		require.NoError(t, err)
+		require.Nil(t, verified)
 	})
 
-	t.Run("VerifyCertExtensions with partial issuer match", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "owner", "owner/repo", "https://token.actions.githubusercontent.com")
+	t.Run("with partial OIDCIssuer match", func(t *testing.T) {
+		expectedResults := results
+		expectedResults[0].VerificationResult.Signature.Certificate.Extensions.Issuer = "https://token.actions.githubusercontent.com/foo-bar"
+		verified, err := VerifyCertExtensions(expectedResults, c)
 		require.ErrorContains(t, err, "expected Issuer to be https://token.actions.githubusercontent.com, got https://token.actions.githubusercontent.com/foo-bar -- if you have a custom OIDC issuer")
-	})
-
-	t.Run("VerifyCertExtensions with wrong issuer", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "owner", "", "wrong")
-		require.ErrorContains(t, err, "expected Issuer to be wrong, got https://token.actions.githubusercontent.com/foo-bar")
-	})
-}
-
-func TestVerifyTenancyCertExtensions(t *testing.T) {
-	defaultIssuer := GitHubOIDCIssuer
-
-	results := []*AttestationProcessingResult{
-		{
-			VerificationResult: &verify.VerificationResult{
-				Signature: &verify.SignatureVerificationResult{
-					Certificate: &certificate.Summary{
-						Extensions: certificate.Extensions{
-							SourceRepositoryOwnerURI: "https://foo.ghe.com/owner",
-							SourceRepositoryURI:      "https://foo.ghe.com/owner/repo",
-							Issuer:                   "https://token.actions.foo.ghe.com",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	t.Run("VerifyCertExtensions with owner and repo", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "foo", "owner", "owner/repo", defaultIssuer)
-		require.NoError(t, err)
-	})
-
-	t.Run("VerifyCertExtensions with owner and repo, no tenant", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "", "owner", "owner/repo", defaultIssuer)
-		require.ErrorContains(t, err, "expected SourceRepositoryOwnerURI to be https://github.com/owner, got https://foo.ghe.com/owner")
-	})
-
-	t.Run("VerifyCertExtensions with owner and repo, wrong tenant", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "bar", "owner", "owner/repo", defaultIssuer)
-		require.ErrorContains(t, err, "expected SourceRepositoryOwnerURI to be https://bar.ghe.com/owner, got https://foo.ghe.com/owner")
-	})
-
-	t.Run("VerifyCertExtensions with owner", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "foo", "owner", "", defaultIssuer)
-		require.NoError(t, err)
-	})
-
-	t.Run("VerifyCertExtensions with wrong owner", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "foo", "wrong", "", defaultIssuer)
-		require.ErrorContains(t, err, "expected SourceRepositoryOwnerURI to be https://foo.ghe.com/wrong, got https://foo.ghe.com/owner")
-	})
-
-	t.Run("VerifyCertExtensions with wrong repo", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "foo", "owner", "wrong", defaultIssuer)
-		require.ErrorContains(t, err, "expected SourceRepositoryURI to be https://foo.ghe.com/wrong, got https://foo.ghe.com/owner/repo")
-	})
-
-	t.Run("VerifyCertExtensions with correct, non-default issuer", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "foo", "owner", "owner/repo", "https://token.actions.foo.ghe.com")
-		require.NoError(t, err)
-	})
-
-	t.Run("VerifyCertExtensions with wrong issuer", func(t *testing.T) {
-		err := VerifyCertExtensions(results, "foo", "owner", "owner/repo", "wrong")
-		require.ErrorContains(t, err, "expected Issuer to be wrong, got https://token.actions.foo.ghe.com")
+		require.Nil(t, verified)
 	})
 }

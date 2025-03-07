@@ -341,7 +341,7 @@ func TestRerun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
 						return 2, nil
 					})

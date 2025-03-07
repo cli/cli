@@ -23,7 +23,8 @@ type editItemOpts struct {
 	fieldID              string
 	projectID            string
 	text                 string
-	number               float32
+	number               float64
+	numberChanged        bool
 	date                 string
 	singleSelectOptionID string
 	iterationID          string
@@ -63,23 +64,24 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 		Short: "Edit an item in a project",
 		Long: heredoc.Docf(`
 			Edit either a draft issue or a project item. Both usages require the ID of the item to edit.
-			
+
 			For non-draft issues, the ID of the project is also required, and only a single field value can be updated per invocation.
 
 			Remove project item field value using %[1]s--clear%[1]s flag.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# edit an item's text field value
-			gh project item-edit --id <item-ID> --field-id <field-ID> --project-id <project-ID> --text "new text"
+			# Edit an item's text field value
+			$ gh project item-edit --id <item-id> --field-id <field-id> --project-id <project-id> --text "new text"
 
-			# clear an item's field value
-			gh project item-edit --id <item-ID> --field-id <field-ID> --project-id <project-ID> --clear
+			# Clear an item's field value
+			$ gh project item-edit --id <item-id> --field-id <field-id> --project-id <project-id> --clear
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.numberChanged = cmd.Flags().Changed("number")
 			if err := cmdutil.MutuallyExclusive(
 				"only one of `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` may be used",
 				opts.text != "",
-				opts.number != 0,
+				opts.numberChanged,
 				opts.date != "",
 				opts.singleSelectOptionID != "",
 				opts.iterationID != "",
@@ -89,7 +91,7 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 
 			if err := cmdutil.MutuallyExclusive(
 				"cannot use `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` in conjunction with `--clear`",
-				opts.text != "" || opts.number != 0 || opts.date != "" || opts.singleSelectOptionID != "" || opts.iterationID != "",
+				opts.text != "" || opts.numberChanged || opts.date != "" || opts.singleSelectOptionID != "" || opts.iterationID != "",
 				opts.clear,
 			); err != nil {
 				return err
@@ -123,7 +125,7 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 	editItemCmd.Flags().StringVar(&opts.fieldID, "field-id", "", "ID of the field to update")
 	editItemCmd.Flags().StringVar(&opts.projectID, "project-id", "", "ID of the project to which the field belongs to")
 	editItemCmd.Flags().StringVar(&opts.text, "text", "", "Text value for the field")
-	editItemCmd.Flags().Float32Var(&opts.number, "number", 0, "Number value for the field")
+	editItemCmd.Flags().Float64Var(&opts.number, "number", 0, "Number value for the field")
 	editItemCmd.Flags().StringVar(&opts.date, "date", "", "Date value for the field (YYYY-MM-DD)")
 	editItemCmd.Flags().StringVar(&opts.singleSelectOptionID, "single-select-option-id", "", "ID of the single select option value to set on the field")
 	editItemCmd.Flags().StringVar(&opts.iterationID, "iteration-id", "", "ID of the iteration value to set on the field")
@@ -146,7 +148,7 @@ func runEditItem(config editItemConfig) error {
 	}
 
 	// update item values
-	if config.opts.text != "" || config.opts.number != 0 || config.opts.date != "" || config.opts.singleSelectOptionID != "" || config.opts.iterationID != "" {
+	if config.opts.text != "" || config.opts.numberChanged || config.opts.date != "" || config.opts.singleSelectOptionID != "" || config.opts.iterationID != "" {
 		return updateItemValues(config)
 	}
 
@@ -172,7 +174,7 @@ func buildUpdateItem(config editItemConfig, date time.Time) (*UpdateProjectV2Fie
 		value = githubv4.ProjectV2FieldValue{
 			Text: githubv4.NewString(githubv4.String(config.opts.text)),
 		}
-	} else if config.opts.number != 0 {
+	} else if config.opts.numberChanged {
 		value = githubv4.ProjectV2FieldValue{
 			Number: githubv4.NewFloat(githubv4.Float(config.opts.number)),
 		}

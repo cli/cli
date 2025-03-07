@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
+	"strings"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 )
@@ -20,6 +22,12 @@ type LiveStore struct {
 }
 
 func (s *LiveStore) createJSONLinesFilePath(artifact string) string {
+	if runtime.GOOS == "windows" {
+		// Colons are special characters in Windows and cannot be used in file names.
+		// Replace them with dashes to avoid issues.
+		artifact = strings.ReplaceAll(artifact, ":", "-")
+	}
+
 	path := fmt.Sprintf("%s.jsonl", artifact)
 	if s.outputPath != "" {
 		return fmt.Sprintf("%s/%s", s.outputPath, path)

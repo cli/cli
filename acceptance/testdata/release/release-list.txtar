@@ -1,0 +1,16 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Create a release in the repo
+cd $SCRIPT_NAME-$RANDOM_STRING
+exec gh release create v1.2.3 --notes 'awesome release' --latest
+
+# List the releases
+exec gh release list
+stdout 'v1.2.3'

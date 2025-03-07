@@ -4,8 +4,9 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"golang.org/x/sync/errgroup"
+
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 type Detector interface {
@@ -62,7 +63,7 @@ func NewDetector(httpClient *http.Client, host string) Detector {
 }
 
 func (d *detector) IssueFeatures() (IssueFeatures, error) {
-	if !ghinstance.IsEnterprise(d.host) {
+	if !ghauth.IsEnterprise(d.host) {
 		return allIssueFeatures, nil
 	}
 
@@ -163,7 +164,7 @@ func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
 }
 
 func (d *detector) RepositoryFeatures() (RepositoryFeatures, error) {
-	if !ghinstance.IsEnterprise(d.host) {
+	if !ghauth.IsEnterprise(d.host) {
 		return allRepositoryFeatures, nil
 	}
 

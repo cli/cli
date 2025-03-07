@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -21,6 +22,17 @@ import (
 )
 
 var artifactPath = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0.tgz")
+
+func expectedFilePath(tempDir string, digestWithAlg string) string {
+	var filename string
+	if runtime.GOOS == "windows" {
+		filename = fmt.Sprintf("%s.jsonl", strings.ReplaceAll(digestWithAlg, ":", "-"))
+	} else {
+		filename = fmt.Sprintf("%s.jsonl", digestWithAlg)
+	}
+
+	return test.NormalizeRelativePath(fmt.Sprintf("%s/%s", tempDir, filename))
+}
 
 func TestNewDownloadCmd(t *testing.T) {
 	testIO, _, _, _ := iostreams.Test()
@@ -201,9 +213,10 @@ func TestRunDownload(t *testing.T) {
 		artifact, err := artifact.NewDigestedArtifact(baseOpts.OCIClient, baseOpts.ArtifactPath, baseOpts.DigestAlgorithm)
 		require.NoError(t, err)
 
-		require.FileExists(t, fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
+		expectedFilePath := expectedFilePath(tempDir, artifact.DigestWithAlg())
+		require.FileExists(t, expectedFilePath)
 
-		actualLineCount, err := countLines(fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
+		actualLineCount, err := countLines(expectedFilePath)
 		require.NoError(t, err)
 
 		expectedLineCount := 2
@@ -221,9 +234,10 @@ func TestRunDownload(t *testing.T) {
 		artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 		require.NoError(t, err)
 
-		require.FileExists(t, fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
+		expectedFilePath := expectedFilePath(tempDir, artifact.DigestWithAlg())
+		require.FileExists(t, expectedFilePath)
 
-		actualLineCount, err := countLines(fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
+		actualLineCount, err := countLines(expectedFilePath)
 		require.NoError(t, err)
 
 		expectedLineCount := 2
@@ -240,9 +254,10 @@ func TestRunDownload(t *testing.T) {
 		artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 		require.NoError(t, err)
 
-		require.FileExists(t, fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
+		expectedFilePath := expectedFilePath(tempDir, artifact.DigestWithAlg())
+		require.FileExists(t, expectedFilePath)
 
-		actualLineCount, err := countLines(fmt.Sprintf("%s/%s.jsonl", tempDir, artifact.DigestWithAlg()))
+		actualLineCount, err := countLines(expectedFilePath)
 		require.NoError(t, err)
 
 		expectedLineCount := 2
@@ -261,7 +276,7 @@ func TestRunDownload(t *testing.T) {
 		opts := baseOpts
 		opts.APIClient = api.MockClient{
 			OnGetByOwnerAndDigest: func(repo, digest string, limit int) ([]*api.Attestation, error) {
-				return nil, api.ErrNoAttestations{}
+				return nil, api.ErrNoAttestationsFound
 			},
 		}
 

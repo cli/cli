@@ -17,6 +17,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var errNoUserComments = errors.New("no comments found for current user")
+
 type InputType int
 
 const (
@@ -32,19 +34,21 @@ type Commentable interface {
 }
 
 type CommentableOptions struct {
-	IO                    *iostreams.IOStreams
-	HttpClient            func() (*http.Client, error)
-	RetrieveCommentable   func() (Commentable, ghrepo.Interface, error)
-	EditSurvey            func(string) (string, error)
-	InteractiveEditSurvey func(string) (string, error)
-	ConfirmSubmitSurvey   func() (bool, error)
-	OpenInBrowser         func(string) error
-	Interactive           bool
-	InputType             InputType
-	Body                  string
-	EditLast              bool
-	Quiet                 bool
-	Host                  string
+	IO                        *iostreams.IOStreams
+	HttpClient                func() (*http.Client, error)
+	RetrieveCommentable       func() (Commentable, ghrepo.Interface, error)
+	EditSurvey                func(string) (string, error)
+	InteractiveEditSurvey     func(string) (string, error)
+	ConfirmSubmitSurvey       func() (bool, error)
+	ConfirmCreateIfNoneSurvey func() (bool, error)
+	OpenInBrowser             func(string) error
+	Interactive               bool
+	InputType                 InputType
+	Body                      string
+	EditLast                  bool
+	CreateIfNone              bool
+	Quiet                     bool
+	Host                      string
 }
 
 func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
@@ -66,6 +70,10 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 		inputFlags++
 	}
 
+	if opts.CreateIfNone && !opts.EditLast {
+		return cmdutil.FlagErrorf("`--create-if-none` can only be used with `--edit-last`")
+	}
+
 	if inputFlags == 0 {
 		if !opts.IO.CanPrompt() {
 			return cmdutil.FlagErrorf("flags required when not running interactively")
@@ -85,7 +93,24 @@ func CommentableRun(opts *CommentableOptions) error {
 	}
 	opts.Host = repo.RepoHost()
 	if opts.EditLast {
-		return updateComment(commentable, opts)
+		err := updateComment(commentable, opts)
+		if !errors.Is(err, errNoUserComments) {
+			return err
+		}
+
+		if opts.Interactive {
+			if opts.CreateIfNone {
+				fmt.Fprintln(opts.IO.ErrOut, "No comments found. Creating a new comment.")
+			} else {
+				ok, err := opts.ConfirmCreateIfNoneSurvey()
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return errNoUserComments
+				}
+			}
+		}
 	}
 	return createComment(commentable, opts)
 }
@@ -144,7 +169,7 @@ func createComment(commentable Commentable, opts *CommentableOptions) error {
 func updateComment(commentable Commentable, opts *CommentableOptions) error {
 	comments := commentable.CurrentUserComments()
 	if len(comments) == 0 {
-		return fmt.Errorf("no comments found for current user")
+		return errNoUserComments
 	}
 
 	lastComment := &comments[len(comments)-1]
@@ -216,6 +241,12 @@ func CommentableInteractiveEditSurvey(cf func() (gh.Config, error), io *iostream
 		fmt.Fprintf(io.Out, "- %s to draft your comment in %s... ", cs.Bold("Press Enter"), cs.Bold(surveyext.EditorName(editorCommand)))
 		_ = waitForEnter(io.In)
 		return surveyext.Edit(editorCommand, "*.md", initialValue, io.In, io.Out, io.ErrOut)
+	}
+}
+
+func CommentableInteractiveCreateIfNoneSurvey(p Prompt) func() (bool, error) {
+	return func() (bool, error) {
+		return p.Confirm("No comments found. Create one?", true)
 	}
 }
 

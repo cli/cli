@@ -254,7 +254,7 @@ func (e *jsonExporter) exportData(v reflect.Value) interface{} {
 		}
 		return m.Interface()
 	case reflect.Struct:
-		if v.CanAddr() && reflect.PtrTo(v.Type()).Implements(exportableType) {
+		if v.CanAddr() && reflect.PointerTo(v.Type()).Implements(exportableType) {
 			ve := v.Addr().Interface().(exportable)
 			return ve.ExportData(e.fields)
 		} else if v.Type().Implements(exportableType) {

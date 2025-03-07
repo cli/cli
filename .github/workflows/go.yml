@@ -51,7 +51,7 @@ jobs:
       - name: Build executable
         run: make
 
-      - name: Run attestation command integration Tests
+      - name: Run attestation command set integration tests
+        shell: bash
         run: |
-          ./test/integration/attestation-cmd/download-and-verify-package-attestation.sh
-          ./test/integration/attestation-cmd/verify-sigstore-bundle-versions.sh
+          ./test/integration/attestation-cmd/run-all-tests.sh "${{ matrix.os }}"

@@ -1,0 +1,35 @@
+# It's unclear what we want to do with these acceptance tests beyond our GHEC discovery, so skip new ones by default
+skip
+
+# Set up env var
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Initialise a local repository with two branches
+# We expect a bare repo to have all refs pushed with --mirror
+mkdir ${REPO}
+cd ${REPO}
+exec git init
+exec git checkout -b feature-1
+exec git commit --allow-empty -m 'Empty Commit 1'
+
+exec git checkout -b feature-2
+exec git commit --allow-empty -m 'Empty Commit 2'
+
+# Clone a bare repo from that local repo
+cd ..
+exec git clone --bare ${REPO} ${REPO}-bare
+cd ${REPO}-bare
+
+# Create a GitHub repository from that bare repo
+exec gh repo create ${ORG}/${REPO} --private --source . --push --remote bare
+
+# Defer repo cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# Check the remote repo has both branches
+exec gh api /repos/${ORG}/${REPO}/branches
+stdout 'feature-1'
+stdout 'feature-2'

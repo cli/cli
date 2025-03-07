@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
+	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,8 @@ func TestVerifyIntegration(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		Logger: logger,
+		Logger:         logger,
+		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
 	cmdFactory := factory.New("test")
@@ -40,6 +42,7 @@ func TestVerifyIntegration(t *testing.T) {
 		OCIClient:        oci.NewLiveClient(),
 		OIDCIssuer:       verification.GitHubOIDCIssuer,
 		Owner:            "sigstore",
+		PredicateType:    verification.SLSAPredicateV1,
 		SANRegex:         "^https://github.com/sigstore/",
 		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
 	}
@@ -75,13 +78,50 @@ func TestVerifyIntegration(t *testing.T) {
 		require.ErrorContains(t, err, "expected SourceRepositoryOwnerURI to be https://github.com/fakeowner, got https://github.com/sigstore")
 	})
 
-	t.Run("with invalid owner and invalid repo", func(t *testing.T) {
+	t.Run("with no matching OIDC issuer", func(t *testing.T) {
 		opts := publicGoodOpts
-		opts.Repo = "fakeowner/fakerepo"
+		opts.OIDCIssuer = "some-other-issuer"
 
 		err := runVerify(&opts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "expected SourceRepositoryURI to be https://github.com/fakeowner/fakerepo, got https://github.com/sigstore/sigstore-js")
+		require.ErrorContains(t, err, "expected Issuer to be some-other-issuer, got https://token.actions.githubusercontent.com")
+	})
+
+	t.Run("with invalid SAN", func(t *testing.T) {
+		opts := publicGoodOpts
+		opts.SAN = "fake san"
+
+		err := runVerify(&opts)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\"")
+	})
+
+	t.Run("with invalid SAN regex", func(t *testing.T) {
+		opts := publicGoodOpts
+		opts.SANRegex = "^https://github.com/sigstore/not-real/"
+
+		err := runVerify(&opts)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "verifying with issuer \"sigstore.dev\"")
+	})
+
+	t.Run("with bundle from OCI registry", func(t *testing.T) {
+		opts := Options{
+			APIClient:             api.NewLiveClient(hc, host, logger),
+			ArtifactPath:          "oci://ghcr.io/github/artifact-attestations-helm-charts/policy-controller:v0.10.0-github9",
+			UseBundleFromRegistry: true,
+			DigestAlgorithm:       "sha256",
+			Logger:                logger,
+			OCIClient:             oci.NewLiveClient(),
+			OIDCIssuer:            verification.GitHubOIDCIssuer,
+			Owner:                 "github",
+			PredicateType:         verification.SLSAPredicateV1,
+			SANRegex:              "^https://github.com/github/",
+			SigstoreVerifier:      verification.NewLiveSigstoreVerifier(sigstoreConfig),
+		}
+
+		err := runVerify(&opts)
+		require.NoError(t, err)
 	})
 }
 
@@ -92,7 +132,8 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		Logger: logger,
+		Logger:         logger,
+		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
 	cmdFactory := factory.New("test")
@@ -112,6 +153,7 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 		Logger:           logger,
 		OCIClient:        oci.NewLiveClient(),
 		OIDCIssuer:       "https://token.actions.githubusercontent.com/hammer-time",
+		PredicateType:    verification.SLSAPredicateV1,
 		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
 	}
 
@@ -161,7 +203,8 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		Logger: logger,
+		Logger:         logger,
+		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
 	cmdFactory := factory.New("test")
@@ -181,6 +224,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		Logger:           logger,
 		OCIClient:        oci.NewLiveClient(),
 		OIDCIssuer:       verification.GitHubOIDCIssuer,
+		PredicateType:    verification.SLSAPredicateV1,
 		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
 	}
 
@@ -249,7 +293,8 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		Logger: logger,
+		Logger:         logger,
+		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
 	cmdFactory := factory.New("test")
@@ -271,6 +316,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 		OCIClient:        oci.NewLiveClient(),
 		OIDCIssuer:       verification.GitHubOIDCIssuer,
 		Owner:            "malancas",
+		PredicateType:    verification.SLSAPredicateV1,
 		Repo:             "malancas/attest-demo",
 		SigstoreVerifier: verification.NewLiveSigstoreVerifier(sigstoreConfig),
 	}

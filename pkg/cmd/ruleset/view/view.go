@@ -15,7 +15,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +49,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			If no ID is provided, an interactive prompt will be used to choose
 			the ruleset to view.
-			
+
 			Use the %[1]s--parents%[1]s flag to control whether rulesets configured at higher
 			levels that also apply to the provided repository or organization should
 			be returned. The default is %[1]strue%[1]s.
@@ -124,7 +124,7 @@ func viewRun(opts *ViewOptions) error {
 		}
 	}
 
-	hostname, _ := ghAuth.DefaultHost()
+	hostname, _ := ghauth.DefaultHost()
 	cs := opts.IO.ColorScheme()
 
 	if opts.InteractiveMode {

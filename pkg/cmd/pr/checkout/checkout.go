@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	cliContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -25,9 +27,8 @@ type CheckoutOptions struct {
 	Remotes    func() (cliContext.Remotes, error)
 	Branch     func() (string, error)
 
-	Finder shared.PRFinder
+	PRResolver PRResolver
 
-	SelectorArg       string
 	RecurseSubmodules bool
 	Force             bool
 	Detach            bool
@@ -45,14 +46,43 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 	}
 
 	cmd := &cobra.Command{
-		Use:   "checkout {<number> | <url> | <branch>}",
+		Use:   "checkout [<number> | <url> | <branch>]",
 		Short: "Check out a pull request in git",
-		Args:  cmdutil.ExactArgs(1, "argument required"),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Finder = shared.NewFinder(f)
+		Example: heredoc.Doc(`
+			# Interactively select a PR from the 10 most recent to check out
+			$ gh pr checkout
 
+			# Checkout a specific PR
+			$ gh pr checkout 32
+			$ gh pr checkout https://github.com/OWNER/REPO/pull/32
+			$ gh pr checkout feature
+		`),
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				opts.SelectorArg = args[0]
+				opts.PRResolver = &specificPRResolver{
+					prFinder: shared.NewFinder(f),
+					selector: args[0],
+				}
+			} else if opts.IO.CanPrompt() {
+				baseRepo, err := f.BaseRepo()
+				if err != nil {
+					return err
+				}
+
+				httpClient, err := f.HttpClient()
+				if err != nil {
+					return err
+				}
+
+				opts.PRResolver = &promptingPRResolver{
+					io:       opts.IO,
+					prompter: f.Prompter,
+					prLister: shared.NewLister(httpClient),
+					baseRepo: baseRepo,
+				}
+			} else {
+				return cmdutil.FlagErrorf("pull request number, URL, or branch required when not running interactively")
 			}
 
 			if runF != nil {
@@ -71,11 +101,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 }
 
 func checkoutRun(opts *CheckoutOptions) error {
-	findOptions := shared.FindOptions{
-		Selector: opts.SelectorArg,
-		Fields:   []string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository", "maintainerCanModify"},
-	}
-	pr, baseRepo, err := opts.Finder.Find(findOptions)
+	pr, baseRepo, err := opts.PRResolver.Resolve()
 	if err != nil {
 		return err
 	}
@@ -130,7 +156,9 @@ func checkoutRun(opts *CheckoutOptions) error {
 		cmdQueue = append(cmdQueue, []string{"submodule", "update", "--init", "--recursive"})
 	}
 
-	err = executeCmds(opts.GitClient, cmdQueue)
+	// Note that although we will probably be fetching from the head, in practice, PR checkout can only
+	// ever point to one host, and we know baseRepo must be populated.
+	err = executeCmds(opts.GitClient, git.CredentialPatternFromHost(baseRepo.RepoHost()), cmdQueue)
 	if err != nil {
 		return err
 	}
@@ -147,7 +175,7 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 		refSpec += fmt.Sprintf(":refs/remotes/%s", remoteBranch)
 	}
 
-	cmds = append(cmds, []string{"fetch", remote.Name, refSpec})
+	cmds = append(cmds, []string{"fetch", remote.Name, refSpec, "--no-tags"})
 
 	localBranch := pr.HeadRefName
 	if opts.BranchName != "" {
@@ -177,7 +205,7 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 	ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
 
 	if opts.Detach {
-		cmds = append(cmds, []string{"fetch", baseURLOrName, ref})
+		cmds = append(cmds, []string{"fetch", baseURLOrName, ref, "--no-tags"})
 		cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
 		return cmds
 	}
@@ -193,7 +221,7 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 	currentBranch, _ := opts.Branch()
 	if localBranch == currentBranch {
 		// PR head matches currently checked out branch
-		cmds = append(cmds, []string{"fetch", baseURLOrName, ref})
+		cmds = append(cmds, []string{"fetch", baseURLOrName, ref, "--no-tags"})
 		if opts.Force {
 			cmds = append(cmds, []string{"reset", "--hard", "FETCH_HEAD"})
 		} else {
@@ -201,13 +229,12 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 			cmds = append(cmds, []string{"merge", "--ff-only", "FETCH_HEAD"})
 		}
 	} else {
+		// TODO: check if non-fast-forward and suggest to use `--force`
+		fetchCmd := []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--no-tags"}
 		if opts.Force {
-			cmds = append(cmds, []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--force"})
-		} else {
-			// TODO: check if non-fast-forward and suggest to use `--force`
-			cmds = append(cmds, []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch)})
+			fetchCmd = append(fetchCmd, "--force")
 		}
-
+		cmds = append(cmds, fetchCmd)
 		cmds = append(cmds, []string{"checkout", localBranch})
 	}
 
@@ -240,13 +267,16 @@ func localBranchExists(client *git.Client, b string) bool {
 	return err == nil
 }
 
-func executeCmds(client *git.Client, cmdQueue [][]string) error {
+func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cmdQueue [][]string) error {
 	for _, args := range cmdQueue {
 		var err error
 		var cmd *git.Command
-		if args[0] == "fetch" || args[0] == "submodule" {
-			cmd, err = client.AuthenticatedCommand(context.Background(), args...)
-		} else {
+		switch args[0] {
+		case "submodule":
+			cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
+		case "fetch":
+			cmd, err = client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, args...)
+		default:
 			cmd, err = client.Command(context.Background(), args...)
 		}
 		if err != nil {
@@ -257,4 +287,84 @@ func executeCmds(client *git.Client, cmdQueue [][]string) error {
 		}
 	}
 	return nil
+}
+
+type PRResolver interface {
+	Resolve() (*api.PullRequest, ghrepo.Interface, error)
+}
+
+type specificPRResolver struct {
+	prFinder shared.PRFinder
+	selector string
+}
+
+func (r *specificPRResolver) Resolve() (*api.PullRequest, ghrepo.Interface, error) {
+	pr, baseRepo, err := r.prFinder.Find(shared.FindOptions{
+		Selector: r.selector,
+		Fields: []string{
+			"number",
+			"headRefName",
+			"headRepository",
+			"headRepositoryOwner",
+			"isCrossRepository",
+			"maintainerCanModify",
+		},
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return pr, baseRepo, nil
+}
+
+type promptingPRResolver struct {
+	io       *iostreams.IOStreams
+	prompter shared.Prompt
+
+	prLister shared.PRLister
+
+	baseRepo ghrepo.Interface
+}
+
+func (r *promptingPRResolver) Resolve() (*api.PullRequest, ghrepo.Interface, error) {
+	r.io.StartProgressIndicator()
+	listResult, err := r.prLister.List(shared.ListOptions{
+		BaseRepo: r.baseRepo,
+		State:    "open",
+		Fields: []string{
+			"number",
+			"title",
+			"state",
+			"isDraft",
+
+			"headRefName",
+			"headRepository",
+			"headRepositoryOwner",
+			"isCrossRepository",
+			"maintainerCanModify",
+		},
+		LimitResults: 10})
+	r.io.StopProgressIndicator()
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(listResult.PullRequests) == 0 {
+		return nil, nil, shared.ListNoResults(ghrepo.FullName(r.baseRepo), "pull request", false)
+	}
+
+	candidates := []string{}
+	for _, pr := range listResult.PullRequests {
+		candidates = append(candidates, fmt.Sprintf("%d\t%s %s [%s]",
+			pr.Number,
+			shared.PrStateWithDraft(&pr),
+			text.RemoveExcessiveWhitespace(pr.Title),
+			pr.HeadLabel(),
+		))
+	}
+
+	selected, err := r.prompter.Select("Select a pull request", "", candidates)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &listResult.PullRequests[selected], r.baseRepo, nil
 }

@@ -35,6 +35,8 @@ jobs:
 
           ---
 
+          cc: @github/cli
+
           > $BODY
           EOF
 
@@ -62,6 +64,8 @@ jobs:
           **Triggered by:** @$TRIGGERED_BY
 
           ---
+
+          cc: @github/cli
 
           > $BODY
           EOF

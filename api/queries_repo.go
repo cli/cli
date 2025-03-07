@@ -41,9 +41,10 @@ type Repository struct {
 	MirrorURL                string
 	SecurityPolicyURL        string
 
-	CreatedAt time.Time
-	PushedAt  *time.Time
-	UpdatedAt time.Time
+	CreatedAt  time.Time
+	PushedAt   *time.Time
+	UpdatedAt  time.Time
+	ArchivedAt *time.Time
 
 	IsBlankIssuesEnabled    bool
 	IsSecurityPolicyEnabled bool
@@ -207,8 +208,24 @@ type IssueLabel struct {
 }
 
 type License struct {
-	Key  string `json:"key"`
-	Name string `json:"name"`
+	Key            string   `json:"key"`
+	Name           string   `json:"name"`
+	SPDXID         string   `json:"spdx_id"`
+	URL            string   `json:"url"`
+	NodeID         string   `json:"node_id"`
+	HTMLURL        string   `json:"html_url"`
+	Description    string   `json:"description"`
+	Implementation string   `json:"implementation"`
+	Permissions    []string `json:"permissions"`
+	Conditions     []string `json:"conditions"`
+	Limitations    []string `json:"limitations"`
+	Body           string   `json:"body"`
+	Featured       bool     `json:"featured"`
+}
+
+type GitIgnore struct {
+	Name   string `json:"name"`
+	Source string `json:"source"`
 }
 
 // RepoOwner is the login name of the owner
@@ -1390,4 +1407,54 @@ func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
 	default:
 		return false, ghAPI.HandleHTTPError(resp)
 	}
+}
+
+// RepoLicenses fetches available repository licenses.
+// It uses API v3 because licenses are not supported by GraphQL.
+func RepoLicenses(httpClient *http.Client, hostname string) ([]License, error) {
+	var licenses []License
+	client := NewClientFromHTTP(httpClient)
+	err := client.REST(hostname, "GET", "licenses", nil, &licenses)
+	if err != nil {
+		return nil, err
+	}
+	return licenses, nil
+}
+
+// RepoLicense fetches an available repository license.
+// It uses API v3 because licenses are not supported by GraphQL.
+func RepoLicense(httpClient *http.Client, hostname string, licenseName string) (*License, error) {
+	var license License
+	client := NewClientFromHTTP(httpClient)
+	path := fmt.Sprintf("licenses/%s", licenseName)
+	err := client.REST(hostname, "GET", path, nil, &license)
+	if err != nil {
+		return nil, err
+	}
+	return &license, nil
+}
+
+// RepoGitIgnoreTemplates fetches available repository gitignore templates.
+// It uses API v3 here because gitignore template isn't supported by GraphQL.
+func RepoGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string, error) {
+	var gitIgnoreTemplates []string
+	client := NewClientFromHTTP(httpClient)
+	err := client.REST(hostname, "GET", "gitignore/templates", nil, &gitIgnoreTemplates)
+	if err != nil {
+		return nil, err
+	}
+	return gitIgnoreTemplates, nil
+}
+
+// RepoGitIgnoreTemplate fetches an available repository gitignore template.
+// It uses API v3 here because gitignore template isn't supported by GraphQL.
+func RepoGitIgnoreTemplate(httpClient *http.Client, hostname string, gitIgnoreTemplateName string) (*GitIgnore, error) {
+	var gitIgnoreTemplate GitIgnore
+	client := NewClientFromHTTP(httpClient)
+	path := fmt.Sprintf("gitignore/templates/%s", gitIgnoreTemplateName)
+	err := client.REST(hostname, "GET", path, nil, &gitIgnoreTemplate)
+	if err != nil {
+		return nil, err
+	}
+	return &gitIgnoreTemplate, nil
 }

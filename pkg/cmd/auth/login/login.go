@@ -15,7 +15,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared/gitcredentials"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -68,8 +68,11 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			to writing the token to a plain text file. See %[1]sgh auth status%[1]s for its
 			stored location.
 
-			Alternatively, use %[1]s--with-token%[1]s to pass in a token on standard input.
+			Alternatively, use %[1]s--with-token%[1]s to pass in a personal access token (classic) on standard input.
 			The minimum required scopes for the token are: %[1]srepo%[1]s, %[1]sread:org%[1]s, and %[1]sgist%[1]s.
+			Take care when passing a fine-grained personal access token to %[1]s--with-token%[1]s
+			as the inherent scoping to certain resources may cause confusing behaviour when interacting with other
+			resources. Favour setting %[1]sGH_TOKEN%[1]s for fine-grained personal access token usage.
 
 			Alternatively, gh will use the authentication token found in environment variables.
 			This method is most suitable for "headless" use of gh such as in automation. See
@@ -84,12 +87,15 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			Specifying %[1]sssh%[1]s for the git protocol will detect existing SSH keys to upload,
 			prompting to create and upload a new key if one is not found. This can be skipped with
 			%[1]s--skip-ssh-key%[1]s flag.
+
+			For more information on OAuth scopes, see
+			<https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps/>.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Start interactive setup
 			$ gh auth login
 
-			# Authenticate against github.com by reading the token from a file
+			# Authenticate against <github.com> by reading the token from a file
 			$ gh auth login --with-token < mytoken.txt
 
 			# Authenticate with specific host
@@ -123,7 +129,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			}
 
 			if opts.Hostname == "" && (!opts.Interactive || opts.Web) {
-				opts.Hostname, _ = ghAuth.DefaultHost()
+				opts.Hostname, _ = ghauth.DefaultHost()
 			}
 
 			opts.MainExecutable = f.Executable()

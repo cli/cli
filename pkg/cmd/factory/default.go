@@ -44,6 +44,31 @@ func New(appVersion string) *cmdutil.Factory {
 	return f
 }
 
+// BaseRepoFunc requests a list of Remotes, and selects the first one.
+// Although Remotes is injected via the factory so it looks like the function might
+// be configurable, in practice, it's calling readRemotes, and the injection is indirection.
+//
+// readRemotes makes use of the remoteResolver, which is responsible for requesting the list
+// of remotes for the current working directory from git. It then does some filtering to
+// only retain remotes for hosts that we have authenticated against; keep in mind this may
+// be the single value of GH_HOST.
+//
+// That list of remotes is sorted by their remote name, in the following order:
+//  1. upstream
+//  2. github
+//  3. origin
+//  4. other remotes, no ordering guaratanteed because the sort function is not stable
+//
+// Given that list, this function chooses the first one.
+//
+// Here's a common example of when this might matter: when we clone a fork, by default we add
+// the parent as a remote named upstream. So the remotes may look like this:
+// upstream  https://github.com/cli/cli.git (fetch)
+// upstream https://github.com/cli/cli.git (push)
+// origin  https://github.com/cli/cli-fork.git (fetch)
+// origin  https://github.com/cli/cli-fork.git (push)
+//
+// With this resolution function, the upstream will always be chosen (assuming we have authenticated with github.com).
 func BaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 	return func() (ghrepo.Interface, error) {
 		remotes, err := f.Remotes()
@@ -54,6 +79,74 @@ func BaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 	}
 }
 
+// SmartBaseRepoFunc provides additional behaviour over BaseRepoFunc. Read the BaseRepoFunc
+// documentation for more information on how remotes are fetched and ordered.
+//
+// Unlike BaseRepoFunc, instead of selecting the first remote in the list, this function will
+// use the API to resolve repository networks, and attempt to use the `resolved` git remote config value
+// as part of determining the base repository.
+//
+// Although the behaviour commented below really belongs to the `BaseRepo` function on `ResolvedRemotes`,
+// in practice the most important place to understand the general behaviour is here, so that's where
+// I'm going to write it.
+//
+// Firstly, the remotes are inspected to see whether any are already resolved. Resolution means the git
+// config value of the `resolved` key was `base` (meaning this remote is the base repository), or a specific
+// repository e.g. `cli/cli` (meaning that specific repo is the base repo, regardless of whether a remote
+// exists for it). These values are set by default on clone of a fork, or by running `repo set-default`. If
+// either are set, that repository is returned.
+//
+// If we the current invocation is unable to prompt, then the first remote is returned. I believe this behaviour
+// exists for backwards compatibility before the later steps were introduced, however, this is frequently a source
+// of differing behaviour between interactive and non-interactive invocations:
+//
+// ➜ git remote -v
+// origin  https://github.com/williammartin/test-repo.git (fetch)
+// origin  https://github.com/williammartin/test-repo.git (push)
+// upstream        https://github.com/williammartin-test-org/test-repo.git (fetch)
+// upstream        https://github.com/williammartin-test-org/test-repo.git (push)
+//
+// ➜ gh pr list
+// X No default remote repository has been set for this directory.
+//
+// please run `gh repo set-default` to select a default remote repository.
+// ➜ gh pr list | cat
+// 3       test    williammartin-test-org:remote-push-default-feature      OPEN    2024-12-13T10:28:40Z
+//
+// Furthermore, when repositories have been renamed on the server and not on the local git remote, this causes
+// even more confusion because the API requests can be different, and FURTHERMORE this can be an issue for
+// services that don't handle renames correctly, like the ElasticSearch indexing.
+//
+// Assuming we have an interactive invocation, then the next step is to resolve a network of repositories. This
+// involves creating a dynamic GQL query requesting information about each repository (up to a limit of 5).
+// Each returned repo is added to a list, along with its parent, if present in the query response.
+// The repositories in the query retain the same ordering as previously outlined. Interestingly, the request is sent
+// to the hostname of the first repo, so if you happen to have remotes on different GitHub hosts, then they won't
+// resolve correctly. I'm not sure this has ever caused an issue, but does seem like a potential source of bugs.
+// In practice, since the remotes are ordered with upstream, github, origin before others, it's almost always going
+// to be the case that the correct host is chosen.
+//
+// Because fetching the network includes the parent repo, even if it is not a remote, this requires the user to
+// disambiguate, which can be surprising, though I'm not sure I've heard anyone complain:
+//
+// ➜ git remote -v
+// origin  https://github.com/williammartin/test-repo.git (fetch)
+// origin  https://github.com/williammartin/test-repo.git (push)
+//
+// ➜ gh pr list
+// X No default remote repository has been set for this directory.
+//
+// please run `gh repo set-default` to select a default remote repository.
+//
+// If no repos are returned from the API then we return the first remote from the original list. I'm not sure
+// why we do this rather than erroring, because it seems like almost every future step is going to fail when hitting
+// the API. Potentially it helps if there is an API blip? It was added without comment in:
+// https://github.com/cli/cli/pull/1706/files#diff-65730f0373fb91dd749940cf09daeaf884e5643d665a6c3eb09d54785a6d475eR113
+//
+// If one repo is returned from the API, then that one is returned as the base repo.
+//
+// If more than one repo is returned from the API, we indicate to the user that they need to run `repo set-default`,
+// and return an error with no base repo.
 func SmartBaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 	return func() (ghrepo.Interface, error) {
 		httpClient, err := f.HttpClient()
@@ -67,11 +160,11 @@ func SmartBaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 		if err != nil {
 			return nil, err
 		}
-		repoContext, err := ghContext.ResolveRemotesToRepos(remotes, apiClient, "")
+		resolvedRepos, err := ghContext.ResolveRemotesToRepos(remotes, apiClient, "")
 		if err != nil {
 			return nil, err
 		}
-		baseRepo, err := repoContext.BaseRepo(f.IOStreams)
+		baseRepo, err := resolvedRepos.BaseRepo(f.IOStreams)
 		if err != nil {
 			return nil, err
 		}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
@@ -31,7 +32,12 @@ func TestCreateJSONLinesFilePath(t *testing.T) {
 	artifact, err := artifact.NewDigestedArtifact(oci.MockClient{}, "../test/data/sigstore-js-2.1.0.tgz", "sha512")
 	require.NoError(t, err)
 
-	outputFileName := fmt.Sprintf("%s.jsonl", artifact.DigestWithAlg())
+	var expectedFileName string
+	if runtime.GOOS == "windows" {
+		expectedFileName = fmt.Sprintf("%s-%s.jsonl", artifact.Algorithm(), artifact.Digest())
+	} else {
+		expectedFileName = fmt.Sprintf("%s.jsonl", artifact.DigestWithAlg())
+	}
 
 	testCases := []struct {
 		name       string
@@ -41,22 +47,22 @@ func TestCreateJSONLinesFilePath(t *testing.T) {
 		{
 			name:       "with output path",
 			outputPath: tempDir,
-			expected:   path.Join(tempDir, outputFileName),
+			expected:   path.Join(tempDir, expectedFileName),
 		},
 		{
 			name:       "with nested output path",
 			outputPath: path.Join(tempDir, "subdir"),
-			expected:   path.Join(tempDir, "subdir", outputFileName),
+			expected:   path.Join(tempDir, "subdir", expectedFileName),
 		},
 		{
 			name:       "with output path with beginning slash",
 			outputPath: path.Join("/", tempDir, "subdir"),
-			expected:   path.Join("/", tempDir, "subdir", outputFileName),
+			expected:   path.Join("/", tempDir, "subdir", expectedFileName),
 		},
 		{
 			name:       "without output path",
 			outputPath: "",
-			expected:   outputFileName,
+			expected:   expectedFileName,
 		},
 	}
 

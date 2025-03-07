@@ -50,7 +50,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 
 			However, this %[1]s<number>%[1]s should not be used with the %[1]s--job%[1]s flag and will result in the
 			API returning %[1]s404 NOT FOUND%[1]s. Instead, you can get the correct job IDs using the following command:
-			
+
 				gh run view <run-id> --json jobs --jq '.jobs[] | {name, databaseId}'
 
 			You will need to use databaseId field for triggering job re-runs.
@@ -202,6 +202,9 @@ func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFa
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
+			if httpError.Message == "Unable to retry this workflow run because it was created over a month ago" {
+				return fmt.Errorf("run %d cannot be rerun; %s", run.ID, httpError.Message)
+			}
 			return fmt.Errorf("run %d cannot be rerun; its workflow file may be broken", run.ID)
 		}
 		return fmt.Errorf("failed to rerun: %w", err)

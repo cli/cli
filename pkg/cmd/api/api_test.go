@@ -367,6 +367,72 @@ func Test_NewCmdApi(t *testing.T) {
 			},
 			wantsErr: false,
 		},
+		{
+			name: "request path with container package name containing slashes",
+			cli:  "/user/packages/container/github.com/username/package_name --verbose",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "/user/packages/container/github.com%2Fusername%2Fpackage_name",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
+				Verbose:             true,
+			},
+			wantsErr: false,
+		},
+		{
+			name: "request path with container package name containing slashes and restore",
+			cli:  "/user/packages/container/github.com/username/package_name/restore --verbose",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "/user/packages/container/github.com%2Fusername%2Fpackage_name/restore",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
+				Verbose:             true,
+			},
+			wantsErr: false,
+		},
+		{
+			name: "request path with container package name containing slashes and versions",
+			cli:  "/user/packages/container/github.com/username/package_name/versions --verbose",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "/user/packages/container/github.com%2Fusername%2Fpackage_name/versions",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
+				Verbose:             true,
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1231,6 +1297,35 @@ func Test_apiRun_DELETE(t *testing.T) {
 
 	if gotRequest.Body != nil {
 		t.Errorf("expected nil request body, got %T", gotRequest.Body)
+	}
+}
+
+func Test_apiRun_HEAD(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	err := apiRun(&ApiOptions{
+		IO: ios,
+		Config: func() (gh.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: 422,
+					Request:    req,
+					Header: map[string][]string{
+						"Content-Type": {"application/json"},
+					}}, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		MagicFields:         []string(nil),
+		RawFields:           []string(nil),
+		RequestMethod:       "HEAD",
+		RequestMethodPassed: true,
+	})
+	if err != cmdutil.SilentError {
+		t.Fatalf("got error %v", err)
 	}
 }
 

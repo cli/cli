@@ -395,8 +395,9 @@ func TestProjectItems_FieldTitle(t *testing.T) {
 									"fieldValues": map[string]interface{}{
 										"nodes": []map[string]interface{}{
 											{
-												"__typename": "ProjectV2ItemFieldIterationValue",
-												"title":      "Iteration Title 1",
+												"__typename":  "ProjectV2ItemFieldIterationValue",
+												"title":       "Iteration Title 1",
+												"iterationId": "iterationId1",
 											},
 											{
 												"__typename": "ProjectV2ItemFieldMilestoneValue",
@@ -426,6 +427,7 @@ func TestProjectItems_FieldTitle(t *testing.T) {
 	assert.Len(t, project.Items.Nodes, 1)
 	assert.Len(t, project.Items.Nodes[0].FieldValues.Nodes, 2)
 	assert.Equal(t, project.Items.Nodes[0].FieldValues.Nodes[0].ProjectV2ItemFieldIterationValue.Title, "Iteration Title 1")
+	assert.Equal(t, project.Items.Nodes[0].FieldValues.Nodes[0].ProjectV2ItemFieldIterationValue.IterationId, "iterationId1")
 	assert.Equal(t, project.Items.Nodes[0].FieldValues.Nodes[1].ProjectV2ItemFieldMilestoneValue.Milestone.Title, "Milestone Title 1")
 }
 

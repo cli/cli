@@ -48,6 +48,22 @@ func TestNewCmdeditItem(t *testing.T) {
 			},
 		},
 		{
+			name: "number with floating point value",
+			cli:  "--number 123.45 --id 123",
+			wants: editItemOpts{
+				number: 123.45,
+				itemID: "123",
+			},
+		},
+		{
+			name: "number zero",
+			cli:  "--number 0 --id 123",
+			wants: editItemOpts{
+				number: 0,
+				itemID: "123",
+			},
+		},
+		{
 			name: "field-id",
 			cli:  "--field-id FIELD_ID --id 123",
 			wants: editItemOpts{
@@ -255,7 +271,7 @@ func TestRunItemEdit_Number(t *testing.T) {
 	// edit item
 	gock.New("https://api.github.com").
 		Post("/graphql").
-		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"number":2}}}}`).
+		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"number":123.45}}}}`).
 		Reply(200).
 		JSON(map[string]interface{}{
 			"data": map[string]interface{}{
@@ -284,10 +300,64 @@ func TestRunItemEdit_Number(t *testing.T) {
 	config := editItemConfig{
 		io: ios,
 		opts: editItemOpts{
-			number:    2,
-			itemID:    "item_id",
-			projectID: "project_id",
-			fieldID:   "field_id",
+			number:        123.45,
+			numberChanged: true,
+			itemID:        "item_id",
+			projectID:     "project_id",
+			fieldID:       "field_id",
+		},
+		client: client,
+	}
+
+	err := runEditItem(config)
+	assert.NoError(t, err)
+	assert.Equal(
+		t,
+		"Edited item \"title\"\n",
+		stdout.String())
+}
+
+func TestRunItemEdit_NumberZero(t *testing.T) {
+	defer gock.Off()
+	// gock.Observe(gock.DumpRequest)
+
+	// edit item
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation UpdateItemValues.*","variables":{"input":{"projectId":"project_id","itemId":"item_id","fieldId":"field_id","value":{"number":0}}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"updateProjectV2ItemFieldValue": map[string]interface{}{
+					"projectV2Item": map[string]interface{}{
+						"ID": "item_id",
+						"content": map[string]interface{}{
+							"__typename": "Issue",
+							"body":       "body",
+							"title":      "title",
+							"number":     1,
+							"repository": map[string]interface{}{
+								"nameWithOwner": "my-repo",
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+
+	config := editItemConfig{
+		io: ios,
+		opts: editItemOpts{
+			number:        0,
+			numberChanged: true,
+			itemID:        "item_id",
+			projectID:     "project_id",
+			fieldID:       "field_id",
 		},
 		client: client,
 	}

@@ -1,0 +1,9 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Attempt to rename the repo with a slash in the name
+! exec gh repo rename $ORG/new-name --repo=$ORG/$SCRIPT_NAME-$RANDOM_STRING --yes
+stderr 'New repository name cannot contain '/' character - to transfer a repository to a new owner, you must follow additional steps on GitHub.com. For more information on transferring repository ownership, see <https://docs.github.com/en/repositories/creating-and-managing-repositories/transferring-a-repository>.'
+
+# Defer repo deletion
+defer gh repo delete $ORG/$SCRIPT_NAME-$RANDOM_STRING --yes

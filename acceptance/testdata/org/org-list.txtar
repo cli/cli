@@ -1,0 +1,6 @@
+# This test could fail if the user is a member of more than 30 organizations because
+# the `gh org list` command only returns the first 30 organizations the user is a member of
+
+# List organizations the user is a member of
+exec gh org list
+stdout ${GH_ACCEPTANCE_ORG}

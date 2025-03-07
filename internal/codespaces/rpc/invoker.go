@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -241,6 +242,9 @@ func (i *invoker) StartSSHServerWithOptions(ctx context.Context, options StartSS
 		return 0, "", fmt.Errorf("failed to parse SSH server port: %w", err)
 	}
 
+	if !isUsernameValid(response.User) {
+		return 0, "", fmt.Errorf("invalid username: %s", response.User)
+	}
 	return port, response.User, nil
 }
 
@@ -299,4 +303,11 @@ func (i *invoker) notifyCodespaceOfClientActivity(ctx context.Context, activity 
 	}
 
 	return nil
+}
+
+func isUsernameValid(username string) bool {
+	// assuming valid usernames are alphanumeric, with these special characters allowed: . _ -
+	var validUsernamePattern = `^[a-zA-Z0-9_][-.a-zA-Z0-9_]*$`
+	re := regexp.MustCompile(validUsernamePattern)
+	return re.MatchString(username)
 }

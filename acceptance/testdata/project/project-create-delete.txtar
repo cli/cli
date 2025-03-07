@@ -1,0 +1,13 @@
+# Create a project and get the project number
+env PROJECT_TITLE=$SCRIPT_NAME-$RANDOM_STRING
+exec gh project create --owner=$ORG --title=$PROJECT_TITLE --format='json' --jq='.number'
+stdout2env PROJECT_NUMBER
+
+# Confirm the project has been created
+exec gh project view --owner=$ORG $PROJECT_NUMBER
+
+# Delete the project
+exec gh project delete --owner=$ORG $PROJECT_NUMBER
+
+# Confirm the project has been deleted
+! exec gh project view --owner=$ORG $PROJECT_NUMBER

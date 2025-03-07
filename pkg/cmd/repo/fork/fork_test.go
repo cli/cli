@@ -298,7 +298,7 @@ func TestRepoFork(t *testing.T) {
 					return true, nil
 				})
 			},
-			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote origin\n",
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Renamed remote origin to upstream\n✓ Added remote origin\n",
 		},
 		{
 			name: "implicit tty reuse existing remote",
@@ -370,7 +370,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register("git remote rename origin upstream", 0, "")
 				cs.Register(`git remote add origin https://github.com/someone/REPO.git`, 0, "")
 			},
-			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote origin\n",
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Renamed remote origin to upstream\n✓ Added remote origin\n",
 		},
 		{
 			name: "implicit nontty reuse existing remote",
@@ -390,6 +390,7 @@ func TestRepoFork(t *testing.T) {
 				},
 			},
 			httpStubs: forkPost,
+			wantOut:   "https://github.com/someone/REPO\n",
 		},
 		{
 			name: "implicit nontty remote exists",
@@ -424,11 +425,13 @@ func TestRepoFork(t *testing.T) {
 				cs.Register("git remote rename origin upstream", 0, "")
 				cs.Register(`git remote add origin https://github.com/someone/REPO.git`, 0, "")
 			},
+			wantOut: "https://github.com/someone/REPO\n",
 		},
 		{
 			name:      "implicit nontty no args",
 			opts:      &ForkOptions{},
 			httpStubs: forkPost,
+			wantOut:   "https://github.com/someone/REPO\n",
 		},
 		{
 			name: "passes git flags",
@@ -561,6 +564,7 @@ func TestRepoFork(t *testing.T) {
 				Repository: "OWNER/REPO",
 			},
 			httpStubs: forkPost,
+			wantOut:   "https://github.com/someone/REPO\n",
 		},
 		{
 			name: "repo arg nontty repo already exists",
@@ -604,6 +608,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
+			wantOut: "https://github.com/someone/REPO\n",
 		},
 		{
 			name: "non tty repo arg with fork-name",
@@ -640,6 +645,7 @@ func TestRepoFork(t *testing.T) {
 					httpmock.StringResponse(renameResult))
 			},
 			wantErrOut: "",
+			wantOut:    "https://github.com/OWNER/REPO\n",
 		},
 		{
 			name: "tty repo arg with fork-name",
@@ -694,6 +700,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
+			wantOut: "https://github.com/someone/REPO\n",
 		},
 		{
 			name: "does not retry clone if error occurs and exit code is not 128",

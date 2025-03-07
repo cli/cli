@@ -444,6 +444,74 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n  https://github.com/OWNER/REPO\n",
 		},
 		{
+			name: "interactive with existing bare repository public and push",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
+					switch message {
+					case "Add a remote?":
+						return true, nil
+					case `Would you like to mirror all refs to "origin"?`:
+						return true, nil
+					default:
+						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
+					}
+				}
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					switch message {
+					case "Path to local repository":
+						return defaultValue, nil
+					case "Repository name":
+						return "REPO", nil
+					case "Description":
+						return "my new repo", nil
+					case "What should the new remote be called?":
+						return defaultValue, nil
+					default:
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Push an existing local repository to GitHub")
+					case "Visibility":
+						return prompter.IndexFor(options, "Private")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -C . rev-parse --git-dir`, 0, ".")
+				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
+				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
+				cs.Register(`git -C . push origin --mirror`, 0, "")
+			},
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n  https://github.com/OWNER/REPO\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Mirrored all refs to https://github.com/OWNER/REPO.git\n",
+		},
+		{
 			name: "interactive with existing repository public add remote and push",
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
@@ -697,6 +765,71 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "https://github.com/OWNER/REPO\n",
 		},
 		{
+			name: "noninteractive create bare from source and push",
+			opts: &CreateOptions{
+				Interactive: false,
+				Source:      ".",
+				Push:        true,
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+						{
+							"data": {
+								"createRepository": {
+									"repository": {
+										"id": "REPOID",
+										"name": "REPO",
+										"owner": {"login":"OWNER"},
+										"url": "https://github.com/OWNER/REPO"
+									}
+								}
+							}
+						}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -C . rev-parse --git-dir`, 0, ".")
+				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
+				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
+				cs.Register(`git -C . push origin --mirror`, 0, "")
+			},
+			wantStdout: "https://github.com/OWNER/REPO\n",
+		},
+		{
+			name: "noninteractive create from cwd that isn't a git repo",
+			opts: &CreateOptions{
+				Interactive: false,
+				Source:      ".",
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+			},
+			tty: false,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -C . rev-parse --git-dir`, 128, "")
+			},
+			wantErr: true,
+			errMsg:  "current directory is not a git repository. Run `git init` to initialize it",
+		},
+		{
+			name: "noninteractive create from cwd that isn't a git repo",
+			opts: &CreateOptions{
+				Interactive: false,
+				Source:      "some-dir",
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+			},
+			tty: false,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -C some-dir rev-parse --git-dir`, 128, "")
+			},
+			wantErr: true,
+			errMsg:  "some-dir is not a git repository. Run `git -C \"some-dir\" init` to initialize it",
+		},
+		{
 			name: "noninteractive clone from scratch",
 			opts: &CreateOptions{
 				Interactive: false,
@@ -856,11 +989,11 @@ func Test_createRun(t *testing.T) {
 			defer reg.Verify(t)
 			err := createRun(tt.opts)
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, "", stderr.String())
 		})

@@ -119,6 +119,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			alongside %[1]s--fill%[1]s, the values specified by %[1]s--title%[1]s and/or %[1]s--body%[1]s will
 			take precedence and overwrite any autofilled content.
 
+			The base branch for the created PR can be specified using the %[1]s--base%[1]s flag. If not provided,
+			the value of %[1]sgh-merge-base%[1]s git branch config will be used. If not configured, the repository's
+			default branch will be used. Run %[1]sgit config branch.{current}.gh-merge-base {base}%[1]s to configure
+			the current branch to use the specified merge base.
+
 			Link an issue to the pull request by referencing the issue in the body of the pull
 			request. If the body text mentions %[1]sFixes #123%[1]s or %[1]sCloses #123%[1]s, the referenced issue
 			will automatically get closed when the pull request gets merged.
@@ -258,17 +263,17 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) (err error) {
+func createRun(opts *CreateOptions) error {
 	ctx, err := NewCreateContext(opts)
 	if err != nil {
-		return
+		return err
 	}
 
 	client := ctx.Client
 
 	state, err := NewIssueState(*ctx, *opts)
 	if err != nil {
-		return
+		return err
 	}
 
 	var openURL string
@@ -278,17 +283,20 @@ func createRun(opts *CreateOptions) (err error) {
 			state.Title = opts.Title
 			state.Body = opts.Body
 		}
+		if opts.Template != "" {
+			state.Template = opts.Template
+		}
 		err = handlePush(*opts, *ctx)
 		if err != nil {
-			return
+			return err
 		}
 		openURL, err = generateCompareURL(*ctx, *state)
 		if err != nil {
-			return
+			return err
 		}
 		if !shared.ValidURL(openURL) {
 			err = fmt.Errorf("cannot open in browser: maximum URL length exceeded")
-			return
+			return err
 		}
 		return previewPR(*opts, openURL)
 	}
@@ -336,7 +344,7 @@ func createRun(opts *CreateOptions) (err error) {
 	if !opts.EditorMode && (opts.FillVerbose || opts.Autofill || opts.FillFirst || (opts.TitleProvided && opts.BodyProvided)) {
 		err = handlePush(*opts, *ctx)
 		if err != nil {
-			return
+			return err
 		}
 		return submitPR(*opts, *ctx, *state)
 	}
@@ -360,7 +368,7 @@ func createRun(opts *CreateOptions) (err error) {
 			var template shared.Template
 			template, err = tpl.Select(opts.Template)
 			if err != nil {
-				return
+				return err
 			}
 			if state.Title == "" {
 				state.Title = template.Title()
@@ -370,18 +378,18 @@ func createRun(opts *CreateOptions) (err error) {
 
 		state.Title, state.Body, err = opts.TitledEditSurvey(state.Title, state.Body)
 		if err != nil {
-			return
+			return err
 		}
 		if state.Title == "" {
 			err = fmt.Errorf("title can't be blank")
-			return
+			return err
 		}
 	} else {
 
 		if !opts.TitleProvided {
-			err = shared.TitleSurvey(opts.Prompter, state)
+			err = shared.TitleSurvey(opts.Prompter, opts.IO, state)
 			if err != nil {
-				return
+				return err
 			}
 		}
 
@@ -395,12 +403,12 @@ func createRun(opts *CreateOptions) (err error) {
 				if opts.Template != "" {
 					template, err = tpl.Select(opts.Template)
 					if err != nil {
-						return
+						return err
 					}
 				} else {
 					template, err = tpl.Choose()
 					if err != nil {
-						return
+						return err
 					}
 				}
 
@@ -411,13 +419,13 @@ func createRun(opts *CreateOptions) (err error) {
 
 			err = shared.BodySurvey(opts.Prompter, state, templateContent)
 			if err != nil {
-				return
+				return err
 			}
 		}
 
 		openURL, err = generateCompareURL(*ctx, *state)
 		if err != nil {
-			return
+			return err
 		}
 
 		allowPreview := !state.HasMetadata() && shared.ValidURL(openURL) && !opts.DryRun
@@ -436,12 +444,12 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.BaseRepo, fetcher, state)
 			if err != nil {
-				return
+				return err
 			}
 
 			action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata() && !opts.DryRun, false, state.Draft)
 			if err != nil {
-				return
+				return err
 			}
 		}
 	}
@@ -449,12 +457,12 @@ func createRun(opts *CreateOptions) (err error) {
 	if action == shared.CancelAction {
 		fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
 		err = cmdutil.CancelError
-		return
+		return err
 	}
 
 	err = handlePush(*opts, *ctx)
 	if err != nil {
-		return
+		return err
 	}
 
 	if action == shared.PreviewAction {
@@ -471,7 +479,7 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	err = errors.New("expected to cancel, preview, or submit")
-	return
+	return err
 }
 
 var regexPattern = regexp.MustCompile(`(?m)^`)
@@ -510,45 +518,81 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 	return nil
 }
 
-func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, headBranch string) *git.TrackingRef {
-	refsForLookup := []string{"HEAD"}
-	var trackingRefs []git.TrackingRef
+// TODO: Replace with the finder's PullRequestRefs struct
+// trackingRef represents a ref for a remote tracking branch.
+type trackingRef struct {
+	remoteName string
+	branchName string
+}
 
-	headBranchConfig := gitClient.ReadBranchConfig(context.Background(), headBranch)
-	if headBranchConfig.RemoteName != "" {
-		tr := git.TrackingRef{
-			RemoteName: headBranchConfig.RemoteName,
-			BranchName: strings.TrimPrefix(headBranchConfig.MergeRef, "refs/heads/"),
+func (r trackingRef) String() string {
+	return "refs/remotes/" + r.remoteName + "/" + r.branchName
+}
+
+func mustParseTrackingRef(text string) trackingRef {
+	parts := strings.SplitN(string(text), "/", 4)
+	// The only place this is called is tryDetermineTrackingRef, where we are reconstructing
+	// the same tracking ref we passed in. If it doesn't match the expected format, this is a
+	// programmer error we want to know about, so it's ok to panic.
+	if len(parts) != 4 {
+		panic(fmt.Errorf("tracking ref should have four parts: %s", text))
+	}
+	if parts[0] != "refs" || parts[1] != "remotes" {
+		panic(fmt.Errorf("tracking ref should start with refs/remotes/: %s", text))
+	}
+
+	return trackingRef{
+		remoteName: parts[2],
+		branchName: parts[3],
+	}
+}
+
+// tryDetermineTrackingRef is intended to try and find a remote branch on the same commit as the currently checked out
+// HEAD, i.e. the local branch. If there are multiple branches that might match, the first remote is chosen, which in
+// practice is determined by the sorting algorithm applied much earlier in the process, roughly "upstream", "github", "origin",
+// and then everything else unstably sorted.
+func tryDetermineTrackingRef(gitClient *git.Client, remotes ghContext.Remotes, localBranchName string, headBranchConfig git.BranchConfig) (trackingRef, bool) {
+	// To try and determine the tracking ref for a local branch, we first construct a collection of refs
+	// that might be tracking, given the current branch's config, and the list of known remotes.
+	refsForLookup := []string{"HEAD"}
+	if headBranchConfig.RemoteName != "" && headBranchConfig.MergeRef != "" {
+		tr := trackingRef{
+			remoteName: headBranchConfig.RemoteName,
+			branchName: strings.TrimPrefix(headBranchConfig.MergeRef, "refs/heads/"),
 		}
-		trackingRefs = append(trackingRefs, tr)
 		refsForLookup = append(refsForLookup, tr.String())
 	}
 
 	for _, remote := range remotes {
-		tr := git.TrackingRef{
-			RemoteName: remote.Name,
-			BranchName: headBranch,
+		tr := trackingRef{
+			remoteName: remote.Name,
+			branchName: localBranchName,
 		}
-		trackingRefs = append(trackingRefs, tr)
 		refsForLookup = append(refsForLookup, tr.String())
 	}
 
+	// Then we ask git for details about these refs, for example, refs/remotes/origin/trunk might return a hash
+	// for the remote tracking branch, trunk, for the remote, origin. If there is no ref, the git client returns
+	// no ref information.
+	//
+	// We also first check for the HEAD ref, so that we have the hash of the currently checked out commit.
 	resolvedRefs, _ := gitClient.ShowRefs(context.Background(), refsForLookup)
+
+	// If there is more than one resolved ref, that means that at least one ref was found in addition to the HEAD.
 	if len(resolvedRefs) > 1 {
+		headRef := resolvedRefs[0]
 		for _, r := range resolvedRefs[1:] {
-			if r.Hash != resolvedRefs[0].Hash {
+			// If the hash of the remote ref doesn't match the hash of HEAD then the remote branch is not in the same
+			// state, so it can't be used.
+			if r.Hash != headRef.Hash {
 				continue
 			}
-			for _, tr := range trackingRefs {
-				if tr.String() != r.Name {
-					continue
-				}
-				return &tr
-			}
+			// Otherwise we can parse the returned ref into a tracking ref and return that
+			return mustParseTrackingRef(r.Name), true
 		}
 	}
 
-	return nil
+	return trackingRef{}, false
 }
 
 func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadataState, error) {
@@ -637,16 +681,22 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	var headRepo ghrepo.Interface
 	var headRemote *ghContext.Remote
 
+	headBranchConfig, err := gitClient.ReadBranchConfig(context.Background(), headBranch)
+	if err != nil {
+		return nil, err
+	}
 	if isPushEnabled {
-		// determine whether the head branch is already pushed to a remote
-		if pushedTo := determineTrackingBranch(gitClient, remotes, headBranch); pushedTo != nil {
+		// TODO: This doesn't respect the @{push} revision resolution or triagular workflows assembled with
+		// remote.pushDefault, or branch.<branchName>.pushremote config settings. The finder's ParsePRRefs
+		// may be able to replace this function entirely.
+		if trackingRef, found := tryDetermineTrackingRef(gitClient, remotes, headBranch, headBranchConfig); found {
 			isPushEnabled = false
-			if r, err := remotes.FindByName(pushedTo.RemoteName); err == nil {
+			if r, err := remotes.FindByName(trackingRef.remoteName); err == nil {
 				headRepo = r
 				headRemote = r
-				headBranchLabel = pushedTo.BranchName
+				headBranchLabel = trackingRef.branchName
 				if !ghrepo.IsSame(baseRepo, headRepo) {
-					headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), pushedTo.BranchName)
+					headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), trackingRef.branchName)
 				}
 			}
 		}
@@ -712,6 +762,9 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 
 	baseBranch := opts.BaseBranch
+	if baseBranch == "" {
+		baseBranch = headBranchConfig.MergeBase
+	}
 	if baseBranch == "" {
 		baseBranch = baseRepo.DefaultBranchRef.Name
 	}
@@ -882,6 +935,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	headRepo := ctx.HeadRepo
 	headRemote := ctx.HeadRemote
 	client := ctx.Client
+	gitClient := ctx.GitClient
 
 	var err error
 	// if a head repository could not be determined so far, automatically create
@@ -923,7 +977,8 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
 		gitClient := ctx.GitClient
 		origin, _ := remotes.FindByName("origin")
-		upstream, _ := remotes.FindByName("upstream")
+		upstreamName := "upstream"
+		upstream, _ := remotes.FindByName(upstreamName)
 		remoteName := "origin"
 
 		if origin != nil {
@@ -931,7 +986,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		}
 
 		if origin != nil && upstream == nil && ghrepo.IsSame(origin, ctx.BaseRepo) {
-			renameCmd, err := gitClient.Command(context.Background(), "remote", "rename", "origin", "upstream")
+			renameCmd, err := gitClient.Command(context.Background(), "remote", "rename", "origin", upstreamName)
 			if err != nil {
 				return err
 			}
@@ -939,7 +994,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 				return fmt.Errorf("error renaming origin remote: %w", err)
 			}
 			remoteName = "origin"
-			fmt.Fprintf(opts.IO.ErrOut, "Changed %s remote to %q\n", ghrepo.FullName(ctx.BaseRepo), "upstream")
+			fmt.Fprintf(opts.IO.ErrOut, "Changed %s remote to %q\n", ghrepo.FullName(ctx.BaseRepo), upstreamName)
 		}
 
 		gitRemote, err := gitClient.AddRemote(context.Background(), remoteName, headRepoURL, []string{})
@@ -948,6 +1003,19 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		}
 
 		fmt.Fprintf(opts.IO.ErrOut, "Added %s as remote %q\n", ghrepo.FullName(headRepo), remoteName)
+
+		// Only mark `upstream` remote as default if `gh pr create` created the remote.
+		if didForkRepo {
+			err := gitClient.SetRemoteResolution(context.Background(), upstreamName, "base")
+			if err != nil {
+				return fmt.Errorf("error setting upstream as default: %w", err)
+			}
+
+			if opts.IO.IsStdoutTTY() {
+				cs := opts.IO.ColorScheme()
+				fmt.Fprintf(opts.IO.ErrOut, "%s Repository %s set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n", cs.WarningIcon(), cs.Bold(ghrepo.FullName(headRepo)))
+			}
+		}
 
 		headRemote = &ghContext.Remote{
 			Remote: gitRemote,
@@ -960,7 +1028,6 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		pushBranch := func() error {
 			w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
 			defer w.Flush()
-			gitClient := ctx.GitClient
 			ref := fmt.Sprintf("HEAD:refs/heads/%s", ctx.HeadBranch)
 			bo := backoff.NewConstantBackOff(2 * time.Second)
 			ctx := context.Background()

@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
@@ -29,10 +30,20 @@ import (
 // ErrInitialCommitFailed indicates the initial commit when making a new extension failed.
 var ErrInitialCommitFailed = errors.New("initial commit failed")
 
+type ErrExtensionExecutableNotFound struct {
+	Dir  string
+	Name string
+}
+
+func (e *ErrExtensionExecutableNotFound) Error() string {
+	return fmt.Sprintf("an extension has been installed but there is no executable: executable file named \"%s\" in %s is required to run the extension after install. Perhaps you need to build it?\n", e.Name, e.Dir)
+}
+
 const darwinAmd64 = "darwin-amd64"
 
 type Manager struct {
 	dataDir    func() string
+	updateDir  func() string
 	lookPath   func(string) (string, error)
 	findSh     func() (string, error)
 	newCommand func(string, ...string) *exec.Cmd
@@ -46,7 +57,10 @@ type Manager struct {
 
 func NewManager(ios *iostreams.IOStreams, gc *git.Client) *Manager {
 	return &Manager{
-		dataDir:    config.DataDir,
+		dataDir: config.DataDir,
+		updateDir: func() string {
+			return filepath.Join(config.StateDir(), "extensions")
+		},
 		lookPath:   safeexec.LookPath,
 		findSh:     findsh.Find,
 		newCommand: exec.Command,
@@ -193,11 +207,32 @@ func (m *Manager) populateLatestVersions(exts []*Extension) {
 
 func (m *Manager) InstallLocal(dir string) error {
 	name := filepath.Base(dir)
+	if err := m.cleanExtensionUpdateDir(name); err != nil {
+		return err
+	}
 	targetLink := filepath.Join(m.installDir(), name)
+
 	if err := os.MkdirAll(filepath.Dir(targetLink), 0755); err != nil {
 		return err
 	}
-	return makeSymlink(dir, targetLink)
+	if err := makeSymlink(dir, targetLink); err != nil {
+		return err
+	}
+
+	// Check if an executable of the same name exists in the target directory.
+	// An error here doesn't indicate a failed extension installation, but
+	// it does indicate that the user will not be able to run the extension until
+	// the executable file is built or created manually somehow.
+	if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+		if os.IsNotExist(err) {
+			return &ErrExtensionExecutableNotFound{
+				Dir:  dir,
+				Name: name,
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 type binManifest struct {
@@ -233,7 +268,7 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 		return err
 	}
 	if !hs {
-		return errors.New("extension is not installable: missing executable")
+		return fmt.Errorf("extension is not installable: no usable release artifact or script found in %s", repo)
 	}
 
 	return m.installGit(repo, target)
@@ -294,29 +329,30 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 			errorMessageInRed, platform, issueCreateCommand)
 	}
 
-	name := repo.RepoName()
-	targetDir := filepath.Join(m.installDir(), name)
+	if m.dryRunMode {
+		return nil
+	}
 
-	// TODO clean this up if function errs?
-	if !m.dryRunMode {
-		err = os.MkdirAll(targetDir, 0755)
-		if err != nil {
-			return fmt.Errorf("failed to create installation directory: %w", err)
-		}
+	name := repo.RepoName()
+	if err := m.cleanExtensionUpdateDir(name); err != nil {
+		return err
+	}
+
+	targetDir := filepath.Join(m.installDir(), name)
+	if err = os.MkdirAll(targetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create installation directory: %w", err)
 	}
 
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	if !m.dryRunMode {
-		err = downloadAsset(m.client, *asset, binPath)
-		if err != nil {
-			return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
-		}
-		if trueARMBinary {
-			if err := codesignBinary(binPath); err != nil {
-				return fmt.Errorf("failed to codesign downloaded binary: %w", err)
-			}
+	err = downloadAsset(m.client, *asset, binPath)
+	if err != nil {
+		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
+	}
+	if trueARMBinary {
+		if err := codesignBinary(binPath); err != nil {
+			return fmt.Errorf("failed to codesign downloaded binary: %w", err)
 		}
 	}
 
@@ -334,10 +370,8 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 		return fmt.Errorf("failed to serialize manifest: %w", err)
 	}
 
-	if !m.dryRunMode {
-		if err := writeManifest(targetDir, manifestName, bs); err != nil {
-			return err
-		}
+	if err := writeManifest(targetDir, manifestName, bs); err != nil {
+		return err
 	}
 
 	return nil
@@ -385,6 +419,10 @@ func (m *Manager) installGit(repo ghrepo.Interface, target string) error {
 
 	name := strings.TrimSuffix(path.Base(cloneURL), ".git")
 	targetDir := filepath.Join(m.installDir(), name)
+
+	if err := m.cleanExtensionUpdateDir(name); err != nil {
+		return err
+	}
 
 	_, err := m.gitClient.Clone(cloneURL, []string{targetDir})
 	if err != nil {
@@ -442,9 +480,14 @@ func (m *Manager) Upgrade(name string, force bool) error {
 }
 
 func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
+	var longestExt = slices.MaxFunc(exts, func(a, b *Extension) int {
+		return len(a.Name()) - len(b.Name())
+	})
+	var longestExtName = len(longestExt.Name())
+
 	var failed bool
 	for _, f := range exts {
-		fmt.Fprintf(m.io.Out, "[%s]: ", f.Name())
+		fmt.Fprintf(m.io.Out, "[%*s]: ", longestExtName, f.Name())
 		currentVersion := displayExtensionVersion(f, f.CurrentVersion())
 		err := m.upgradeExtension(f, force)
 		if err != nil {
@@ -528,18 +571,27 @@ func (m *Manager) upgradeBinExtension(ext *Extension) error {
 }
 
 func (m *Manager) Remove(name string) error {
-	targetDir := filepath.Join(m.installDir(), "gh-"+name)
+	name = normalizeExtension(name)
+	targetDir := filepath.Join(m.installDir(), name)
 	if _, err := os.Lstat(targetDir); os.IsNotExist(err) {
 		return fmt.Errorf("no extension found: %q", targetDir)
 	}
 	if m.dryRunMode {
 		return nil
 	}
+	if err := m.cleanExtensionUpdateDir(name); err != nil {
+		return err
+	}
 	return os.RemoveAll(targetDir)
 }
 
 func (m *Manager) installDir() string {
 	return filepath.Join(m.dataDir(), "extensions")
+}
+
+// UpdateDir returns the extension-specific directory where updates are stored.
+func (m *Manager) UpdateDir(name string) string {
+	return filepath.Join(m.updateDir(), normalizeExtension(name))
 }
 
 //go:embed ext_tmpls/goBinMain.go.txt
@@ -801,4 +853,33 @@ func codesignBinary(binPath string) error {
 	}
 	cmd := exec.Command(codesignExe, "--sign", "-", "--force", "--preserve-metadata=entitlements,requirements,flags,runtime", binPath)
 	return cmd.Run()
+}
+
+// cleanExtensionUpdateDir deletes the extension-specific directory containing metadata used in checking for updates.
+// Because extension names are not unique across GitHub organizations and users, we feel its important to clean up this metadata
+// before installing or removing an extension with the same name to avoid confusing the extension manager based on past extensions.
+//
+// As of cli/cli#9934, the only effect on gh from not cleaning up metadata before installing or removing an extension are:
+//
+//  1. The last `checked_for_update_at` timestamp is sufficiently in the past and will check for an update on first use,
+//     which would happen if no extension update metadata existed.
+//
+//  2. The last `checked_for_update_at` timestamp is sufficiently in the future and will not check for an update,
+//     this is not a major concern as users could manually modify this.
+//
+// This could change over time as other functionality is added to extensions, which we cannot predict within cli/cli#9934,
+// such as extension manifest and lock files within cli/cli#6118.
+func (m *Manager) cleanExtensionUpdateDir(name string) error {
+	if err := os.RemoveAll(m.UpdateDir(name)); err != nil {
+		return fmt.Errorf("failed to remove previous extension update state: %w", err)
+	}
+	return nil
+}
+
+// normalizeExtension makes sure that the provided extension name is prefixed with "gh-".
+func normalizeExtension(name string) string {
+	if !strings.HasPrefix(name, "gh-") {
+		name = "gh-" + name
+	}
+	return name
 }

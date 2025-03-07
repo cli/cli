@@ -52,10 +52,15 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			The %[1]s--owner%[1]s flag value must match the name of the GitHub organization
 			that the artifact's linked repository belongs to.
 
-			By default, the verify command will attempt to fetch attestations associated
-			with the provided artifact from the GitHub API. If you would prefer to verify
-			the artifact using attestations stored on disk (c.f. the %[1]sdownload%[1]s command),
-			provide a path to the %[1]s--bundle%[1]s flag.
+			By default, the verify command will:
+			- only verify provenance attestations
+			- attempt to fetch relevant attestations via the GitHub API.
+
+			To verify other types of attestations, use the %[1]s--predicate-type%[1]s flag.
+
+			To use your artifact's OCI registry instead of GitHub's API, use the
+			%[1]s--bundle-from-oci%[1]s flag. For offline verification, using attestations
+			stored on desk (c.f. the download command), provide a path to the %[1]s--bundle%[1]s flag.
 
 			To see the full results that are generated upon successful verification, i.e.
 			for use with a policy engine, provide the %[1]s--format=json%[1]s flag.
@@ -138,7 +143,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			}
 
 			// Prepare for tenancy if detected
-			if ghinstance.IsTenancy(opts.Hostname) {
+			if ghauth.IsTenancy(opts.Hostname) {
 				td, err := opts.APIClient.GetTrustDomain()
 				if err != nil {
 					return fmt.Errorf("error getting trust domain, make sure you are authenticated against the host: %w", err)
@@ -152,9 +157,6 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 				config.TrustDomain = td
 				opts.Tenant = tenant
 			}
-
-			// set policy flags based on what has been provided
-			opts.SetPolicyFlags()
 
 			if runF != nil {
 				return runF(opts)
@@ -179,7 +181,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Repository name in the format <owner>/<repo>")
 	verifyCmd.MarkFlagsMutuallyExclusive("owner", "repo")
 	verifyCmd.MarkFlagsOneRequired("owner", "repo")
-	verifyCmd.Flags().StringVarP(&opts.PredicateType, "predicate-type", "", "", "Filter attestations by provided predicate type")
+	verifyCmd.Flags().StringVarP(&opts.PredicateType, "predicate-type", "", verification.SLSAPredicateV1, "Filter attestations by provided predicate type")
 	verifyCmd.Flags().BoolVarP(&opts.NoPublicGood, "no-public-good", "", false, "Do not verify attestations signed with Sigstore public good instance")
 	verifyCmd.Flags().StringVarP(&opts.TrustedRoot, "custom-trusted-root", "", "", "Path to a trusted_root.jsonl file; likely for offline verification")
 	verifyCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
@@ -193,11 +195,25 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex", "signer-repo", "signer-workflow")
 	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", verification.GitHubOIDCIssuer, "Issuer of the OIDC token")
 	verifyCmd.Flags().StringVarP(&opts.Hostname, "hostname", "", "", "Configure host to use")
+	verifyCmd.Flags().StringVarP(&opts.SignerDigest, "signer-digest", "", "", "Digest associated with the signer workflow")
+	verifyCmd.Flags().StringVarP(&opts.SourceRef, "source-ref", "", "", "Ref associated with the source workflow")
+	verifyCmd.Flags().StringVarP(&opts.SourceDigest, "source-digest", "", "", "Digest associated with the source workflow")
 
 	return verifyCmd
 }
 
 func runVerify(opts *Options) error {
+	ec, err := newEnforcementCriteria(opts)
+	if err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build verification policy"))
+		return err
+	}
+
+	if err := ec.Valid(); err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Invalid verification policy"))
+		return err
+	}
+
 	artifact, err := artifact.NewDigestedArtifact(opts.OCIClient, opts.ArtifactPath, opts.DigestAlgorithm)
 	if err != nil {
 		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Loading digest for %s failed\n"), opts.ArtifactPath)
@@ -206,70 +222,34 @@ func runVerify(opts *Options) error {
 
 	opts.Logger.Printf("Loaded digest %s for %s\n", artifact.DigestWithAlg(), artifact.URL)
 
-	c := verification.FetchAttestationsConfig{
-		APIClient:             opts.APIClient,
-		BundlePath:            opts.BundlePath,
-		Digest:                artifact.DigestWithAlg(),
-		Limit:                 opts.Limit,
-		Owner:                 opts.Owner,
-		Repo:                  opts.Repo,
-		OCIClient:             opts.OCIClient,
-		UseBundleFromRegistry: opts.UseBundleFromRegistry,
-		NameRef:               artifact.NameRef(),
-	}
-	attestations, err := verification.GetAttestations(c)
+	attestations, logMsg, err := getAttestations(opts, *artifact)
 	if err != nil {
-		if ok := errors.Is(err, api.ErrNoAttestations{}); ok {
+		if ok := errors.Is(err, api.ErrNoAttestationsFound); ok {
 			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), artifact.DigestWithAlg())
 			return err
 		}
-
-		if c.IsBundleProvided() {
-			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Loading attestations from %s failed\n"), artifact.URL)
-		} else if c.UseBundleFromRegistry {
-			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Loading attestations from OCI registry failed"))
-		} else {
-			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Loading attestations from GitHub API failed"))
-		}
+		// Print the message signifying failure fetching attestations
+		opts.Logger.Println(opts.Logger.ColorScheme.Red(logMsg))
 		return err
 	}
-
-	pluralAttestation := text.Pluralize(len(attestations), "attestation")
-	if c.IsBundleProvided() {
-		opts.Logger.Printf("Loaded %s from %s\n", pluralAttestation, opts.BundlePath)
-	} else if c.UseBundleFromRegistry {
-		opts.Logger.Printf("Loaded %s from %s\n", pluralAttestation, opts.ArtifactPath)
-	} else {
-		opts.Logger.Printf("Loaded %s from GitHub API\n", pluralAttestation)
-	}
+	// Print the message signifying success fetching attestations
+	opts.Logger.Println(logMsg)
 
 	// Apply predicate type filter to returned attestations
-	if opts.PredicateType != "" {
-		filteredAttestations := verification.FilterAttestations(opts.PredicateType, attestations)
-
-		if len(filteredAttestations) == 0 {
-			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found with predicate type: %s\n"), opts.PredicateType)
-			return err
-		}
-
-		attestations = filteredAttestations
+	filteredAttestations := verification.FilterAttestations(ec.PredicateType, attestations)
+	if len(filteredAttestations) == 0 {
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found with predicate type: %s\n"), opts.PredicateType)
+		return fmt.Errorf("no matching predicate found")
 	}
+	attestations = filteredAttestations
 
-	policy, err := buildVerifyPolicy(opts, *artifact)
+	// print information about the policy that will be enforced against attestations
+	opts.Logger.Println("\nThe following policy criteria will be enforced:")
+	opts.Logger.Println(ec.BuildPolicyInformation())
+
+	verified, errMsg, err := verifyAttestations(*artifact, attestations, opts.SigstoreVerifier, ec)
 	if err != nil {
-		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build verification policy"))
-		return err
-	}
-
-	sigstoreRes := opts.SigstoreVerifier.Verify(attestations, policy)
-	if sigstoreRes.Error != nil {
-		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Verification failed"))
-		return sigstoreRes.Error
-	}
-
-	// Verify extensions
-	if err := verification.VerifyCertExtensions(sigstoreRes.VerifyResults, opts.Tenant, opts.Owner, opts.Repo, opts.OIDCIssuer); err != nil {
-		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Verification failed"))
+		opts.Logger.Println(opts.Logger.ColorScheme.Red(errMsg))
 		return err
 	}
 
@@ -278,26 +258,39 @@ func runVerify(opts *Options) error {
 	// If an exporter is provided with the --json flag, write the results to the terminal in JSON format
 	if opts.exporter != nil {
 		// print the results to the terminal as an array of JSON objects
-		if err = opts.exporter.Write(opts.Logger.IO, sigstoreRes.VerifyResults); err != nil {
+		if err = opts.exporter.Write(opts.Logger.IO, verified); err != nil {
 			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to write JSON output"))
 			return err
 		}
 		return nil
 	}
 
-	opts.Logger.Printf("%s was attested by:\n", artifact.DigestWithAlg())
+	opts.Logger.Printf("The following %s matched the policy criteria\n\n", text.Pluralize(len(verified), "attestation"))
 
-	// Otherwise print the results to the terminal in a table
-	tableContent, err := buildTableVerifyContent(opts.Tenant, sigstoreRes.VerifyResults)
-	if err != nil {
-		opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to parse results"))
-		return err
-	}
+	// Otherwise print the results to the terminal
+	for i, v := range verified {
+		buildConfigURI := v.VerificationResult.Signature.Certificate.Extensions.BuildConfigURI
+		sourceRepoAndOrg, sourceWorkflow, err := extractAttestationDetail(opts.Tenant, buildConfigURI)
+		if err != nil {
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to parse build config URI"))
+			return err
+		}
+		builderSignerURI := v.VerificationResult.Signature.Certificate.Extensions.BuildSignerURI
+		signerRepoAndOrg, signerWorkflow, err := extractAttestationDetail(opts.Tenant, builderSignerURI)
+		if err != nil {
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to parse build signer URI"))
+			return err
+		}
 
-	headers := []string{"repo", "predicate_type", "workflow"}
-	if err = opts.Logger.PrintTable(headers, tableContent); err != nil {
-		opts.Logger.Println(opts.Logger.ColorScheme.Red("failed to print attestation details to table"))
-		return err
+		opts.Logger.Printf("- Attestation #%d\n", i+1)
+		rows := [][]string{
+			{"  - Build repo", sourceRepoAndOrg},
+			{"  - Build workflow", sourceWorkflow},
+			{"  - Signer repo", signerRepoAndOrg},
+			{"  - Signer workflow", signerWorkflow},
+		}
+		//nolint:errcheck
+		opts.Logger.PrintBulletPoints(rows)
 	}
 
 	// All attestations passed verification and policy evaluation
@@ -328,39 +321,15 @@ func extractAttestationDetail(tenant, builderSignerURI string) (string, string, 
 
 	match := orgAndRepoRegexp.FindStringSubmatch(builderSignerURI)
 	if len(match) < 2 {
-		return "", "", fmt.Errorf("no match found for org and repo")
+		return "", "", fmt.Errorf("no match found for org and repo: %s", builderSignerURI)
 	}
 	orgAndRepo := match[1]
 
 	match = workflowRegexp.FindStringSubmatch(builderSignerURI)
 	if len(match) < 2 {
-		return "", "", fmt.Errorf("no match found for workflow")
+		return "", "", fmt.Errorf("no match found for workflow: %s", builderSignerURI)
 	}
 	workflow := match[1]
 
 	return orgAndRepo, workflow, nil
-}
-
-func buildTableVerifyContent(tenant string, results []*verification.AttestationProcessingResult) ([][]string, error) {
-	content := make([][]string, len(results))
-
-	for i, res := range results {
-		if res.VerificationResult == nil ||
-			res.VerificationResult.Signature == nil ||
-			res.VerificationResult.Signature.Certificate == nil {
-			return nil, fmt.Errorf("bundle missing verification result fields")
-		}
-		builderSignerURI := res.VerificationResult.Signature.Certificate.Extensions.BuildSignerURI
-		repoAndOrg, workflow, err := extractAttestationDetail(tenant, builderSignerURI)
-		if err != nil {
-			return nil, err
-		}
-		if res.VerificationResult.Statement == nil {
-			return nil, fmt.Errorf("bundle missing attestation statement (bundle must originate from GitHub Artifact Attestations)")
-		}
-		predicateType := res.VerificationResult.Statement.PredicateType
-		content[i] = []string{repoAndOrg, predicateType, workflow}
-	}
-
-	return content, nil
 }

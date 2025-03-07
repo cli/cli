@@ -611,7 +611,7 @@ func TestIssueCreate_recover(t *testing.T) {
 
 	pm := &prompter.PrompterMock{}
 	pm.InputFunc = func(p, d string) (string, error) {
-		if p == "Title" {
+		if p == "Title (required)" {
 			return d, nil
 		} else {
 			return "", prompter.NoSuchPromptErr(p)
@@ -736,7 +736,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 
 	pm := &prompter.PrompterMock{}
 	pm.InputFunc = func(p, d string) (string, error) {
-		if p == "Title" {
+		if p == "Title (required)" {
 			return "hello", nil
 		} else {
 			return "", prompter.NoSuchPromptErr(p)

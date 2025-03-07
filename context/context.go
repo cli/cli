@@ -99,7 +99,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 	cs := io.ColorScheme()
 
 	fmt.Fprintf(io.ErrOut,
-		"%s No default remote repository has been set for this directory.\n",
+		"%s No default remote repository has been set. To learn more about the default repository, run: gh repo set-default --help\n",
 		cs.FailureIcon())
 
 	fmt.Fprintln(io.Out)

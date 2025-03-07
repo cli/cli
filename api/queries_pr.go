@@ -33,6 +33,7 @@ type PullRequest struct {
 	Closed              bool
 	URL                 string
 	BaseRefName         string
+	BaseRefOid          string
 	HeadRefName         string
 	HeadRefOid          string
 	Body                string

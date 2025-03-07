@@ -101,10 +101,7 @@ func TestLogin(t *testing.T) {
 					// simulate that the public key file has been generated
 					_ = os.WriteFile(keyFile+".pub", []byte("PUBKEY asdf"), 0600)
 				})
-				opts.sshContext = ssh.Context{
-					ConfigDir: dir,
-					KeygenExe: "ssh-keygen",
-				}
+				opts.sshContext = ssh.NewContextForTests(dir, "ssh-keygen")
 			},
 			wantsConfig: map[string]string{
 				"example.com:user":         "monalisa",
@@ -112,6 +109,11 @@ func TestLogin(t *testing.T) {
 				"example.com:git_protocol": "ssh",
 			},
 			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
+				sshDir, err := opts.sshContext.SshDir()
+				if err != nil {
+					t.Errorf("Could not load ssh config dir: %v", err)
+				}
+
 				assert.Equal(t, heredoc.Docf(`
 				Tip: you can generate a Personal Access Token here https://example.com/settings/tokens
 				The minimum required scopes are 'repo', 'read:org', 'admin:public_key'.
@@ -119,7 +121,7 @@ func TestLogin(t *testing.T) {
 				✓ Configured git protocol
 				✓ Uploaded the SSH key to your GitHub account: %s
 				✓ Logged in as monalisa
-			`, filepath.Join(opts.sshContext.ConfigDir, "id_ed25519.pub")), stderr)
+			`, filepath.Join(sshDir, "id_ed25519.pub")), stderr)
 			},
 		},
 		{
@@ -179,10 +181,7 @@ func TestLogin(t *testing.T) {
 					// simulate that the public key file has been generated
 					_ = os.WriteFile(keyFile+".pub", []byte("PUBKEY asdf"), 0600)
 				})
-				opts.sshContext = ssh.Context{
-					ConfigDir: dir,
-					KeygenExe: "ssh-keygen",
-				}
+				opts.sshContext = ssh.NewContextForTests(dir, "ssh-keygen")
 			},
 			wantsConfig: map[string]string{
 				"example.com:user":         "monalisa",
@@ -190,6 +189,11 @@ func TestLogin(t *testing.T) {
 				"example.com:git_protocol": "ssh",
 			},
 			stderrAssert: func(t *testing.T, opts *LoginOptions, stderr string) {
+				sshDir, err := opts.sshContext.SshDir()
+				if err != nil {
+					t.Errorf("Could not load ssh config dir: %v", err)
+				}
+
 				assert.Equal(t, heredoc.Docf(`
 				Tip: you can generate a Personal Access Token here https://example.com/settings/tokens
 				The minimum required scopes are 'repo', 'read:org', 'admin:public_key'.
@@ -197,7 +201,7 @@ func TestLogin(t *testing.T) {
 				✓ Configured git protocol
 				✓ Uploaded the SSH key to your GitHub account: %s
 				✓ Logged in as monalisa
-			`, filepath.Join(opts.sshContext.ConfigDir, "id_ed25519.pub")), stderr)
+			`, filepath.Join(sshDir, "id_ed25519.pub")), stderr)
 			},
 		},
 		{

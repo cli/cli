@@ -235,10 +235,11 @@ type FieldValueNodes struct {
 		Field ProjectField
 	} `graphql:"... on ProjectV2ItemFieldDateValue"`
 	ProjectV2ItemFieldIterationValue struct {
-		Title     string
-		StartDate string
-		Duration  int
-		Field     ProjectField
+		Title       string
+		StartDate   string
+		Duration    int
+		Field       ProjectField
+		IterationId string
 	} `graphql:"... on ProjectV2ItemFieldIterationValue"`
 	ProjectV2ItemFieldLabelValue struct {
 		Labels struct {
@@ -249,7 +250,7 @@ type FieldValueNodes struct {
 		Field ProjectField
 	} `graphql:"... on ProjectV2ItemFieldLabelValue"`
 	ProjectV2ItemFieldNumberValue struct {
-		Number float32
+		Number float64
 		Field  ProjectField
 	} `graphql:"... on ProjectV2ItemFieldNumberValue"`
 	ProjectV2ItemFieldSingleSelectValue struct {
@@ -1488,9 +1489,10 @@ func projectFieldValueData(v FieldValueNodes) interface{} {
 		return v.ProjectV2ItemFieldDateValue.Date
 	case "ProjectV2ItemFieldIterationValue":
 		return map[string]interface{}{
-			"title":     v.ProjectV2ItemFieldIterationValue.Title,
-			"startDate": v.ProjectV2ItemFieldIterationValue.StartDate,
-			"duration":  v.ProjectV2ItemFieldIterationValue.Duration,
+			"title":       v.ProjectV2ItemFieldIterationValue.Title,
+			"startDate":   v.ProjectV2ItemFieldIterationValue.StartDate,
+			"duration":    v.ProjectV2ItemFieldIterationValue.Duration,
+			"iterationId": v.ProjectV2ItemFieldIterationValue.IterationId,
 		}
 	case "ProjectV2ItemFieldNumberValue":
 		return v.ProjectV2ItemFieldNumberValue.Number

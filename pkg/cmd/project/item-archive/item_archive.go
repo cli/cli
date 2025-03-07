@@ -46,8 +46,8 @@ func NewCmdArchiveItem(f *cmdutil.Factory, runF func(config archiveItemConfig) e
 		Short: "Archive an item in a project",
 		Use:   "item-archive [<number>]",
 		Example: heredoc.Doc(`
-			# archive an item in the current user's project "1"
-			gh project item-archive 1 --owner "@me" --id <item-ID>
+			# Archive an item in the current user's project "1"
+			$ gh project item-archive 1 --owner "@me" --id <item-ID>
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

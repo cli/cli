@@ -6,9 +6,10 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/set"
+
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 type requestOptions struct {
@@ -120,13 +121,10 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		}
 	`
 
-	currentUsername := options.Username
-	if currentUsername == "@me" && ghinstance.IsEnterprise(repo.RepoHost()) {
-		var err error
-		currentUsername, err = api.CurrentLoginName(apiClient, repo.RepoHost())
-		if err != nil {
-			return nil, err
-		}
+	currentUsername, err := getCurrentUsername(options.Username, repo.RepoHost(), apiClient)
+
+	if err != nil {
+		return nil, err
 	}
 
 	viewerQuery := fmt.Sprintf("repo:%s state:open is:pr author:%s", ghrepo.FullName(repo), currentUsername)
@@ -186,6 +184,17 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 	}
 
 	return &payload, nil
+}
+
+func getCurrentUsername(username string, hostname string, apiClient *api.Client) (string, error) {
+	if username == "@me" && ghauth.IsEnterprise(hostname) {
+		var err error
+		username, err = api.CurrentLoginName(apiClient, hostname)
+		if err != nil {
+			return "", err
+		}
+	}
+	return username, nil
 }
 
 func pullRequestFragment(conflictStatus bool, statusCheckRollupWithCountByState bool) (string, error) {

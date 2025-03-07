@@ -32,6 +32,7 @@ func TestJSONFields(t *testing.T) {
 		"author",
 		"autoMergeRequest",
 		"baseRefName",
+		"baseRefOid",
 		"body",
 		"changedFiles",
 		"closed",

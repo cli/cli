@@ -198,7 +198,7 @@ func (c codespace) displayName(includeOwner bool) string {
 		displayName = c.Name
 	}
 
-	description := fmt.Sprintf("%s (%s): %s", c.Repository.FullName, branch, displayName)
+	description := fmt.Sprintf("%s [%s]: %s", c.Repository.FullName, branch, displayName)
 
 	if includeOwner {
 		description = fmt.Sprintf("%-15s %s", c.Owner.Login, description)

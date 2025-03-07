@@ -27,6 +27,10 @@ func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, ba
 	if len(state.Assignees) > 0 {
 		q.Set("assignees", strings.Join(state.Assignees, ","))
 	}
+	// Set a template parameter if no body parameter is provided e.g. Web Mode
+	if len(state.Template) > 0 && len(state.Body) == 0 {
+		q.Set("template", state.Template)
+	}
 	if len(state.Labels) > 0 {
 		q.Set("labels", strings.Join(state.Labels, ","))
 	}
@@ -40,6 +44,7 @@ func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, ba
 	if len(state.Milestones) > 0 {
 		q.Set("milestone", state.Milestones[0])
 	}
+
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }

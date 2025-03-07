@@ -32,7 +32,7 @@ jobs:
           go mod verify
           go mod download
 
-          LINT_VERSION=1.59.1
+          LINT_VERSION=1.63.4
           curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v${LINT_VERSION}/golangci-lint-${LINT_VERSION}-linux-amd64.tar.gz | \
             tar xz --strip-components 1 --wildcards \*/golangci-lint
           mkdir -p bin && mv golangci-lint bin/
@@ -53,6 +53,6 @@ jobs:
           assert-nothing-changed go fmt ./...
           assert-nothing-changed go mod tidy
 
-          bin/golangci-lint run --out-format=github-actions --timeout=3m || STATUS=$?
+          bin/golangci-lint run --out-format=colored-line-number --timeout=3m || STATUS=$?
 
           exit $STATUS

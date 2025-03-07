@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/verify"
@@ -12,39 +13,102 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 )
 
-const (
-	// represents the GitHub hosted runner in the certificate RunnerEnvironment extension
-	GitHubRunner = "github-hosted"
-	hostRegex    = `^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+.*$`
-)
+const hostRegex = `^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+.*$`
 
 func expandToGitHubURL(tenant, ownerOrRepo string) string {
 	if tenant == "" {
-		return fmt.Sprintf("(?i)^https://github.com/%s/", ownerOrRepo)
+		return fmt.Sprintf("https://github.com/%s", ownerOrRepo)
 	}
-	return fmt.Sprintf("(?i)^https://%s.ghe.com/%s/", tenant, ownerOrRepo)
+	return fmt.Sprintf("https://%s.ghe.com/%s", tenant, ownerOrRepo)
 }
 
-func buildSANMatcher(opts *Options) (verify.SubjectAlternativeNameMatcher, error) {
-	if opts.SignerRepo != "" {
-		signedRepoRegex := expandToGitHubURL(opts.Tenant, opts.SignerRepo)
-		return verify.NewSANMatcher("", signedRepoRegex)
+func expandToGitHubURLRegex(tenant, ownerOrRepo string) string {
+	url := expandToGitHubURL(tenant, ownerOrRepo)
+	return fmt.Sprintf("(?i)^%s/", url)
+}
+
+func newEnforcementCriteria(opts *Options) (verification.EnforcementCriteria, error) {
+	// initialize the enforcement criteria with the provided PredicateType
+	c := verification.EnforcementCriteria{
+		PredicateType: opts.PredicateType,
+	}
+
+	// set the owner value by checking the repo and owner options
+	var owner string
+	if opts.Repo != "" {
+		// we expect the repo argument to be in the format <OWNER>/<REPO>
+		splitRepo := strings.Split(opts.Repo, "/")
+		// if Repo is provided but owner is not, set the OWNER portion of the Repo value
+		// to Owner
+		owner = splitRepo[0]
+	} else {
+		// otherwise use the user provided owner value
+		owner = opts.Owner
+	}
+
+	// Set the SANRegex and SAN values using the provided options
+	// First check if the opts.SANRegex or opts.SAN values are provided
+	if opts.SANRegex != "" || opts.SAN != "" {
+		c.SANRegex = opts.SANRegex
+		c.SAN = opts.SAN
+	} else if opts.SignerRepo != "" {
+		// next check if opts.SignerRepo was provided
+		signedRepoRegex := expandToGitHubURLRegex(opts.Tenant, opts.SignerRepo)
+		c.SANRegex = signedRepoRegex
 	} else if opts.SignerWorkflow != "" {
-		validatedWorkflowRegex, err := validateSignerWorkflow(opts)
+		validatedWorkflowRegex, err := validateSignerWorkflow(opts.Hostname, opts.SignerWorkflow)
 		if err != nil {
-			return verify.SubjectAlternativeNameMatcher{}, err
+			return verification.EnforcementCriteria{}, err
 		}
-
-		return verify.NewSANMatcher("", validatedWorkflowRegex)
-	} else if opts.SAN != "" || opts.SANRegex != "" {
-		return verify.NewSANMatcher(opts.SAN, opts.SANRegex)
+		c.SANRegex = validatedWorkflowRegex
+	} else if opts.Repo != "" {
+		// if the user has not provided the SAN, SANRegex, SignerRepo, or SignerWorkflow options
+		// then we default to the repo option
+		c.SANRegex = expandToGitHubURLRegex(opts.Tenant, opts.Repo)
+	} else {
+		// if opts.Repo was not provided, we fall back to the opts.Owner value
+		c.SANRegex = expandToGitHubURLRegex(opts.Tenant, owner)
 	}
 
-	return verify.SubjectAlternativeNameMatcher{}, nil
+	// if the DenySelfHostedRunner option is set to true, set the
+	// RunnerEnvironment extension to the GitHub hosted runner value
+	if opts.DenySelfHostedRunner {
+		c.Certificate.RunnerEnvironment = verification.GitHubRunner
+	} else {
+		// if Certificate.RunnerEnvironment value is set to the empty string
+		// through the second function argument,
+		// no certificate matching will happen on the RunnerEnvironment field
+		c.Certificate.RunnerEnvironment = ""
+	}
+
+	// If the Repo option is provided, set the SourceRepositoryURI extension
+	if opts.Repo != "" {
+		c.Certificate.SourceRepositoryURI = expandToGitHubURL(opts.Tenant, opts.Repo)
+	}
+
+	// Set the SourceRepositoryOwnerURI extension using owner and tenant if provided
+	c.Certificate.SourceRepositoryOwnerURI = expandToGitHubURL(opts.Tenant, owner)
+
+	// if the tenant is provided and OIDC issuer provided matches the default
+	// use the tenant-specific issuer
+	if opts.Tenant != "" && opts.OIDCIssuer == verification.GitHubOIDCIssuer {
+		c.Certificate.Issuer = fmt.Sprintf(verification.GitHubTenantOIDCIssuer, opts.Tenant)
+	} else {
+		// otherwise use the custom OIDC issuer provided as an option
+		c.Certificate.Issuer = opts.OIDCIssuer
+	}
+
+	// set the SourceRepositoryDigest, SourceRepositoryRef, and BuildSignerDigest
+	// extensions if the options are provided
+	c.Certificate.BuildSignerDigest = opts.SignerDigest
+	c.Certificate.SourceRepositoryDigest = opts.SourceDigest
+	c.Certificate.SourceRepositoryRef = opts.SourceRef
+
+	return c, nil
 }
 
-func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.PolicyOption, error) {
-	sanMatcher, err := buildSANMatcher(opts)
+func buildCertificateIdentityOption(c verification.EnforcementCriteria) (verify.PolicyOption, error) {
+	sanMatcher, err := verify.NewSANMatcher(c.SAN, c.SANRegex)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +120,7 @@ func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.Pol
 	}
 
 	extensions := certificate.Extensions{
-		RunnerEnvironment: runnerEnv,
+		RunnerEnvironment: c.Certificate.RunnerEnvironment,
 	}
 
 	certId, err := verify.NewCertificateIdentity(sanMatcher, issuerMatcher, extensions)
@@ -67,34 +131,13 @@ func buildCertificateIdentityOption(opts *Options, runnerEnv string) (verify.Pol
 	return verify.WithCertificateIdentity(certId), nil
 }
 
-func buildVerifyCertIdOption(opts *Options) (verify.PolicyOption, error) {
-	if opts.DenySelfHostedRunner {
-		withGHRunner, err := buildCertificateIdentityOption(opts, GitHubRunner)
-		if err != nil {
-			return nil, err
-		}
-
-		return withGHRunner, nil
-	}
-
-	// if Extensions.RunnerEnvironment value is set to the empty string
-	// through the second function argument,
-	// no certificate matching will happen on the RunnerEnvironment field
-	withAnyRunner, err := buildCertificateIdentityOption(opts, "")
-	if err != nil {
-		return nil, err
-	}
-
-	return withAnyRunner, nil
-}
-
-func buildVerifyPolicy(opts *Options, a artifact.DigestedArtifact) (verify.PolicyBuilder, error) {
+func buildSigstoreVerifyPolicy(c verification.EnforcementCriteria, a artifact.DigestedArtifact) (verify.PolicyBuilder, error) {
 	artifactDigestPolicyOption, err := verification.BuildDigestPolicyOption(a)
 	if err != nil {
 		return verify.PolicyBuilder{}, err
 	}
 
-	certIdOption, err := buildVerifyCertIdOption(opts)
+	certIdOption, err := buildCertificateIdentityOption(c)
 	if err != nil {
 		return verify.PolicyBuilder{}, err
 	}
@@ -103,25 +146,23 @@ func buildVerifyPolicy(opts *Options, a artifact.DigestedArtifact) (verify.Polic
 	return policy, nil
 }
 
-func addSchemeToRegex(s string) string {
-	return fmt.Sprintf("^https://%s", s)
-}
-
-func validateSignerWorkflow(opts *Options) (string, error) {
+func validateSignerWorkflow(hostname, signerWorkflow string) (string, error) {
 	// we expect a provided workflow argument be in the format [HOST/]/<OWNER>/<REPO>/path/to/workflow.yml
 	// if the provided workflow does not contain a host, set the host
-	match, err := regexp.MatchString(hostRegex, opts.SignerWorkflow)
+	match, err := regexp.MatchString(hostRegex, signerWorkflow)
 	if err != nil {
 		return "", err
 	}
 
 	if match {
-		return addSchemeToRegex(opts.SignerWorkflow), nil
+		return fmt.Sprintf("^https://%s", signerWorkflow), nil
 	}
 
-	if opts.Hostname == "" {
+	// if the provided workflow did not match the expect format
+	// we move onto creating a signer workflow using the provided host name
+	if hostname == "" {
 		return "", errors.New("unknown host")
 	}
 
-	return addSchemeToRegex(fmt.Sprintf("%s/%s", opts.Hostname, opts.SignerWorkflow)), nil
+	return fmt.Sprintf("^https://%s/%s", hostname, signerWorkflow), nil
 }

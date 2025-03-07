@@ -1,0 +1,24 @@
+skip 'it modifies the user''s personal GitHub account SSH keys'
+
+# scopes admin:ssh_signing_key,admin:public_key
+
+# Add an SSH key to the account
+exec gh ssh-key add sshKey.pub --title 'acceptance-test-key'
+
+# List the SSH keys
+exec gh ssh-key list
+stdout 'acceptance-test-key'
+
+# Get the ID of the key we created
+exec gh api /user/keys --jq '.[] | select(.title == "acceptance-test-key") | .id'
+stdout2env SSH_KEY_ID
+
+# Delete the SSH key
+exec gh ssh-key delete --yes ${SSH_KEY_ID}
+
+# Check the key is deleted
+exec gh ssh-key list
+! stdout 'acceptance-test-key'
+
+-- sshKey.pub --
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAZmdeRNskfpvYL5YHB/YJaW8hTEXpnvPMkx5Ri+YwUr acceptance

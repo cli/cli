@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -124,39 +125,39 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			into an outer JSON array.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# list releases in the current repository
+			# List releases in the current repository
 			$ gh api repos/{owner}/{repo}/releases
 
-			# post an issue comment
+			# Post an issue comment
 			$ gh api repos/{owner}/{repo}/issues/123/comments -f body='Hi from CLI'
 
-			# post nested parameter read from a file
+			# Post nested parameter read from a file
 			$ gh api gists -F 'files[myfile.txt][content]=@myfile.txt'
 
-			# add parameters to a GET request
+			# Add parameters to a GET request
 			$ gh api -X GET search/issues -f q='repo:cli/cli is:open remote'
 
-			# set a custom HTTP header
+			# Set a custom HTTP header
 			$ gh api -H 'Accept: application/vnd.github.v3.raw+json' ...
 
-			# opt into GitHub API previews
+			# Opt into GitHub API previews
 			$ gh api --preview baptiste,nebula ...
 
-			# print only specific fields from the response
+			# Print only specific fields from the response
 			$ gh api repos/{owner}/{repo}/issues --jq '.[].title'
 
-			# use a template for the output
+			# Use a template for the output
 			$ gh api repos/{owner}/{repo}/issues --template \
 			  '{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " | color "yellow"}}){{"\n"}}{{end}}'
 
-			# update allowed values of the "environment" custom property in a deeply nested array
-			gh api -X PATCH /orgs/{org}/properties/schema \
+			# Update allowed values of the "environment" custom property in a deeply nested array
+			$ gh api -X PATCH /orgs/{org}/properties/schema \
 			   -F 'properties[][property_name]=environment' \
 			   -F 'properties[][default_value]=production' \
 			   -F 'properties[][allowed_values][]=staging' \
 			   -F 'properties[][allowed_values][]=production'
 
-			# list releases with GraphQL
+			# List releases with GraphQL
 			$ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
 			  query($name: String!, $owner: String!) {
 			    repository(owner: $owner, name: $name) {
@@ -167,7 +168,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			  }
 			'
 
-			# list all repositories for a user
+			# List all repositories for a user
 			$ gh api graphql --paginate -f query='
 			  query($endCursor: String) {
 			    viewer {
@@ -182,7 +183,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			  }
 			'
 
-			# get the percentage of forks for the current user
+			# Get the percentage of forks for the current user
 			$ gh api graphql --paginate --slurp -f query='
 			  query($endCursor: String) {
 			    viewer {
@@ -201,12 +202,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		Annotations: map[string]string{
 			"help:environment": heredoc.Doc(`
 				GH_TOKEN, GITHUB_TOKEN (in order of precedence): an authentication token for
-				github.com API requests.
+				<github.com> API requests.
 
 				GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an
 				authentication token for API requests to GitHub Enterprise.
 
-				GH_HOST: make the request to a GitHub host other than github.com.
+				GH_HOST: make the request to a GitHub host other than <github.com>.
 			`),
 		},
 		Args: cobra.ExactArgs(1),
@@ -239,17 +240,19 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return err
 			}
 
-			if opts.Slurp && !opts.Paginate {
-				return cmdutil.FlagErrorf("`--paginate` required when passing `--slurp`")
-			}
+			if opts.Slurp {
+				if err := cmdutil.MutuallyExclusive(
+					"the `--slurp` option is not supported with `--jq` or `--template`",
+					opts.Slurp,
+					opts.FilterOutput != "",
+					opts.Template != "",
+				); err != nil {
+					return err
+				}
 
-			if err := cmdutil.MutuallyExclusive(
-				"the `--slurp` option is not supported with `--jq` or `--template`",
-				opts.Slurp,
-				opts.FilterOutput != "",
-				opts.Template != "",
-			); err != nil {
-				return err
+				if !opts.Paginate {
+					return cmdutil.FlagErrorf("`--paginate` required when passing `--slurp`")
+				}
 			}
 
 			if err := cmdutil.MutuallyExclusive(
@@ -261,6 +264,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			); err != nil {
 				return err
 			}
+
+			opts.RequestPath = escapePackageNameInPath(opts.RequestPath)
 
 			if runF != nil {
 				return runF(&opts)
@@ -461,9 +466,11 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 
 	var serverError string
 	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
-		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
-		if err != nil {
-			return
+		if !strings.EqualFold(opts.RequestMethod, "HEAD") {
+			responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
+			if err != nil {
+				return
+			}
 		}
 	}
 
@@ -686,4 +693,38 @@ func previewNamesToMIMETypes(names []string) string {
 		types = append(types, fmt.Sprintf("application/vnd.github.%s-preview", p))
 	}
 	return strings.Join(types, ", ")
+}
+
+// The package name part in the `packages` endpoints may contain slashes and
+// other characters that need to be URL encoded.
+//
+// The `escapePackageNameInPath` function extracts and normalizes package names
+// in the path. The regex `pathWithPackageNameRE` is being used to extract the
+// package name with a capture group named `package`.
+//
+// See https://docs.github.com/en/rest/packages/packages APIs for more details.
+//
+// Here's an example:
+//
+// The package name `orders/cache` needs to be URL encoded because it contains
+// a slash `/`. The `escapePackageNameInPath` function will extract the
+// `orders/cache` part, perform the URL encoding, and return the normalized API
+// endpoint with `%2F` replacing the slash `/` in the package name part only.
+//
+// - Package name: `orders/cache`
+// - API endpoint: `/users/USER/packages/container/orders/cache`
+// - Normalized:   `/users/USER/packages/container/orders%2Fcache`
+
+var pathWithPackageNameRE = regexp.MustCompile(`^\/(?:orgs|user|users)(?:\/.*)?\/packages\/(?:npm|maven|rubygems|docker|nuget|container)\/(?<package>.*?)(?:\/(?:restore|versions)|$)`)
+
+func escapePackageNameInPath(path string) string {
+	matches := pathWithPackageNameRE.FindStringSubmatch(path)
+	if len(matches) > 0 {
+		i := pathWithPackageNameRE.SubexpIndex("package")
+		packageName := matches[i]
+		if packageName != "" {
+			return strings.Replace(path, packageName, url.QueryEscape(packageName), 1)
+		}
+	}
+	return path
 }

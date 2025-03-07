@@ -77,6 +77,10 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
 
+			if opts.Exporter != nil && opts.Watch {
+				return cmdutil.FlagErrorf("cannot use `--watch` with `--json` flag")
+			}
+
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
 				return cmdutil.FlagErrorf("argument required when using the `--repo` flag")
 			}

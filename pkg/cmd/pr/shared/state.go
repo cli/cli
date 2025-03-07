@@ -23,6 +23,8 @@ type IssueMetadataState struct {
 	Body  string
 	Title string
 
+	Template string
+
 	Metadata   []string
 	Reviewers  []string
 	Assignees  []string

@@ -1,0 +1,10 @@
+# Check that the credential helper is unset for the host. This command is
+# expected to fail before gh auth setup-git is run.
+! exec git config --get credential.https://${GH_HOST}.helper
+
+# Run the setup-git command
+exec gh auth setup-git
+
+# Check that the credential helper is set to gh
+exec git config --get credential.https://${GH_HOST}.helper
+stdout '^.*gh auth git-credential$'
