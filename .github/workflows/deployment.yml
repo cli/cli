@@ -301,7 +301,7 @@ jobs:
           base64 -d <<<"$GPG_KEY" | gpg --import --no-tty --batch --yes
           echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
           gpg-connect-agent RELOADAGENT /bye
-          /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP" <<<"$GPG_PASSPHRASE"
+          base64 -d <<<"$GPG_PASSPHRASE" | /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP"
       - name: Sign RPMs
         if: inputs.environment == 'production'
         run: |
