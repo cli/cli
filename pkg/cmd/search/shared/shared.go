@@ -27,14 +27,15 @@ const (
 )
 
 type IssuesOptions struct {
-	Browser  browser.Browser
-	Entity   EntityType
-	Exporter cmdutil.Exporter
-	IO       *iostreams.IOStreams
-	Now      time.Time
-	Query    search.Query
-	Searcher search.Searcher
-	WebMode  bool
+	AdvancedSearch bool
+	Browser        browser.Browser
+	Entity         EntityType
+	Exporter       cmdutil.Exporter
+	IO             *iostreams.IOStreams
+	Now            time.Time
+	Query          search.Query
+	Searcher       search.Searcher
+	WebMode        bool
 }
 
 func Searcher(f *cmdutil.Factory) (search.Searcher, error) {

@@ -16,9 +16,10 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 	var order, sort string
 	var appAuthor string
 	opts := &shared.IssuesOptions{
-		Browser: f.Browser,
-		Entity:  shared.Issues,
-		IO:      f.IOStreams,
+		AdvancedSearch: false,
+		Browser:        f.Browser,
+		Entity:         shared.Issues,
+		IO:             f.IOStreams,
 		Query: search.Query{Kind: search.KindIssues,
 			Qualifiers: search.Qualifiers{Type: "issue"}},
 	}
@@ -63,6 +64,9 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 			}
 			if opts.Query.Limit < 1 || opts.Query.Limit > shared.SearchMaxResults {
 				return cmdutil.FlagErrorf("`--limit` must be between 1 and 1000")
+			}
+			if c.Flags().Changed("advanced-search") {
+				opts.Query.AdvancedSearch = true
 			}
 			if c.Flags().Changed("author") && c.Flags().Changed("app") {
 				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
@@ -136,6 +140,7 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 
 	// Query qualifier flags
 	cmd.Flags().BoolVar(&includePrs, "include-prs", false, "Include pull requests in results")
+	cmd.Flags().BoolVar(&opts.AdvancedSearch, "advanced-search", false, "Use advanced search syntax")
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Filter based on the repository archived state {true|false}")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Assignee, "assignee", "", "Filter by assignee")

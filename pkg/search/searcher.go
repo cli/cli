@@ -157,6 +157,9 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 func (s searcher) search(query Query, result interface{}) (*http.Response, error) {
 	path := fmt.Sprintf("%ssearch/%s", ghinstance.RESTPrefix(s.host), query.Kind)
 	qs := url.Values{}
+	if query.AdvancedSearch {
+		qs.Set("advanced_search", "true")
+	}
 	qs.Set("page", strconv.Itoa(query.Page))
 	qs.Set("per_page", strconv.Itoa(query.Limit))
 	qs.Set("q", query.String())
