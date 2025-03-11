@@ -110,6 +110,8 @@ func CommentableRun(opts *CommentableOptions) error {
 					return errNoUserComments
 				}
 			}
+		} else if !opts.CreateIfNone {
+			return errNoUserComments
 		}
 	}
 	return createComment(commentable, opts)
