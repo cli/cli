@@ -19,6 +19,9 @@ var _ gh.Config = &ConfigMock{}
 //
 //		// make and configure a mocked gh.Config
 //		mockedConfig := &ConfigMock{
+//			AdvancedIssueSearchFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the AdvancedIssueSearch method")
+//			},
 //			AliasesFunc: func() gh.AliasConfig {
 //				panic("mock out the Aliases method")
 //			},
@@ -71,6 +74,9 @@ var _ gh.Config = &ConfigMock{}
 //
 //	}
 type ConfigMock struct {
+	// AdvancedIssueSearchFunc mocks the AdvancedIssueSearch method.
+	AdvancedIssueSearchFunc func(hostname string) gh.ConfigEntry
+
 	// AliasesFunc mocks the Aliases method.
 	AliasesFunc func() gh.AliasConfig
 
@@ -118,6 +124,11 @@ type ConfigMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AdvancedIssueSearch holds details about calls to the AdvancedIssueSearch method.
+		AdvancedIssueSearch []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
 		// Aliases holds details about calls to the Aliases method.
 		Aliases []struct {
 		}
@@ -190,21 +201,54 @@ type ConfigMock struct {
 		Write []struct {
 		}
 	}
-	lockAliases            sync.RWMutex
-	lockAuthentication     sync.RWMutex
-	lockBrowser            sync.RWMutex
-	lockCacheDir           sync.RWMutex
-	lockEditor             sync.RWMutex
-	lockGetOrDefault       sync.RWMutex
-	lockGitProtocol        sync.RWMutex
-	lockHTTPUnixSocket     sync.RWMutex
-	lockMigrate            sync.RWMutex
-	lockPager              sync.RWMutex
-	lockPreferEditorPrompt sync.RWMutex
-	lockPrompt             sync.RWMutex
-	lockSet                sync.RWMutex
-	lockVersion            sync.RWMutex
-	lockWrite              sync.RWMutex
+	lockAdvancedIssueSearch sync.RWMutex
+	lockAliases             sync.RWMutex
+	lockAuthentication      sync.RWMutex
+	lockBrowser             sync.RWMutex
+	lockCacheDir            sync.RWMutex
+	lockEditor              sync.RWMutex
+	lockGetOrDefault        sync.RWMutex
+	lockGitProtocol         sync.RWMutex
+	lockHTTPUnixSocket      sync.RWMutex
+	lockMigrate             sync.RWMutex
+	lockPager               sync.RWMutex
+	lockPreferEditorPrompt  sync.RWMutex
+	lockPrompt              sync.RWMutex
+	lockSet                 sync.RWMutex
+	lockVersion             sync.RWMutex
+	lockWrite               sync.RWMutex
+}
+
+// AdvancedIssueSearch calls AdvancedIssueSearchFunc.
+func (mock *ConfigMock) AdvancedIssueSearch(hostname string) gh.ConfigEntry {
+	if mock.AdvancedIssueSearchFunc == nil {
+		panic("ConfigMock.AdvancedIssueSearchFunc: method is nil but Config.AdvancedIssueSearch was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockAdvancedIssueSearch.Lock()
+	mock.calls.AdvancedIssueSearch = append(mock.calls.AdvancedIssueSearch, callInfo)
+	mock.lockAdvancedIssueSearch.Unlock()
+	return mock.AdvancedIssueSearchFunc(hostname)
+}
+
+// AdvancedIssueSearchCalls gets all the calls that were made to AdvancedIssueSearch.
+// Check the length with:
+//
+//	len(mockedConfig.AdvancedIssueSearchCalls())
+func (mock *ConfigMock) AdvancedIssueSearchCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockAdvancedIssueSearch.RLock()
+	calls = mock.calls.AdvancedIssueSearch
+	mock.lockAdvancedIssueSearch.RUnlock()
+	return calls
 }
 
 // Aliases calls AliasesFunc.

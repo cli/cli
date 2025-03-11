@@ -35,6 +35,8 @@ type Config interface {
 	// Set provides primitive access for setting configuration values, optionally scoped by host.
 	Set(hostname string, key string, value string)
 
+	// AdvancedIssueSearch returns the configured advanced issue search, optionally scoped by host.
+	AdvancedIssueSearch(hostname string) ConfigEntry
 	// Browser returns the configured browser, optionally scoped by host.
 	Browser(hostname string) ConfigEntry
 	// Editor returns the configured editor, optionally scoped by host.

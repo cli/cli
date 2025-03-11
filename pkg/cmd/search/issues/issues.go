@@ -2,6 +2,7 @@ package issues
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/search/shared"
@@ -15,8 +16,20 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 	var noAssignee, noLabel, noMilestone, noProject bool
 	var order, sort string
 	var appAuthor string
+
+	// TODO: Extract to shared function
+	advancedSearch := os.Getenv("GH_ADVANCED_ISSUE_SEARCH")
+	if advancedSearch == "" {
+		config, err := f.Config()
+		if err != nil {
+			advancedSearch = "disabled"
+		} else {
+			advancedSearch = config.AdvancedIssueSearch("").Value
+		}
+	}
+
 	opts := &shared.IssuesOptions{
-		AdvancedSearch: false,
+		AdvancedSearch: advancedSearch == "enabled",
 		Browser:        f.Browser,
 		Entity:         shared.Issues,
 		IO:             f.IOStreams,
@@ -65,7 +78,7 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 			if opts.Query.Limit < 1 || opts.Query.Limit > shared.SearchMaxResults {
 				return cmdutil.FlagErrorf("`--limit` must be between 1 and 1000")
 			}
-			if c.Flags().Changed("advanced-search") {
+			if opts.AdvancedSearch {
 				opts.Query.AdvancedSearch = true
 			}
 			if c.Flags().Changed("author") && c.Flags().Changed("app") {
@@ -140,7 +153,6 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 
 	// Query qualifier flags
 	cmd.Flags().BoolVar(&includePrs, "include-prs", false, "Include pull requests in results")
-	cmd.Flags().BoolVar(&opts.AdvancedSearch, "advanced-search", false, "Use advanced search syntax")
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Filter based on the repository archived state {true|false}")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Assignee, "assignee", "", "Filter by assignee")
