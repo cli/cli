@@ -2,7 +2,6 @@ package issues
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/search/shared"
@@ -17,19 +16,8 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 	var order, sort string
 	var appAuthor string
 
-	// TODO: Extract to shared function
-	advancedSearch := os.Getenv("GH_ADVANCED_ISSUE_SEARCH")
-	if advancedSearch == "" {
-		config, err := f.Config()
-		if err != nil {
-			advancedSearch = "disabled"
-		} else {
-			advancedSearch = config.AdvancedIssueSearch("").Value
-		}
-	}
-
 	opts := &shared.IssuesOptions{
-		AdvancedSearch: advancedSearch == "enabled",
+		AdvancedSearch: cmdutil.AdvancedIssueSearchEnabled(f),
 		Browser:        f.Browser,
 		Entity:         shared.Issues,
 		IO:             f.IOStreams,

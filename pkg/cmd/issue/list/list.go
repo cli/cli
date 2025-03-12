@@ -3,7 +3,6 @@ package list
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -47,19 +46,8 @@ type ListOptions struct {
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
-	// TODO: Extract to shared function
-	advancedSearch := os.Getenv("GH_ADVANCED_ISSUE_SEARCH")
-	if advancedSearch == "" {
-		config, err := f.Config()
-		if err != nil {
-			advancedSearch = "disabled"
-		} else {
-			advancedSearch = config.AdvancedIssueSearch("").Value
-		}
-	}
-
 	opts := &ListOptions{
-		AdvancedSearch: advancedSearch == "enabled",
+		AdvancedSearch: cmdutil.AdvancedIssueSearchEnabled(f),
 		IO:             f.IOStreams,
 		HttpClient:     f.HttpClient,
 		Config:         f.Config,
