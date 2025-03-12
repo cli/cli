@@ -49,7 +49,7 @@ func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, ex
 	}
 
 	perPage := limit
-	if limit > 100 {
+	if (limit > 100) || (limit == -1) {
 		perPage = 100
 	}
 
