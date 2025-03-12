@@ -1,6 +1,7 @@
 package release
 
 import (
+	cmdCheckout "github.com/cli/cli/v2/pkg/cmd/release/checkout"
 	cmdCreate "github.com/cli/cli/v2/pkg/cmd/release/create"
 	cmdDelete "github.com/cli/cli/v2/pkg/cmd/release/delete"
 	cmdDeleteAsset "github.com/cli/cli/v2/pkg/cmd/release/delete-asset"
@@ -34,6 +35,7 @@ func NewCmdRelease(f *cmdutil.Factory) *cobra.Command {
 		cmdDownload.NewCmdDownload(f, nil),
 		cmdDelete.NewCmdDelete(f, nil),
 		cmdDeleteAsset.NewCmdDeleteAsset(f, nil),
+		cmdCheckout.NewCmdCheckout(f, nil),
 	)
 
 	return cmd
