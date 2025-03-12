@@ -112,7 +112,7 @@ loop:
 	return &res, nil
 }
 
-func searchIssues(client *api.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.IssuesAndTotalCount, error) {
+func searchIssues(client *api.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int, advancedSearch bool) (*api.IssuesAndTotalCount, error) {
 	fragments := fmt.Sprintf("fragment issue on Issue {%s}", api.IssueGraphQL(filters.Fields))
 	query := fragments +
 		`query IssueSearch($repo: String!, $owner: String!, $type: SearchType!, $limit: Int, $after: String, $query: String!) {
@@ -149,10 +149,17 @@ func searchIssues(client *api.Client, repo ghrepo.Interface, filters prShared.Fi
 
 	perPage := min(limit, 100)
 
+	var searchType string
+	if advancedSearch {
+		searchType = "ISSUE_ADVANCED"
+	} else {
+		searchType = "ISSUE"
+	}
+
 	variables := map[string]interface{}{
 		"owner": repo.RepoOwner(),
 		"repo":  repo.RepoName(),
-		"type":  "ISSUE",
+		"type":  searchType,
 		"limit": perPage,
 		"query": q,
 	}

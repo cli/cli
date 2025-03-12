@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -23,11 +24,12 @@ import (
 )
 
 type ListOptions struct {
-	HttpClient func() (*http.Client, error)
-	Config     func() (gh.Config, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser.Browser
+	AdvancedSearch bool
+	HttpClient     func() (*http.Client, error)
+	Config         func() (gh.Config, error)
+	IO             *iostreams.IOStreams
+	BaseRepo       func() (ghrepo.Interface, error)
+	Browser        browser.Browser
 
 	Assignee     string
 	Labels       []string
@@ -45,12 +47,24 @@ type ListOptions struct {
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
+	// TODO: Extract to shared function
+	advancedSearch := os.Getenv("GH_ADVANCED_ISSUE_SEARCH")
+	if advancedSearch == "" {
+		config, err := f.Config()
+		if err != nil {
+			advancedSearch = "disabled"
+		} else {
+			advancedSearch = config.AdvancedIssueSearch("").Value
+		}
+	}
+
 	opts := &ListOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		Config:     f.Config,
-		Browser:    f.Browser,
-		Now:        time.Now,
+		AdvancedSearch: advancedSearch == "enabled",
+		IO:             f.IOStreams,
+		HttpClient:     f.HttpClient,
+		Config:         f.Config,
+		Browser:        f.Browser,
+		Now:            time.Now,
 	}
 
 	var appAuthor string
@@ -181,7 +195,7 @@ func listRun(opts *ListOptions) error {
 		filterOptions.Fields = opts.Exporter.Fields()
 	}
 
-	listResult, err := issueList(httpClient, baseRepo, filterOptions, opts.LimitResults)
+	listResult, err := issueList(httpClient, baseRepo, filterOptions, opts.LimitResults, opts.AdvancedSearch)
 	if err != nil {
 		return err
 	}
@@ -212,7 +226,7 @@ func listRun(opts *ListOptions) error {
 	return nil
 }
 
-func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.IssuesAndTotalCount, error) {
+func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int, advancedSearch bool) (*api.IssuesAndTotalCount, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	if filters.Search != "" || len(filters.Labels) > 0 || filters.Milestone != "" {
@@ -224,7 +238,7 @@ func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.Filt
 			filters.Milestone = milestone.Title
 		}
 
-		return searchIssues(apiClient, repo, filters, limit)
+		return searchIssues(apiClient, repo, filters, limit, advancedSearch)
 	}
 
 	var err error
