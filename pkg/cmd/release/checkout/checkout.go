@@ -1,14 +1,18 @@
 package checkout
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	cliContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -83,6 +87,142 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 }
 
 func checkoutRun(opts *CheckoutOptions) error {
-	fmt.Println("fetching release...")
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	var release *shared.Release
+
+	if opts.TagName == "" {
+		release, err = shared.FetchLatestRelease(ctx, httpClient, baseRepo)
+		if err != nil {
+			return fmt.Errorf("failed to fetch latest release: %w", err)
+		}
+	} else {
+		release, err = shared.FetchRelease(ctx, httpClient, baseRepo, opts.TagName)
+		if err != nil {
+			return fmt.Errorf("failed to fetch release %s: %w", opts.TagName, err)
+		}
+	}
+
+	if strings.HasPrefix(release.TagName, "-") {
+		return fmt.Errorf("invalid tag name: %q", release.TagName)
+	}
+
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+	protocol := cfg.GitProtocol(baseRepo.RepoHost()).Value
+
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return err
+	}
+	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
+	baseURLOrName := ghrepo.FormatRemoteURL(baseRepo, protocol)
+	if baseRemote != nil {
+		baseURLOrName = baseRemote.Name
+	}
+
+	var cmdQueue [][]string
+	localBranch := release.TagName
+	if opts.BranchName != "" {
+		localBranch = opts.BranchName
+	}
+
+	refSpec := fmt.Sprintf("refs/tags/%s", release.TagName)
+	cmdQueue = append(cmdQueue, []string{"fetch", baseURLOrName, refSpec, "--no-tags"})
+
+	if localBranchExists(opts.GitClient, localBranch) {
+		if opts.IO.IsStdoutTTY() && !opts.Force {
+			fmt.Fprintf(opts.IO.Out, "A branch named '%s' already exists. Proceeding may overwrite local changes.\n", localBranch)
+			confirmed, err := confirm(opts.IO, "Do you want to proceed? [y/N] ")
+			if err != nil {
+				return fmt.Errorf("failed to get confirmation: %w", err)
+			}
+			if !confirmed {
+				fmt.Fprintf(opts.IO.Out, "Aborted.\n")
+				return nil
+			}
+		}
+
+		cmdQueue = append(cmdQueue, []string{"checkout", localBranch})
+		if opts.Force {
+			cmdQueue = append(cmdQueue, []string{"reset", "--hard", refSpec})
+		} else {
+			cmdQueue = append(cmdQueue, []string{"merge", "--ff-only", refSpec})
+		}
+	} else {
+		cmdQueue = append(cmdQueue, []string{"checkout", "-b", localBranch, refSpec})
+	}
+
+	if opts.RecurseSubmodules {
+		cmdQueue = append(cmdQueue, []string{"submodule", "sync", "--recursive"})
+		cmdQueue = append(cmdQueue, []string{"submodule", "update", "--init", "--recursive"})
+	}
+
+	err = executeCmds(opts.GitClient, git.CredentialPatternFromHost(baseRepo.RepoHost()), cmdQueue)
+	if err != nil {
+		return fmt.Errorf("failed to execute git commands: %w", err)
+	}
+
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "Checked out %s to %s\n", release.TagName, localBranch)
+	}
+
+	return nil
+}
+
+// localBranchExists checks if a local branch already exists
+func localBranchExists(client *git.Client, branch string) bool {
+	_, err := client.ShowRefs(context.Background(), []string{"refs/heads/" + branch})
+	return err == nil
+}
+
+// confirm prompts the user for a yes/no response, defaulting to no
+func confirm(io *iostreams.IOStreams, prompt string) (bool, error) {
+	if !io.IsStdinTTY() || !io.IsStdoutTTY() {
+		return false, nil
+	}
+
+	fmt.Fprint(io.Out, prompt)
+	reader := bufio.NewReader(io.In)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return false, err
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	return response == "y" || response == "yes", nil
+}
+
+// executeCmds runs a queue of Git commands with appropriate credential handling
+func executeCmds(client *git.Client, credentialPattern git.CredentialPattern, cmdQueue [][]string) error {
+	for _, args := range cmdQueue {
+		var err error
+		var cmd *git.Command
+		switch args[0] {
+		case "submodule":
+			cmd, err = client.AuthenticatedCommand(context.Background(), credentialPattern, args...)
+		case "fetch":
+			cmd, err = client.AuthenticatedCommand(context.Background(), git.AllMatchingCredentialsPattern, args...)
+		default:
+			cmd, err = client.Command(context.Background(), args...)
+		}
+		if err != nil {
+			return err
+		}
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
