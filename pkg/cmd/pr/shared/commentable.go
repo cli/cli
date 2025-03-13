@@ -18,6 +18,7 @@ import (
 )
 
 var errNoUserComments = errors.New("no comments found for current user")
+var errDeleteNotConfirmed = errors.New("deletion not confirmed")
 
 type InputType int
 
@@ -41,14 +42,14 @@ type CommentableOptions struct {
 	InteractiveEditSurvey     func(string) (string, error)
 	ConfirmSubmitSurvey       func() (bool, error)
 	ConfirmCreateIfNoneSurvey func() (bool, error)
-	ConfirmDeleteComment			func(string) (bool, error)
+	ConfirmDeleteComment      func(string) (bool, error)
 	OpenInBrowser             func(string) error
 	Interactive               bool
 	InputType                 InputType
 	Body                      string
 	EditLast                  bool
 	DeleteLast                bool
-	Confirmed								  bool
+	Confirmed                 bool
 	CreateIfNone              bool
 	Quiet                     bool
 	Host                      string
@@ -239,15 +240,25 @@ func deleteComment(commentable Commentable, opts *CommentableOptions) error {
 
 	lastComment := &comments[len(comments)-1]
 
-	if opts.IO.CanPrompt() && !opts.Confirmed {
-		cs := opts.IO.ColorScheme()
-		fmt.Printf("%s Deleted comments cannot be recovered.\n", cs.WarningIcon())
-		ok, err := opts.ConfirmDeleteComment(lastComment.ID)
+	if opts.Interactive {
+		ok, err := opts.ConfirmDeleteComment(lastComment.Body)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			return errors.New("Deletion not confirmed")
+			return errDeleteNotConfirmed
+		}
+	}
+
+	if opts.IO.CanPrompt() && !opts.Confirmed {
+		cs := opts.IO.ColorScheme()
+		fmt.Printf("%s Deleted comments cannot be recovered.\n", cs.WarningIcon())
+		ok, err := opts.ConfirmDeleteComment(lastComment.Body)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errDeleteNotConfirmed
 		}
 	}
 
@@ -307,7 +318,7 @@ func CommentableEditSurvey(cf func() (gh.Config, error), io *iostreams.IOStreams
 
 func CommentableConfirmDeleteComment(p Prompt) func(string) (bool, error) {
 	return func(id string) (bool, error) {
-		return p.Confirm(fmt.Sprintf("Delete comment #%s", id), true)
+		return p.Confirm(fmt.Sprintf("Deleting comment with body: %s", id), true)
 	}
 }
 
