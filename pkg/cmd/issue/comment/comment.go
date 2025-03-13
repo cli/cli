@@ -17,6 +17,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 		InteractiveEditSurvey:     prShared.CommentableInteractiveEditSurvey(f.Config, f.IOStreams),
 		ConfirmSubmitSurvey:       prShared.CommentableConfirmSubmitSurvey(f.Prompter),
 		ConfirmCreateIfNoneSurvey: prShared.CommentableInteractiveCreateIfNoneSurvey(f.Prompter),
+		ConfirmDeleteComment:      prShared.CommentableConfirmDeleteComment(f.Prompter),
 		OpenInBrowser:             f.Browser.Browse,
 	}
 
@@ -42,7 +43,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 					return nil, nil, err
 				}
 				fields := []string{"id", "url"}
-				if opts.EditLast {
+				if opts.EditLast || opts.DeleteLast {
 					fields = append(fields, "comments")
 				}
 				return issueShared.IssueFromArgWithFields(httpClient, f.BaseRepo, args[0], fields)
@@ -70,6 +71,8 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 	cmd.Flags().BoolP("editor", "e", false, "Skip prompts and open the text editor to write the body in")
 	cmd.Flags().BoolP("web", "w", false, "Open the web browser to write the comment")
 	cmd.Flags().BoolVar(&opts.EditLast, "edit-last", false, "Edit the last comment of the same author")
+	cmd.Flags().BoolVar(&opts.DeleteLast, "delete-last", false, "Delete the last comment of the same author")
+	cmd.Flags().BoolVar(&opts.Confirmed, "yes", false, "Skip the confirmation prompt")
 	cmd.Flags().BoolVar(&opts.CreateIfNone, "create-if-none", false, "Create a new comment if no comments are found. Can be used only with --edit-last")
 
 	return cmd
