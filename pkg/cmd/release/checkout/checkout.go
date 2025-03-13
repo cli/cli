@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -49,11 +51,11 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 
 	cmd := &cobra.Command{
 		Use:   "checkout [<tag>]",
-		Short: "Check out a release tag",
+		Short: "Check out a release",
 		Long: heredoc.Doc(`
-			Check out a GitHub release tag.
+			Check out a GitHub release.
 
-			In a local repository, checks out the specified release tag.
+			In a local repository, checks out the specified release.
 			With --repo, clones the specified repository to a directory named '<reponame>-<releasetag>' if not in a matching Git repository.
 			Without a tag, checks out the latest release.
 		`),
@@ -61,13 +63,13 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 			# Checkout the latest release in the current repo
 			$ gh release checkout
 
-			# Checkout a specific tag in the current repo
+			# Checkout a specific release in the current repo
 			$ gh release checkout v1.2.3
 
-			# Clone and checkout a release from an external repo
+			# Checkout a release from an external repo
 			$ gh release checkout v1.2.3 --repo owner/repo
 
-			# Clone with a custom branch name
+			# Checkout in a custom branch name
 			$ gh release checkout v1.2.3 -b my-branch --repo owner/repo
 		`),
 		Args: cobra.MaximumNArgs(1),
@@ -125,6 +127,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 
 	var baseRemote *cliContext.Remote
 	var repoMatches bool
+
 	if opts.IsLocalGitRepo {
 		remotes, err := opts.Remotes()
 		if err != nil {
@@ -140,11 +143,13 @@ func checkoutRun(opts *CheckoutOptions) error {
 		if len(remotes) > 0 {
 			currentRepo = fmt.Sprintf("%s/%s", remotes[0].RepoOwner(), remotes[0].RepoName())
 		}
-		return fmt.Errorf("--repo %s doesn't match the current repository (%s).\nRun outside a Git repo to checkout release, or omit --repo to use the current repo", ghrepo.FullName(baseRepo), currentRepo)
+		return fmt.Errorf("--repo %s doesn't match the current repository (%s).\nTry running out of a Git repo to checkout release, or omit --repo to checkout for current repo", ghrepo.FullName(baseRepo), currentRepo)
 	}
 
 	var release *shared.Release
+
 	fetchMessage := fmt.Sprintf("Fetching release info for %s...", ghrepo.FullName(baseRepo))
+
 	if opts.IO.IsStdoutTTY() {
 		opts.IO.StartProgressIndicatorWithLabel(fetchMessage)
 	}
@@ -167,7 +172,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 
 	cs := opts.IO.ColorScheme()
 
-	if !opts.IsLocalGitRepo || !repoMatches {
+	if !opts.IsLocalGitRepo {
 		targetDir := fmt.Sprintf("%s-%s", baseRepo.RepoName(), release.TagName)
 		if err := handleExistingDir(opts, targetDir, baseRepo, release.TagName, cs); err != nil {
 			return err
@@ -209,7 +214,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 		cmd.Stdout = nil
 		cmd.Stderr = opts.IO.ErrOut
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to create branch after clone: %w", err)
+			return fmt.Errorf("failed to create branch after checkout: %w", err)
 		}
 
 		if opts.IO.IsStdoutTTY() {
@@ -266,8 +271,12 @@ func checkoutRun(opts *CheckoutOptions) error {
 
 // handleExistingDir checks and handles an existing directory before cloning
 func handleExistingDir(opts *CheckoutOptions, targetDir string, baseRepo ghrepo.Interface, tagName string, cs *iostreams.ColorScheme) error {
-	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+	_, err := os.Stat(targetDir)
+	if errors.Is(err, fs.ErrNotExist) {
 		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to stat directory %s: %w", targetDir, err)
 	}
 	if !opts.IO.CanPrompt() || opts.Yes {
 		return os.RemoveAll(targetDir)
@@ -278,7 +287,11 @@ func handleExistingDir(opts *CheckoutOptions, targetDir string, baseRepo ghrepo.
 		return fmt.Errorf("failed to get confirmation: %w", err)
 	}
 	if !confirmed {
-		fmt.Fprintf(opts.IO.Out, "%s Checkout aborted\n", cs.Yellow("!"))
+		msg := "! Checkout aborted\n"
+		if cs != nil {
+			msg = fmt.Sprintf("%s Checkout aborted\n", cs.Yellow("!"))
+		}
+		fmt.Fprint(opts.IO.Out, msg)
 		return cmdutil.SilentError
 	}
 	return os.RemoveAll(targetDir)

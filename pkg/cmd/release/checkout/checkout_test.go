@@ -2,8 +2,11 @@ package checkout
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	cliContext "github.com/cli/cli/v2/context"
@@ -30,29 +33,29 @@ func TestNewCmdCheckout(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:  "no arguments",
-			args:  "",
-			isTTY: true,
-			want: CheckoutOptions{
-				TagName: "",
-			},
+			name:    "no arguments",
+			args:    "",
+			isTTY:   true,
+			wantErr: "not in a Git repository and no --repo specified.\nPlease run from a Git repository or use --repo to specify a repository to checkout release",
 		},
 		{
-			name:  "specific tag",
+			name:  "specific release",
 			args:  "v1.2.3",
 			isTTY: true,
 			want: CheckoutOptions{
 				TagName: "v1.2.3",
 			},
+			wantErr: "not in a Git repository and no --repo specified.\nPlease run from a Git repository or use --repo to specify a repository to checkout release",
 		},
 		{
-			name:  "force flag",
+			name:  "force",
 			args:  "--force v1.2.3",
 			isTTY: true,
 			want: CheckoutOptions{
 				TagName: "v1.2.3",
 				Force:   true,
 			},
+			wantErr: "not in a Git repository and no --repo specified.\nPlease run from a Git repository or use --repo to specify a repository to checkout release",
 		},
 		{
 			name:  "custom branch",
@@ -62,6 +65,7 @@ func TestNewCmdCheckout(t *testing.T) {
 				TagName:    "v1.2.3",
 				BranchName: "my-branch",
 			},
+			wantErr: "not in a Git repository and no --repo specified.\nPlease run from a Git repository or use --repo to specify a repository to checkout release",
 		},
 		{
 			name:  "recurse submodules",
@@ -71,6 +75,13 @@ func TestNewCmdCheckout(t *testing.T) {
 				TagName:           "v1.2.3",
 				RecurseSubmodules: true,
 			},
+			wantErr: "not in a Git repository and no --repo specified.\nPlease run from a Git repository or use --repo to specify a repository to checkout release",
+		},
+		{
+			name:    "no arguments, non-TTY",
+			args:    "",
+			isTTY:   false,
+			wantErr: "release tag argument required when not running interactively",
 		},
 	}
 
@@ -78,8 +89,12 @@ func TestNewCmdCheckout(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				Remotes: func() (cliContext.Remotes, error) {
+					return nil, fmt.Errorf("not a git repo")
+				},
 			}
 			var opts *CheckoutOptions
 			cmd := NewCmdCheckout(f, func(o *CheckoutOptions) error {
@@ -99,10 +114,12 @@ func TestNewCmdCheckout(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+			require.NotNil(t, opts, "opts should be initialized")
 			assert.Equal(t, tt.want.TagName, opts.TagName)
 			assert.Equal(t, tt.want.Force, opts.Force)
 			assert.Equal(t, tt.want.BranchName, opts.BranchName)
 			assert.Equal(t, tt.want.RecurseSubmodules, opts.RecurseSubmodules)
+			assert.False(t, opts.IsLocalGitRepo)
 		})
 	}
 }
@@ -112,6 +129,7 @@ func Test_checkoutRun(t *testing.T) {
 		name       string
 		opts       *CheckoutOptions
 		runStubs   func(*run.CommandStubber)
+		httpStubs  func(*httpmock.Registry)
 		stdin      string
 		isTTY      bool
 		wantStdout string
@@ -119,9 +137,13 @@ func Test_checkoutRun(t *testing.T) {
 		wantErr    string
 	}{
 		{
-			name: "checkout latest release",
+			name: "checkout latest release in local repo",
 			opts: &CheckoutOptions{
-				TagName: "",
+				TagName:        "",
+				IsLocalGitRepo: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "", `{"tag_name": "v1.2.3"}`)
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git fetch origin refs/tags/v1.2.3 --no-tags`, 0, "")
@@ -130,12 +152,15 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			isTTY:      true,
 			wantStdout: "✓ Checked out v1.2.3 to v1.2.3\n",
-			wantStderr: "",
 		},
 		{
-			name: "checkout specific release",
+			name: "checkout specific release in local repo",
 			opts: &CheckoutOptions{
-				TagName: "v1.2.3",
+				TagName:        "v1.2.3",
+				IsLocalGitRepo: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{"tag_name": "v1.2.3"}`)
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git fetch origin refs/tags/v1.2.3 --no-tags`, 0, "")
@@ -144,12 +169,15 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			isTTY:      true,
 			wantStdout: "✓ Checked out v1.2.3 to v1.2.3\n",
-			wantStderr: "",
 		},
 		{
 			name: "branch exists, TTY, confirm yes",
 			opts: &CheckoutOptions{
-				TagName: "v1.2.3",
+				TagName:        "v1.2.3",
+				IsLocalGitRepo: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{"tag_name": "v1.2.3"}`)
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git fetch origin refs/tags/v1.2.3 --no-tags`, 0, "")
@@ -159,26 +187,34 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			stdin:      "y\n",
 			isTTY:      true,
-			wantStdout: "A branch named 'v1.2.3' already exists. Proceeding may overwrite local changes.\nDo you want to proceed? [y/N] ✓ Checked out v1.2.3 to v1.2.3\n",
-			wantStderr: "",
+			wantStdout: "Branch 'v1.2.3' already exists. Overwrite with v1.2.3? [y/N] ✓ Checked out v1.2.3 to v1.2.3\n",
 		},
 		{
 			name: "branch exists, TTY, confirm no",
 			opts: &CheckoutOptions{
-				TagName: "v1.2.3",
+				TagName:        "v1.2.3",
+				IsLocalGitRepo: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{"tag_name": "v1.2.3"}`)
 			},
 			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin refs/tags/v1.2.3 --no-tags`, 0, "")
 				cs.Register(`git show-ref --verify -- refs/heads/v1.2.3`, 0, "")
 			},
 			stdin:      "n\n",
 			isTTY:      true,
-			wantStdout: "A branch named 'v1.2.3' already exists. Proceeding may overwrite local changes.\nDo you want to proceed? [y/N] ! Checkout aborted\n",
-			wantStderr: "",
+			wantStdout: "Branch 'v1.2.3' already exists. Overwrite with v1.2.3? [y/N] ! Checkout aborted\n",
+			wantErr:    "SilentError",
 		},
 		{
 			name: "branch exists, non-TTY",
 			opts: &CheckoutOptions{
-				TagName: "v1.2.3",
+				TagName:        "v1.2.3",
+				IsLocalGitRepo: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{"tag_name": "v1.2.3"}`)
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git fetch origin refs/tags/v1.2.3 --no-tags`, 0, "")
@@ -188,13 +224,16 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			isTTY:      false,
 			wantStdout: "",
-			wantStderr: "",
 		},
 		{
 			name: "force flag",
 			opts: &CheckoutOptions{
-				TagName: "v1.2.3",
-				Force:   true,
+				TagName:        "v1.2.3",
+				Force:          true,
+				IsLocalGitRepo: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{"tag_name": "v1.2.3"}`)
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git fetch origin refs/tags/v1.2.3 --no-tags`, 0, "")
@@ -204,13 +243,16 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			isTTY:      true,
 			wantStdout: "✓ Checked out v1.2.3 to v1.2.3\n",
-			wantStderr: "",
 		},
 		{
 			name: "custom branch name",
 			opts: &CheckoutOptions{
-				TagName:    "v1.2.3",
-				BranchName: "my-branch",
+				TagName:        "v1.2.3",
+				BranchName:     "my-branch",
+				IsLocalGitRepo: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{"tag_name": "v1.2.3"}`)
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git fetch origin refs/tags/v1.2.3 --no-tags`, 0, "")
@@ -219,13 +261,16 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			isTTY:      true,
 			wantStdout: "✓ Checked out v1.2.3 to my-branch\n",
-			wantStderr: "",
 		},
 		{
 			name: "recurse submodules",
 			opts: &CheckoutOptions{
 				TagName:           "v1.2.3",
 				RecurseSubmodules: true,
+				IsLocalGitRepo:    true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{"tag_name": "v1.2.3"}`)
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git fetch origin refs/tags/v1.2.3 --no-tags`, 0, "")
@@ -236,7 +281,49 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			isTTY:      true,
 			wantStdout: "✓ Checked out v1.2.3 to v1.2.3\n",
-			wantStderr: "",
+		},
+		{
+			name: "clone when not in git repo",
+			opts: &CheckoutOptions{
+				TagName:        "v1.2.3",
+				IsLocalGitRepo: false,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{"tag_name": "v1.2.3"}`)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git clone --branch v1.2.3 https://github.com/OWNER/REPO.git`, 0, "")
+				cs.Register(`git checkout -b v1.2.3`, 0, "")
+			},
+			isTTY:      true,
+			wantStdout: "✓ Cloned OWNER/REPO@v1.2.3 to REPO-v1.2.3\n",
+		},
+		{
+			name: "clone with mismatched repo",
+			opts: &CheckoutOptions{
+				TagName:        "v1.2.3",
+				IsLocalGitRepo: true,
+			},
+			isTTY:      true,
+			wantStdout: "",
+			wantErr:    "--repo OWNER/REPO doesn't match the current repository (OTHER/OTHER-REPO).\nTry running out of a Git repo to checkout release, or omit --repo to checkout for current repo",
+		},
+		{
+			name: "clone with existing dir, confirm yes",
+			opts: &CheckoutOptions{
+				TagName:        "v1.2.3",
+				IsLocalGitRepo: false,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{"tag_name": "v1.2.3"}`)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git clone --branch v1.2.3 https://github.com/OWNER/REPO.git`, 0, "")
+				cs.Register(`git checkout -b v1.2.3`, 0, "")
+			},
+			stdin:      "y\n",
+			isTTY:      true,
+			wantStdout: "Directory 'REPO-v1.2.3' already exists. Overwrite by cloning OWNER/REPO@v1.2.3? [y/N] ✓ Cloned OWNER/REPO@v1.2.3 to REPO-v1.2.3\n",
 		},
 	}
 
@@ -251,8 +338,9 @@ func Test_checkoutRun(t *testing.T) {
 
 			fakeHTTP := &httpmock.Registry{}
 			defer fakeHTTP.Verify(t)
-
-			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", tt.opts.TagName, `{"tag_name": "v1.2.3"}`)
+			if tt.httpStubs != nil {
+				tt.httpStubs(fakeHTTP)
+			}
 
 			cs, cmdTeardown := run.Stub()
 			defer cmdTeardown(t)
@@ -260,28 +348,59 @@ func Test_checkoutRun(t *testing.T) {
 				tt.runStubs(cs)
 			}
 
+			tempDir := t.TempDir()
+			if tt.name == "clone when not in git repo" || tt.name == "clone with existing dir, confirm yes" {
+				err := os.Mkdir(filepath.Join(tempDir, "REPO"), 0755)
+				if err != nil {
+					t.Fatalf("failed to create REPO dir: %v", err)
+				}
+				if tt.name == "clone with existing dir, confirm yes" {
+					err = os.Mkdir(filepath.Join(tempDir, "REPO-v1.2.3"), 0755)
+					if err != nil {
+						t.Fatalf("failed to create REPO-v1.2.3 dir: %v", err)
+					}
+				}
+			}
+
+			origDir, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("failed to get current dir: %v", err)
+			}
+			err = os.Chdir(tempDir)
+			if err != nil {
+				t.Fatalf("failed to change to temp dir: %v", err)
+			}
+			defer os.Chdir(origDir)
+
 			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
 			tt.opts.GitClient = &git.Client{GhPath: "gh", GitPath: "git"}
-			tt.opts.Remotes = func() (cliContext.Remotes, error) {
-				repo, err := ghrepo.FromFullName("OWNER/REPO")
-				if err != nil {
-					t.Fatal(err)
-				}
-				return cliContext.Remotes{
-					{Remote: &git.Remote{Name: "origin"}, Repo: repo},
-				}, nil
+			tt.opts.Config = func() (gh.Config, error) {
+				return config.NewBlankConfig(), nil
 			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
-			tt.opts.Config = func() (gh.Config, error) {
-				return config.NewBlankConfig(), nil
+
+			if tt.name == "clone with mismatched repo" {
+				tt.opts.Remotes = func() (cliContext.Remotes, error) {
+					repo, _ := ghrepo.FromFullName("OTHER/OTHER-REPO")
+					return cliContext.Remotes{{Remote: &git.Remote{Name: "origin"}, Repo: repo}}, nil
+				}
+			} else if tt.opts.IsLocalGitRepo {
+				tt.opts.Remotes = func() (cliContext.Remotes, error) {
+					repo, _ := ghrepo.FromFullName("OWNER/REPO")
+					return cliContext.Remotes{{Remote: &git.Remote{Name: "origin"}, Repo: repo}}, nil
+				}
+			} else {
+				tt.opts.Remotes = func() (cliContext.Remotes, error) {
+					return nil, fmt.Errorf("not a git repo")
+				}
 			}
 
-			err := checkoutRun(tt.opts)
+			err = checkoutRun(tt.opts)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
