@@ -43,7 +43,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 
 	cmd := &cobra.Command{
 		Use:   "checkout [<tag>]",
-		Short: "Check out a release tag in git",
+		Short: "Check out a release tag",
 		Long: heredoc.Doc(`
 			Check out a GitHub release tag in your local repository.
 
@@ -55,13 +55,13 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 			$ gh release checkout
 
 			# Checkout a specific release tag
-			$ gh release checkout v2.67.0
+			$ gh release checkout v1.2.3
 
 			# Checkout a release from a non-local repo
-			$ gh release checkout v2.67.0 --repo cli/cli
+			$ gh release checkout v1.2.3 --repo owner/repo
 
-			# Checkout with a custom branch name
-			$ gh release checkout v2.67.0 -b my-release-branch
+			# Checkout in a custom branch name
+			$ gh release checkout v1.2.3 -b my-release-branch
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -69,6 +69,10 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 
 			if len(args) > 0 {
 				opts.TagName = args[0]
+			}
+
+			if !opts.IO.IsStdoutTTY() && !opts.IO.IsStdinTTY() && opts.TagName == "" {
+				return cmdutil.FlagErrorf("release tag argument required when not running interactively")
 			}
 
 			if runF != nil {
@@ -103,17 +107,18 @@ func checkoutRun(opts *CheckoutOptions) error {
 	if opts.TagName == "" {
 		release, err = shared.FetchLatestRelease(ctx, httpClient, baseRepo)
 		if err != nil {
-			return fmt.Errorf("failed to fetch latest release: %w", err)
+			return cmdutil.FlagErrorf("failed to fetch latest release: %w", err)
 		}
 	} else {
 		release, err = shared.FetchRelease(ctx, httpClient, baseRepo, opts.TagName)
 		if err != nil {
-			return fmt.Errorf("failed to fetch release %s: %w", opts.TagName, err)
+			return cmdutil.FlagErrorf("failed to fetch release %s: %w", opts.TagName, err)
 		}
 	}
 
-	if strings.HasPrefix(release.TagName, "-") {
-		return fmt.Errorf("invalid tag name: %q", release.TagName)
+	// Validate tag name (simple check)
+	if strings.HasPrefix(release.TagName, "-") || strings.Contains(release.TagName, " ") {
+		return cmdutil.FlagErrorf("invalid tag name: %q", release.TagName)
 	}
 
 	cfg, err := opts.Config()
@@ -141,15 +146,16 @@ func checkoutRun(opts *CheckoutOptions) error {
 	refSpec := fmt.Sprintf("refs/tags/%s", release.TagName)
 	cmdQueue = append(cmdQueue, []string{"fetch", baseURLOrName, refSpec, "--no-tags"})
 
+	cs := opts.IO.ColorScheme()
 	if localBranchExists(opts.GitClient, localBranch) {
-		if opts.IO.IsStdoutTTY() && !opts.Force {
+		if opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY() && !opts.Force {
 			fmt.Fprintf(opts.IO.Out, "A branch named '%s' already exists. Proceeding may overwrite local changes.\n", localBranch)
 			confirmed, err := confirm(opts.IO, "Do you want to proceed? [y/N] ")
 			if err != nil {
 				return fmt.Errorf("failed to get confirmation: %w", err)
 			}
 			if !confirmed {
-				fmt.Fprintf(opts.IO.Out, "Aborted.\n")
+				fmt.Fprintf(opts.IO.Out, "%s Checkout aborted\n", cs.Yellow("!"))
 				return nil
 			}
 		}
@@ -175,7 +181,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "Checked out %s to %s\n", release.TagName, localBranch)
+		fmt.Fprintf(opts.IO.Out, "%s Checked out %s to %s\n", cs.SuccessIconWithColor(cs.Green), release.TagName, localBranch)
 	}
 
 	return nil
