@@ -116,7 +116,7 @@ func CommentDelete(client *Client, repoHost string, params CommentDeleteInput) (
 		},
 	}
 
-	err := client.Mutate(repoHost, "DeleteComment", &mutation, variables)
+	err := client.Mutate(repoHost, "CommentDelete", &mutation, variables)
 	if err != nil {
 		return err
 	}
