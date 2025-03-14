@@ -34,7 +34,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view {<license-key> | <SPDX-ID>}",
+		Use:   "view {<license-key> | <spdx-id>}",
 		Short: "View a specific repository license",
 		Long: heredoc.Docf(`
 			View a specific repository license by license key or SPDX ID.
@@ -43,19 +43,19 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		`, "`"),
 		Example: heredoc.Doc(`
 			# View the MIT license from SPDX ID
-			gh repo license view MIT
+			$ gh repo license view MIT
 
 			# View the MIT license from license key
-			gh repo license view mit
+			$ gh repo license view mit
 
 			# View the GNU AGPL-3.0 license from SPDX ID
-			gh repo license view AGPL-3.0
+			$ gh repo license view AGPL-3.0
 
 			# View the GNU AGPL-3.0 license from license key
-			gh repo license view agpl-3.0
+			$ gh repo license view agpl-3.0
 
 			# Create a LICENSE.md with the MIT license
-			gh repo license view MIT > LICENSE.md
+			$ gh repo license view MIT > LICENSE.md
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

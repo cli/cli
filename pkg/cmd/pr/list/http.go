@@ -7,7 +7,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
-	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
 func shouldUseSearch(filters prShared.FilterOptions) bool {
@@ -19,10 +18,8 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters pr
 		return searchPullRequests(httpClient, repo, filters, limit)
 	}
 
-	return prShared.NewLister(&cmdutil.Factory{
-		HttpClient: func() (*http.Client, error) { return httpClient, nil },
-		BaseRepo:   func() (ghrepo.Interface, error) { return repo, nil },
-	}).List(prShared.ListOptions{
+	return prShared.NewLister(httpClient).List(prShared.ListOptions{
+		BaseRepo:     repo,
 		LimitResults: limit,
 		State:        filters.State,
 		BaseBranch:   filters.BaseBranch,

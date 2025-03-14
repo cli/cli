@@ -52,17 +52,18 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "",
 			isTTY: true,
 			want: CreateOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        false,
-				Prerelease:   false,
-				RepoOverride: "",
-				Concurrency:  5,
-				Assets:       []*shared.AssetForUpload(nil),
-				VerifyTag:    false,
+				TagName:         "",
+				Target:          "",
+				Name:            "",
+				Body:            "",
+				BodyProvided:    false,
+				Draft:           false,
+				Prerelease:      false,
+				RepoOverride:    "",
+				Concurrency:     5,
+				Assets:          []*shared.AssetForUpload(nil),
+				VerifyTag:       false,
+				FailOnNoCommits: false,
 			},
 		},
 		{
@@ -76,17 +77,18 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3",
 			isTTY: true,
 			want: CreateOptions{
-				TagName:      "v1.2.3",
-				Target:       "",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        false,
-				Prerelease:   false,
-				RepoOverride: "",
-				Concurrency:  5,
-				Assets:       []*shared.AssetForUpload(nil),
-				VerifyTag:    false,
+				TagName:         "v1.2.3",
+				Target:          "",
+				Name:            "",
+				Body:            "",
+				BodyProvided:    false,
+				Draft:           false,
+				Prerelease:      false,
+				RepoOverride:    "",
+				Concurrency:     5,
+				Assets:          []*shared.AssetForUpload(nil),
+				VerifyTag:       false,
+				FailOnNoCommits: false,
 			},
 		},
 		{
@@ -347,6 +349,19 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY:   false,
 			wantErr: "using `--notes-from-tag` with `--generate-notes` or `--notes-start-tag` is not supported",
 		},
+		{
+			name:  "with --fail-on-no-commits",
+			args:  "v1.2.3 --fail-on-no-commits",
+			isTTY: false,
+			want: CreateOptions{
+				TagName:         "v1.2.3",
+				BodyProvided:    false,
+				Concurrency:     5,
+				Assets:          []*shared.AssetForUpload(nil),
+				NotesFromTag:    false,
+				FailOnNoCommits: true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -402,6 +417,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.IsLatest, opts.IsLatest)
 			assert.Equal(t, tt.want.VerifyTag, opts.VerifyTag)
 			assert.Equal(t, tt.want.NotesFromTag, opts.NotesFromTag)
+			assert.Equal(t, tt.want.FailOnNoCommits, opts.FailOnNoCommits)
 
 			require.Equal(t, len(tt.want.Assets), len(opts.Assets))
 			for i := range tt.want.Assets {
@@ -458,6 +474,100 @@ func Test_createRun(t *testing.T) {
 				}))
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: ``,
+		},
+		{
+			name:  "create a release if there are new commits and the last release does not exist",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:         "v1.2.3",
+				Name:            "The Big 1.2",
+				Body:            "* Fixed bugs",
+				BodyProvided:    true,
+				Target:          "",
+				FailOnNoCommits: true,
+			},
+			runStubs: defaultRunStubs,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"), httpmock.StatusStringResponse(404, `{
+					"message": "Not Found",
+					"documentation_url": "https://docs.github.com/rest/releases/releases#get-the-latest-release",
+					"status": "404"
+				}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
+						"name":       "The Big 1.2",
+						"body":       "* Fixed bugs",
+						"draft":      false,
+						"prerelease": false,
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: ``,
+		},
+		{
+			name:  "create a release if there are new commits and the last release exists",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:         "v1.2.3",
+				Name:            "The Big 1.2",
+				Body:            "* Fixed bugs",
+				BodyProvided:    true,
+				Target:          "",
+				FailOnNoCommits: true,
+			},
+			runStubs: defaultRunStubs,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"), httpmock.StatusStringResponse(200, `{
+					"tag_name": "v1.2.2"
+				}`))
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/compare/v1.2.2...HEAD"), httpmock.StatusStringResponse(200, `{
+						"status": "ahead"
+				}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
+						"name":       "The Big 1.2",
+						"body":       "* Fixed bugs",
+						"draft":      false,
+						"prerelease": false,
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: ``,
+		},
+		{
+			name:  "create a release if there are no new commits but the last release exists",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:         "v1.2.3",
+				Name:            "The Big 1.2",
+				Body:            "* Fixed bugs",
+				BodyProvided:    true,
+				Target:          "",
+				FailOnNoCommits: true,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"), httpmock.StatusStringResponse(200, `{
+					"tag_name": "v1.2.2"
+				}`))
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/compare/v1.2.2...HEAD"), httpmock.StatusStringResponse(200, `{
+					"status": "identical"
+				}`))
+			},
+			wantErr:    "no new commits since the last release",
+			wantStdout: "",
 			wantStderr: ``,
 		},
 		{

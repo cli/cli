@@ -119,15 +119,15 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 
 			When the %[1]s--visibility%[1]s flag is used, %[1]s--accept-visibility-change-consequences%[1]s flag is required.
 
-			For information on all the potential consequences, see <https://gh.io/setting-repository-visibility>
+			For information on all the potential consequences, see <https://gh.io/setting-repository-visibility>.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
-			# enable issues and wiki
-			gh repo edit --enable-issues --enable-wiki
+			# Enable issues and wiki
+			$ gh repo edit --enable-issues --enable-wiki
 
-			# disable projects
-			gh repo edit --enable-projects=false
+			# Disable projects
+			$ gh repo edit --enable-projects=false
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {

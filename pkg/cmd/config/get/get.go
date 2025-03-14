@@ -29,7 +29,6 @@ func NewCmdConfigGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Co
 		Short: "Print the value of a given configuration key",
 		Example: heredoc.Doc(`
 			$ gh config get git_protocol
-			https
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

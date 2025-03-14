@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	o "github.com/cli/cli/v2/pkg/option"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
@@ -34,6 +35,8 @@ type SigstoreConfig struct {
 	NoPublicGood bool
 	// If tenancy mode is not used, trust domain is empty
 	TrustDomain string
+	// TUFMetadataDir
+	TUFMetadataDir o.Option[string]
 }
 
 type SigstoreVerifier interface {
@@ -45,7 +48,8 @@ type LiveSigstoreVerifier struct {
 	Logger       *io.Handler
 	NoPublicGood bool
 	// If tenancy mode is not used, trust domain is empty
-	TrustDomain string
+	TrustDomain    string
+	TUFMetadataDir o.Option[string]
 }
 
 var ErrNoAttestationsVerified = errors.New("no attestations were verified")
@@ -55,10 +59,11 @@ var ErrNoAttestationsVerified = errors.New("no attestations were verified")
 // Public Good, GitHub, or a custom trusted root.
 func NewLiveSigstoreVerifier(config SigstoreConfig) *LiveSigstoreVerifier {
 	return &LiveSigstoreVerifier{
-		TrustedRoot:  config.TrustedRoot,
-		Logger:       config.Logger,
-		NoPublicGood: config.NoPublicGood,
-		TrustDomain:  config.TrustDomain,
+		TrustedRoot:    config.TrustedRoot,
+		Logger:         config.Logger,
+		NoPublicGood:   config.NoPublicGood,
+		TrustDomain:    config.TrustDomain,
+		TUFMetadataDir: config.TUFMetadataDir,
 	}
 }
 
@@ -89,9 +94,9 @@ func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEnti
 			if v.NoPublicGood {
 				return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
 			}
-			return newPublicGoodVerifier()
+			return newPublicGoodVerifier(v.TUFMetadataDir)
 		case GitHubIssuerOrg:
-			return newGitHubVerifier(v.TrustDomain)
+			return newGitHubVerifier(v.TrustDomain, v.TUFMetadataDir)
 		default:
 			return nil, fmt.Errorf("leaf certificate issuer is not recognized")
 		}
@@ -255,10 +260,10 @@ func newCustomVerifier(trustedRoot *root.TrustedRoot) (*verify.SignedEntityVerif
 	return gv, nil
 }
 
-func newGitHubVerifier(trustDomain string) (*verify.SignedEntityVerifier, error) {
+func newGitHubVerifier(trustDomain string, tufMetadataDir o.Option[string]) (*verify.SignedEntityVerifier, error) {
 	var tr string
 
-	opts := GitHubTUFOptions()
+	opts := GitHubTUFOptions(tufMetadataDir)
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client: %v", err)
@@ -289,8 +294,8 @@ func newGitHubVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verify.Si
 	return gv, nil
 }
 
-func newPublicGoodVerifier() (*verify.SignedEntityVerifier, error) {
-	opts := DefaultOptionsWithCacheSetting()
+func newPublicGoodVerifier(tufMetadataDir o.Option[string]) (*verify.SignedEntityVerifier, error) {
+	opts := DefaultOptionsWithCacheSetting(tufMetadataDir)
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client: %v", err)

@@ -69,32 +69,32 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			- Repository home page
 			- Repository settings
 		`),
-		Use:  "browse [<number> | <path> | <commit-SHA>]",
+		Use:  "browse [<number> | <path> | <commit-sha>]",
 		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
+			# Open the home page of the current repository
 			$ gh browse
-			#=> Open the home page of the current repository
 
+			# Open the script directory of the current repository
 			$ gh browse script/
-			#=> Open the script directory of the current repository
 
+			# Open issue or pull request 217
 			$ gh browse 217
-			#=> Open issue or pull request 217
 
+			# Open commit page
 			$ gh browse 77507cd94ccafcf568f8560cfecde965fcfa63
-			#=> Open commit page
 
+			# Open repository settings
 			$ gh browse --settings
-			#=> Open repository settings
 
+			# Open main.go at line 312
 			$ gh browse main.go:312
-			#=> Open main.go at line 312
 
+			# Open main.go with the repository at head of bug-fix branch
 			$ gh browse main.go --branch bug-fix
-			#=> Open main.go with the repository at head of bug-fix branch
 
+			# Open main.go with the repository at commit 775007cd
 			$ gh browse main.go --commit=77507cd94ccafcf568f8560cfecde965fcfa63
-			#=> Open main.go with the repository at commit 775007cd
 		`),
 		Annotations: map[string]string{
 			"help:arguments": heredoc.Doc(`

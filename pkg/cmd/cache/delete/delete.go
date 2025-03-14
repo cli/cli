@@ -22,8 +22,9 @@ type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
-	DeleteAll  bool
-	Identifier string
+	DeleteAll         bool
+	SucceedOnNoCaches bool
+	Identifier        string
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
@@ -33,7 +34,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "delete [<cache-id>| <cache-key> | --all]",
+		Use:   "delete [<cache-id> | <cache-key> | --all]",
 		Short: "Delete GitHub Actions caches",
 		Long: heredoc.Docf(`
 			Delete GitHub Actions caches.
@@ -50,8 +51,11 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			# Delete a cache by id in a specific repo
 			$ gh cache delete 1234 --repo cli/cli
 
-			# Delete all caches
+			# Delete all caches (exit code 1 on no caches)
 			$ gh cache delete --all
+
+			# Delete all caches (exit code 0 on no caches)
+			$ gh cache delete --all --succeed-on-no-caches
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -63,6 +67,10 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				opts.DeleteAll, len(args) > 0,
 			); err != nil {
 				return err
+			}
+
+			if !opts.DeleteAll && opts.SucceedOnNoCaches {
+				return cmdutil.FlagErrorf("--succeed-on-no-caches must be used in conjunction with --all")
 			}
 
 			if !opts.DeleteAll && len(args) == 0 {
@@ -82,6 +90,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().BoolVarP(&opts.DeleteAll, "all", "a", false, "Delete all caches")
+	cmd.Flags().BoolVar(&opts.SucceedOnNoCaches, "succeed-on-no-caches", false, "Return exit code 0 if no caches found. Must be used in conjunction with `--all`")
 
 	return cmd
 }
@@ -100,12 +109,21 @@ func deleteRun(opts *DeleteOptions) error {
 
 	var toDelete []string
 	if opts.DeleteAll {
+		opts.IO.StartProgressIndicator()
 		caches, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: -1})
+		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
 		if len(caches.ActionsCaches) == 0 {
-			return fmt.Errorf("%s No caches to delete", opts.IO.ColorScheme().FailureIcon())
+			if opts.SucceedOnNoCaches {
+				if opts.IO.IsStdoutTTY() {
+					fmt.Fprintf(opts.IO.Out, "%s No caches to delete\n", opts.IO.ColorScheme().SuccessIcon())
+				}
+				return nil
+			} else {
+				return fmt.Errorf("%s No caches to delete", opts.IO.ColorScheme().FailureIcon())
+			}
 		}
 		for _, cache := range caches.ActionsCaches {
 			toDelete = append(toDelete, strconv.Itoa(cache.Id))

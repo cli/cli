@@ -47,7 +47,7 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 			timestamps, and if the included signatures match the provided public key.
 
 			This command cannot be used to verify a bundle. To verify a bundle, see the
-		 %[1]sgh at verify%[1]s command.
+			%[1]sgh at verify%[1]s command.
 
 			By default, this command prints a condensed table. To see full results, provide the
 			%[1]s--format=json%[1]s flag.

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/cli/go-gh/v2/pkg/config"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
 )
@@ -14,7 +15,7 @@ var githubRoot []byte
 
 const GitHubTUFMirror = "https://tuf-repo.github.com"
 
-func DefaultOptionsWithCacheSetting() *tuf.Options {
+func DefaultOptionsWithCacheSetting(tufMetadataDir o.Option[string]) *tuf.Options {
 	opts := tuf.DefaultOptions()
 
 	// The CODESPACES environment variable will be set to true in a Codespaces workspace
@@ -25,8 +26,8 @@ func DefaultOptionsWithCacheSetting() *tuf.Options {
 		opts.DisableLocalCache = true
 	}
 
-	// Set the cache path to a directory owned by the CLI
-	opts.CachePath = filepath.Join(config.CacheDir(), ".sigstore", "root")
+	// Set the cache path to the provided dir, or a directory owned by the CLI
+	opts.CachePath = tufMetadataDir.UnwrapOr(filepath.Join(config.CacheDir(), ".sigstore", "root"))
 
 	// Allow TUF cache for 1 day
 	opts.CacheValidity = 1
@@ -34,8 +35,8 @@ func DefaultOptionsWithCacheSetting() *tuf.Options {
 	return opts
 }
 
-func GitHubTUFOptions() *tuf.Options {
-	opts := DefaultOptionsWithCacheSetting()
+func GitHubTUFOptions(tufMetadataDir o.Option[string]) *tuf.Options {
+	opts := DefaultOptionsWithCacheSetting(tufMetadataDir)
 
 	opts.Root = githubRoot
 	opts.RepositoryBaseURL = GitHubTUFMirror

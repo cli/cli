@@ -52,7 +52,7 @@ func (c EnforcementCriteria) Valid() error {
 }
 
 func (c EnforcementCriteria) BuildPolicyInformation() string {
-	policyAttr := make([][]string, 0, 6)
+	policyAttr := [][]string{}
 
 	policyAttr = appendStr(policyAttr, "- Predicate type must match", c.PredicateType)
 
@@ -60,6 +60,16 @@ func (c EnforcementCriteria) BuildPolicyInformation() string {
 
 	if c.Certificate.SourceRepositoryURI != "" {
 		policyAttr = appendStr(policyAttr, "- Source Repository URI must match", c.Certificate.SourceRepositoryURI)
+	}
+
+	if c.Certificate.BuildSignerDigest != "" {
+		policyAttr = appendStr(policyAttr, "- Build signer digest must match", c.Certificate.BuildSignerDigest)
+	}
+	if c.Certificate.SourceRepositoryDigest != "" {
+		policyAttr = appendStr(policyAttr, "- Source repo digest digest must match", c.Certificate.SourceRepositoryDigest)
+	}
+	if c.Certificate.SourceRepositoryRef != "" {
+		policyAttr = appendStr(policyAttr, "- Source repo ref must match", c.Certificate.SourceRepositoryRef)
 	}
 
 	if c.SAN != "" {

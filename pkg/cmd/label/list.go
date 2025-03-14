@@ -42,10 +42,10 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 			This behavior cannot be configured with the %[1]s--order%[1]s or %[1]s--sort%[1]s flags.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# sort labels by name
+			# Sort labels by name
 			$ gh label list --sort name
 
-			# find labels with "bug" in the name or description
+			# Find labels with "bug" in the name or description
 			$ gh label list --search bug
 		`),
 		Args:    cobra.NoArgs,

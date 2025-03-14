@@ -134,7 +134,7 @@ There are two common ways to verify a downloaded release, depending if `gh` is a
 - **Option 1: Using `gh` if already installed:**
 
   ```shell
-  $ % gh at verify -R cli/cli gh_2.62.0_macOS_arm64.zip
+  $ gh at verify -R cli/cli gh_2.62.0_macOS_arm64.zip
   Loaded digest sha256:fdb77f31b8a6dd23c3fd858758d692a45f7fc76383e37d475bdcae038df92afc for file://gh_2.62.0_macOS_arm64.zip
   Loaded 1 attestation from GitHub API
   ✓ Verification succeeded!

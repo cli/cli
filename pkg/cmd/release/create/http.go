@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -298,4 +299,32 @@ func tokenHasWorkflowScope(resp *http.Response) bool {
 	}
 
 	return slices.Contains(strings.Split(scopes, ","), "workflow")
+}
+
+// isNewRelease checks if there are new commits since the latest release.
+func isNewRelease(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
+	ctx := context.Background()
+	release, err := shared.FetchLatestRelease(ctx, httpClient, repo)
+	if err != nil {
+		if errors.Is(err, shared.ErrReleaseNotFound) {
+			return true, nil
+		} else {
+			return false, err
+		}
+	}
+
+	tagName := release.TagName
+	path := fmt.Sprintf("repos/%s/%s/compare/%s...HEAD?per_page=1", repo.RepoOwner(), repo.RepoName(), tagName)
+
+	var comparisonStatus struct {
+		Status string `json:"status"`
+	}
+
+	apiClient := api.NewClientFromHTTP(httpClient)
+	if err := apiClient.REST(repo.RepoHost(), "GET", path, nil, &comparisonStatus); err != nil {
+		return false, err
+	}
+
+	isNew := comparisonStatus.Status == "ahead"
+	return isNew, nil
 }

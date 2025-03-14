@@ -31,8 +31,11 @@ type Options struct {
 	Repo                  string
 	SAN                   string
 	SANRegex              string
+	SignerDigest          string
 	SignerRepo            string
 	SignerWorkflow        string
+	SourceDigest          string
+	SourceRef             string
 	APIClient             api.Client
 	Logger                *io.Handler
 	OCIClient             oci.Client

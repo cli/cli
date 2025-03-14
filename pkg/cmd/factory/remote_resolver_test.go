@@ -1,14 +1,17 @@
 package factory
 
 import (
+	"errors"
 	"net/url"
 	"testing"
 
+	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	ghmock "github.com/cli/cli/v2/internal/gh/mock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type identityTranslator struct{}
@@ -287,4 +290,96 @@ func Test_remoteResolver(t *testing.T) {
 			assert.Equal(t, tt.output, names)
 		})
 	}
+}
+
+func Test_remoteResolver_Caching(t *testing.T) {
+	t.Run("cache remotes", func(t *testing.T) {
+		var readRemotesCalled bool
+
+		rr := &remoteResolver{
+			readRemotes: func() (git.RemoteSet, error) {
+				if readRemotesCalled {
+					return git.RemoteSet{}, errors.New("readRemotes should only be called once")
+				}
+
+				readRemotesCalled = true
+				return git.RemoteSet{
+					git.NewRemote("origin", "https://github.com/owner/repo.git"),
+				}, nil
+			},
+			getConfig: func() (gh.Config, error) {
+				cfg := &ghmock.ConfigMock{}
+				cfg.AuthenticationFunc = func() gh.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"github.com"})
+					authCfg.SetDefaultHost("github.com", "default")
+					return authCfg
+				}
+				return cfg, nil
+			},
+			urlTranslator: identityTranslator{},
+		}
+
+		resolver := rr.Resolver()
+
+		expectedRemoteNames := []string{"origin"}
+		remotes, err := resolver()
+		require.NoError(t, err)
+		require.Equal(t, expectedRemoteNames, mapRemotesToNames(remotes))
+
+		require.Equal(t, readRemotesCalled, true)
+
+		cachedRemotes, err := resolver()
+		require.NoError(t, err, "expected no error to be cached")
+		require.Equal(t, expectedRemoteNames, mapRemotesToNames(cachedRemotes), "expected the remotes to be cached")
+	})
+
+	t.Run("cache error", func(t *testing.T) {
+		var readRemotesCalled bool
+
+		rr := &remoteResolver{
+			readRemotes: func() (git.RemoteSet, error) {
+				if readRemotesCalled {
+					return git.RemoteSet{
+						git.NewRemote("origin", "https://github.com/owner/repo.git"),
+					}, nil
+				}
+
+				readRemotesCalled = true
+				return git.RemoteSet{}, errors.New("error to be cached")
+			},
+			getConfig: func() (gh.Config, error) {
+				cfg := &ghmock.ConfigMock{}
+				cfg.AuthenticationFunc = func() gh.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"github.com"})
+					authCfg.SetDefaultHost("github.com", "default")
+					return authCfg
+				}
+				return cfg, nil
+			},
+			urlTranslator: identityTranslator{},
+		}
+
+		resolver := rr.Resolver()
+
+		expectedErr := errors.New("error to be cached")
+		remotes, err := resolver()
+		require.Equal(t, expectedErr, err)
+		require.Empty(t, remotes, "should return no remotes")
+
+		require.Equal(t, readRemotesCalled, true)
+
+		cachedRemotes, err := resolver()
+		require.Equal(t, expectedErr, err, "expected the error to be cached")
+		require.Empty(t, cachedRemotes, "should return no remotes")
+	})
+}
+
+func mapRemotesToNames(remotes context.Remotes) []string {
+	names := make([]string, len(remotes))
+	for i, r := range remotes {
+		names[i] = r.Name
+	}
+	return names
 }

@@ -1,5 +1,7 @@
 # Releasing
 
+To read about what happens during a production deployment, see the [release process deep dive doc](release-process-deep-dive.md).
+
 To initiate a new production deployment:
 
 ```sh

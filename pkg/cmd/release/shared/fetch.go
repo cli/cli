@@ -124,7 +124,7 @@ func (rel *Release) ExportData(fields []string) map[string]interface{} {
 	return data
 }
 
-var errNotFound = errors.New("release not found")
+var ErrReleaseNotFound = errors.New("release not found")
 
 type fetchResult struct {
 	release *Release
@@ -150,7 +150,7 @@ func FetchRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Inte
 	}()
 
 	res := <-results
-	if errors.Is(res.error, errNotFound) {
+	if errors.Is(res.error, ErrReleaseNotFound) {
 		res = <-results
 		cancel() // satisfy the linter even though no goroutines are running anymore
 	} else {
@@ -190,7 +190,7 @@ func fetchDraftRelease(ctx context.Context, httpClient *http.Client, repo ghrepo
 	}
 
 	if query.Repository.Release == nil || !query.Repository.Release.IsDraft {
-		return nil, errNotFound
+		return nil, ErrReleaseNotFound
 	}
 
 	// Then, use REST to get information about the draft release. In theory, we could have fetched
@@ -213,7 +213,7 @@ func fetchReleasePath(ctx context.Context, httpClient *http.Client, host string,
 
 	if resp.StatusCode == 404 {
 		_, _ = io.Copy(io.Discard, resp.Body)
-		return nil, errNotFound
+		return nil, ErrReleaseNotFound
 	} else if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
 	}

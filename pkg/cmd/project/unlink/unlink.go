@@ -41,16 +41,16 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 	opts := unlinkOpts{}
 	linkCmd := &cobra.Command{
 		Short: "Unlink a project from a repository or a team",
-		Use:   "unlink [<number>] [flag]",
+		Use:   "unlink [<number>]",
 		Example: heredoc.Doc(`
-			# unlink monalisa's project 1 from her repository "my_repo"
-			gh project unlink 1 --owner monalisa --repo my_repo
+			# Unlink monalisa's project 1 from her repository "my_repo"
+			$ gh project unlink 1 --owner monalisa --repo my_repo
 
-			# unlink monalisa's organization's project 1 from her team "my_team"
-			gh project unlink 1 --owner my_organization --team my_team
+			# Unlink monalisa's organization's project 1 from her team "my_team"
+			$ gh project unlink 1 --owner my_organization --team my_team
 
-			# unlink monalisa's project 1 from the repository of current directory if neither --repo nor --team is specified
-			gh project unlink 1
+			# Unlink monalisa's project 1 from the repository of current directory if neither --repo nor --team is specified
+			$ gh project unlink 1
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := client.New(f)
