@@ -240,25 +240,20 @@ func deleteComment(commentable Commentable, opts *CommentableOptions) error {
 
 	lastComment := &comments[len(comments)-1]
 
-	if opts.Interactive {
-		ok, err := opts.ConfirmDeleteComment(lastComment.Body)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return errDeleteNotConfirmed
-		}
-	}
+	cs := opts.IO.ColorScheme()
 
-	if opts.IO.CanPrompt() && !opts.Confirmed {
-		cs := opts.IO.ColorScheme()
-		fmt.Printf("%s Deleted comments cannot be recovered.\n", cs.WarningIcon())
-		ok, err := opts.ConfirmDeleteComment(lastComment.Body)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return errDeleteNotConfirmed
+	if (opts.IO.CanPrompt() && !opts.Confirmed) {
+		if opts.Interactive {
+			fmt.Fprintf(opts.IO.Out, "%s Deleted comments cannot be recovered.\n", cs.WarningIcon())
+			ok, err := opts.ConfirmDeleteComment(lastComment.Body)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return errDeleteNotConfirmed
+			}
+		} else {
+			return errors.New("you must use --yes flag to confirm deletion in non-interactive mode")
 		}
 	}
 
@@ -269,13 +264,13 @@ func deleteComment(commentable Commentable, opts *CommentableOptions) error {
 
 	apiClient := api.NewClientFromHTTP(httpClient)
 	params := api.CommentDeleteInput{CommentId: lastComment.Identifier()}
-	url, err := api.CommentDelete(apiClient, opts.Host, params)
-	if err != nil {
-		return err
+	deletionErr := api.CommentDelete(apiClient, opts.Host, params)
+	if deletionErr != nil {
+		return deletionErr
 	}
 
 	if !opts.Quiet {
-		fmt.Fprintln(opts.IO.Out, url)
+		fmt.Fprintln(opts.IO.Out, "Deleted the comment successfully.")
 	}
 
 	return nil
@@ -317,8 +312,8 @@ func CommentableEditSurvey(cf func() (gh.Config, error), io *iostreams.IOStreams
 }
 
 func CommentableConfirmDeleteComment(p Prompt) func(string) (bool, error) {
-	return func(id string) (bool, error) {
-		return p.Confirm(fmt.Sprintf("Deleting comment with body: %s", id), true)
+	return func(body string) (bool, error) {
+		return p.Confirm(fmt.Sprintf("Deleting the comment with a body: '%s'.", body), true)
 	}
 }
 

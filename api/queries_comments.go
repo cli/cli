@@ -103,7 +103,7 @@ func CommentUpdate(client *Client, repoHost string, params CommentUpdateInput) (
 	return mutation.UpdateIssueComment.IssueComment.URL, nil
 }
 
-func CommentDelete(client *Client, repoHost string, params CommentDeleteInput) (string, error) {
+func CommentDelete(client *Client, repoHost string, params CommentDeleteInput) (error) {
 	var mutation struct {
 		DeleteIssueComment struct {
 			ClientMutationID string
@@ -118,10 +118,10 @@ func CommentDelete(client *Client, repoHost string, params CommentDeleteInput) (
 
 	err := client.Mutate(repoHost, "DeleteComment", &mutation, variables)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return mutation.DeleteIssueComment.ClientMutationID, nil
+	return nil
 }
 
 func (c Comment) Identifier() string {
