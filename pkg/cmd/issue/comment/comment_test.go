@@ -275,87 +275,6 @@ func Test_commentRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
 		},
 		{
-			name: "non interactive editor with delete last without any comment",
-			input: &shared.CommentableOptions{
-				Interactive:  false,
-				DeleteLast:   true,
-			},
-			emptyComments:  true,
-			expectErr: true,
-			stderr: "no comments found for current user",
-		},
-		{
-			name: "interactive editor with delete last without any comment",
-			input: &shared.CommentableOptions{
-				Interactive:  true,
-				DeleteLast:   true,
-			},
-			emptyComments:  true,
-			expectErr: true,
-			stderr: "no comments found for current user",
-		},
-		{
-			name: "non interactive editor with delete last without confirmation",
-			input: &shared.CommentableOptions{
-				Interactive:  false,
-				DeleteLast:   true,
-
-				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
-			},
-			expectErr: true,
-			stderr: "you must use --yes flag to confirm deletion in non-interactive mode",
-		},
-		{
-			name: "non interactive editor with delete last with confirmation",
-			input: &shared.CommentableOptions{
-				Interactive:  false,
-				DeleteLast:   true,
-				Confirmed:    true,
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentDelete(t, reg)
-			},
-			stdout: "Deleted the comment successfully.\n",
-		},
-		{
-			name: "interactive editor with delete last and confirmed",
-			input: &shared.CommentableOptions{
-				Interactive:  false,
-				DeleteLast:   true,
-				Confirmed:    true,
-
-				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentDelete(t, reg)
-			},
-			stdout: "Deleted the comment successfully.\n",
-		},
-		{
-			name: "interactive editor with delete last and not confirmed default but confirmed interactively",
-			input: &shared.CommentableOptions{
-				Interactive:  true,
-				DeleteLast:   true,
-
-				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentDelete(t, reg)
-			},
-			stdout: "! Deleted comments cannot be recovered.\nDeleted the comment successfully.\n",
-		},
-		{
-			name: "interactive editor with delete last and not confirmed default but confirmed interactively",
-			input: &shared.CommentableOptions{
-				Interactive:  true,
-				DeleteLast:   true,
-
-				ConfirmDeleteComment:     func(string) (bool, error) { return false, nil },
-			},
-			expectErr: true,
-			stderr: "deletion not confirmed",
-		},
-		{
 			name: "non-interactive web",
 			input: &shared.CommentableOptions{
 				Interactive: false,
@@ -482,6 +401,87 @@ func Test_commentRun(t *testing.T) {
 			},
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
 		},
+				{
+			name: "non interactive editor with delete last without any comment",
+			input: &shared.CommentableOptions{
+				Interactive:  false,
+				DeleteLast:   true,
+			},
+			emptyComments:  true,
+			expectErr: true,
+			stderr: "no comments found for current user",
+		},
+		{
+			name: "interactive editor with delete last without any comment",
+			input: &shared.CommentableOptions{
+				Interactive:  true,
+				DeleteLast:   true,
+			},
+			emptyComments:  true,
+			expectErr: true,
+			stderr: "no comments found for current user",
+		},
+		{
+			name: "non interactive editor with delete last without confirmation",
+			input: &shared.CommentableOptions{
+				Interactive:  false,
+				DeleteLast:   true,
+
+				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
+			},
+			expectErr: true,
+			stderr: "you must use --yes flag to confirm deletion in non-interactive mode",
+		},
+		{
+			name: "non interactive editor with delete last with confirmation",
+			input: &shared.CommentableOptions{
+				Interactive:  false,
+				DeleteLast:   true,
+				Confirmed:    true,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentDelete(t, reg)
+			},
+			stdout: "Deleted the comment successfully.\n",
+		},
+		{
+			name: "interactive editor with delete last and confirmed",
+			input: &shared.CommentableOptions{
+				Interactive:  false,
+				DeleteLast:   true,
+				Confirmed:    true,
+
+				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentDelete(t, reg)
+			},
+			stdout: "Deleted the comment successfully.\n",
+		},
+		{
+			name: "interactive editor with delete last and not confirmed default but confirmed interactively",
+			input: &shared.CommentableOptions{
+				Interactive:  true,
+				DeleteLast:   true,
+
+				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentDelete(t, reg)
+			},
+			stdout: "! Deleted comments cannot be recovered.\nDeleted the comment successfully.\n",
+		},
+		{
+			name: "interactive editor with delete last and not confirmed default but confirmed interactively",
+			input: &shared.CommentableOptions{
+				Interactive:  true,
+				DeleteLast:   true,
+
+				ConfirmDeleteComment:     func(string) (bool, error) { return false, nil },
+			},
+			expectErr: true,
+			stderr: "deletion not confirmed",
+		},
 	}
 	for _, tt := range tests {
 		ios, _, stdout, stderr := iostreams.Test()
@@ -522,12 +522,11 @@ func Test_commentRun(t *testing.T) {
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.stderr, err.Error())
-				return 
 			} else {
 				assert.NoError(t, err)
+				assert.Equal(t, tt.stdout, stdout.String())
+				assert.Equal(t, tt.stderr, stderr.String())
 			}
-			assert.Equal(t, tt.stdout, stdout.String())
-			assert.Equal(t, tt.stderr, stderr.String())
 		})
 	}
 }

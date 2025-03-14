@@ -16,6 +16,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 		InteractiveEditSurvey:     shared.CommentableInteractiveEditSurvey(f.Config, f.IOStreams),
 		ConfirmSubmitSurvey:       shared.CommentableConfirmSubmitSurvey(f.Prompter),
 		ConfirmCreateIfNoneSurvey: shared.CommentableInteractiveCreateIfNoneSurvey(f.Prompter),
+		ConfirmDeleteComment:      shared.CommentableConfirmDeleteComment(f.Prompter),
 		OpenInBrowser:             f.Browser.Browse,
 	}
 
@@ -43,7 +44,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 				selector = args[0]
 			}
 			fields := []string{"id", "url"}
-			if opts.EditLast {
+			if opts.EditLast || opts.DeleteLast {
 				fields = append(fields, "comments")
 			}
 			finder := shared.NewFinder(f)
@@ -76,6 +77,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 	cmd.Flags().BoolP("editor", "e", false, "Skip prompts and open the text editor to write the body in")
 	cmd.Flags().BoolP("web", "w", false, "Open the web browser to write the comment")
 	cmd.Flags().BoolVar(&opts.EditLast, "edit-last", false, "Edit the last comment of the same author")
+	cmd.Flags().BoolVar(&opts.DeleteLast, "delete-last", false, "Delete the last comment of the same author")
 	cmd.Flags().BoolVar(&opts.CreateIfNone, "create-if-none", false, "Create a new comment if no comments are found. Can be used only with --edit-last")
 
 	return cmd
