@@ -39,6 +39,7 @@ require (
 	github.com/muhammadmuzzammil1998/jsonc v0.0.0-20201229145248-615b0916ca38
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/rivo/tview v0.0.0-20221029100920-c4a7e501810d
+	github.com/schollz/progressbar/v3 v3.18.0
 	github.com/shurcooL/githubv4 v0.0.0-20240120211514-18a1ae0e79dc
 	github.com/sigstore/protobuf-specs v0.3.3
 	github.com/sigstore/sigstore-go v0.7.0
@@ -48,7 +49,7 @@ require (
 	github.com/zalando/go-keyring v0.2.5
 	golang.org/x/crypto v0.35.0
 	golang.org/x/sync v0.11.0
-	golang.org/x/term v0.29.0
+	golang.org/x/term v0.30.0
 	golang.org/x/text v0.22.0
 	google.golang.org/grpc v1.69.4
 	google.golang.org/protobuf v1.36.5
@@ -110,8 +111,9 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
+	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
@@ -159,7 +161,7 @@ require (
 	golang.org/x/exp v0.0.0-20240325151524-a685a6edb6d8 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.36.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/tools v0.29.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250102185135-69823020774d // indirect

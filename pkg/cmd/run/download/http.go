@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
+	"github.com/schollz/progressbar/v3"
 )
 
 type apiPlatform struct {
@@ -53,7 +54,16 @@ func downloadArtifact(httpClient *http.Client, url string, destDir safepaths.Abs
 		_ = os.Remove(tmpfile.Name())
 	}()
 
-	size, err := io.Copy(tmpfile, resp.Body)
+	var reader io.Reader = resp.Body
+	if resp.ContentLength > 0 {
+		bar := progressbar.DefaultBytes(
+			resp.ContentLength,
+			"Downloading artifact",
+		)
+		reader = io.TeeReader(resp.Body, bar)
+	}
+
+	size, err := io.Copy(tmpfile, reader)
 	if err != nil {
 		return fmt.Errorf("error writing zip archive: %w", err)
 	}
