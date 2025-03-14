@@ -401,7 +401,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
 		},
-				{
+		{
 			name: "non interactive editor with delete last without any comment",
 			input: &shared.CommentableOptions{
 				Interactive:  false,
