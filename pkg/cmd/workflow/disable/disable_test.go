@@ -50,6 +50,35 @@ func TestNewCmdDisable(t *testing.T) {
 				Selector: "123",
 			},
 		},
+		{
+			name:     "multiple args without multi flag",
+			cli:      "123 456",
+			tty:      true,
+			wantsErr: true,
+		},
+		{
+			name:     "multi flag with no args",
+			cli:      "--multi",
+			tty:      true,
+			wantsErr: true,
+		},
+		{
+			name: "multi flag with args",
+			cli:  "--multi 123 456",
+			tty:  true,
+			wants: DisableOptions{
+				Multi:        true,
+				SelectorArgs: []string{"123", "456"},
+			},
+		},
+		{
+			name: "multi flag with args nontty",
+			cli:  "--multi 123 456",
+			wants: DisableOptions{
+				Multi:        true,
+				SelectorArgs: []string{"123", "456"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -85,6 +114,8 @@ func TestNewCmdDisable(t *testing.T) {
 
 			assert.Equal(t, tt.wants.Selector, gotOpts.Selector)
 			assert.Equal(t, tt.wants.Prompt, gotOpts.Prompt)
+			assert.Equal(t, tt.wants.Multi, gotOpts.Multi)
+			assert.Equal(t, tt.wants.SelectorArgs, gotOpts.SelectorArgs)
 		})
 	}
 }
@@ -255,6 +286,47 @@ func TestDisableRun(t *testing.T) {
 			wantErr:    true,
 			wantErrOut: "could not resolve to a unique workflow; found: another.yml yetanother.yml",
 		},
+		{
+			name: "multi mode with multiple workflow IDs",
+			opts: &DisableOptions{
+				Multi:        true,
+				SelectorArgs: []string{"123", "789"},
+			},
+			tty: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.AWorkflow))
+				reg.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/123/disable"),
+					httpmock.StatusStringResponse(204, "{}"))
+				
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/789"),
+					httpmock.JSONResponse(shared.AnotherWorkflow))
+				reg.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/789/disable"),
+					httpmock.StatusStringResponse(204, "{}"))
+			},
+			wantOut: "✓ Disabled a workflow\n✓ Disabled another workflow\n✓ Successfully disabled all 2 workflows\n",
+		},
+		{
+			name: "multi mode with duplicate workflow",
+			opts: &DisableOptions{
+				Multi:        true,
+				SelectorArgs: []string{"123", "123"},
+			},
+			tty: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.AWorkflow))
+				reg.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/123/disable"),
+					httpmock.StatusStringResponse(204, "{}"))
+			},
+			wantOut: "✓ Disabled a workflow\n✓ Successfully disabled all 1 workflows\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -282,7 +354,7 @@ func TestDisableRun(t *testing.T) {
 			err := runDisable(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.Equal(t, tt.wantErrOut, err.Error())
+					assert.Equal(t, tt.wantErrOut, err.Error())
 				return
 			}
 			assert.NoError(t, err)
