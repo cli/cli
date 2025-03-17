@@ -300,7 +300,7 @@ func TestDisableRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/123/disable"),
 					httpmock.StatusStringResponse(204, "{}"))
-				
+
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/789"),
 					httpmock.JSONResponse(shared.AnotherWorkflow))
@@ -354,7 +354,7 @@ func TestDisableRun(t *testing.T) {
 			err := runDisable(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
-					assert.Equal(t, tt.wantErrOut, err.Error())
+				assert.Equal(t, tt.wantErrOut, err.Error())
 				return
 			}
 			assert.NoError(t, err)
