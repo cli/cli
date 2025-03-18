@@ -57,6 +57,15 @@ func TestNewCmdWatch(t *testing.T) {
 				ExitStatus: true,
 			},
 		},
+		{
+			name: "compact status",
+			cli:  "1234 --compact",
+			wants: WatchOptions{
+				Interval: defaultInterval,
+				RunID:    "1234",
+				Compact:  true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
