@@ -25,7 +25,7 @@ func RenderRunHeader(cs *iostreams.ColorScheme, run Run, ago, prNumber string, a
 	return header
 }
 
-func RenderJobs(cs *iostreams.ColorScheme, jobs []Job, verbose bool) string {
+func RenderJobs(cs *iostreams.ColorScheme, jobs []Job, verbose, compact bool) string {
 	lines := []string{}
 	for _, job := range jobs {
 		elapsed := job.CompletedAt.Sub(job.StartedAt)
@@ -37,10 +37,27 @@ func RenderJobs(cs *iostreams.ColorScheme, jobs []Job, verbose bool) string {
 		id := cs.Cyanf("%d", job.ID)
 		lines = append(lines, fmt.Sprintf("%s %s%s (ID %s)", symbolColor(symbol), cs.Bold(job.Name), elapsedStr, id))
 		if verbose || IsFailureState(job.Conclusion) {
+			stepLogs := []string{}
 			for _, step := range job.Steps {
 				stepSymbol, stepSymColor := Symbol(cs, step.Status, step.Conclusion)
-				lines = append(lines, fmt.Sprintf("  %s %s", stepSymColor(stepSymbol), step.Name))
+
+				if compact {
+					if step.Status == InProgress || step.Status == Completed {
+						stepLogs = append(stepLogs, fmt.Sprintf("  %s %s", stepSymColor(stepSymbol), step.Name))
+
+						if len(stepLogs) > 1 {
+							stepLogs = stepLogs[len(stepLogs)-1:]
+						}
+
+						if IsFailureState(step.Conclusion) {
+							break
+						}
+					}
+				} else {
+					stepLogs = append(stepLogs, fmt.Sprintf("  %s %s", stepSymColor(stepSymbol), step.Name))
+				}
 			}
+			lines = append(lines, stepLogs...)
 		}
 	}
 
