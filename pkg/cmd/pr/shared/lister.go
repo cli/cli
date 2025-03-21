@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmdutil"
 
 	api "github.com/cli/cli/v2/api"
 )
@@ -15,6 +14,8 @@ type PRLister interface {
 }
 
 type ListOptions struct {
+	BaseRepo ghrepo.Interface
+
 	LimitResults int
 
 	State      string
@@ -25,32 +26,16 @@ type ListOptions struct {
 }
 
 type lister struct {
-	baseRepoFn func() (ghrepo.Interface, error)
-	httpClient func() (*http.Client, error)
+	httpClient *http.Client
 }
 
-func NewLister(factory *cmdutil.Factory) PRLister {
+func NewLister(httpClient *http.Client) PRLister {
 	return &lister{
-		baseRepoFn: factory.BaseRepo,
-		httpClient: factory.HttpClient,
+		httpClient: httpClient,
 	}
 }
 
 func (l *lister) List(opts ListOptions) (*api.PullRequestAndTotalCount, error) {
-	repo, err := l.baseRepoFn()
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := l.httpClient()
-	if err != nil {
-		return nil, err
-	}
-
-	return listPullRequests(client, repo, opts)
-}
-
-func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters ListOptions) (*api.PullRequestAndTotalCount, error) {
 	type response struct {
 		Repository struct {
 			PullRequests struct {
@@ -63,8 +48,8 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters Li
 			}
 		}
 	}
-	limit := filters.LimitResults
-	fragment := fmt.Sprintf("fragment pr on PullRequest{%s}", api.PullRequestGraphQL(filters.Fields))
+	limit := opts.LimitResults
+	fragment := fmt.Sprintf("fragment pr on PullRequest{%s}", api.PullRequestGraphQL(opts.Fields))
 	query := fragment + `
 		query PullRequestList(
 			$owner: String!,
@@ -98,11 +83,11 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters Li
 
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{
-		"owner": repo.RepoOwner(),
-		"repo":  repo.RepoName(),
+		"owner": opts.BaseRepo.RepoOwner(),
+		"repo":  opts.BaseRepo.RepoName(),
 	}
 
-	switch filters.State {
+	switch opts.State {
 	case "open":
 		variables["state"] = []string{"OPEN"}
 	case "closed":
@@ -112,25 +97,25 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters Li
 	case "all":
 		variables["state"] = []string{"OPEN", "CLOSED", "MERGED"}
 	default:
-		return nil, fmt.Errorf("invalid state: %s", filters.State)
+		return nil, fmt.Errorf("invalid state: %s", opts.State)
 	}
 
-	if filters.BaseBranch != "" {
-		variables["baseBranch"] = filters.BaseBranch
+	if opts.BaseBranch != "" {
+		variables["baseBranch"] = opts.BaseBranch
 	}
-	if filters.HeadBranch != "" {
-		variables["headBranch"] = filters.HeadBranch
+	if opts.HeadBranch != "" {
+		variables["headBranch"] = opts.HeadBranch
 	}
 
 	res := api.PullRequestAndTotalCount{}
 	var check = make(map[int]struct{})
-	client := api.NewClientFromHTTP(httpClient)
+	client := api.NewClientFromHTTP(l.httpClient)
 
 loop:
 	for {
 		variables["limit"] = pageLimit
 		var data response
-		err := client.GraphQL(repo.RepoHost(), query, variables, &data)
+		err := client.GraphQL(opts.BaseRepo.RepoHost(), query, variables, &data)
 		if err != nil {
 			return nil, err
 		}

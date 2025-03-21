@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
+	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +26,8 @@ func getAttestationsFor(t *testing.T, bundlePath string) []*api.Attestation {
 
 func TestVerifyAttestations(t *testing.T) {
 	sgVerifier := verification.NewLiveSigstoreVerifier(verification.SigstoreConfig{
-		Logger: io.NewTestHandler(),
+		Logger:         io.NewTestHandler(),
+		TUFMetadataDir: o.Some(t.TempDir()),
 	})
 
 	certSummary := certificate.Summary{}

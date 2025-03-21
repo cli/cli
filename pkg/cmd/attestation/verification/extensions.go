@@ -59,5 +59,15 @@ func verifyCertExtensions(given, expected certificate.Summary) error {
 		return fmt.Errorf("expected Issuer to be %s, got %s", expected.Issuer, given.Issuer)
 	}
 
+	if expected.BuildSignerDigest != "" && !strings.EqualFold(expected.BuildSignerDigest, given.BuildSignerDigest) {
+		return fmt.Errorf("expected BuildSignerDigest to be %s, got %s", expected.BuildSignerDigest, given.BuildSignerDigest)
+	}
+	if expected.SourceRepositoryDigest != "" && !strings.EqualFold(expected.SourceRepositoryDigest, given.SourceRepositoryDigest) {
+		return fmt.Errorf("expected SourceRepositoryDigest to be %s, got %s", expected.SourceRepositoryDigest, given.SourceRepositoryDigest)
+	}
+	if expected.SourceRepositoryRef != "" && !strings.EqualFold(expected.SourceRepositoryRef, given.SourceRepositoryRef) {
+		return fmt.Errorf("expected SourceRepositoryRef to be %s, got %s", expected.SourceRepositoryRef, given.SourceRepositoryRef)
+	}
+
 	return nil
 }

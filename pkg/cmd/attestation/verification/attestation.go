@@ -29,43 +29,37 @@ type FetchRemoteAttestationsParams struct {
 
 // GetLocalAttestations returns a slice of attestations read from a local bundle file.
 func GetLocalAttestations(path string) ([]*api.Attestation, error) {
+	var attestations []*api.Attestation
+	var err error
 	fileExt := filepath.Ext(path)
-	switch fileExt {
-	case ".json":
-		attestations, err := loadBundleFromJSONFile(path)
-		if err != nil {
-			var pathErr *os.PathError
-			if errors.As(err, &pathErr) {
-				return nil, fmt.Errorf("bundle could not be loaded from JSON file at %s", path)
-			} else if errors.Is(err, bundle.ErrValidation) {
-				return nil, err
-			}
-			return nil, fmt.Errorf("bundle content could not be parsed")
-		}
-		return attestations, nil
-	case ".jsonl":
-		attestations, err := loadBundlesFromJSONLinesFile(path)
-		if err != nil {
-			var pathErr *os.PathError
-			if errors.As(err, &pathErr) {
-				return nil, fmt.Errorf("bundles could not be loaded from JSON lines file at %s", path)
-			} else if errors.Is(err, bundle.ErrValidation) {
-				return nil, err
-			}
-			return nil, fmt.Errorf("bundle content could not be parsed")
-		}
-		return attestations, nil
+	if fileExt == ".json" {
+		attestations, err = loadBundleFromJSONFile(path)
+	} else if fileExt == ".jsonl" {
+		attestations, err = loadBundlesFromJSONLinesFile(path)
+	} else {
+		return nil, ErrUnrecognisedBundleExtension
 	}
-	return nil, ErrUnrecognisedBundleExtension
+
+	if err != nil {
+		var pathErr *os.PathError
+		if errors.As(err, &pathErr) {
+			return nil, fmt.Errorf("could not load content from file path %s: %w", path, err)
+		} else if errors.Is(err, bundle.ErrValidation) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("bundle content could not be parsed: %w", err)
+	}
+
+	return attestations, nil
 }
 
 func loadBundleFromJSONFile(path string) ([]*api.Attestation, error) {
-	localAttestation, err := bundle.LoadJSONFromPath(path)
+	b, err := bundle.LoadJSONFromPath(path)
 	if err != nil {
 		return nil, err
 	}
 
-	return []*api.Attestation{{Bundle: localAttestation}}, nil
+	return []*api.Attestation{{Bundle: b}}, nil
 }
 
 func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {

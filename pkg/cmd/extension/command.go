@@ -411,8 +411,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return nil
 				},
 			}
-			cmd.Flags().BoolVar(&forceFlag, "force", false, "force upgrade extension, or ignore if latest already installed")
-			cmd.Flags().StringVar(&pinFlag, "pin", "", "pin extension to a release tag or commit ref")
+			cmd.Flags().BoolVar(&forceFlag, "force", false, "Force upgrade extension, or ignore if latest already installed")
+			cmd.Flags().StringVar(&pinFlag, "pin", "", "Pin extension to a release tag or commit ref")
 			return cmd
 		}(),
 		func() *cobra.Command {
@@ -526,7 +526,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return browse.ExtBrowse(opts)
 				},
 			}
-			cmd.Flags().BoolVar(&debug, "debug", false, "log to /tmp/extBrowse-*")
+			cmd.Flags().BoolVar(&debug, "debug", false, "Log to /tmp/extBrowse-*")
 			cmd.Flags().BoolVarP(&singleColumn, "single-column", "s", false, "Render TUI with only one column of text")
 			return cmd
 		}(),
@@ -542,7 +542,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				of the extension.
 			`, "`"),
 			Example: heredoc.Doc(`
-				# execute a label extension instead of the core gh label command
+				# Execute a label extension instead of the core gh label command
 				$ gh extension exec label
 			`),
 			Args:               cobra.MinimumNArgs(1),
@@ -573,16 +573,16 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Short: "Create a new extension",
 				Example: heredoc.Doc(`
 					# Use interactively
-					gh extension create
+					$ gh extension create
 
 					# Create a script-based extension
-					gh extension create foobar
+					$ gh extension create foobar
 
 					# Create a Go extension
-					gh extension create --precompiled=go foobar
+					$ gh extension create --precompiled=go foobar
 
 					# Create a non-Go precompiled extension
-					gh extension create --precompiled=other foobar
+					$ gh extension create --precompiled=other foobar
 				`),
 				Args: cobra.MaximumNArgs(1),
 				RunE: func(cmd *cobra.Command, args []string) error {

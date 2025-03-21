@@ -15,6 +15,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -36,6 +37,17 @@ type AssetForUpload struct {
 }
 
 func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
+	labeledArgs, unlabeledArgs := cmdutil.Partition(args, func(arg string) bool {
+		return strings.Contains(arg, "#")
+	})
+
+	args, err = cmdutil.GlobPaths(unlabeledArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	args = append(args, labeledArgs...)
+
 	for _, arg := range args {
 		var label string
 		fn := arg

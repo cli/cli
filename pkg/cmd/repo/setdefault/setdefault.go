@@ -64,16 +64,16 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 		Short: "Configure default repository for this directory",
 		Long:  explainer(),
 		Example: heredoc.Doc(`
-			Interactively select a default repository:
+			# Interactively select a default repository
 			$ gh repo set-default
 
-			Set a repository explicitly:
+			# Set a repository explicitly
 			$ gh repo set-default owner/repo
 
-			View the current default repository:
+			# View the current default repository
 			$ gh repo set-default --view
 
-			Show more repository options in the interactive picker:
+			# Show more repository options in the interactive picker
 			$ git remote add newrepo https://github.com/owner/repo
 			$ gh repo set-default
 		`),
@@ -105,8 +105,8 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.ViewMode, "view", "v", false, "view the current default repository")
-	cmd.Flags().BoolVarP(&opts.UnsetMode, "unset", "u", false, "unset the current default repository")
+	cmd.Flags().BoolVarP(&opts.ViewMode, "view", "v", false, "View the current default repository")
+	cmd.Flags().BoolVarP(&opts.UnsetMode, "unset", "u", false, "Unset the current default repository")
 
 	return cmd
 }

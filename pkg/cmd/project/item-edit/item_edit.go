@@ -70,11 +70,11 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 			Remove project item field value using %[1]s--clear%[1]s flag.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# edit an item's text field value
-			gh project item-edit --id <item-ID> --field-id <field-ID> --project-id <project-ID> --text "new text"
+			# Edit an item's text field value
+			$ gh project item-edit --id <item-id> --field-id <field-id> --project-id <project-id> --text "new text"
 
-			# clear an item's field value
-			gh project item-edit --id <item-ID> --field-id <field-ID> --project-id <project-ID> --clear
+			# Clear an item's field value
+			$ gh project item-edit --id <item-id> --field-id <field-id> --project-id <project-id> --clear
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.numberChanged = cmd.Flags().Changed("number")

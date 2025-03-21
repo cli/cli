@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
+	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,8 @@ func TestVerifyIntegration(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		Logger: logger,
+		Logger:         logger,
+		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
 	cmdFactory := factory.New("test")
@@ -130,7 +132,8 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		Logger: logger,
+		Logger:         logger,
+		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
 	cmdFactory := factory.New("test")
@@ -200,7 +203,8 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		Logger: logger,
+		Logger:         logger,
+		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
 	cmdFactory := factory.New("test")
@@ -289,7 +293,8 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		Logger: logger,
+		Logger:         logger,
+		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
 	cmdFactory := factory.New("test")

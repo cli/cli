@@ -69,7 +69,7 @@ func TestIssues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testscript.Run(t, testScriptParamsFor(tsEnv, "pr"))
+	testscript.Run(t, testScriptParamsFor(tsEnv, "issue"))
 }
 
 func TestLabels(t *testing.T) {

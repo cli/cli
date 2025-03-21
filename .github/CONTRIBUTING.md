@@ -24,7 +24,7 @@ We accept pull requests for bug fixes and features where we've discussed the app
 ## Building the project
 
 Prerequisites:
-- Go 1.22+
+- Go 1.23+
 
 Build with:
 * Unix-like systems: `make`

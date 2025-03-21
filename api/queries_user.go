@@ -31,7 +31,7 @@ func CurrentLoginNameAndOrgs(client *Client, hostname string) (string, []string,
 	for _, org := range query.Viewer.Organizations.Nodes {
 		orgNames = append(orgNames, org.Login)
 	}
-	return query.Viewer.Login, orgNames, err
+	return query.Viewer.Login, orgNames, nil
 }
 
 func CurrentUserID(client *Client, hostname string) (string, error) {

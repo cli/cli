@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
@@ -217,10 +218,12 @@ func getDevContainer(ctx context.Context, apiClient apiClient, codespace *api.Co
 
 func newPortsVisibilityCmd(app *App, selector *CodespaceSelector) *cobra.Command {
 	return &cobra.Command{
-		Use:     "visibility <port>:{public|private|org}...",
-		Short:   "Change the visibility of the forwarded port",
-		Example: "gh codespace ports visibility 80:org 3000:private 8000:public",
-		Args:    cobra.MinimumNArgs(1),
+		Use:   "visibility <port>:{public|private|org}...",
+		Short: "Change the visibility of the forwarded port",
+		Example: heredoc.Doc(`
+			$ gh codespace ports visibility 80:org 3000:private 8000:public
+		`),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.UpdatePortVisibility(cmd.Context(), selector, args)
 		},

@@ -195,6 +195,9 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex", "signer-repo", "signer-workflow")
 	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", verification.GitHubOIDCIssuer, "Issuer of the OIDC token")
 	verifyCmd.Flags().StringVarP(&opts.Hostname, "hostname", "", "", "Configure host to use")
+	verifyCmd.Flags().StringVarP(&opts.SignerDigest, "signer-digest", "", "", "Digest associated with the signer workflow")
+	verifyCmd.Flags().StringVarP(&opts.SourceRef, "source-ref", "", "", "Ref associated with the source workflow")
+	verifyCmd.Flags().StringVarP(&opts.SourceDigest, "source-digest", "", "", "Digest associated with the source workflow")
 
 	return verifyCmd
 }

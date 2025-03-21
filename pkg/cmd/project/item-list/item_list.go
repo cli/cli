@@ -32,8 +32,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 		Short: "List the items in a project",
 		Use:   "item-list [<number>]",
 		Example: heredoc.Doc(`
-			# list the items in the current users's project "1"
-			gh project item-list 1 --owner "@me"
+			# List the items in the current users's project "1"
+			$ gh project item-list 1 --owner "@me"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

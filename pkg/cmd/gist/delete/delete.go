@@ -38,19 +38,19 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		Use:   "delete {<id> | <url>}",
 		Short: "Delete a gist",
 		Long: heredoc.Docf(`
-		Delete a GitHub gist.
+			Delete a GitHub gist.
 
-		To delete a gist interactively, use %[1]sgh gist delete%[1]s with no arguments.
+			To delete a gist interactively, use %[1]sgh gist delete%[1]s with no arguments.
 
-		To delete a gist non-interactively, supply the gist id or url.
-	`, "`"),
+			To delete a gist non-interactively, supply the gist id or url.
+		`, "`"),
 		Example: heredoc.Doc(`
-		# delete a gist interactively
-		gh gist delete
+			# Delete a gist interactively
+			$ gh gist delete
 
-		# delete a gist non-interactively
-		gh gist delete 1234
-	`),
+			# Delete a gist non-interactively
+			$ gh gist delete 1234
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			if !opts.IO.CanPrompt() && !opts.Confirmed {
@@ -71,7 +71,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			return deleteRun(&opts)
 		},
 	}
-	cmd.Flags().BoolVar(&opts.Confirmed, "yes", false, "confirm deletion without prompting")
+	cmd.Flags().BoolVar(&opts.Confirmed, "yes", false, "Confirm deletion without prompting")
 	return cmd
 }
 

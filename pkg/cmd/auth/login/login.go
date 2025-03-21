@@ -72,7 +72,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			The minimum required scopes for the token are: %[1]srepo%[1]s, %[1]sread:org%[1]s, and %[1]sgist%[1]s.
 			Take care when passing a fine-grained personal access token to %[1]s--with-token%[1]s
 			as the inherent scoping to certain resources may cause confusing behaviour when interacting with other
-			resources. Favour setting %[1]sGH_TOKEN$%[1]s for fine-grained personal access token usage.
+			resources. Favour setting %[1]sGH_TOKEN%[1]s for fine-grained personal access token usage.
 
 			Alternatively, gh will use the authentication token found in environment variables.
 			This method is most suitable for "headless" use of gh such as in automation. See
@@ -88,7 +88,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			prompting to create and upload a new key if one is not found. This can be skipped with
 			%[1]s--skip-ssh-key%[1]s flag.
 
-			For more information on OAuth scopes, <https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps/>.
+			For more information on OAuth scopes, see
+			<https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps/>.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Start interactive setup

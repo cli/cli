@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
+	o "github.com/cli/cli/v2/pkg/option"
 
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/require"
@@ -50,7 +51,8 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			verifier := NewLiveSigstoreVerifier(SigstoreConfig{
-				Logger: io.NewTestHandler(),
+				Logger:         io.NewTestHandler(),
+				TUFMetadataDir: o.Some(t.TempDir()),
 			})
 
 			results, err := verifier.Verify(tc.attestations, publicGoodPolicy(t))
@@ -68,7 +70,8 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 
 	t.Run("with 2/3 verified attestations", func(t *testing.T) {
 		verifier := NewLiveSigstoreVerifier(SigstoreConfig{
-			Logger: io.NewTestHandler(),
+			Logger:         io.NewTestHandler(),
+			TUFMetadataDir: o.Some(t.TempDir()),
 		})
 
 		invalidBundle := getAttestationsFor(t, "../test/data/sigstore-js-2.1.0-bundle-v0.1.json")
@@ -84,7 +87,8 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 
 	t.Run("fail with 0/2 verified attestations", func(t *testing.T) {
 		verifier := NewLiveSigstoreVerifier(SigstoreConfig{
-			Logger: io.NewTestHandler(),
+			Logger:         io.NewTestHandler(),
+			TUFMetadataDir: o.Some(t.TempDir()),
 		})
 
 		invalidBundle := getAttestationsFor(t, "../test/data/sigstore-js-2.1.0-bundle-v0.1.json")
@@ -107,7 +111,8 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 		attestations := getAttestationsFor(t, "../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle.jsonl")
 
 		verifier := NewLiveSigstoreVerifier(SigstoreConfig{
-			Logger: io.NewTestHandler(),
+			Logger:         io.NewTestHandler(),
+			TUFMetadataDir: o.Some(t.TempDir()),
 		})
 
 		results, err := verifier.Verify(attestations, githubPolicy)
@@ -119,8 +124,9 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 		attestations := getAttestationsFor(t, "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl")
 
 		verifier := NewLiveSigstoreVerifier(SigstoreConfig{
-			Logger:      io.NewTestHandler(),
-			TrustedRoot: test.NormalizeRelativePath("../test/data/trusted_root.json"),
+			Logger:         io.NewTestHandler(),
+			TrustedRoot:    test.NormalizeRelativePath("../test/data/trusted_root.json"),
+			TUFMetadataDir: o.Some(t.TempDir()),
 		})
 
 		results, err := verifier.Verify(attestations, publicGoodPolicy(t))

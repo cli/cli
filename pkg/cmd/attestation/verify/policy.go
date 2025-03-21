@@ -66,7 +66,7 @@ func newEnforcementCriteria(opts *Options) (verification.EnforcementCriteria, er
 		// then we default to the repo option
 		c.SANRegex = expandToGitHubURLRegex(opts.Tenant, opts.Repo)
 	} else {
-		// if opts.Repo was not provided, we fallback to the opts.Owner value
+		// if opts.Repo was not provided, we fall back to the opts.Owner value
 		c.SANRegex = expandToGitHubURLRegex(opts.Tenant, owner)
 	}
 
@@ -97,6 +97,12 @@ func newEnforcementCriteria(opts *Options) (verification.EnforcementCriteria, er
 		// otherwise use the custom OIDC issuer provided as an option
 		c.Certificate.Issuer = opts.OIDCIssuer
 	}
+
+	// set the SourceRepositoryDigest, SourceRepositoryRef, and BuildSignerDigest
+	// extensions if the options are provided
+	c.Certificate.BuildSignerDigest = opts.SignerDigest
+	c.Certificate.SourceRepositoryDigest = opts.SourceDigest
+	c.Certificate.SourceRepositoryRef = opts.SourceRef
 
 	return c, nil
 }

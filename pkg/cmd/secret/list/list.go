@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -70,7 +71,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			// If the user specified a repo directly, then we're using the OverrideBaseRepoFunc set by EnableRepoOverride
 			// So there's no reason to use the specialised BaseRepoFunc that requires remote disambiguation.
 			opts.BaseRepo = f.BaseRepo
-			if !cmd.Flags().Changed("repo") {
+			isRepoUserProvided := cmd.Flags().Changed("repo") || os.Getenv("GH_REPO") != ""
+			if !isRepoUserProvided {
 				// If they haven't specified a repo directly, then we will wrap the BaseRepoFunc in one that errors if
 				// there might be multiple valid remotes.
 				opts.BaseRepo = shared.RequireNoAmbiguityBaseRepoFunc(opts.BaseRepo, f.Remotes)
