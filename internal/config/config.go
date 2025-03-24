@@ -15,19 +15,20 @@ import (
 )
 
 const (
-	aliasesKey            = "aliases"
-	browserKey            = "browser"
-	editorKey             = "editor"
-	gitProtocolKey        = "git_protocol"
-	hostsKey              = "hosts"
-	httpUnixSocketKey     = "http_unix_socket"
-	oauthTokenKey         = "oauth_token"
-	pagerKey              = "pager"
-	promptKey             = "prompt"
-	preferEditorPromptKey = "prefer_editor_prompt"
-	userKey               = "user"
-	usersKey              = "users"
-	versionKey            = "version"
+	advancedIssueSearchKey = "advanced_issue_search"
+	aliasesKey             = "aliases"
+	browserKey             = "browser"
+	editorKey              = "editor"
+	gitProtocolKey         = "git_protocol"
+	hostsKey               = "hosts"
+	httpUnixSocketKey      = "http_unix_socket"
+	oauthTokenKey          = "oauth_token"
+	pagerKey               = "pager"
+	promptKey              = "prompt"
+	preferEditorPromptKey  = "prefer_editor_prompt"
+	userKey                = "user"
+	usersKey               = "users"
+	versionKey             = "version"
 )
 
 func NewConfig() (gh.Config, error) {
@@ -141,6 +142,11 @@ func (c *cfg) Prompt(hostname string) gh.ConfigEntry {
 func (c *cfg) PreferEditorPrompt(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, preferEditorPromptKey).Unwrap()
+}
+
+func (c *cfg) AdvancedIssueSearch(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, advancedIssueSearchKey).Unwrap()
 }
 
 func (c *cfg) Version() o.Option[string] {
@@ -600,6 +606,15 @@ var Options = []ConfigOption{
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Browser(hostname).Value
+		},
+	},
+	{
+		Key:           advancedIssueSearchKey,
+		Description:   "toggle advanced issue search API {enabled|disabled} (default disabled)",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.AdvancedIssueSearch(hostname).Value
 		},
 	},
 }

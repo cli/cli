@@ -88,6 +88,7 @@ func Test_listRun(t *testing.T) {
 				cfg.Set("HOST", "pager", "less")
 				cfg.Set("HOST", "http_unix_socket", "")
 				cfg.Set("HOST", "browser", "brave")
+				cfg.Set("HOST", "advanced_issue_search", "disabled")
 				return cfg
 			}(),
 			input: &ListOptions{Hostname: "HOST"},
@@ -98,6 +99,7 @@ prefer_editor_prompt=enabled
 pager=less
 http_unix_socket=
 browser=brave
+advanced_issue_search=disabled
 `,
 		},
 	}

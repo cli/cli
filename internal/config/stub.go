@@ -79,6 +79,9 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	mock.CacheDirFunc = func() string {
 		return cfg.CacheDir()
 	}
+	mock.AdvancedIssueSearchFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.AdvancedIssueSearch(hostname)
+	}
 	return mock
 }
 
