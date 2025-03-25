@@ -33,6 +33,7 @@ import (
 	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
 	searchCmd "github.com/cli/cli/v2/pkg/cmd/search"
 	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
+	sponsorsCmd "github.com/cli/cli/v2/pkg/cmd/sponsors"
 	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
 	statusCmd "github.com/cli/cli/v2/pkg/cmd/status"
 	variableCmd "github.com/cli/cli/v2/pkg/cmd/variable"
@@ -134,6 +135,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(extensionCmd.NewCmdExtension(f))
 	cmd.AddCommand(searchCmd.NewCmdSearch(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
+	cmd.AddCommand(sponsorsCmd.NewCmdSponsors(f))
 	cmd.AddCommand(variableCmd.NewCmdVariable(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
