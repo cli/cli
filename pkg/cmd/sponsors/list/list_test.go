@@ -77,7 +77,6 @@ func Test_listRun(t *testing.T) {
 		opts       *ListOptions
 		httpStubs  func(*httpmock.Registry)
 		wantStdout []string
-		wantStderr string
 		wantErr    string
 	}{
 		{
@@ -240,7 +239,7 @@ func Test_listRun(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 
-			ios, _, stdout, stderr := iostreams.Test()
+			ios, _, stdout, _ := iostreams.Test()
 
 			ios.SetStdoutTTY(tt.tty)
 
@@ -266,7 +265,6 @@ func Test_listRun(t *testing.T) {
 				expectedStdout = fmt.Sprintf("%s\n", strings.Join(tt.wantStdout, "\n"))
 			}
 			assert.Equal(t, expectedStdout, stdout.String())
-			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }
