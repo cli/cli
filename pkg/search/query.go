@@ -88,7 +88,7 @@ type Qualifiers struct {
 
 func (q Query) String() string {
 	qualifiers := formatQualifiers(q.Qualifiers)
-	keywords := formatKeywords(q.Keywords)
+	keywords := formatKeywords(q.Keywords, q.AdvancedSearch)
 	all := append(keywords, qualifiers...)
 	return strings.TrimSpace(strings.Join(all, " "))
 }
@@ -149,10 +149,14 @@ func formatQualifiers(qs Qualifiers) []string {
 	return all
 }
 
-func formatKeywords(ks []string) []string {
+func formatKeywords(ks []string, advancedSearch bool) []string {
 	for i, k := range ks {
 		before, after, found := strings.Cut(k, ":")
-		if !found {
+		// Usage for advanced search is:
+		//    gh search issues -- "assignee:@me state:open"
+		//
+		// Rather than quoting each keyword, pass the query as provided
+		if advancedSearch || !found {
 			ks[i] = quote(k)
 		} else {
 			ks[i] = fmt.Sprintf("%s:%s", before, quote(after))
