@@ -192,7 +192,7 @@ func Test_listRun(t *testing.T) {
 				require.EqualError(t, err, tt.wantErr)
 				return
 			}
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			expectedStdout := ""
 			if len(tt.wantStdout) > 0 {
