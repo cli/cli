@@ -5,12 +5,14 @@ import (
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/shurcooL/graphql"
+	"github.com/spf13/cobra"
+
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/spf13/cobra"
 )
 
 const defaultListLimit = 30
@@ -96,51 +98,42 @@ func listRun(opts *ListOptions) error {
 }
 
 func listSponsors(httpClient *http.Client, hostname string, username string, limit uint) ([]string, error) {
-	type response struct {
+	var query struct {
 		User struct {
 			Sponsors struct {
 				Edges []struct {
 					Node struct {
-						Login string
+						User struct {
+							Login graphql.String
+						} `graphql:"... on User"`
+						Org struct {
+							Login graphql.String
+						} `graphql:"... on Organization"`
 					}
 				}
-			}
-		}
+			} `graphql:"sponsors(first: $limit, orderBy: { direction: ASC, field: LOGIN })"`
+		} `graphql:"user(login: $login)"`
 	}
-
-	query := `query UserSponsorList($login: String!, $limit: Int!) {
-		user(login: $login) {
-			sponsors(first: $limit, orderBy: { direction: ASC, field: LOGIN } ) {
-				edges {
-					node {
-						... on User {
-							login
-						}
-						... on Organization {
-							login
-						}
-					}
-				}
-			}
-		}
-	}`
 
 	client := api.NewClientFromHTTP(httpClient)
 
 	variables := map[string]any{
-		"login": username,
-		"limit": limit,
+		"login": graphql.String(username),
+		"limit": graphql.Int(limit),
 	}
 
-	var data response
-	err := client.GraphQL(hostname, query, variables, &data)
+	err := client.Query(hostname, "UserSponsorList", &query, variables)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]string, 0, len(data.User.Sponsors.Edges))
-	for _, edge := range data.User.Sponsors.Edges {
-		result = append(result, edge.Node.Login)
+	result := make([]string, 0, len(query.User.Sponsors.Edges))
+	for _, edge := range query.User.Sponsors.Edges {
+		if edge.Node.User.Login != "" {
+			result = append(result, string(edge.Node.User.Login))
+		} else if edge.Node.Org.Login != "" {
+			result = append(result, string(edge.Node.Org.Login))
+		}
 	}
 	return result, nil
 }
