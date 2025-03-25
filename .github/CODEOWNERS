@@ -1,4 +1,5 @@
-* @cli/code-reviewers
+
+- @cli/code-reviewers
 
 pkg/cmd/codespace/ @cli/codespaces
 internal/codespaces/ @cli/codespaces
@@ -7,4 +8,4 @@ internal/codespaces/ @cli/codespaces
 pkg/cmd/attestation/ @cli/package-security
 test/integration/attestation-cmd @cli/package-security
 
-pkg/cmd/attestation/verification/embed/tuf-repo.github.com/ @cli/tuf-root-reviewers
+**pkg/cmd/attestation/verification/embed/tuf-repo.github.com/ @cli/tuf-root-reviewers
