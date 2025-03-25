@@ -78,8 +78,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(sponsors) == 0 {
-		fmt.Fprintf(opts.IO.ErrOut, "no sponsor found\n")
-		return nil
+		return cmdutil.NewNoResultsError("no sponsor found")
 	}
 
 	headers := []string{"Sponsor"}
