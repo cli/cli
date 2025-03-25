@@ -78,7 +78,9 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(sponsors) == 0 {
-		fmt.Fprintln(opts.IO.Out, "no sponsor found")
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintln(opts.IO.Out, "no sponsor found")
+		}
 		return nil
 	}
 
