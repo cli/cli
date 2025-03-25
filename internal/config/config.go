@@ -610,7 +610,7 @@ var Options = []ConfigOption{
 	},
 	{
 		Key:           advancedIssueSearchKey,
-		Description:   "toggle advanced issue search API {enabled|disabled} (default disabled)",
+		Description:   "toggle advanced issue search API",
 		DefaultValue:  "disabled",
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
