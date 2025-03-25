@@ -16,13 +16,14 @@ const (
 )
 
 type Query struct {
-	Keywords   []string
-	Kind       string
-	Limit      int
-	Order      string
-	Page       int
-	Qualifiers Qualifiers
-	Sort       string
+	AdvancedSearch bool
+	Keywords       []string
+	Kind           string
+	Limit          int
+	Order          string
+	Page           int
+	Qualifiers     Qualifiers
+	Sort           string
 }
 
 type Qualifiers struct {
