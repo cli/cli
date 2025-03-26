@@ -1,4 +1,4 @@
-package sponsorsß
+package sponsors
 
 import (
 	cmdList "github.com/cli/cli/v2/pkg/cmd/sponsors/list"
