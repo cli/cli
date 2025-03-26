@@ -1,6 +1,7 @@
 package list
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -21,6 +23,7 @@ type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
+	Prompter   prompter.Prompter
 
 	Username string
 }
@@ -30,20 +33,20 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list <user>",
+		Use:   "list [<user>]",
 		Short: "List sponsors",
 		Long: heredoc.Doc(`
 			List sponsors of a given user.
 		`),
 		Aliases: []string{"ls"},
-		Args:    cmdutil.ExactArgs(1, "must specify username"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// This is for consistency with the other commands, but the check seems
-			// irrelevant since we have already used the cobra.ExactArgs.
-			if len(args) > 0 {
+			if len(args) > 1 {
+				return cmdutil.FlagErrorf("too many arguments")
+			} else if len(args) == 1 {
 				opts.Username = args[0]
 			}
 
@@ -70,6 +73,17 @@ func listRun(opts *ListOptions) error {
 	}
 
 	username := opts.Username
+
+	if username == "" {
+		if !opts.IO.CanPrompt() {
+			return errors.New("username not provided")
+		}
+		value, err := opts.Prompter.Input("Which user do you want to target?", "")
+		if err != nil {
+			return err
+		}
+		username = value
+	}
 
 	hostname, _ := cfg.Authentication().DefaultHost()
 	sponsors, err := listSponsors(client, hostname, username, defaultListLimit)
