@@ -60,6 +60,9 @@ func SearchIssues(opts *IssuesOptions) error {
 		}
 		return opts.Browser.Browse(url)
 	}
+	if opts.AdvancedSearch {
+		opts.Query.AdvancedSearch = true
+	}
 	io.StartProgressIndicator()
 	result, err := opts.Searcher.Issues(opts.Query)
 	io.StopProgressIndicator()

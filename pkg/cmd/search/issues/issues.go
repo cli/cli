@@ -65,9 +65,6 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 			if opts.Query.Limit < 1 || opts.Query.Limit > shared.SearchMaxResults {
 				return cmdutil.FlagErrorf("`--limit` must be between 1 and 1000")
 			}
-			if opts.AdvancedSearch {
-				opts.Query.AdvancedSearch = true
-			}
 			if c.Flags().Changed("author") && c.Flags().Changed("app") {
 				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
 			}
