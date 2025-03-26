@@ -75,7 +75,7 @@ func Test_listRun(t *testing.T) {
 		name       string
 		tty        bool
 		opts       *ListOptions
-		httpStubs  func(*httpmock.Registry)
+		httpStubs  func(*testing.T, *httpmock.Registry)
 		wantStdout []string
 		wantErr    string
 	}{
@@ -85,7 +85,7 @@ func Test_listRun(t *testing.T) {
 			opts: &ListOptions{
 				Username: "johndoe",
 			},
-			httpStubs: func(reg *httpmock.Registry) {
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query UserSponsorList\b`),
 					httpmock.GraphQLQuery(`
@@ -127,7 +127,7 @@ func Test_listRun(t *testing.T) {
 			opts: &ListOptions{
 				Username: "johndoe",
 			},
-			httpStubs: func(reg *httpmock.Registry) {
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query UserSponsorList\b`),
 					httpmock.GraphQLQuery(`
@@ -168,7 +168,7 @@ func Test_listRun(t *testing.T) {
 			opts: &ListOptions{
 				Username: "johndoe",
 			},
-			httpStubs: func(reg *httpmock.Registry) {
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query UserSponsorList\b`),
 					httpmock.GraphQLQuery(`
@@ -195,7 +195,7 @@ func Test_listRun(t *testing.T) {
 			opts: &ListOptions{
 				Username: "johndoe",
 			},
-			httpStubs: func(reg *httpmock.Registry) {
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query UserSponsorList\b`),
 					httpmock.GraphQLQuery(`
@@ -222,7 +222,7 @@ func Test_listRun(t *testing.T) {
 			opts: &ListOptions{
 				Username: "johndoe",
 			},
-			httpStubs: func(reg *httpmock.Registry) {
+			httpStubs: func(_ *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query UserSponsorList\b`),
 					httpmock.GraphQLQuery(
@@ -252,7 +252,7 @@ func Test_listRun(t *testing.T) {
 				return config.NewBlankConfig(), nil
 			}
 
-			tt.httpStubs(reg)
+			tt.httpStubs(t, reg)
 
 			err := listRun(tt.opts)
 			if tt.wantErr != "" {
