@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/shurcooL/graphql"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 
 	"github.com/cli/cli/v2/api"
@@ -103,10 +103,10 @@ func listSponsors(httpClient *http.Client, hostname string, username string, lim
 				Edges []struct {
 					Node struct {
 						User struct {
-							Login graphql.String
+							Login githubv4.String
 						} `graphql:"... on User"`
 						Org struct {
-							Login graphql.String
+							Login githubv4.String
 						} `graphql:"... on Organization"`
 					}
 				}
@@ -117,8 +117,8 @@ func listSponsors(httpClient *http.Client, hostname string, username string, lim
 	client := api.NewClientFromHTTP(httpClient)
 
 	variables := map[string]any{
-		"login": graphql.String(username),
-		"limit": graphql.Int(limit),
+		"login": githubv4.String(username),
+		"limit": githubv4.Int(limit),
 	}
 
 	err := client.Query(hostname, "UserSponsorList", &query, variables)

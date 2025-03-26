@@ -77,7 +77,6 @@ func Test_listRun(t *testing.T) {
 		opts       *ListOptions
 		httpStubs  func(*httpmock.Registry)
 		wantStdout []string
-		wantStderr string
 		wantErr    string
 	}{
 		{
@@ -123,6 +122,47 @@ func Test_listRun(t *testing.T) {
 				"bar",
 			},
 		}, {
+			name: "normal no-tty",
+			tty:  false,
+			opts: &ListOptions{
+				Username: "johndoe",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserSponsorList\b`),
+					httpmock.GraphQLQuery(`
+						{
+							"data": {
+								"user": {
+									"sponsors": {
+										"edges": [
+											{
+												"node": {
+													"login": "foo"
+												}
+											},
+											{
+												"node": {
+													"login": "bar"
+												}
+											}
+										]
+									}
+								}
+							}
+						}`,
+						func(_ string, inputs map[string]interface{}) {
+							assert.Equal(t, "johndoe", inputs["login"])
+							assert.Equal(t, float64(30), inputs["limit"])
+						},
+					),
+				)
+			},
+			wantStdout: []string{
+				"foo",
+				"bar",
+			},
+		}, {
 			name: "normal tty, no sponsor",
 			tty:  true,
 			opts: &ListOptions{
@@ -148,7 +188,34 @@ func Test_listRun(t *testing.T) {
 					),
 				)
 			},
-			wantStderr: "no sponsor found\n",
+			wantErr: "no sponsor found",
+		}, {
+			name: "normal no-tty, no sponsor",
+			tty:  false,
+			opts: &ListOptions{
+				Username: "johndoe",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserSponsorList\b`),
+					httpmock.GraphQLQuery(`
+						{
+							"data": {
+								"user": {
+									"sponsors": {
+										"edges": []
+									}
+								}
+							}
+						}`,
+						func(_ string, inputs map[string]interface{}) {
+							assert.Equal(t, "johndoe", inputs["login"])
+							assert.Equal(t, float64(30), inputs["limit"])
+						},
+					),
+				)
+			},
+			wantErr: "no sponsor found",
 		}, {
 			name: "api error",
 			tty:  true,
@@ -173,7 +240,7 @@ func Test_listRun(t *testing.T) {
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 
-			ios, _, stdout, stderr := iostreams.Test()
+			ios, _, stdout, _ := iostreams.Test()
 
 			ios.SetStdoutTTY(tt.tty)
 
@@ -199,7 +266,6 @@ func Test_listRun(t *testing.T) {
 				expectedStdout = fmt.Sprintf("%s\n", strings.Join(tt.wantStdout, "\n"))
 			}
 			assert.Equal(t, expectedStdout, stdout.String())
-			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }
