@@ -188,7 +188,7 @@ func Test_listRun(t *testing.T) {
 					),
 				)
 			},
-			wantStdout: []string{"no sponsor found"},
+			wantErr: "no sponsor found",
 		}, {
 			name: "normal no-tty, no sponsor",
 			tty:  false,
@@ -215,6 +215,7 @@ func Test_listRun(t *testing.T) {
 					),
 				)
 			},
+			wantErr: "no sponsor found",
 		}, {
 			name: "api error",
 			tty:  true,
