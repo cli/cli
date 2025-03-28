@@ -2,7 +2,7 @@ module github.com/cli/cli/v2
 
 go 1.23.0
 
-toolchain go1.23.5
+toolchain go1.24.1
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
@@ -51,7 +51,7 @@ require (
 	golang.org/x/term v0.30.0
 	golang.org/x/text v0.23.0
 	google.golang.org/grpc v1.69.4
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/yaml.v3 v3.0.1
 )
