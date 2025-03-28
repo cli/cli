@@ -5,16 +5,23 @@ import (
 )
 
 func AdvancedIssueSearchEnabled(f *Factory) bool {
-	advancedSearch := os.Getenv("GH_ADVANCED_ISSUE_SEARCH")
-
-	if advancedSearch == "" {
-		config, err := f.Config()
-		if err != nil {
-			advancedSearch = "disabled"
-		} else {
-			advancedSearch = config.AdvancedIssueSearch("").Value
+	envVar, set := os.LookupEnv("GH_ADVANCED_ISSUE_SEARCH")
+	if set {
+		switch envVar {
+		case "", "0", "disabled", "false":
+			return false
+		default:
+			return true
 		}
 	}
 
-	return advancedSearch == "enabled"
+	var configValue string
+	config, err := f.Config()
+	if err != nil {
+		configValue = "disabled"
+	} else {
+		configValue = config.AdvancedIssueSearch("").Value
+	}
+
+	return configValue == "enabled"
 }
