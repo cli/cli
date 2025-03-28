@@ -142,8 +142,16 @@ func genMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 		fmt.Fprintf(w, "```\n%s\n```\n\n", cmd.UseLine())
 	}
 	if hasLong {
-		longWithEscapedPipe := strings.ReplaceAll(cmd.Long, "|", "&#124;")
-		fmt.Fprintf(w, "%s\n\n", longWithEscapedPipe)
+		// For `gh config` command, escape pipe symbols in long description to prevent table formatting
+		// For more details, see https://github.com/cli/cli/issues/10348.
+		// This is a workaround until it's fixed in the kramdown.
+		// Related jekyll issue: https://github.com/jekyll/jekyll/issues/2818
+		if cmd.Use == "config <command>" {
+			longWithEscapedPipe := strings.ReplaceAll(cmd.Long, "|", "&#124;")
+			fmt.Fprintf(w, "%s\n\n", longWithEscapedPipe)
+		} else {
+			fmt.Fprintf(w, "%s\n\n", cmd.Long)
+		}
 	}
 
 	for _, g := range root.GroupedCommands(cmd) {
