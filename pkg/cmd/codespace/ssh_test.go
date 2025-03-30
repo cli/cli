@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -68,9 +69,7 @@ func TestGenerateAutomaticSSHKeys(t *testing.T) {
 	for _, tt := range tests {
 		dir := t.TempDir()
 
-		sshContext := ssh.Context{
-			ConfigDir: dir,
-		}
+		sshContext := ssh.NewContextForTests(dir, "")
 
 		for _, file := range tt.existingFiles {
 			f, err := os.Create(filepath.Join(dir, file))
@@ -125,6 +124,10 @@ func TestGenerateAutomaticSSHKeys(t *testing.T) {
 }
 
 func TestSelectSSHKeys(t *testing.T) {
+	// This string will be substituted in sshArgs for test cases
+	// This is to work around the temp test ssh dir not being known until the test is executing
+	substituteSSHDir := "SUB_SSH_DIR"
+
 	tests := []struct {
 		sshDirFiles      []string
 		sshConfigKeys    []string
@@ -139,7 +142,7 @@ func TestSelectSSHKeys(t *testing.T) {
 			wantKeyPair: &ssh.KeyPair{PrivateKeyPath: "custom-private-key", PublicKeyPath: "custom-private-key.pub"},
 		},
 		{
-			sshArgs:     []string{"-i", automaticPrivateKeyName},
+			sshArgs:     []string{"-i", path.Join(substituteSSHDir, automaticPrivateKeyName)},
 			wantKeyPair: &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
 		},
 		{
@@ -202,7 +205,7 @@ func TestSelectSSHKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		sshDir := t.TempDir()
-		sshContext := ssh.Context{ConfigDir: sshDir}
+		sshContext := ssh.NewContextForTests(sshDir, "")
 
 		for _, file := range tt.sshDirFiles {
 			f, err := os.Create(filepath.Join(sshDir, file))
@@ -226,7 +229,12 @@ func TestSelectSSHKeys(t *testing.T) {
 			t.Fatalf("could not write test config %v", err)
 		}
 
-		tt.sshArgs = append([]string{"-F", configPath}, tt.sshArgs...)
+		var subbedSSHArgs []string
+		for _, arg := range tt.sshArgs {
+			subbedSSHArgs = append(subbedSSHArgs, strings.Replace(arg, substituteSSHDir, sshDir, -1))
+		}
+
+		tt.sshArgs = append([]string{"-F", configPath}, subbedSSHArgs...)
 
 		gotKeyPair, gotShouldAddArg, err := selectSSHKeys(context.Background(), sshContext, tt.sshArgs, sshOptions{profile: tt.profileOpt})
 
@@ -254,11 +262,24 @@ func TestSelectSSHKeys(t *testing.T) {
 		}
 
 		// Strip the dir (sshDir) from the gotKeyPair paths so that they match wantKeyPair (which doesn't know the directory)
-		gotKeyPair.PrivateKeyPath = filepath.Base(gotKeyPair.PrivateKeyPath)
-		gotKeyPair.PublicKeyPath = filepath.Base(gotKeyPair.PublicKeyPath)
+		gotKeyPairJustFileNames := &ssh.KeyPair{
+			PrivateKeyPath: filepath.Base(gotKeyPair.PrivateKeyPath),
+			PublicKeyPath:  filepath.Base(gotKeyPair.PublicKeyPath),
+		}
 
-		if fmt.Sprintf("%v", gotKeyPair) != fmt.Sprintf("%v", tt.wantKeyPair) {
-			t.Errorf("Want selectSSHKeys result to be %v, got %v", tt.wantKeyPair, gotKeyPair)
+		if fmt.Sprintf("%v", gotKeyPairJustFileNames) != fmt.Sprintf("%v", tt.wantKeyPair) {
+			t.Errorf("Want selectSSHKeys result to be %v, got %v", tt.wantKeyPair, gotKeyPairJustFileNames)
+		}
+
+		// If the automatic key pair is selected, it needs to exist no matter what
+		if strings.Contains(tt.wantKeyPair.PrivateKeyPath, automaticPrivateKeyName) {
+			if _, err := os.Stat(gotKeyPair.PrivateKeyPath); err != nil {
+				t.Errorf("Expected automatic key pair private key to exist, but it did not")
+			}
+
+			if _, err := os.Stat(gotKeyPair.PublicKeyPath); err != nil {
+				t.Errorf("Expected automatic key pair public key to exist, but it did not")
+			}
 		}
 	}
 }

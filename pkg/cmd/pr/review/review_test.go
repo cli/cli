@@ -11,8 +11,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -166,7 +166,7 @@ func Test_NewCmdReview(t *testing.T) {
 	}
 }
 
-func runCommand(rt http.RoundTripper, prompter prompter.Prompter, remotes context.Remotes, isTTY bool, cli string) (*test.CmdOut, error) {
+func runCommand(rt http.RoundTripper, prompter prompter.Prompter, isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
@@ -177,7 +177,7 @@ func runCommand(rt http.RoundTripper, prompter prompter.Prompter, remotes contex
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		Prompter: prompter,
@@ -249,7 +249,7 @@ func TestPRReview(t *testing.T) {
 					}),
 			)
 
-			output, err := runCommand(http, nil, nil, false, tt.args)
+			output, err := runCommand(http, nil, false, tt.args)
 			assert.NoError(t, err)
 			assert.Equal(t, "", output.String())
 			assert.Equal(t, "", output.Stderr())
@@ -278,15 +278,15 @@ func TestPRReview_interactive(t *testing.T) {
 		ConfirmFunc:        func(_ string, _ bool) (bool, error) { return true, nil },
 	}
 
-	output, err := runCommand(http, pm, nil, true, "")
+	output, err := runCommand(http, pm, true, "")
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Doc(`
 		Got:
 
 		  cool story                                                                  
-		
+
 	`), output.String())
-	assert.Equal(t, "✓ Approved pull request #123\n", output.Stderr())
+	assert.Equal(t, "✓ Approved pull request OWNER/REPO#123\n", output.Stderr())
 }
 
 func TestPRReview_interactive_no_body(t *testing.T) {
@@ -300,7 +300,7 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 		MarkdownEditorFunc: func(_, _ string, _ bool) (string, error) { return "", nil },
 	}
 
-	_, err := runCommand(http, pm, nil, true, "")
+	_, err := runCommand(http, pm, true, "")
 	assert.EqualError(t, err, "this type of review cannot be blank")
 }
 
@@ -325,8 +325,8 @@ func TestPRReview_interactive_blank_approve(t *testing.T) {
 		ConfirmFunc:        func(_ string, _ bool) (bool, error) { return true, nil },
 	}
 
-	output, err := runCommand(http, pm, nil, true, "")
+	output, err := runCommand(http, pm, true, "")
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Approved pull request #123\n", output.Stderr())
+	assert.Equal(t, "✓ Approved pull request OWNER/REPO#123\n", output.Stderr())
 }

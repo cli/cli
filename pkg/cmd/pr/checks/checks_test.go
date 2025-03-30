@@ -79,6 +79,11 @@ func TestNewCmdChecks(t *testing.T) {
 			wantsError: "cannot use `--fail-fast` flag without `--watch` flag",
 		},
 		{
+			name:       "watch with json flag",
+			cli:        "--watch --json workflow",
+			wantsError: "cannot use `--watch` with `--json` flag",
+		},
+		{
 			name: "required flag",
 			cli:  "--required",
 			wants: ChecksOptions{
@@ -171,7 +176,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				Some checks were not successful
 				0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				X  sad tests                1m26s    sweet link
 				✓  cool tests               1m26s    sweet link
@@ -191,7 +196,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				Some checks were cancelled
 				1 cancelled, 0 failing, 2 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME           DESCRIPTION  ELAPSED  URL
 				✓  cool tests                  1m26s    sweet link
 				-  sad tests                   1m26s    sweet link
@@ -211,7 +216,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				Some checks are still pending
 				1 cancelled, 0 failing, 2 successful, 0 skipped, and 1 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				✓  cool tests               1m26s    sweet link
 				✓  rad tests                1m26s    sweet link
@@ -232,7 +237,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME           DESCRIPTION  ELAPSED  URL
 				✓  awesome tests               1m26s    sweet link
 				✓  cool tests                  1m26s    sweet link
@@ -253,7 +258,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Docf(`
 				%[1]s[?1049hAll checks were successful
 				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME           DESCRIPTION  ELAPSED  URL
 				✓  awesome tests               1m26s    sweet link
 				✓  cool tests                  1m26s    sweet link
@@ -281,17 +286,17 @@ func Test_checksRun(t *testing.T) {
 			},
 			wantOut: heredoc.Docf(`
 				%[1]s[?1049h%[1]s[0;0H%[1]s[JRefreshing checks status every 0 seconds. Press Ctrl+C to quit.
-				
+
 				Some checks were not successful
 				0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				X  sad tests                1m26s    sweet link
 				✓  cool tests               1m26s    sweet link
 				*  slow tests               1m26s    sweet link
 				%[1]s[?1049lSome checks were not successful
 				0 cancelled, 1 failing, 1 successful, 0 skipped, and 1 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				X  sad tests                1m26s    sweet link
 				✓  cool tests               1m26s    sweet link
@@ -311,7 +316,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				Some checks were not successful
 				0 cancelled, 1 failing, 2 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				X  a status                          sweet link
 				✓  cool tests               1m26s    sweet link
@@ -397,7 +402,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 1 successful, 2 skipped, and 0 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				✓  cool tests               1m26s    sweet link
 				-  rad tests                1m26s    sweet link
@@ -429,7 +434,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 1 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME        DESCRIPTION  ELAPSED  URL
 				✓  cool tests               1m26s    sweet link
 			`),
@@ -484,7 +489,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 3 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME           DESCRIPTION          ELAPSED  URL
 				✓  awesome tests  awesome description  1m26s    sweet link
 				✓  cool tests     cool description     1m26s    sweet link
@@ -515,7 +520,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 2 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME                             DESCRIPTION       ELAPSED  URL
 				✓  tests/cool tests (pull_request)  cool description  1m26s    sweet link
 				✓  tests/cool tests (push)          cool description  1m26s    sweet link
@@ -535,7 +540,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut: heredoc.Doc(`
 				All checks were successful
 				0 cancelled, 0 failing, 1 successful, 0 skipped, and 0 pending checks
-				
+
 				   NAME              DESCRIPTION       ELAPSED  URL
 				✓  tests/cool tests  cool description  1m26s    sweet link
 			`),
@@ -622,7 +627,7 @@ func TestChecksRun_web(t *testing.T) {
 		{
 			name:       "tty",
 			isTTY:      true,
-			wantStderr: "Opening github.com/OWNER/REPO/pull/123/checks in your browser.\n",
+			wantStderr: "Opening https://github.com/OWNER/REPO/pull/123/checks in your browser.\n",
 			wantStdout: "",
 			wantBrowse: "https://github.com/OWNER/REPO/pull/123/checks",
 		},

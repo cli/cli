@@ -13,6 +13,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -224,9 +225,33 @@ func Test_createRun(t *testing.T) {
 			responseStatus: http.StatusOK,
 		},
 		{
-			name: "multiple files",
+			name: "when both a file and the stdin '-' are provided, it matches on all the files passed in and stdin",
 			opts: &CreateOptions{
 				Filenames: []string{fixtureFile, "-"},
+			},
+			stdin:      "cool stdin content",
+			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
+			wantStderr: "- Creating gist with multiple files\n✓ Created secret gist fixture.txt\n",
+			wantErr:    false,
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"fixture.txt": map[string]interface{}{
+						"content": "{}",
+					},
+					"gistfile1.txt": map[string]interface{}{
+						"content": "cool stdin content",
+					},
+				},
+			},
+			responseStatus: http.StatusOK,
+		},
+		{
+			name: "when both a file and the stdin '-' are provided, but '-' is not the last argument, it matches on all the files provided and stdin",
+			opts: &CreateOptions{
+				Filenames: []string{"-", fixtureFile},
 			},
 			stdin:      "cool stdin content",
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
@@ -295,7 +320,7 @@ func Test_createRun(t *testing.T) {
 				WebMode:   true,
 				Filenames: []string{fixtureFile},
 			},
-			wantOut:    "Opening gist.github.com/aa5a315d61ae9438b18d in your browser.\n",
+			wantOut:    "Opening https://gist.github.com/aa5a315d61ae9438b18d in your browser.\n",
 			wantStderr: "- Creating gist fixture.txt\n✓ Created secret gist fixture.txt\n",
 			wantErr:    false,
 			wantBrowse: "https://gist.github.com/aa5a315d61ae9438b18d",
@@ -331,7 +356,7 @@ func Test_createRun(t *testing.T) {
 		}
 		tt.opts.HttpClient = mockClient
 
-		tt.opts.Config = func() (config.Config, error) {
+		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
 

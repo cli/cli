@@ -34,7 +34,7 @@ func Test_codespace_displayName(t *testing.T) {
 					DisplayName: "scuba steve",
 				},
 			},
-			want: "cli/cli (trunk): scuba steve",
+			want: "cli/cli [trunk]: scuba steve",
 		},
 		{
 			name: "No included name - included gitstatus - no unsaved changes",
@@ -50,7 +50,7 @@ func Test_codespace_displayName(t *testing.T) {
 					DisplayName: "scuba steve",
 				},
 			},
-			want: "cli/cli (trunk): scuba steve",
+			want: "cli/cli [trunk]: scuba steve",
 		},
 		{
 			name: "No included name - included gitstatus - unsaved changes",
@@ -67,7 +67,7 @@ func Test_codespace_displayName(t *testing.T) {
 					DisplayName: "scuba steve",
 				},
 			},
-			want: "cli/cli (trunk*): scuba steve",
+			want: "cli/cli [trunk*]: scuba steve",
 		},
 		{
 			name: "Included name - included gitstatus - unsaved changes",
@@ -84,7 +84,7 @@ func Test_codespace_displayName(t *testing.T) {
 					DisplayName: "scuba steve",
 				},
 			},
-			want: "cli/cli (trunk*): scuba steve",
+			want: "cli/cli [trunk*]: scuba steve",
 		},
 		{
 			name: "Included name - included gitstatus - no unsaved changes",
@@ -101,7 +101,7 @@ func Test_codespace_displayName(t *testing.T) {
 					DisplayName: "scuba steve",
 				},
 			},
-			want: "cli/cli (trunk): scuba steve",
+			want: "cli/cli [trunk]: scuba steve",
 		},
 		{
 			name: "with includeOwner true, prefixes the codespace owner",
@@ -123,7 +123,7 @@ func Test_codespace_displayName(t *testing.T) {
 					DisplayName: "scuba steve",
 				},
 			},
-			want: "jimmy           cli/cli (trunk): scuba steve",
+			want: "jimmy           cli/cli [trunk]: scuba steve",
 		},
 	}
 	for _, tt := range tests {
@@ -163,7 +163,7 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 				},
 			},
 			wantCodespacesNames: []string{
-				"cli/cli (trunk): scuba steve",
+				"cli/cli [trunk]: scuba steve",
 			},
 		},
 		{
@@ -191,8 +191,8 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 				},
 			},
 			wantCodespacesNames: []string{
-				"cli/cli (trunk): scuba steve",
-				"cli/cli (trunk): flappy bird",
+				"cli/cli [trunk]: scuba steve",
+				"cli/cli [trunk]: flappy bird",
 			},
 		},
 		{
@@ -220,8 +220,8 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 				},
 			},
 			wantCodespacesNames: []string{
-				"cli/cli (trunk): scuba steve",
-				"cli/cli (feature): flappy bird",
+				"cli/cli [trunk]: scuba steve",
+				"cli/cli [feature]: flappy bird",
 			},
 		},
 		{
@@ -249,8 +249,8 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 				},
 			},
 			wantCodespacesNames: []string{
-				"github/cli (trunk): scuba steve",
-				"cli/cli (trunk): flappy bird",
+				"github/cli [trunk]: scuba steve",
+				"cli/cli [trunk]: flappy bird",
 			},
 		},
 		{
@@ -279,8 +279,8 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 				},
 			},
 			wantCodespacesNames: []string{
-				"cli/cli (trunk): scuba steve",
-				"cli/cli (trunk*): flappy bird",
+				"cli/cli [trunk]: scuba steve",
+				"cli/cli [trunk*]: flappy bird",
 			},
 		},
 	}

@@ -29,5 +29,10 @@ jobs:
           languages: go
           queries: security-and-quality
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

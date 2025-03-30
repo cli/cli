@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
@@ -15,7 +16,7 @@ import (
 
 func TestSearcher(t *testing.T) {
 	f := factory.New("1")
-	f.Config = func() (config.Config, error) {
+	f.Config = func() (gh.Config, error) {
 		return config.NewBlankConfig(), nil
 	}
 	_, err := Searcher(f)
@@ -170,7 +171,7 @@ func TestSearchIssues(t *testing.T) {
 				WebMode: true,
 			},
 			tty:        true,
-			wantStderr: "Opening github.com/search in your browser.\n",
+			wantStderr: "Opening https://github.com/search in your browser.\n",
 		},
 		{
 			name: "opens browser for web mode notty",

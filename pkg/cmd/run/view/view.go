@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -28,36 +29,53 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type runLogCache interface {
-	Exists(string) bool
-	Create(string, io.Reader) error
-	Open(string) (*zip.ReadCloser, error)
+type RunLogCache struct {
+	cacheDir string
 }
 
-type rlc struct{}
-
-func (rlc) Exists(path string) bool {
-	if _, err := os.Stat(path); err != nil {
-		return false
+func (c RunLogCache) Exists(key string) (bool, error) {
+	_, err := os.Stat(c.filepath(key))
+	if err == nil {
+		return true, nil
 	}
-	return true
+
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("checking cache entry: %v", err)
 }
-func (rlc) Create(path string, content io.Reader) error {
-	err := os.MkdirAll(filepath.Dir(path), 0755)
-	if err != nil {
-		return fmt.Errorf("could not create cache: %w", err)
+
+func (c RunLogCache) Create(key string, content io.Reader) error {
+	if err := os.MkdirAll(c.cacheDir, 0755); err != nil {
+		return fmt.Errorf("creating cache directory: %v", err)
 	}
 
-	out, err := os.Create(path)
+	out, err := os.Create(c.filepath(key))
 	if err != nil {
-		return err
+		return fmt.Errorf("creating cache entry: %v", err)
 	}
 	defer out.Close()
-	_, err = io.Copy(out, content)
-	return err
+
+	if _, err := io.Copy(out, content); err != nil {
+		return fmt.Errorf("writing cache entry: %v", err)
+
+	}
+
+	return nil
 }
-func (rlc) Open(path string) (*zip.ReadCloser, error) {
-	return zip.OpenReader(path)
+
+func (c RunLogCache) Open(key string) (*zip.ReadCloser, error) {
+	r, err := zip.OpenReader(c.filepath(key))
+	if err != nil {
+		return nil, fmt.Errorf("opening cache entry: %v", err)
+	}
+
+	return r, nil
+}
+
+func (c RunLogCache) filepath(key string) string {
+	return filepath.Join(c.cacheDir, fmt.Sprintf("run-log-%s.zip", key))
 }
 
 type ViewOptions struct {
@@ -66,7 +84,7 @@ type ViewOptions struct {
 	BaseRepo    func() (ghrepo.Interface, error)
 	Browser     browser.Browser
 	Prompter    shared.Prompter
-	RunLogCache runLogCache
+	RunLogCache RunLogCache
 
 	RunID      string
 	JobID      string
@@ -85,18 +103,23 @@ type ViewOptions struct {
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
-		IO:          f.IOStreams,
-		HttpClient:  f.HttpClient,
-		Prompter:    f.Prompter,
-		Now:         time.Now,
-		Browser:     f.Browser,
-		RunLogCache: rlc{},
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
+		Now:        time.Now,
+		Browser:    f.Browser,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "view [<run-id>]",
 		Short: "View a summary of a workflow run",
-		Args:  cobra.MaximumNArgs(1),
+		Long: heredoc.Docf(`
+			View a summary of a workflow run.
+
+			This command does not support authenticating via fine grained PATs
+			as it is not currently possible to create a PAT with the %[1]schecks:read%[1]s permission.
+		`, "`"),
+		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
 			# Interactively select a run to view, optionally selecting a single job
 			$ gh run view
@@ -119,6 +142,15 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
+
+			config, err := f.Config()
+			if err != nil {
+				return err
+			}
+
+			opts.RunLogCache = RunLogCache{
+				cacheDir: config.CacheDir(),
+			}
 
 			if len(args) == 0 && opts.JobID == "" {
 				if !opts.IO.CanPrompt() {
@@ -294,7 +326,7 @@ func runView(opts *ViewOptions) error {
 	prNumber := ""
 	number, err := shared.PullRequestForRun(client, repo, *run)
 	if err == nil {
-		prNumber = fmt.Sprintf(" #%d", number)
+		prNumber = fmt.Sprintf(" %s#%d", ghrepo.FullName(repo), number)
 	}
 
 	var artifacts []shared.Artifact
@@ -306,10 +338,17 @@ func runView(opts *ViewOptions) error {
 	}
 
 	var annotations []shared.Annotation
+	var missingAnnotationsPermissions bool
+
 	for _, job := range jobs {
 		as, err := shared.GetAnnotations(client, repo, job)
 		if err != nil {
-			return fmt.Errorf("failed to get annotations: %w", err)
+			if err != shared.ErrMissingAnnotationsPermissions {
+				return fmt.Errorf("failed to get annotations: %w", err)
+			}
+
+			missingAnnotationsPermissions = true
+			break
 		}
 		annotations = append(annotations, as...)
 	}
@@ -341,7 +380,11 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
 	}
 
-	if len(annotations) > 0 {
+	if missingAnnotationsPermissions {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
+		fmt.Fprintln(out, "requesting annotations returned 403 Forbidden as the token does not have sufficient permissions. Note that it is not currently possible to create a fine-grained PAT with the `checks:read` permission.")
+	} else if len(annotations) > 0 {
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, cs.Bold("ANNOTATIONS"))
 		fmt.Fprintln(out, shared.RenderAnnotations(cs, annotations))
@@ -424,10 +467,14 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run, attempt uint64) (*zip.ReadCloser, error) {
-	filename := fmt.Sprintf("run-log-%d-%d.zip", run.ID, run.StartedTime().Unix())
-	filepath := filepath.Join(os.TempDir(), "gh-cli-cache", filename)
-	if !cache.Exists(filepath) {
+func getRunLog(cache RunLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run, attempt uint64) (*zip.ReadCloser, error) {
+	cacheKey := fmt.Sprintf("%d-%d", run.ID, run.StartedTime().Unix())
+	isCached, err := cache.Exists(cacheKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isCached {
 		// Run log does not exist in cache so retrieve and store it
 		logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
 			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID)
@@ -455,13 +502,13 @@ func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface
 			return nil, err
 		}
 
-		err = cache.Create(filepath, respReader)
+		err = cache.Create(cacheKey, respReader)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return cache.Open(filepath)
+	return cache.Open(cacheKey)
 }
 
 func promptForJob(prompter shared.Prompter, cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, error) {
@@ -484,6 +531,8 @@ func promptForJob(prompter shared.Prompter, cs *iostreams.ColorScheme, jobs []sh
 	return nil, nil
 }
 
+const JOB_NAME_MAX_LENGTH = 90
+
 func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	// As described in https://github.com/cli/cli/issues/5011#issuecomment-1570713070, there are a number of steps
 	// the server can take when producing the downloaded zip file that can result in a mismatch between the job name
@@ -492,13 +541,81 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	//  * Truncating names that are too long for zip files
 	//  * Adding collision deduplicating numbers for jobs with the same name
 	//
-	// We are hesitant to duplicate all the server logic due to the fragility but while we explore our options, it
-	// is sensible to fix the issue that is unavoidable for users, that when a job uses a composite action, the server
-	// constructs a job name by constructing a job name of `<JOB_NAME`> / <ACTION_NAME>`. This means that logs will
-	// never be found for jobs that use composite actions.
+	// We are hesitant to duplicate all the server logic due to the fragility but it may be unavoidable. Currently, we:
+	// * Strip `/` which occur when composite action job names are constructed of the form `<JOB_NAME`> / <ACTION_NAME>`
+	// * Truncate long job names
+	//
 	sanitizedJobName := strings.ReplaceAll(job.Name, "/", "")
-	re := fmt.Sprintf(`%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
+	sanitizedJobName = strings.ReplaceAll(sanitizedJobName, ":", "")
+	sanitizedJobName = truncateAsUTF16(sanitizedJobName, JOB_NAME_MAX_LENGTH)
+	re := fmt.Sprintf(`^%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
+}
+
+/*
+If you're reading this comment by necessity, I'm sorry and if you're reading it for fun, you're welcome, you weirdo.
+
+What is the length of this string "a😅😅"? If you said 9 you'd be right. If you said 3 or 5 you might also be right!
+
+Here's a summary:
+
+	"a" takes 1 byte (`\x61`)
+	"😅" takes 4 `bytes` (`\xF0\x9F\x98\x85`)
+	"a😅😅" therefore takes 9 `bytes`
+	In Go `len("a😅😅")` is 9 because the `len` builtin counts `bytes`
+	In Go `len([]rune("a😅😅"))` is 3 because each `rune` is 4 `bytes` so each character fits within a `rune`
+	In C# `"a😅😅".Length` is 5 because `.Length` counts `Char` objects, `Chars` hold 2 bytes, and "😅" takes 2 Chars.
+
+But wait, what does C# have to do with anything? Well the server is running C#. Which server? The one that serves log
+files to us in `.zip` format of course! When the server is constructing the zip file to avoid running afoul of a 260
+byte zip file path length limitation, it applies transformations to various strings in order to limit their length.
+In C#, the server truncates strings with this function:
+
+	public static string TruncateAfter(string str, int max)
+	{
+		string result = str.Length > max ? str.Substring(0, max) : str;
+		result = result.Trim();
+		return result;
+	}
+
+This seems like it would be easy enough to replicate in Go but as we already discovered, the length of a string isn't
+as obvious as it might seem. Since C# uses UTF-16 encoding for strings, and Go uses UTF-8 encoding and represents
+characters by runes (which are an alias of int32) we cannot simply slice the string without any further consideration.
+Instead, we need to encode the string as UTF-16 bytes, slice it and then decode it back to UTF-8.
+
+Interestingly, in C# length and substring both act on the Char type so it's possible to slice into the middle of
+a visual, "representable" character. For example we know `"a😅😅".Length` = 5 (1+2+2) and therefore Substring(0,4)
+results in the final character being cleaved in two, resulting in "a😅�". Since our int32 runes are being encoded as
+2 uint16 elements, we also mimic this behaviour by slicing into the UTF-16 encoded string.
+
+Here's a program you can put into a dotnet playground to see how C# works:
+
+	using System;
+	public class Program {
+	  public static void Main() {
+	    string s = "a😅😅";
+	    Console.WriteLine("{0} {1}", s.Length, s);
+	    string t = TruncateAfter(s, 4);
+	    Console.WriteLine("{0} {1}", t.Length, t);
+	  }
+	  public static string TruncateAfter(string str, int max) {
+	    string result = str.Length > max ? str.Substring(0, max) : str;
+	    return result.Trim();
+	  }
+	}
+
+This will output:
+5 a😅😅
+4 a😅�
+*/
+func truncateAsUTF16(str string, max int) string {
+	// Encode the string to UTF-16 to count code units
+	utf16Encoded := utf16.Encode([]rune(str))
+	if len(utf16Encoded) > max {
+		// Decode back to UTF-8 up to the max length
+		str = string(utf16.Decode(utf16Encoded[:max]))
+	}
+	return strings.TrimSpace(str)
 }
 
 // This function takes a zip file of logs and a list of jobs.

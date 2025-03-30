@@ -44,6 +44,13 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 	cmd := &cobra.Command{
 		Use:   "develop {<number> | <url>}",
 		Short: "Manage linked branches for an issue",
+		Long: heredoc.Docf(`
+			Manage linked branches for an issue.
+
+			When using the %[1]s--base%[1]s flag, the new development branch will be created from the specified
+			remote branch. The new branch will be configured as the base branch for pull requests created using
+			%[1]sgh pr create%[1]s.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# List branches for issue 123
 			$ gh issue develop --list 123
@@ -106,7 +113,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 
 	fl := cmd.Flags()
 	fl.StringVar(&opts.BranchRepo, "branch-repo", "", "Name or URL of the repository where you want to create your new branch")
-	fl.StringVarP(&opts.BaseBranch, "base", "b", "", "Name of the base branch you want to make your new branch from")
+	fl.StringVarP(&opts.BaseBranch, "base", "b", "", "Name of the remote branch you want to make your new branch from")
 	fl.BoolVarP(&opts.Checkout, "checkout", "c", false, "Checkout the branch after creating it")
 	fl.BoolVarP(&opts.List, "list", "l", false, "List linked branches for the issue")
 	fl.StringVarP(&opts.Name, "name", "n", "", "Name of the branch to create")
@@ -171,7 +178,15 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s/%s/%s/tree/%s\n", branchRepo.RepoHost(), branchRepo.RepoOwner(), branchRepo.RepoName(), branchName)
+	// Remember which branch to target when creating a PR.
+	if opts.BaseBranch != "" {
+		err = opts.GitClient.SetBranchConfig(ctx.Background(), branchName, git.MergeBaseConfig, opts.BaseBranch)
+		if err != nil {
+			return err
+		}
+	}
+
+	fmt.Fprintf(opts.IO.Out, "%s/%s/tree/%s\n", branchRepo.RepoHost(), ghrepo.FullName(branchRepo), branchName)
 
 	return checkoutBranch(opts, branchRepo, branchName)
 }
@@ -185,11 +200,11 @@ func developRunList(opts *DevelopOptions, apiClient *api.Client, issueRepo ghrep
 	}
 
 	if len(branches) == 0 {
-		return cmdutil.NewNoResultsError(fmt.Sprintf("no linked branches found for %s/%s#%d", issueRepo.RepoOwner(), issueRepo.RepoName(), issue.Number))
+		return cmdutil.NewNoResultsError(fmt.Sprintf("no linked branches found for %s#%d", ghrepo.FullName(issueRepo), issue.Number))
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "\nShowing linked branches for %s/%s#%d\n\n", issueRepo.RepoOwner(), issueRepo.RepoName(), issue.Number)
+		fmt.Fprintf(opts.IO.Out, "\nShowing linked branches for %s#%d\n\n", ghrepo.FullName(issueRepo), issue.Number)
 	}
 
 	printLinkedBranches(opts.IO, branches)

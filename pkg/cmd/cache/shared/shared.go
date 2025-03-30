@@ -2,6 +2,7 @@ package shared
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -38,6 +39,8 @@ type GetCachesOptions struct {
 	Limit int
 	Order string
 	Sort  string
+	Key   string
+	Ref   string
 }
 
 // Return a list of caches for a repository. Pass a negative limit to request
@@ -56,6 +59,12 @@ func GetCaches(client *api.Client, repo ghrepo.Interface, opts GetCachesOptions)
 	}
 	if opts.Order != "" {
 		path += fmt.Sprintf("&direction=%s", opts.Order)
+	}
+	if opts.Key != "" {
+		path += fmt.Sprintf("&key=%s", url.QueryEscape(opts.Key))
+	}
+	if opts.Ref != "" {
+		path += fmt.Sprintf("&ref=%s", url.QueryEscape(opts.Ref))
 	}
 
 	var result *CachePayload

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/utils"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 type tokenGetter interface {
@@ -86,7 +86,7 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 	}}
 }
 
-// AddAuthToken adds an authentication token header for the host specified by the request.
+// AddAuthTokenHeader adds an authentication token header for the host specified by the request.
 func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
@@ -98,7 +98,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 			// Only set header if an initial request or redirect request to the same host as the initial request.
 			// If the host has changed during a redirect do not add the authentication token header.
 			if !redirectHostnameChange {
-				hostname := ghinstance.NormalizeHostname(getHost(req))
+				hostname := ghauth.NormalizeHostname(getHost(req))
 				if token, _ := cfg.ActiveToken(hostname); token != "" {
 					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
 				}

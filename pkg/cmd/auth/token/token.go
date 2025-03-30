@@ -1,10 +1,11 @@
 package token
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -12,7 +13,7 @@ import (
 
 type TokenOptions struct {
 	IO     *iostreams.IOStreams
-	Config func() (config.Config, error)
+	Config func() (gh.Config, error)
 
 	Hostname      string
 	Username      string
@@ -46,7 +47,7 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance authenticated with")
-	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to log out of")
+	cmd.Flags().StringVarP(&opts.Username, "user", "u", "", "The account to output the token for")
 	cmd.Flags().BoolVarP(&opts.SecureStorage, "secure-storage", "", false, "Search only secure credential store for authentication token")
 	_ = cmd.Flags().MarkHidden("secure-storage")
 
@@ -88,7 +89,7 @@ func tokenRun(opts *TokenOptions) error {
 		if opts.Username != "" {
 			errMsg += fmt.Sprintf(" account %s", opts.Username)
 		}
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	if val != "" {

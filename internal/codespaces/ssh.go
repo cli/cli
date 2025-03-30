@@ -19,9 +19,9 @@ type printer interface {
 // port-forwarding session. It runs until the shell is terminated
 // (including by cancellation of the context).
 func Shell(
-	ctx context.Context, p printer, sshArgs []string, port int, destination string, printConnDetails bool,
+	ctx context.Context, p printer, sshArgs []string, command []string, port int, destination string, printConnDetails bool,
 ) error {
-	cmd, connArgs, err := newSSHCommand(ctx, port, destination, sshArgs)
+	cmd, connArgs, err := newSSHCommand(ctx, port, destination, sshArgs, command)
 	if err != nil {
 		return fmt.Errorf("failed to create ssh command: %w", err)
 	}
@@ -51,28 +51,22 @@ func Copy(ctx context.Context, scpArgs []string, port int, destination string) e
 // NewRemoteCommand returns an exec.Cmd that will securely run a shell
 // command on the remote machine.
 func NewRemoteCommand(ctx context.Context, tunnelPort int, destination string, sshArgs ...string) (*exec.Cmd, error) {
-	cmd, _, err := newSSHCommand(ctx, tunnelPort, destination, sshArgs)
+	sshArgs, command, err := ParseSSHArgs(sshArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd, _, err := newSSHCommand(ctx, tunnelPort, destination, sshArgs, command)
 	return cmd, err
 }
 
 // newSSHCommand populates an exec.Cmd to run a command (or if blank,
 // an interactive shell) over ssh.
-func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) (*exec.Cmd, []string, error) {
+func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string, command []string) (*exec.Cmd, []string, error) {
 	connArgs := []string{
 		"-p", strconv.Itoa(port),
 		"-o", "NoHostAuthenticationForLocalhost=yes",
 		"-o", "PasswordAuthentication=no",
-	}
-
-	// The ssh command syntax is: ssh [flags] user@host command [args...]
-	// There is no way to specify the user@host destination as a flag.
-	// Unfortunately, that means we need to know which user-provided words are
-	// SSH flags and which are command arguments so that we can place
-	// them before or after the destination, and that means we need to know all
-	// the flags and their arities.
-	cmdArgs, command, err := parseSSHArgs(cmdArgs)
-	if err != nil {
-		return nil, nil, err
 	}
 
 	cmdArgs = append(cmdArgs, connArgs...)
@@ -96,7 +90,14 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 	return cmd, connArgs, nil
 }
 
-func parseSSHArgs(args []string) (cmdArgs, command []string, err error) {
+// ParseSSHArgs parses the given array of arguments into two distinct slices of flags and command.
+// The ssh command syntax is: ssh [flags] user@host command [args...]
+// There is no way to specify the user@host destination as a flag.
+// Unfortunately, that means we need to know which user-provided words are
+// SSH flags and which are command arguments so that we can place
+// them before or after the destination, and that means we need to know all
+// the flags and their arities.
+func ParseSSHArgs(args []string) (cmdArgs, command []string, err error) {
 	return parseArgs(args, "bcDeFIiLlmOopRSWw")
 }
 

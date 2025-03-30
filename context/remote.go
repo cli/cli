@@ -31,7 +31,7 @@ func (r Remotes) FindByRepo(owner, name string) (*Remote, error) {
 			return rem, nil
 		}
 	}
-	return nil, fmt.Errorf("no matching remote found")
+	return nil, fmt.Errorf("no matching remote found; looking for %s/%s", owner, name)
 }
 
 // Filter remotes by given hostnames, maintains original order

@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
@@ -112,6 +113,8 @@ func TestRenameRun(t *testing.T) {
 		promptStubs func(*prompter.MockPrompter)
 		wantOut     string
 		tty         bool
+		wantErr     bool
+		errMsg      string
 	}{
 		{
 			name:    "none argument",
@@ -216,6 +219,16 @@ func TestRenameRun(t *testing.T) {
 			},
 			wantOut: "",
 		},
+
+		{
+			name: "error on name with slash",
+			tty:  true,
+			opts: RenameOptions{
+				newRepoSelector: "org/new-name",
+			},
+			wantErr: true,
+			errMsg:  "New repository name cannot contain '/' character - to transfer a repository to a new owner, you must follow additional steps on <github.com>. For more information on transferring repository ownership, see <https://docs.github.com/en/repositories/creating-and-managing-repositories/transferring-a-repository>.",
+		},
 	}
 
 	for _, tt := range testCases {
@@ -230,7 +243,7 @@ func TestRenameRun(t *testing.T) {
 			return repo, nil
 		}
 
-		tt.opts.Config = func() (config.Config, error) {
+		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
 
@@ -267,6 +280,10 @@ func TestRenameRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
 			err := renameRun(&tt.opts)
+			if tt.wantErr {
+				assert.EqualError(t, err, tt.errMsg)
+				return
+			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, stdout.String())
 		})

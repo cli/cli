@@ -16,6 +16,7 @@ func Test_repoCreate(t *testing.T) {
 		input    repoCreateInput
 		stubs    func(t *testing.T, r *httpmock.Registry)
 		wantErr  bool
+		errMsg   string
 		wantRepo string
 	}{
 		{
@@ -681,6 +682,51 @@ func Test_repoCreate(t *testing.T) {
 			},
 			wantRepo: "https://github.com/snacks-inc/crisps",
 		},
+		{
+			name:     "create personal repository but try to set it as 'internal'",
+			hostname: "github.com",
+			input: repoCreateInput{
+				Name:        "winter-foods",
+				Description: "roasted chestnuts",
+				HomepageURL: "http://example.com",
+				Visibility:  "internal",
+				OwnerLogin:  "OWNER",
+			},
+			wantErr: true,
+			errMsg:  "internal repositories can only be created within an organization",
+			stubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "users/OWNER"),
+					httpmock.StringResponse(`{ "node_id": "1234", "type": "Not-Org" }`))
+				r.Exclude(
+					t,
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+				)
+			},
+		},
+		{
+			name:     "create personal repository with README but try to set it as 'internal'",
+			hostname: "github.com",
+			input: repoCreateInput{
+				Name:        "winter-foods",
+				Description: "roasted chestnuts",
+				HomepageURL: "http://example.com",
+				Visibility:  "internal",
+				OwnerLogin:  "OWNER",
+				InitReadme:  true,
+			},
+			wantErr: true,
+			errMsg:  "internal repositories can only be created within an organization",
+			stubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "users/OWNER"),
+					httpmock.StringResponse(`{ "node_id": "1234", "type": "Not-Org" }`))
+				r.Exclude(
+					t,
+					httpmock.REST("POST", "user/repos"),
+				)
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -691,6 +737,9 @@ func Test_repoCreate(t *testing.T) {
 			r, err := repoCreate(httpClient, tt.hostname, tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.ErrorContains(t, err, tt.errMsg)
+				}
 				return
 			} else {
 				assert.NoError(t, err)

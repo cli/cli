@@ -14,7 +14,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -32,7 +32,7 @@ type iprompter interface {
 type ForkOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (ghContext.Remotes, error)
@@ -221,6 +221,8 @@ func forkRun(opts *ForkOptions) error {
 	} else {
 		if connectedToTerminal {
 			fmt.Fprintf(stderr, "%s Created fork %s\n", cs.SuccessIconWithColor(cs.Green), cs.Bold(ghrepo.FullName(forkedRepo)))
+		} else {
+			fmt.Fprintln(opts.IO.Out, ghrepo.GenerateRepoURL(forkedRepo, ""))
 		}
 	}
 
@@ -243,7 +245,9 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol := cfg.GitProtocol(repoToFork.RepoHost())
+	protocolConfig := cfg.GitProtocol(repoToFork.RepoHost())
+	protocolIsConfiguredByUser := protocolConfig.Source == gh.ConfigUserProvided
+	protocol := protocolConfig.Value
 
 	gitClient := opts.GitClient
 	ctx := context.Background()
@@ -254,7 +258,7 @@ func forkRun(opts *ForkOptions) error {
 			return err
 		}
 
-		if protocol == "" { // user has no set preference
+		if !protocolIsConfiguredByUser {
 			if remote, err := remotes.FindByRepo(repoToFork.RepoOwner(), repoToFork.RepoName()); err == nil {
 				scheme := ""
 				if remote.FetchURL != nil {
@@ -303,6 +307,10 @@ func forkRun(opts *ForkOptions) error {
 					_, err = renameCmd.Output()
 					if err != nil {
 						return err
+					}
+
+					if connectedToTerminal {
+						fmt.Fprintf(stderr, "%s Renamed remote %s to %s\n", cs.SuccessIcon(), cs.Bold(remoteName), cs.Bold(renameTarget))
 					}
 				} else {
 					return fmt.Errorf("a git remote named '%s' already exists", remoteName)

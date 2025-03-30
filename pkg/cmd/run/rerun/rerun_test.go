@@ -78,10 +78,13 @@ func TestNewCmdRerun(t *testing.T) {
 			},
 		},
 		{
-			name:     "with args jobID and runID fails",
-			tty:      true,
-			cli:      "1234 --job 5678",
-			wantsErr: true,
+			name: "with args jobID and runID uses jobID",
+			tty:  true,
+			cli:  "1234 --job 5678",
+			wants: RerunOptions{
+				JobID: "5678",
+				RunID: "",
+			},
 		},
 		{
 			name:     "with arg job with no ID fails",
@@ -338,7 +341,7 @@ func TestRerun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
 						return 2, nil
 					})

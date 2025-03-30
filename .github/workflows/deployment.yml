@@ -1,12 +1,14 @@
 name: Deployment
-run-name: ${{ inputs.tag_name }} / go ${{ inputs.go_version }} / ${{ inputs.environment }}
+run-name: ${{ inputs.tag_name }} / ${{ inputs.environment }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
 permissions:
+  attestations: write
   contents: write
+  id-token: write
 
 on:
   workflow_dispatch:
@@ -17,9 +19,6 @@ on:
       environment:
         default: production
         type: environment
-      go_version:
-        default: "1.21"
-        type: string
       platforms:
         default: "linux,macos,windows"
         type: string
@@ -29,7 +28,17 @@ on:
         default: true
 
 jobs:
+  validate-tag-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag name format
+        run: |
+          if [[ ! "${{ inputs.tag_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag name format. Must be in the form v1.2.3"
+            exit 1
+          fi
   linux:
+    needs: validate-tag-name
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     if: contains(inputs.platforms, 'linux')
@@ -39,9 +48,9 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go_version }}
+          go-version-file: 'go.mod'
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: "~1.17.1"
           install-only: true
@@ -64,6 +73,7 @@ jobs:
             dist/*.deb
 
   macos:
+    needs: validate-tag-name
     runs-on: macos-latest
     environment: ${{ inputs.environment }}
     if: contains(inputs.platforms, 'macos')
@@ -73,7 +83,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go_version }}
+          go-version-file: 'go.mod'
       - name: Configure macOS signing
         if: inputs.environment == 'production'
         env:
@@ -93,7 +103,7 @@ jobs:
           security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
           rm "$RUNNER_TEMP/cert.p12"
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: "~1.17.1"
           install-only: true
@@ -111,6 +121,19 @@ jobs:
         run: |
           shopt -s failglob
           script/sign dist/gh_*_macOS_*.zip
+      - name: Build universal macOS pkg installer
+        if: inputs.environment != 'production'
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: script/pkgmacos "$TAG_NAME"
+      - name: Build & notarize universal macOS pkg installer
+        if: inputs.environment == 'production'
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+          APPLE_DEVELOPER_INSTALLER_ID: ${{ vars.APPLE_DEVELOPER_INSTALLER_ID }}
+        run: |
+          shopt -s failglob
+          script/pkgmacos "$TAG_NAME"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -119,8 +142,10 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.zip
-
+            dist/*.pkg
+ 
   windows:
+    needs: validate-tag-name
     runs-on: windows-latest
     environment: ${{ inputs.environment }}
     if: contains(inputs.platforms, 'windows')
@@ -130,9 +155,9 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ inputs.go_version }}
+          go-version-file: 'go.mod'
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: "~1.17.1"
           install-only: true
@@ -171,7 +196,7 @@ jobs:
         run: script/release --local "$TAG_NAME" --platform windows
       - name: Set up MSBuild
         id: setupmsbuild
-        uses: microsoft/setup-msbuild@v1.3.1
+        uses: microsoft/setup-msbuild@v2.0.0
       - name: Build MSI
         shell: bash
         env:
@@ -190,10 +215,8 @@ jobs:
               platform="x64"
               ;;
             *_arm64 )
-              echo "skipping building MSI for arm64 because WiX 3.11 doesn't support it: https://github.com/wixtoolset/issues/issues/6141" >&2
-              continue
-              #source_dir="$PWD/dist/windows_windows_arm64"
-              #platform="arm64"
+              source_dir="$PWD/dist/windows_windows_arm64"
+              platform="arm64"
               ;;
             * )
               printf "unsupported architecture: %s\n" "$MSI_NAME" >&2
@@ -278,12 +301,17 @@ jobs:
           base64 -d <<<"$GPG_KEY" | gpg --import --no-tty --batch --yes
           echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
           gpg-connect-agent RELOADAGENT /bye
-          /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP" <<<"$GPG_PASSPHRASE"
+          base64 -d <<<"$GPG_PASSPHRASE" | /usr/lib/gnupg2/gpg-preset-passphrase --preset "$GPG_KEYGRIP"
       - name: Sign RPMs
         if: inputs.environment == 'production'
         run: |
           cp script/rpmmacros ~/.rpmmacros
           rpmsign --addsign dist/*.rpm
+      - name: Attest release artifacts
+        if: inputs.environment == 'production'
+        uses: actions/attest-build-provenance@bd77c077858b8d561b7a36cbe48ef4cc642ca39d # v2.2.2
+        with:
+          subject-path: "dist/gh_*"
       - name: Run createrepo
         env:
           GPG_SIGN: ${{ inputs.environment == 'production' }}
@@ -333,8 +361,6 @@ jobs:
           )
           if [[ $TAG_NAME == *-* ]]; then
             release_args+=( --prerelease )
-          else
-            release_args+=( --discussion-category "General" )
           fi
           guard="echo"
           [ "$DO_PUBLISH" = "false" ] || guard=""

@@ -15,21 +15,29 @@ func TestRun(id int64, s Status, c Conclusion) Run {
 }
 
 func TestRunWithCommit(id int64, s Status, c Conclusion, commit string) Run {
+	return TestRunWithWorkflowAndCommit(123, id, s, c, commit)
+}
+
+func TestRunWithOrgRequiredWorkflow(id int64, s Status, c Conclusion, commit string) Run {
+	return TestRunWithWorkflowAndCommit(456, id, s, c, commit)
+}
+
+func TestRunWithWorkflowAndCommit(workflowId, runId int64, s Status, c Conclusion, commit string) Run {
 	return Run{
-		WorkflowID: 123,
-		ID:         id,
+		WorkflowID: workflowId,
+		ID:         runId,
 		CreatedAt:  TestRunStartTime,
 		UpdatedAt:  TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 		Status:     s,
 		Conclusion: c,
 		Event:      "push",
 		HeadBranch: "trunk",
-		JobsURL:    fmt.Sprintf("https://api.github.com/runs/%d/jobs", id),
+		JobsURL:    fmt.Sprintf("https://api.github.com/runs/%d/jobs", runId),
 		HeadCommit: Commit{
 			Message: commit,
 		},
 		HeadSha: "1234567890",
-		URL:     fmt.Sprintf("https://github.com/runs/%d", id),
+		URL:     fmt.Sprintf("https://github.com/runs/%d", runId),
 		HeadRepository: Repo{
 			Owner: struct{ Login string }{Login: "OWNER"},
 			Name:  "REPO",
@@ -51,6 +59,18 @@ var TestRuns []Run = []Run{
 	TestRun(8, Requested, ""),
 	TestRun(9, Queued, ""),
 	TestRun(10, Completed, Stale),
+}
+
+var TestRunsWithOrgRequiredWorkflows []Run = []Run{
+	TestRunWithOrgRequiredWorkflow(1, Completed, TimedOut, "cool commit"),
+	TestRunWithOrgRequiredWorkflow(2, InProgress, "", "cool commit"),
+	TestRunWithOrgRequiredWorkflow(3, Completed, Success, "cool commit"),
+	TestRunWithOrgRequiredWorkflow(4, Completed, Cancelled, "cool commit"),
+	TestRun(5, Completed, Failure),
+	TestRun(6, Completed, Neutral),
+	TestRun(7, Completed, Skipped),
+	TestRun(8, Requested, ""),
+	TestRun(9, Queued, ""),
 }
 
 var WorkflowRuns []Run = []Run{
@@ -106,6 +126,16 @@ var FailedJob Job = Job{
 			Conclusion: Failure,
 			Number:     2,
 		},
+	},
+}
+
+var SuccessfulJobAnnotations []Annotation = []Annotation{
+	{
+		JobName:   "cool job",
+		Message:   "the job is happy",
+		Path:      "blaze.py",
+		Level:     "notice",
+		StartLine: 420,
 	},
 }
 

@@ -234,7 +234,7 @@ func Test_runLock(t *testing.T) {
 					return -1, prompter.NoSuchPromptErr(p)
 				}
 			},
-			wantOut: "✓ Locked as TOO_HEATED: Issue #451 (traverse the library)\n",
+			wantOut: "✓ Locked as TOO_HEATED: Issue OWNER/REPO#451 (traverse the library)\n",
 		},
 		{
 			name:  "lock issue with explicit reason tty",
@@ -261,7 +261,7 @@ func Test_runLock(t *testing.T) {
 						      "lockedRecord": {
 						        "locked": true }}}}`))
 			},
-			wantOut: "✓ Locked as OFF_TOPIC: Issue #451 (traverse the library)\n",
+			wantOut: "✓ Locked as OFF_TOPIC: Issue OWNER/REPO#451 (traverse the library)\n",
 		},
 		{
 			name:  "unlock issue tty",
@@ -288,7 +288,7 @@ func Test_runLock(t *testing.T) {
 						      "unlockedRecord": {
 						        "locked": false }}}}`))
 			},
-			wantOut: "✓ Unlocked: Issue #451 (traverse the library)\n",
+			wantOut: "✓ Unlocked: Issue OWNER/REPO#451 (traverse the library)\n",
 		},
 		{
 			name:  "unlock issue nontty",
@@ -375,14 +375,14 @@ func Test_runLock(t *testing.T) {
 			},
 			promptStubs: func(t *testing.T, pm *prompter.PrompterMock) {
 				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					if p == "Issue #451 already locked. Unlock and lock again as OFF_TOPIC?" {
+					if p == "Issue OWNER/REPO#451 already locked. Unlock and lock again as OFF_TOPIC?" {
 						return true, nil
 					}
 
 					return false, prompter.NoSuchPromptErr(p)
 				}
 			},
-			wantOut: "✓ Locked as OFF_TOPIC: Issue #451 (traverse the library)\n",
+			wantOut: "✓ Locked as OFF_TOPIC: Issue OWNER/REPO#451 (traverse the library)\n",
 		},
 		{
 			name:  "relock issue nontty",
@@ -462,7 +462,7 @@ func Test_runLock(t *testing.T) {
 					return -1, prompter.NoSuchPromptErr(p)
 				}
 			},
-			wantOut: "✓ Locked as TOO_HEATED: Pull request #451 (traverse the library)\n",
+			wantOut: "✓ Locked as TOO_HEATED: Pull request OWNER/REPO#451 (traverse the library)\n",
 		},
 		{
 			name:  "lock pr with explicit reason tty",
@@ -489,7 +489,7 @@ func Test_runLock(t *testing.T) {
 						      "lockedRecord": {
 						        "locked": true }}}}`))
 			},
-			wantOut: "✓ Locked as OFF_TOPIC: Pull request #451 (traverse the library)\n",
+			wantOut: "✓ Locked as OFF_TOPIC: Pull request OWNER/REPO#451 (traverse the library)\n",
 		},
 		{
 			name:  "lock pr with explicit nontty",
@@ -566,7 +566,7 @@ func Test_runLock(t *testing.T) {
 						      "unlockedRecord": {
 						        "locked": false }}}}`))
 			},
-			wantOut: "✓ Unlocked: Pull request #451 (traverse the library)\n",
+			wantOut: "✓ Unlocked: Pull request OWNER/REPO#451 (traverse the library)\n",
 		},
 		{
 			name:  "relock pr tty",
@@ -603,14 +603,14 @@ func Test_runLock(t *testing.T) {
 			},
 			promptStubs: func(t *testing.T, pm *prompter.PrompterMock) {
 				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					if p == "Pull request #451 already locked. Unlock and lock again as OFF_TOPIC?" {
+					if p == "Pull request OWNER/REPO#451 already locked. Unlock and lock again as OFF_TOPIC?" {
 						return true, nil
 					}
 
 					return false, prompter.NoSuchPromptErr(p)
 				}
 			},
-			wantOut: "✓ Locked as OFF_TOPIC: Pull request #451 (traverse the library)\n",
+			wantOut: "✓ Locked as OFF_TOPIC: Pull request OWNER/REPO#451 (traverse the library)\n",
 		},
 		{
 			name:  "relock pr nontty",

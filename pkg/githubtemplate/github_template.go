@@ -98,6 +98,21 @@ func ExtractName(filePath string) string {
 	return path.Base(filePath)
 }
 
+// ExtractTitle returns the title of the template from YAML front-matter
+func ExtractTitle(filePath string) string {
+	contents, err := os.ReadFile(filePath)
+	frontmatterBoundaries := detectFrontmatter(contents)
+	if err == nil && frontmatterBoundaries[0] == 0 {
+		templateData := struct {
+			Title string
+		}{}
+		if err := yaml.Unmarshal(contents[0:frontmatterBoundaries[1]], &templateData); err == nil && templateData.Title != "" {
+			return templateData.Title
+		}
+	}
+	return ""
+}
+
 // ExtractContents returns the template contents without the YAML front-matter
 func ExtractContents(filePath string) []byte {
 	contents, err := os.ReadFile(filePath)

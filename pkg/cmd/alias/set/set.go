@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -14,7 +14,7 @@ import (
 )
 
 type SetOptions struct {
-	Config func() (config.Config, error)
+	Config func() (gh.Config, error)
 	IO     *iostreams.IOStreams
 
 	Name              string
@@ -51,7 +51,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			invoked. This allows for chaining multiple commands via piping and redirection.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# note: Command Prompt on Windows requires using double quotes for arguments
+			# Note: Command Prompt on Windows requires using double quotes for arguments
 			$ gh alias set pv 'pr view'
 			$ gh pv -w 123  #=> gh pr view -w 123
 

@@ -29,16 +29,31 @@ func NewClient(httpClient *http.Client, hostname string, ios *iostreams.IOStream
 	}
 }
 
-func NewTestClient() *Client {
+// TestClientOpt is a test option for the test client.
+type TestClientOpt func(*Client)
+
+// WithPrompter is a test option to set the prompter for the test client.
+func WithPrompter(p iprompter) TestClientOpt {
+	return func(c *Client) {
+		c.prompter = p
+	}
+}
+
+func NewTestClient(opts ...TestClientOpt) *Client {
 	apiClient := &hostScopedClient{
 		hostname: "github.com",
 		Client:   api.NewClientFromHTTP(http.DefaultClient),
 	}
-	return &Client{
+	c := &Client{
 		apiClient: apiClient,
 		spinner:   false,
 		prompter:  nil,
 	}
+
+	for _, o := range opts {
+		o(c)
+	}
+	return c
 }
 
 type iprompter interface {
@@ -220,10 +235,11 @@ type FieldValueNodes struct {
 		Field ProjectField
 	} `graphql:"... on ProjectV2ItemFieldDateValue"`
 	ProjectV2ItemFieldIterationValue struct {
-		Title     string
-		StartDate string
-		Duration  int
-		Field     ProjectField
+		Title       string
+		StartDate   string
+		Duration    int
+		Field       ProjectField
+		IterationId string
 	} `graphql:"... on ProjectV2ItemFieldIterationValue"`
 	ProjectV2ItemFieldLabelValue struct {
 		Labels struct {
@@ -234,7 +250,7 @@ type FieldValueNodes struct {
 		Field ProjectField
 	} `graphql:"... on ProjectV2ItemFieldLabelValue"`
 	ProjectV2ItemFieldNumberValue struct {
-		Number float32
+		Number float64
 		Field  ProjectField
 	} `graphql:"... on ProjectV2ItemFieldNumberValue"`
 	ProjectV2ItemFieldSingleSelectValue struct {
@@ -385,6 +401,7 @@ func (p ProjectItem) DetailedItem() exportable {
 	switch p.Type() {
 	case "DraftIssue":
 		return DraftIssue{
+			ID:    p.Content.DraftIssue.ID,
 			Body:  p.Body(),
 			Title: p.Title(),
 		}
@@ -1353,6 +1370,82 @@ func (c *Client) Projects(login string, t OwnerType, limit int, fields bool) (Pr
 	}
 }
 
+type linkProjectToRepoMutation struct {
+	LinkProjectV2ToRepository struct {
+		ClientMutationId string `graphql:"clientMutationId"`
+	} `graphql:"linkProjectV2ToRepository(input:$input)"`
+}
+
+type linkProjectToTeamMutation struct {
+	LinkProjectV2ToTeam struct {
+		ClientMutationId string `graphql:"clientMutationId"`
+	} `graphql:"linkProjectV2ToTeam(input:$input)"`
+}
+
+type unlinkProjectFromRepoMutation struct {
+	UnlinkProjectV2FromRepository struct {
+		ClientMutationId string `graphql:"clientMutationId"`
+	} `graphql:"unlinkProjectV2FromRepository(input:$input)"`
+}
+
+type unlinkProjectFromTeamMutation struct {
+	UnlinkProjectV2FromTeam struct {
+		ClientMutationId string `graphql:"clientMutationId"`
+	} `graphql:"unlinkProjectV2FromTeam(input:$input)"`
+}
+
+// LinkProjectToRepository links a project to a repository.
+func (c *Client) LinkProjectToRepository(projectID string, repoID string) error {
+	var mutation linkProjectToRepoMutation
+	variables := map[string]interface{}{
+		"input": githubv4.LinkProjectV2ToRepositoryInput{
+			ProjectID:    githubv4.String(projectID),
+			RepositoryID: githubv4.ID(repoID),
+		},
+	}
+
+	return c.Mutate("LinkProjectV2ToRepository", &mutation, variables)
+}
+
+// LinkProjectToTeam links a project to a team.
+func (c *Client) LinkProjectToTeam(projectID string, teamID string) error {
+	var mutation linkProjectToTeamMutation
+	variables := map[string]interface{}{
+		"input": githubv4.LinkProjectV2ToTeamInput{
+			ProjectID: githubv4.String(projectID),
+			TeamID:    githubv4.ID(teamID),
+		},
+	}
+
+	return c.Mutate("LinkProjectV2ToTeam", &mutation, variables)
+}
+
+// UnlinkProjectFromRepository unlinks a project from a repository.
+func (c *Client) UnlinkProjectFromRepository(projectID string, repoID string) error {
+	var mutation unlinkProjectFromRepoMutation
+	variables := map[string]interface{}{
+		"input": githubv4.UnlinkProjectV2FromRepositoryInput{
+			ProjectID:    githubv4.String(projectID),
+			RepositoryID: githubv4.ID(repoID),
+		},
+	}
+
+	return c.Mutate("UnlinkProjectV2FromRepository", &mutation, variables)
+}
+
+// UnlinkProjectFromTeam unlinks a project from a team.
+func (c *Client) UnlinkProjectFromTeam(projectID string, teamID string) error {
+	var mutation unlinkProjectFromTeamMutation
+	variables := map[string]interface{}{
+		"input": githubv4.UnlinkProjectV2FromTeamInput{
+			ProjectID: githubv4.String(projectID),
+			TeamID:    githubv4.ID(teamID),
+		},
+	}
+
+	return c.Mutate("UnlinkProjectV2FromTeam", &mutation, variables)
+}
+
 func handleError(err error) error {
 	var gerr api.GraphQLError
 	if errors.As(err, &gerr) {
@@ -1396,9 +1489,10 @@ func projectFieldValueData(v FieldValueNodes) interface{} {
 		return v.ProjectV2ItemFieldDateValue.Date
 	case "ProjectV2ItemFieldIterationValue":
 		return map[string]interface{}{
-			"title":     v.ProjectV2ItemFieldIterationValue.Title,
-			"startDate": v.ProjectV2ItemFieldIterationValue.StartDate,
-			"duration":  v.ProjectV2ItemFieldIterationValue.Duration,
+			"title":       v.ProjectV2ItemFieldIterationValue.Title,
+			"startDate":   v.ProjectV2ItemFieldIterationValue.StartDate,
+			"duration":    v.ProjectV2ItemFieldIterationValue.Duration,
+			"iterationId": v.ProjectV2ItemFieldIterationValue.IterationId,
 		}
 	case "ProjectV2ItemFieldNumberValue":
 		return v.ProjectV2ItemFieldNumberValue.Number

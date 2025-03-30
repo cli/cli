@@ -1,0 +1,129 @@
+#!/bin/zsh
+set -e
+
+print_help() {
+    cat <<EOF
+To build a universal pkg for macOS:
+  script/pkgmacos <tag-name>
+
+To build and sign set APPLE_DEVELOPER_INSTALLER_ID environment variable before.
+For example, if you have a signing identity with the identifier 
+"Developer ID Installer: Your Name (ABC123DEF)" set it in the variable.
+EOF
+}
+
+if [ $# -eq 0 ]; then
+  print_help >&2
+  exit 1
+fi
+
+tag_name=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+  -h | --help )
+    print_help
+    exit 0
+    ;;
+  -* )
+    printf "unrecognized flag: %s\n" "$1" >&2
+    exit 1
+    ;;
+  * )
+    tag_name="${1#v}"
+    shift 1
+    ;;
+  esac
+done
+
+# check os requirements: is running macOS 12+ and pkgbuild + productbuild are available
+os_version=$(sw_vers -productVersion)
+major_version=${os_version%%.*}
+
+if (( major_version < 12 )); then
+  echo "This script requires macOS 12 or later. You are running macOS ${os_version}." >&2
+  exit 1
+fi
+
+if ! command -v pkgbuild &> /dev/null; then
+  echo "pkgbuild could not be found. Please install Xcode Command Line Tools." >&2
+  exit 1
+fi
+
+if ! command -v productbuild &> /dev/null; then
+  echo "productbuild could not be found. Please install Xcode Command Line Tools." >&2
+  exit 1
+fi
+# end of os requirements check
+
+# gh-binary paths
+bin_path="/bin/gh"
+arm64_bin="./dist/macos_darwin_arm64$bin_path"
+amd64_bin="./dist/macos_darwin_amd64_v1$bin_path"
+# payload paths
+payload_root="pkg_payload"
+payload_local_bin="${payload_root}/usr/local/bin"
+payload_zsh_site_functions="${payload_root}/usr/local/share/zsh/site-functions"
+payload_man1="${payload_root}/usr/local/share/man/man1"
+
+merge_binaries() {
+    lipo -create -output "${payload_local_bin}/gh" "$arm64_bin" "$amd64_bin"
+}
+
+build_pkg() {
+  # setup payload
+  mkdir -p "${payload_local_bin}"
+  mkdir -p "${payload_man1}"
+  mkdir -p "${payload_zsh_site_functions}"
+
+  # copy man pages
+  for file in ./share/man/man1/gh*.1; do
+    cp "$file" "${payload_man1}"
+  done
+  # Include only Zsh completions,
+  # the recommended/only option on macOS since Catalina for default shell.
+  cp "./share/zsh/site-functions/_gh" "${payload_zsh_site_functions}"
+
+  # merge binaries
+  merge_binaries
+
+  # build pkg
+  pkgbuild \
+    --root "$payload_root" \
+    --identifier "com.github.cli" \
+    --version "$tag_name" \
+    --install-location "/" \
+    "./dist/com.github.cli.pkg"
+
+  # setup resources
+  mkdir -p "./build/macOS/resources"
+  cp "LICENSE" "./build/macOS/resources"
+
+  PRODUCTBUILD_ARGS=()
+
+  # include signing if developer id is set
+  if [ -n "$APPLE_DEVELOPER_INSTALLER_ID" ]; then
+    PRODUCTBUILD_ARGS+=("--timestamp")
+    PRODUCTBUILD_ARGS+=("--sign")
+    PRODUCTBUILD_ARGS+=("${APPLE_DEVELOPER_INSTALLER_ID}")
+  else
+    echo "skipping macOS pkg code-signing; APPLE_DEVELOPER_INSTALLER_ID not set" >&2
+  fi
+
+  # build distribution
+  productbuild \
+    --distribution "./build/macOS/distribution.xml" \
+    --resources "./build/macOS/resources" \
+    --package-path "./dist" \
+    "${PRODUCTBUILD_ARGS[@]}" \
+    "./dist/gh_${tag_name}_macOS_universal.pkg"
+}
+
+cleanup() {
+  # remove temp installer so it does not get uploaded
+  rm -f "./dist/com.github.cli.pkg"
+}
+
+trap cleanup EXIT
+
+build_pkg

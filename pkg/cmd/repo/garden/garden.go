@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -90,7 +90,7 @@ type GardenOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 
 	RepoArg string
 }
@@ -236,16 +236,15 @@ func gardenRun(opts *GardenOptions) error {
 		}
 	}()
 
-mainLoop:
 	for {
 		oldX := player.X
 		oldY := player.Y
 
 		d := <-dirc
 		if d == Quit {
-			break mainLoop
+			break
 		} else if !player.move(d) {
-			continue mainLoop
+			continue
 		}
 
 		underPlayer := garden[player.Y][player.X]

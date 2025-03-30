@@ -8,29 +8,46 @@ import (
 	"github.com/mgutz/ansi"
 )
 
+const (
+	NoTheme        = "none"
+	DarkTheme      = "dark"
+	LightTheme     = "light"
+	highlightStyle = "black:yellow"
+)
+
+// Special cases like darkThemeTableHeader / lightThemeTableHeader are necessary when using color and modifiers
+// (bold, underline, dim) because ansi.ColorFunc requires a foreground color and resets formats.
 var (
-	magenta            = ansi.ColorFunc("magenta")
-	cyan               = ansi.ColorFunc("cyan")
-	red                = ansi.ColorFunc("red")
-	yellow             = ansi.ColorFunc("yellow")
-	blue               = ansi.ColorFunc("blue")
-	green              = ansi.ColorFunc("green")
-	gray               = ansi.ColorFunc("black+h")
-	lightGrayUnderline = ansi.ColorFunc("white+du")
-	bold               = ansi.ColorFunc("default+b")
-	cyanBold           = ansi.ColorFunc("cyan+b")
-	greenBold          = ansi.ColorFunc("green+b")
+	magenta               = ansi.ColorFunc("magenta")
+	cyan                  = ansi.ColorFunc("cyan")
+	red                   = ansi.ColorFunc("red")
+	yellow                = ansi.ColorFunc("yellow")
+	blue                  = ansi.ColorFunc("blue")
+	green                 = ansi.ColorFunc("green")
+	gray                  = ansi.ColorFunc("black+h")
+	bold                  = ansi.ColorFunc("default+b")
+	cyanBold              = ansi.ColorFunc("cyan+b")
+	greenBold             = ansi.ColorFunc("green+b")
+	highlightStart        = ansi.ColorCode(highlightStyle)
+	highlight             = ansi.ColorFunc(highlightStyle)
+	darkThemeTableHeader  = ansi.ColorFunc("white+du")
+	lightThemeTableHeader = ansi.ColorFunc("black+hu")
+	noThemeTableHeader    = ansi.ColorFunc("default+u")
 
 	gray256 = func(t string) string {
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
 	}
 )
 
-func NewColorScheme(enabled, is256enabled bool, trueColor bool) *ColorScheme {
+// NewColorScheme initializes color logic based on provided terminal capabilities.
+// Logic dealing with terminal theme detected, such as whether color is enabled, 8-bit color supported, true color supported,
+// and terminal theme detected.
+func NewColorScheme(enabled, is256enabled, trueColor bool, theme string) *ColorScheme {
 	return &ColorScheme{
 		enabled:      enabled,
 		is256enabled: is256enabled,
 		hasTrueColor: trueColor,
+		theme:        theme,
 	}
 }
 
@@ -38,6 +55,7 @@ type ColorScheme struct {
 	enabled      bool
 	is256enabled bool
 	hasTrueColor bool
+	theme        string
 }
 
 func (c *ColorScheme) Enabled() bool {
@@ -109,13 +127,6 @@ func (c *ColorScheme) Grayf(t string, args ...interface{}) string {
 	return c.Gray(fmt.Sprintf(t, args...))
 }
 
-func (c *ColorScheme) LightGrayUnderline(t string) string {
-	if !c.enabled {
-		return t
-	}
-	return lightGrayUnderline(t)
-}
-
 func (c *ColorScheme) Magenta(t string) string {
 	if !c.enabled {
 		return t
@@ -176,6 +187,30 @@ func (c *ColorScheme) FailureIconWithColor(colo func(string) string) string {
 	return colo("X")
 }
 
+func (c *ColorScheme) HighlightStart() string {
+	if !c.enabled {
+		return ""
+	}
+
+	return highlightStart
+}
+
+func (c *ColorScheme) Highlight(t string) string {
+	if !c.enabled {
+		return t
+	}
+
+	return highlight(t)
+}
+
+func (c *ColorScheme) Reset() string {
+	if !c.enabled {
+		return ""
+	}
+
+	return ansi.Reset
+}
+
 func (c *ColorScheme) ColorFromString(s string) func(string) string {
 	s = strings.ToLower(s)
 	var fn func(string) string
@@ -223,4 +258,20 @@ func (c *ColorScheme) HexToRGB(hex string, x string) string {
 	g, _ := strconv.ParseInt(hex[2:4], 16, 64)
 	b, _ := strconv.ParseInt(hex[4:6], 16, 64)
 	return fmt.Sprintf("\033[38;2;%d;%d;%dm%s\033[0m", r, g, b, x)
+}
+
+func (c *ColorScheme) TableHeader(t string) string {
+	// Table headers are only stylized if color is enabled including underline modifier.
+	if !c.enabled {
+		return t
+	}
+
+	switch c.theme {
+	case DarkTheme:
+		return darkThemeTableHeader(t)
+	case LightTheme:
+		return lightThemeTableHeader(t)
+	default:
+		return noThemeTableHeader(t)
+	}
 }

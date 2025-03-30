@@ -255,7 +255,7 @@ func Test_listRun(t *testing.T) {
 			opts: ListOptions{
 				WebMode: true,
 			},
-			wantStdout: "Opening github.com/OWNER/REPO/rules in your browser.\n",
+			wantStdout: "Opening https://github.com/OWNER/REPO/rules in your browser.\n",
 			wantStderr: "",
 			wantBrowse: "https://github.com/OWNER/REPO/rules",
 		},
@@ -266,7 +266,7 @@ func Test_listRun(t *testing.T) {
 				WebMode:      true,
 				Organization: "my-org",
 			},
-			wantStdout: "Opening github.com/organizations/my-org/settings/rules in your browser.\n",
+			wantStdout: "Opening https://github.com/organizations/my-org/settings/rules in your browser.\n",
 			wantStderr: "",
 			wantBrowse: "https://github.com/organizations/my-org/settings/rules",
 		},

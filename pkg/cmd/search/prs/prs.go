@@ -36,26 +36,29 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 
 			GitHub search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-issues-and-pull-requests>
-    `),
+		`),
 		Example: heredoc.Doc(`
-			# search pull requests matching set of keywords "fix" and "bug"
+			# Search pull requests matching set of keywords "fix" and "bug"
 			$ gh search prs fix bug
 
-			# search draft pull requests in cli repository
+			# Search draft pull requests in cli repository
 			$ gh search prs --repo=cli/cli --draft
 
-			# search open pull requests requesting your review
+			# Search open pull requests requesting your review
 			$ gh search prs --review-requested=@me --state=open
 
-			# search merged pull requests assigned to yourself
+			# Search merged pull requests assigned to yourself
 			$ gh search prs --assignee=@me --merged
 
-			# search pull requests with numerous reactions
+			# Search pull requests with numerous reactions
 			$ gh search prs --reactions=">100"
 
-			# search pull requests without label "bug"
+			# Search pull requests without label "bug"
 			$ gh search prs -- -label:bug
-    `),
+
+			# Search pull requests only from un-archived repositories (default is all repositories)
+			$ gh search prs --owner github --archived=false
+		`),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
 				return cmdutil.FlagErrorf("specify search keywords or flags")
@@ -145,7 +148,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 
 	// Issue query qualifier flags
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
-	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Restrict search to archived repositories")
+	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Filter based on the repository archived state {true|false}")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Assignee, "assignee", "", "Filter by assignee")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Author, "author", "", "Filter by author")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Closed, "closed", "", "Filter on closed at `date`")
@@ -165,7 +168,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	cmd.Flags().BoolVar(&noLabel, "no-label", false, "Filter on missing label")
 	cmd.Flags().BoolVar(&noMilestone, "no-milestone", false, "Filter on missing milestone")
 	cmd.Flags().BoolVar(&noProject, "no-project", false, "Filter on missing project")
-	cmd.Flags().StringVar(&opts.Query.Qualifiers.Project, "project", "", "Filter on project board `number`")
+	cmd.Flags().StringVar(&opts.Query.Qualifiers.Project, "project", "", "Filter on project board `owner/number`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Reactions, "reactions", "", "Filter on `number` of reactions")
 	cmd.Flags().StringSliceVarP(&opts.Query.Qualifiers.Repo, "repo", "R", nil, "Filter on repository")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Qualifiers.State, "state", "", "", []string{"open", "closed"}, "Filter based on state")

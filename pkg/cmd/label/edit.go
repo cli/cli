@@ -42,10 +42,10 @@ func newCmdEdit(f *cmdutil.Factory, runF func(*editOptions) error) *cobra.Comman
 			The label color needs to be 6 character hex value.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# update the color of the bug label
+			# Update the color of the bug label
 			$ gh label edit bug --color FF0000
 
-			# rename and edit the description of the bug label
+			# Rename and edit the description of the bug label
 			$ gh label edit bug --name big-bug --description "Bigger than normal bug"
 		`),
 		Args: cmdutil.ExactArgs(1, "cannot update label: name argument required"),

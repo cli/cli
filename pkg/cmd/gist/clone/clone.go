@@ -7,18 +7,19 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 type CloneOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	IO         *iostreams.IOStreams
 
 	GitArgs   []string
@@ -80,7 +81,7 @@ func cloneRun(opts *CloneOptions) error {
 			return err
 		}
 		hostname, _ := cfg.Authentication().DefaultHost()
-		protocol := cfg.GitProtocol(hostname)
+		protocol := cfg.GitProtocol(hostname).Value
 		gistURL = formatRemoteURL(hostname, gistURL, protocol)
 	}
 
@@ -93,7 +94,7 @@ func cloneRun(opts *CloneOptions) error {
 }
 
 func formatRemoteURL(hostname string, gistID string, protocol string) string {
-	if ghinstance.IsEnterprise(hostname) {
+	if ghauth.IsEnterprise(hostname) {
 		if protocol == "ssh" {
 			return fmt.Sprintf("git@%s:gist/%s.git", hostname, gistID)
 		}

@@ -366,7 +366,7 @@ func (s *IOStreams) TerminalWidth() int {
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
-	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256(), s.HasTrueColor())
+	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256(), s.HasTrueColor(), s.TerminalTheme())
 }
 
 func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
@@ -524,7 +524,7 @@ func (w *fdWriteCloser) Fd() uintptr {
 	return w.fd
 }
 
-// fdWriter represents a wrapped stdin ReadCloser that preserves the original file descriptor
+// fdReader represents a wrapped stdin ReadCloser that preserves the original file descriptor
 type fdReader struct {
 	io.ReadCloser
 	fd uintptr

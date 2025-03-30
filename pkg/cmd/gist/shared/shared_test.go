@@ -93,12 +93,15 @@ func TestIsBinaryContents(t *testing.T) {
 }
 
 func TestPromptGists(t *testing.T) {
+	sixHours, _ := time.ParseDuration("6h")
+	sixHoursAgo := time.Now().Add(-sixHours)
+	sixHoursAgoFormatted := sixHoursAgo.Format(time.RFC3339Nano)
+
 	tests := []struct {
 		name          string
 		prompterStubs func(pm *prompter.MockPrompter)
 		response      string
-		wantOut       string
-		gist          *Gist
+		wantOut       Gist
 		wantErr       bool
 	}{
 		{
@@ -112,21 +115,21 @@ func TestPromptGists(t *testing.T) {
 			},
 			response: `{ "data": { "viewer": { "gists": { "nodes": [
 							{
-								"name": "gistid1",
+								"name": "1234",
 								"files": [{ "name": "cool.txt" }],
 								"description": "",
 								"updatedAt": "%[1]v",
 								"isPublic": true
 							},
 							{
-								"name": "gistid2",
+								"name": "5678",
 								"files": [{ "name": "gistfile0.txt" }],
 								"description": "",
 								"updatedAt": "%[1]v",
 								"isPublic": true
 							}
 						] } } } }`,
-			wantOut: "gistid1",
+			wantOut: Gist{ID: "1234", Files: map[string]*GistFile{"cool.txt": {Filename: "cool.txt"}}, UpdatedAt: sixHoursAgo, Public: true},
 		},
 		{
 			name: "multiple files, select second gist",
@@ -139,26 +142,26 @@ func TestPromptGists(t *testing.T) {
 			},
 			response: `{ "data": { "viewer": { "gists": { "nodes": [
 							{
-								"name": "gistid1",
+								"name": "1234",
 								"files": [{ "name": "cool.txt" }],
 								"description": "",
 								"updatedAt": "%[1]v",
 								"isPublic": true
 							},
 							{
-								"name": "gistid2",
+								"name": "5678",
 								"files": [{ "name": "gistfile0.txt" }],
 								"description": "",
 								"updatedAt": "%[1]v",
 								"isPublic": true
 							}
 						] } } } }`,
-			wantOut: "gistid2",
+			wantOut: Gist{ID: "5678", Files: map[string]*GistFile{"gistfile0.txt": {Filename: "gistfile0.txt"}}, UpdatedAt: sixHoursAgo, Public: true},
 		},
 		{
 			name:     "no files",
 			response: `{ "data": { "viewer": { "gists": { "nodes": [] } } } }`,
-			wantOut:  "",
+			wantOut:  Gist{},
 		},
 	}
 
@@ -166,15 +169,12 @@ func TestPromptGists(t *testing.T) {
 
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
-
 		const query = `query GistList\b`
-		sixHours, _ := time.ParseDuration("6h")
-		sixHoursAgo := time.Now().Add(-sixHours)
 		reg.Register(
 			httpmock.GraphQL(query),
 			httpmock.StringResponse(fmt.Sprintf(
 				tt.response,
-				sixHoursAgo.Format(time.RFC3339),
+				sixHoursAgoFormatted,
 			)),
 		)
 		client := &http.Client{Transport: reg}
@@ -185,9 +185,9 @@ func TestPromptGists(t *testing.T) {
 				tt.prompterStubs(mockPrompter)
 			}
 
-			gistID, err := PromptGists(mockPrompter, client, "github.com", ios.ColorScheme())
+			gist, err := PromptGists(mockPrompter, client, "github.com", ios.ColorScheme())
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantOut, gistID)
+			assert.Equal(t, tt.wantOut.ID, gist.ID)
 			reg.Verify(t)
 		})
 	}

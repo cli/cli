@@ -11,7 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -29,7 +29,7 @@ type iprompter interface {
 
 type CreateOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -60,6 +60,7 @@ type CreateOptions struct {
 	NotesStartTag      string
 	VerifyTag          bool
 	NotesFromTag       bool
+	FailOnNoCommits    bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -77,7 +78,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
 
-		Use:   "create [<tag>] [<files>...]",
+		Use:   "create [<tag>] [<filename>... | <pattern>...]",
 		Short: "Create a new release",
 		Long: heredoc.Docf(`
 			Create a new GitHub Release for a repository.
@@ -99,31 +100,45 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			When using automatically generated release notes, a release title will also be automatically
 			generated unless a title was explicitly passed. Additional release notes can be prepended to
 			automatically generated notes by using the %[1]s--notes%[1]s flag.
+
+			By default, the release is created even if there are no new commits since the last release.
+			This may result in the same or duplicate release which may not be desirable in some cases.
+			Use %[1]s--fail-on-no-commits%[1]s to fail if no new commits are available. This flag has no
+			effect if there are no existing releases or this is the very first release.
 		`, "`"),
 		Example: heredoc.Doc(`
-			Interactively create a release
+			# Interactively create a release
 			$ gh release create
 
-			Interactively create a release from specific tag
+			# Interactively create a release from specific tag
 			$ gh release create v1.2.3
 
-			Non-interactively create a release
+			# Non-interactively create a release
 			$ gh release create v1.2.3 --notes "bugfix release"
 
-			Use automatically generated release notes
+			# Use automatically generated release notes
 			$ gh release create v1.2.3 --generate-notes
 
-			Use release notes from a file
-			$ gh release create v1.2.3 -F changelog.md
+			# Use release notes from a file
+			$ gh release create v1.2.3 -F release-notes.md
 
-			Upload all tarballs in a directory as release assets
+			# Use annotated tag notes
+			$ gh release create v1.2.3 --notes-from-tag
+
+			# Don't mark the release as latest
+			$ gh release create v1.2.3 --latest=false
+
+			# Upload all tarballs in a directory as release assets
 			$ gh release create v1.2.3 ./dist/*.tgz
 
-			Upload a release asset with a display label
+			# Upload a release asset with a display label
 			$ gh release create v1.2.3 '/path/to/asset.zip#My display label'
 
-			Create a release and start a discussion
+			# Create a release and start a discussion
 			$ gh release create v1.2.3 --discussion-category "General"
+
+			# Create a release only if there are new commits available since the last release
+			$ gh release create v1.2.3 --fail-on-no-commits
 		`),
 		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -178,16 +193,17 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVarP(&opts.Draft, "draft", "d", false, "Save the release as a draft instead of publishing it")
 	cmd.Flags().BoolVarP(&opts.Prerelease, "prerelease", "p", false, "Mark the release as a prerelease")
-	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
+	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default [main branch])")
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
-	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
+	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default [automatic based on date and version]). --latest=false to explicitly NOT set as latest")
 	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
 	cmd.Flags().BoolVarP(&opts.NotesFromTag, "notes-from-tag", "", false, "Automatically generate notes from annotated tag")
+	cmd.Flags().BoolVar(&opts.FailOnNoCommits, "fail-on-no-commits", false, "Fail if there are no commits since the last release (no impact on the first release)")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
 
@@ -203,6 +219,16 @@ func createRun(opts *CreateOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
+	}
+
+	if opts.FailOnNoCommits {
+		isNew, err := isNewRelease(httpClient, baseRepo)
+		if err != nil {
+			return fmt.Errorf("failed to check whether there were new commits since last release: %v", err)
+		}
+		if !isNew {
+			return fmt.Errorf("no new commits since the last release")
+		}
 	}
 
 	var existingTag bool
@@ -471,6 +497,21 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	newRelease, err := createRelease(httpClient, baseRepo, params)
+
+	var errMissingRequiredWorkflowScope *errMissingRequiredWorkflowScope
+	if errors.As(err, &errMissingRequiredWorkflowScope) {
+		host := errMissingRequiredWorkflowScope.Hostname
+		refreshInstructions := fmt.Sprintf("gh auth refresh -h %[1]s -s workflow", host)
+		cs := opts.IO.ColorScheme()
+
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("%s Failed to create release, \"workflow\" scope may be required.\n", cs.WarningIcon()))
+		sb.WriteString(fmt.Sprintf("To request it, run:\n%s\n", cs.Bold(refreshInstructions)))
+		fmt.Fprint(opts.IO.ErrOut, sb.String())
+
+		return cmdutil.SilentError
+	}
+
 	if err != nil {
 		return err
 	}
@@ -513,12 +554,38 @@ func createRun(opts *CreateOptions) error {
 }
 
 func gitTagInfo(client *git.Client, tagName string) (string, error) {
-	cmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
+	contentCmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents)")
 	if err != nil {
 		return "", err
 	}
-	b, err := cmd.Output()
-	return string(b), err
+	content, err := contentCmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	// If there is a signature, we should strip it from the end of the content.
+	// Note that, we can achieve this by looking for markers like "-----BEGIN PGP
+	// SIGNATURE-----" and cut the remaining text from the content, but this is
+	// not a safe approach, because, although unlikely, the content can contain
+	// a signature-like section which we shouldn't leave it as is. So, we need
+	// to get the tag signature as a whole, if any, and remote it from the content.
+	signatureCmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:signature)")
+	if err != nil {
+		return "", err
+	}
+	signature, err := signatureCmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	if len(signature) == 0 {
+		// The tag annotation content has no trailing signature to strip out,
+		// so we return the entire content.
+		return string(content), nil
+	}
+
+	body, _ := strings.CutSuffix(string(content), "\n"+string(signature))
+	return body, nil
 }
 
 func detectPreviousTag(client *git.Client, headRef string) (string, error) {

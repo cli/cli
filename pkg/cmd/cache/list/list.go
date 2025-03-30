@@ -27,6 +27,8 @@ type ListOptions struct {
 	Limit int
 	Order string
 	Sort  string
+	Key   string
+	Ref   string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -37,16 +39,25 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List Github Actions caches",
+		Short: "List GitHub Actions caches",
 		Example: heredoc.Doc(`
-		# List caches for current repository
-		$ gh cache list
+			# List caches for current repository
+			$ gh cache list
 
-		# List caches for specific repository
-		$ gh cache list --repo cli/cli
+			# List caches for specific repository
+			$ gh cache list --repo cli/cli
 
-		# List caches sorted by least recently accessed
-		$ gh cache list --sort last_accessed_at --order asc
+			# List caches sorted by least recently accessed
+			$ gh cache list --sort last_accessed_at --order asc
+
+			# List caches that have keys matching a prefix (or that match exactly)
+			$ gh cache list --key key-prefix
+
+			# List caches for a specific branch, replace <branch-name> with the actual branch name
+			$ gh cache list --ref refs/heads/<branch-name>
+
+			# List caches for a specific pull request, replace <pr-number> with the actual pull request number
+			$ gh cache list --ref refs/pull/<pr-number>/merge
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -69,6 +80,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of caches to fetch")
 	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "O", "desc", []string{"asc", "desc"}, "Order of caches returned")
 	cmdutil.StringEnumFlag(cmd, &opts.Sort, "sort", "S", "last_accessed_at", []string{"created_at", "last_accessed_at", "size_in_bytes"}, "Sort fetched caches")
+	cmd.Flags().StringVarP(&opts.Key, "key", "k", "", "Filter by cache key prefix")
+	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "Filter by ref, formatted as refs/heads/<branch name> or refs/pull/<number>/merge")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.CacheFields)
 
 	return cmd
@@ -87,13 +100,13 @@ func listRun(opts *ListOptions) error {
 	client := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	result, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order})
+	result, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order, Key: opts.Key, Ref: opts.Ref})
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("%s Failed to get caches: %w", opts.IO.ColorScheme().FailureIcon(), err)
 	}
 
-	if len(result.ActionsCaches) == 0 {
+	if len(result.ActionsCaches) == 0 && opts.Exporter == nil {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("No caches found in %s", ghrepo.FullName(repo)))
 	}
 

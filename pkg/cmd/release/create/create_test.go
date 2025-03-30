@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
@@ -50,17 +52,18 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "",
 			isTTY: true,
 			want: CreateOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        false,
-				Prerelease:   false,
-				RepoOverride: "",
-				Concurrency:  5,
-				Assets:       []*shared.AssetForUpload(nil),
-				VerifyTag:    false,
+				TagName:         "",
+				Target:          "",
+				Name:            "",
+				Body:            "",
+				BodyProvided:    false,
+				Draft:           false,
+				Prerelease:      false,
+				RepoOverride:    "",
+				Concurrency:     5,
+				Assets:          []*shared.AssetForUpload(nil),
+				VerifyTag:       false,
+				FailOnNoCommits: false,
 			},
 		},
 		{
@@ -74,17 +77,18 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3",
 			isTTY: true,
 			want: CreateOptions{
-				TagName:      "v1.2.3",
-				Target:       "",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        false,
-				Prerelease:   false,
-				RepoOverride: "",
-				Concurrency:  5,
-				Assets:       []*shared.AssetForUpload(nil),
-				VerifyTag:    false,
+				TagName:         "v1.2.3",
+				Target:          "",
+				Name:            "",
+				Body:            "",
+				BodyProvided:    false,
+				Draft:           false,
+				Prerelease:      false,
+				RepoOverride:    "",
+				Concurrency:     5,
+				Assets:          []*shared.AssetForUpload(nil),
+				VerifyTag:       false,
+				FailOnNoCommits: false,
 			},
 		},
 		{
@@ -345,6 +349,19 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY:   false,
 			wantErr: "using `--notes-from-tag` with `--generate-notes` or `--notes-start-tag` is not supported",
 		},
+		{
+			name:  "with --fail-on-no-commits",
+			args:  "v1.2.3 --fail-on-no-commits",
+			isTTY: false,
+			want: CreateOptions{
+				TagName:         "v1.2.3",
+				BodyProvided:    false,
+				Concurrency:     5,
+				Assets:          []*shared.AssetForUpload(nil),
+				NotesFromTag:    false,
+				FailOnNoCommits: true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -400,6 +417,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.IsLatest, opts.IsLatest)
 			assert.Equal(t, tt.want.VerifyTag, opts.VerifyTag)
 			assert.Equal(t, tt.want.NotesFromTag, opts.NotesFromTag)
+			assert.Equal(t, tt.want.FailOnNoCommits, opts.FailOnNoCommits)
 
 			require.Equal(t, len(tt.want.Assets), len(opts.Assets))
 			for i := range tt.want.Assets {
@@ -411,6 +429,14 @@ func Test_NewCmdCreate(t *testing.T) {
 }
 
 func Test_createRun(t *testing.T) {
+	const contentCmd = `git tag --list .* --format=%\(contents\)`
+	const signatureCmd = `git tag --list .* --format=%\(contents:signature\)`
+
+	defaultRunStubs := func(rs *run.CommandStubber) {
+		rs.Register(contentCmd, 0, "")
+		rs.Register(signatureCmd, 0, "")
+	}
+
 	tests := []struct {
 		name       string
 		isTTY      bool
@@ -431,9 +457,7 @@ func Test_createRun(t *testing.T) {
 				BodyProvided: true,
 				Target:       "",
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
@@ -453,6 +477,100 @@ func Test_createRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
+			name:  "create a release if there are new commits and the last release does not exist",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:         "v1.2.3",
+				Name:            "The Big 1.2",
+				Body:            "* Fixed bugs",
+				BodyProvided:    true,
+				Target:          "",
+				FailOnNoCommits: true,
+			},
+			runStubs: defaultRunStubs,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"), httpmock.StatusStringResponse(404, `{
+					"message": "Not Found",
+					"documentation_url": "https://docs.github.com/rest/releases/releases#get-the-latest-release",
+					"status": "404"
+				}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
+						"name":       "The Big 1.2",
+						"body":       "* Fixed bugs",
+						"draft":      false,
+						"prerelease": false,
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: ``,
+		},
+		{
+			name:  "create a release if there are new commits and the last release exists",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:         "v1.2.3",
+				Name:            "The Big 1.2",
+				Body:            "* Fixed bugs",
+				BodyProvided:    true,
+				Target:          "",
+				FailOnNoCommits: true,
+			},
+			runStubs: defaultRunStubs,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"), httpmock.StatusStringResponse(200, `{
+					"tag_name": "v1.2.2"
+				}`))
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/compare/v1.2.2...HEAD"), httpmock.StatusStringResponse(200, `{
+						"status": "ahead"
+				}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
+						"name":       "The Big 1.2",
+						"body":       "* Fixed bugs",
+						"draft":      false,
+						"prerelease": false,
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: ``,
+		},
+		{
+			name:  "create a release if there are no new commits but the last release exists",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:         "v1.2.3",
+				Name:            "The Big 1.2",
+				Body:            "* Fixed bugs",
+				BodyProvided:    true,
+				Target:          "",
+				FailOnNoCommits: true,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"), httpmock.StatusStringResponse(200, `{
+					"tag_name": "v1.2.2"
+				}`))
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/compare/v1.2.2...HEAD"), httpmock.StatusStringResponse(200, `{
+					"status": "identical"
+				}`))
+			},
+			wantErr:    "no new commits since the last release",
+			wantStdout: "",
+			wantStderr: ``,
+		},
+		{
 			name:  "with discussion category",
 			isTTY: true,
 			opts: CreateOptions{
@@ -463,9 +581,7 @@ func Test_createRun(t *testing.T) {
 				Target:             "",
 				DiscussionCategory: "General",
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
@@ -495,9 +611,7 @@ func Test_createRun(t *testing.T) {
 				BodyProvided: true,
 				Target:       "main",
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
@@ -526,9 +640,7 @@ func Test_createRun(t *testing.T) {
 				Draft:        true,
 				Target:       "",
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
@@ -557,9 +669,7 @@ func Test_createRun(t *testing.T) {
 				BodyProvided:  true,
 				GenerateNotes: false,
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
@@ -588,9 +698,7 @@ func Test_createRun(t *testing.T) {
 				BodyProvided:  true,
 				GenerateNotes: true,
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
@@ -620,9 +728,7 @@ func Test_createRun(t *testing.T) {
 				GenerateNotes: true,
 				NotesStartTag: "v1.1.0",
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.RESTPayload(200, `{
@@ -663,9 +769,7 @@ func Test_createRun(t *testing.T) {
 				GenerateNotes: true,
 				NotesStartTag: "v1.1.0",
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.RESTPayload(200, `{
@@ -714,9 +818,7 @@ func Test_createRun(t *testing.T) {
 				},
 				Concurrency: 1,
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
@@ -775,9 +877,7 @@ func Test_createRun(t *testing.T) {
 				},
 				Concurrency: 1,
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
@@ -837,9 +937,7 @@ func Test_createRun(t *testing.T) {
 				},
 				Concurrency: 1,
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(200, ``))
 			},
@@ -867,9 +965,7 @@ func Test_createRun(t *testing.T) {
 				},
 				Concurrency: 1,
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
@@ -904,9 +1000,7 @@ func Test_createRun(t *testing.T) {
 				},
 				Concurrency: 1,
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
@@ -942,9 +1036,7 @@ func Test_createRun(t *testing.T) {
 				},
 				Concurrency: 1,
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(200, ``))
 			},
@@ -973,9 +1065,7 @@ func Test_createRun(t *testing.T) {
 				DiscussionCategory: "general",
 				Concurrency:        1,
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
@@ -1026,7 +1116,8 @@ func Test_createRun(t *testing.T) {
 				NotesFromTag: true,
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "some tag message")
+				rs.Register(contentCmd, 0, "some tag message")
+				rs.Register(signatureCmd, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -1063,7 +1154,8 @@ func Test_createRun(t *testing.T) {
 				NotesFromTag: true,
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "some tag message")
+				rs.Register(contentCmd, 0, "some tag message")
+				rs.Register(signatureCmd, 0, "")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -1098,10 +1190,76 @@ func Test_createRun(t *testing.T) {
 				Assets:       []*shared.AssetForUpload(nil),
 				NotesFromTag: true,
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "")
+			runStubs: defaultRunStubs,
+			wantErr:  "cannot generate release notes from tag v1.2.3 as it does not exist locally",
+		},
+		{
+			name:  "API returns 404, OAuth token has no workflow scope",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName: "Does not matter",
 			},
-			wantErr: "cannot generate release notes from tag v1.2.3 as it does not exist locally",
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(contentCmd, 0, "some tag message")
+				rs.Register(signatureCmd, 0, "")
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+					httpmock.StatusScopesResponder(404, `repo,read:org`))
+			},
+			wantStderr: heredoc.Doc(`
+				! Failed to create release, "workflow" scope may be required.
+				To request it, run:
+				gh auth refresh -h github.com -s workflow
+			`),
+			wantErr: cmdutil.SilentError.Error(),
+		},
+		{
+			name:  "API returns 404, OAuth token has workflow scope",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName: "Does not matter",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(contentCmd, 0, "some tag message")
+				rs.Register(signatureCmd, 0, "")
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+					httpmock.StatusScopesResponder(404, `repo,read:org,workflow`))
+			},
+			wantErr: "HTTP 404 (https://api.github.com/repos/OWNER/REPO/releases)",
+		},
+		{
+			name:  "API returns 404, not an OAuth token",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName: "Does not matter",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(contentCmd, 0, "some tag message")
+				rs.Register(signatureCmd, 0, "")
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+					httpmock.StatusStringResponse(404, `HTTP 404 (https://api.github.com/repos/OWNER/REPO/releases)`))
+			},
+			wantErr: "HTTP 404 (https://api.github.com/repos/OWNER/REPO/releases)",
 		},
 	}
 	for _, tt := range tests {
@@ -1136,7 +1294,6 @@ func Test_createRun(t *testing.T) {
 			err := createRun(&tt.opts)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
-				return
 			} else {
 				require.NoError(t, err)
 			}
@@ -1148,6 +1305,13 @@ func Test_createRun(t *testing.T) {
 }
 
 func Test_createRun_interactive(t *testing.T) {
+	const contentCmd = `git tag --list .* --format=%\(contents\)`
+	const signatureCmd = `git tag --list .* --format=%\(contents:signature\)`
+
+	defaultRunStubs := func(rs *run.CommandStubber) {
+		rs.Register(contentCmd, 1, "")
+	}
+
 	tests := []struct {
 		name          string
 		httpStubs     func(*httpmock.Registry)
@@ -1184,9 +1348,7 @@ func Test_createRun_interactive(t *testing.T) {
 					return false, nil
 				})
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 1, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
 					{ "name": "v1.2.3" }, { "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
@@ -1233,9 +1395,7 @@ func Test_createRun_interactive(t *testing.T) {
 					return false, nil
 				})
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 1, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
 					{ "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
@@ -1282,9 +1442,7 @@ func Test_createRun_interactive(t *testing.T) {
 					return false, nil
 				})
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 1, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
 					{ "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
@@ -1331,9 +1489,7 @@ func Test_createRun_interactive(t *testing.T) {
 					return false, nil
 				})
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 1, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.StatusStringResponse(200, `{
@@ -1380,7 +1536,7 @@ func Test_createRun_interactive(t *testing.T) {
 				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 1, "")
+				defaultRunStubs(rs)
 				rs.Register(`git describe --tags --abbrev=0 HEAD\^`, 0, "v1.2.2\n")
 				rs.Register(`git .+log .+v1\.2\.2\.\.HEAD$`, 0, "commit subject\n\ncommit body\n")
 			},
@@ -1426,7 +1582,8 @@ func Test_createRun_interactive(t *testing.T) {
 				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "hello from annotated tag")
+				rs.Register(contentCmd, 0, "hello from annotated tag")
+				rs.Register(signatureCmd, 0, "")
 				rs.Register(`git describe --tags --abbrev=0 v1\.2\.3\^`, 1, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -1455,7 +1612,8 @@ func Test_createRun_interactive(t *testing.T) {
 				TagName: "v1.2.3",
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "tag exists")
+				rs.Register(contentCmd, 0, "tag exists")
+				rs.Register(signatureCmd, 0, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
@@ -1488,7 +1646,8 @@ func Test_createRun_interactive(t *testing.T) {
 				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "tag exists")
+				rs.Register(contentCmd, 0, "tag exists")
+				rs.Register(signatureCmd, 0, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
@@ -1535,9 +1694,7 @@ func Test_createRun_interactive(t *testing.T) {
 					return false, nil
 				})
 			},
-			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 1, "")
-			},
+			runStubs: defaultRunStubs,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.RESTPayload(200, `{
@@ -1590,7 +1747,7 @@ func Test_createRun_interactive(t *testing.T) {
 				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 1, "")
+				defaultRunStubs(rs)
 				rs.Register(`git .+log .+v1\.1\.0\.\.HEAD$`, 0, "commit subject\n\ncommit body\n")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -1638,7 +1795,8 @@ func Test_createRun_interactive(t *testing.T) {
 				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "tag exists")
+				rs.Register(contentCmd, 0, "tag exists")
+				rs.Register(signatureCmd, 0, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
@@ -1694,7 +1852,7 @@ func Test_createRun_interactive(t *testing.T) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
 
-			tt.opts.Config = func() (config.Config, error) {
+			tt.opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
 
@@ -1746,6 +1904,106 @@ func Test_createRun_interactive(t *testing.T) {
 
 			assert.Equal(t, tt.wantOut, stdout.String())
 			assert.Equal(t, "", stderr.String())
+		})
+	}
+}
+
+func Test_gitTagInfo(t *testing.T) {
+	const tagName = "foo"
+	const contentCmd = `git tag --list foo --format=%\(contents\)`
+	const signatureCmd = `git tag --list foo --format=%\(contents:signature\)`
+
+	tests := []struct {
+		name       string
+		runStubs   func(*run.CommandStubber)
+		wantErr    string
+		wantResult string
+	}{
+		{
+			name: "no signature",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent")
+				cs.Register(signatureCmd, 0, "")
+			},
+			wantResult: "some\nmultiline\ncontent",
+		},
+		{
+			name: "with signature (PGP)",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN PGP SIGNATURE-----\n\nfoo\n-----END PGP SIGNATURE-----")
+				cs.Register(signatureCmd, 0, "-----BEGIN PGP SIGNATURE-----\n\nfoo\n-----END PGP SIGNATURE-----")
+			},
+			wantResult: "some\nmultiline\ncontent",
+		},
+		{
+			name: "with signature (PGP, RFC1991)",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN PGP MESSAGE-----\n\nfoo\n-----END PGP MESSAGE-----")
+				cs.Register(signatureCmd, 0, "-----BEGIN PGP MESSAGE-----\n\nfoo\n-----END PGP MESSAGE-----")
+			},
+			wantResult: "some\nmultiline\ncontent",
+		},
+		{
+			name: "with signature (SSH)",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN SSH SIGNATURE-----\nfoo\n-----END SSH SIGNATURE-----")
+				cs.Register(signatureCmd, 0, "-----BEGIN SSH SIGNATURE-----\nfoo\n-----END SSH SIGNATURE-----")
+			},
+			wantResult: "some\nmultiline\ncontent",
+		},
+		{
+			name: "with signature (X.509)",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN SIGNED MESSAGE-----\nfoo\n-----END SIGNED MESSAGE-----")
+				cs.Register(signatureCmd, 0, "-----BEGIN SIGNED MESSAGE-----\nfoo\n-----END SIGNED MESSAGE-----")
+			},
+			wantResult: "some\nmultiline\ncontent",
+		},
+		{
+			name: "with signature in content but not as true signature",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "some\nmultiline\ncontent\n-----BEGIN PGP SIGNATURE-----\n\nfoo\n-----END PGP SIGNATURE-----")
+				cs.Register(signatureCmd, 0, "")
+			},
+			wantResult: "some\nmultiline\ncontent\n-----BEGIN PGP SIGNATURE-----\n\nfoo\n-----END PGP SIGNATURE-----",
+		},
+		{
+			name: "error getting content",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 1, "some error")
+			},
+			wantErr: fmt.Sprintf("failed to run git: %s exited with status 1", contentCmd),
+		},
+		{
+			name: "error getting signature",
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(contentCmd, 0, "whatever")
+				cs.Register(signatureCmd, 1, "some error")
+			},
+			wantErr: fmt.Sprintf("failed to run git: %s exited with status 1", signatureCmd),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gitClient := &git.Client{GitPath: "some/path/git"}
+
+			rs, teardown := run.Stub()
+			defer teardown(t)
+			if tt.runStubs != nil {
+				tt.runStubs(rs)
+			}
+
+			result, err := gitTagInfo(gitClient, tagName)
+
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.wantResult, result)
 		})
 	}
 }

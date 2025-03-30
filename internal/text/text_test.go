@@ -54,3 +54,130 @@ func TestFuzzyAgoAbbr(t *testing.T) {
 		assert.Equal(t, expected, fuzzy)
 	}
 }
+
+func TestFormatSlice(t *testing.T) {
+	tests := []struct {
+		name        string
+		values      []string
+		indent      uint
+		lineLength  uint
+		prependWith string
+		appendWith  string
+		sort        bool
+		wants       string
+	}{
+		{
+			name:       "empty",
+			lineLength: 10,
+			values:     []string{},
+			wants:      "",
+		},
+		{
+			name:       "empty with indent",
+			lineLength: 10,
+			indent:     2,
+			values:     []string{},
+			wants:      "  ",
+		},
+		{
+			name:       "single",
+			lineLength: 10,
+			values:     []string{"foo"},
+			wants:      "foo",
+		},
+		{
+			name:       "single with indent",
+			lineLength: 10,
+			indent:     2,
+			values:     []string{"foo"},
+			wants:      "  foo",
+		},
+		{
+			name:       "long single with indent",
+			lineLength: 10,
+			indent:     2,
+			values:     []string{"some-long-value"},
+			wants:      "  some-long-value",
+		},
+		{
+			name:       "exact line length",
+			lineLength: 4,
+			values:     []string{"a", "b"},
+			wants:      "a, b",
+		},
+		{
+			name:       "values longer than line length",
+			lineLength: 4,
+			values:     []string{"long-value", "long-value"},
+			wants:      "long-value,\nlong-value",
+		},
+		{
+			name:       "zero line length (no wrapping expected)",
+			lineLength: 0,
+			values:     []string{"foo", "bar"},
+			wants:      "foo, bar",
+		},
+		{
+			name:       "simple",
+			lineLength: 10,
+			values:     []string{"foo", "bar", "baz", "foo", "bar", "baz"},
+			wants:      "foo, bar,\nbaz, foo,\nbar, baz",
+		},
+		{
+			name:        "simple, surrounded",
+			lineLength:  13,
+			prependWith: "<",
+			appendWith:  ">",
+			values:      []string{"foo", "bar", "baz", "foo", "bar", "baz"},
+			wants:       "<foo>, <bar>,\n<baz>, <foo>,\n<bar>, <baz>",
+		},
+		{
+			name:       "sort",
+			lineLength: 99,
+			sort:       true,
+			values:     []string{"c", "b", "a"},
+			wants:      "a, b, c",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.wants, FormatSlice(tt.values, tt.lineLength, tt.indent, tt.prependWith, tt.appendWith, tt.sort))
+		})
+	}
+}
+
+func TestDisplayURL(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+		want string
+	}{
+		{
+			name: "simple",
+			url:  "https://github.com/cli/cli/issues/9470",
+			want: "https://github.com/cli/cli/issues/9470",
+		},
+		{
+			name: "without scheme",
+			url:  "github.com/cli/cli/issues/9470",
+			want: "https://github.com/cli/cli/issues/9470",
+		},
+		{
+			name: "with query param and anchor",
+			url:  "https://github.com/cli/cli/issues/9470?q=is:issue#issue-command",
+			want: "https://github.com/cli/cli/issues/9470",
+		},
+		{
+			name: "preserve http protocol use despite insecure",
+			url:  "http://github.com/cli/cli/issues/9470",
+			want: "http://github.com/cli/cli/issues/9470",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, DisplayURL(tt.url))
+		})
+	}
+}

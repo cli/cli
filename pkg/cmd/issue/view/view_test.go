@@ -10,15 +10,42 @@ import (
 
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestJSONFields(t *testing.T) {
+	jsonfieldstest.ExpectCommandToSupportJSONFields(t, NewCmdView, []string{
+		"assignees",
+		"author",
+		"body",
+		"closed",
+		"comments",
+		"createdAt",
+		"closedAt",
+		"id",
+		"labels",
+		"milestone",
+		"number",
+		"projectCards",
+		"projectItems",
+		"reactionGroups",
+		"state",
+		"title",
+		"updatedAt",
+		"url",
+		"isPinned",
+		"stateReason",
+	})
+}
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
@@ -31,7 +58,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
@@ -96,7 +123,7 @@ func TestIssueView_web(t *testing.T) {
 	}
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues/123 in your browser.\n", stderr.String())
+	assert.Equal(t, "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n", stderr.String())
 	browser.Verify(t, "https://github.com/OWNER/REPO/issues/123")
 }
 
@@ -183,7 +210,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue without metadata": {
 			fixture: "./fixtures/issueView_preview.json",
 			expectedOutputs: []string{
-				`ix of coins #123`,
+				`ix of coins OWNER/REPO#123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -192,7 +219,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue with metadata": {
 			fixture: "./fixtures/issueView_previewWithMetadata.json",
 			expectedOutputs: []string{
-				`ix of coins #123`,
+				`ix of coins OWNER/REPO#123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`8 \x{1f615} • 7 \x{1f440} • 6 \x{2764}\x{fe0f} • 5 \x{1f389} • 4 \x{1f604} • 3 \x{1f680} • 2 \x{1f44e} • 1 \x{1f44d}`,
 				`Assignees:.*marseilles, monaco\n`,
@@ -206,7 +233,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue with empty body": {
 			fixture: "./fixtures/issueView_previewWithEmptyBody.json",
 			expectedOutputs: []string{
-				`ix of coins #123`,
+				`ix of coins OWNER/REPO#123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`No description provided`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -215,7 +242,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Closed issue": {
 			fixture: "./fixtures/issueView_previewClosedState.json",
 			expectedOutputs: []string{
-				`ix of coins #123`,
+				`ix of coins OWNER/REPO#123`,
 				`Closed.*marseilles opened about 9 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -329,7 +356,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				"IssueByNumber": "./fixtures/issueView_previewSingleComment.json",
 			},
 			expectedOutputs: []string{
-				`some title #123`,
+				`some title OWNER/REPO#123`,
 				`some body`,
 				`———————— Not showing 5 comments ————————`,
 				`marseilles \(Collaborator\) • Jan  1, 2020 • Newest comment`,
@@ -345,7 +372,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				"CommentsForIssue": "./fixtures/issueView_previewFullComments.json",
 			},
 			expectedOutputs: []string{
-				`some title #123`,
+				`some title OWNER/REPO#123`,
 				`some body`,
 				`monalisa • Jan  1, 2020 • Edited`,
 				`1 \x{1f615} • 2 \x{1f440} • 3 \x{2764}\x{fe0f} • 4 \x{1f389} • 5 \x{1f604} • 6 \x{1f680} • 7 \x{1f44e} • 8 \x{1f44d}`,

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 // DefaultHostname is the domain name of the default GitHub instance.
@@ -20,43 +22,15 @@ func Default() string {
 	return defaultHostname
 }
 
-// IsEnterprise reports whether a non-normalized host name looks like a GHE instance.
-func IsEnterprise(h string) bool {
-	normalizedHostName := NormalizeHostname(h)
-	return normalizedHostName != defaultHostname && normalizedHostName != localhost
-}
-
-// IsTenancy reports whether a non-normalized host name looks like a tenancy instance.
-func IsTenancy(h string) bool {
-	normalizedHostName := NormalizeHostname(h)
-	return strings.HasSuffix(normalizedHostName, "."+tenancyHost)
-}
-
 // TenantName extracts the tenant name from tenancy host name and
 // reports whether it found the tenant name.
 func TenantName(h string) (string, bool) {
-	normalizedHostName := NormalizeHostname(h)
+	normalizedHostName := ghauth.NormalizeHostname(h)
 	return cutSuffix(normalizedHostName, "."+tenancyHost)
 }
 
 func isGarage(h string) bool {
 	return strings.EqualFold(h, "garage.github.com")
-}
-
-// NormalizeHostname returns the canonical host name of a GitHub instance.
-func NormalizeHostname(h string) string {
-	hostname := strings.ToLower(h)
-	if strings.HasSuffix(hostname, "."+defaultHostname) {
-		return defaultHostname
-	}
-	if strings.HasSuffix(hostname, "."+localhost) {
-		return localhost
-	}
-	if before, found := cutSuffix(hostname, "."+tenancyHost); found {
-		idx := strings.LastIndex(before, ".")
-		return fmt.Sprintf("%s.%s", before[idx+1:], tenancyHost)
-	}
-	return hostname
 }
 
 func HostnameValidator(hostname string) error {
@@ -73,7 +47,7 @@ func GraphQLEndpoint(hostname string) string {
 	if isGarage(hostname) {
 		return fmt.Sprintf("https://%s/api/graphql", hostname)
 	}
-	if IsEnterprise(hostname) {
+	if ghauth.IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/graphql", hostname)
 	}
 	if strings.EqualFold(hostname, localhost) {
@@ -86,7 +60,7 @@ func RESTPrefix(hostname string) string {
 	if isGarage(hostname) {
 		return fmt.Sprintf("https://%s/api/v3/", hostname)
 	}
-	if IsEnterprise(hostname) {
+	if ghauth.IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/v3/", hostname)
 	}
 	if strings.EqualFold(hostname, localhost) {
@@ -107,7 +81,7 @@ func GistHost(hostname string) string {
 	if isGarage(hostname) {
 		return fmt.Sprintf("%s/gist/", hostname)
 	}
-	if IsEnterprise(hostname) {
+	if ghauth.IsEnterprise(hostname) {
 		return fmt.Sprintf("%s/gist/", hostname)
 	}
 	if strings.EqualFold(hostname, localhost) {

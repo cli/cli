@@ -7,11 +7,15 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -137,6 +141,9 @@ func TestNewCmdView(t *testing.T) {
 
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -222,7 +229,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
-			wantOut: "\n✓ trunk CI #2898 · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3\n",
+			wantOut: "\n✓ trunk CI OWNER/REPO#2898 · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3\n",
 		},
 		{
 			name: "associate with PR with attempt",
@@ -266,7 +273,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
-			wantOut: "\n✓ trunk CI #2898 · 3 (Attempt #3)\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3/attempts/3\n",
+			wantOut: "\n✓ trunk CI OWNER/REPO#2898 · 3 (Attempt #3)\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3/attempts/3\n",
 		},
 		{
 			name: "exit status, failed run",
@@ -536,9 +543,9 @@ func TestViewRun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
-						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+						return prompter.IndexFor(opts, "✓ cool commit, CI [trunk] Feb 23, 2021")
 					})
 			},
 			opts: &ViewOptions{
@@ -586,9 +593,9 @@ func TestViewRun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
-						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+						return prompter.IndexFor(opts, "✓ cool commit, CI [trunk] Feb 23, 2021")
 					})
 				pm.RegisterSelect("View a specific job in this run?",
 					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
@@ -639,9 +646,9 @@ func TestViewRun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
-						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+						return prompter.IndexFor(opts, "✓ cool commit, CI [trunk] Feb 23, 2021")
 					})
 				pm.RegisterSelect("View a specific job in this run?",
 					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
@@ -736,9 +743,9 @@ func TestViewRun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
-						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+						return prompter.IndexFor(opts, "✓ cool commit, CI [trunk] Feb 23, 2021")
 					})
 				pm.RegisterSelect("View a specific job in this run?",
 					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
@@ -816,7 +823,7 @@ func TestViewRun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
 						return 4, nil
 					})
@@ -869,7 +876,7 @@ func TestViewRun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
 						return 4, nil
 					})
@@ -943,7 +950,7 @@ func TestViewRun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
 						return 4, nil
 					})
@@ -1097,9 +1104,9 @@ func TestViewRun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
-						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+						return prompter.IndexFor(opts, "✓ cool commit, CI [trunk] Feb 23, 2021")
 					})
 				pm.RegisterSelect("View a specific job in this run?",
 					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
@@ -1148,9 +1155,9 @@ func TestViewRun(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
-						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+						return prompter.IndexFor(opts, "✓ cool commit, CI [trunk] Feb 23, 2021")
 					})
 				pm.RegisterSelect("View a specific job in this run?",
 					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
@@ -1176,7 +1183,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
 			browsedURL: "https://github.com/runs/3",
-			wantOut:    "Opening github.com/runs/3 in your browser.\n",
+			wantOut:    "Opening https://github.com/runs/3 in your browser.\n",
 		},
 		{
 			name: "web job",
@@ -1197,7 +1204,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
 			browsedURL: "https://github.com/jobs/10?check_suite_focus=true",
-			wantOut:    "Opening github.com/jobs/10 in your browser.\n",
+			wantOut:    "Opening https://github.com/jobs/10 in your browser.\n",
 		},
 		{
 			name: "hide job header, failure",
@@ -1313,6 +1320,38 @@ func TestViewRun(t *testing.T) {
 			errMsg:  "failed to get annotations: HTTP 500 (https://api.github.com/repos/OWNER/REPO/check-runs/20/annotations)",
 			wantErr: true,
 		},
+		{
+			name: "annotation endpoint forbidden (fine grained tokens)",
+			tty:  true,
+			opts: &ViewOptions{
+				RunID: "1234",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/artifacts"),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestForRun`),
+					httpmock.StringResponse(``))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/20/annotations"),
+					httpmock.StatusStringResponse(403, "Forbidden"))
+			},
+			wantOut: "\nX trunk CI · 1234\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nrequesting annotations returned 403 Forbidden as the token does not have sufficient permissions. Note that it is not currently possible to create a fine-grained PAT with the `checks:read` permission.\n\nTo see what failed, try: gh run view 1234 --log-failed\nView this run on GitHub: https://github.com/runs/1234\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1342,8 +1381,9 @@ func TestViewRun(t *testing.T) {
 
 		browser := &browser.Stub{}
 		tt.opts.Browser = browser
-		rlc := testRunLogCache{}
-		tt.opts.RunLogCache = rlc
+		tt.opts.RunLogCache = RunLogCache{
+			cacheDir: t.TempDir(),
+		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := runView(tt.opts)
@@ -1369,14 +1409,18 @@ func TestViewRun(t *testing.T) {
 }
 
 // Structure of fixture zip file
+// To see the structure of fixture zip file, run:
+// `❯ unzip -lv pkg/cmd/run/view/fixtures/run_log.zip`
 //
 //	run log/
 //	├── cool job/
 //	│   ├── 1_fob the barz.txt
 //	│   └── 2_barz the fob.txt
-//	└── sad job/
-//	    ├── 1_barf the quux.txt
-//	    └── 2_quux the barf.txt
+//	├── sad job/
+//	│   ├── 1_barf the quux.txt
+//	│   └── 2_quux the barf.txt
+//	└── ad job/
+//	    └── 1_barf the quux.txt
 func Test_attachRunLog(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -1432,6 +1476,18 @@ func Test_attachRunLog(t *testing.T) {
 			wantMatch: false,
 		},
 		{
+			name: "one job name is a suffix of another",
+			job: shared.Job{
+				Name: "ad job",
+				Steps: []shared.Step{{
+					Name:   "barf the quux",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "ad job/1_barf the quux.txt",
+		},
+		{
 			name: "escape metacharacters in job name",
 			job: shared.Job{
 				Name: "metacharacters .+*?()|[]{}^$ job",
@@ -1466,39 +1522,65 @@ func Test_attachRunLog(t *testing.T) {
 			// not the double space in the dir name, as the slash has been removed
 			wantFilename: "cool job  with slash/1_fob the barz.txt",
 		},
+		{
+			name: "job name with colon matches dir with colon removed",
+			job: shared.Job{
+				Name: "cool job : with colon",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "cool job  with colon/1_fob the barz.txt",
+		},
+		{
+			name: "Job name with really long name (over the ZIP limit)",
+			job: shared.Job{
+				Name: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_",
+				Steps: []shared.Step{{
+					Name:   "Long Name Job",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnine/1_Long Name Job.txt",
+		},
+		{
+			name: "Job name that would be truncated by the C# server to split a grapheme",
+			job: shared.Job{
+				Name: "Emoji Test 😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅",
+				Steps: []shared.Step{{
+					Name:   "Emoji Job",
+					Number: 1,
+				}},
+			},
+			wantMatch:    true,
+			wantFilename: "Emoji Test 😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅�/1_Emoji Job.txt",
+		},
 	}
 
-	rlz, err := zip.OpenReader("./fixtures/run_log.zip")
+	run_log_zip_reader, err := zip.OpenReader("./fixtures/run_log.zip")
 	require.NoError(t, err)
-	defer rlz.Close()
+	defer run_log_zip_reader.Close()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			attachRunLog(&rlz.Reader, []shared.Job{tt.job})
+			attachRunLog(&run_log_zip_reader.Reader, []shared.Job{tt.job})
+
+			t.Logf("Job details: ")
 
 			for _, step := range tt.job.Steps {
 				log := step.Log
 				logPresent := log != nil
-				require.Equal(t, tt.wantMatch, logPresent)
+				require.Equal(t, tt.wantMatch, logPresent, "log not present")
 				if logPresent {
-					require.Equal(t, tt.wantFilename, log.Name)
+					require.Equal(t, tt.wantFilename, log.Name, "Filename mismatch")
 				}
 			}
 		})
 	}
-}
-
-type testRunLogCache struct{}
-
-func (testRunLogCache) Exists(path string) bool {
-	return false
-}
-func (testRunLogCache) Create(path string, content io.Reader) error {
-	return nil
-}
-func (testRunLogCache) Open(path string) (*zip.ReadCloser, error) {
-	return zip.OpenReader("./fixtures/run_log.zip")
 }
 
 var barfTheFobLogOutput = heredoc.Doc(`
@@ -1528,3 +1610,61 @@ sad job	quux the barf	log line 3
 var coolJobRunLogOutput = fmt.Sprintf("%s%s", fobTheBarzLogOutput, barfTheFobLogOutput)
 var sadJobRunLogOutput = fmt.Sprintf("%s%s", barfTheQuuxLogOutput, quuxTheBarfLogOutput)
 var expectedRunLogOutput = fmt.Sprintf("%s%s", coolJobRunLogOutput, sadJobRunLogOutput)
+
+func TestRunLog(t *testing.T) {
+	t.Run("when the cache dir doesn't exist, exists return false", func(t *testing.T) {
+		cacheDir := t.TempDir() + "/non-existent-dir"
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		exists, err := rlc.Exists("unimportant-key")
+		require.NoError(t, err)
+		require.False(t, exists)
+	})
+
+	t.Run("when no cache entry has been created, exists returns false", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		exists, err := rlc.Exists("unimportant-key")
+		require.NoError(t, err)
+		require.False(t, exists)
+	})
+
+	t.Run("when a cache entry has been created, exists returns true", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		contents := strings.NewReader("unimportant-content")
+		require.NoError(t, rlc.Create("key", contents))
+
+		exists, err := rlc.Exists("key")
+		require.NoError(t, err)
+		require.True(t, exists)
+	})
+
+	t.Run("when the cache dir doesn't exist, creating a cache entry creates it", func(t *testing.T) {
+		cacheDir := t.TempDir() + "/non-existent-dir"
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		contents := strings.NewReader("unimportant-content")
+		require.NoError(t, rlc.Create("key", contents))
+
+		require.DirExists(t, cacheDir)
+	})
+
+	t.Run("when a cache entry has been created, reading it returns its contents", func(t *testing.T) {
+		cacheDir := t.TempDir()
+		rlc := RunLogCache{cacheDir: cacheDir}
+
+		f, err := os.Open("./fixtures/run_log.zip")
+		require.NoError(t, err)
+		defer f.Close()
+
+		require.NoError(t, rlc.Create("key", f))
+
+		zipReader, err := rlc.Open("key")
+		require.NoError(t, err)
+		defer zipReader.Close()
+		require.NotEmpty(t, zipReader.File)
+	})
+}

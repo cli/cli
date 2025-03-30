@@ -1,0 +1,31 @@
+# Create and clone a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private --clone
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# cd to the repo and list the deploy keys. There should be no keys
+cd $SCRIPT_NAME-$RANDOM_STRING
+exec gh repo deploy-key list --json=title
+! stdout title
+
+# Add a deploy key
+exec gh repo deploy-key add ../deployKey.pub
+
+# Ensure the deploy key was added
+exec gh repo deploy-key list --json=title --jq='.[].title'
+stdout myTitle
+
+# Get the deploy key id
+exec gh repo deploy-key list --json=title,id --jq='.[].title="myTitle" | .[].id'
+stdout2env DEPLOY_KEY_ID
+
+# Delete the deploy key
+exec gh repo deploy-key delete $DEPLOY_KEY_ID
+
+# Ensure the deploy key was deleted
+exec gh repo deploy-key list --json=id --jq='.[].id'
+! stdout $DEPLOY_KEY_ID
+
+-- deployKey.pub --
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAZmdeRNskfpvYL5YHB/YJaW8hTEXpnvPMkx5Ri+YwUr myTitle

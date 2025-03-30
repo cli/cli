@@ -123,3 +123,79 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 	assert.Equal(t, []string{"good first issue"}, state.Labels)
 	assert.Equal(t, []string{"The road to 1.0"}, state.Projects)
 }
+
+func TestTitledEditSurvey_cleanupHint(t *testing.T) {
+	var editorInitialText string
+	editor := &testEditor{
+		edit: func(s string) (string, error) {
+			editorInitialText = s
+			return `editedTitle
+editedBody
+------------------------ >8 ------------------------
+
+Please Enter the title on the first line and the body on subsequent lines.
+Lines below dotted lines will be ignored, and an empty title aborts the creation process.`, nil
+		},
+	}
+
+	title, body, err := TitledEditSurvey(editor)("initialTitle", "initialBody")
+	assert.NoError(t, err)
+
+	assert.Equal(t, `initialTitle
+initialBody
+------------------------ >8 ------------------------
+
+Please Enter the title on the first line and the body on subsequent lines.
+Lines below dotted lines will be ignored, and an empty title aborts the creation process.`, editorInitialText)
+	assert.Equal(t, "editedTitle", title)
+	assert.Equal(t, "editedBody", body)
+}
+
+type testEditor struct {
+	edit func(string) (string, error)
+}
+
+func (e testEditor) Edit(filename, text string) (string, error) {
+	return e.edit(text)
+}
+
+func TestTitleSurvey(t *testing.T) {
+	tests := []struct {
+		name               string
+		prompterMockInputs []string
+		expectedTitle      string
+		expectStderr       bool
+	}{
+		{
+			name:               "title provided",
+			prompterMockInputs: []string{"title"},
+			expectedTitle:      "title",
+		},
+		{
+			name:               "first input empty",
+			prompterMockInputs: []string{"", "title"},
+			expectedTitle:      "title",
+			expectStderr:       true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, stderr := iostreams.Test()
+			pm := prompter.NewMockPrompter(t)
+			for _, input := range tt.prompterMockInputs {
+				pm.RegisterInput("Title (required)", func(string, string) (string, error) {
+					return input, nil
+				})
+			}
+
+			state := &IssueMetadataState{}
+			err := TitleSurvey(pm, io, state)
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedTitle, state.Title)
+			if tt.expectStderr {
+				assert.Equal(t, "X Title cannot be blank\n", stderr.String())
+			}
+		})
+	}
+}

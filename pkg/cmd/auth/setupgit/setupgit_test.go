@@ -8,25 +8,23 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/require"
 )
 
-type mockGitConfigurer struct {
+type gitCredentialsConfigurerSpy struct {
 	hosts    []string
 	setupErr error
 }
 
-func (gf *mockGitConfigurer) SetupFor(hostname string) []string {
-	return gf.hosts
-}
-
-func (gf *mockGitConfigurer) Setup(hostname, username, authToken string) error {
+func (gf *gitCredentialsConfigurerSpy) ConfigureOurs(hostname string) error {
 	gf.hosts = append(gf.hosts, hostname)
 	return gf.setupErr
 }
+
 func TestNewCmdSetupGit(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -81,7 +79,7 @@ func Test_setupGitRun(t *testing.T) {
 		name               string
 		opts               *SetupGitOptions
 		setupErr           error
-		cfgStubs           func(*testing.T, config.Config)
+		cfgStubs           func(*testing.T, gh.Config)
 		expectedHostsSetup []string
 		expectedErr        error
 		expectedErrOut     string
@@ -89,7 +87,7 @@ func Test_setupGitRun(t *testing.T) {
 		{
 			name: "opts.Config returns an error",
 			opts: &SetupGitOptions{
-				Config: func() (config.Config, error) {
+				Config: func() (gh.Config, error) {
 					return nil, fmt.Errorf("oops")
 				},
 			},
@@ -100,7 +98,7 @@ func Test_setupGitRun(t *testing.T) {
 			opts: &SetupGitOptions{
 				Hostname: "ghe.io",
 			},
-			cfgStubs: func(t *testing.T, cfg config.Config) {
+			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
 			expectedErr: errors.New("You are not logged into the GitHub host \"ghe.io\". Run gh auth login -h ghe.io to authenticate or provide `--force`"),
@@ -118,7 +116,7 @@ func Test_setupGitRun(t *testing.T) {
 			opts: &SetupGitOptions{
 				Hostname: "ghe.io",
 			},
-			cfgStubs: func(t *testing.T, cfg config.Config) {
+			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				login(t, cfg, "ghe.io", "test-user", "gho_ABCDEFG", "https", false)
 			},
 			expectedHostsSetup: []string{"ghe.io"},
@@ -129,7 +127,7 @@ func Test_setupGitRun(t *testing.T) {
 				Hostname: "ghe.io",
 			},
 			setupErr: fmt.Errorf("broken"),
-			cfgStubs: func(t *testing.T, cfg config.Config) {
+			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				login(t, cfg, "ghe.io", "test-user", "gho_ABCDEFG", "https", false)
 			},
 			expectedErr:    errors.New("failed to set up git credential helper: broken"),
@@ -144,7 +142,7 @@ func Test_setupGitRun(t *testing.T) {
 		{
 			name: "when there are known hosts, and no hostname is provided, set them all up",
 			opts: &SetupGitOptions{},
-			cfgStubs: func(t *testing.T, cfg config.Config) {
+			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				login(t, cfg, "ghe.io", "test-user", "gho_ABCDEFG", "https", false)
 				login(t, cfg, "github.com", "test-user", "gho_ABCDEFG", "https", false)
 			},
@@ -154,7 +152,7 @@ func Test_setupGitRun(t *testing.T) {
 			name:     "when no hostname is provided but setting one up errors, that error is bubbled",
 			opts:     &SetupGitOptions{},
 			setupErr: fmt.Errorf("broken"),
-			cfgStubs: func(t *testing.T, cfg config.Config) {
+			cfgStubs: func(t *testing.T, cfg gh.Config) {
 				login(t, cfg, "ghe.io", "test-user", "gho_ABCDEFG", "https", false)
 			},
 			expectedErr:    errors.New("failed to set up git credential helper: broken"),
@@ -177,13 +175,13 @@ func Test_setupGitRun(t *testing.T) {
 			}
 
 			if tt.opts.Config == nil {
-				tt.opts.Config = func() (config.Config, error) {
+				tt.opts.Config = func() (gh.Config, error) {
 					return cfg, nil
 				}
 			}
 
-			gcSpy := &mockGitConfigurer{setupErr: tt.setupErr}
-			tt.opts.gitConfigure = gcSpy
+			credentialsConfigurerSpy := &gitCredentialsConfigurerSpy{setupErr: tt.setupErr}
+			tt.opts.CredentialsHelperConfig = credentialsConfigurerSpy
 
 			err := setupGitRun(tt.opts)
 			if tt.expectedErr != nil {
@@ -193,7 +191,7 @@ func Test_setupGitRun(t *testing.T) {
 			}
 
 			if tt.expectedHostsSetup != nil {
-				require.Equal(t, tt.expectedHostsSetup, gcSpy.hosts)
+				require.Equal(t, tt.expectedHostsSetup, credentialsConfigurerSpy.hosts)
 			}
 
 			require.Equal(t, tt.expectedErrOut, stderr.String())
@@ -201,8 +199,8 @@ func Test_setupGitRun(t *testing.T) {
 	}
 }
 
-func login(t *testing.T, c config.Config, hostname, username, token, gitProtocol string, secureStorage bool) {
+func login(t *testing.T, c gh.Config, hostname, username, token, gitProtocol string, secureStorage bool) {
 	t.Helper()
-	_, err := c.Authentication().Login(hostname, username, token, "https", secureStorage)
+	_, err := c.Authentication().Login(hostname, username, token, gitProtocol, secureStorage)
 	require.NoError(t, err)
 }

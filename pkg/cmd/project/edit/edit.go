@@ -45,8 +45,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(config editConfig) error) *cobra.C
 		Short: "Edit a project",
 		Use:   "edit [<number>]",
 		Example: heredoc.Doc(`
-			# edit the title of monalisa's project "1"
-			gh project edit 1 --owner monalisa --title "New title"
+			# Edit the title of monalisa's project "1"
+			$ gh project edit 1 --owner monalisa --title "New title"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

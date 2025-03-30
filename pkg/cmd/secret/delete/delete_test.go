@@ -2,16 +2,23 @@ package delete
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"testing"
 
+	ghContext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdDelete(t *testing.T) {
@@ -118,11 +125,147 @@ func TestNewCmdDelete(t *testing.T) {
 	}
 }
 
+func TestNewCmdDeleteBaseRepoFuncs(t *testing.T) {
+	multipleRemotes := ghContext.Remotes{
+		&ghContext.Remote{
+			Remote: &git.Remote{
+				Name: "origin",
+			},
+			Repo: ghrepo.New("owner", "fork"),
+		},
+		&ghContext.Remote{
+			Remote: &git.Remote{
+				Name: "upstream",
+			},
+			Repo: ghrepo.New("owner", "repo"),
+		},
+	}
+
+	singleRemote := ghContext.Remotes{
+		&ghContext.Remote{
+			Remote: &git.Remote{
+				Name: "origin",
+			},
+			Repo: ghrepo.New("owner", "repo"),
+		},
+	}
+
+	tests := []struct {
+		name          string
+		args          string
+		env           map[string]string
+		remotes       ghContext.Remotes
+		prompterStubs func(*prompter.MockPrompter)
+		wantRepo      ghrepo.Interface
+		wantErr       error
+	}{
+		{
+			name:     "when there is a repo flag provided, the factory base repo func is used",
+			args:     "SECRET_NAME --repo owner/repo",
+			remotes:  multipleRemotes,
+			wantRepo: ghrepo.New("owner", "repo"),
+		},
+		{
+			name: "when GH_REPO env var is provided, the factory base repo func is used",
+			args: "SECRET_NAME",
+			env: map[string]string{
+				"GH_REPO": "owner/repo",
+			},
+			remotes:  multipleRemotes,
+			wantRepo: ghrepo.New("owner", "repo"),
+		},
+		{
+			name:    "when there is no repo flag or GH_REPO env var provided, and no prompting, the base func requiring no ambiguity is used",
+			args:    "SECRET_NAME",
+			remotes: multipleRemotes,
+			wantErr: shared.AmbiguousBaseRepoError{
+				Remotes: multipleRemotes,
+			},
+		},
+		{
+			name:     "when there is no repo flag or GH_REPO env provided, and there is a single remote, the factory base repo func is used",
+			args:     "SECRET_NAME",
+			remotes:  singleRemote,
+			wantRepo: ghrepo.New("owner", "repo"),
+		},
+		{
+			name:    "when there is no repo flag or GH_REPO env var provided, and can prompt, the base func resolving ambiguity is used",
+			args:    "SECRET_NAME",
+			remotes: multipleRemotes,
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect(
+					"Select a repo",
+					[]string{"owner/fork", "owner/repo"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "owner/fork")
+					},
+				)
+			},
+			wantRepo: ghrepo.New("owner", "fork"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			var pm *prompter.MockPrompter
+			if tt.prompterStubs != nil {
+				ios.SetStdinTTY(true)
+				ios.SetStdoutTTY(true)
+				ios.SetStderrTTY(true)
+				pm = prompter.NewMockPrompter(t)
+				tt.prompterStubs(pm)
+			}
+
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("owner/repo")
+				},
+				Prompter: pm,
+				Remotes: func() (ghContext.Remotes, error) {
+					return tt.remotes, nil
+				},
+			}
+
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+
+			argv, err := shlex.Split(tt.args)
+			assert.NoError(t, err)
+
+			var gotOpts *DeleteOptions
+			cmd := NewCmdDelete(f, func(opts *DeleteOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			// Require to support --repo flag
+			cmdutil.EnableRepoOverride(cmd, f)
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+
+			_, err = cmd.ExecuteC()
+			require.NoError(t, err)
+
+			baseRepo, err := gotOpts.BaseRepo()
+			if tt.wantErr != nil {
+				require.Equal(t, tt.wantErr, err)
+				return
+			}
+			require.True(t, ghrepo.IsSame(tt.wantRepo, baseRepo))
+		})
+	}
+}
+
 func Test_removeRun_repo(t *testing.T) {
 	tests := []struct {
-		name     string
-		opts     *DeleteOptions
-		wantPath string
+		name      string
+		opts      *DeleteOptions
+		host      string
+		httpStubs func(*httpmock.Registry)
 	}{
 		{
 			name: "Actions",
@@ -130,7 +273,21 @@ func Test_removeRun_repo(t *testing.T) {
 				Application: "actions",
 				SecretName:  "cool_secret",
 			},
-			wantPath: "repos/owner/repo/actions/secrets/cool_secret",
+			host: "github.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.WithHost(httpmock.REST("DELETE", "repos/owner/repo/actions/secrets/cool_secret"), "api.github.com"), httpmock.StatusStringResponse(204, "No Content"))
+			},
+		},
+		{
+			name: "Actions GHES",
+			opts: &DeleteOptions{
+				Application: "actions",
+				SecretName:  "cool_secret",
+			},
+			host: "example.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.WithHost(httpmock.REST("DELETE", "api/v3/repos/owner/repo/actions/secrets/cool_secret"), "example.com"), httpmock.StatusStringResponse(204, "No Content"))
+			},
 		},
 		{
 			name: "Dependabot",
@@ -138,23 +295,38 @@ func Test_removeRun_repo(t *testing.T) {
 				Application: "dependabot",
 				SecretName:  "cool_dependabot_secret",
 			},
-			wantPath: "repos/owner/repo/dependabot/secrets/cool_dependabot_secret",
+			host: "github.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.WithHost(httpmock.REST("DELETE", "repos/owner/repo/dependabot/secrets/cool_dependabot_secret"), "api.github.com"), httpmock.StatusStringResponse(204, "No Content"))
+			},
+		},
+		{
+			name: "Dependabot GHES",
+			opts: &DeleteOptions{
+				Application: "dependabot",
+				SecretName:  "cool_dependabot_secret",
+			},
+			host: "example.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.WithHost(httpmock.REST("DELETE", "api/v3/repos/owner/repo/dependabot/secrets/cool_dependabot_secret"), "example.com"), httpmock.StatusStringResponse(204, "No Content"))
+			},
 		},
 		{
 			name: "defaults to Actions",
 			opts: &DeleteOptions{
 				SecretName: "cool_secret",
 			},
-			wantPath: "repos/owner/repo/actions/secrets/cool_secret",
+			host: "github.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.WithHost(httpmock.REST("DELETE", "repos/owner/repo/actions/secrets/cool_secret"), "api.github.com"), httpmock.StatusStringResponse(204, "No Content"))
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
-
-		reg.Register(
-			httpmock.REST("DELETE", tt.wantPath),
-			httpmock.StatusStringResponse(204, "No Content"))
+		tt.httpStubs(reg)
+		defer reg.Verify(t)
 
 		ios, _, _, _ := iostreams.Test()
 
@@ -162,48 +334,74 @@ func Test_removeRun_repo(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-		tt.opts.Config = func() (config.Config, error) {
+		tt.opts.Config = func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("owner/repo")
+			return ghrepo.FromFullNameWithHost("owner/repo", tt.host)
 		}
 
 		err := removeRun(tt.opts)
 		assert.NoError(t, err)
-
-		reg.Verify(t)
 	}
 }
 
 func Test_removeRun_env(t *testing.T) {
-	reg := &httpmock.Registry{}
-
-	reg.Register(
-		httpmock.REST("DELETE", "repos/owner/repo/environments/development/secrets/cool_secret"),
-		httpmock.StatusStringResponse(204, "No Content"))
-
-	ios, _, _, _ := iostreams.Test()
-
-	opts := &DeleteOptions{
-		IO: ios,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
+	tests := []struct {
+		name      string
+		opts      *DeleteOptions
+		host      string
+		httpStubs func(*httpmock.Registry)
+	}{
+		{
+			name: "delete environment secret",
+			opts: &DeleteOptions{
+				SecretName: "cool_secret",
+				EnvName:    "development",
+			},
+			host: "github.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.WithHost(httpmock.REST("DELETE", "repos/owner/repo/environments/development/secrets/cool_secret"), "api.github.com"),
+					httpmock.StatusStringResponse(204, "No Content"))
+			},
 		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+		{
+			name: "delete environment secret GHES",
+			opts: &DeleteOptions{
+				SecretName: "cool_secret",
+				EnvName:    "development",
+			},
+			host: "example.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.WithHost(httpmock.REST("DELETE", "api/v3/repos/owner/repo/environments/development/secrets/cool_secret"), "example.com"),
+					httpmock.StatusStringResponse(204, "No Content"))
+			},
 		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("owner/repo")
-		},
-		SecretName: "cool_secret",
-		EnvName:    "development",
 	}
 
-	err := removeRun(opts)
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		reg := &httpmock.Registry{}
+		tt.httpStubs(reg)
+		defer reg.Verify(t)
 
-	reg.Verify(t)
+		ios, _, _, _ := iostreams.Test()
+		tt.opts.IO = ios
+		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+			if tt.host != "" {
+				return ghrepo.FromFullNameWithHost("owner/repo", tt.host)
+			}
+			return ghrepo.FromFullName("owner/repo")
+		}
+		tt.opts.HttpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+		tt.opts.Config = func() (gh.Config, error) {
+			return config.NewBlankConfig(), nil
+		}
+
+		err := removeRun(tt.opts)
+		require.NoError(t, err)
+	}
 }
 
 func Test_removeRun_org(t *testing.T) {
@@ -247,7 +445,7 @@ func Test_removeRun_org(t *testing.T) {
 
 			ios, _, _, _ := iostreams.Test()
 
-			tt.opts.Config = func() (config.Config, error) {
+			tt.opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
@@ -281,7 +479,7 @@ func Test_removeRun_user(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		SecretName:  "cool_secret",

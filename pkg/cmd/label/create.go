@@ -66,7 +66,7 @@ func newCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 			The label color needs to be 6 character hex value.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# create new bug label
+			# Create new bug label
 			$ gh label create bug --description "Something isn't working" --color E99695
 		`),
 		Args: cmdutil.ExactArgs(1, "cannot create label: name argument required"),
@@ -137,8 +137,7 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions
 		return err
 	}
 	requestBody := bytes.NewReader(requestByte)
-	result := label{}
-	err = apiClient.REST(repo.RepoHost(), "POST", path, requestBody, &result)
+	err = apiClient.REST(repo.RepoHost(), "POST", path, requestBody, nil)
 
 	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
 		err = errLabelAlreadyExists
@@ -173,8 +172,7 @@ func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *editOptions
 		return err
 	}
 	requestBody := bytes.NewReader(requestByte)
-	result := label{}
-	err = apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, &result)
+	err = apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, nil)
 
 	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
 		err = errLabelAlreadyExists

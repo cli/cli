@@ -4,6 +4,9 @@ POV: your team at GitHub is interested in shipping a new command in `gh`.
 
 This document outlines the process the CLI team prefers for helping ensure success both for your new feature and the CLI project as a whole.
 
+> [!NOTE]
+> External contributors, please see [CONTRIBUTING.md](/.github/CONTRIBUTING.md).
+
 ## Step 0: Create an extension
 
 Even if you want to see your code merged into `gh`, you should start with [an extension](https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions) written in Go and leveraging [go-gh](https://github.com/cli/go-gh). Though `gh` extensions can be written in any language, we treat Go as a first class experience and ship a library of helpers for extensions written in Go.
@@ -22,13 +25,13 @@ Describe how your new command would be used. Include mock-up examples, including
 
 We take this step seriously because we believe in keeping `gh`'s interface consistent and intuitive.
 
-## Step 2: Beta
+## Step 2: Public Preview
 
-Once we've signed off on the proposed UX on the issue opened in step 1, develop your extension to at least beta quality. It's up to you if you actually want to go through a beta release phase with real users or not.
+Once we've signed off on the proposed UX on the issue opened in step 1, develop your extension to at least public preview quality. It's up to you if you actually want to go through a public preview release phase with real users or not.
 
 ## Step 3: Merge or no merge
 
-With a beta in hand it's time to decide whether or not to mainline your extension into the `trunk` of `gh`. Some questions to consider:
+With a public preview in hand it's time to decide whether or not to mainline your extension into the `trunk` of `gh`. Some questions to consider:
 
 - How complex is the support burden for your feature?
 

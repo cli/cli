@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	gitAuthRE = `-c credential.helper= -c credential.helper=!"[^"]+" auth git-credential `
+	gitAuthRE = `-c credential(?:\..+)?\.helper= -c credential(?:\..+)?\.helper=!"[^"]+" auth git-credential `
 )
 
 type T interface {

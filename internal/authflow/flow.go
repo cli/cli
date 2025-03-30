@@ -16,6 +16,8 @@ import (
 	"github.com/cli/cli/v2/utils"
 	"github.com/cli/oauth"
 	"github.com/henvic/httpretty"
+
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 var (
@@ -41,18 +43,16 @@ func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 	minimumScopes := []string{"repo", "read:org", "gist"}
 	scopes := append(minimumScopes, additionalScopes...)
 
-	callbackURI := "http://127.0.0.1/callback"
-	if ghinstance.IsEnterprise(oauthHost) {
-		// the OAuth app on Enterprise hosts is still registered with a legacy callback URL
-		// see https://github.com/cli/cli/pull/222, https://github.com/cli/cli/pull/650
-		callbackURI = "http://localhost/"
+	host, err := oauth.NewGitHubHost(ghinstance.HostPrefix(oauthHost))
+	if err != nil {
+		return "", "", err
 	}
 
 	flow := &oauth.Flow{
-		Host:         oauth.GitHubHost(ghinstance.HostPrefix(oauthHost)),
+		Host:         host,
 		ClientID:     oauthClientID,
 		ClientSecret: oauthClientSecret,
-		CallbackURI:  callbackURI,
+		CallbackURI:  getCallbackURI(oauthHost),
 		Scopes:       scopes,
 		DisplayCode: func(code, verificationURL string) error {
 			fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
@@ -72,7 +72,7 @@ func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 				return nil
 			}
 
-			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
+			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), authURL)
 			_ = waitForEnter(IO.In)
 
 			if err := b.Browse(authURL); err != nil {
@@ -103,6 +103,16 @@ func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 	}
 
 	return token.Token, userLogin, nil
+}
+
+func getCallbackURI(oauthHost string) string {
+	callbackURI := "http://127.0.0.1/callback"
+	if ghauth.IsEnterprise(oauthHost) {
+		// the OAuth app on Enterprise hosts is still registered with a legacy callback URL
+		// see https://github.com/cli/cli/pull/222, https://github.com/cli/cli/pull/650
+		callbackURI = "http://localhost/"
+	}
+	return callbackURI
 }
 
 type cfg struct {

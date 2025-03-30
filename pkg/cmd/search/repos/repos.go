@@ -46,29 +46,29 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 
 			GitHub search syntax is documented at:
 			<https://docs.github.com/search-github/searching-on-github/searching-for-repositories>
-    `),
+		`),
 		Example: heredoc.Doc(`
-			# search repositories matching set of keywords "cli" and "shell"
+			# Search repositories matching set of keywords "cli" and "shell"
 			$ gh search repos cli shell
 
-			# search repositories matching phrase "vim plugin"
+			# Search repositories matching phrase "vim plugin"
 			$ gh search repos "vim plugin"
 
-			# search repositories public repos in the microsoft organization
+			# Search repositories public repos in the microsoft organization
 			$ gh search repos --owner=microsoft --visibility=public
 
-			# search repositories with a set of topics
+			# Search repositories with a set of topics
 			$ gh search repos --topic=unix,terminal
 
-			# search repositories by coding language and number of good first issues
+			# Search repositories by coding language and number of good first issues
 			$ gh search repos --language=go --good-first-issues=">=10"
 
-			# search repositories without topic "linux"
+			# Search repositories without topic "linux"
 			$ gh search repos -- -topic:linux
 
-			# search repositories excluding archived repositories
+			# Search repositories excluding archived repositories
 			$ gh search repos --archived=false
-    `),
+		`),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
 				return cmdutil.FlagErrorf("specify search keywords or flags")
@@ -105,7 +105,7 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 	cmdutil.StringEnumFlag(cmd, &sort, "sort", "", "best-match", []string{"forks", "help-wanted-issues", "stars", "updated"}, "Sort fetched repositories")
 
 	// Query qualifier flags
-	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Filter based on archive state")
+	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Filter based on the repository archived state {true|false}")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Created, "created", "", "Filter based on created at `date`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Followers, "followers", "", "Filter based on `number` of followers")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Qualifiers.Fork, "include-forks", "", "", []string{"false", "true", "only"}, "Include forks in fetched repositories")

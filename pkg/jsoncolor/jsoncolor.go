@@ -16,6 +16,10 @@ const (
 	colorBool   = "33"   // yellow
 )
 
+type JsonWriter interface {
+	Preface() []json.Delim
+}
+
 // Write colorized JSON output parsed from reader
 func Write(w io.Writer, r io.Reader, indent string) error {
 	dec := json.NewDecoder(r)
@@ -23,6 +27,10 @@ func Write(w io.Writer, r io.Reader, indent string) error {
 
 	var idx int
 	var stack []json.Delim
+
+	if jsonWriter, ok := w.(JsonWriter); ok {
+		stack = append(stack, jsonWriter.Preface()...)
+	}
 
 	for {
 		t, err := dec.Token()
@@ -92,6 +100,20 @@ func Write(w io.Writer, r io.Reader, indent string) error {
 			fmt.Fprint(w, "\n")
 		}
 	}
+
+	return nil
+}
+
+// WriteDelims writes delims in color and with the appropriate indent
+// based on the stack size returned from an io.Writer that implements JsonWriter.Preface().
+func WriteDelims(w io.Writer, delims, indent string) error {
+	var stack []json.Delim
+	if jaw, ok := w.(JsonWriter); ok {
+		stack = jaw.Preface()
+	}
+
+	fmt.Fprintf(w, "\x1b[%sm%s\x1b[m", colorDelim, delims)
+	fmt.Fprint(w, "\n", strings.Repeat(indent, len(stack)))
 
 	return nil
 }

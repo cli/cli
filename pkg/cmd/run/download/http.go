@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 )
 
@@ -21,11 +22,11 @@ func (p *apiPlatform) List(runID string) ([]shared.Artifact, error) {
 	return shared.ListArtifacts(p.client, p.repo, runID)
 }
 
-func (p *apiPlatform) Download(url string, dir string) error {
+func (p *apiPlatform) Download(url string, dir safepaths.Absolute) error {
 	return downloadArtifact(p.client, url, dir)
 }
 
-func downloadArtifact(httpClient *http.Client, url, destDir string) error {
+func downloadArtifact(httpClient *http.Client, url string, destDir safepaths.Absolute) error {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err

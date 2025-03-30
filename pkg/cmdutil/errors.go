@@ -13,7 +13,7 @@ func FlagErrorf(format string, args ...interface{}) error {
 	return FlagErrorWrap(fmt.Errorf(format, args...))
 }
 
-// FlagError returns a new FlagError that wraps the specified error.
+// FlagErrorWrap returns a new FlagError that wraps the specified error.
 func FlagErrorWrap(err error) error { return &FlagError{err} }
 
 // A *FlagError indicates an error processing command-line flags or other arguments.

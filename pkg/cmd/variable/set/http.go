@@ -72,7 +72,7 @@ func setVariable(client *api.Client, host string, opts setOptions) setResult {
 			return result
 		} else if errors.As(err, &postErr) && postErr.StatusCode == 409 {
 			// Server will return a 409 if variable already exists
-			result.Operation = createdOperation
+			result.Operation = updatedOperation
 			err = patchRepoVariable(client, opts.Repository, opts.Key, opts.Value)
 		}
 	}

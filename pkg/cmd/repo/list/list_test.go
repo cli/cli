@@ -15,11 +15,85 @@ import (
 
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/cli/cli/v2/test"
 )
+
+func TestJSONFields(t *testing.T) {
+	jsonfieldstest.ExpectCommandToSupportJSONFields(t, NewCmdList, []string{
+		"archivedAt",
+		"assignableUsers",
+		"codeOfConduct",
+		"contactLinks",
+		"createdAt",
+		"defaultBranchRef",
+		"deleteBranchOnMerge",
+		"description",
+		"diskUsage",
+		"forkCount",
+		"fundingLinks",
+		"hasDiscussionsEnabled",
+		"hasIssuesEnabled",
+		"hasProjectsEnabled",
+		"hasWikiEnabled",
+		"homepageUrl",
+		"id",
+		"isArchived",
+		"isBlankIssuesEnabled",
+		"isEmpty",
+		"isFork",
+		"isInOrganization",
+		"isMirror",
+		"isPrivate",
+		"isSecurityPolicyEnabled",
+		"isTemplate",
+		"isUserConfigurationRepository",
+		"issueTemplates",
+		"issues",
+		"labels",
+		"languages",
+		"latestRelease",
+		"licenseInfo",
+		"mentionableUsers",
+		"mergeCommitAllowed",
+		"milestones",
+		"mirrorUrl",
+		"name",
+		"nameWithOwner",
+		"openGraphImageUrl",
+		"owner",
+		"parent",
+		"primaryLanguage",
+		"projects",
+		"projectsV2",
+		"pullRequestTemplates",
+		"pullRequests",
+		"pushedAt",
+		"rebaseMergeAllowed",
+		"repositoryTopics",
+		"securityPolicyUrl",
+		"sshUrl",
+		"squashMergeAllowed",
+		"stargazerCount",
+		"templateRepository",
+		"updatedAt",
+		"url",
+		"usesCustomOpenGraphImage",
+		"viewerCanAdminister",
+		"viewerDefaultCommitEmail",
+		"viewerDefaultMergeMethod",
+		"viewerHasStarred",
+		"viewerPermission",
+		"viewerPossibleCommitEmails",
+		"viewerSubscription",
+		"visibility",
+		"watchers",
+	})
+}
 
 func TestNewCmdList(t *testing.T) {
 	tests := []struct {
@@ -282,7 +356,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 	}
@@ -325,7 +399,7 @@ func TestRepoList_nontty(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		Now: func() time.Time {
@@ -366,7 +440,7 @@ func TestRepoList_tty(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		Now: func() time.Time {
@@ -436,7 +510,7 @@ func TestRepoList_noVisibilityField(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		Now: func() time.Time {
@@ -474,7 +548,7 @@ func TestRepoList_invalidOwner(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		Now: func() time.Time {

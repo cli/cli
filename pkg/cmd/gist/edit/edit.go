@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -27,7 +27,7 @@ var editNextOptions = []string{"Edit another file", "Submit", "Cancel"}
 type EditOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	Prompter   prompter.Prompter
 
 	Edit func(string, string, string, *iostreams.IOStreams) (string, error)
@@ -108,15 +108,20 @@ func editRun(opts *EditOptions) error {
 	if gistID == "" {
 		cs := opts.IO.ColorScheme()
 		if gistID == "" {
-			gistID, err = shared.PromptGists(opts.Prompter, client, host, cs)
+			if !opts.IO.CanPrompt() {
+				return cmdutil.FlagErrorf("gist ID or URL required when not running interactively")
+			}
+
+			gist, err := shared.PromptGists(opts.Prompter, client, host, cs)
 			if err != nil {
 				return err
 			}
 
-			if gistID == "" {
+			if gist.ID == "" {
 				fmt.Fprintln(opts.IO.Out, "No gists found.")
 				return nil
 			}
+			gistID = gist.ID
 		}
 	}
 

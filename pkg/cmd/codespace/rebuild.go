@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
@@ -20,9 +21,12 @@ func newRebuildCmd(app *App) *cobra.Command {
 	rebuildCmd := &cobra.Command{
 		Use:   "rebuild",
 		Short: "Rebuild a codespace",
-		Long: `Rebuilding recreates your codespace. Your code and any current changes will be
-preserved. Your codespace will be rebuilt using your working directory's
-dev container. A full rebuild also removes cached Docker images.`,
+		Long: heredoc.Doc(`
+			Rebuilding recreates your codespace.
+
+			Your code and any current changes will be preserved. Your codespace will be rebuilt using
+			your working directory's dev container. A full rebuild also removes cached Docker images.
+		`),
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Rebuild(cmd.Context(), selector, fullRebuild)
@@ -31,7 +35,7 @@ dev container. A full rebuild also removes cached Docker images.`,
 
 	selector = AddCodespaceSelector(rebuildCmd, app.apiClient)
 
-	rebuildCmd.Flags().BoolVar(&fullRebuild, "full", false, "perform a full rebuild")
+	rebuildCmd.Flags().BoolVar(&fullRebuild, "full", false, "Perform a full rebuild")
 
 	return rebuildCmd
 }

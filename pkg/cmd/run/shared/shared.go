@@ -27,6 +27,7 @@ const (
 	InProgress Status = "in_progress"
 	Requested  Status = "requested"
 	Waiting    Status = "waiting"
+	Pending    Status = "pending"
 
 	// Run conclusions
 	ActionRequired Conclusion = "action_required"
@@ -53,6 +54,7 @@ var AllStatuses = []string{
 	"in_progress",
 	"requested",
 	"waiting",
+	"pending",
 	"action_required",
 	"cancelled",
 	"failure",
@@ -72,6 +74,7 @@ var RunFields = []string{
 	"createdAt",
 	"updatedAt",
 	"startedAt",
+	"attempt",
 	"status",
 	"conclusion",
 	"event",
@@ -97,7 +100,7 @@ type Run struct {
 	workflowName   string // cache column
 	WorkflowID     int64  `json:"workflow_id"`
 	Number         int64  `json:"run_number"`
-	Attempts       uint64 `json:"run_attempt"`
+	Attempt        uint64 `json:"run_attempt"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
@@ -179,16 +182,22 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 			for _, j := range r.Jobs {
 				steps := make([]interface{}, 0, len(j.Steps))
 				for _, s := range j.Steps {
+					var stepCompletedAt time.Time
+					if !s.CompletedAt.IsZero() {
+						stepCompletedAt = s.CompletedAt
+					}
 					steps = append(steps, map[string]interface{}{
-						"name":       s.Name,
-						"status":     s.Status,
-						"conclusion": s.Conclusion,
-						"number":     s.Number,
+						"name":        s.Name,
+						"status":      s.Status,
+						"conclusion":  s.Conclusion,
+						"number":      s.Number,
+						"startedAt":   s.StartedAt,
+						"completedAt": stepCompletedAt,
 					})
 				}
-				var completedAt time.Time
+				var jobCompletedAt time.Time
 				if !j.CompletedAt.IsZero() {
-					completedAt = j.CompletedAt
+					jobCompletedAt = j.CompletedAt
 				}
 				jobs = append(jobs, map[string]interface{}{
 					"databaseId":  j.ID,
@@ -197,7 +206,7 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 					"name":        j.Name,
 					"steps":       steps,
 					"startedAt":   j.StartedAt,
-					"completedAt": completedAt,
+					"completedAt": jobCompletedAt,
 					"url":         j.URL,
 				})
 			}
@@ -224,11 +233,13 @@ type Job struct {
 }
 
 type Step struct {
-	Name       string
-	Status     Status
-	Conclusion Conclusion
-	Number     int
-	Log        *zip.File
+	Name        string
+	Status      Status
+	Conclusion  Conclusion
+	Number      int
+	StartedAt   time.Time `json:"started_at"`
+	CompletedAt time.Time `json:"completed_at"`
+	Log         *zip.File
 }
 
 type Steps []Step
@@ -260,6 +271,14 @@ type CheckRun struct {
 	ID int64
 }
 
+var ErrMissingAnnotationsPermissions = errors.New("missing annotations permissions error")
+
+// GetAnnotations fetches annotations from the REST API.
+//
+// If the job has no annotations, an empty slice is returned.
+// If the API returns a 403, a custom ErrMissingAnnotationsPermissions error is returned.
+//
+// When fine-grained PATs support checks:read permission, we can remove the need for this at the call sites.
 func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annotation, error) {
 	var result []*Annotation
 
@@ -268,9 +287,18 @@ func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annot
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
 		var httpError api.HTTPError
-		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
+		if !errors.As(err, &httpError) {
+			return nil, err
+		}
+
+		if httpError.StatusCode == http.StatusNotFound {
 			return []Annotation{}, nil
 		}
+
+		if httpError.StatusCode == http.StatusForbidden {
+			return nil, ErrMissingAnnotationsPermissions
+		}
+
 		return nil, err
 	}
 
@@ -418,6 +446,18 @@ func preloadWorkflowNames(client *api.Client, repo ghrepo.Interface, runs []Run)
 		if _, ok := workflowMap[run.WorkflowID]; !ok {
 			// Look up workflow by ID because it may have been deleted
 			workflow, err := workflowShared.GetWorkflow(client, repo, run.WorkflowID)
+			// If the error is an httpError and it is a 404, this is likely a
+			// organization or enterprise ruleset workflow. The user does not
+			// have permissions to view the details of the workflow, so we cannot
+			// look it up directly without receiving a 404, but it is nonetheless
+			// in the workflow run list. To handle this, we set the workflow name
+			// to an empty string.
+			// Deciding to put this here instead of in GetWorkflow to allow
+			// the caller to decide what a 404 means.
+			if httpErr, ok := err.(api.HTTPError); ok && httpErr.StatusCode == 404 {
+				workflowMap[run.WorkflowID] = ""
+				continue
+			}
 			if err != nil {
 				return err
 			}
@@ -482,7 +522,7 @@ func SelectRun(p Prompter, cs *iostreams.ColorScheme, runs []Run) (string, error
 		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
 			// TODO truncate commit message, long ones look terrible
-			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.Title(), run.WorkflowName(), run.HeadBranch, preciseAgo(now, run.StartedTime())))
+			fmt.Sprintf("%s %s, %s [%s] %s", symbol, run.Title(), run.WorkflowName(), run.HeadBranch, preciseAgo(now, run.StartedTime())))
 	}
 
 	selected, err := p.Select("Select a workflow run", "", candidates)

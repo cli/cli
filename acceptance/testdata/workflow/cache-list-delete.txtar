@@ -1,0 +1,69 @@
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# commit the workflow file
+cd $SCRIPT_NAME-$RANDOM_STRING
+mkdir .github/workflows
+mv ../workflow.yml .github/workflows/workflow.yml
+exec git add .github/workflows/workflow.yml
+exec git commit -m 'Create workflow file'
+exec git push -u origin main
+
+# Sleep because it takes a second for the workflow to register
+sleep 1
+
+# Check the workflow is indeed created
+exec gh workflow list
+stdout 'Test Workflow Name'
+
+# Run the workflow
+exec gh workflow run 'Test Workflow Name'
+
+# It takes some time for a workflow run to register
+sleep 10
+
+# Get the run ID we want to watch
+exec gh run list --json databaseId --jq '.[0].databaseId'
+stdout2env RUN_ID
+
+# Wait for workflow to complete
+exec gh run watch $RUN_ID --exit-status
+
+# List the cache
+exec gh cache list
+stdout 'Linux-values'
+
+# Delete the cache
+exec gh cache delete 'Linux-values'
+
+-- workflow.yml --
+name: Test Workflow Name
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Cache values
+      id: cache-values
+      uses: actions/cache@v4
+      with:
+        path: values.txt
+        key: ${{ runner.os }}-values
+
+    - name: Generate values file
+      if: steps.cache-values.outputs.cache-hit != 'true'
+      run: echo "values" > values.txt

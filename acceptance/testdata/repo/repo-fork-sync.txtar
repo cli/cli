@@ -1,0 +1,42 @@
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create and clone a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private --clone
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Fork and clone the repo
+exec gh repo fork $ORG/$SCRIPT_NAME-$RANDOM_STRING --org $ORG --fork-name $SCRIPT_NAME-$RANDOM_STRING-fork --clone
+
+# Defer fork cleanup
+defer gh repo delete $ORG/$SCRIPT_NAME-$RANDOM_STRING-fork --yes
+
+# Sleep so that the BE has time to sync
+sleep 5
+
+# Check that the repo was forked
+exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING-fork --json='isFork' --jq='.isFork'
+stdout 'true'
+
+# Modify original repo
+cd $SCRIPT_NAME-$RANDOM_STRING
+mv ../asset.txt asset.txt
+exec git add .
+exec git commit -m 'Add asset.txt'
+exec git push
+
+# Checkout the forked repo and ensure asset.txt is not present
+cd ../$SCRIPT_NAME-$RANDOM_STRING-fork
+exec git checkout main
+! exists asset.txt
+
+# Sync the forked repo with the original repo
+exec gh repo sync
+
+# Check that asset.txt now exists in the fork
+exists asset.txt
+
+-- asset.txt --
+Hello, world!

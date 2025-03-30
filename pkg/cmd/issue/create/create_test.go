@@ -14,6 +14,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
@@ -37,6 +38,7 @@ func TestNewCmdCreate(t *testing.T) {
 		tty       bool
 		stdin     string
 		cli       string
+		config    string
 		wantsErr  bool
 		wantsOpts CreateOptions
 	}{
@@ -124,6 +126,77 @@ func TestNewCmdCreate(t *testing.T) {
 			cli:      `-t mytitle --template "bug report" --body-file "body_file.md"`,
 			wantsErr: true,
 		},
+		{
+			name:     "editor by cli",
+			tty:      true,
+			cli:      "--editor",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				EditorMode:  true,
+				Interactive: false,
+			},
+		},
+		{
+			name:     "editor by config",
+			tty:      true,
+			cli:      "",
+			config:   "prefer_editor_prompt: enabled",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				EditorMode:  true,
+				Interactive: false,
+			},
+		},
+		{
+			name:     "editor and template",
+			tty:      true,
+			cli:      `--editor --template "bug report"`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				EditorMode:  true,
+				Template:    "bug report",
+				Interactive: false,
+			},
+		},
+		{
+			name:     "editor and web",
+			tty:      true,
+			cli:      "--editor --web",
+			wantsErr: true,
+		},
+		{
+			name:     "can use web even though editor is enabled by config",
+			tty:      true,
+			cli:      `--web --title mytitle --body "issue body"`,
+			config:   "prefer_editor_prompt: enabled",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "issue body",
+				RecoverFile: "",
+				WebMode:     true,
+				EditorMode:  false,
+				Interactive: false,
+			},
+		},
+		{
+			name:     "editor with non-tty",
+			tty:      false,
+			cli:      "--editor",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -137,6 +210,12 @@ func TestNewCmdCreate(t *testing.T) {
 
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				Config: func() (gh.Config, error) {
+					if tt.config != "" {
+						return config.NewFromString(tt.config), nil
+					}
+					return config.NewBlankConfig(), nil
+				},
 			}
 
 			var opts *CreateOptions
@@ -187,7 +266,7 @@ func Test_createRun(t *testing.T) {
 				WebMode: true,
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
 			name: "title and body",
@@ -197,7 +276,7 @@ func Test_createRun(t *testing.T) {
 				Body:    "hello cli",
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=hello+cli&title=myissue",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
 			name: "assignee",
@@ -206,7 +285,7 @@ func Test_createRun(t *testing.T) {
 				Assignees: []string{"monalisa"},
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=monalisa&body=",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
 			name: "@me",
@@ -223,7 +302,7 @@ func Test_createRun(t *testing.T) {
 					} }`))
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa&body=",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
 			name: "project",
@@ -279,7 +358,7 @@ func Test_createRun(t *testing.T) {
 					} } } }`))
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=&projects=OWNER%2FREPO%2F1",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
 			name: "has templates",
@@ -299,7 +378,7 @@ func Test_createRun(t *testing.T) {
 				)
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new/choose",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new/choose in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new/choose in your browser.\n",
 		},
 		{
 			name: "too long body",
@@ -308,6 +387,72 @@ func Test_createRun(t *testing.T) {
 				Body:    strings.Repeat("A", 9216),
 			},
 			wantsErr: "cannot open in browser: maximum URL length exceeded",
+		},
+		{
+			name: "editor",
+			httpStubs: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "title", inputs["title"])
+						assert.Equal(t, "body", inputs["body"])
+					}))
+			},
+			opts: CreateOptions{
+				EditorMode:       true,
+				TitledEditSurvey: func(string, string) (string, string, error) { return "title", "body", nil },
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "editor and template",
+			httpStubs: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`))
+				r.Register(
+					httpmock.GraphQL(`query IssueTemplates\b`),
+					httpmock.StringResponse(`
+			{ "data": { "repository": { "issueTemplates": [
+				{ "name": "Bug report",
+				  "title": "bug: ",
+				  "body": "Does not work :((" }
+			] } } }`),
+				)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "bug: ", inputs["title"])
+						assert.Equal(t, "Does not work :((", inputs["body"])
+					}))
+			},
+			opts: CreateOptions{
+				EditorMode:       true,
+				Template:         "Bug report",
+				TitledEditSurvey: func(title string, body string) (string, string, error) { return title, body, nil },
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
 		},
 	}
 	for _, tt := range tests {
@@ -364,7 +509,7 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
-		Config: func() (config.Config, error) {
+		Config: func() (gh.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
 		BaseRepo: func() (ghrepo.Interface, error) {
@@ -466,7 +611,7 @@ func TestIssueCreate_recover(t *testing.T) {
 
 	pm := &prompter.PrompterMock{}
 	pm.InputFunc = func(p, d string) (string, error) {
-		if p == "Title" {
+		if p == "Title (required)" {
 			return d, nil
 		} else {
 			return "", prompter.NoSuchPromptErr(p)
@@ -591,7 +736,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 
 	pm := &prompter.PrompterMock{}
 	pm.InputFunc = func(p, d string) (string, error) {
-		if p == "Title" {
+		if p == "Title (required)" {
 			return "hello", nil
 		} else {
 			return "", prompter.NoSuchPromptErr(p)
@@ -618,7 +763,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 
 		Creating issue in OWNER/REPO
 
-		Opening github.com/OWNER/REPO/issues/new in your browser.
+		Opening https://github.com/OWNER/REPO/issues/new in your browser.
 	`), output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", output.BrowsedURL)
 }

@@ -18,6 +18,7 @@ type Stub struct {
 	matched   bool
 	Matcher   Matcher
 	Responder Responder
+	exclude   bool
 }
 
 func MatchAny(*http.Request) bool {
@@ -123,6 +124,15 @@ func StringResponse(body string) Responder {
 	}
 }
 
+func WithHost(matcher Matcher, host string) Matcher {
+	return func(req *http.Request) bool {
+		if !strings.EqualFold(req.Host, host) {
+			return false
+		}
+		return matcher(req)
+	}
+}
+
 func WithHeader(responder Responder, header string, value string) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		resp, _ := responder(req)
@@ -178,7 +188,11 @@ func RESTPayload(responseStatus int, responseBody string, cb func(payload map[st
 			return nil, err
 		}
 		cb(bodyData)
-		return httpResponse(responseStatus, req, bytes.NewBufferString(responseBody)), nil
+
+		header := http.Header{
+			"Content-Type": []string{"application/json"},
+		}
+		return httpResponseWithHeader(responseStatus, req, bytes.NewBufferString(responseBody), header), nil
 	}
 }
 
@@ -215,10 +229,16 @@ func GraphQLQuery(body string, cb func(string, map[string]interface{})) Responde
 	}
 }
 
+// ScopesResponder returns a response with a 200 status code and the given OAuth scopes.
 func ScopesResponder(scopes string) func(*http.Request) (*http.Response, error) {
+	return StatusScopesResponder(http.StatusOK, scopes)
+}
+
+// StatusScopesResponder returns a response with the given status code and OAuth scopes.
+func StatusScopesResponder(status int, scopes string) func(*http.Request) (*http.Response, error) {
 	return func(req *http.Request) (*http.Response, error) {
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: status,
 			Request:    req,
 			Header: map[string][]string{
 				"X-Oauth-Scopes": {scopes},

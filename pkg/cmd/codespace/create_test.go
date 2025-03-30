@@ -648,14 +648,14 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				assert.EqualError(t, err, tt.wantErr.Error())
 			}
 			if err != nil && tt.wantErr == nil {
-				t.Logf(err.Error())
+				t.Log(err.Error())
 			}
 			if got := stdout.String(); got != tt.wantStdout {
-				t.Logf(t.Name())
+				t.Log(t.Name())
 				t.Errorf("  stdout = %v, want %v", got, tt.wantStdout)
 			}
 			if got := stderr.String(); got != tt.wantStderr {
-				t.Logf(t.Name())
+				t.Log(t.Name())
 				t.Errorf("  stderr = %v, want %v", got, tt.wantStderr)
 			}
 

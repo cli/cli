@@ -337,7 +337,7 @@ func TestPrMerge(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
+	r := regexp.MustCompile(`Merged pull request OWNER/REPO#1 \(The title of the PR\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -369,7 +369,7 @@ func TestPrMerge_blocked(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Docf(`
-		X Pull request #1 is not mergeable: the base branch policy prohibits the merge.
+		X Pull request OWNER/REPO#1 is not mergeable: the base branch policy prohibits the merge.
 		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
 		To use administrator privileges to immediately merge the pull request, add the %[1]s--admin%[1]s flag.
 		`, "`"), output.Stderr())
@@ -402,7 +402,7 @@ func TestPrMerge_dirty(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Docf(`
-		X Pull request #123 is not mergeable: the merge commit cannot be cleanly created.
+		X Pull request OWNER/REPO#123 is not mergeable: the merge commit cannot be cleanly created.
 		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
 		Run the following to resolve the merge conflicts locally:
 		  gh pr checkout 123 && git fetch origin trunk && git merge origin/trunk
@@ -518,7 +518,7 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
+	r := regexp.MustCompile(`Merged pull request OWNER/REPO#1 \(The title of the PR\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -559,7 +559,7 @@ func TestPrMerge_withMatchCommitHeadFlag(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
+	r := regexp.MustCompile(`Merged pull request OWNER/REPO#1 \(The title of the PR\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -601,7 +601,7 @@ func TestPrMerge_withAuthorFlag(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
+	r := regexp.MustCompile(`Merged pull request OWNER/REPO#1 \(The title of the PR\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -653,10 +653,33 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 		✓ Deleted local branch blueberries and switched to branch main
 		✓ Deleted remote branch blueberries
 	`), output.Stderr())
+}
+
+func TestPrMerge_deleteBranch_mergeQueue(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"",
+		&api.PullRequest{
+			ID:                  "PR_10",
+			Number:              10,
+			State:               "OPEN",
+			Title:               "Blueberries are a good fruit",
+			HeadRefName:         "blueberries",
+			BaseRefName:         "main",
+			MergeStateStatus:    "CLEAN",
+			IsMergeQueueEnabled: true,
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	_, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
+	assert.Contains(t, err.Error(), "X Cannot use `-d` or `--delete-branch` when merge queue enabled")
 }
 
 func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
@@ -704,7 +727,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 		✓ Deleted local branch blueberries and switched to branch fruit
 		✓ Deleted remote branch blueberries
 	`), output.Stderr())
@@ -753,7 +776,7 @@ func TestPrMerge_deleteBranch_onlyLocally(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 		✓ Deleted local branch blueberries and switched to branch main
 	`), output.Stderr())
 }
@@ -803,7 +826,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 		✓ Deleted local branch blueberries and switched to branch fruit
 		✓ Deleted remote branch blueberries
 	`), output.Stderr())
@@ -850,7 +873,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 		✓ Deleted local branch blueberries
 		✓ Deleted remote branch blueberries
 	`), output.Stderr())
@@ -892,7 +915,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	}
 
 	assert.Equal(t, heredoc.Doc(`
-		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 	`), output.Stderr())
 }
 
@@ -932,8 +955,8 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	}
 
 	assert.Equal(t, heredoc.Doc(`
-		! Pull request #10 (Blueberries are a good fruit) has diverged from local branch
-		✓ Merged pull request #10 (Blueberries are a good fruit)
+		! Pull request OWNER/REPO#10 (Blueberries are a good fruit) has diverged from local branch
+		✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 	`), output.Stderr())
 }
 
@@ -972,7 +995,7 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 	}
 
 	assert.Equal(t, heredoc.Doc(`
-		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 	`), output.Stderr())
 }
 
@@ -1010,7 +1033,7 @@ func TestPrMerge_rebase(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	r := regexp.MustCompile(`Rebased and merged pull request #2 \(The title of the PR\)`)
+	r := regexp.MustCompile(`Rebased and merged pull request OWNER/REPO#2 \(The title of the PR\)`)
 
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
@@ -1053,7 +1076,7 @@ func TestPrMerge_squash(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		✓ Squashed and merged pull request #3 (The title of the PR)
+		✓ Squashed and merged pull request OWNER/REPO#3 (The title of the PR)
 	`), output.Stderr())
 }
 
@@ -1085,7 +1108,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 
 	pm := &prompter.PrompterMock{
 		ConfirmFunc: func(p string, d bool) (bool, error) {
-			if p == "Pull request #4 was already merged. Delete the branch locally?" {
+			if p == "Pull request OWNER/REPO#4 was already merged. Delete the branch locally?" {
 				return true, nil
 			} else {
 				return false, prompter.NoSuchPromptErr(p)
@@ -1129,7 +1152,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "! Pull request #4 was already merged\n", output.Stderr())
+	assert.Equal(t, "! Pull request OWNER/REPO#4 was already merged\n", output.Stderr())
 }
 
 func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
@@ -1156,7 +1179,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 
 	pm := &prompter.PrompterMock{
 		ConfirmFunc: func(p string, d bool) (bool, error) {
-			if p == "Pull request #4 was already merged. Delete the branch locally?" {
+			if p == "Pull request OWNER/REPO#4 was already merged. Delete the branch locally?" {
 				return true, nil
 			} else {
 				return false, prompter.NoSuchPromptErr(p)
@@ -1196,7 +1219,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {
 
 	pm := &prompter.PrompterMock{
 		ConfirmFunc: func(p string, d bool) (bool, error) {
-			if p == "Pull request #4 was already merged. Delete the branch locally?" {
+			if p == "Pull request OWNER/REPO#4 was already merged. Delete the branch locally?" {
 				return d, nil
 			} else {
 				return false, prompter.NoSuchPromptErr(p)
@@ -1275,7 +1298,7 @@ func TestPRMergeTTY(t *testing.T) {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	assert.Equal(t, "Merging pull request #3 (It was the best of times)\n✓ Merged pull request #3 (It was the best of times)\n", output.Stderr())
+	assert.Equal(t, "Merging pull request OWNER/REPO#3 (It was the best of times)\n✓ Merged pull request OWNER/REPO#3 (It was the best of times)\n", output.Stderr())
 }
 
 func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
@@ -1346,8 +1369,8 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
-		Merging pull request #3 (It was the best of times)
-		✓ Merged pull request #3 (It was the best of times)
+		Merging pull request OWNER/REPO#3 (It was the best of times)
+		✓ Merged pull request OWNER/REPO#3 (It was the best of times)
 		✓ Deleted local branch blueberries and switched to branch main
 		✓ Deleted remote branch blueberries
 	`), output.Stderr())
@@ -1438,7 +1461,7 @@ func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "Merging pull request #123 (title)\n✓ Squashed and merged pull request #123 (title)\n", stderr.String())
+	assert.Equal(t, "Merging pull request OWNER/REPO#123 (title)\n✓ Squashed and merged pull request OWNER/REPO#123 (title)\n", stderr.String())
 }
 
 func TestPRMergeEmptyStrategyNonTTY(t *testing.T) {
@@ -1517,7 +1540,7 @@ func TestPRTTY_cancelled(t *testing.T) {
 		t.Fatalf("got error %v", err)
 	}
 
-	assert.Equal(t, "Merging pull request #123 (title)\nCancelled.\n", output.Stderr())
+	assert.Equal(t, "Merging pull request OWNER/REPO#123 (title)\nCancelled.\n", output.Stderr())
 }
 
 func Test_mergeMethodSurvey(t *testing.T) {
@@ -1576,7 +1599,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "✓ Pull request #123 will be automatically merged via squash when all requirements are met\n", stderr.String())
+	assert.Equal(t, "✓ Pull request OWNER/REPO#123 will be automatically merged via squash when all requirements are met\n", stderr.String())
 }
 
 func TestMergeRun_autoMerge_directMerge(t *testing.T) {
@@ -1614,7 +1637,7 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "✓ Merged pull request #123 ()\n", stderr.String())
+	assert.Equal(t, "✓ Merged pull request OWNER/REPO#123 ()\n", stderr.String())
 }
 
 func TestMergeRun_disableAutoMerge(t *testing.T) {
@@ -1649,7 +1672,7 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "✓ Auto-merge disabled for pull request #123\n", stderr.String())
+	assert.Equal(t, "✓ Auto-merge disabled for pull request OWNER/REPO#123\n", stderr.String())
 }
 
 func TestPrInMergeQueue(t *testing.T) {
@@ -1680,7 +1703,7 @@ func TestPrInMergeQueue(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "! Pull request #1 is already queued to merge\n", output.Stderr())
+	assert.Equal(t, "! Pull request OWNER/REPO#1 is already queued to merge\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
@@ -1718,7 +1741,7 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "! The merge strategy for main is set by the merge queue\n✓ Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
+	assert.Equal(t, "! The merge strategy for main is set by the merge queue\n✓ Pull request OWNER/REPO#1 will be added to the merge queue for main when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueClean(t *testing.T) {
@@ -1758,7 +1781,7 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
+	assert.Equal(t, "✓ Pull request OWNER/REPO#1 will be added to the merge queue for main when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueBlocked(t *testing.T) {
@@ -1798,7 +1821,7 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
+	assert.Equal(t, "✓ Pull request OWNER/REPO#1 will be added to the merge queue for main when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueAdmin(t *testing.T) {
@@ -1867,7 +1890,7 @@ func TestPrAddToMergeQueueAdmin(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Merging pull request #1 (The title of the PR)\n✓ Merged pull request #1 (The title of the PR)\n", output.Stderr())
+	assert.Equal(t, "Merging pull request OWNER/REPO#1 (The title of the PR)\n✓ Merged pull request OWNER/REPO#1 (The title of the PR)\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueAdminWithMergeStrategy(t *testing.T) {
@@ -1906,7 +1929,7 @@ func TestPrAddToMergeQueueAdminWithMergeStrategy(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Merged pull request #1 (The title of the PR)\n", output.Stderr())
+	assert.Equal(t, "✓ Merged pull request OWNER/REPO#1 (The title of the PR)\n", output.Stderr())
 }
 
 type testEditor struct{}

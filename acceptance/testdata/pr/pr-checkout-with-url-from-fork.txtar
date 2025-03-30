@@ -1,0 +1,37 @@
+# Set up env vars
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer upstream cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# Create a fork
+exec gh repo fork ${ORG}/${REPO} --org ${ORG} --fork-name ${REPO}-fork
+
+# Defer fork cleanup
+defer gh repo delete --yes ${ORG}/${REPO}-fork
+
+# Clone both repos
+exec gh repo clone ${ORG}/${REPO}
+exec gh repo clone ${ORG}/${REPO}-fork
+
+# Prepare a branch to PR in the fork itself
+cd ${REPO}-fork
+exec git checkout -b feature-branch
+exec git commit --allow-empty -m 'Empty Commit'
+exec git push -u origin feature-branch
+
+# Create the PR inside the fork
+exec gh repo set-default ${ORG}/${REPO}-fork
+exec gh pr create --title 'Feature Title' --body 'Feature Body'
+stdout2env PR_URL
+
+# Checkout the PR by full URL in the upstream repo
+cd ${WORK}/${REPO}
+exec gh pr checkout ${PR_URL}
+stderr 'Switched to branch ''feature-branch'''

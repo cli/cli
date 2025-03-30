@@ -6,7 +6,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -17,7 +17,7 @@ import (
 type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
+	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	VariableName string
@@ -91,22 +91,24 @@ func removeRun(opts *DeleteOptions) error {
 		}
 	}
 
-	var path string
-	switch variableEntity {
-	case shared.Organization:
-		path = fmt.Sprintf("orgs/%s/actions/variables/%s", orgName, opts.VariableName)
-	case shared.Environment:
-		path = fmt.Sprintf("repos/%s/environments/%s/variables/%s", ghrepo.FullName(baseRepo), envName, opts.VariableName)
-	case shared.Repository:
-		path = fmt.Sprintf("repos/%s/actions/variables/%s", ghrepo.FullName(baseRepo), opts.VariableName)
-	}
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
 
-	host, _ := cfg.Authentication().DefaultHost()
+	var path string
+	var host string
+	switch variableEntity {
+	case shared.Organization:
+		path = fmt.Sprintf("orgs/%s/actions/variables/%s", orgName, opts.VariableName)
+		host, _ = cfg.Authentication().DefaultHost()
+	case shared.Environment:
+		path = fmt.Sprintf("repos/%s/environments/%s/variables/%s", ghrepo.FullName(baseRepo), envName, opts.VariableName)
+		host = baseRepo.RepoHost()
+	case shared.Repository:
+		path = fmt.Sprintf("repos/%s/actions/variables/%s", ghrepo.FullName(baseRepo), opts.VariableName)
+		host = baseRepo.RepoHost()
+	}
 
 	err = client.REST(host, "DELETE", path, nil, nil)
 	if err != nil {

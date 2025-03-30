@@ -14,8 +14,17 @@ import (
 )
 
 type Context struct {
-	ConfigDir string
-	KeygenExe string
+	configDir string
+	keygenExe string
+}
+
+// NewContextForTests creates a new `ssh.Context` with internal properties set to the
+// specified values. It should only be used to inject test-specific setup.
+func NewContextForTests(configDir, keygenExe string) Context {
+	return Context{
+		configDir,
+		keygenExe,
+	}
 }
 
 type KeyPair struct {
@@ -26,7 +35,7 @@ type KeyPair struct {
 var ErrKeyAlreadyExists = errors.New("SSH key already exists")
 
 func (c *Context) LocalPublicKeys() ([]string, error) {
-	sshDir, err := c.sshDir()
+	sshDir, err := c.SshDir()
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +54,7 @@ func (c *Context) GenerateSSHKey(keyName string, passphrase string) (*KeyPair, e
 		return nil, err
 	}
 
-	sshDir, err := c.sshDir()
+	sshDir, err := c.SshDir()
 	if err != nil {
 		return nil, err
 	}
@@ -79,20 +88,20 @@ func (c *Context) GenerateSSHKey(keyName string, passphrase string) (*KeyPair, e
 	return &keyPair, nil
 }
 
-func (c *Context) sshDir() (string, error) {
-	if c.ConfigDir != "" {
-		return c.ConfigDir, nil
+func (c *Context) SshDir() (string, error) {
+	if c.configDir != "" {
+		return c.configDir, nil
 	}
 	dir, err := config.HomeDirPath(".ssh")
 	if err == nil {
-		c.ConfigDir = dir
+		c.configDir = dir
 	}
 	return dir, err
 }
 
 func (c *Context) findKeygen() (string, error) {
-	if c.KeygenExe != "" {
-		return c.KeygenExe, nil
+	if c.keygenExe != "" {
+		return c.keygenExe, nil
 	}
 
 	keygenExe, err := safeexec.LookPath("ssh-keygen")
@@ -107,7 +116,7 @@ func (c *Context) findKeygen() (string, error) {
 	}
 
 	if err == nil {
-		c.KeygenExe = keygenExe
+		c.keygenExe = keygenExe
 	}
 	return keygenExe, err
 }

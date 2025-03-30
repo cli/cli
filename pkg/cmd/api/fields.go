@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -99,6 +100,9 @@ func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 				}
 			}
 		} else {
+			if _, exists := destMap[subkey]; exists {
+				return fmt.Errorf("unexpected override existing field under %q", subkey)
+			}
 			destMap[subkey] = value
 		}
 		return nil
@@ -136,6 +140,8 @@ func addParamsSlice(m map[string]interface{}, prevkey, newkey string) (map[strin
 				lastItem := existSlice[len(existSlice)-1]
 				if lastMap, ok := lastItem.(map[string]interface{}); ok {
 					if _, keyExists := lastMap[newkey]; !keyExists {
+						return lastMap, nil
+					} else if reflect.TypeOf(lastMap[newkey]).Kind() == reflect.Slice {
 						return lastMap, nil
 					}
 				}

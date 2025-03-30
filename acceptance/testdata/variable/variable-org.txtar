@@ -1,0 +1,20 @@
+# Setup environment variables used for testscript
+env2upper VAR_NAME=${SCRIPT_NAME}_${RANDOM_STRING}
+
+# Confirm organization variable does not exist, will fail admin:org scope missing
+exec gh variable list --org $ORG
+! stdout $VAR_NAME
+
+# Create an organization variable
+exec gh variable set $VAR_NAME --org $ORG --body 'just an org variable'
+
+# Defer organization variable cleanup
+defer gh variable delete $VAR_NAME --org $ORG
+
+# Verify new organization variable exists
+exec gh variable list --org $ORG
+stdout $VAR_NAME
+
+# Verify organization variable can be retrieved
+exec gh variable get $VAR_NAME --org $ORG
+stdout 'just an org variable'

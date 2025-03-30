@@ -4,7 +4,7 @@
 
 ![screenshot of gh pr status](https://user-images.githubusercontent.com/98482/84171218-327e7a80-aa40-11ea-8cd1-5177fc2d0e72.png)
 
-GitHub CLI is supported for users on GitHub.com and GitHub Enterprise Server 2.20+ with support for macOS, Windows, and Linux.
+GitHub CLI is supported for users on GitHub.com, GitHub Enterprise Cloud, and GitHub Enterprise Server 2.20+ with support for macOS, Windows, and Linux.
 
 ## Documentation
 
@@ -21,7 +21,10 @@ If you are a hubber and are interested in shipping new commands for the CLI, che
 
 ### macOS
 
-`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], [Webi][], and as a downloadable binary from the [releases page][].
+`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], [Webi][], and as a downloadable binary including Mac OS installer `.pkg` from the [releases page][].
+
+> [!NOTE]
+> As of May 29th, Mac OS installer `.pkg` are unsigned with efforts prioritized in [`cli/cli#9139`](https://github.com/cli/cli/issues/9139) to support signing them.
 
 #### Homebrew
 
@@ -57,6 +60,14 @@ Additional Conda installation options available on the [gh-feedstock page](https
 
 For more information about the Webi installer see [its homepage](https://webinstall.dev/).
 
+#### Flox
+
+| Install:          | Upgrade:                |
+| ----------------- | ----------------------- |
+| `flox install gh` | `flox upgrade toplevel` |
+
+For more information about Flox, see [its homepage](https://flox.dev)
+
 ### Linux & BSD
 
 `gh` is available via:
@@ -77,7 +88,7 @@ For more information, see [Linux & BSD installation](./docs/install_linux.md).
 | ------------------- | --------------------|
 | `winget install --id GitHub.cli` | `winget upgrade --id GitHub.cli` |
 
-> **Note**  
+> [!NOTE]
 > The Windows installer modifies your PATH. When using Windows Terminal, you will need to **open a new window** for the changes to take effect. (Simply opening a new tab will _not_ be sufficient.)
 
 #### scoop
@@ -113,6 +124,38 @@ GitHub CLI comes pre-installed in all [GitHub-Hosted Runners](https://docs.githu
 ### Other platforms
 
 Download packaged binaries from the [releases page][].
+
+#### Verification of binaries
+
+Since version 2.50.0 `gh` has been producing [Build Provenance Attestation](https://github.blog/changelog/2024-06-25-artifact-attestations-is-generally-available/) enabling a cryptographically verifiable paper-trail back to the origin GitHub repository, git revision and build instructions used. The build provenance attestations are signed and relies on Public Good [Sigstore](https://www.sigstore.dev/) for PKI.
+
+There are two common ways to verify a downloaded release, depending if `gh` is already installed or not. If `gh` is installed, it's trivial to verify a new release:
+
+- **Option 1: Using `gh` if already installed:**
+
+  ```shell
+  $ gh at verify -R cli/cli gh_2.62.0_macOS_arm64.zip
+  Loaded digest sha256:fdb77f31b8a6dd23c3fd858758d692a45f7fc76383e37d475bdcae038df92afc for file://gh_2.62.0_macOS_arm64.zip
+  Loaded 1 attestation from GitHub API
+  ✓ Verification succeeded!
+
+  sha256:fdb77f31b8a6dd23c3fd858758d692a45f7fc76383e37d475bdcae038df92afc was attested by:
+  REPO     PREDICATE_TYPE                  WORKFLOW
+  cli/cli  https://slsa.dev/provenance/v1  .github/workflows/deployment.yml@refs/heads/trunk
+  ```
+
+- **Option 2: Using Sigstore [`cosign`](https://github.com/sigstore/cosign):**
+
+  To perform this, download the [attestation](https://github.com/cli/cli/attestations) for the downloaded release and use cosign to verify the authenticity of the downloaded release:
+
+  ```shell
+  $ cosign verify-blob-attestation --bundle cli-cli-attestation-3120304.sigstore.json \
+        --new-bundle-format \
+        --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+        --certificate-identity-regexp="^https://github.com/cli/cli/.github/workflows/deployment.yml@refs/heads/trunk$" \
+        gh_2.62.0_macOS_arm64.zip
+  Verified OK
+  ```
 
 ### Build from source
 

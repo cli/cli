@@ -133,7 +133,7 @@ func runDelete(opts *DeleteOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s Request to delete workflow submitted.\n", cs.SuccessIcon())
+	fmt.Fprintf(opts.IO.Out, "%s Request to delete workflow run submitted.\n", cs.SuccessIcon())
 	return nil
 }
 

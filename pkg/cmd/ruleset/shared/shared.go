@@ -78,7 +78,7 @@ func ParseRulesForDisplay(rules []RulesetRule) string {
 	for _, rule := range rules {
 		display.WriteString(fmt.Sprintf("- %s", rule.Type))
 
-		if rule.Parameters != nil && len(rule.Parameters) > 0 {
+		if len(rule.Parameters) > 0 {
 			display.WriteString(": ")
 
 			// sort these keys too for consistency

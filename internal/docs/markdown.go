@@ -8,11 +8,32 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 	"github.com/spf13/pflag"
 )
+
+func printJSONFields(w io.Writer, cmd *cobra.Command) {
+	raw, ok := cmd.Annotations["help:json-fields"]
+	if !ok {
+		return
+	}
+
+	fmt.Fprint(w, "### JSON Fields\n\n")
+	fmt.Fprint(w, text.FormatSlice(strings.Split(raw, ","), 0, 0, "`", "`", true))
+	fmt.Fprint(w, "\n\n")
+}
+
+func printAliases(w io.Writer, cmd *cobra.Command) {
+	if len(cmd.Aliases) > 0 {
+		fmt.Fprintf(w, "### ALIASES\n\n")
+		fmt.Fprint(w, text.FormatSlice(strings.Split(strings.Join(root.BuildAliasList(cmd, cmd.Aliases), ", "), ","), 0, 0, "", "", true))
+		fmt.Fprint(w, "\n\n")
+	}
+
+}
 
 func printOptions(w io.Writer, cmd *cobra.Command) error {
 	flags := cmd.NonInheritedFlags()
@@ -46,17 +67,43 @@ func hasNonHelpFlags(fs *pflag.FlagSet) (found bool) {
 	return
 }
 
+var hiddenFlagDefaults = map[string]bool{
+	"false": true,
+	"":      true,
+	"[]":    true,
+	"0s":    true,
+}
+
+var defaultValFormats = map[string]string{
+	"string":   " (default \"%s\")",
+	"duration": " (default \"%s\")",
+}
+
+func getDefaultValueDisplayString(f *pflag.Flag) string {
+
+	if hiddenFlagDefaults[f.DefValue] || hiddenFlagDefaults[f.Value.Type()] {
+		return ""
+	}
+
+	if dvf, found := defaultValFormats[f.Value.Type()]; found {
+		return fmt.Sprintf(dvf, f.Value)
+	}
+	return fmt.Sprintf(" (default %s)", f.Value)
+
+}
+
 type flagView struct {
 	Name      string
 	Varname   string
 	Shorthand string
+	DefValue  string
 	Usage     string
 }
 
 var flagsTemplate = `
 <dl class="flags">{{ range . }}
-	<dt>{{ if .Shorthand }}<code>-{{.Shorthand}}</code>, {{ end -}}
-		<code>--{{.Name}}{{ if .Varname }} &lt;{{.Varname}}&gt;{{ end }}</code></dt>
+	<dt>{{ if .Shorthand }}<code>-{{.Shorthand}}</code>, {{ end }}
+		<code>--{{.Name}}{{ if .Varname }} &lt;{{.Varname}}&gt;{{ end }}{{.DefValue}}</code></dt>
 	<dd>{{.Usage}}</dd>
 {{ end }}</dl>
 `
@@ -70,10 +117,12 @@ func printFlagsHTML(w io.Writer, fs *pflag.FlagSet) error {
 			return
 		}
 		varname, usage := pflag.UnquoteUsage(f)
+
 		flags = append(flags, flagView{
 			Name:      f.Name,
 			Varname:   varname,
 			Shorthand: f.Shorthand,
+			DefValue:  getDefaultValueDisplayString(f),
 			Usage:     usage,
 		})
 	})
@@ -93,7 +142,8 @@ func genMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 		fmt.Fprintf(w, "```\n%s\n```\n\n", cmd.UseLine())
 	}
 	if hasLong {
-		fmt.Fprintf(w, "%s\n\n", cmd.Long)
+		longWithEscapedPipe := strings.ReplaceAll(cmd.Long, "|", "&#124;")
+		fmt.Fprintf(w, "%s\n\n", longWithEscapedPipe)
 	}
 
 	for _, g := range root.GroupedCommands(cmd) {
@@ -107,6 +157,8 @@ func genMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 	if err := printOptions(w, cmd); err != nil {
 		return err
 	}
+	printAliases(w, cmd)
+	printJSONFields(w, cmd)
 	fmt.Fprint(w, "{% endraw %}\n")
 
 	if len(cmd.Example) > 0 {

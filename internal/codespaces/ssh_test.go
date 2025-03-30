@@ -74,7 +74,7 @@ func TestParseSSHArgs(t *testing.T) {
 	}
 
 	for _, tcase := range testCases {
-		args, command, err := parseSSHArgs(tcase.Args)
+		args, command, err := ParseSSHArgs(tcase.Args)
 
 		checkParseResult(t, tcase, args, command, err)
 	}

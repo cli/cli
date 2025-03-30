@@ -10,6 +10,7 @@ import (
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
+	attestationCmd "github.com/cli/cli/v2/pkg/cmd/attestation"
 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
 	cacheCmd "github.com/cli/cli/v2/pkg/cmd/cache"
@@ -124,6 +125,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(actionsCmd.NewCmdActions(f))
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
+	cmd.AddCommand(attestationCmd.NewCmdAttestation(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
@@ -170,7 +172,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	// Extensions
 	em := f.ExtensionManager
 	for _, e := range em.List() {
-		extensionCmd := NewCmdExtension(io, em, e)
+		extensionCmd := NewCmdExtension(io, em, e, nil)
 		cmd.AddCommand(extensionCmd)
 	}
 

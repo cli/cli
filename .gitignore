@@ -12,6 +12,8 @@
 /.goreleaser.generated.yml
 /script/build
 /script/build.exe
+/pkg_payload
+/build/macOS/resources
 
 # VS Code
 .vscode
@@ -24,5 +26,8 @@
 
 # vim
 *.swp
+
+# Emacs
+*~
 
 vendor/

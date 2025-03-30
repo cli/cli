@@ -196,9 +196,9 @@ func TestRunCancel(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow run",
-					[]string{"* cool commit, CI (trunk) Feb 23, 2021"},
+					[]string{"* cool commit, CI [trunk] Feb 23, 2021"},
 					func(_, _ string, opts []string) (int, error) {
-						return prompter.IndexFor(opts, "* cool commit, CI (trunk) Feb 23, 2021")
+						return prompter.IndexFor(opts, "* cool commit, CI [trunk] Feb 23, 2021")
 					})
 			},
 			wantOut: "✓ Request to cancel workflow 1234 submitted.\n",

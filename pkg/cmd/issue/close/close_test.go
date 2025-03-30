@@ -123,7 +123,7 @@ func TestCloseRun(t *testing.T) {
 						}),
 				)
 			},
-			wantStderr: "✓ Closed issue #13 (The title of the issue)\n",
+			wantStderr: "✓ Closed issue OWNER/REPO#13 (The title of the issue)\n",
 		},
 		{
 			name: "close issue with comment",
@@ -159,7 +159,7 @@ func TestCloseRun(t *testing.T) {
 						}),
 				)
 			},
-			wantStderr: "✓ Closed issue #13 (The title of the issue)\n",
+			wantStderr: "✓ Closed issue OWNER/REPO#13 (The title of the issue)\n",
 		},
 		{
 			name: "close issue with reason",
@@ -187,7 +187,7 @@ func TestCloseRun(t *testing.T) {
 						}),
 				)
 			},
-			wantStderr: "✓ Closed issue #13 (The title of the issue)\n",
+			wantStderr: "✓ Closed issue OWNER/REPO#13 (The title of the issue)\n",
 		},
 		{
 			name: "close issue with reason when reason is not supported",
@@ -214,7 +214,7 @@ func TestCloseRun(t *testing.T) {
 						}),
 				)
 			},
-			wantStderr: "✓ Closed issue #13 (The title of the issue)\n",
+			wantStderr: "✓ Closed issue OWNER/REPO#13 (The title of the issue)\n",
 		},
 		{
 			name: "issue already closed",
@@ -231,7 +231,7 @@ func TestCloseRun(t *testing.T) {
             } } }`),
 				)
 			},
-			wantStderr: "! Issue #13 (The title of the issue) is already closed\n",
+			wantStderr: "! Issue OWNER/REPO#13 (The title of the issue) is already closed\n",
 		},
 		{
 			name: "issues disabled",

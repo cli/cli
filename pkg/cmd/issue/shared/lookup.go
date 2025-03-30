@@ -36,7 +36,7 @@ func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.I
 	return issue, baseRepo, err
 }
 
-// IssuesFromArgWithFields loads 1 or more issues or pull requests with the specified fields. If some of the fields
+// IssuesFromArgsWithFields loads 1 or more issues or pull requests with the specified fields. If some of the fields
 // could not be fetched by GraphQL, this returns non-nil issues and a *PartialLoadError.
 func IssuesFromArgsWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), args []string, fields []string) ([]*api.Issue, ghrepo.Interface, error) {
 	var issuesRepo ghrepo.Interface
@@ -100,7 +100,7 @@ func IssuesFromArgsWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo
 	return issues, issuesRepo, nil
 }
 
-var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/issues/(\d+)`)
+var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/(?:issues|pull)/(\d+)`)
 
 func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
 	u, err := url.Parse(s)

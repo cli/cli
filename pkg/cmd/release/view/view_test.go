@@ -14,10 +14,33 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsonfieldstest"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestJSONFields(t *testing.T) {
+	jsonfieldstest.ExpectCommandToSupportJSONFields(t, NewCmdView, []string{
+		"apiUrl",
+		"author",
+		"assets",
+		"body",
+		"createdAt",
+		"databaseId",
+		"id",
+		"isDraft",
+		"isPrerelease",
+		"name",
+		"publishedAt",
+		"tagName",
+		"tarballUrl",
+		"targetCommitish",
+		"uploadUrl",
+		"url",
+		"zipballUrl",
+	})
+}
 
 func Test_NewCmdView(t *testing.T) {
 	tests := []struct {
@@ -145,15 +168,15 @@ func Test_viewRun(t *testing.T) {
 			wantStdout: heredoc.Doc(`
 				v1.2.3
 				MonaLisa released this about 1 day ago
-				
+
 				                                                                              
 				  • Fixed bugs                                                                
-				
-				
+
+
 				Assets
 				windows.zip  12 B
 				linux.tgz    34 B
-				
+
 				View on GitHub: https://github.com/OWNER/REPO/releases/tags/v1.2.3
 			`),
 			wantStderr: ``,

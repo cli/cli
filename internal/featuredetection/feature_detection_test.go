@@ -26,6 +26,14 @@ func TestIssueFeatures(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:     "ghec data residency (ghe.com)",
+			hostname: "stampname.ghe.com",
+			wantFeatures: IssueFeatures{
+				StateReason: true,
+			},
+			wantErr: false,
+		},
+		{
 			name:     "GHE empty response",
 			hostname: "git.my.org",
 			queryResponse: map[string]string{
@@ -264,6 +272,16 @@ func TestRepositoryFeatures(t *testing.T) {
 		{
 			name:     "github.com",
 			hostname: "github.com",
+			wantFeatures: RepositoryFeatures{
+				PullRequestTemplateQuery: true,
+				VisibilityField:          true,
+				AutoMerge:                true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "ghec data residency (ghe.com)",
+			hostname: "stampname.ghe.com",
 			wantFeatures: RepositoryFeatures{
 				PullRequestTemplateQuery: true,
 				VisibilityField:          true,

@@ -11,6 +11,7 @@ env:
   TARGET_REPO: github/cli
 jobs:
   issue:
+    environment: cli-discuss-automation
     runs-on: ubuntu-latest
     if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'discuss'
     steps:
@@ -35,11 +36,14 @@ jobs:
 
           ---
 
+          cc: @github/cli
+
           > $BODY
           EOF
 
   pull_request:
     runs-on: ubuntu-latest
+    environment: cli-discuss-automation
     if: github.event_name == 'pull_request_target' && github.event.action == 'labeled' && github.event.label.name == 'discuss'
     steps:
       - name: Create issue based on source pull request
@@ -62,6 +66,8 @@ jobs:
           **Triggered by:** @$TRIGGERED_BY
 
           ---
+
+          cc: @github/cli
 
           > $BODY
           EOF

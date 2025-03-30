@@ -2,11 +2,13 @@ package download
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+
+	"github.com/cli/cli/v2/internal/safepaths"
 )
 
 const (
@@ -15,12 +17,17 @@ const (
 	execMode os.FileMode = 0755
 )
 
-func extractZip(zr *zip.Reader, destDir string) error {
+func extractZip(zr *zip.Reader, destDir safepaths.Absolute) error {
 	for _, zf := range zr.File {
-		fpath := filepath.Join(destDir, filepath.FromSlash(zf.Name))
-		if !filepathDescendsFrom(fpath, destDir) {
-			continue
+		fpath, err := destDir.Join(zf.Name)
+		if err != nil {
+			var pathTraversalError safepaths.PathTraversalError
+			if errors.As(err, &pathTraversalError) {
+				continue
+			}
+			return err
 		}
+
 		if err := extractZipFile(zf, fpath); err != nil {
 			return fmt.Errorf("error extracting %q: %w", zf.Name, err)
 		}
@@ -28,10 +35,10 @@ func extractZip(zr *zip.Reader, destDir string) error {
 	return nil
 }
 
-func extractZipFile(zf *zip.File, dest string) (extractErr error) {
+func extractZipFile(zf *zip.File, dest safepaths.Absolute) (extractErr error) {
 	zm := zf.Mode()
 	if zm.IsDir() {
-		extractErr = os.MkdirAll(dest, dirMode)
+		extractErr = os.MkdirAll(dest.String(), dirMode)
 		return
 	}
 
@@ -42,14 +49,12 @@ func extractZipFile(zf *zip.File, dest string) (extractErr error) {
 	}
 	defer f.Close()
 
-	if dir := filepath.Dir(dest); dir != "." {
-		if extractErr = os.MkdirAll(dir, dirMode); extractErr != nil {
-			return
-		}
+	if extractErr = os.MkdirAll(filepath.Dir(dest.String()), dirMode); extractErr != nil {
+		return
 	}
 
 	var df *os.File
-	if df, extractErr = os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, getPerm(zm)); extractErr != nil {
+	if df, extractErr = os.OpenFile(dest.String(), os.O_WRONLY|os.O_CREATE|os.O_EXCL, getPerm(zm)); extractErr != nil {
 		return
 	}
 
@@ -68,16 +73,4 @@ func getPerm(m os.FileMode) os.FileMode {
 		return fileMode
 	}
 	return execMode
-}
-
-func filepathDescendsFrom(p, dir string) bool {
-	p = filepath.Clean(p)
-	dir = filepath.Clean(dir)
-	if dir == "." && !filepath.IsAbs(p) {
-		return !strings.HasPrefix(p, ".."+string(filepath.Separator))
-	}
-	if !strings.HasSuffix(dir, string(filepath.Separator)) {
-		dir += string(filepath.Separator)
-	}
-	return strings.HasPrefix(p, dir)
 }

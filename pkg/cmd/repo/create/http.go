@@ -99,6 +99,11 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		isOrg = owner.IsOrganization()
 	}
 
+	isInternal := strings.ToLower(input.Visibility) == "internal"
+	if isInternal && !isOrg {
+		return nil, fmt.Errorf("internal repositories can only be created within an organization")
+	}
+
 	if input.TemplateRepositoryID != "" {
 		var response struct {
 			CloneTemplateRepository struct {
@@ -332,28 +337,6 @@ func listTemplateRepositories(client *http.Client, hostname, owner string) ([]ap
 	}
 
 	return templateRepositories, nil
-}
-
-// listGitIgnoreTemplates uses API v3 here because gitignore template isn't supported by GraphQL yet.
-func listGitIgnoreTemplates(httpClient *http.Client, hostname string) ([]string, error) {
-	var gitIgnoreTemplates []string
-	client := api.NewClientFromHTTP(httpClient)
-	err := client.REST(hostname, "GET", "gitignore/templates", nil, &gitIgnoreTemplates)
-	if err != nil {
-		return []string{}, err
-	}
-	return gitIgnoreTemplates, nil
-}
-
-// listLicenseTemplates uses API v3 here because license template isn't supported by GraphQL yet.
-func listLicenseTemplates(httpClient *http.Client, hostname string) ([]api.License, error) {
-	var licenseTemplates []api.License
-	client := api.NewClientFromHTTP(httpClient)
-	err := client.REST(hostname, "GET", "licenses", nil, &licenseTemplates)
-	if err != nil {
-		return nil, err
-	}
-	return licenseTemplates, nil
 }
 
 // Returns the current username and any orgs that user is a member of.

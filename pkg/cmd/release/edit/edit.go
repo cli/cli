@@ -43,10 +43,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		Use:   "edit <tag>",
 		Short: "Edit a release",
 		Example: heredoc.Doc(`
-			Publish a release that was previously a draft
+			# Publish a release that was previously a draft
 			$ gh release edit v1.0 --draft=false
 
-			Update the release notes from the content of a file
+			# Update the release notes from the content of a file
 			$ gh release edit v1.0 --notes-file /path/to/release_notes.md
 		`),
 		Args: cobra.ExactArgs(1),
@@ -79,7 +79,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmdutil.NilStringFlag(cmd, &opts.Body, "notes", "n", "Release notes")
 	cmdutil.NilStringFlag(cmd, &opts.Name, "title", "t", "Release title")
 	cmdutil.NilStringFlag(cmd, &opts.DiscussionCategory, "discussion-category", "", "Start a discussion in the specified category when publishing a draft")
-	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
+	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default [main branch])")
 	cmd.Flags().StringVar(&opts.TagName, "tag", "", "The name of the tag")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.VerifyTag, "verify-tag", false, "Abort in case the git tag doesn't already exist in the remote repository")

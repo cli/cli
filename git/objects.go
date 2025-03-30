@@ -54,23 +54,20 @@ type Ref struct {
 	Name string
 }
 
-// TrackingRef represents a ref for a remote tracking branch.
-type TrackingRef struct {
-	RemoteName string
-	BranchName string
-}
-
-func (r TrackingRef) String() string {
-	return "refs/remotes/" + r.RemoteName + "/" + r.BranchName
-}
-
 type Commit struct {
 	Sha   string
 	Title string
+	Body  string
 }
 
+// These are the keys we read from the git branch.<name> config.
 type BranchConfig struct {
-	RemoteName string
-	RemoteURL  *url.URL
-	MergeRef   string
+	RemoteName     string   // .remote if string
+	RemoteURL      *url.URL // .remote if url
+	MergeRef       string   // .merge
+	PushRemoteName string   // .pushremote if string
+	PushRemoteURL  *url.URL // .pushremote if url
+
+	// MergeBase is the optional base branch to target in a new PR if `--base` is not specified.
+	MergeBase string
 }

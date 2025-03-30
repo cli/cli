@@ -1,6 +1,11 @@
 package git
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestIsURL(t *testing.T) {
 	tests := []struct {
@@ -56,9 +61,7 @@ func TestIsURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsURL(tt.url); got != tt.want {
-				t.Errorf("IsURL() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, IsURL(tt.url))
 		})
 	}
 }
@@ -123,6 +126,26 @@ func TestParseURL(t *testing.T) {
 				Scheme: "ssh",
 				User:   "git",
 				Host:   "example.com",
+				Path:   "/owner/repo.git",
+			},
+		},
+		{
+			name: "ssh, ipv6",
+			url:  "ssh://git@[::1]/owner/repo.git",
+			want: url{
+				Scheme: "ssh",
+				User:   "git",
+				Host:   "[::1]",
+				Path:   "/owner/repo.git",
+			},
+		},
+		{
+			name: "ssh with port, ipv6",
+			url:  "ssh://git@[::1]:22/owner/repo.git",
+			want: url{
+				Scheme: "ssh",
+				User:   "git",
+				Host:   "[::1]",
 				Path:   "/owner/repo.git",
 			},
 		},
@@ -196,25 +219,24 @@ func TestParseURL(t *testing.T) {
 				Path:   "",
 			},
 		},
+		{
+			name:    "fails to parse",
+			url:     "ssh://git@[/tmp/git-repo",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			u, err := ParseURL(tt.url)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("got error: %v", err)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
 			}
-			if u.Scheme != tt.want.Scheme {
-				t.Errorf("expected scheme %q, got %q", tt.want.Scheme, u.Scheme)
-			}
-			if u.User.Username() != tt.want.User {
-				t.Errorf("expected user %q, got %q", tt.want.User, u.User.Username())
-			}
-			if u.Host != tt.want.Host {
-				t.Errorf("expected host %q, got %q", tt.want.Host, u.Host)
-			}
-			if u.Path != tt.want.Path {
-				t.Errorf("expected path %q, got %q", tt.want.Path, u.Path)
-			}
+
+			assert.Equal(t, u.Scheme, tt.want.Scheme)
+			assert.Equal(t, u.User.Username(), tt.want.User)
+			assert.Equal(t, u.Host, tt.want.Host)
+			assert.Equal(t, u.Path, tt.want.Path)
 		})
 	}
 }

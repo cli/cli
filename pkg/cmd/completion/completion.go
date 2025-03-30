@@ -33,7 +33,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 			After, add this to your %[1]s~/.bash_profile%[1]s:
 
 				eval "$(gh completion -s bash)"
-			
+
 			### zsh
 
 			Generate a %[1]s_gh%[1]s completion script and put it somewhere in your %[1]s$fpath%[1]s:
@@ -44,7 +44,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 
 				autoload -U compinit
 				compinit -i
-			
+
 			Zsh version 5.7 or later is recommended.
 
 			### fish
@@ -59,7 +59,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 
 				mkdir -Path (Split-Path -Parent $profile) -ErrorAction SilentlyContinue
 				notepad $profile
-			
+
 			Add the line and save the file:
 
 				Invoke-Expression -Command $(gh completion -s powershell | Out-String)

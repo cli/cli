@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
-	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/cli/go-gh/v2/pkg/repository"
 )
 
@@ -37,7 +37,7 @@ func FullName(r Interface) string {
 }
 
 func defaultHost() string {
-	host, _ := ghAuth.DefaultHost()
+	host, _ := ghauth.DefaultHost()
 	return host
 }
 

@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Replace http.Client transport layer with registry so all requests get
@@ -25,6 +28,18 @@ func (r *Registry) Register(m Matcher, resp Responder) {
 	})
 }
 
+func (r *Registry) Exclude(t *testing.T, m Matcher) {
+	excludedStub := &Stub{
+		Matcher: m,
+		Responder: func(req *http.Request) (*http.Response, error) {
+			assert.FailNowf(t, "Exclude error", "API called when excluded: %v", req.URL)
+			return nil, nil
+		},
+		exclude: true,
+	}
+	r.stubs = append(r.stubs, excludedStub)
+}
+
 type Testing interface {
 	Errorf(string, ...interface{})
 	Helper()
@@ -33,7 +48,7 @@ type Testing interface {
 func (r *Registry) Verify(t Testing) {
 	n := 0
 	for _, s := range r.stubs {
-		if !s.matched {
+		if !s.matched && !s.exclude {
 			n++
 		}
 	}
@@ -62,6 +77,7 @@ func (r *Registry) RoundTrip(req *http.Request) (*http.Response, error) {
 		stub = s
 		break // TODO: remove
 	}
+
 	if stub != nil {
 		stub.matched = true
 	}

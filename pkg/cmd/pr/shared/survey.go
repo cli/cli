@@ -1,12 +1,16 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/surveyext"
 )
 
 type Action int
@@ -106,10 +110,17 @@ func BodySurvey(p Prompt, state *IssueMetadataState, templateContent string) err
 	return nil
 }
 
-func TitleSurvey(p Prompt, state *IssueMetadataState) error {
-	result, err := p.Input("Title", state.Title)
-	if err != nil {
-		return err
+func TitleSurvey(p Prompt, io *iostreams.IOStreams, state *IssueMetadataState) error {
+	var err error
+	result := ""
+	for result == "" {
+		result, err = p.Input("Title (required)", state.Title)
+		if err != nil {
+			return err
+		}
+		if result == "" {
+			fmt.Fprintf(io.ErrOut, "%s Title cannot be blank\n", io.ColorScheme().FailureIcon())
+		}
 	}
 
 	if result != state.Title {
@@ -316,4 +327,64 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	}
 
 	return nil
+}
+
+type Editor interface {
+	Edit(filename, initialValue string) (string, error)
+}
+
+type UserEditor struct {
+	IO     *iostreams.IOStreams
+	Config func() (gh.Config, error)
+}
+
+func (e *UserEditor) Edit(filename, initialValue string) (string, error) {
+	editorCommand, err := cmdutil.DetermineEditor(e.Config)
+	if err != nil {
+		return "", err
+	}
+	return surveyext.Edit(editorCommand, filename, initialValue, e.IO.In, e.IO.Out, e.IO.ErrOut)
+}
+
+const editorHintMarker = "------------------------ >8 ------------------------"
+const editorHint = `
+Please Enter the title on the first line and the body on subsequent lines.
+Lines below dotted lines will be ignored, and an empty title aborts the creation process.`
+
+func TitledEditSurvey(editor Editor) func(string, string) (string, string, error) {
+	return func(initialTitle, initialBody string) (string, string, error) {
+		initialValue := strings.Join([]string{initialTitle, initialBody, editorHintMarker, editorHint}, "\n")
+		titleAndBody, err := editor.Edit("*.md", initialValue)
+		if err != nil {
+			return "", "", err
+		}
+
+		titleAndBody = strings.ReplaceAll(titleAndBody, "\r\n", "\n")
+		titleAndBody, _, _ = strings.Cut(titleAndBody, editorHintMarker)
+		title, body, _ := strings.Cut(titleAndBody, "\n")
+		return title, strings.TrimSuffix(body, "\n"), nil
+	}
+}
+
+func InitEditorMode(f *cmdutil.Factory, editorMode bool, webMode bool, canPrompt bool) (bool, error) {
+	if err := cmdutil.MutuallyExclusive(
+		"specify only one of `--editor` or `--web`",
+		editorMode,
+		webMode,
+	); err != nil {
+		return false, err
+	}
+
+	config, err := f.Config()
+	if err != nil {
+		return false, err
+	}
+
+	editorMode = !webMode && (editorMode || config.PreferEditorPrompt("").Value == "enabled")
+
+	if editorMode && !canPrompt {
+		return false, errors.New("--editor or enabled prefer_editor_prompt configuration are not supported in non-tty mode")
+	}
+
+	return editorMode, nil
 }

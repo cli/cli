@@ -11,7 +11,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -28,19 +27,19 @@ type iconfig interface {
 }
 
 type LoginOptions struct {
-	IO            *iostreams.IOStreams
-	Config        iconfig
-	HTTPClient    *http.Client
-	GitClient     *git.Client
-	Hostname      string
-	Interactive   bool
-	Web           bool
-	Scopes        []string
-	Executable    string
-	GitProtocol   string
-	Prompter      Prompt
-	Browser       browser.Browser
-	SecureStorage bool
+	IO               *iostreams.IOStreams
+	Config           iconfig
+	HTTPClient       *http.Client
+	Hostname         string
+	Interactive      bool
+	Web              bool
+	Scopes           []string
+	GitProtocol      string
+	Prompter         Prompt
+	Browser          browser.Browser
+	CredentialFlow   *GitCredentialFlow
+	SecureStorage    bool
+	SkipSSHKeyPrompt bool
 
 	sshContext ssh.Context
 }
@@ -70,21 +69,16 @@ func Login(opts *LoginOptions) error {
 
 	var additionalScopes []string
 
-	credentialFlow := &GitCredentialFlow{
-		Executable: opts.Executable,
-		Prompter:   opts.Prompter,
-		GitClient:  opts.GitClient,
-	}
 	if opts.Interactive && gitProtocol == "https" {
-		if err := credentialFlow.Prompt(hostname); err != nil {
+		if err := opts.CredentialFlow.Prompt(hostname); err != nil {
 			return err
 		}
-		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
+		additionalScopes = append(additionalScopes, opts.CredentialFlow.Scopes()...)
 	}
 
 	var keyToUpload string
 	keyTitle := defaultSSHKeyTitle
-	if opts.Interactive && gitProtocol == "ssh" {
+	if opts.Interactive && !opts.SkipSSHKeyPrompt && gitProtocol == "ssh" {
 		pubKeys, err := opts.sshContext.LocalPublicKeys()
 		if err != nil {
 			return err
@@ -110,7 +104,7 @@ func Login(opts *LoginOptions) error {
 
 			if sshChoice {
 				passphrase, err := opts.Prompter.Password(
-					"Enter a passphrase for your new SSH key (Optional)")
+					"Enter a passphrase for your new SSH key (Optional):")
 				if err != nil {
 					return err
 				}
@@ -207,8 +201,8 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication credentials saved in plain text\n", cs.Yellow("!"))
 	}
 
-	if credentialFlow.ShouldSetup() {
-		err := credentialFlow.Setup(hostname, username, authToken)
+	if opts.CredentialFlow.ShouldSetup() {
+		err := opts.CredentialFlow.Setup(hostname, username, authToken)
 		if err != nil {
 			return err
 		}
