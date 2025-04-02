@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -67,6 +68,12 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 }
 
 func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
+	// Do not run these on windows because they'll fail with:
+	// hinshun\vt10x@v0.0.0-20220119200601-820417d04eec\vt_other.go:26:8: t.cur.attr undefined (type Cursor has no field or method attr, but does have field Attr)
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping on Windows")
+	}
+
 	// Create a PTY and hook up a virtual terminal emulator
 	ptm, pts, err := pty.Open()
 	require.NoError(t, err)
