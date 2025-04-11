@@ -155,10 +155,17 @@ func (m *Manager) list(includeMetadata bool) ([]*Extension, error) {
 				})
 			}
 		} else if isSymlink(f.Type()) {
-			results = append(results, &Extension{
-				path: filepath.Join(dir, f.Name(), f.Name()),
-				kind: LocalKind,
-			})
+			if _, err := os.Stat(filepath.Join(dir, f.Name(), manifestName)); err == nil {
+				results = append(results, &Extension{
+					path: filepath.Join(dir, f.Name(), f.Name()),
+					kind: BinaryKind,
+				})
+			} else {
+				results = append(results, &Extension{
+					path: filepath.Join(dir, f.Name(), f.Name()),
+					kind: LocalKind,
+				})
+			}
 		} else {
 			// the contents of a regular file point to a local extension on disk
 			p, err := readPathFromFile(filepath.Join(dir, f.Name()))
