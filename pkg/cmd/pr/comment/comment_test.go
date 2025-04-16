@@ -275,6 +275,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
+			stderr:        "no comments found for the current user",
 		},
 		{
 			name: "updating last comment with interactive editor succeeds if there are comments",
@@ -351,6 +352,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
+			stderr:        "no comments found for the current user",
 		},
 		{
 			name: "creating new comment with non-interactive editor succeeds",
@@ -378,6 +380,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
+			stderr:        "no comments found for the current user",
 		},
 		{
 			name: "updating last comment with non-interactive editor succeeds if there are comments",
@@ -455,83 +458,84 @@ func Test_commentRun(t *testing.T) {
 		{
 			name: "non interactive editor with delete last without any comment",
 			input: &shared.CommentableOptions{
-				Interactive:  false,
-				DeleteLast:   true,
+				Interactive: false,
+				DeleteLast:  true,
 			},
-			emptyComments:  true,
-			expectErr: true,
-			stderr: "no comments found for current user",
+			emptyComments: true,
+			wantsErr:      true,
+			stderr:        "no comments found for the current user",
 		},
 		{
 			name: "interactive editor with delete last without any comment",
 			input: &shared.CommentableOptions{
-				Interactive:  true,
-				DeleteLast:   true,
+				Interactive: true,
+				DeleteLast:  true,
 			},
-			emptyComments:  true,
-			expectErr: true,
-			stderr: "no comments found for current user",
+			emptyComments: true,
+			wantsErr:      true,
+			stderr:        "no comments found for the current user",
 		},
 		{
 			name: "non interactive editor with delete last without confirmation",
 			input: &shared.CommentableOptions{
-				Interactive:  false,
-				DeleteLast:   true,
+				Interactive: false,
+				DeleteLast:  true,
 
-				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
+				ConfirmDeleteLastComment: func(string) (bool, error) { return true, nil },
 			},
-			expectErr: true,
-			stderr: "you must use --yes flag to confirm deletion in non-interactive mode",
+			wantsErr: true,
+			stderr:   "you must use --yes flag to confirm deletion in non-interactive mode",
 		},
 		{
 			name: "non interactive editor with delete last with confirmation",
 			input: &shared.CommentableOptions{
-				Interactive:  false,
-				DeleteLast:   true,
-				Confirmed:    true,
+				Interactive:         false,
+				DeleteLast:          true,
+				DeleteLastConfirmed: true,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentDelete(t, reg)
 			},
-			stdout: "Deleted the comment successfully.\n",
+			stderr: "Comment deleted\n",
 		},
 		{
 			name: "interactive editor with delete last and confirmed",
 			input: &shared.CommentableOptions{
-				Interactive:  false,
-				DeleteLast:   true,
-				Confirmed:    true,
+				Interactive:         false,
+				DeleteLast:          true,
+				DeleteLastConfirmed: true,
 
-				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
+				ConfirmDeleteLastComment: func(string) (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentDelete(t, reg)
 			},
-			stdout: "Deleted the comment successfully.\n",
+			stderr: "Comment deleted\n",
 		},
 		{
 			name: "interactive editor with delete last and not confirmed default but confirmed interactively",
 			input: &shared.CommentableOptions{
-				Interactive:  true,
-				DeleteLast:   true,
+				Interactive: true,
+				DeleteLast:  true,
 
-				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
+				ConfirmDeleteLastComment: func(string) (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentDelete(t, reg)
 			},
-			stdout: "! Deleted comments cannot be recovered.\nDeleted the comment successfully.\n",
+			stdout: "! Deleted comments cannot be recovered.\n",
+			stderr: "Comment deleted\n",
 		},
 		{
 			name: "interactive editor with delete last and not confirmed default but confirmed interactively",
 			input: &shared.CommentableOptions{
-				Interactive:  true,
-				DeleteLast:   true,
+				Interactive: true,
+				DeleteLast:  true,
 
-				ConfirmDeleteComment:     func(string) (bool, error) { return false, nil },
+				ConfirmDeleteLastComment: func(string) (bool, error) { return false, nil },
 			},
-			expectErr: true,
-			stderr: "deletion not confirmed",
+			wantsErr: true,
+			stderr:   "deletion not confirmed",
 		},
 	}
 	for _, tt := range tests {
@@ -571,6 +575,7 @@ func Test_commentRun(t *testing.T) {
 			err := shared.CommentableRun(tt.input)
 			if tt.wantsErr {
 				assert.Error(t, err)
+				assert.Equal(t, tt.stderr, err.Error())
 				return
 			}
 			assert.NoError(t, err)

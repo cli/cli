@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var errNoUserComments = errors.New("no comments found for current user")
+var errNoUserComments = errors.New("no comments found for the current user")
 var errDeleteNotConfirmed = errors.New("deletion not confirmed")
 
 type InputType int
@@ -42,14 +42,14 @@ type CommentableOptions struct {
 	InteractiveEditSurvey     func(string) (string, error)
 	ConfirmSubmitSurvey       func() (bool, error)
 	ConfirmCreateIfNoneSurvey func() (bool, error)
-	ConfirmDeleteComment      func(string) (bool, error)
+	ConfirmDeleteLastComment  func(string) (bool, error)
 	OpenInBrowser             func(string) error
 	Interactive               bool
 	InputType                 InputType
 	Body                      string
 	EditLast                  bool
 	DeleteLast                bool
-	Confirmed                 bool
+	DeleteLastConfirmed       bool
 	CreateIfNone              bool
 	Quiet                     bool
 	Host                      string
@@ -249,14 +249,14 @@ func deleteComment(commentable Commentable, opts *CommentableOptions) error {
 		return errNoUserComments
 	}
 
-	lastComment := &comments[len(comments)-1]
+	lastComment := comments[len(comments)-1]
 
 	cs := opts.IO.ColorScheme()
 
-	if (opts.IO.CanPrompt() && !opts.Confirmed) {
+	if (opts.IO.CanPrompt() && !opts.DeleteLastConfirmed) {
 		if opts.Interactive {
 			fmt.Fprintf(opts.IO.Out, "%s Deleted comments cannot be recovered.\n", cs.WarningIcon())
-			ok, err := opts.ConfirmDeleteComment(lastComment.Body)
+			ok, err := opts.ConfirmDeleteLastComment(lastComment.Body)
 			if err != nil {
 				return err
 			}
@@ -281,7 +281,7 @@ func deleteComment(commentable Commentable, opts *CommentableOptions) error {
 	}
 
 	if !opts.Quiet {
-		fmt.Fprintln(opts.IO.Out, "Deleted the comment successfully.")
+		fmt.Fprintln(opts.IO.ErrOut, "Comment deleted")
 	}
 
 	return nil
@@ -322,9 +322,9 @@ func CommentableEditSurvey(cf func() (gh.Config, error), io *iostreams.IOStreams
 	}
 }
 
-func CommentableConfirmDeleteComment(p Prompt) func(string) (bool, error) {
+func CommentableConfirmDeleteLastComment(p Prompt) func(string) (bool, error) {
 	return func(body string) (bool, error) {
-		return p.Confirm(fmt.Sprintf("Deleting the comment with a body: '%s'.", body), true)
+		return p.Confirm(fmt.Sprintf("Delete the comment: %s?", body), true)
 	}
 }
 

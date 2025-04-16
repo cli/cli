@@ -256,6 +256,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
+			stderr: "no comments found for the current user",
 		},
 		{
 			name: "updating last comment with interactive editor succeeds if there are comments",
@@ -332,6 +333,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
+			stderr: "no comments found for the current user",
 		},
 		{
 			name: "creating new comment with non-interactive editor succeeds",
@@ -359,6 +361,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
+			stderr: "no comments found for the current user",
 		},
 		{
 			name: "updating last comment with non-interactive editor succeeds if there are comments",
@@ -441,8 +444,8 @@ func Test_commentRun(t *testing.T) {
 				DeleteLast:   true,
 			},
 			emptyComments:  true,
-			expectErr: true,
-			stderr: "no comments found for current user",
+			wantsErr: true,
+			stderr: "no comments found for the current user",
 		},
 		{
 			name: "interactive editor with delete last without any comment",
@@ -451,8 +454,8 @@ func Test_commentRun(t *testing.T) {
 				DeleteLast:   true,
 			},
 			emptyComments:  true,
-			expectErr: true,
-			stderr: "no comments found for current user",
+			wantsErr: true,
+			stderr: "no comments found for the current user",
 		},
 		{
 			name: "non interactive editor with delete last without confirmation",
@@ -460,9 +463,9 @@ func Test_commentRun(t *testing.T) {
 				Interactive:  false,
 				DeleteLast:   true,
 
-				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
+				ConfirmDeleteLastComment:     func(string) (bool, error) { return true, nil },
 			},
-			expectErr: true,
+			wantsErr: true,
 			stderr: "you must use --yes flag to confirm deletion in non-interactive mode",
 		},
 		{
@@ -470,26 +473,26 @@ func Test_commentRun(t *testing.T) {
 			input: &shared.CommentableOptions{
 				Interactive:  false,
 				DeleteLast:   true,
-				Confirmed:    true,
+				DeleteLastConfirmed:    true,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentDelete(t, reg)
 			},
-			stdout: "Deleted the comment successfully.\n",
+			stderr: "Comment deleted\n",
 		},
 		{
 			name: "interactive editor with delete last and confirmed",
 			input: &shared.CommentableOptions{
 				Interactive:  false,
 				DeleteLast:   true,
-				Confirmed:    true,
+				DeleteLastConfirmed:    true,
 
-				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
+				ConfirmDeleteLastComment:     func(string) (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentDelete(t, reg)
 			},
-			stdout: "Deleted the comment successfully.\n",
+			stderr: "Comment deleted\n",
 		},
 		{
 			name: "interactive editor with delete last and not confirmed default but confirmed interactively",
@@ -497,22 +500,23 @@ func Test_commentRun(t *testing.T) {
 				Interactive:  true,
 				DeleteLast:   true,
 
-				ConfirmDeleteComment:     func(string) (bool, error) { return true, nil },
+				ConfirmDeleteLastComment:     func(string) (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentDelete(t, reg)
 			},
-			stdout: "! Deleted comments cannot be recovered.\nDeleted the comment successfully.\n",
+			stdout: "! Deleted comments cannot be recovered.\n",
+			stderr: "Comment deleted\n",
 		},
 		{
-			name: "interactive editor with delete last and not confirmed default but confirmed interactively",
+			name: "interactive editor with delete last and not confirmed default but not confirmed interactively",
 			input: &shared.CommentableOptions{
 				Interactive:  true,
 				DeleteLast:   true,
 
-				ConfirmDeleteComment:     func(string) (bool, error) { return false, nil },
+				ConfirmDeleteLastComment:     func(string) (bool, error) { return false, nil },
 			},
-			expectErr: true,
+			wantsErr: true,
 			stderr: "deletion not confirmed",
 		},
 	}
@@ -554,6 +558,7 @@ func Test_commentRun(t *testing.T) {
 			err := shared.CommentableRun(tt.input)
 			if tt.wantsErr {
 				assert.Error(t, err)
+				assert.Equal(t, tt.stderr, err.Error())
 				return
 			}
 			assert.NoError(t, err)
