@@ -144,15 +144,15 @@ func Test_viewRun(t *testing.T) {
 			wantStdout: heredoc.Doc(`
 				v1.2.3
 				MonaLisa released this about 1 day ago
-
-				                                                                                  
-				  • Fixed bugs                                                                    
-
-
+				
+				                                                                              
+				  • Fixed bugs                                                                
+				
+				
 				Assets
 				windows.zip  12 B
 				linux.tgz    34 B
-
+				
 				View on GitHub: https://github.com/OWNER/REPO/releases/tags/v1.2.3
 			`),
 			wantStderr: ``,
@@ -169,8 +169,8 @@ func Test_viewRun(t *testing.T) {
 				v1.2.3
 				MonaLisa released this about 1 day ago
 
-				                                                                                  
-				  • Fixed bugs                                                                    
+				                                                                              
+				  • Fixed bugs                                                                
 
 
 				Assets

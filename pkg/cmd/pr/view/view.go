@@ -260,7 +260,7 @@ func printHumanPrPreview(opts *ViewOptions, baseRepo ghrepo.Interface, pr *api.P
 	var md string
 	var err error
 	if pr.Body == "" {
-		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
+		md = fmt.Sprintf("\n  %s\n\n", cs.Muted("No description provided"))
 	} else {
 		md, err = markdown.Render(pr.Body,
 			markdown.WithTheme(opts.IO.TerminalTheme()),
@@ -282,7 +282,7 @@ func printHumanPrPreview(opts *ViewOptions, baseRepo ghrepo.Interface, pr *api.P
 	}
 
 	// Footer
-	fmt.Fprintf(out, cs.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+	fmt.Fprintf(out, cs.Muted("View this pull request on GitHub: %s\n"), pr.URL)
 
 	return nil
 }
@@ -423,7 +423,7 @@ func prLabelList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 
 	labelNames := make([]string, 0, len(pr.Labels.Nodes))
 	for _, label := range pr.Labels.Nodes {
-		labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
+		labelNames = append(labelNames, cs.Label(label.Color, label.Name))
 	}
 
 	list := strings.Join(labelNames, ", ")

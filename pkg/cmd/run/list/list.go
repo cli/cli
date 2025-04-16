@@ -62,6 +62,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 			Note that providing the %[1]sworkflow_name%[1]s to the %[1]s-w%[1]s flag will not fetch disabled workflows.
 			Also pass the %[1]s-a%[1]s flag to fetch disabled workflow runs using the %[1]sworkflow_name%[1]s and the %[1]s-w%[1]s flag.
+
+			Runs created by organization and enterprise ruleset workflows will not display a workflow name due to GitHub API limitations.
 		`, "`"),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -174,7 +176,7 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(string(run.Event))
 		tp.AddField(fmt.Sprintf("%d", run.ID), tableprinter.WithColor(cs.Cyan))
 		tp.AddField(run.Duration(opts.now).String())
-		tp.AddTimeField(opts.now, run.StartedTime(), cs.Gray)
+		tp.AddTimeField(opts.now, run.StartedTime(), cs.Muted)
 		tp.EndRow()
 	}
 

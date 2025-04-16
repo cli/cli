@@ -132,7 +132,7 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 		}
 		tp.AddField(text.RemoveExcessiveWhitespace(issue.Title))
 		tp.AddField(listIssueLabels(&issue, cs, tp.IsTTY()))
-		tp.AddTimeField(now, issue.UpdatedAt, cs.Gray)
+		tp.AddTimeField(now, issue.UpdatedAt, cs.Muted)
 		tp.EndRow()
 	}
 
@@ -158,7 +158,7 @@ func listIssueLabels(issue *search.Issue, cs *iostreams.ColorScheme, colorize bo
 	labelNames := make([]string, 0, len(issue.Labels))
 	for _, label := range issue.Labels {
 		if colorize {
-			labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
+			labelNames = append(labelNames, cs.Label(label.Color, label.Name))
 		} else {
 			labelNames = append(labelNames, label.Name)
 		}

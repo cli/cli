@@ -3,6 +3,8 @@ package httpmock
 import (
 	"fmt"
 	"net/http"
+	"runtime/debug"
+	"strings"
 	"sync"
 	"testing"
 
@@ -23,6 +25,7 @@ type Registry struct {
 
 func (r *Registry) Register(m Matcher, resp Responder) {
 	r.stubs = append(r.stubs, &Stub{
+		Stack:     string(debug.Stack()),
 		Matcher:   m,
 		Responder: resp,
 	})
@@ -46,17 +49,24 @@ type Testing interface {
 }
 
 func (r *Registry) Verify(t Testing) {
-	n := 0
+	var unmatchedStubStacks []string
 	for _, s := range r.stubs {
 		if !s.matched && !s.exclude {
-			n++
+			unmatchedStubStacks = append(unmatchedStubStacks, s.Stack)
 		}
 	}
-	if n > 0 {
+	if len(unmatchedStubStacks) > 0 {
 		t.Helper()
-		// NOTE: stubs offer no useful reflection, so we can't print details
+		stacks := strings.Builder{}
+		for i, stack := range unmatchedStubStacks {
+			stacks.WriteString(fmt.Sprintf("Stub %d:\n", i+1))
+			stacks.WriteString(fmt.Sprintf("\t%s", stack))
+			if stack != unmatchedStubStacks[len(unmatchedStubStacks)-1] {
+				stacks.WriteString("\n")
+			}
+		}
 		// about dead stubs and what they were trying to match
-		t.Errorf("%d unmatched HTTP stubs", n)
+		t.Errorf("%d HTTP stubs unmatched, stacks:\n%s", len(unmatchedStubStacks), stacks.String())
 	}
 }
 
@@ -84,7 +94,7 @@ func (r *Registry) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if stub == nil {
 		r.mu.Unlock()
-		return nil, fmt.Errorf("no registered stubs matched %v", req)
+		return nil, fmt.Errorf("no registered HTTP stubs matched %v", req)
 	}
 
 	r.Requests = append(r.Requests, req)

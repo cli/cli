@@ -1,0 +1,31 @@
+# Setup environment variables used for testscript
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# Clone the repo
+exec gh repo clone ${ORG}/${REPO}
+
+# Create an issue in the repo
+cd ${REPO}
+exec gh issue create --title 'Feature Request' --body 'Feature Body'
+stdout2env ISSUE_URL
+
+# Comment on the issue
+exec gh issue comment ${ISSUE_URL} --body 'Looks like a great feature!'
+
+# View the issue
+exec gh issue view ${ISSUE_URL} --comments
+stdout 'Looks like a great feature!'
+
+# Edit the last comment
+exec gh issue comment ${ISSUE_URL} --edit-last --body 'Looks like an amazing feature!'
+
+# View the issue
+exec gh issue view ${ISSUE_URL} --comments
+! stdout 'Looks like a great feature!'
+stdout 'Looks like an amazing feature!'

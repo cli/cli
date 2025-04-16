@@ -152,7 +152,7 @@ There are two common ways to verify a downloaded release, depending if `gh` is a
   $ cosign verify-blob-attestation --bundle cli-cli-attestation-3120304.sigstore.json \
         --new-bundle-format \
         --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-        --certificate-identity-regexp="^https://github.com/cli/cli/.github/workflows/deployment.yml@refs/heads/trunk$" \
+        --certificate-identity="https://github.com/cli/cli/.github/workflows/deployment.yml@refs/heads/trunk" \
         gh_2.62.0_macOS_arm64.zip
   Verified OK
   ```

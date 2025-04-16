@@ -52,7 +52,8 @@ func RenderAnnotations(cs *iostreams.ColorScheme, annotations []Annotation) stri
 
 	for _, a := range annotations {
 		lines = append(lines, fmt.Sprintf("%s %s", AnnotationSymbol(cs, a), a.Message))
-		lines = append(lines, cs.Grayf("%s: %s#%d\n", a.JobName, a.Path, a.StartLine))
+		// Following newline is essential for spacing between annotations
+		lines = append(lines, cs.Mutedf("%s: %s#%d\n", a.JobName, a.Path, a.StartLine))
 	}
 
 	return strings.Join(lines, "\n")

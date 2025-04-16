@@ -39,8 +39,7 @@ builds:
     goarch: [386, amd64, arm64]
     hooks:
       post:
-        - cmd: >-
-            {{ if eq .Runtime.Goos "windows" }}pwsh .\script\sign.ps1{{ else }}./script/sign{{ end }} '{{ .Path }}'
+        - cmd: pwsh .\script\sign.ps1 '{{ .Path }}'
           output: true
     binary: bin/gh
     main: ./cmd/gh

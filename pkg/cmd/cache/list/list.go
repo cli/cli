@@ -99,11 +99,12 @@ func listRun(opts *ListOptions) error {
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
+	cs := opts.IO.ColorScheme()
 	opts.IO.StartProgressIndicator()
 	result, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: opts.Limit, Sort: opts.Sort, Order: opts.Order, Key: opts.Key, Ref: opts.Ref})
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		return fmt.Errorf("%s Failed to get caches: %w", opts.IO.ColorScheme().FailureIcon(), err)
+		return fmt.Errorf("%s Failed to get caches: %w", cs.FailureIcon(), err)
 	}
 
 	if len(result.ActionsCaches) == 0 && opts.Exporter == nil {
@@ -130,11 +131,11 @@ func listRun(opts *ListOptions) error {
 
 	tp := tableprinter.New(opts.IO, tableprinter.WithHeader("ID", "KEY", "SIZE", "CREATED", "ACCESSED"))
 	for _, cache := range result.ActionsCaches {
-		tp.AddField(opts.IO.ColorScheme().Cyan(fmt.Sprintf("%d", cache.Id)))
+		tp.AddField(cs.Cyanf("%d", cache.Id))
 		tp.AddField(cache.Key)
 		tp.AddField(humanFileSize(cache.SizeInBytes))
-		tp.AddTimeField(opts.Now, cache.CreatedAt, opts.IO.ColorScheme().Gray)
-		tp.AddTimeField(opts.Now, cache.LastAccessedAt, opts.IO.ColorScheme().Gray)
+		tp.AddTimeField(opts.Now, cache.CreatedAt, cs.Muted)
+		tp.AddTimeField(opts.Now, cache.LastAccessedAt, cs.Muted)
 		tp.EndRow()
 	}
 

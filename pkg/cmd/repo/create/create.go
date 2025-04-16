@@ -262,10 +262,15 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 func createRun(opts *CreateOptions) error {
 	if opts.Interactive {
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+		host, _ := cfg.Authentication().DefaultHost()
 		answer, err := opts.Prompter.Select("What would you like to do?", "", []string{
-			"Create a new repository on GitHub from scratch",
-			"Create a new repository on GitHub from a template repository",
-			"Push an existing local repository to GitHub",
+			fmt.Sprintf("Create a new repository on %s from scratch", host),
+			fmt.Sprintf("Create a new repository on %s from a template repository", host),
+			fmt.Sprintf("Push an existing local repository to %s", host),
 		})
 		if err != nil {
 			return err
@@ -323,7 +328,9 @@ func createFromScratch(opts *CreateOptions) error {
 		if idx := strings.IndexRune(opts.Name, '/'); idx > 0 {
 			targetRepo = opts.Name[0:idx+1] + shared.NormalizeRepoName(opts.Name[idx+1:])
 		}
-		confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(opts.Visibility)), true)
+		confirmed, err := opts.Prompter.Confirm(
+			fmt.Sprintf(`This will create "%s" as a %s repository on %s. Continue?`, targetRepo, strings.ToLower(opts.Visibility), host),
+			true)
 		if err != nil {
 			return err
 		} else if !confirmed {
@@ -392,9 +399,10 @@ func createFromScratch(opts *CreateOptions) error {
 	isTTY := opts.IO.IsStdoutTTY()
 	if isTTY {
 		fmt.Fprintf(opts.IO.Out,
-			"%s Created repository %s on GitHub\n  %s\n",
+			"%s Created repository %s on %s\n  %s\n",
 			cs.SuccessIconWithColor(cs.Green),
 			ghrepo.FullName(repo),
+			host,
 			repo.URL)
 	} else {
 		fmt.Fprintln(opts.IO.Out, repo.URL)
@@ -482,7 +490,9 @@ func createFromTemplate(opts *CreateOptions) error {
 	if idx := strings.IndexRune(opts.Name, '/'); idx > 0 {
 		targetRepo = opts.Name[0:idx+1] + shared.NormalizeRepoName(opts.Name[idx+1:])
 	}
-	confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(opts.Visibility)), true)
+	confirmed, err := opts.Prompter.Confirm(
+		fmt.Sprintf(`This will create "%s" as a %s repository on %s. Continue?`, targetRepo, strings.ToLower(opts.Visibility), host),
+		true)
 	if err != nil {
 		return err
 	} else if !confirmed {
@@ -496,9 +506,10 @@ func createFromTemplate(opts *CreateOptions) error {
 
 	cs := opts.IO.ColorScheme()
 	fmt.Fprintf(opts.IO.Out,
-		"%s Created repository %s on GitHub\n  %s\n",
+		"%s Created repository %s on %s\n  %s\n",
 		cs.SuccessIconWithColor(cs.Green),
 		ghrepo.FullName(repo),
+		host,
 		repo.URL)
 
 	opts.Clone, err = opts.Prompter.Confirm("Clone the new repository locally?", true)
@@ -622,9 +633,10 @@ func createFromLocal(opts *CreateOptions) error {
 
 	if isTTY {
 		fmt.Fprintf(stdout,
-			"%s Created repository %s on GitHub\n  %s\n",
+			"%s Created repository %s on %s\n  %s\n",
 			cs.SuccessIconWithColor(cs.Green),
 			ghrepo.FullName(repo),
+			host,
 			repo.URL)
 	} else {
 		fmt.Fprintln(stdout, repo.URL)

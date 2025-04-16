@@ -486,9 +486,9 @@ func Test_listRun(t *testing.T) {
 				)
 			},
 			wantOut: heredoc.Docf(`
-				%[1]s[0;2;4;37mID  %[1]s[0m  %[1]s[0;2;4;37mDESCRIPTION                  %[1]s[0m  %[1]s[0;2;4;37mFILES  %[1]s[0m  %[1]s[0;2;4;37mVISIBILITY%[1]s[0m  %[1]s[0;2;4;37mUPDATED          %[1]s[0m
-				1234  %[1]s[0;30;43mocto%[1]s[0m%[1]s[0;1;39m match in the description%[1]s[0m  1 file   %[1]s[0;32mpublic    %[1]s[0m  %[1]s[38;5;242mabout 6 hours ago%[1]s[m
-				2345  %[1]s[0;1;39mmatch in the file name       %[1]s[0m  %[1]s[0;30;43m2 files%[1]s[0m  %[1]s[0;31msecret    %[1]s[0m  %[1]s[38;5;242mabout 6 hours ago%[1]s[m
+				%[1]s[0;4;39mID  %[1]s[0m  %[1]s[0;4;39mDESCRIPTION                  %[1]s[0m  %[1]s[0;4;39mFILES  %[1]s[0m  %[1]s[0;4;39mVISIBILITY%[1]s[0m  %[1]s[0;4;39mUPDATED          %[1]s[0m
+				1234  %[1]s[0;30;43mocto%[1]s[0m%[1]s[0;1;39m match in the description%[1]s[0m  1 file   %[1]s[0;32mpublic    %[1]s[0m  %[1]s[38;5;242mabout 6 hours ago%[1]s[0m
+				2345  %[1]s[0;1;39mmatch in the file name       %[1]s[0m  %[1]s[0;30;43m2 files%[1]s[0m  %[1]s[0;31msecret    %[1]s[0m  %[1]s[38;5;242mabout 6 hours ago%[1]s[0m
 			`, "\x1b"),
 		},
 		{
@@ -654,50 +654,57 @@ func Test_highlightMatch(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
-		color bool
+		cs    *iostreams.ColorScheme
 		want  string
 	}{
 		{
 			name:  "single match",
 			input: "Octo",
+			cs:    &iostreams.ColorScheme{},
 			want:  "Octo",
 		},
 		{
 			name:  "single match (color)",
 			input: "Octo",
-			color: true,
-			want:  "\x1b[0;30;43mOcto\x1b[0m",
+			cs: &iostreams.ColorScheme{
+				Enabled: true,
+			},
+			want: "\x1b[0;30;43mOcto\x1b[0m",
 		},
 		{
 			name:  "single match with extra",
 			input: "Hello, Octocat!",
+			cs:    &iostreams.ColorScheme{},
 			want:  "Hello, Octocat!",
 		},
 		{
 			name:  "single match with extra (color)",
 			input: "Hello, Octocat!",
-			color: true,
-			want:  "\x1b[0;34mHello, \x1b[0m\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat!\x1b[0m",
+			cs: &iostreams.ColorScheme{
+				Enabled: true,
+			},
+			want: "\x1b[0;34mHello, \x1b[0m\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat!\x1b[0m",
 		},
 		{
 			name:  "multiple matches",
 			input: "Octocat/octo",
+			cs:    &iostreams.ColorScheme{},
 			want:  "Octocat/octo",
 		},
 		{
 			name:  "multiple matches (color)",
 			input: "Octocat/octo",
-			color: true,
-			want:  "\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat/\x1b[0m\x1b[0;30;43mocto\x1b[0m",
+			cs: &iostreams.ColorScheme{
+				Enabled: true,
+			},
+			want: "\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat/\x1b[0m\x1b[0;30;43mocto\x1b[0m",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs := iostreams.NewColorScheme(tt.color, false, false)
-
 			matched := false
-			got, err := highlightMatch(tt.input, regex, &matched, cs.Blue, cs.Highlight)
+			got, err := highlightMatch(tt.input, regex, &matched, tt.cs.Blue, tt.cs.Highlight)
 			assert.NoError(t, err)
 			assert.True(t, matched)
 			assert.Equal(t, tt.want, got)

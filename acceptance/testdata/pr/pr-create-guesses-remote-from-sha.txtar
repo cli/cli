@@ -1,0 +1,46 @@
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+env FORK=${REPO}-fork
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Get the current username for the fork owner
+exec gh api user --jq .login
+stdout2env USER
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# Create a user fork of repository. This will be owned by USER.
+exec gh repo fork ${ORG}/${REPO} --fork-name ${FORK}
+sleep 5
+
+# Defer repo cleanup of fork
+defer gh repo delete --yes ${USER}/${FORK}
+
+# Retrieve fork repository information
+exec gh repo view ${USER}/${FORK} --json id --jq '.id'
+stdout2env FORK_ID
+
+exec gh repo clone ${USER}/${FORK}
+cd ${FORK}
+
+# Prepare a branch to commit
+exec git checkout -b feature-branch
+exec git commit --allow-empty -m 'Upstream Commit'
+exec git push upstream feature-branch
+
+# Prepare an additional commit
+exec git commit --allow-empty -m 'Fork Commit'
+exec git push origin feature-branch
+
+# Create the PR
+exec gh pr create --title 'Feature Title' --body 'Feature Body'
+stdout https://${GH_HOST}/${ORG}/${REPO}/pull/1
+
+# Check the PR is indeed created
+exec gh pr view ${USER}:feature-branch --json headRefName,headRepository,baseRefName,isCrossRepository
+stdout {"baseRefName":"main","headRefName":"feature-branch","headRepository":{"id":"${FORK_ID}","name":"${FORK}"},"isCrossRepository":true}

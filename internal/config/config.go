@@ -17,6 +17,7 @@ import (
 const (
 	aliasesKey            = "aliases"
 	browserKey            = "browser"
+	colorLabelsKey        = "color_labels"
 	editorKey             = "editor"
 	gitProtocolKey        = "git_protocol"
 	hostsKey              = "hosts"
@@ -111,6 +112,11 @@ func (c *cfg) Authentication() gh.AuthConfig {
 func (c *cfg) Browser(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, browserKey).Unwrap()
+}
+
+func (c *cfg) ColorLabels(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, colorLabelsKey).Unwrap()
 }
 
 func (c *cfg) Editor(hostname string) gh.ConfigEntry {
@@ -532,6 +538,8 @@ aliases:
 http_unix_socket:
 # What web browser gh should use when opening URLs. If blank, will refer to environment.
 browser:
+# Whether to display labels using their RGB hex color codes in terminals that support truecolor. Supported values: enabled, disabled
+color_labels: disabled
 `
 
 type ConfigOption struct {
@@ -600,6 +608,15 @@ var Options = []ConfigOption{
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Browser(hostname).Value
+		},
+	},
+	{
+		Key:           colorLabelsKey,
+		Description:   "whether to display labels using their RGB hex color codes in terminals that support truecolor",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.ColorLabels(hostname).Value
 		},
 	},
 }

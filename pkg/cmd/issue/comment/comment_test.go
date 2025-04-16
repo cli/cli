@@ -224,9 +224,10 @@ func Test_commentRun(t *testing.T) {
 		expectErr     bool
 		stdout        string
 		stderr        string
+		wantsErr      bool
 	}{
 		{
-			name: "interactive editor",
+			name: "creating new comment with interactive editor succeeds",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				InputType:   0,
@@ -235,13 +236,29 @@ func Test_commentRun(t *testing.T) {
 				InteractiveEditSurvey: func(string) (string, error) { return "comment body", nil },
 				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
 			},
+			emptyComments: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name: "interactive editor with edit last",
+			name: "updating last comment with interactive editor fails if there are no comments and decline prompt to create",
+			input: &shared.CommentableOptions{
+				Interactive: true,
+				InputType:   0,
+				Body:        "",
+				EditLast:    true,
+
+				InteractiveEditSurvey:     func(string) (string, error) { return "comment body", nil },
+				ConfirmSubmitSurvey:       func() (bool, error) { return true, nil },
+				ConfirmCreateIfNoneSurvey: func() (bool, error) { return false, nil },
+			},
+			emptyComments: true,
+			wantsErr:      true,
+		},
+		{
+			name: "updating last comment with interactive editor succeeds if there are comments",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				InputType:   0,
@@ -254,10 +271,11 @@ func Test_commentRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentUpdate(t, reg)
 			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
+			emptyComments: false,
+			stdout:        "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
 		},
 		{
-			name: "interactive editor with edit last and create if none",
+			name: "updating last comment with interactive editor creates new comment if there are no comments but --create-if-none",
 			input: &shared.CommentableOptions{
 				Interactive:  true,
 				InputType:    0,
@@ -270,12 +288,14 @@ func Test_commentRun(t *testing.T) {
 				ConfirmSubmitSurvey:       func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockCommentUpdate(t, reg)
+				mockCommentCreate(t, reg)
 			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
+			emptyComments: true,
+			stderr:        "No comments found. Creating a new comment.\n",
+			stdout:        "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name: "non-interactive web",
+			name: "creating new comment with non-interactive web opens issue in browser focusing on new comment",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeWeb,
@@ -283,55 +303,38 @@ func Test_commentRun(t *testing.T) {
 
 				OpenInBrowser: func(string) error { return nil },
 			},
-			stderr: "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
+			emptyComments: true,
+			stderr:        "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
 		},
 		{
-			name: "non-interactive web with edit last",
+			name: "updating last comment with non-interactive web opens issue in browser focusing on the last comment",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeWeb,
 				Body:        "",
 				EditLast:    true,
 
-				OpenInBrowser: func(string) error { return nil },
-			},
-			stderr: "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
-		},
-		{
-			name: "non-interactive web with edit last and create if none for empty comments",
-			input: &shared.CommentableOptions{
-				Interactive:  false,
-				InputType:    shared.InputTypeWeb,
-				Body:         "",
-				EditLast:     true,
-				CreateIfNone: true,
-
-				OpenInBrowser: func(u string) error {
-					assert.Contains(t, u, "#issuecomment-new")
-					return nil
-				},
-			},
-			emptyComments: true,
-			stderr:        "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
-		},
-		{
-			name: "non-interactive web with edit last and create if none",
-			input: &shared.CommentableOptions{
-				Interactive:  false,
-				InputType:    shared.InputTypeWeb,
-				Body:         "",
-				EditLast:     true,
-				CreateIfNone: true,
-
 				OpenInBrowser: func(u string) error {
 					assert.Contains(t, u, "#issuecomment-111")
 					return nil
 				},
 			},
-			stderr: "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
+			emptyComments: false,
+			stderr:        "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
 		},
 		{
-			name: "non-interactive editor",
+			name: "updating last comment with non-interactive web errors because there are no comments",
+			input: &shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeWeb,
+				Body:        "",
+				EditLast:    true,
+			},
+			emptyComments: true,
+			wantsErr:      true,
+		},
+		{
+			name: "creating new comment with non-interactive editor succeeds",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeEditor,
@@ -345,7 +348,20 @@ func Test_commentRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name: "non-interactive editor with edit last",
+			name: "updating last comment with non-interactive editor fails if there are no comments",
+			input: &shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeEditor,
+				Body:        "",
+				EditLast:    true,
+
+				EditSurvey: func(string) (string, error) { return "comment body", nil },
+			},
+			emptyComments: true,
+			wantsErr:      true,
+		},
+		{
+			name: "updating last comment with non-interactive editor succeeds if there are comments",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeEditor,
@@ -357,10 +373,11 @@ func Test_commentRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentUpdate(t, reg)
 			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
+			emptyComments: false,
+			stdout:        "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
 		},
 		{
-			name: "non-interactive editor with edit last and create if none",
+			name: "updating last comment with non-interactive editor creates new comment if there are no comments but --create-if-none",
 			input: &shared.CommentableOptions{
 				Interactive:  false,
 				InputType:    shared.InputTypeEditor,
@@ -377,7 +394,7 @@ func Test_commentRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name: "non-interactive inline",
+			name: "creating new comment with non-interactive inline succeeds if comment body is provided",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -389,7 +406,7 @@ func Test_commentRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name: "non-interactive inline with edit last",
+			name: "updating last comment with non-interactive inline succeeds if there are comments and comment body is provided",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -399,7 +416,23 @@ func Test_commentRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentUpdate(t, reg)
 			},
-			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
+			emptyComments: false,
+			stdout:        "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
+		},
+		{
+			name: "updating last comment with non-interactive inline creates new comment if there are no comments but --create-if-none",
+			input: &shared.CommentableOptions{
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "comment body",
+				EditLast:     true,
+				CreateIfNone: true,
+			},
+			emptyComments: true,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentCreate(t, reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
 			name: "non interactive editor with delete last without any comment",
@@ -519,14 +552,13 @@ func Test_commentRun(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := shared.CommentableRun(tt.input)
-			if tt.expectErr {
+			if tt.wantsErr {
 				assert.Error(t, err)
-				assert.Equal(t, tt.stderr, err.Error())
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.stdout, stdout.String())
-				assert.Equal(t, tt.stderr, stderr.String())
+				return
 			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.stdout, stdout.String())
+			assert.Equal(t, tt.stderr, stderr.String())
 		})
 	}
 }

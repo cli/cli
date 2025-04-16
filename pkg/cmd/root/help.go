@@ -87,7 +87,7 @@ func isRootCmd(command *cobra.Command) bool {
 	return command != nil && !command.HasParent()
 }
 
-func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
+func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, _ []string) {
 	flags := command.Flags()
 
 	if isRootCmd(command) {

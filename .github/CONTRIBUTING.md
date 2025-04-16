@@ -62,9 +62,9 @@ To propose a design:
 - Include a link to the issue that the design is for.
 - Describe the design you are proposing to resolve the issue, leveraging the [CLI Design System][].
 - Mock up the design you are proposing using our [Google Docs Template][] or code blocks.
-  - Mock ups should cleary illustrate the command(s) being run and the expected output(s).
+  - Mock ups should clearly illustrate the command(s) being run and the expected output(s).
 
-### (core team only) Revewing a design
+### (core team only) Reviewing a design
 
 A member of the core team will [triage](../docs/triage.md) the design proposal. Once a member of the core team has reviewed the design, they may add the [`help wanted`][hw] label to the issue, so a PR can be opened to provide the implementation.
 

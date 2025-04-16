@@ -1,20 +1,22 @@
 # This test is the same as pr-create-basic, except that the git push doesn't include the -u argument
 # This causes a git config read to fail during gh pr create, but it should not be fatal
 
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
 # Use gh as a credential helper
 exec gh auth setup-git
 
 # Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+exec gh repo create ${ORG}/${REPO} --add-readme --private
 
 # Defer repo cleanup
-defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+defer gh repo delete --yes ${ORG}/${REPO}
 
 # Clone the repo
-exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+exec gh repo clone ${ORG}/${REPO}
 
 # Prepare a branch to PR
-cd $SCRIPT_NAME-$RANDOM_STRING
+cd ${REPO}
 exec git checkout -b feature-branch
 exec git commit --allow-empty -m 'Empty Commit'
 exec git push origin feature-branch

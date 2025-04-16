@@ -740,7 +740,7 @@ func statusRun(opts *StatusOptions) error {
 		errs := sg.authErrors.ToSlice()
 		sort.Strings(errs)
 		for _, msg := range errs {
-			fmt.Fprintln(out, cs.Gray(fmt.Sprintf("warning: %s", msg)))
+			fmt.Fprintln(out, cs.Mutedf("warning: %s", msg))
 		}
 	}
 

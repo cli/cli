@@ -381,7 +381,6 @@ func (c *Client) lookupCommit(ctx context.Context, sha, format string) ([]byte, 
 // Downstream consumers of ReadBranchConfig should consider the behavior they desire if this errors,
 // as an empty config is not necessarily breaking.
 func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (BranchConfig, error) {
-
 	prefix := regexp.QuoteMeta(fmt.Sprintf("branch.%s.", branch))
 	args := []string{"config", "--get-regexp", fmt.Sprintf("^%s(remote|merge|pushremote|%s)$", prefix, MergeBaseConfig)}
 	cmd, err := c.Command(ctx, args...)
@@ -441,18 +440,50 @@ func (c *Client) SetBranchConfig(ctx context.Context, branch, name, value string
 	return err
 }
 
+// PushDefault defines the action git push should take if no refspec is given.
+// See: https://git-scm.com/docs/git-config#Documentation/git-config.txt-pushdefault
+type PushDefault string
+
+const (
+	PushDefaultNothing  PushDefault = "nothing"
+	PushDefaultCurrent  PushDefault = "current"
+	PushDefaultUpstream PushDefault = "upstream"
+	PushDefaultTracking PushDefault = "tracking"
+	PushDefaultSimple   PushDefault = "simple"
+	PushDefaultMatching PushDefault = "matching"
+)
+
+func ParsePushDefault(s string) (PushDefault, error) {
+	validPushDefaults := map[string]struct{}{
+		string(PushDefaultNothing):  {},
+		string(PushDefaultCurrent):  {},
+		string(PushDefaultUpstream): {},
+		string(PushDefaultTracking): {},
+		string(PushDefaultSimple):   {},
+		string(PushDefaultMatching): {},
+	}
+
+	if _, ok := validPushDefaults[s]; ok {
+		return PushDefault(s), nil
+	}
+
+	return "", fmt.Errorf("unknown push.default value: %s", s)
+}
+
 // PushDefault returns the value of push.default in the config. If the value
 // is not set, it returns "simple" (the default git value). See
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-pushdefault
-func (c *Client) PushDefault(ctx context.Context) (string, error) {
+func (c *Client) PushDefault(ctx context.Context) (PushDefault, error) {
 	pushDefault, err := c.Config(ctx, "push.default")
 	if err == nil {
-		return pushDefault, nil
+		return ParsePushDefault(pushDefault)
 	}
 
+	// If there is an error that the config key is not set, return the default value
+	// that git uses since 2.0.
 	var gitError *GitError
 	if ok := errors.As(err, &gitError); ok && gitError.ExitCode == 1 {
-		return "simple", nil
+		return PushDefaultSimple, nil
 	}
 	return "", err
 }
@@ -473,13 +504,48 @@ func (c *Client) RemotePushDefault(ctx context.Context) (string, error) {
 	return "", err
 }
 
-// ParsePushRevision gets the value of the @{push} revision syntax
+// RemoteTrackingRef is the structured form of the string "refs/remotes/<remote>/<branch>".
+// For example, the @{push} revision syntax could report "refs/remotes/origin/main" which would
+// be parsed into RemoteTrackingRef{Remote: "origin", Branch: "main"}.
+type RemoteTrackingRef struct {
+	Remote string
+	Branch string
+}
+
+func (r RemoteTrackingRef) String() string {
+	return fmt.Sprintf("refs/remotes/%s/%s", r.Remote, r.Branch)
+}
+
+// ParseRemoteTrackingRef parses a string of the form "refs/remotes/<remote>/<branch>" into
+// a RemoteTrackingBranch struct. If the string does not match this format, an error is returned.
+func ParseRemoteTrackingRef(s string) (RemoteTrackingRef, error) {
+	parts := strings.Split(s, "/")
+	if len(parts) != 4 || parts[0] != "refs" || parts[1] != "remotes" {
+		return RemoteTrackingRef{}, fmt.Errorf("remote tracking branch must have format refs/remotes/<remote>/<branch> but was: %s", s)
+	}
+
+	return RemoteTrackingRef{
+		Remote: parts[2],
+		Branch: parts[3],
+	}, nil
+}
+
+// PushRevision gets the value of the @{push} revision syntax
 // An error here doesn't necessarily mean something is broken, but may mean that the @{push}
 // revision syntax couldn't be resolved, such as in non-centralized workflows with
 // push.default = simple. Downstream consumers should consider how to handle this error.
-func (c *Client) ParsePushRevision(ctx context.Context, branch string) (string, error) {
-	revParseOut, err := c.revParse(ctx, "--abbrev-ref", branch+"@{push}")
-	return firstLine(revParseOut), err
+func (c *Client) PushRevision(ctx context.Context, branch string) (RemoteTrackingRef, error) {
+	revParseOut, err := c.revParse(ctx, "--symbolic-full-name", branch+"@{push}")
+	if err != nil {
+		return RemoteTrackingRef{}, err
+	}
+
+	ref, err := ParseRemoteTrackingRef(firstLine(revParseOut))
+	if err != nil {
+		return RemoteTrackingRef{}, fmt.Errorf("could not parse push revision: %v", err)
+	}
+
+	return ref, nil
 }
 
 func (c *Client) DeleteLocalTag(ctx context.Context, tag string) error {

@@ -152,7 +152,7 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 		case false:
 			nameColor = cs.Yellow
 		case true:
-			nameColor = cs.Gray
+			nameColor = cs.Muted
 		}
 
 		tp.AddField(formattedName, tableprinter.WithColor(nameColor))
@@ -172,7 +172,7 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 		if err != nil {
 			return fmt.Errorf("error parsing date %q: %w", c.CreatedAt, err)
 		}
-		tp.AddTimeField(time.Now(), ct, cs.Gray)
+		tp.AddTimeField(time.Now(), ct, cs.Muted)
 
 		if hasNonProdVSCSTarget {
 			tp.AddField(c.VSCSTarget)

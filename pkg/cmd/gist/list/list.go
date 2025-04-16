@@ -206,7 +206,7 @@ func printTable(io *iostreams.IOStreams, gists []shared.Gist, filter *regexp.Reg
 			tableprinter.WithColor(highlightFilesFunc(&gist)),
 		)
 		tp.AddField(visibility, tableprinter.WithColor(visColor))
-		tp.AddTimeField(time.Now(), gist.UpdatedAt, cs.Gray)
+		tp.AddTimeField(time.Now(), gist.UpdatedAt, cs.Muted)
 		tp.EndRow()
 	}
 

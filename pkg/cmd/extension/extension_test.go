@@ -102,3 +102,84 @@ func TestOwnerCached(t *testing.T) {
 
 	assert.Equal(t, "cli", e.Owner())
 }
+
+func TestIsPinnedBinaryExtensionUnpinned(t *testing.T) {
+	tempDir := t.TempDir()
+	extName := "gh-bin-ext"
+	extDir := filepath.Join(tempDir, "extensions", extName)
+	extPath := filepath.Join(extDir, extName)
+	bm := binManifest{
+		Name: "gh-bin-ext",
+	}
+	assert.NoError(t, stubBinaryExtension(extDir, bm))
+	e := &Extension{
+		kind: BinaryKind,
+		path: extPath,
+	}
+
+	assert.False(t, e.IsPinned())
+}
+
+func TestIsPinnedBinaryExtensionPinned(t *testing.T) {
+	tempDir := t.TempDir()
+	extName := "gh-bin-ext"
+	extDir := filepath.Join(tempDir, "extensions", extName)
+	extPath := filepath.Join(extDir, extName)
+	bm := binManifest{
+		Name:     "gh-bin-ext",
+		IsPinned: true,
+	}
+	assert.NoError(t, stubBinaryExtension(extDir, bm))
+	e := &Extension{
+		kind: BinaryKind,
+		path: extPath,
+	}
+
+	assert.True(t, e.IsPinned())
+}
+
+func TestIsPinnedGitExtensionUnpinned(t *testing.T) {
+	tempDir := t.TempDir()
+	extPath := filepath.Join(tempDir, "extensions", "gh-local", "gh-local")
+	assert.NoError(t, stubExtension(extPath))
+
+	gc := &mockGitClient{}
+	gc.On("CommandOutput", []string{"rev-parse", "HEAD"}).Return("abcd1234", nil)
+	e := &Extension{
+		kind:      GitKind,
+		gitClient: gc,
+		path:      extPath,
+	}
+
+	assert.False(t, e.IsPinned())
+	gc.AssertExpectations(t)
+}
+
+func TestIsPinnedGitExtensionPinned(t *testing.T) {
+	tempDir := t.TempDir()
+	extPath := filepath.Join(tempDir, "extensions", "gh-local", "gh-local")
+	assert.NoError(t, stubPinnedExtension(extPath, "abcd1234"))
+
+	gc := &mockGitClient{}
+	gc.On("CommandOutput", []string{"rev-parse", "HEAD"}).Return("abcd1234", nil)
+	e := &Extension{
+		kind:      GitKind,
+		gitClient: gc,
+		path:      extPath,
+	}
+
+	assert.True(t, e.IsPinned())
+	gc.AssertExpectations(t)
+}
+
+func TestIsPinnedLocalExtension(t *testing.T) {
+	tempDir := t.TempDir()
+	extPath := filepath.Join(tempDir, "extensions", "gh-local", "gh-local")
+	assert.NoError(t, stubLocalExtension(tempDir, extPath))
+	e := &Extension{
+		kind: LocalKind,
+		path: extPath,
+	}
+
+	assert.False(t, e.IsPinned())
+}

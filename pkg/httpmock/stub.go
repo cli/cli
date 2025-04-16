@@ -15,6 +15,7 @@ type Matcher func(req *http.Request) bool
 type Responder func(req *http.Request) (*http.Response, error)
 
 type Stub struct {
+	Stack     string
 	matched   bool
 	Matcher   Matcher
 	Responder Responder

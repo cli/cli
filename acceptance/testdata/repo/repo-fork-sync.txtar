@@ -9,12 +9,10 @@ defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
 
 # Fork and clone the repo
 exec gh repo fork $ORG/$SCRIPT_NAME-$RANDOM_STRING --org $ORG --fork-name $SCRIPT_NAME-$RANDOM_STRING-fork --clone
+sleep 5
 
 # Defer fork cleanup
 defer gh repo delete $ORG/$SCRIPT_NAME-$RANDOM_STRING-fork --yes
-
-# Sleep so that the BE has time to sync
-sleep 5
 
 # Check that the repo was forked
 exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING-fork --json='isFork' --jq='.isFork'
