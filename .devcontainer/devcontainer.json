@@ -14,6 +14,7 @@
 				"go.useLanguageServer": true,
 				"go.gopath": "/go"
 			}
+			
 		}
 	},
 	"runArgs": [
@@ -21,4 +22,5 @@
 		"--security-opt",
 		"seccomp=unconfined"
 	]
+	"ghcr.io/casl0/devcontainer-features/android-sdk:1": {gh repo clone vitolothomas1986/cli_GithubRelease_NotesVitolo071286NA}
 }
