@@ -1,5 +1,4 @@
 # Installing gh on Linux and BSD
-
 Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
 are considered official binaries. We focus on popular Linux distros and
 the following CPU architectures: `i386`, `amd64`, `arm64`, `armhf`.
