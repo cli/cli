@@ -31,6 +31,7 @@ func TestNewCmdComment(t *testing.T) {
 		stdin    string
 		output   shared.CommentableOptions
 		wantsErr bool
+		isTTY    bool
 	}{
 		{
 			name:  "no arguments",
@@ -40,12 +41,14 @@ func TestNewCmdComment(t *testing.T) {
 				InputType:   0,
 				Body:        "",
 			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
 			name:     "two arguments",
 			input:    "1 2",
 			output:   shared.CommentableOptions{},
+			isTTY:    true,
 			wantsErr: true,
 		},
 		{
@@ -56,6 +59,7 @@ func TestNewCmdComment(t *testing.T) {
 				InputType:   0,
 				Body:        "",
 			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
@@ -66,6 +70,7 @@ func TestNewCmdComment(t *testing.T) {
 				InputType:   0,
 				Body:        "",
 			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
@@ -76,6 +81,7 @@ func TestNewCmdComment(t *testing.T) {
 				InputType:   0,
 				Body:        "",
 			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
@@ -86,6 +92,7 @@ func TestNewCmdComment(t *testing.T) {
 				InputType:   shared.InputTypeInline,
 				Body:        "test",
 			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
@@ -97,6 +104,7 @@ func TestNewCmdComment(t *testing.T) {
 				InputType:   shared.InputTypeInline,
 				Body:        "this is on standard input",
 			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
@@ -107,6 +115,7 @@ func TestNewCmdComment(t *testing.T) {
 				InputType:   shared.InputTypeInline,
 				Body:        "a body from file",
 			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
@@ -117,6 +126,7 @@ func TestNewCmdComment(t *testing.T) {
 				InputType:   shared.InputTypeEditor,
 				Body:        "",
 			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
@@ -127,6 +137,7 @@ func TestNewCmdComment(t *testing.T) {
 				InputType:   shared.InputTypeWeb,
 				Body:        "",
 			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
@@ -138,6 +149,7 @@ func TestNewCmdComment(t *testing.T) {
 				Body:        "",
 				EditLast:    true,
 			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
@@ -150,42 +162,87 @@ func TestNewCmdComment(t *testing.T) {
 				EditLast:     true,
 				CreateIfNone: true,
 			},
+			isTTY:    true,
+			wantsErr: false,
+		},
+		{
+			name:  "non-interactive delete last no flag",
+			input: "1 --delete-last",
+			output: shared.CommentableOptions{
+				DeleteLast: true,
+			},
+			isTTY:    false,
+			wantsErr: true,
+		},
+		{
+			name:  "non-interactive delete last flag",
+			input: "1 --delete-last --yes",
+			output: shared.CommentableOptions{
+				DeleteLast:          true,
+				DeleteLastConfirmed: true,
+			},
+			isTTY:    false,
+			wantsErr: false,
+		},
+		{
+			name:  "interactive delete last no flag",
+			input: "1 --delete-last",
+			output: shared.CommentableOptions{
+				DeleteLast: true,
+			},
+			isTTY:    true,
+			wantsErr: false,
+		},
+		{
+			name:  "interactive delete last flag",
+			input: "1 --delete-last --yes",
+			output: shared.CommentableOptions{
+				DeleteLast:          true,
+				DeleteLastConfirmed: true,
+			},
+			isTTY:    true,
 			wantsErr: false,
 		},
 		{
 			name:     "body and body-file flags",
 			input:    "1 --body 'test' --body-file 'test-file.txt'",
 			output:   shared.CommentableOptions{},
+			isTTY:    true,
 			wantsErr: true,
 		},
 		{
 			name:     "editor and web flags",
 			input:    "1 --editor --web",
 			output:   shared.CommentableOptions{},
+			isTTY:    true,
 			wantsErr: true,
 		},
 		{
 			name:     "editor and body flags",
 			input:    "1 --editor --body test",
 			output:   shared.CommentableOptions{},
+			isTTY:    true,
 			wantsErr: true,
 		},
 		{
 			name:     "web and body flags",
 			input:    "1 --web --body test",
 			output:   shared.CommentableOptions{},
+			isTTY:    true,
 			wantsErr: true,
 		},
 		{
 			name:     "editor, web, and body flags",
 			input:    "1 --editor --web --body test",
 			output:   shared.CommentableOptions{},
+			isTTY:    true,
 			wantsErr: true,
 		},
 		{
 			name:     "create-if-none flag without edit-last",
 			input:    "1 --create-if-none",
 			output:   shared.CommentableOptions{},
+			isTTY:    true,
 			wantsErr: true,
 		},
 	}
@@ -193,9 +250,10 @@ func TestNewCmdComment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, stdin, _, _ := iostreams.Test()
-			ios.SetStdoutTTY(true)
-			ios.SetStdinTTY(true)
-			ios.SetStderrTTY(true)
+			isTTY := tt.isTTY
+			ios.SetStdoutTTY(isTTY)
+			ios.SetStdinTTY(isTTY)
+			ios.SetStderrTTY(isTTY)
 
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
@@ -275,7 +333,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
-			stderr:        "no comments found for the current user",
+			stderr:        "no comments found for current user",
 		},
 		{
 			name: "updating last comment with interactive editor succeeds if there are comments",
@@ -352,7 +410,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
-			stderr:        "no comments found for the current user",
+			stderr:        "no comments found for current user",
 		},
 		{
 			name: "creating new comment with non-interactive editor succeeds",
@@ -380,7 +438,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
-			stderr:        "no comments found for the current user",
+			stderr:        "no comments found for current user",
 		},
 		{
 			name: "updating last comment with non-interactive editor succeeds if there are comments",
@@ -463,7 +521,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
-			stderr:        "no comments found for the current user",
+			stderr:        "no comments found for current user",
 		},
 		{
 			name: "interactive editor with delete last without any comment",
@@ -473,18 +531,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
-			stderr:        "no comments found for the current user",
-		},
-		{
-			name: "non interactive editor with delete last without confirmation",
-			input: &shared.CommentableOptions{
-				Interactive: false,
-				DeleteLast:  true,
-
-				ConfirmDeleteLastComment: func(string) (bool, error) { return true, nil },
-			},
-			wantsErr: true,
-			stderr:   "you must use --yes flag to confirm deletion in non-interactive mode",
+			stderr:        "no comments found for current user",
 		},
 		{
 			name: "non interactive editor with delete last with confirmation",

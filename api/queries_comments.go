@@ -103,7 +103,7 @@ func CommentUpdate(client *Client, repoHost string, params CommentUpdateInput) (
 	return mutation.UpdateIssueComment.IssueComment.URL, nil
 }
 
-func CommentDelete(client *Client, repoHost string, params CommentDeleteInput) (error) {
+func CommentDelete(client *Client, repoHost string, params CommentDeleteInput) error {
 	var mutation struct {
 		DeleteIssueComment struct {
 			ClientMutationID string

@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var errNoUserComments = errors.New("no comments found for the current user")
+var errNoUserComments = errors.New("no comments found for current user")
 var errDeleteNotConfirmed = errors.New("deletion not confirmed")
 
 type InputType int
@@ -76,6 +76,13 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 
 	if opts.CreateIfNone && !opts.EditLast {
 		return cmdutil.FlagErrorf("`--create-if-none` can only be used with `--edit-last`")
+	}
+
+	if opts.DeleteLast {
+		if opts.IO.CanPrompt() || opts.DeleteLastConfirmed {
+			return nil
+		}
+		return cmdutil.FlagErrorf("you must use `--yes` flag to confirm deletion in non-interactive mode")
 	}
 
 	if inputFlags == 0 {
@@ -253,18 +260,14 @@ func deleteComment(commentable Commentable, opts *CommentableOptions) error {
 
 	cs := opts.IO.ColorScheme()
 
-	if (opts.IO.CanPrompt() && !opts.DeleteLastConfirmed) {
-		if opts.Interactive {
-			fmt.Fprintf(opts.IO.Out, "%s Deleted comments cannot be recovered.\n", cs.WarningIcon())
-			ok, err := opts.ConfirmDeleteLastComment(lastComment.Body)
-			if err != nil {
-				return err
-			}
-			if !ok {
-				return errDeleteNotConfirmed
-			}
-		} else {
-			return errors.New("you must use --yes flag to confirm deletion in non-interactive mode")
+	if opts.IO.CanPrompt() && !opts.DeleteLastConfirmed {
+		fmt.Fprintf(opts.IO.Out, "%s Deleted comments cannot be recovered.\n", cs.WarningIcon())
+		ok, err := opts.ConfirmDeleteLastComment(lastComment.Body)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errDeleteNotConfirmed
 		}
 	}
 
