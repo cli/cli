@@ -114,6 +114,9 @@ var HelpTopics = []helpTopic{
 
 			%[1]sGH_ACCESSIBLE_PROMPTER%[1]s (preview): set to a truthy value to enable prompts that are
 			more compatible with speech synthesis and braille screen readers.
+
+			%[1]sGH_SPINNER_DISABLED%[1]s: set to a truthy value to replace the spinner animation with
+			a textual progress indicator.
 		`, "`"),
 	},
 	{

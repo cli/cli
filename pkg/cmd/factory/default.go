@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -281,6 +282,12 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 		io.SetNeverPrompt(true)
 	} else if prompt := cfg.Prompt(""); prompt.Value == "disabled" {
 		io.SetNeverPrompt(true)
+	}
+
+	ghSpinnerDisabledValue, ghSpinnerDisabledIsSet := os.LookupEnv("GH_SPINNER_DISABLED")
+	falseyValues := []string{"false", "0", "no", ""}
+	if ghSpinnerDisabledIsSet && !slices.Contains(falseyValues, ghSpinnerDisabledValue) {
+		io.SetSpinnerDisabled(true)
 	}
 
 	// Pager precedence

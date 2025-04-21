@@ -432,6 +432,54 @@ func Test_ioStreams_prompt(t *testing.T) {
 	}
 }
 
+func Test_ioStreams_spinnerDisabled(t *testing.T) {
+	tests := []struct {
+		name            string
+		spinnerDisabled bool
+		env             map[string]string
+	}{
+		{
+			name:            "default config",
+			spinnerDisabled: false,
+		},
+		{
+			name:            "spinner disabled via GH_SPINNER_DISABLED env var = 0",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "0"},
+			spinnerDisabled: false,
+		},
+		{
+			name:            "spinner disabled via GH_SPINNER_DISABLED env var = false",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "false"},
+			spinnerDisabled: false,
+		},
+		{
+			name:            "spinner disabled via GH_SPINNER_DISABLED env var = no",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "no"},
+			spinnerDisabled: false,
+		},
+		{
+			name:            "spinner enabled via GH_SPINNER_DISABLED env var = 1",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "1"},
+			spinnerDisabled: true,
+		},
+		{
+			name:            "spinner enabled via GH_SPINNER_DISABLED env var = true",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "true"},
+			spinnerDisabled: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			f := New("1")
+			io := ioStreams(f)
+			assert.Equal(t, tt.spinnerDisabled, io.GetSpinnerDisabled())
+		})
+	}
+}
+
 func Test_ioStreams_colorLabels(t *testing.T) {
 	tests := []struct {
 		name               string
