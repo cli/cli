@@ -76,7 +76,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 	cmd.Flags().BoolP("editor", "e", false, "Skip prompts and open the text editor to write the body in")
 	cmd.Flags().BoolP("web", "w", false, "Open the web browser to write the comment")
 	cmd.Flags().BoolVar(&opts.EditLast, "edit-last", false, "Edit the last comment of the same author")
-	cmd.Flags().StringVar(&opts.EditSelector, "edit-selector", "", "Edit the comment based on the selector")
+	cmd.Flags().StringVar(&opts.EditSelector, "edit-selector", "", "Edit the comment based on the jq selector. Can be used only with --edit-last")
 	cmd.Flags().BoolVar(&opts.CreateIfNone, "create-if-none", false, "Create a new comment if no comments are found. Can be used only with --edit-last")
 
 	return cmd
