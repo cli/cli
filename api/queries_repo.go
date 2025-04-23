@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"golang.org/x/sync/errgroup"
 
@@ -782,35 +783,54 @@ func (m *RepoMetadataResult) projectV2TitleToID(projectTitle string) (string, bo
 	return "", false
 }
 
-func ProjectsToPaths(projects []RepoProject, projectsV2 []ProjectV2, names []string) ([]string, error) {
-	var paths []string
-	for _, projectName := range names {
-		found := false
-		for _, p := range projects {
-			if strings.EqualFold(projectName, p.Name) {
-				// format of ResourcePath: /OWNER/REPO/projects/PROJECT_NUMBER or /orgs/ORG/projects/PROJECT_NUMBER or /users/USER/projects/PROJECT_NUBER
-				// required format of path: OWNER/REPO/PROJECT_NUMBER or ORG/PROJECT_NUMBER or USER/PROJECT_NUMBER
-				var path string
-				pathParts := strings.Split(p.ResourcePath, "/")
-				if pathParts[1] == "orgs" || pathParts[1] == "users" {
-					path = fmt.Sprintf("%s/%s", pathParts[2], pathParts[4])
-				} else {
-					path = fmt.Sprintf("%s/%s/%s", pathParts[1], pathParts[2], pathParts[4])
+func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string, projectsV1Support gh.ProjectsV1Support) ([]string, error) {
+	paths := make([]string, 0, len(projectNames))
+	matchedPaths := map[string]struct{}{}
+
+	// TODO: ProjectsV1Cleanup
+	// At this point, we only know the names that the user has provided, so we can't push this conditional up the stack.
+	// First we'll try to match against v1 projects, if supported
+	if projectsV1Support == gh.ProjectsV1Supported {
+		v1Projects, err := v1Projects(client, repo)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, projectName := range projectNames {
+			for _, p := range v1Projects {
+				if strings.EqualFold(projectName, p.Name) {
+					pathParts := strings.Split(p.ResourcePath, "/")
+					var path string
+					if pathParts[1] == "orgs" || pathParts[1] == "users" {
+						path = fmt.Sprintf("%s/%s", pathParts[2], pathParts[4])
+					} else {
+						path = fmt.Sprintf("%s/%s/%s", pathParts[1], pathParts[2], pathParts[4])
+					}
+					paths = append(paths, path)
+					matchedPaths[projectName] = struct{}{}
+					break
 				}
-				paths = append(paths, path)
-				found = true
-				break
 			}
 		}
-		if found {
+	}
+
+	// Then we'll try to match against v2 projects
+	v2Projects, err := v2Projects(client, repo)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, projectName := range projectNames {
+		// If we already found a v1 project with this name, skip it
+		if _, ok := matchedPaths[projectName]; ok {
 			continue
 		}
-		for _, p := range projectsV2 {
+
+		found := false
+		for _, p := range v2Projects {
 			if strings.EqualFold(projectName, p.Title) {
-				// format of ResourcePath: /OWNER/REPO/projects/PROJECT_NUMBER or /orgs/ORG/projects/PROJECT_NUMBER or /users/USER/projects/PROJECT_NUBER
-				// required format of path: OWNER/REPO/PROJECT_NUMBER or ORG/PROJECT_NUMBER or USER/PROJECT_NUMBER
-				var path string
 				pathParts := strings.Split(p.ResourcePath, "/")
+				var path string
 				if pathParts[1] == "orgs" || pathParts[1] == "users" {
 					path = fmt.Sprintf("%s/%s", pathParts[2], pathParts[4])
 				} else {
@@ -821,10 +841,12 @@ func ProjectsToPaths(projects []RepoProject, projectsV2 []ProjectV2, names []str
 				break
 			}
 		}
+
 		if !found {
 			return nil, fmt.Errorf("'%s' not found", projectName)
 		}
 	}
+
 	return paths, nil
 }
 
@@ -863,7 +885,8 @@ type RepoMetadataInput struct {
 	Assignees  bool
 	Reviewers  bool
 	Labels     bool
-	Projects   bool
+	ProjectsV1 bool
+	ProjectsV2 bool
 	Milestones bool
 }
 
@@ -882,6 +905,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 			return err
 		})
 	}
+
 	if input.Reviewers {
 		g.Go(func() error {
 			teams, err := OrganizationTeams(client, repo)
@@ -894,6 +918,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 			return nil
 		})
 	}
+
 	if input.Reviewers {
 		g.Go(func() error {
 			login, err := CurrentLoginName(client, repo.RepoHost())
@@ -904,6 +929,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 			return err
 		})
 	}
+
 	if input.Labels {
 		g.Go(func() error {
 			labels, err := RepoLabels(client, repo)
@@ -914,13 +940,23 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 			return err
 		})
 	}
-	if input.Projects {
+
+	if input.ProjectsV1 {
 		g.Go(func() error {
 			var err error
-			result.Projects, result.ProjectsV2, err = relevantProjects(client, repo)
+			result.Projects, err = v1Projects(client, repo)
 			return err
 		})
 	}
+
+	if input.ProjectsV2 {
+		g.Go(func() error {
+			var err error
+			result.ProjectsV2, err = v2Projects(client, repo)
+			return err
+		})
+	}
+
 	if input.Milestones {
 		g.Go(func() error {
 			milestones, err := RepoMilestones(client, repo, "open")
@@ -943,7 +979,8 @@ type RepoResolveInput struct {
 	Assignees  []string
 	Reviewers  []string
 	Labels     []string
-	Projects   []string
+	ProjectsV1 bool
+	ProjectsV2 bool
 	Milestones []string
 }
 
@@ -970,7 +1007,8 @@ func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoRes
 
 	// there is no way to look up projects nor milestones by name, so preload them all
 	mi := RepoMetadataInput{
-		Projects:   len(input.Projects) > 0,
+		ProjectsV1: input.ProjectsV1,
+		ProjectsV2: input.ProjectsV2,
 		Milestones: len(input.Milestones) > 0,
 	}
 	result, err := RepoMetadata(client, repo, mi)
@@ -1237,26 +1275,12 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 	return milestones, nil
 }
 
-func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string) ([]string, error) {
-	projects, projectsV2, err := relevantProjects(client, repo)
-	if err != nil {
-		return nil, err
-	}
-	return ProjectsToPaths(projects, projectsV2, projectNames)
-}
-
-// RelevantProjects retrieves set of Projects and ProjectsV2 relevant to given repository:
+// v1Projects retrieves set of RepoProjects relevant to given repository:
 // - Projects for repository
 // - Projects for repository organization, if it belongs to one
-// - ProjectsV2 owned by current user
-// - ProjectsV2 linked to repository
-// - ProjectsV2 owned by repository organization, if it belongs to one
-func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []ProjectV2, error) {
+func v1Projects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 	var repoProjects []RepoProject
 	var orgProjects []RepoProject
-	var userProjectsV2 []ProjectV2
-	var repoProjectsV2 []ProjectV2
-	var orgProjectsV2 []ProjectV2
 
 	g, _ := errgroup.WithContext(context.Background())
 
@@ -1268,6 +1292,7 @@ func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []P
 		}
 		return err
 	})
+
 	g.Go(func() error {
 		var err error
 		orgProjects, err = OrganizationProjects(client, repo)
@@ -1277,6 +1302,29 @@ func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []P
 		}
 		return nil
 	})
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	projects := make([]RepoProject, 0, len(repoProjects)+len(orgProjects))
+	projects = append(projects, repoProjects...)
+	projects = append(projects, orgProjects...)
+
+	return projects, nil
+}
+
+// v2Projects retrieves set of ProjectV2 relevant to given repository:
+// - ProjectsV2 owned by current user
+// - ProjectsV2 linked to repository
+// - ProjectsV2 owned by repository organization, if it belongs to one
+func v2Projects(client *Client, repo ghrepo.Interface) ([]ProjectV2, error) {
+	var userProjectsV2 []ProjectV2
+	var repoProjectsV2 []ProjectV2
+	var orgProjectsV2 []ProjectV2
+
+	g, _ := errgroup.WithContext(context.Background())
+
 	g.Go(func() error {
 		var err error
 		userProjectsV2, err = CurrentUserProjectsV2(client, repo.RepoHost())
@@ -1286,6 +1334,7 @@ func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []P
 		}
 		return nil
 	})
+
 	g.Go(func() error {
 		var err error
 		repoProjectsV2, err = RepoProjectsV2(client, repo)
@@ -1295,6 +1344,7 @@ func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []P
 		}
 		return nil
 	})
+
 	g.Go(func() error {
 		var err error
 		orgProjectsV2, err = OrganizationProjectsV2(client, repo)
@@ -1308,12 +1358,8 @@ func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []P
 	})
 
 	if err := g.Wait(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	projects := make([]RepoProject, 0, len(repoProjects)+len(orgProjects))
-	projects = append(projects, repoProjects...)
-	projects = append(projects, orgProjects...)
 
 	// ProjectV2 might appear across multiple queries so use a map to keep them deduplicated.
 	m := make(map[string]ProjectV2, len(userProjectsV2)+len(repoProjectsV2)+len(orgProjectsV2))
@@ -1331,7 +1377,7 @@ func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []P
 		projectsV2 = append(projectsV2, p)
 	}
 
-	return projects, projectsV2, nil
+	return projectsV2, nil
 }
 
 func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path string, body io.Reader) (*Repository, error) {

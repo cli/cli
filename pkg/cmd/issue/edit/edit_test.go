@@ -10,7 +10,9 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -787,4 +789,89 @@ func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
 		{ "data": { "add_000": { "item": { "id": "1" } }, "delete_001": { "item": { "id": "2" } } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
+}
+
+// TODO projectsV1Deprecation
+// Remove this test.
+func TestProjectsV1Deprecation(t *testing.T) {
+	t.Run("when projects v1 is supported, is included in query", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Register(
+			httpmock.GraphQL(`projectCards`),
+			// Simulate a GraphQL error to early exit the test.
+			httpmock.StatusStringResponse(500, ""),
+		)
+
+		_, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		// Ignore the error because we have no way to really stub it without
+		// fully stubbing a GQL error structure in the request body.
+		_ = editRun(&EditOptions{
+			IO: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			BaseRepo: func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			},
+			Detector: &fd.EnabledDetectorMock{},
+
+			IssueNumbers: []int{123},
+			Editable: prShared.Editable{
+				Projects: prShared.EditableProjects{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"Test Project"},
+						Edited: true,
+					},
+				},
+			},
+		})
+
+		// Verify that our request contained projectCards
+		reg.Verify(t)
+	})
+
+	t.Run("when projects v1 is not supported, is not included in query", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Exclude(t, httpmock.GraphQL(`projectCards`))
+
+		reg.Register(
+			httpmock.GraphQL(`.*`),
+			// Simulate a GraphQL error to early exit the test.
+			httpmock.StatusStringResponse(500, ""),
+		)
+
+		_, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		// Ignore the error because we're not really interested in it.
+		_ = editRun(&EditOptions{
+			IO: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			BaseRepo: func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			},
+			Detector: &fd.DisabledDetectorMock{},
+
+			IssueNumbers: []int{123},
+			Editable: prShared.Editable{
+				Projects: prShared.EditableProjects{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"Test Project"},
+						Edited: true,
+					},
+				},
+			},
+		})
+
+		// Verify that our request contained projectCards
+		reg.Verify(t)
+	})
 }

@@ -440,7 +440,8 @@ func createRun(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		return submitPR(*opts, *ctx, *state)
+		// TODO wm: revisit project support
+		return submitPR(*opts, *ctx, *state, gh.ProjectsV1Supported)
 	}
 
 	if opts.RecoverFile != "" {
@@ -536,7 +537,8 @@ func createRun(opts *CreateOptions) error {
 				Repo:      ctx.PRRefs.BaseRepo(),
 				State:     state,
 			}
-			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.PRRefs.BaseRepo(), fetcher, state)
+			// TODO wm: revisit project support
+			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.PRRefs.BaseRepo(), fetcher, state, gh.ProjectsV1Supported)
 			if err != nil {
 				return err
 			}
@@ -565,11 +567,13 @@ func createRun(opts *CreateOptions) error {
 
 	if action == shared.SubmitDraftAction {
 		state.Draft = true
-		return submitPR(*opts, *ctx, *state)
+		// TODO wm: revisit project support
+		return submitPR(*opts, *ctx, *state, gh.ProjectsV1Supported)
 	}
 
 	if action == shared.SubmitAction {
-		return submitPR(*opts, *ctx, *state)
+		// TODO wm: revisit project support
+		return submitPR(*opts, *ctx, *state, gh.ProjectsV1Supported)
 	}
 
 	err = errors.New("expected to cancel, preview, or submit")
@@ -621,13 +625,13 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 	}
 
 	state := &shared.IssueMetadataState{
-		Type:       shared.PRMetadata,
-		Reviewers:  opts.Reviewers,
-		Assignees:  assignees,
-		Labels:     opts.Labels,
-		Projects:   opts.Projects,
-		Milestones: milestoneTitles,
-		Draft:      opts.IsDraft,
+		Type:          shared.PRMetadata,
+		Reviewers:     opts.Reviewers,
+		Assignees:     assignees,
+		Labels:        opts.Labels,
+		ProjectTitles: opts.Projects,
+		Milestones:    milestoneTitles,
+		Draft:         opts.IsDraft,
 	}
 
 	if opts.FillVerbose || opts.Autofill || opts.FillFirst || !opts.TitleProvided || !opts.BodyProvided {
@@ -966,7 +970,7 @@ func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
 	return remotes, nil
 }
 
-func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
+func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState, projectV1Support gh.ProjectsV1Support) error {
 	client := ctx.Client
 
 	params := map[string]interface{}{
@@ -982,7 +986,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		return errors.New("pull request title must not be blank")
 	}
 
-	err := shared.AddMetadataToIssueParams(client, ctx.PRRefs.BaseRepo(), params, &state)
+	err := shared.AddMetadataToIssueParams(client, ctx.PRRefs.BaseRepo(), params, &state, projectV1Support)
 	if err != nil {
 		return err
 	}
@@ -1028,8 +1032,8 @@ func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *s
 	if len(state.Milestones) != 0 {
 		fmt.Fprintf(w, "milestones:\t%v\n", strings.Join(state.Milestones, ", "))
 	}
-	if len(state.Projects) != 0 {
-		fmt.Fprintf(w, "projects:\t%v\n", strings.Join(state.Projects, ", "))
+	if len(state.ProjectTitles) != 0 {
+		fmt.Fprintf(w, "projects:\t%v\n", strings.Join(state.ProjectTitles, ", "))
 	}
 	fmt.Fprintf(w, "maintainerCanModify:\t%t\n", params["maintainerCanModify"])
 	fmt.Fprint(w, "body:\n")
@@ -1060,8 +1064,8 @@ func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}
 	if len(state.Milestones) != 0 {
 		fmt.Fprintf(out, "%s: %s\n", cs.Bold("Milestones"), strings.Join(state.Milestones, ", "))
 	}
-	if len(state.Projects) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", cs.Bold("Projects"), strings.Join(state.Projects, ", "))
+	if len(state.ProjectTitles) != 0 {
+		fmt.Fprintf(out, "%s: %s\n", cs.Bold("Projects"), strings.Join(state.ProjectTitles, ", "))
 	}
 	fmt.Fprintf(out, "%s: %t\n", cs.Bold("MaintainerCanModify"), params["maintainerCanModify"])
 
@@ -1217,7 +1221,8 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 		ctx.PRRefs.BaseRepo(),
 		"compare/%s...%s?expand=1",
 		url.PathEscape(ctx.PRRefs.BaseRef()), url.PathEscape(ctx.PRRefs.QualifiedHeadRef()))
-	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.PRRefs.BaseRepo(), u, state)
+	// TODO wm: revisit project support
+	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.PRRefs.BaseRepo(), u, state, gh.ProjectsV1Supported)
 	if err != nil {
 		return "", err
 	}

@@ -5,9 +5,12 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	shared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -22,6 +25,7 @@ type EditOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   prShared.EditPrompter
+	Detector   fd.Detector
 
 	DetermineEditor    func() (string, error)
 	FieldsToEditSurvey func(prShared.EditPrompter, *prShared.Editable) error
@@ -201,7 +205,18 @@ func editRun(opts *EditOptions) error {
 		lookupFields = append(lookupFields, "labels")
 	}
 	if editable.Projects.Edited {
-		lookupFields = append(lookupFields, "projectCards")
+		// TODO projectsV1Deprecation
+		// Remove this section as we should no longer add projectCards
+		if opts.Detector == nil {
+			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+		}
+
+		projectsV1Support := opts.Detector.ProjectsV1()
+		if projectsV1Support == gh.ProjectsV1Supported {
+			lookupFields = append(lookupFields, "projectCards")
+		}
+
 		lookupFields = append(lookupFields, "projectItems")
 	}
 	if editable.Milestone.Edited {

@@ -381,7 +381,8 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 		Reviewers:  editable.Reviewers.Edited,
 		Assignees:  editable.Assignees.Edited,
 		Labels:     editable.Labels.Edited,
-		Projects:   editable.Projects.Edited,
+		ProjectsV1: editable.Projects.Edited,
+		ProjectsV2: editable.Projects.Edited,
 		Milestones: editable.Milestone.Edited,
 	}
 	metadata, err := api.RepoMetadata(client, repo, input)
