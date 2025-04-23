@@ -97,7 +97,7 @@ func CommentableRun(opts *CommentableOptions) error {
 	opts.Host = repo.RepoHost()
 
 	// Create new comment, bail before complexities of updating the last comment
-	if !opts.EditLast {
+	if !opts.EditLast || opts.EditSelector == "" {
 		return createComment(commentable, opts)
 	}
 
