@@ -21,7 +21,7 @@ func Test_selectComment(t *testing.T) {
 		{
 			name: "body contains expression",
 			args: args{
-				selector: `.body | contains("thank you")`,
+				selector: `. | select(.body | contains("thank you"))`,
 				comments: []api.Comment{
 					{ID: "test-0", Body: "It is a test. Thanks."},
 					{ID: "test-1", Body: "now thank you test"},
@@ -33,7 +33,7 @@ func Test_selectComment(t *testing.T) {
 		{
 			name: "author is known",
 			args: args{
-				selector: `.author.login == "alice"`,
+				selector: `. | select(.author.login == "alice")`,
 				comments: []api.Comment{
 					{ID: "test-0", Author: api.CommentAuthor{Login: "bobby"}},
 					{ID: "test-1", Author: api.CommentAuthor{Login: "alice"}},
@@ -45,7 +45,7 @@ func Test_selectComment(t *testing.T) {
 		{
 			name: "no comments matching expression",
 			args: args{
-				selector: `.author.login == "unknown"`,
+				selector: `. | select(.author.login == "unknown")`,
 				comments: []api.Comment{
 					{ID: "test-0", Author: api.CommentAuthor{Login: "bobby"}},
 					{ID: "test-1", Author: api.CommentAuthor{Login: "alice"}},
@@ -66,13 +66,11 @@ func Test_selectComment(t *testing.T) {
 					t.Errorf("selectComment() = _, %v, want _, %v", err, tt.wantErr)
 				}
 			} else {
-				if tt.wantErr != nil {
-					if got == nil || got.ID != tt.want.ID {
-						t.Errorf("selectComment() = %v, _, want %v, _", got, tt.want)
-					}
-					if !errors.Is(err, tt.wantErr) {
-						t.Errorf("selectComment() = _, %v, want _, %v", err, tt.wantErr)
-					}
+				if got == nil || got.ID != tt.want.ID {
+					t.Errorf("selectComment() = %v, _, want %v, _", got, tt.want)
+				}
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("selectComment() = _, %v, want _, %v", err, tt.wantErr)
 				}
 			}
 		})

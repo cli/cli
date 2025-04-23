@@ -2,6 +2,7 @@ package shared
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -97,7 +98,7 @@ func CommentableRun(opts *CommentableOptions) error {
 	opts.Host = repo.RepoHost()
 
 	// Create new comment, bail before complexities of updating the last comment
-	if !opts.EditLast || opts.EditSelector == "" {
+	if !opts.EditLast {
 		return createComment(commentable, opts)
 	}
 
@@ -255,19 +256,32 @@ func selectComment(selector string, comments []api.Comment) (*api.Comment, error
 	}
 
 	for i, comment := range comments {
-		iter := query.Run(comment)
-		v, ok := iter.Next()
-		if !ok || v == nil {
-			continue
+		// Convert comment to map[string]interface{} using JSON round-trip
+		raw, err := json.Marshal(comment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal comment: %w", err)
 		}
-		if _, isErr := v.(error); isErr {
-			continue
+
+		var generic map[string]interface{}
+		if err := json.Unmarshal(raw, &generic); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal to generic map: %w", err)
 		}
-		// A match is any result that isn't false, null, or an error
-		return &comments[i], nil
+
+		iter := query.Run(generic)
+		for {
+			v, ok := iter.Next()
+			if !ok {
+				break
+			}
+			if err, isErr := v.(error); isErr {
+				return nil, fmt.Errorf("jq evaluation error: %w", err)
+			}
+			// Match found
+			return &comments[i], nil
+		}
 	}
 
-	return nil, fmt.Errorf("%w: %q", errNoSelectorComments, selector)
+	return nil, fmt.Errorf("%w: %s", errNoSelectorComments, selector)
 }
 
 func CommentableConfirmSubmitSurvey(p Prompt) func() (bool, error) {

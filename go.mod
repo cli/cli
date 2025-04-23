@@ -33,6 +33,7 @@ require (
 	github.com/henvic/httpretty v0.1.4
 	github.com/hinshun/vt10x v0.0.0-20220119200601-820417d04eec
 	github.com/in-toto/attestation v1.1.1
+	github.com/itchyny/gojq v0.12.15
 	github.com/joho/godotenv v1.5.1
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mattn/go-colorable v0.1.14
@@ -119,7 +120,6 @@ require (
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/in-toto/in-toto-golang v0.9.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/itchyny/gojq v0.12.15 // indirect
 	github.com/itchyny/timefmt-go v0.1.5 // indirect
 	github.com/jedisct1/go-minisign v0.0.0-20211028175153-1c139d1cc84b // indirect
 	github.com/josharian/intern v1.0.0 // indirect
