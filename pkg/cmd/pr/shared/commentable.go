@@ -14,10 +14,12 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/surveyext"
+	"github.com/itchyny/gojq"
 	"github.com/spf13/cobra"
 )
 
 var errNoUserComments = errors.New("no comments found for current user")
+var errNoSelectorComments = errors.New("no comments found for given selector")
 
 type InputType int
 
@@ -46,6 +48,7 @@ type CommentableOptions struct {
 	InputType                 InputType
 	Body                      string
 	EditLast                  bool
+	EditSelector              string
 	CreateIfNone              bool
 	Quiet                     bool
 	Host                      string
@@ -183,11 +186,20 @@ func updateComment(commentable Commentable, opts *CommentableOptions) error {
 		return errNoUserComments
 	}
 
-	lastComment := &comments[len(comments)-1]
+	var editableComment *api.Comment
+	if opts.EditSelector != "" {
+		comment, err := selectComment(opts.EditSelector, comments)
+		if err != nil {
+			return err
+		}
+		editableComment = comment
+	} else {
+		editableComment = &comments[len(comments)-1]
+	}
 
 	switch opts.InputType {
 	case InputTypeWeb:
-		openURL := lastComment.Link()
+		openURL := editableComment.Link()
 		if opts.IO.IsStdoutTTY() && !opts.Quiet {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
@@ -195,7 +207,7 @@ func updateComment(commentable Commentable, opts *CommentableOptions) error {
 	case InputTypeEditor:
 		var body string
 		var err error
-		initialValue := lastComment.Content()
+		initialValue := editableComment.Content()
 		if opts.Interactive {
 			body, err = opts.InteractiveEditSurvey(initialValue)
 		} else {
@@ -223,7 +235,7 @@ func updateComment(commentable Commentable, opts *CommentableOptions) error {
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
-	params := api.CommentUpdateInput{Body: opts.Body, CommentId: lastComment.Identifier()}
+	params := api.CommentUpdateInput{Body: opts.Body, CommentId: editableComment.Identifier()}
 	url, err := api.CommentUpdate(apiClient, opts.Host, params)
 	if err != nil {
 		return err
@@ -234,6 +246,28 @@ func updateComment(commentable Commentable, opts *CommentableOptions) error {
 	}
 
 	return nil
+}
+
+func selectComment(selector string, comments []api.Comment) (*api.Comment, error) {
+	query, err := gojq.Parse(selector)
+	if err != nil {
+		return nil, fmt.Errorf("invalid jq selector: %w", err)
+	}
+
+	for i, comment := range comments {
+		iter := query.Run(comment)
+		v, ok := iter.Next()
+		if !ok || v == nil {
+			continue
+		}
+		if _, isErr := v.(error); isErr {
+			continue
+		}
+		// A match is any result that isn't false, null, or an error
+		return &comments[i], nil
+	}
+
+	return nil, fmt.Errorf("%w: %q", errNoSelectorComments, selector)
 }
 
 func CommentableConfirmSubmitSurvey(p Prompt) func() (bool, error) {
