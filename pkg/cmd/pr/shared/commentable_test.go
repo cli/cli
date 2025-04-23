@@ -31,13 +31,13 @@ func Test_selectComment(t *testing.T) {
 			want: &api.Comment{ID: "test-1"},
 		},
 		{
-			name: "author is known",
+			name: "id is known",
 			args: args{
-				selector: `. | select(.author.login == "alice")`,
+				selector: `. | select(.id == "test-1")`,
 				comments: []api.Comment{
-					{ID: "test-0", Author: api.CommentAuthor{Login: "bobby"}},
-					{ID: "test-1", Author: api.CommentAuthor{Login: "alice"}},
-					{ID: "test-2", Author: api.CommentAuthor{Login: "github"}},
+					{ID: "test-0"},
+					{ID: "test-1"},
+					{ID: "test-2"},
 				},
 			},
 			want: &api.Comment{ID: "test-1"},
@@ -45,11 +45,11 @@ func Test_selectComment(t *testing.T) {
 		{
 			name: "no comments matching expression",
 			args: args{
-				selector: `. | select(.author.login == "unknown")`,
+				selector: `. | select(.author.login == "not-alice")`,
 				comments: []api.Comment{
-					{ID: "test-0", Author: api.CommentAuthor{Login: "bobby"}},
+					{ID: "test-0", Author: api.CommentAuthor{Login: "alice"}},
 					{ID: "test-1", Author: api.CommentAuthor{Login: "alice"}},
-					{ID: "test-2", Author: api.CommentAuthor{Login: "github"}},
+					{ID: "test-2", Author: api.CommentAuthor{Login: "alice"}},
 				},
 			},
 			wantErr: errNoSelectorComments,
