@@ -54,6 +54,19 @@ func Test_selectComment(t *testing.T) {
 			},
 			wantErr: errNoSelectorComments,
 		},
+		{
+			name: "multiple matches",
+			args: args{
+				selector: `. | select(.body | contains("test"))`,
+				comments: []api.Comment{
+					{ID: "test-0", Body: "It is a test. Thanks."},
+					{ID: "test-1", Body: "now thank you test"},
+					{ID: "test-2", Body: "thank test you"},
+					{ID: "test-3", Body: "this thank test you"},
+				},
+			},
+			want: &api.Comment{ID: "test-3"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

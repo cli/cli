@@ -141,6 +141,18 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:  "edit last flag with selector",
+			input: "1 --edit-last --edit-selector='. | select(.body | contains \"test\")'",
+			output: shared.CommentableOptions{
+				Interactive:  true,
+				InputType:    shared.InputTypeEditor,
+				Body:         "",
+				EditLast:     true,
+				EditSelector: `. | select(.body | contains "test")`,
+			},
+			wantsErr: false,
+		},
+		{
 			name:  "edit last flag with create if none",
 			input: "1 --edit-last --create-if-none",
 			output: shared.CommentableOptions{

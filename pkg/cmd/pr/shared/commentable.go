@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
@@ -254,6 +255,9 @@ func selectComment(selector string, comments []api.Comment) (*api.Comment, error
 	if err != nil {
 		return nil, fmt.Errorf("invalid jq selector: %w", err)
 	}
+
+	// Reverse comments list, as we want to select last comment matchin expression.
+	slices.Reverse(comments)
 
 	for i, comment := range comments {
 		// Convert comment to map[string]interface{} using JSON round-trip
