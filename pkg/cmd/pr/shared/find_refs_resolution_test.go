@@ -462,7 +462,7 @@ func TestTryDetermineDefaultPRHead(t *testing.T) {
 			})
 		}
 
-		t.Run("but if the merge ref is empty, error", func(t *testing.T) {
+		t.Run("but if the merge ref is empty, use the provided branch name", func(t *testing.T) {
 			t.Parallel()
 
 			repoResolvedFromPushRemoteClient := stubGitConfigClient{
@@ -474,12 +474,14 @@ func TestTryDetermineDefaultPRHead(t *testing.T) {
 				pushDefaultFn: stubPushDefault(git.PushDefaultUpstream, nil),
 			}
 
-			_, err := TryDetermineDefaultPRHead(
+			defaultPRHead, err := TryDetermineDefaultPRHead(
 				repoResolvedFromPushRemoteClient,
 				stubRemoteToRepoResolver(ghContext.Remotes{&baseRemote, &forkRemote}, nil),
 				"feature-branch",
 			)
-			require.Error(t, err)
+			require.NoError(t, err)
+
+			require.Equal(t, "feature-branch", defaultPRHead.BranchName)
 		})
 	})
 

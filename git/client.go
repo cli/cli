@@ -518,15 +518,56 @@ func (r RemoteTrackingRef) String() string {
 
 // ParseRemoteTrackingRef parses a string of the form "refs/remotes/<remote>/<branch>" into
 // a RemoteTrackingBranch struct. If the string does not match this format, an error is returned.
+//
+// For now, we assume that refnames are of the format "<remote>/<branch>", where
+// the remote is a single path component, and branch may have many path components e.g.
+// "origin/my/branch" is valid as: {Remote: "origin", Branch: "my/branch"}
+// but "my/origin/branch" would parse incorrectly as: {Remote: "my", Branch: "origin/branch"}
+// I don't believe there is a way to fix this without providing the list of remotes to this function.
+//
+// It becomes particularly confusing if you have something like:
+//
+// ```
+// [remote "foo"]
+// 	url = https://github.com/williammartin/test-repo.git
+// 	fetch = +refs/heads/*:refs/remotes/foo/*
+// [remote "foo/bar"]
+// 	url = https://github.com/williammartin/test-repo.git
+// 	fetch = +refs/heads/*:refs/remotes/foo/bar/*
+// [branch "bar/baz"]
+// 	remote = foo
+// 	merge = refs/heads/bar/baz
+// [branch "baz"]
+// 	remote = foo/bar
+// 	merge = refs/heads/baz
+// ```
+//
+// These @{push} refs would resolve identically:
+//
+// ```
+// ➜ git rev-parse --symbolic-full-name baz@{push}
+// refs/remotes/foo/bar/baz
+
+// ➜ git rev-parse --symbolic-full-name bar/baz@{push}
+// refs/remotes/foo/bar/baz
+// ```
+//
+// When using this ref, git assumes it means `remote: foo` `branch: bar/baz`.
 func ParseRemoteTrackingRef(s string) (RemoteTrackingRef, error) {
-	parts := strings.Split(s, "/")
-	if len(parts) != 4 || parts[0] != "refs" || parts[1] != "remotes" {
+	prefix := "refs/remotes/"
+	if !strings.HasPrefix(s, prefix) {
+		return RemoteTrackingRef{}, fmt.Errorf("remote tracking branch must have format refs/remotes/<remote>/<branch> but was: %s", s)
+	}
+
+	refName := strings.TrimPrefix(s, prefix)
+	refNameParts := strings.SplitN(refName, "/", 2)
+	if len(refNameParts) != 2 {
 		return RemoteTrackingRef{}, fmt.Errorf("remote tracking branch must have format refs/remotes/<remote>/<branch> but was: %s", s)
 	}
 
 	return RemoteTrackingRef{
-		Remote: parts[2],
-		Branch: parts[3],
+		Remote: refNameParts[0],
+		Branch: refNameParts[1],
 	}, nil
 }
 

@@ -1151,13 +1151,38 @@ func TestRemoteTrackingRef(t *testing.T) {
 			wantError             error
 		}{
 			{
-				name:              "valid remote tracking ref",
+				name:              "valid remote tracking ref without slash in branch name",
 				remoteTrackingRef: "refs/remotes/origin/branchName",
 				wantRemoteTrackingRef: RemoteTrackingRef{
 					Remote: "origin",
 					Branch: "branchName",
 				},
 			},
+			{
+				name:              "valid remote tracking ref with slash in branch name",
+				remoteTrackingRef: "refs/remotes/origin/branch/name",
+				wantRemoteTrackingRef: RemoteTrackingRef{
+					Remote: "origin",
+					Branch: "branch/name",
+				},
+			},
+			// TODO: Uncomment when we support slashes in remote names
+			// {
+			// 	name: "valid remote tracking ref with slash in remote name",
+			// 	remoteTrackingRef: "refs/remotes/my/origin/branchName",
+			// 	wantRemoteTrackingRef: RemoteTrackingRef{
+			// 		Remote: "my/origin",
+			// 		Branch: "branchName",
+			// 	},
+			// },
+			// {
+			// 	name: 			"valid remote tracking ref with slash in remote name and branch name",
+			// 	remoteTrackingRef: "refs/remotes/my/origin/branch/name",
+			// 	wantRemoteTrackingRef: RemoteTrackingRef{
+			// 		Remote: "my/origin",
+			// 		Branch: "branch/name",
+			// 	},
+			// },
 			{
 				name:                  "incorrect parts",
 				remoteTrackingRef:     "refs/remotes/origin",
