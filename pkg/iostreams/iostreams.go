@@ -58,6 +58,7 @@ type IOStreams struct {
 	progressIndicatorEnabled bool
 	progressIndicator        *spinner.Spinner
 	progressIndicatorMu      sync.Mutex
+	spinnerDisabled          bool
 
 	alternateScreenBufferEnabled bool
 	alternateScreenBufferActive  bool
@@ -78,8 +79,8 @@ type IOStreams struct {
 	pagerCommand string
 	pagerProcess *os.Process
 
-	neverPrompt     bool
-	spinnerDisabled bool
+	neverPrompt               bool
+	accessiblePrompterEnabled bool
 
 	TempFileOverride *os.File
 }
@@ -455,6 +456,14 @@ func (s *IOStreams) SetAccessibleColorsEnabled(enabled bool) {
 
 func (s *IOStreams) AccessibleColorsEnabled() bool {
 	return s.accessibleColorsEnabled
+}
+
+func (s *IOStreams) SetAccessiblePrompterEnabled(enabled bool) {
+	s.accessiblePrompterEnabled = enabled
+}
+
+func (s *IOStreams) AccessiblePrompterEnabled() bool {
+	return s.accessiblePrompterEnabled
 }
 
 func System() *IOStreams {

@@ -22,6 +22,9 @@ var _ gh.Config = &ConfigMock{}
 //			AccessibleColorsFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the AccessibleColors method")
 //			},
+//			AccessiblePrompterFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the AccessiblePrompter method")
+//			},
 //			AliasesFunc: func() gh.AliasConfig {
 //				panic("mock out the Aliases method")
 //			},
@@ -64,6 +67,9 @@ var _ gh.Config = &ConfigMock{}
 //			SetFunc: func(hostname string, key string, value string)  {
 //				panic("mock out the Set method")
 //			},
+//			SpinnerFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the Spinner method")
+//			},
 //			VersionFunc: func() o.Option[string] {
 //				panic("mock out the Version method")
 //			},
@@ -79,6 +85,9 @@ var _ gh.Config = &ConfigMock{}
 type ConfigMock struct {
 	// AccessibleColorsFunc mocks the AccessibleColors method.
 	AccessibleColorsFunc func(hostname string) gh.ConfigEntry
+
+	// AccessiblePrompterFunc mocks the AccessiblePrompter method.
+	AccessiblePrompterFunc func(hostname string) gh.ConfigEntry
 
 	// AliasesFunc mocks the Aliases method.
 	AliasesFunc func() gh.AliasConfig
@@ -122,6 +131,9 @@ type ConfigMock struct {
 	// SetFunc mocks the Set method.
 	SetFunc func(hostname string, key string, value string)
 
+	// SpinnerFunc mocks the Spinner method.
+	SpinnerFunc func(hostname string) gh.ConfigEntry
+
 	// VersionFunc mocks the Version method.
 	VersionFunc func() o.Option[string]
 
@@ -132,6 +144,11 @@ type ConfigMock struct {
 	calls struct {
 		// AccessibleColors holds details about calls to the AccessibleColors method.
 		AccessibleColors []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
+		// AccessiblePrompter holds details about calls to the AccessiblePrompter method.
+		AccessiblePrompter []struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
@@ -205,6 +222,11 @@ type ConfigMock struct {
 			// Value is the value argument value.
 			Value string
 		}
+		// Spinner holds details about calls to the Spinner method.
+		Spinner []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
 		// Version holds details about calls to the Version method.
 		Version []struct {
 		}
@@ -213,6 +235,7 @@ type ConfigMock struct {
 		}
 	}
 	lockAccessibleColors   sync.RWMutex
+	lockAccessiblePrompter sync.RWMutex
 	lockAliases            sync.RWMutex
 	lockAuthentication     sync.RWMutex
 	lockBrowser            sync.RWMutex
@@ -227,6 +250,7 @@ type ConfigMock struct {
 	lockPreferEditorPrompt sync.RWMutex
 	lockPrompt             sync.RWMutex
 	lockSet                sync.RWMutex
+	lockSpinner            sync.RWMutex
 	lockVersion            sync.RWMutex
 	lockWrite              sync.RWMutex
 }
@@ -260,6 +284,38 @@ func (mock *ConfigMock) AccessibleColorsCalls() []struct {
 	mock.lockAccessibleColors.RLock()
 	calls = mock.calls.AccessibleColors
 	mock.lockAccessibleColors.RUnlock()
+	return calls
+}
+
+// AccessiblePrompter calls AccessiblePrompterFunc.
+func (mock *ConfigMock) AccessiblePrompter(hostname string) gh.ConfigEntry {
+	if mock.AccessiblePrompterFunc == nil {
+		panic("ConfigMock.AccessiblePrompterFunc: method is nil but Config.AccessiblePrompter was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockAccessiblePrompter.Lock()
+	mock.calls.AccessiblePrompter = append(mock.calls.AccessiblePrompter, callInfo)
+	mock.lockAccessiblePrompter.Unlock()
+	return mock.AccessiblePrompterFunc(hostname)
+}
+
+// AccessiblePrompterCalls gets all the calls that were made to AccessiblePrompter.
+// Check the length with:
+//
+//	len(mockedConfig.AccessiblePrompterCalls())
+func (mock *ConfigMock) AccessiblePrompterCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockAccessiblePrompter.RLock()
+	calls = mock.calls.AccessiblePrompter
+	mock.lockAccessiblePrompter.RUnlock()
 	return calls
 }
 
@@ -705,6 +761,38 @@ func (mock *ConfigMock) SetCalls() []struct {
 	mock.lockSet.RLock()
 	calls = mock.calls.Set
 	mock.lockSet.RUnlock()
+	return calls
+}
+
+// Spinner calls SpinnerFunc.
+func (mock *ConfigMock) Spinner(hostname string) gh.ConfigEntry {
+	if mock.SpinnerFunc == nil {
+		panic("ConfigMock.SpinnerFunc: method is nil but Config.Spinner was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockSpinner.Lock()
+	mock.calls.Spinner = append(mock.calls.Spinner, callInfo)
+	mock.lockSpinner.Unlock()
+	return mock.SpinnerFunc(hostname)
+}
+
+// SpinnerCalls gets all the calls that were made to Spinner.
+// Check the length with:
+//
+//	len(mockedConfig.SpinnerCalls())
+func (mock *ConfigMock) SpinnerCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockSpinner.RLock()
+	calls = mock.calls.Spinner
+	mock.lockSpinner.RUnlock()
 	return calls
 }
 

@@ -55,6 +55,9 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	mock.AccessibleColorsFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.AccessibleColors(hostname)
 	}
+	mock.AccessiblePrompterFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.AccessiblePrompter(hostname)
+	}
 	mock.BrowserFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Browser(hostname)
 	}
@@ -78,6 +81,9 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	}
 	mock.PreferEditorPromptFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.PreferEditorPrompt(hostname)
+	}
+	mock.SpinnerFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.Spinner(hostname)
 	}
 	mock.VersionFunc = func() o.Option[string] {
 		return cfg.Version()

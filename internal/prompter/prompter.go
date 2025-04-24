@@ -2,13 +2,12 @@ package prompter
 
 import (
 	"fmt"
-	"os"
-	"slices"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/charmbracelet/huh"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/surveyext"
 	ghPrompter "github.com/cli/go-gh/v2/pkg/prompter"
 )
@@ -43,24 +42,21 @@ type Prompter interface {
 	MarkdownEditor(prompt string, defaultValue string, blankAllowed bool) (string, error)
 }
 
-func New(editorCmd string, stdin ghPrompter.FileReader, stdout ghPrompter.FileWriter, stderr ghPrompter.FileWriter) Prompter {
-	accessiblePrompterValue, accessiblePrompterIsSet := os.LookupEnv("GH_ACCESSIBLE_PROMPTER")
-	falseyValues := []string{"false", "0", "no", ""}
-
-	if accessiblePrompterIsSet && !slices.Contains(falseyValues, accessiblePrompterValue) {
+func New(editorCmd string, io *iostreams.IOStreams) Prompter {
+	if io.AccessiblePrompterEnabled() {
 		return &accessiblePrompter{
-			stdin:     stdin,
-			stdout:    stdout,
-			stderr:    stderr,
+			stdin:     io.In,
+			stdout:    io.Out,
+			stderr:    io.ErrOut,
 			editorCmd: editorCmd,
 		}
 	}
 
 	return &surveyPrompter{
-		prompter:  ghPrompter.New(stdin, stdout, stderr),
-		stdin:     stdin,
-		stdout:    stdout,
-		stderr:    stderr,
+		prompter:  ghPrompter.New(io.In, io.Out, io.ErrOut),
+		stdin:     io.In,
+		stdout:    io.Out,
+		stderr:    io.ErrOut,
 		editorCmd: editorCmd,
 	}
 }

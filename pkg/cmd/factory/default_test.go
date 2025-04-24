@@ -435,11 +435,22 @@ func Test_ioStreams_prompt(t *testing.T) {
 func Test_ioStreams_spinnerDisabled(t *testing.T) {
 	tests := []struct {
 		name            string
+		config          gh.Config
 		spinnerDisabled bool
 		env             map[string]string
 	}{
 		{
 			name:            "default config",
+			spinnerDisabled: false,
+		},
+		{
+			name:            "config with spinner disabled",
+			config:          disableSpinnersConfig(),
+			spinnerDisabled: true,
+		},
+		{
+			name:            "config with spinner enabled",
+			config:          enableSpinnersConfig(),
 			spinnerDisabled: false,
 		},
 		{
@@ -467,6 +478,18 @@ func Test_ioStreams_spinnerDisabled(t *testing.T) {
 			env:             map[string]string{"GH_SPINNER_DISABLED": "true"},
 			spinnerDisabled: true,
 		},
+		{
+			name:            "config enabled but env disabled, respects env",
+			config:          enableSpinnersConfig(),
+			env:             map[string]string{"GH_SPINNER_DISABLED": "true"},
+			spinnerDisabled: true,
+		},
+		{
+			name:            "config disabled but env enabled, respects env",
+			config:          disableSpinnersConfig(),
+			env:             map[string]string{"GH_SPINNER_DISABLED": "false"},
+			spinnerDisabled: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -474,8 +497,83 @@ func Test_ioStreams_spinnerDisabled(t *testing.T) {
 				t.Setenv(k, v)
 			}
 			f := New("1")
+			f.Config = func() (gh.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
 			io := ioStreams(f)
 			assert.Equal(t, tt.spinnerDisabled, io.GetSpinnerDisabled())
+		})
+	}
+}
+
+func Test_ioStreams_accessiblePrompterEnabled(t *testing.T) {
+	tests := []struct {
+		name                      string
+		config                    gh.Config
+		accessiblePrompterEnabled bool
+		env                       map[string]string
+	}{
+		{
+			name:                      "default config",
+			accessiblePrompterEnabled: false,
+		},
+		{
+			name:                      "config with accessible prompter enabled",
+			config:                    enableAccessiblePrompterConfig(),
+			accessiblePrompterEnabled: true,
+		},
+		{
+			name:                      "config with accessible prompter disabled",
+			config:                    disableAccessiblePrompterConfig(),
+			accessiblePrompterEnabled: false,
+		},
+		{
+			name:                      "accessible prompter enabled via GH_ACCESSIBLE_PROMPTER env var = 1",
+			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "1"},
+			accessiblePrompterEnabled: true,
+		},
+		{
+			name:                      "accessible prompter enabled via GH_ACCESSIBLE_PROMPTER env var = true",
+			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "true"},
+			accessiblePrompterEnabled: true,
+		},
+		{
+			name:                      "accessible prompter disabled via GH_ACCESSIBLE_PROMPTER env var = 0",
+			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "0"},
+			accessiblePrompterEnabled: false,
+		},
+		{
+			name:                      "config disabled but env enabled, respects env",
+			config:                    disableAccessiblePrompterConfig(),
+			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "true"},
+			accessiblePrompterEnabled: true,
+		},
+		{
+			name:                      "config enabled but env disabled, respects env",
+			config:                    enableAccessiblePrompterConfig(),
+			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "false"},
+			accessiblePrompterEnabled: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			f := New("1")
+			f.Config = func() (gh.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
+			io := ioStreams(f)
+			assert.Equal(t, tt.accessiblePrompterEnabled, io.AccessiblePrompterEnabled())
 		})
 	}
 }
@@ -662,6 +760,22 @@ func pagerConfig() gh.Config {
 
 func disablePromptConfig() gh.Config {
 	return config.NewFromString("prompt: disabled")
+}
+
+func enableAccessiblePrompterConfig() gh.Config {
+	return config.NewFromString("accessible_prompter: enabled")
+}
+
+func disableAccessiblePrompterConfig() gh.Config {
+	return config.NewFromString("accessible_prompter: disabled")
+}
+
+func disableSpinnersConfig() gh.Config {
+	return config.NewFromString("spinner: disabled")
+}
+
+func enableSpinnersConfig() gh.Config {
+	return config.NewFromString("spinner: enabled")
 }
 
 func disableColorLabelsConfig() gh.Config {

@@ -37,6 +37,8 @@ type Config interface {
 
 	// AccessibleColors returns the configured accessible_colors setting, optionally scoped by host.
 	AccessibleColors(hostname string) ConfigEntry
+	// AccessiblePrompter returns the configured accessible_prompter setting, optionally scoped by host.
+	AccessiblePrompter(hostname string) ConfigEntry
 	// Browser returns the configured browser, optionally scoped by host.
 	Browser(hostname string) ConfigEntry
 	// ColorLabels returns the configured color_label setting, optionally scoped by host.
@@ -53,6 +55,8 @@ type Config interface {
 	Prompt(hostname string) ConfigEntry
 	// PreferEditorPrompt returns the configured editor-based prompt, optionally scoped by host.
 	PreferEditorPrompt(hostname string) ConfigEntry
+	// Spinner returns the configured spinner setting, optionally scoped by host.
+	Spinner(hostname string) ConfigEntry
 
 	// Aliases provides persistent storage and modification of command aliases.
 	Aliases() AliasConfig
