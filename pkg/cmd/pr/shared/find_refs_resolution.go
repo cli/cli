@@ -336,9 +336,9 @@ func tryDetermineDefaultPushTarget(gitClient GitConfigClient, localBranchName st
 	// push.default = upstream or tracking, then we use the branch name from the merge ref.
 	remoteBranch := localBranchName
 	if pushDefault == git.PushDefaultUpstream || pushDefault == git.PushDefaultTracking {
-		remoteBranch = strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
-		if remoteBranch == "" {
-			return defaultPushTarget{}, fmt.Errorf("could not determine remote branch name")
+		mergeRef := strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
+		if mergeRef != "" {
+			remoteBranch = mergeRef
 		}
 	}
 
