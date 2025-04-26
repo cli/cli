@@ -17,8 +17,9 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/goccy/go-yaml/ast"
+	"github.com/goccy/go-yaml/parser"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 type RunOptions struct {
@@ -346,100 +347,113 @@ type WorkflowInput struct {
 }
 
 func findInputs(yamlContent []byte) ([]WorkflowInput, error) {
-	var rootNode yaml.Node
-	err := yaml.Unmarshal(yamlContent, &rootNode)
+	file, err := parser.ParseBytes(yamlContent, 0)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse workflow YAML: %w", err)
 	}
-
-	if len(rootNode.Content) != 1 {
+	if file == nil || len(file.Docs) == 0 || file.Docs[0].Body == nil {
 		return nil, errors.New("invalid YAML file")
 	}
-
-	var onKeyNode *yaml.Node
-	var dispatchKeyNode *yaml.Node
-	var inputsKeyNode *yaml.Node
-	var inputsMapNode *yaml.Node
-
-	// TODO this is pretty hideous
-	for _, node := range rootNode.Content[0].Content {
-		if onKeyNode != nil {
-			if node.Kind == yaml.MappingNode {
-				for _, node := range node.Content {
-					if dispatchKeyNode != nil {
-						for _, node := range node.Content {
-							if inputsKeyNode != nil {
-								inputsMapNode = node
-								break
-							}
-							if node.Value == "inputs" {
-								inputsKeyNode = node
-							}
-						}
-						break
-					}
-					if node.Value == "workflow_dispatch" {
-						dispatchKeyNode = node
-					}
-				}
-			} else if node.Kind == yaml.SequenceNode {
-				for _, node := range node.Content {
-					if node.Value == "workflow_dispatch" {
-						dispatchKeyNode = node
-						break
-					}
-				}
-			} else if node.Kind == yaml.ScalarNode {
-				if node.Value == "workflow_dispatch" {
-					dispatchKeyNode = node
-					break
-				}
-			}
-			break
-		}
-		if strings.EqualFold(node.Value, "on") {
-			onKeyNode = node
-		}
+	root, ok := file.Docs[0].Body.(*ast.MappingNode)
+	if !ok {
+		return nil, errors.New("root node is not a mapping")
 	}
 
-	if onKeyNode == nil {
+	getMapValue := func(m *ast.MappingNode, key string) ast.Node {
+		for _, item := range m.Values {
+			if k, ok := item.Key.(*ast.StringNode); ok && k.Value == key {
+				return item.Value
+			}
+		}
+		return nil
+	}
+
+	onNode := getMapValue(root, "on")
+	if onNode == nil {
 		return nil, errors.New("invalid workflow: no 'on' key")
 	}
 
-	if dispatchKeyNode == nil {
+	var dispatchNode ast.Node
+	switch n := onNode.(type) {
+	case *ast.MappingNode:
+		dispatchNode = getMapValue(n, "workflow_dispatch")
+	case *ast.SequenceNode:
+		for _, v := range n.Values {
+			if s, ok := v.(*ast.StringNode); ok && s.Value == "workflow_dispatch" {
+				dispatchNode = v
+				break
+			}
+		}
+	case *ast.StringNode:
+		if n.Value == "workflow_dispatch" {
+			dispatchNode = n
+		}
+	}
+	if dispatchNode == nil {
 		return nil, errors.New("unable to manually run a workflow without a workflow_dispatch event")
 	}
 
-	out := []WorkflowInput{}
-
-	m := map[string]WorkflowInput{}
-
-	if inputsKeyNode == nil || inputsMapNode == nil {
-		return out, nil
-	}
-
-	err = inputsMapNode.Decode(&m)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode workflow inputs: %w", err)
-	}
-
-	for name, input := range m {
-		if input.Type == "choice" && len(input.Options) == 0 {
-			return nil, fmt.Errorf("workflow input %q is of type choice, but has no options", name)
+	inputsNode := func() ast.Node {
+		if m, ok := dispatchNode.(*ast.MappingNode); ok {
+			return getMapValue(m, "inputs")
 		}
-		out = append(out, WorkflowInput{
-			Name:        name,
-			Default:     input.Default,
-			Description: input.Description,
-			Required:    input.Required,
-			Options:     input.Options,
-			Type:        input.Type,
-		})
+		return nil
+	}()
+	if inputsNode == nil {
+		return []WorkflowInput{}, nil
+	}
+	inputsMap, ok := inputsNode.(*ast.MappingNode)
+	if !ok {
+		return nil, errors.New("inputs node is not a mapping")
 	}
 
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].Name < out[j].Name
-	})
+	getString := func(m *ast.MappingNode, key string) string {
+		n := getMapValue(m, key)
+		if s, ok := n.(*ast.StringNode); ok {
+			return s.Value
+		}
+		return ""
+	}
+	getBool := func(m *ast.MappingNode, key string) bool {
+		n := getMapValue(m, key)
+		if b, ok := n.(*ast.BoolNode); ok {
+			return b.Value
+		}
+		return false
+	}
+	getStringSlice := func(m *ast.MappingNode, key string) []string {
+		n := getMapValue(m, key)
+		if seq, ok := n.(*ast.SequenceNode); ok {
+			var out []string
+			for _, v := range seq.Values {
+				if s, ok := v.(*ast.StringNode); ok {
+					out = append(out, s.Value)
+				}
+			}
+			return out
+		}
+		return nil
+	}
 
+	var out []WorkflowInput
+	for _, item := range inputsMap.Values {
+		key, ok := item.Key.(*ast.StringNode)
+		if !ok {
+			continue
+		}
+		input := WorkflowInput{Name: key.Value}
+		if valMap, ok := item.Value.(*ast.MappingNode); ok {
+			input.Description = getString(valMap, "description")
+			input.Default = getString(valMap, "default")
+			input.Type = getString(valMap, "type")
+			input.Required = getBool(valMap, "required")
+			input.Options = getStringSlice(valMap, "options")
+		}
+		if input.Type == "choice" && len(input.Options) == 0 {
+			return nil, fmt.Errorf("workflow input %q is of type choice, but has no options", input.Name)
+		}
+		out = append(out, input)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
 }

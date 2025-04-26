@@ -39,7 +39,7 @@ func TestAliasList(t *testing.T) {
 				  gc: "!gh gist create \"$@\" | pbcopy"
 			`),
 			isTTY:      true,
-			wantStdout: "co: pr checkout\ngc: '!gh gist create \"$@\" | pbcopy'\n",
+			wantStdout: "co: pr checkout\ngc: \"!gh gist create \\\"$@\\\" | pbcopy\"\n",
 			wantStderr: "",
 		},
 		{
@@ -52,7 +52,7 @@ func TestAliasList(t *testing.T) {
 				    coop
 			`),
 			isTTY:      true,
-			wantStdout: "one: |\n    foo\n    bar\ntwo: |-\n    !chicken\n    coop\n",
+			wantStdout: "one: |\n  foo\n  bar\ntwo: \"!chicken\\ncoop\"\n",
 			wantStderr: "",
 		},
 	}

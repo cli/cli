@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 // FindNonLegacy returns the list of template file paths from the template folder (according to the "upgraded multiple template builder")

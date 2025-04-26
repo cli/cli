@@ -224,6 +224,12 @@ func Test_findInputs(t *testing.T) {
 			errMsg:  "invalid YAML file",
 		},
 		{
+			name:    "invalid YAML",
+			YAML:    []byte("foo"),
+			wantErr: true,
+			errMsg:  "root node is not a mapping",
+		},
+		{
 			name:    "no event specified",
 			YAML:    []byte("name: workflow"),
 			wantErr: true,
@@ -239,7 +245,7 @@ func Test_findInputs(t *testing.T) {
 			name:    "bad inputs",
 			YAML:    []byte("name: workflow\non:\n workflow_dispatch:\n  inputs: lol  "),
 			wantErr: true,
-			errMsg:  "could not decode workflow inputs: yaml: unmarshal errors:\n  line 4: cannot unmarshal !!str `lol` into map[string]run.WorkflowInput",
+			errMsg:  "inputs node is not a mapping",
 		},
 		{
 			name:    "short syntax",

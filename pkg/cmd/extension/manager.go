@@ -24,7 +24,7 @@ import (
 	"github.com/cli/cli/v2/pkg/findsh"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/safeexec"
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 // ErrInitialCommitFailed indicates the initial commit when making a new extension failed.
