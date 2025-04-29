@@ -78,7 +78,14 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 		return cmdutil.FlagErrorf("`--create-if-none` can only be used with `--edit-last`")
 	}
 
+	if opts.DeleteLastConfirmed && !opts.DeleteLast {
+		return cmdutil.FlagErrorf("`--yes` should only be used with `--delete-last`")
+	}
+
 	if opts.DeleteLast {
+		if inputFlags > 0 {
+			return cmdutil.FlagErrorf("should not provide comment body when using `--delete-last`")
+		}
 		if opts.IO.CanPrompt() || opts.DeleteLastConfirmed {
 			return nil
 		}

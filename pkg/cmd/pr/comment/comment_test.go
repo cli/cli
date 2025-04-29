@@ -2,6 +2,7 @@ package comment
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -166,7 +167,7 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:  "non-interactive delete last no flag",
+			name:  "non-interactive delete last without confirmation",
 			input: "1 --delete-last",
 			output: shared.CommentableOptions{
 				DeleteLast: true,
@@ -202,6 +203,46 @@ func TestNewCmdComment(t *testing.T) {
 			},
 			isTTY:    true,
 			wantsErr: false,
+		},
+		{
+			name:  "interactive delete last flag with web flag",
+			input: "1 --delete-last --yes --web",
+			output: shared.CommentableOptions{
+				DeleteLast:          true,
+				DeleteLastConfirmed: true,
+			},
+			isTTY:    true,
+			wantsErr: true,
+		},
+		{
+			name:  "interactive delete last flag with editor flags",
+			input: "1 --delete-last --yes --editor",
+			output: shared.CommentableOptions{
+				DeleteLast:          true,
+				DeleteLastConfirmed: true,
+			},
+			isTTY:    true,
+			wantsErr: true,
+		},
+		{
+			name:  "interactive delete last flag with body flags",
+			input: "1 --delete-last --yes --body",
+			output: shared.CommentableOptions{
+				DeleteLast:          true,
+				DeleteLastConfirmed: true,
+			},
+			isTTY:    true,
+			wantsErr: true,
+		},
+		{
+			name:  "interactive only pass yes without delete-last ",
+			input: "1 --yes",
+			output: shared.CommentableOptions{
+				DeleteLast:          true,
+				DeleteLastConfirmed: true,
+			},
+			isTTY:    true,
+			wantsErr: true,
 		},
 		{
 			name:     "body and body-file flags",
@@ -289,6 +330,8 @@ func TestNewCmdComment(t *testing.T) {
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.InputType, gotOpts.InputType)
 			assert.Equal(t, tt.output.Body, gotOpts.Body)
+			assert.Equal(t, tt.output.DeleteLast, gotOpts.DeleteLast)
+			assert.Equal(t, tt.output.DeleteLastConfirmed, gotOpts.DeleteLastConfirmed)
 		})
 	}
 }
@@ -298,8 +341,8 @@ func Test_commentRun(t *testing.T) {
 		name          string
 		input         *shared.CommentableOptions
 		emptyComments bool
+		comments      api.Comments
 		httpStubs     func(*testing.T, *httpmock.Registry)
-		expectErr     bool
 		stdout        string
 		stderr        string
 		wantsErr      bool
@@ -333,7 +376,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
-			stderr:        "no comments found for current user",
+			stdout:        "no comments found for current user",
 		},
 		{
 			name: "updating last comment with interactive editor succeeds if there are comments",
@@ -410,7 +453,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
-			stderr:        "no comments found for current user",
+			stdout:        "no comments found for current user",
 		},
 		{
 			name: "creating new comment with non-interactive editor succeeds",
@@ -438,7 +481,7 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: true,
 			wantsErr:      true,
-			stderr:        "no comments found for current user",
+			stdout:        "no comments found for current user",
 		},
 		{
 			name: "updating last comment with non-interactive editor succeeds if there are comments",
@@ -514,27 +557,27 @@ func Test_commentRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
 		{
-			name: "non interactive editor with delete last without any comment",
+			name: "deleting last comment with non interactive editor with delete last without any comment",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				DeleteLast:  true,
 			},
 			emptyComments: true,
 			wantsErr:      true,
-			stderr:        "no comments found for current user",
+			stdout:        "no comments found for current user",
 		},
 		{
-			name: "interactive editor with delete last without any comment",
+			name: "deleting last comment with interactive editor with delete last without any comment",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				DeleteLast:  true,
 			},
 			emptyComments: true,
 			wantsErr:      true,
-			stderr:        "no comments found for current user",
+			stdout:        "no comments found for current user",
 		},
 		{
-			name: "non interactive editor with delete last with confirmation",
+			name: "deleting last comment with non interactive editor with delete last with confirmation",
 			input: &shared.CommentableOptions{
 				Interactive:         false,
 				DeleteLast:          true,
@@ -546,27 +589,43 @@ func Test_commentRun(t *testing.T) {
 			stderr: "Comment deleted\n",
 		},
 		{
-			name: "interactive editor with delete last and confirmed",
+			name: "deleting last comment with interactive editor with delete last and confirmed",
 			input: &shared.CommentableOptions{
 				Interactive:         false,
 				DeleteLast:          true,
 				DeleteLastConfirmed: true,
 
-				ConfirmDeleteLastComment: func(string) (bool, error) { return true, nil },
+				ConfirmDeleteLastComment: func(body string) (bool, error) {
+					if body != "comment body" {
+						return false, errors.New("unexpected comment body")
+					}
+					return true, nil
+				},
 			},
+			comments: api.Comments{Nodes: []api.Comment{
+				{ID: "id1", Author: api.CommentAuthor{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-111", ViewerDidAuthor: true, Body: "comment body"},
+			}},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentDelete(t, reg)
 			},
 			stderr: "Comment deleted\n",
 		},
 		{
-			name: "interactive editor with delete last and not confirmed default but confirmed interactively",
+			name: "deleting last comment with interactive editor with delete last and not confirmed default but confirmed interactively",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				DeleteLast:  true,
 
-				ConfirmDeleteLastComment: func(string) (bool, error) { return true, nil },
+				ConfirmDeleteLastComment: func(body string) (bool, error) {
+					if body != "comment body" {
+						return false, errors.New("unexpected comment body")
+					}
+					return true, nil
+				},
 			},
+			comments: api.Comments{Nodes: []api.Comment{
+				{ID: "id1", Author: api.CommentAuthor{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-111", ViewerDidAuthor: true, Body: "comment body"},
+			}},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentDelete(t, reg)
 			},
@@ -574,15 +633,46 @@ func Test_commentRun(t *testing.T) {
 			stderr: "Comment deleted\n",
 		},
 		{
-			name: "interactive editor with delete last and not confirmed default but confirmed interactively",
+			name: "deleting last comment with interactive editor with delete last and not confirmed default but confirmation declined",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				DeleteLast:  true,
 
-				ConfirmDeleteLastComment: func(string) (bool, error) { return false, nil },
+				ConfirmDeleteLastComment: func(body string) (bool, error) {
+					if body != "comment body" {
+						return false, errors.New("unexpected comment body")
+					}
+					return true, nil
+				},
 			},
+			comments: api.Comments{Nodes: []api.Comment{
+				{ID: "id1", Author: api.CommentAuthor{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-111", ViewerDidAuthor: true, Body: "test comment body"},
+			}},
 			wantsErr: true,
-			stderr:   "deletion not confirmed",
+			stdout:   "deletion not confirmed",
+		},
+		{
+			name: "deleting last comment with interactive editor with delete last and not confirmed default but confirmed interactively with comment body longer than 40 characters",
+			input: &shared.CommentableOptions{
+				Interactive: true,
+				DeleteLast:  true,
+
+				ConfirmDeleteLastComment: func(body string) (bool, error) {
+					if body != "Lorem ipsum dolor sit amet, consectet..." {
+						return false, errors.New("unexpected comment body")
+					}
+					return true, nil
+				},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentDelete(t, reg)
+			},
+			comments: api.Comments{Nodes: []api.Comment{
+				{ID: "id1", Author: api.CommentAuthor{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-111", ViewerDidAuthor: true, Body: "Lorem ipsum dolor sit amet, consectet lorem ipsum again"},
+			}},
+			wantsErr: false,
+			stdout:   "! Deleted comments cannot be recovered.\n",
+			stderr:   "Comment deleted\n",
 		},
 	}
 	for _, tt := range tests {
@@ -608,6 +698,8 @@ func Test_commentRun(t *testing.T) {
 		}}
 		if tt.emptyComments {
 			comments.Nodes = []api.Comment{}
+		} else if len(tt.comments.Nodes) > 0 {
+			comments = tt.comments
 		}
 
 		tt.input.RetrieveCommentable = func() (shared.Commentable, ghrepo.Interface, error) {
@@ -622,7 +714,7 @@ func Test_commentRun(t *testing.T) {
 			err := shared.CommentableRun(tt.input)
 			if tt.wantsErr {
 				assert.Error(t, err)
-				assert.Equal(t, tt.stderr, err.Error())
+				assert.Equal(t, tt.stderr, stderr.String())
 				return
 			}
 			assert.NoError(t, err)
