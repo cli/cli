@@ -82,7 +82,7 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 		if opts.IO.CanPrompt() || opts.DeleteLastConfirmed {
 			return nil
 		}
-		return cmdutil.FlagErrorf("you must use `--yes` flag to confirm deletion in non-interactive mode")
+		return cmdutil.FlagErrorf("should provide `--yes` to confirm deletion in non-interactive mode")
 	}
 
 	if inputFlags == 0 {
@@ -262,7 +262,7 @@ func deleteComment(commentable Commentable, opts *CommentableOptions) error {
 
 	if opts.IO.CanPrompt() && !opts.DeleteLastConfirmed {
 		fmt.Fprintf(opts.IO.Out, "%s Deleted comments cannot be recovered.\n", cs.WarningIcon())
-		ok, err := opts.ConfirmDeleteLastComment(lastComment.Body)
+		ok, err := opts.ConfirmDeleteLastComment(text.Truncate(40, lastComment.Body))
 		if err != nil {
 			return err
 		}
@@ -327,7 +327,7 @@ func CommentableEditSurvey(cf func() (gh.Config, error), io *iostreams.IOStreams
 
 func CommentableConfirmDeleteLastComment(p Prompt) func(string) (bool, error) {
 	return func(body string) (bool, error) {
-		return p.Confirm(fmt.Sprintf("Delete the comment: %s?", body), true)
+		return p.Confirm(fmt.Sprintf("Delete the comment: %q?", body), true)
 	}
 }
 
