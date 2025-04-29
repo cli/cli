@@ -250,18 +250,62 @@ func TestPullRequest_ExportData(t *testing.T) {
 			fields: []string{"closingIssuesReferences"},
 			inputJSON: heredoc.Doc(`
 				{ "closingIssuesReferences": { "nodes": [
-						{
-							"number": 123
-						},
-						{
-							"number": 456
+					{
+						"id": "I_123",
+						"number": 123,
+						"url": "https://github.com/cli/cli/issues/123",
+						"repository": {
+							"id": "R_123",
+							"name": "cli",
+							"owner": {
+								"id": "O_123",
+								"login": "cli"
+							}
 						}
+					},
+					{
+						"id": "I_456",
+						"number": 456,
+						"url": "https://github.com/cli/cli/issues/456",
+						"repository": {
+							"id": "R_456",
+							"name": "cli",
+							"owner": {
+								"id": "O_456",
+								"login": "cli"
+							}
+						}
+					}
 				] } }
 			`),
 			outputJSON: heredoc.Doc(`
 				{ "closingIssuesReferences": [
-					123,
-					456
+					{
+						"id": "I_123",
+						"number": 123,
+						"repository": {
+							"id": "R_123",
+							"name": "cli",
+							"owner": {
+							"id": "O_123",
+							"login": "cli"
+							}
+						},
+						"url": "https://github.com/cli/cli/issues/123"
+					},
+					{
+						"id": "I_456",
+						"number": 456,
+						"repository": {
+							"id": "R_456",
+							"name": "cli",
+							"owner": {
+							"id": "O_456",
+							"login": "cli"
+							}
+						},
+						"url": "https://github.com/cli/cli/issues/456"
+					}
 				] }
 			`),
 		},

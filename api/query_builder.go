@@ -135,7 +135,17 @@ var prCommits = shortenQuery(`
 var prClosingIssuesReferences = shortenQuery(`
 	closingIssuesReferences(first: 100) {
 		nodes {
-			number
+			id,
+			number,
+			url,
+			repository {
+				id,
+				name,
+				owner {
+					id,
+					login
+				}
+			}
 		}
 		pageInfo{hasNextPage,endCursor}
 	}

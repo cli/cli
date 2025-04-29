@@ -111,7 +111,17 @@ type CommitStatusCheckRollup struct {
 
 type ClosingIssuesReferences struct {
 	Nodes []struct {
-		Number int
+		ID         string
+		Number     int
+		URL        string
+		Repository struct {
+			ID    string
+			Name  string
+			Owner struct {
+				ID    string
+				Login string
+			}
+		}
 	}
 	PageInfo struct {
 		HasNextPage bool
