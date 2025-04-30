@@ -239,6 +239,11 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 			return preloadPrComments(httpClient, f.baseRefRepo, pr)
 		})
 	}
+	if fields.Contains("closingIssuesReferences") {
+		g.Go(func() error {
+			return preloadPrClosingIssuesReferences(httpClient, f.baseRefRepo, pr)
+		})
+	}
 	if fields.Contains("statusCheckRollup") {
 		g.Go(func() error {
 			return preloadPrChecks(httpClient, f.baseRefRepo, pr)
@@ -449,6 +454,45 @@ func preloadPrComments(client *http.Client, repo ghrepo.Interface, pr *api.PullR
 	}
 
 	pr.Comments.PageInfo.HasNextPage = false
+	return nil
+}
+
+func preloadPrClosingIssuesReferences(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+	if !pr.ClosingIssuesReferences.PageInfo.HasNextPage {
+		return nil
+	}
+
+	type response struct {
+		Node struct {
+			PullRequest struct {
+				ClosingIssuesReferences api.ClosingIssuesReferences `graphql:"closingIssuesReferences(first: 100, after: $endCursor)"`
+			} `graphql:"...on PullRequest"`
+		} `graphql:"node(id: $id)"`
+	}
+
+	variables := map[string]interface{}{
+		"id":        githubv4.ID(pr.ID),
+		"endCursor": githubv4.String(pr.ClosingIssuesReferences.PageInfo.EndCursor),
+	}
+
+	gql := api.NewClientFromHTTP(client)
+
+	for {
+		var query response
+		err := gql.Query(repo.RepoHost(), "closingIssuesReferences", &query, variables)
+		if err != nil {
+			return err
+		}
+
+		pr.ClosingIssuesReferences.Nodes = append(pr.ClosingIssuesReferences.Nodes, query.Node.PullRequest.ClosingIssuesReferences.Nodes...)
+
+		if !query.Node.PullRequest.ClosingIssuesReferences.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Node.PullRequest.ClosingIssuesReferences.PageInfo.EndCursor)
+	}
+
+	pr.ClosingIssuesReferences.PageInfo.HasNextPage = false
 	return nil
 }
 

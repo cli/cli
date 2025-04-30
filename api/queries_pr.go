@@ -93,6 +93,8 @@ type PullRequest struct {
 	Reviews        PullRequestReviews
 	LatestReviews  PullRequestReviews
 	ReviewRequests ReviewRequests
+
+	ClosingIssuesReferences ClosingIssuesReferences
 }
 
 type StatusCheckRollupNode struct {
@@ -105,6 +107,26 @@ type StatusCheckRollupCommit struct {
 
 type CommitStatusCheckRollup struct {
 	Contexts CheckContexts
+}
+
+type ClosingIssuesReferences struct {
+	Nodes []struct {
+		ID         string
+		Number     int
+		URL        string
+		Repository struct {
+			ID    string
+			Name  string
+			Owner struct {
+				ID    string
+				Login string
+			}
+		}
+	}
+	PageInfo struct {
+		HasNextPage bool
+		EndCursor   string
+	}
 }
 
 // https://docs.github.com/en/graphql/reference/enums#checkrunstate

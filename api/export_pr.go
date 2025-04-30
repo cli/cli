@@ -139,6 +139,25 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 				}
 			}
 			data[f] = &requests
+		case "closingIssuesReferences":
+			items := make([]map[string]interface{}, 0, len(pr.ClosingIssuesReferences.Nodes))
+			for _, n := range pr.ClosingIssuesReferences.Nodes {
+				items = append(items, map[string]interface{}{
+
+					"id":     n.ID,
+					"number": n.Number,
+					"url":    n.URL,
+					"repository": map[string]interface{}{
+						"id":   n.Repository.ID,
+						"name": n.Repository.Name,
+						"owner": map[string]interface{}{
+							"id":    n.Repository.Owner.ID,
+							"login": n.Repository.Owner.Login,
+						},
+					},
+				})
+			}
+			data[f] = items
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
