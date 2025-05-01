@@ -594,13 +594,6 @@ func Test_commentRun(t *testing.T) {
 				Interactive:         true,
 				DeleteLast:          true,
 				DeleteLastConfirmed: true,
-
-				ConfirmDeleteLastComment: func(body string) (bool, error) {
-					if body != "comment body" {
-						return false, errors.New("unexpected comment body")
-					}
-					return true, nil
-				},
 			},
 			comments: api.Comments{Nodes: []api.Comment{
 				{ID: "id1", Author: api.CommentAuthor{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-111", ViewerDidAuthor: true, Body: "comment body"},
