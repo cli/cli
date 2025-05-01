@@ -87,6 +87,7 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 			return cmdutil.FlagErrorf("should not provide comment body when using `--delete-last`")
 		}
 		if opts.IO.CanPrompt() || opts.DeleteLastConfirmed {
+			opts.Interactive = opts.IO.CanPrompt()
 			return nil
 		}
 		return cmdutil.FlagErrorf("should provide `--yes` to confirm deletion in non-interactive mode")
@@ -267,7 +268,7 @@ func deleteComment(commentable Commentable, opts *CommentableOptions) error {
 
 	cs := opts.IO.ColorScheme()
 
-	if opts.IO.CanPrompt() && !opts.DeleteLastConfirmed {
+	if opts.Interactive && !opts.DeleteLastConfirmed {
 		// This is not an ideal way of truncating a random string that may
 		// contain emojis or other kind of wide chars.
 		truncated := lastComment.Body
