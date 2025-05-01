@@ -557,7 +557,7 @@ func Test_commentRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
 		{
-			name: "deleting last comment with non interactive editor with delete last without any comment",
+			name: "deleting last comment non-interactively without any comment",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				DeleteLast:  true,
@@ -567,7 +567,7 @@ func Test_commentRun(t *testing.T) {
 			stdout:        "no comments found for current user",
 		},
 		{
-			name: "deleting last comment with interactive editor with delete last without any comment",
+			name: "deleting last comment interactively without any comment",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				DeleteLast:  true,
@@ -577,7 +577,7 @@ func Test_commentRun(t *testing.T) {
 			stdout:        "no comments found for current user",
 		},
 		{
-			name: "deleting last comment with non interactive editor with delete last with confirmation",
+			name: "deleting last comment non-interactively and pre-confirmed",
 			input: &shared.CommentableOptions{
 				Interactive:         false,
 				DeleteLast:          true,
@@ -589,9 +589,9 @@ func Test_commentRun(t *testing.T) {
 			stderr: "Comment deleted\n",
 		},
 		{
-			name: "deleting last comment with interactive editor with delete last and confirmed",
+			name: "deleting last comment interactively and pre-confirmed",
 			input: &shared.CommentableOptions{
-				Interactive:         false,
+				Interactive:         true,
 				DeleteLast:          true,
 				DeleteLastConfirmed: true,
 
@@ -611,7 +611,7 @@ func Test_commentRun(t *testing.T) {
 			stderr: "Comment deleted\n",
 		},
 		{
-			name: "deleting last comment with interactive editor with delete last and not confirmed default but confirmed interactively",
+			name: "deleting last comment interactively and confirmed",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				DeleteLast:  true,
@@ -633,7 +633,7 @@ func Test_commentRun(t *testing.T) {
 			stderr: "Comment deleted\n",
 		},
 		{
-			name: "deleting last comment with interactive editor with delete last and not confirmed default but confirmation declined",
+			name: "deleting last comment interactively and confirmation declined",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				DeleteLast:  true,
@@ -652,7 +652,7 @@ func Test_commentRun(t *testing.T) {
 			stdout:   "deletion not confirmed",
 		},
 		{
-			name: "deleting last comment with interactive editor with delete last and not confirmed default but confirmed interactively with comment body longer than 40 characters",
+			name: "deleting last comment interactively and confirmed with long comment body",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				DeleteLast:  true,
