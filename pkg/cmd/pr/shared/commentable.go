@@ -268,8 +268,15 @@ func deleteComment(commentable Commentable, opts *CommentableOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	if opts.IO.CanPrompt() && !opts.DeleteLastConfirmed {
+		// This is not an ideal way of truncating a random string that may
+		// contain emojis or other kind of wide chars.
+		truncated := lastComment.Body
+		if len(lastComment.Body) > 40 {
+			truncated = lastComment.Body[:40] + "..."
+		}
+
 		fmt.Fprintf(opts.IO.Out, "%s Deleted comments cannot be recovered.\n", cs.WarningIcon())
-		ok, err := opts.ConfirmDeleteLastComment(text.Truncate(40, lastComment.Body))
+		ok, err := opts.ConfirmDeleteLastComment(truncated)
 		if err != nil {
 			return err
 		}

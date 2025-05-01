@@ -658,7 +658,7 @@ func Test_commentRun(t *testing.T) {
 				DeleteLast:  true,
 
 				ConfirmDeleteLastComment: func(body string) (bool, error) {
-					if body != "Lorem ipsum dolor sit amet, consectet..." {
+					if body != "Lorem ipsum dolor sit amet, consectet lo..." {
 						return false, errors.New("unexpected comment body")
 					}
 					return true, nil
