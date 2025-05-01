@@ -646,7 +646,7 @@ func Test_commentRun(t *testing.T) {
 				},
 			},
 			comments: api.Comments{Nodes: []api.Comment{
-				{ID: "id1", Author: api.CommentAuthor{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-111", ViewerDidAuthor: true, Body: "test comment body"},
+				{ID: "id1", Author: api.CommentAuthor{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-111", ViewerDidAuthor: true, Body: "comment body"},
 			}},
 			wantsErr: true,
 			stdout:   "deletion not confirmed",
