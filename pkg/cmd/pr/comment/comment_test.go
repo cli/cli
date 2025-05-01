@@ -189,7 +189,8 @@ func TestNewCmdComment(t *testing.T) {
 			name:  "interactive delete last no flag",
 			input: "1 --delete-last",
 			output: shared.CommentableOptions{
-				DeleteLast: true,
+				Interactive: true,
+				DeleteLast:  true,
 			},
 			isTTY:    true,
 			wantsErr: false,
@@ -198,6 +199,7 @@ func TestNewCmdComment(t *testing.T) {
 			name:  "interactive delete last flag",
 			input: "1 --delete-last --yes",
 			output: shared.CommentableOptions{
+				Interactive:         true,
 				DeleteLast:          true,
 				DeleteLastConfirmed: true,
 			},
