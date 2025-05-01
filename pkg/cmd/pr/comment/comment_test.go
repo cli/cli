@@ -167,16 +167,13 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:  "non-interactive delete last without confirmation",
-			input: "1 --delete-last",
-			output: shared.CommentableOptions{
-				DeleteLast: true,
-			},
+			name:     "delete last flag non-interactive",
+			input:    "1 --delete-last",
 			isTTY:    false,
 			wantsErr: true,
 		},
 		{
-			name:  "non-interactive delete last flag",
+			name:  "delete last flag and pre-confirmation non-interactive",
 			input: "1 --delete-last --yes",
 			output: shared.CommentableOptions{
 				DeleteLast:          true,
@@ -186,7 +183,7 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:  "interactive delete last no flag",
+			name:  "delete last flag interactive",
 			input: "1 --delete-last",
 			output: shared.CommentableOptions{
 				Interactive: true,
@@ -196,7 +193,7 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:  "interactive delete last flag",
+			name:  "delete last flag and pre-confirmation interactive",
 			input: "1 --delete-last --yes",
 			output: shared.CommentableOptions{
 				Interactive:         true,
@@ -207,42 +204,26 @@ func TestNewCmdComment(t *testing.T) {
 			wantsErr: false,
 		},
 		{
-			name:  "interactive delete last flag with web flag",
-			input: "1 --delete-last --yes --web",
-			output: shared.CommentableOptions{
-				DeleteLast:          true,
-				DeleteLastConfirmed: true,
-			},
+			name:     "delete last flag and pre-confirmation with web flag",
+			input:    "1 --delete-last --yes --web",
 			isTTY:    true,
 			wantsErr: true,
 		},
 		{
-			name:  "interactive delete last flag with editor flags",
-			input: "1 --delete-last --yes --editor",
-			output: shared.CommentableOptions{
-				DeleteLast:          true,
-				DeleteLastConfirmed: true,
-			},
+			name:     "delete last flag and pre-confirmation with editor flag",
+			input:    "1 --delete-last --yes --editor",
 			isTTY:    true,
 			wantsErr: true,
 		},
 		{
-			name:  "interactive delete last flag with body flags",
-			input: "1 --delete-last --yes --body",
-			output: shared.CommentableOptions{
-				DeleteLast:          true,
-				DeleteLastConfirmed: true,
-			},
+			name:     "delete last flag and pre-confirmation with body flag",
+			input:    "1 --delete-last --yes --body",
 			isTTY:    true,
 			wantsErr: true,
 		},
 		{
-			name:  "interactive only pass yes without delete-last ",
-			input: "1 --yes",
-			output: shared.CommentableOptions{
-				DeleteLast:          true,
-				DeleteLastConfirmed: true,
-			},
+			name:     "delete pre-confirmation without delete last flag",
+			input:    "1 --yes",
 			isTTY:    true,
 			wantsErr: true,
 		},
