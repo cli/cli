@@ -1,0 +1,68 @@
+# Run go mod edit -replace github.com/cli/go-gh/v2=<PATH TO YOUR LOCAL go-gh>
+#
+# Patch go-gh with:
+# diff --git a/pkg/ssh/ssh.go b/pkg/ssh/ssh.go
+#index 4e5216e..249f66c 100644
+#--- a/pkg/ssh/ssh.go
+#+++ b/pkg/ssh/ssh.go
+#@@ -4,6 +4,7 @@ package ssh
+# import (
+# 	"bufio"
+# 	"net/url"
+#+	"os"
+# 	"os/exec"
+# 	"strings"
+# 	"sync"
+#@@ -75,7 +76,11 @@ func (t *Translator) resolve(hostname string) (string, error) {
+# 	if newCommand == nil {
+# 		newCommand = exec.Command
+# 	}
+#-	sshCmd := newCommand(sshPath, "-G", hostname)
+#+	args := []string{"-G", hostname}
+#+	if os.Getenv("SSH_CONFIG") != "" {
+#+		args = append(args, "-F", os.Getenv("SSH_CONFIG"))
+#+	}
+#+	sshCmd := newCommand(sshPath, args...)
+# 	stdout, err := sshCmd.StdoutPipe()
+# 	if err != nil {
+# 		return "", err
+#
+# Expected failure is:
+# could not resolve remote "origin": none of the git remotes configured for this repository correspond to the GH_HOST environment variable. Try adding a matching remote or unsetting the variable
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Setup environment variables used for testscript
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# First clone the repo via HTTPS just to be able to push a branch without more setup
+exec gh repo clone ${ORG}/${REPO}
+
+# Prepare a branch to PR
+cd ${REPO}
+exec git checkout -b feature-branch
+exec git commit --allow-empty -m 'Empty Commit'
+exec git push -u origin feature-branch
+
+# Rewrite the git remote to use SSH
+exec git remote set-url origin git@github.com:${ORG}/${REPO}.git
+
+# Use a custom env var for proving this out that results in go-gh passing this file with -F
+env SSH_CONFIG=${WORK}/ssh-config
+env GH_HOST=github.com
+env GH_REPO=${ORG}/${REPO}
+
+# Create the PR
+exec gh pr create --title 'Feature Title' --body 'Feature Body'
+stdout https://${GH_HOST}/${ORG}/${REPO}/pull/1
+
+-- ssh-config --
+Host github.com
+    HostName example.com
