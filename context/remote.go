@@ -36,14 +36,38 @@ func (r Remotes) FindByRepo(owner, name string) (*Remote, error) {
 
 // Filter remotes by given hostnames, maintains original order
 func (r Remotes) FilterByHosts(hosts []string) Remotes {
+	fmt.Println("*** Starting FilterByHosts")
+	defer fmt.Println("*** Ending FilterByHosts")
+
+	fmt.Printf("\tHosts: (%d)\n", len(hosts))
+	for _, host := range hosts {
+		fmt.Println("\t\tHost:", host)
+	}
+
+	fmt.Printf("\tRemotes: (%d)\n", len(r))
+	for _, rr := range r {
+		fmt.Printf("\t\tName: %s\n", rr.Name)
+		fmt.Printf("\t\tFetchURL: %s\n", rr.FetchURL)
+		fmt.Printf("\t\tPushURL: %s\n", rr.PushURL)
+		fmt.Printf("\t\tRepo: %#v\n", rr.Repo)
+	}
+
 	filtered := make(Remotes, 0)
 	for _, rr := range r {
 		for _, host := range hosts {
+			fmt.Printf("\t\tComparing %s to %s\n", rr.RepoHost(), host)
 			if strings.EqualFold(rr.RepoHost(), host) {
+				fmt.Printf("\t\tMatched %s to %s\n", rr.RepoHost(), host)
 				filtered = append(filtered, rr)
 				break
 			}
+			fmt.Printf("\t\tNo match %s to %s\n", rr.RepoHost(), host)
 		}
+	}
+
+	fmt.Printf("\tRetained Remotes: (%d)\n", len(filtered))
+	for _, rr := range filtered {
+		fmt.Printf("\t\tRemote: %#v\n", rr.Name)
 	}
 	return filtered
 }
@@ -103,13 +127,23 @@ type Translator interface {
 }
 
 func TranslateRemotes(gitRemotes git.RemoteSet, translator Translator) (remotes Remotes) {
+	fmt.Println("*** Starting TranslateRemotes")
+	defer fmt.Println("*** Ending TranslateRemotes")
+
 	for _, r := range gitRemotes {
+		fmt.Println("\tTranslating: ", r.Name)
 		var repo ghrepo.Interface
 		if r.FetchURL != nil {
-			repo, _ = ghrepo.FromURL(translator.Translate(r.FetchURL))
+			fmt.Println("\t\tFetch URL:", r.FetchURL)
+			translatedFetchURL := translator.Translate(r.FetchURL)
+			fmt.Println("\t\tTranslated Fetch URL:", translatedFetchURL)
+			repo, _ = ghrepo.FromURL(translatedFetchURL)
 		}
 		if r.PushURL != nil && repo == nil {
-			repo, _ = ghrepo.FromURL(translator.Translate(r.PushURL))
+			fmt.Println("\t\tPush URL:", r.PushURL)
+			translatedPushURL := translator.Translate(r.PushURL)
+			fmt.Println("\t\tTranslated Push URL:", translatedPushURL)
+			repo, _ = ghrepo.FromURL(translatedPushURL)
 		}
 		if repo == nil {
 			continue

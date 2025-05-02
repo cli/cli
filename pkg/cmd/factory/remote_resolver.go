@@ -27,6 +27,9 @@ type remoteResolver struct {
 
 func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 	return func() (context.Remotes, error) {
+		fmt.Println("*** Starting Resolver")
+		defer fmt.Println("*** Ending Resolver")
+
 		if rr.cachedRemotes != nil || rr.remotesError != nil {
 			return rr.cachedRemotes, rr.remotesError
 		}
@@ -41,11 +44,26 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 			return nil, rr.remotesError
 		}
 
+		fmt.Printf("\tGit Remotes (%d)\n", len(gitRemotes))
+		for _, remote := range gitRemotes {
+			fmt.Println("\t\tName: ", remote.Name)
+			fmt.Println("\t\tFetchURL: ", remote.FetchURL)
+			fmt.Println("\t\tPushURL: ", remote.PushURL)
+		}
+
 		sshTranslate := rr.urlTranslator
 		if sshTranslate == nil {
 			sshTranslate = ssh.NewTranslator()
 		}
 		resolvedRemotes := context.TranslateRemotes(gitRemotes, sshTranslate)
+
+		fmt.Printf("\tResolved Remotes (%d)\n", len(resolvedRemotes))
+		for _, remote := range resolvedRemotes {
+			fmt.Println("\t\tName: ", remote.Name)
+			fmt.Println("\t\tFetchURL: ", remote.FetchURL)
+			fmt.Println("\t\tPushURL: ", remote.PushURL)
+			fmt.Printf("\t\tRepo: %#v\n", remote.Repo)
+		}
 
 		cfg, err := rr.getConfig()
 		if err != nil {
@@ -73,6 +91,7 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 		// For config file default host fallback to cachedRemotes if none match
 		// For environment default host (GH_HOST) do not fallback to cachedRemotes if none match
 		if src != "default" {
+			fmt.Println("\tFiltering by default host: ", defaultHost)
 			filteredRemotes := rr.cachedRemotes.FilterByHosts([]string{defaultHost})
 			if isHostEnv(src) || len(filteredRemotes) > 0 {
 				rr.cachedRemotes = filteredRemotes
