@@ -1564,7 +1564,7 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "\nCreating pull request for monalisa:task1 into feature/feat2 in OWNER/REPO\n\n",
 		},
 		{
-			name: "--head contains <user>:<branch> syntax",
+			name: "--head contains <owner>:<branch> syntax",
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),

@@ -205,8 +205,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			to push the branch and offer an option to fork the base repository. Use %[1]s--head%[1]s to
 			explicitly skip any forking or pushing behavior.
 
-			%[1]s--head%[1]s supports %[1]s<user>:<branch>%[1]s syntax to select a head repo owned by %[1]s<user>%[1]s.
-			Using an organization as the %[1]s<user>%[1]s is currently not supported.
+			%[1]s--head%[1]s supports %[1]s<owner>:<branch>%[1]s syntax to select a head repo owned by %[1]s<owner>%[1]s.
+			Using an organization as the %[1]s<owner>%[1]s is currently not supported.
 			For more information, see <https://github.com/cli/cli/issues/10093>
 
 			A prompt will also ask for the title and the body of the pull request. Use %[1]s--title%[1]s and
@@ -716,7 +716,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 
 	// If the user provided a head branch we're going to use that without any interrogation
-	// of git. The value can take the form of <branch> or <user>:<branch>. In the former case, the
+	// of git. The value can take the form of <branch> or <owner>:<branch>. In the former case, the
 	// PR base and head repos are the same. In the latter case we don't know the head repo
 	// (though we could look it up in the API) but fortunately we don't need to because the API
 	// will resolve this for us when we create the pull request. This is possible because
