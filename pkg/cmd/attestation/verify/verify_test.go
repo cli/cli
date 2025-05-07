@@ -510,7 +510,7 @@ func TestRunVerify(t *testing.T) {
 
 		err := runVerify(&customOpts)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "no matching predicate found")
+		require.ErrorContains(t, err, "no attestations found with predicate type")
 	})
 
 	t.Run("with valid OCI artifact with UseBundleFromRegistry flag but no bundle return from registry", func(t *testing.T) {
