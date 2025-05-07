@@ -140,28 +140,31 @@ func viewRun(opts *ViewOptions) error {
 
 	issue, err := issueShared.FindIssueOrPR(httpClient, baseRepo, opts.IssueNumber, fields.ToSlice())
 	if err != nil {
-		return err
+		var partialLoadErr *issueShared.PartialLoadError
+		if opts.Exporter == nil && errors.As(err, &partialLoadErr) {
+			fmt.Fprintf(opts.IO.ErrOut, "warning: %s\n", partialLoadErr.Error())
+		} else {
+			return err
+		}
 	}
 
 	if fields.Contains("comments") {
 		// FIXME: this re-fetches the comments connection even though the initial set of 100 were
 		// fetched in the previous request.
-		err = preloadIssueComments(httpClient, baseRepo, issue)
-	}
-
-	if fields.Contains("closedByPullRequestsReferences") {
-		err = preloadClosedByPullRequestsReferences(httpClient, baseRepo, issue)
-	}
-
-	opts.IO.StopProgressIndicator()
-	if err != nil {
-		var loadErr *issueShared.PartialLoadError
-		if opts.Exporter == nil && errors.As(err, &loadErr) {
-			fmt.Fprintf(opts.IO.ErrOut, "warning: %s\n", loadErr.Error())
-		} else {
+		err := preloadIssueComments(httpClient, baseRepo, issue)
+		if err != nil {
 			return err
 		}
 	}
+
+	if fields.Contains("closedByPullRequestsReferences") {
+		err := preloadClosedByPullRequestsReferences(httpClient, baseRepo, issue)
+		if err != nil {
+			return err
+		}
+	}
+
+	opts.IO.StopProgressIndicator()
 
 	if opts.WebMode {
 		openURL := issue.URL
