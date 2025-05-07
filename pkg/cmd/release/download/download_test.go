@@ -398,6 +398,93 @@ func Test_downloadRun(t *testing.T) {
 	}
 }
 
+func Test_downloadRun_assetNotExist(t *testing.T) {
+	tests := []struct {
+		name       string
+		isTTY      bool
+		opts       DownloadOptions
+		wantErr    string
+		wantStdout string
+		wantStderr string
+	}{
+		{
+			name:  "download assets from draft release",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				Destination: ".",
+				Concurrency: 2,
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantErr:    "no assets to download",
+		},
+		{
+			name:  "download assets with archive type `zip` from draft release",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				Destination: ".",
+				Concurrency: 2,
+				ArchiveType: "zip",
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantErr:    "no assets to download",
+		},
+		{
+			name:  "download assets with archive type `tar.gz` from draft release",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				Destination: ".",
+				Concurrency: 2,
+				ArchiveType: "tar.gz",
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantErr:    "no assets to download",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
+
+			fakeHTTP := &httpmock.Registry{}
+			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", tt.opts.TagName, `{
+				"assets": [],
+				"tarball_url": "",
+				"zipball_url": ""
+			}`)
+
+			tt.opts.IO = ios
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: fakeHTTP}, nil
+			}
+			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.FromFullName("OWNER/REPO")
+			}
+
+			err := downloadRun(&tt.opts)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
+
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func Test_downloadRun_cloberAndSkip(t *testing.T) {
 	oldAssetContents := "older copy to be clobbered"
 	oldZipballContents := "older zipball to be clobbered"

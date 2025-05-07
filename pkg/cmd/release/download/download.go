@@ -169,9 +169,11 @@ func downloadRun(opts *DownloadOptions) error {
 		if opts.ArchiveType == "tar.gz" {
 			archiveURL = release.TarballURL
 		}
-		// create pseudo-Asset with no name and pointing to ZipBallURL or TarBallURL
-		toDownload = append(toDownload, shared.ReleaseAsset{APIURL: archiveURL})
-		isArchive = true
+		if archiveURL != "" {
+			// create pseudo-Asset with no name and pointing to ZipBallURL or TarBallURL
+			toDownload = append(toDownload, shared.ReleaseAsset{APIURL: archiveURL})
+			isArchive = true
+		}
 	} else {
 		for _, a := range release.Assets {
 			if len(opts.FilePatterns) > 0 && !matchAny(opts.FilePatterns, a.Name) {
