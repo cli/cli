@@ -1,7 +1,6 @@
 package view
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -106,16 +105,16 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	fields := set.NewStringSet()
+	lookupFields := set.NewStringSet()
 	if opts.Exporter != nil {
-		fields.AddValues(opts.Exporter.Fields())
+		lookupFields.AddValues(opts.Exporter.Fields())
 	} else if opts.WebMode {
-		fields.Add("url")
+		lookupFields.Add("url")
 	} else {
-		fields.AddValues(defaultFields)
+		lookupFields.AddValues(defaultFields)
 		if opts.Comments {
-			fields.Add("comments")
-			fields.Remove("lastComment")
+			lookupFields.Add("comments")
+			lookupFields.Remove("lastComment")
 		}
 
 		// TODO projectsV1Deprecation
@@ -127,7 +126,7 @@ func viewRun(opts *ViewOptions) error {
 
 		projectsV1Support := opts.Detector.ProjectsV1()
 		if projectsV1Support == gh.ProjectsV1Supported {
-			fields.Add("projectCards")
+			lookupFields.Add("projectCards")
 		}
 	}
 
@@ -136,19 +135,14 @@ func viewRun(opts *ViewOptions) error {
 	opts.IO.StartProgressIndicator()
 	defer opts.IO.StopProgressIndicator()
 
-	fields.Add("id")
+	lookupFields.Add("id")
 
-	issue, err := issueShared.FindIssueOrPR(httpClient, baseRepo, opts.IssueNumber, fields.ToSlice())
+	issue, err := issueShared.FindIssueOrPR(httpClient, baseRepo, opts.IssueNumber, lookupFields.ToSlice())
 	if err != nil {
-		var partialLoadErr *issueShared.PartialLoadError
-		if opts.Exporter == nil && errors.As(err, &partialLoadErr) {
-			fmt.Fprintf(opts.IO.ErrOut, "warning: %s\n", partialLoadErr.Error())
-		} else {
-			return err
-		}
+		return err
 	}
 
-	if fields.Contains("comments") {
+	if lookupFields.Contains("comments") {
 		// FIXME: this re-fetches the comments connection even though the initial set of 100 were
 		// fetched in the previous request.
 		err := preloadIssueComments(httpClient, baseRepo, issue)
@@ -157,7 +151,7 @@ func viewRun(opts *ViewOptions) error {
 		}
 	}
 
-	if fields.Contains("closedByPullRequestsReferences") {
+	if lookupFields.Contains("closedByPullRequestsReferences") {
 		err := preloadClosedByPullRequestsReferences(httpClient, baseRepo, issue)
 		if err != nil {
 			return err
