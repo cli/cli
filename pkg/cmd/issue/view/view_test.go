@@ -31,6 +31,7 @@ func TestJSONFields(t *testing.T) {
 		"body",
 		"closed",
 		"comments",
+		"closedByPullRequestsReferences",
 		"createdAt",
 		"closedAt",
 		"id",

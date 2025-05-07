@@ -106,16 +106,16 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	lookupFields := set.NewStringSet()
+	fields := set.NewStringSet()
 	if opts.Exporter != nil {
-		lookupFields.AddValues(opts.Exporter.Fields())
+		fields.AddValues(opts.Exporter.Fields())
 	} else if opts.WebMode {
-		lookupFields.Add("url")
+		fields.Add("url")
 	} else {
-		lookupFields.AddValues(defaultFields)
+		fields.AddValues(defaultFields)
 		if opts.Comments {
-			lookupFields.Add("comments")
-			lookupFields.Remove("lastComment")
+			fields.Add("comments")
+			fields.Remove("lastComment")
 		}
 
 		// TODO projectsV1Deprecation
@@ -127,25 +127,32 @@ func viewRun(opts *ViewOptions) error {
 
 		projectsV1Support := opts.Detector.ProjectsV1()
 		if projectsV1Support == gh.ProjectsV1Supported {
-			lookupFields.Add("projectCards")
+			fields.Add("projectCards")
 		}
 	}
 
 	opts.IO.DetectTerminalTheme()
 
 	opts.IO.StartProgressIndicator()
-	lookupFields.Add("id")
+	defer opts.IO.StopProgressIndicator()
 
-	issue, err := issueShared.FindIssueOrPR(httpClient, baseRepo, opts.IssueNumber, lookupFields.ToSlice())
+	fields.Add("id")
+
+	issue, err := issueShared.FindIssueOrPR(httpClient, baseRepo, opts.IssueNumber, fields.ToSlice())
 	if err != nil {
 		return err
 	}
 
-	if lookupFields.Contains("comments") {
+	if fields.Contains("comments") {
 		// FIXME: this re-fetches the comments connection even though the initial set of 100 were
 		// fetched in the previous request.
 		err = preloadIssueComments(httpClient, baseRepo, issue)
 	}
+
+	if fields.Contains("closedByPullRequestsReferences") {
+		err = preloadClosedByPullRequestsReferences(httpClient, baseRepo, issue)
+	}
+
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		var loadErr *issueShared.PartialLoadError
