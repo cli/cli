@@ -456,7 +456,6 @@ func createRun(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		// TODO wm: revisit project support
 		return submitPR(*opts, *ctx, *state, projectsV1Support)
 	}
 
@@ -534,7 +533,7 @@ func createRun(opts *CreateOptions) error {
 			}
 		}
 
-		openURL, err = generateCompareURL(*ctx, *state, gh.ProjectsV1Supported)
+		openURL, err = generateCompareURL(*ctx, *state, projectsV1Support)
 		if err != nil {
 			return err
 		}
@@ -553,8 +552,7 @@ func createRun(opts *CreateOptions) error {
 				Repo:      ctx.PRRefs.BaseRepo(),
 				State:     state,
 			}
-			// TODO wm: revisit project support
-			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.PRRefs.BaseRepo(), fetcher, state, gh.ProjectsV1Supported)
+			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.PRRefs.BaseRepo(), fetcher, state, projectsV1Support)
 			if err != nil {
 				return err
 			}
@@ -583,12 +581,10 @@ func createRun(opts *CreateOptions) error {
 
 	if action == shared.SubmitDraftAction {
 		state.Draft = true
-		// TODO wm: revisit project support
 		return submitPR(*opts, *ctx, *state, projectsV1Support)
 	}
 
 	if action == shared.SubmitAction {
-		// TODO wm: revisit project support
 		return submitPR(*opts, *ctx, *state, projectsV1Support)
 	}
 
@@ -1237,7 +1233,6 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState, proj
 		ctx.PRRefs.BaseRepo(),
 		"compare/%s...%s?expand=1",
 		url.PathEscape(ctx.PRRefs.BaseRef()), url.PathEscape(ctx.PRRefs.QualifiedHeadRef()))
-	// TODO wm: revisit project support
 	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.PRRefs.BaseRepo(), u, state, projectsV1Support)
 	if err != nil {
 		return "", err
