@@ -5,7 +5,6 @@ package prompter_test
 import (
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -170,7 +169,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		// expected string matches any part of the stream, we have to use an
 		// anchored regexp (i.e., with ^ and $) to make sure the password/token
 		// is not printed at all.
-		_, err = console.Expect(expect.Regexp(regexp.MustCompile("^ \r\n\r\n$")))
+		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
 		require.NoError(t, err)
 	})
 
@@ -241,7 +240,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		// expected string matches any part of the stream, we have to use an
 		// anchored regexp (i.e., with ^ and $) to make sure the password/token
 		// is not printed at all.
-		_, err = console.Expect(expect.Regexp(regexp.MustCompile("^ \r\n\r\n$")))
+		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
 		require.NoError(t, err)
 	})
 
@@ -286,7 +285,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		// expected string matches any part of the stream, we have to use an
 		// anchored regexp (i.e., with ^ and $) to make sure the password/token
 		// is not printed at all.
-		_, err = console.Expect(expect.Regexp(regexp.MustCompile("^ \r\n\r\n$")))
+		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
 		require.NoError(t, err)
 	})
 
