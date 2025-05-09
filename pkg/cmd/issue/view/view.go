@@ -1,7 +1,6 @@
 package view
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -134,6 +133,8 @@ func viewRun(opts *ViewOptions) error {
 	opts.IO.DetectTerminalTheme()
 
 	opts.IO.StartProgressIndicator()
+	defer opts.IO.StopProgressIndicator()
+
 	lookupFields.Add("id")
 
 	issue, err := issueShared.FindIssueOrPR(httpClient, baseRepo, opts.IssueNumber, lookupFields.ToSlice())
@@ -144,17 +145,20 @@ func viewRun(opts *ViewOptions) error {
 	if lookupFields.Contains("comments") {
 		// FIXME: this re-fetches the comments connection even though the initial set of 100 were
 		// fetched in the previous request.
-		err = preloadIssueComments(httpClient, baseRepo, issue)
-	}
-	opts.IO.StopProgressIndicator()
-	if err != nil {
-		var loadErr *issueShared.PartialLoadError
-		if opts.Exporter == nil && errors.As(err, &loadErr) {
-			fmt.Fprintf(opts.IO.ErrOut, "warning: %s\n", loadErr.Error())
-		} else {
+		err := preloadIssueComments(httpClient, baseRepo, issue)
+		if err != nil {
 			return err
 		}
 	}
+
+	if lookupFields.Contains("closedByPullRequestsReferences") {
+		err := preloadClosedByPullRequestsReferences(httpClient, baseRepo, issue)
+		if err != nil {
+			return err
+		}
+	}
+
+	opts.IO.StopProgressIndicator()
 
 	if opts.WebMode {
 		openURL := issue.URL

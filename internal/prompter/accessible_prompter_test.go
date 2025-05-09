@@ -164,7 +164,12 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		// Ensure the dummy password is not printed to the screen,
 		// asserting that echo mode is disabled.
-		_, err = console.ExpectString(" \r\n\r\n")
+		//
+		// Note that since console.ExpectString returns successful if the
+		// expected string matches any part of the stream, we have to use an
+		// anchored regexp (i.e., with ^ and $) to make sure the password/token
+		// is not printed at all.
+		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
 		require.NoError(t, err)
 	})
 
@@ -230,7 +235,12 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		// Ensure the dummy password is not printed to the screen,
 		// asserting that echo mode is disabled.
-		_, err = console.ExpectString(" \r\n\r\n")
+		//
+		// Note that since console.ExpectString returns successful if the
+		// expected string matches any part of the stream, we have to use an
+		// anchored regexp (i.e., with ^ and $) to make sure the password/token
+		// is not printed at all.
+		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
 		require.NoError(t, err)
 	})
 
@@ -252,6 +262,10 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err = console.ExpectString("token is required")
 			require.NoError(t, err)
 
+			// Wait for the retry prompt
+			_, err = console.ExpectString("Paste your authentication token:")
+			require.NoError(t, err)
+
 			// Wait to ensure huh has time to set the echo mode
 			time.Sleep(beforePasswordSendTimeout)
 
@@ -266,7 +280,12 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		// Ensure the dummy password is not printed to the screen,
 		// asserting that echo mode is disabled.
-		_, err = console.ExpectString(" \r\n\r\n")
+		//
+		// Note that since console.ExpectString returns successful if the
+		// expected string matches any part of the stream, we have to use an
+		// anchored regexp (i.e., with ^ and $) to make sure the password/token
+		// is not printed at all.
+		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
 		require.NoError(t, err)
 	})
 
