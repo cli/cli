@@ -393,7 +393,7 @@ func TestRerun(t *testing.T) {
 					}))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/3/rerun"),
-					httpmock.StatusJSONResponse(403, api.HTTPError{
+					httpmock.JSONErrorResponse(403, api.HTTPError{
 						StatusCode: 403,
 						Message:    "blah blah",
 					}),
@@ -421,7 +421,7 @@ func TestRerun(t *testing.T) {
 					}))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/3/rerun"),
-					httpmock.StatusJSONResponse(500, api.HTTPError{
+					httpmock.JSONErrorResponse(500, api.HTTPError{
 						StatusCode: 500,
 						Message:    "blah blah",
 					}),
