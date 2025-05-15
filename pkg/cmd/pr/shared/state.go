@@ -25,12 +25,12 @@ type IssueMetadataState struct {
 
 	Template string
 
-	Metadata   []string
-	Reviewers  []string
-	Assignees  []string
-	Labels     []string
-	Projects   []string
-	Milestones []string
+	Metadata      []string
+	Reviewers     []string
+	Assignees     []string
+	Labels        []string
+	ProjectTitles []string
+	Milestones    []string
 
 	MetadataResult *api.RepoMetadataResult
 
@@ -49,7 +49,7 @@ func (tb *IssueMetadataState) HasMetadata() bool {
 	return len(tb.Reviewers) > 0 ||
 		len(tb.Assignees) > 0 ||
 		len(tb.Labels) > 0 ||
-		len(tb.Projects) > 0 ||
+		len(tb.ProjectTitles) > 0 ||
 		len(tb.Milestones) > 0
 }
 

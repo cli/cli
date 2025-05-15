@@ -5,9 +5,12 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	shared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -22,13 +25,14 @@ type EditOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   prShared.EditPrompter
+	Detector   fd.Detector
 
 	DetermineEditor    func() (string, error)
 	FieldsToEditSurvey func(prShared.EditPrompter, *prShared.Editable) error
 	EditFieldsSurvey   func(prShared.EditPrompter, *prShared.Editable, string) error
 	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable) error
 
-	SelectorArgs []string
+	IssueNumbers []int
 	Interactive  bool
 
 	prShared.Editable
@@ -69,10 +73,22 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		`),
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			issueNumbers, baseRepo, err := shared.ParseIssuesFromArgs(args)
+			if err != nil {
+				return err
+			}
 
-			opts.SelectorArgs = args
+			// If the args provided the base repo then use that directly.
+			if baseRepo, present := baseRepo.Value(); present {
+				opts.BaseRepo = func() (ghrepo.Interface, error) {
+					return baseRepo, nil
+				}
+			} else {
+				// support `-R, --repo` override
+				opts.BaseRepo = f.BaseRepo
+			}
+
+			opts.IssueNumbers = issueNumbers
 
 			flags := cmd.Flags()
 
@@ -134,7 +150,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("field to edit flag required when not running interactively")
 			}
 
-			if opts.Interactive && len(opts.SelectorArgs) > 1 {
+			if opts.Interactive && len(opts.IssueNumbers) > 1 {
 				return cmdutil.FlagErrorf("multiple issues cannot be edited interactively")
 			}
 
@@ -167,6 +183,11 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
 	// Prompt the user which fields they'd like to edit.
 	editable := opts.Editable
 	if opts.Interactive {
@@ -184,7 +205,18 @@ func editRun(opts *EditOptions) error {
 		lookupFields = append(lookupFields, "labels")
 	}
 	if editable.Projects.Edited {
-		lookupFields = append(lookupFields, "projectCards")
+		// TODO projectsV1Deprecation
+		// Remove this section as we should no longer add projectCards
+		if opts.Detector == nil {
+			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+		}
+
+		projectsV1Support := opts.Detector.ProjectsV1()
+		if projectsV1Support == gh.ProjectsV1Supported {
+			lookupFields = append(lookupFields, "projectCards")
+		}
+
 		lookupFields = append(lookupFields, "projectItems")
 	}
 	if editable.Milestone.Edited {
@@ -192,7 +224,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	// Get all specified issues and make sure they are within the same repo.
-	issues, repo, err := shared.IssuesFromArgsWithFields(httpClient, opts.BaseRepo, opts.SelectorArgs, lookupFields)
+	issues, err := shared.FindIssuesOrPRs(httpClient, baseRepo, opts.IssueNumbers, lookupFields)
 	if err != nil {
 		return err
 	}
@@ -200,7 +232,7 @@ func editRun(opts *EditOptions) error {
 	// Fetch editable shared fields once for all issues.
 	apiClient := api.NewClientFromHTTP(httpClient)
 	opts.IO.StartProgressIndicatorWithLabel("Fetching repository information")
-	err = opts.FetchOptions(apiClient, repo, &editable)
+	err = opts.FetchOptions(apiClient, baseRepo, &editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -250,7 +282,7 @@ func editRun(opts *EditOptions) error {
 		go func(issue *api.Issue) {
 			defer g.Done()
 
-			err := prShared.UpdateIssue(httpClient, repo, issue.ID, issue.IsPullRequest(), editable)
+			err := prShared.UpdateIssue(httpClient, baseRepo, issue.ID, issue.IsPullRequest(), editable)
 			if err != nil {
 				failedIssueChan <- fmt.Sprintf("failed to update %s: %s", issue.URL, err)
 				return

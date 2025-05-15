@@ -20,28 +20,28 @@ var _ Prompter = &PrompterMock{}
 //			AuthTokenFunc: func() (string, error) {
 //				panic("mock out the AuthToken method")
 //			},
-//			ConfirmFunc: func(s string, b bool) (bool, error) {
+//			ConfirmFunc: func(prompt string, defaultValue bool) (bool, error) {
 //				panic("mock out the Confirm method")
 //			},
-//			ConfirmDeletionFunc: func(s string) error {
+//			ConfirmDeletionFunc: func(requiredValue string) error {
 //				panic("mock out the ConfirmDeletion method")
 //			},
-//			InputFunc: func(s1 string, s2 string) (string, error) {
+//			InputFunc: func(prompt string, defaultValue string) (string, error) {
 //				panic("mock out the Input method")
 //			},
 //			InputHostnameFunc: func() (string, error) {
 //				panic("mock out the InputHostname method")
 //			},
-//			MarkdownEditorFunc: func(s1 string, s2 string, b bool) (string, error) {
+//			MarkdownEditorFunc: func(prompt string, defaultValue string, blankAllowed bool) (string, error) {
 //				panic("mock out the MarkdownEditor method")
 //			},
 //			MultiSelectFunc: func(prompt string, defaults []string, options []string) ([]int, error) {
 //				panic("mock out the MultiSelect method")
 //			},
-//			PasswordFunc: func(s string) (string, error) {
+//			PasswordFunc: func(prompt string) (string, error) {
 //				panic("mock out the Password method")
 //			},
-//			SelectFunc: func(s1 string, s2 string, strings []string) (int, error) {
+//			SelectFunc: func(prompt string, defaultValue string, options []string) (int, error) {
 //				panic("mock out the Select method")
 //			},
 //		}
@@ -55,28 +55,28 @@ type PrompterMock struct {
 	AuthTokenFunc func() (string, error)
 
 	// ConfirmFunc mocks the Confirm method.
-	ConfirmFunc func(s string, b bool) (bool, error)
+	ConfirmFunc func(prompt string, defaultValue bool) (bool, error)
 
 	// ConfirmDeletionFunc mocks the ConfirmDeletion method.
-	ConfirmDeletionFunc func(s string) error
+	ConfirmDeletionFunc func(requiredValue string) error
 
 	// InputFunc mocks the Input method.
-	InputFunc func(s1 string, s2 string) (string, error)
+	InputFunc func(prompt string, defaultValue string) (string, error)
 
 	// InputHostnameFunc mocks the InputHostname method.
 	InputHostnameFunc func() (string, error)
 
 	// MarkdownEditorFunc mocks the MarkdownEditor method.
-	MarkdownEditorFunc func(s1 string, s2 string, b bool) (string, error)
+	MarkdownEditorFunc func(prompt string, defaultValue string, blankAllowed bool) (string, error)
 
 	// MultiSelectFunc mocks the MultiSelect method.
 	MultiSelectFunc func(prompt string, defaults []string, options []string) ([]int, error)
 
 	// PasswordFunc mocks the Password method.
-	PasswordFunc func(s string) (string, error)
+	PasswordFunc func(prompt string) (string, error)
 
 	// SelectFunc mocks the Select method.
-	SelectFunc func(s1 string, s2 string, strings []string) (int, error)
+	SelectFunc func(prompt string, defaultValue string, options []string) (int, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -85,34 +85,34 @@ type PrompterMock struct {
 		}
 		// Confirm holds details about calls to the Confirm method.
 		Confirm []struct {
-			// S is the s argument value.
-			S string
-			// B is the b argument value.
-			B bool
+			// Prompt is the prompt argument value.
+			Prompt string
+			// DefaultValue is the defaultValue argument value.
+			DefaultValue bool
 		}
 		// ConfirmDeletion holds details about calls to the ConfirmDeletion method.
 		ConfirmDeletion []struct {
-			// S is the s argument value.
-			S string
+			// RequiredValue is the requiredValue argument value.
+			RequiredValue string
 		}
 		// Input holds details about calls to the Input method.
 		Input []struct {
-			// S1 is the s1 argument value.
-			S1 string
-			// S2 is the s2 argument value.
-			S2 string
+			// Prompt is the prompt argument value.
+			Prompt string
+			// DefaultValue is the defaultValue argument value.
+			DefaultValue string
 		}
 		// InputHostname holds details about calls to the InputHostname method.
 		InputHostname []struct {
 		}
 		// MarkdownEditor holds details about calls to the MarkdownEditor method.
 		MarkdownEditor []struct {
-			// S1 is the s1 argument value.
-			S1 string
-			// S2 is the s2 argument value.
-			S2 string
-			// B is the b argument value.
-			B bool
+			// Prompt is the prompt argument value.
+			Prompt string
+			// DefaultValue is the defaultValue argument value.
+			DefaultValue string
+			// BlankAllowed is the blankAllowed argument value.
+			BlankAllowed bool
 		}
 		// MultiSelect holds details about calls to the MultiSelect method.
 		MultiSelect []struct {
@@ -125,17 +125,17 @@ type PrompterMock struct {
 		}
 		// Password holds details about calls to the Password method.
 		Password []struct {
-			// S is the s argument value.
-			S string
+			// Prompt is the prompt argument value.
+			Prompt string
 		}
 		// Select holds details about calls to the Select method.
 		Select []struct {
-			// S1 is the s1 argument value.
-			S1 string
-			// S2 is the s2 argument value.
-			S2 string
-			// Strings is the strings argument value.
-			Strings []string
+			// Prompt is the prompt argument value.
+			Prompt string
+			// DefaultValue is the defaultValue argument value.
+			DefaultValue string
+			// Options is the options argument value.
+			Options []string
 		}
 	}
 	lockAuthToken       sync.RWMutex
@@ -177,21 +177,21 @@ func (mock *PrompterMock) AuthTokenCalls() []struct {
 }
 
 // Confirm calls ConfirmFunc.
-func (mock *PrompterMock) Confirm(s string, b bool) (bool, error) {
+func (mock *PrompterMock) Confirm(prompt string, defaultValue bool) (bool, error) {
 	if mock.ConfirmFunc == nil {
 		panic("PrompterMock.ConfirmFunc: method is nil but Prompter.Confirm was just called")
 	}
 	callInfo := struct {
-		S string
-		B bool
+		Prompt       string
+		DefaultValue bool
 	}{
-		S: s,
-		B: b,
+		Prompt:       prompt,
+		DefaultValue: defaultValue,
 	}
 	mock.lockConfirm.Lock()
 	mock.calls.Confirm = append(mock.calls.Confirm, callInfo)
 	mock.lockConfirm.Unlock()
-	return mock.ConfirmFunc(s, b)
+	return mock.ConfirmFunc(prompt, defaultValue)
 }
 
 // ConfirmCalls gets all the calls that were made to Confirm.
@@ -199,12 +199,12 @@ func (mock *PrompterMock) Confirm(s string, b bool) (bool, error) {
 //
 //	len(mockedPrompter.ConfirmCalls())
 func (mock *PrompterMock) ConfirmCalls() []struct {
-	S string
-	B bool
+	Prompt       string
+	DefaultValue bool
 } {
 	var calls []struct {
-		S string
-		B bool
+		Prompt       string
+		DefaultValue bool
 	}
 	mock.lockConfirm.RLock()
 	calls = mock.calls.Confirm
@@ -213,19 +213,19 @@ func (mock *PrompterMock) ConfirmCalls() []struct {
 }
 
 // ConfirmDeletion calls ConfirmDeletionFunc.
-func (mock *PrompterMock) ConfirmDeletion(s string) error {
+func (mock *PrompterMock) ConfirmDeletion(requiredValue string) error {
 	if mock.ConfirmDeletionFunc == nil {
 		panic("PrompterMock.ConfirmDeletionFunc: method is nil but Prompter.ConfirmDeletion was just called")
 	}
 	callInfo := struct {
-		S string
+		RequiredValue string
 	}{
-		S: s,
+		RequiredValue: requiredValue,
 	}
 	mock.lockConfirmDeletion.Lock()
 	mock.calls.ConfirmDeletion = append(mock.calls.ConfirmDeletion, callInfo)
 	mock.lockConfirmDeletion.Unlock()
-	return mock.ConfirmDeletionFunc(s)
+	return mock.ConfirmDeletionFunc(requiredValue)
 }
 
 // ConfirmDeletionCalls gets all the calls that were made to ConfirmDeletion.
@@ -233,10 +233,10 @@ func (mock *PrompterMock) ConfirmDeletion(s string) error {
 //
 //	len(mockedPrompter.ConfirmDeletionCalls())
 func (mock *PrompterMock) ConfirmDeletionCalls() []struct {
-	S string
+	RequiredValue string
 } {
 	var calls []struct {
-		S string
+		RequiredValue string
 	}
 	mock.lockConfirmDeletion.RLock()
 	calls = mock.calls.ConfirmDeletion
@@ -245,21 +245,21 @@ func (mock *PrompterMock) ConfirmDeletionCalls() []struct {
 }
 
 // Input calls InputFunc.
-func (mock *PrompterMock) Input(s1 string, s2 string) (string, error) {
+func (mock *PrompterMock) Input(prompt string, defaultValue string) (string, error) {
 	if mock.InputFunc == nil {
 		panic("PrompterMock.InputFunc: method is nil but Prompter.Input was just called")
 	}
 	callInfo := struct {
-		S1 string
-		S2 string
+		Prompt       string
+		DefaultValue string
 	}{
-		S1: s1,
-		S2: s2,
+		Prompt:       prompt,
+		DefaultValue: defaultValue,
 	}
 	mock.lockInput.Lock()
 	mock.calls.Input = append(mock.calls.Input, callInfo)
 	mock.lockInput.Unlock()
-	return mock.InputFunc(s1, s2)
+	return mock.InputFunc(prompt, defaultValue)
 }
 
 // InputCalls gets all the calls that were made to Input.
@@ -267,12 +267,12 @@ func (mock *PrompterMock) Input(s1 string, s2 string) (string, error) {
 //
 //	len(mockedPrompter.InputCalls())
 func (mock *PrompterMock) InputCalls() []struct {
-	S1 string
-	S2 string
+	Prompt       string
+	DefaultValue string
 } {
 	var calls []struct {
-		S1 string
-		S2 string
+		Prompt       string
+		DefaultValue string
 	}
 	mock.lockInput.RLock()
 	calls = mock.calls.Input
@@ -308,23 +308,23 @@ func (mock *PrompterMock) InputHostnameCalls() []struct {
 }
 
 // MarkdownEditor calls MarkdownEditorFunc.
-func (mock *PrompterMock) MarkdownEditor(s1 string, s2 string, b bool) (string, error) {
+func (mock *PrompterMock) MarkdownEditor(prompt string, defaultValue string, blankAllowed bool) (string, error) {
 	if mock.MarkdownEditorFunc == nil {
 		panic("PrompterMock.MarkdownEditorFunc: method is nil but Prompter.MarkdownEditor was just called")
 	}
 	callInfo := struct {
-		S1 string
-		S2 string
-		B  bool
+		Prompt       string
+		DefaultValue string
+		BlankAllowed bool
 	}{
-		S1: s1,
-		S2: s2,
-		B:  b,
+		Prompt:       prompt,
+		DefaultValue: defaultValue,
+		BlankAllowed: blankAllowed,
 	}
 	mock.lockMarkdownEditor.Lock()
 	mock.calls.MarkdownEditor = append(mock.calls.MarkdownEditor, callInfo)
 	mock.lockMarkdownEditor.Unlock()
-	return mock.MarkdownEditorFunc(s1, s2, b)
+	return mock.MarkdownEditorFunc(prompt, defaultValue, blankAllowed)
 }
 
 // MarkdownEditorCalls gets all the calls that were made to MarkdownEditor.
@@ -332,14 +332,14 @@ func (mock *PrompterMock) MarkdownEditor(s1 string, s2 string, b bool) (string, 
 //
 //	len(mockedPrompter.MarkdownEditorCalls())
 func (mock *PrompterMock) MarkdownEditorCalls() []struct {
-	S1 string
-	S2 string
-	B  bool
+	Prompt       string
+	DefaultValue string
+	BlankAllowed bool
 } {
 	var calls []struct {
-		S1 string
-		S2 string
-		B  bool
+		Prompt       string
+		DefaultValue string
+		BlankAllowed bool
 	}
 	mock.lockMarkdownEditor.RLock()
 	calls = mock.calls.MarkdownEditor
@@ -388,19 +388,19 @@ func (mock *PrompterMock) MultiSelectCalls() []struct {
 }
 
 // Password calls PasswordFunc.
-func (mock *PrompterMock) Password(s string) (string, error) {
+func (mock *PrompterMock) Password(prompt string) (string, error) {
 	if mock.PasswordFunc == nil {
 		panic("PrompterMock.PasswordFunc: method is nil but Prompter.Password was just called")
 	}
 	callInfo := struct {
-		S string
+		Prompt string
 	}{
-		S: s,
+		Prompt: prompt,
 	}
 	mock.lockPassword.Lock()
 	mock.calls.Password = append(mock.calls.Password, callInfo)
 	mock.lockPassword.Unlock()
-	return mock.PasswordFunc(s)
+	return mock.PasswordFunc(prompt)
 }
 
 // PasswordCalls gets all the calls that were made to Password.
@@ -408,10 +408,10 @@ func (mock *PrompterMock) Password(s string) (string, error) {
 //
 //	len(mockedPrompter.PasswordCalls())
 func (mock *PrompterMock) PasswordCalls() []struct {
-	S string
+	Prompt string
 } {
 	var calls []struct {
-		S string
+		Prompt string
 	}
 	mock.lockPassword.RLock()
 	calls = mock.calls.Password
@@ -420,23 +420,23 @@ func (mock *PrompterMock) PasswordCalls() []struct {
 }
 
 // Select calls SelectFunc.
-func (mock *PrompterMock) Select(s1 string, s2 string, strings []string) (int, error) {
+func (mock *PrompterMock) Select(prompt string, defaultValue string, options []string) (int, error) {
 	if mock.SelectFunc == nil {
 		panic("PrompterMock.SelectFunc: method is nil but Prompter.Select was just called")
 	}
 	callInfo := struct {
-		S1      string
-		S2      string
-		Strings []string
+		Prompt       string
+		DefaultValue string
+		Options      []string
 	}{
-		S1:      s1,
-		S2:      s2,
-		Strings: strings,
+		Prompt:       prompt,
+		DefaultValue: defaultValue,
+		Options:      options,
 	}
 	mock.lockSelect.Lock()
 	mock.calls.Select = append(mock.calls.Select, callInfo)
 	mock.lockSelect.Unlock()
-	return mock.SelectFunc(s1, s2, strings)
+	return mock.SelectFunc(prompt, defaultValue, options)
 }
 
 // SelectCalls gets all the calls that were made to Select.
@@ -444,14 +444,14 @@ func (mock *PrompterMock) Select(s1 string, s2 string, strings []string) (int, e
 //
 //	len(mockedPrompter.SelectCalls())
 func (mock *PrompterMock) SelectCalls() []struct {
-	S1      string
-	S2      string
-	Strings []string
+	Prompt       string
+	DefaultValue string
+	Options      []string
 } {
 	var calls []struct {
-		S1      string
-		S2      string
-		Strings []string
+		Prompt       string
+		DefaultValue string
+		Options      []string
 	}
 	mock.lockSelect.RLock()
 	calls = mock.calls.Select

@@ -1,13 +1,16 @@
 package shared
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type metadataFetcher struct {
@@ -68,7 +71,7 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		Assignees: []string{"hubot"},
 		Type:      PRMetadata,
 	}
-	err := MetadataSurvey(pm, ios, repo, fetcher, state)
+	err := MetadataSurvey(pm, ios, repo, fetcher, state, gh.ProjectsV1Supported)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -77,7 +80,7 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 	assert.Equal(t, []string{"hubot"}, state.Assignees)
 	assert.Equal(t, []string{"monalisa"}, state.Reviewers)
 	assert.Equal(t, []string{"good first issue"}, state.Labels)
-	assert.Equal(t, []string{"The road to 1.0"}, state.Projects)
+	assert.Equal(t, []string{"The road to 1.0"}, state.ProjectTitles)
 	assert.Equal(t, []string{}, state.Milestones)
 }
 
@@ -113,7 +116,8 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
 	}
-	err := MetadataSurvey(pm, ios, repo, fetcher, state)
+
+	err := MetadataSurvey(pm, ios, repo, fetcher, state, gh.ProjectsV1Supported)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -121,7 +125,64 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 
 	assert.Equal(t, []string{"hubot"}, state.Assignees)
 	assert.Equal(t, []string{"good first issue"}, state.Labels)
-	assert.Equal(t, []string{"The road to 1.0"}, state.Projects)
+	assert.Equal(t, []string{"The road to 1.0"}, state.ProjectTitles)
+}
+
+// TODO projectsV1Deprecation
+// Remove this test and projectsV1MetadataFetcherSpy
+func TestMetadataSurveyProjectV1Deprecation(t *testing.T) {
+	t.Run("when projectsV1 is supported, requests projectsV1", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+		repo := ghrepo.New("OWNER", "REPO")
+
+		fetcher := &projectsV1MetadataFetcherSpy{}
+		pm := prompter.NewMockPrompter(t)
+		pm.RegisterMultiSelect("What would you like to add?", []string{}, []string{"Assignees", "Labels", "Projects", "Milestone"}, func(_ string, _, options []string) ([]int, error) {
+			i, err := prompter.IndexFor(options, "Projects")
+			require.NoError(t, err)
+			return []int{i}, nil
+		})
+		pm.RegisterMultiSelect("Projects", []string{}, []string{"Huge Refactoring"}, func(_ string, _, _ []string) ([]int, error) {
+			return []int{0}, nil
+		})
+
+		err := MetadataSurvey(pm, ios, repo, fetcher, &IssueMetadataState{}, gh.ProjectsV1Supported)
+		require.ErrorContains(t, err, "expected test error")
+
+		require.True(t, fetcher.projectsV1Requested, "expected projectsV1 to be requested")
+	})
+
+	t.Run("when projectsV1 is supported, does not request projectsV1", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+		repo := ghrepo.New("OWNER", "REPO")
+
+		fetcher := &projectsV1MetadataFetcherSpy{}
+		pm := prompter.NewMockPrompter(t)
+		pm.RegisterMultiSelect("What would you like to add?", []string{}, []string{"Assignees", "Labels", "Projects", "Milestone"}, func(_ string, _, options []string) ([]int, error) {
+			i, err := prompter.IndexFor(options, "Projects")
+			require.NoError(t, err)
+			return []int{i}, nil
+		})
+		pm.RegisterMultiSelect("Projects", []string{}, []string{"Huge Refactoring"}, func(_ string, _, _ []string) ([]int, error) {
+			return []int{0}, nil
+		})
+
+		err := MetadataSurvey(pm, ios, repo, fetcher, &IssueMetadataState{}, gh.ProjectsV1Unsupported)
+		require.ErrorContains(t, err, "expected test error")
+
+		require.False(t, fetcher.projectsV1Requested, "expected projectsV1 not to be requested")
+	})
+}
+
+type projectsV1MetadataFetcherSpy struct {
+	projectsV1Requested bool
+}
+
+func (mf *projectsV1MetadataFetcherSpy) RepoMetadataFetch(input api.RepoMetadataInput) (*api.RepoMetadataResult, error) {
+	if input.ProjectsV1 {
+		mf.projectsV1Requested = true
+	}
+	return nil, errors.New("expected test error")
 }
 
 func TestTitledEditSurvey_cleanupHint(t *testing.T) {

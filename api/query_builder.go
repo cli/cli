@@ -56,6 +56,25 @@ var issueCommentLast = shortenQuery(`
 	}
 `)
 
+var issueClosedByPullRequestsReferences = shortenQuery(`
+	closedByPullRequestsReferences(first: 100) {
+		nodes {
+			id,
+			number,
+			url,
+			repository {
+				id,
+				name,
+				owner {
+					id,
+					login
+				}
+			}
+		}
+		pageInfo{hasNextPage,endCursor}
+	}
+`)
+
 var prReviewRequests = shortenQuery(`
 	reviewRequests(first: 100) {
 		nodes {
@@ -129,6 +148,25 @@ var prCommits = shortenQuery(`
 				authoredDate
 			}
 		}
+	}
+`)
+
+var prClosingIssuesReferences = shortenQuery(`
+	closingIssuesReferences(first: 100) {
+		nodes {
+			id,
+			number,
+			url,
+			repository {
+				id,
+				name,
+				owner {
+					id,
+					login
+				}
+			}
+		}
+		pageInfo{hasNextPage,endCursor}
 	}
 `)
 
@@ -277,6 +315,7 @@ var sharedIssuePRFields = []string{
 var issueOnlyFields = []string{
 	"isPinned",
 	"stateReason",
+	"closedByPullRequestsReferences",
 }
 
 var IssueFields = append(sharedIssuePRFields, issueOnlyFields...)
@@ -287,6 +326,7 @@ var PullRequestFields = append(sharedIssuePRFields,
 	"baseRefName",
 	"baseRefOid",
 	"changedFiles",
+	"closingIssuesReferences",
 	"commits",
 	"deletions",
 	"files",
@@ -366,6 +406,10 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, StatusCheckRollupGraphQLWithoutCountByState(""))
 		case "statusCheckRollupWithCountByState": // pseudo-field
 			q = append(q, StatusCheckRollupGraphQLWithCountByState())
+		case "closingIssuesReferences":
+			q = append(q, prClosingIssuesReferences)
+		case "closedByPullRequestsReferences":
+			q = append(q, issueClosedByPullRequestsReferences)
 		default:
 			q = append(q, field)
 		}

@@ -15,10 +15,11 @@ stdout2env REPO_ID
 
 # Create a fork in the same org
 exec gh repo fork ${ORG}/${REPO} --org ${ORG} --fork-name ${FORK}
+sleep 5
 
 # Defer repo cleanup of fork
 defer gh repo delete --yes ${ORG}/${FORK}
-sleep 1
+
 exec gh repo view ${ORG}/${FORK} --json id --jq '.id'
 stdout2env FORK_ID
 

@@ -10,7 +10,9 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -26,11 +28,12 @@ func TestNewCmdEdit(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name     string
-		input    string
-		stdin    string
-		output   EditOptions
-		wantsErr bool
+		name             string
+		input            string
+		stdin            string
+		output           EditOptions
+		expectedBaseRepo ghrepo.Interface
+		wantsErr         bool
 	}{
 		{
 			name:     "no argument",
@@ -42,7 +45,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "issue number argument",
 			input: "23",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Interactive:  true,
 			},
 			wantsErr: false,
@@ -51,7 +54,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "title flag",
 			input: "23 --title test",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Title: prShared.EditableString{
 						Value:  "test",
@@ -65,7 +68,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "body flag",
 			input: "23 --body test",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Body: prShared.EditableString{
 						Value:  "test",
@@ -80,7 +83,7 @@ func TestNewCmdEdit(t *testing.T) {
 			input: "23 --body-file -",
 			stdin: "this is on standard input",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Body: prShared.EditableString{
 						Value:  "this is on standard input",
@@ -94,7 +97,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "body from file",
 			input: fmt.Sprintf("23 --body-file '%s'", tmpFile),
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Body: prShared.EditableString{
 						Value:  "a body from file",
@@ -113,7 +116,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "add-assignee flag",
 			input: "23 --add-assignee monalisa,hubot",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Assignees: prShared.EditableSlice{
 						Add:    []string{"monalisa", "hubot"},
@@ -127,7 +130,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "remove-assignee flag",
 			input: "23 --remove-assignee monalisa,hubot",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Assignees: prShared.EditableSlice{
 						Remove: []string{"monalisa", "hubot"},
@@ -141,7 +144,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "add-label flag",
 			input: "23 --add-label feature,TODO,bug",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Labels: prShared.EditableSlice{
 						Add:    []string{"feature", "TODO", "bug"},
@@ -155,7 +158,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "remove-label flag",
 			input: "23 --remove-label feature,TODO,bug",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Labels: prShared.EditableSlice{
 						Remove: []string{"feature", "TODO", "bug"},
@@ -169,7 +172,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "add-project flag",
 			input: "23 --add-project Cleanup,Roadmap",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Projects: prShared.EditableProjects{
 						EditableSlice: prShared.EditableSlice{
@@ -185,7 +188,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "remove-project flag",
 			input: "23 --remove-project Cleanup,Roadmap",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Projects: prShared.EditableProjects{
 						EditableSlice: prShared.EditableSlice{
@@ -201,7 +204,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "milestone flag",
 			input: "23 --milestone GA",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Milestone: prShared.EditableString{
 						Value:  "GA",
@@ -215,7 +218,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "remove-milestone flag",
 			input: "23 --remove-milestone",
 			output: EditOptions{
-				SelectorArgs: []string{"23"},
+				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
 					Milestone: prShared.EditableString{
 						Value:  "",
@@ -234,7 +237,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:  "add label to multiple issues",
 			input: "23 34 --add-label bug",
 			output: EditOptions{
-				SelectorArgs: []string{"23", "34"},
+				IssueNumbers: []int{23, 34},
 				Editable: prShared.Editable{
 					Labels: prShared.EditableSlice{
 						Add:    []string{"bug"},
@@ -243,6 +246,31 @@ func TestNewCmdEdit(t *testing.T) {
 				},
 			},
 			wantsErr: false,
+		},
+		{
+			name: "argument is hash prefixed number",
+			// Escaping is required here to avoid what I think is shellex treating it as a comment.
+			input: "\\#23",
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				Interactive:  true,
+			},
+			wantsErr: false,
+		},
+		{
+			name:  "argument is a URL",
+			input: "https://github.com/cli/cli/issues/23",
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				Interactive:  true,
+			},
+			expectedBaseRepo: ghrepo.New("cli", "cli"),
+			wantsErr:         false,
+		},
+		{
+			name:     "URL arguments parse as different repos",
+			input:    "https://github.com/cli/cli/issues/23 https://github.com/cli/go-gh/issues/23",
+			wantsErr: true,
 		},
 		{
 			name:     "interactive multiple issues",
@@ -282,14 +310,23 @@ func TestNewCmdEdit(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
 
-			assert.NoError(t, err)
-			assert.Equal(t, tt.output.SelectorArgs, gotOpts.SelectorArgs)
+			require.NoError(t, err)
+			assert.Equal(t, tt.output.IssueNumbers, gotOpts.IssueNumbers)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.Editable, gotOpts.Editable)
+			if tt.expectedBaseRepo != nil {
+				baseRepo, err := gotOpts.BaseRepo()
+				require.NoError(t, err)
+				require.True(
+					t,
+					ghrepo.IsSame(tt.expectedBaseRepo, baseRepo),
+					"expected base repo %+v, got %+v", tt.expectedBaseRepo, baseRepo,
+				)
+			}
 		})
 	}
 }
@@ -306,7 +343,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive",
 			input: &EditOptions{
-				SelectorArgs: []string{"123"},
+				IssueNumbers: []int{123},
 				Interactive:  false,
 				Editable: prShared.Editable{
 					Title: prShared.EditableString{
@@ -359,7 +396,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive multiple issues",
 			input: &EditOptions{
-				SelectorArgs: []string{"456", "123"},
+				IssueNumbers: []int{456, 123},
 				Interactive:  false,
 				Editable: prShared.Editable{
 					Assignees: prShared.EditableSlice{
@@ -409,7 +446,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive multiple issues with fetch failures",
 			input: &EditOptions{
-				SelectorArgs: []string{"123", "9999"},
+				IssueNumbers: []int{123, 9999},
 				Interactive:  false,
 				Editable: prShared.Editable{
 					Assignees: prShared.EditableSlice{
@@ -454,7 +491,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive multiple issues with update failures",
 			input: &EditOptions{
-				SelectorArgs: []string{"123", "456"},
+				IssueNumbers: []int{123, 456},
 				Interactive:  false,
 				Editable: prShared.Editable{
 					Assignees: prShared.EditableSlice{
@@ -524,7 +561,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "interactive",
 			input: &EditOptions{
-				SelectorArgs: []string{"123"},
+				IssueNumbers: []int{123},
 				Interactive:  true,
 				FieldsToEditSurvey: func(p prShared.EditPrompter, eo *prShared.Editable) error {
 					eo.Title.Edited = true
@@ -752,4 +789,89 @@ func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
 		{ "data": { "add_000": { "item": { "id": "1" } }, "delete_001": { "item": { "id": "2" } } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
+}
+
+// TODO projectsV1Deprecation
+// Remove this test.
+func TestProjectsV1Deprecation(t *testing.T) {
+	t.Run("when projects v1 is supported, is included in query", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Register(
+			httpmock.GraphQL(`projectCards`),
+			// Simulate a GraphQL error to early exit the test.
+			httpmock.StatusStringResponse(500, ""),
+		)
+
+		_, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		// Ignore the error because we have no way to really stub it without
+		// fully stubbing a GQL error structure in the request body.
+		_ = editRun(&EditOptions{
+			IO: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			BaseRepo: func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			},
+			Detector: &fd.EnabledDetectorMock{},
+
+			IssueNumbers: []int{123},
+			Editable: prShared.Editable{
+				Projects: prShared.EditableProjects{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"Test Project"},
+						Edited: true,
+					},
+				},
+			},
+		})
+
+		// Verify that our request contained projectCards
+		reg.Verify(t)
+	})
+
+	t.Run("when projects v1 is not supported, is not included in query", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Exclude(t, httpmock.GraphQL(`projectCards`))
+
+		reg.Register(
+			httpmock.GraphQL(`.*`),
+			// Simulate a GraphQL error to early exit the test.
+			httpmock.StatusStringResponse(500, ""),
+		)
+
+		_, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		// Ignore the error because we're not really interested in it.
+		_ = editRun(&EditOptions{
+			IO: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			BaseRepo: func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			},
+			Detector: &fd.DisabledDetectorMock{},
+
+			IssueNumbers: []int{123},
+			Editable: prShared.Editable{
+				Projects: prShared.EditableProjects{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"Test Project"},
+						Edited: true,
+					},
+				},
+			},
+		})
+
+		// Verify that our request contained projectCards
+		reg.Verify(t)
+	})
 }

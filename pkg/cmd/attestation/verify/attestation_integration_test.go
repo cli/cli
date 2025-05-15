@@ -25,10 +25,11 @@ func getAttestationsFor(t *testing.T, bundlePath string) []*api.Attestation {
 }
 
 func TestVerifyAttestations(t *testing.T) {
-	sgVerifier := verification.NewLiveSigstoreVerifier(verification.SigstoreConfig{
+	sgVerifier, err := verification.NewLiveSigstoreVerifier(verification.SigstoreConfig{
 		Logger:         io.NewTestHandler(),
 		TUFMetadataDir: o.Some(t.TempDir()),
 	})
+	require.NoError(t, err)
 
 	certSummary := certificate.Summary{}
 	certSummary.SourceRepositoryOwnerURI = "https://github.com/sigstore"

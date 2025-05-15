@@ -46,6 +46,15 @@ func None[T any]() Option[T] {
 	return Option[T]{}
 }
 
+func SomeIfNonZero[T comparable](value T) Option[T] {
+	// value is a zero value then return a None
+	var zero T
+	if value == zero {
+		return None[T]()
+	}
+	return Some(value)
+}
+
 // String implements the [fmt.Stringer] interface.
 func (o Option[T]) String() string {
 	if o.present {

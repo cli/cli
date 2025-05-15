@@ -141,6 +141,18 @@ func IndexFor(options []string, answer string) (int, error) {
 	return -1, NoSuchAnswerErr(answer, options)
 }
 
+func IndexesFor(options []string, answers ...string) ([]int, error) {
+	indexes := make([]int, len(answers))
+	for i, answer := range answers {
+		index, err := IndexFor(options, answer)
+		if err != nil {
+			return nil, err
+		}
+		indexes[i] = index
+	}
+	return indexes, nil
+}
+
 func NoSuchPromptErr(prompt string) error {
 	return fmt.Errorf("no such prompt '%s'", prompt)
 }

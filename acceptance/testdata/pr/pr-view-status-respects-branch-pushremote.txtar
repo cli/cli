@@ -15,10 +15,11 @@ stdout2env REPO_ID
 
 # Create a user fork of repository as opposed to private organization fork
 exec gh repo fork ${ORG}/${REPO} --org ${ORG} --fork-name ${FORK}
+sleep 5
 
 # Defer repo cleanup of fork
 defer gh repo delete --yes ${ORG}/${FORK}
-sleep 5
+
 exec gh repo view ${ORG}/${FORK} --json id --jq '.id'
 stdout2env FORK_ID
 
@@ -27,7 +28,8 @@ exec gh repo clone ${ORG}/${FORK}
 cd ${FORK}
 
 # Prepare a branch where changes are pulled from the upstream default branch but pushed to fork
-exec git checkout -b feature-branch upstream/main
+exec git checkout -b feature-branch
+exec git branch --set-upstream-to upstream/main
 exec git config branch.feature-branch.pushRemote origin
 exec git commit --allow-empty -m 'Empty Commit'
 exec git push

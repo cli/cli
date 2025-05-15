@@ -44,6 +44,28 @@ type Issue struct {
 	Milestone        *Milestone
 	ReactionGroups   ReactionGroups
 	IsPinned         bool
+
+	ClosedByPullRequestsReferences ClosedByPullRequestsReferences
+}
+
+type ClosedByPullRequestsReferences struct {
+	Nodes []struct {
+		ID         string
+		Number     int
+		URL        string
+		Repository struct {
+			ID    string
+			Name  string
+			Owner struct {
+				ID    string
+				Login string
+			}
+		}
+	}
+	PageInfo struct {
+		HasNextPage bool
+		EndCursor   string
+	}
 }
 
 // return values for Issue.Typename

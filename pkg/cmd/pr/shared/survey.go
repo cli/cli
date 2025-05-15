@@ -151,7 +151,7 @@ type RepoMetadataFetcher interface {
 	RepoMetadataFetch(api.RepoMetadataInput) (*api.RepoMetadataResult, error)
 }
 
-func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState) error {
+func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState, projectsV1Support gh.ProjectsV1Support) error {
 	isChosen := func(m string) bool {
 		for _, c := range state.Metadata {
 			if m == c {
@@ -181,7 +181,8 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		Reviewers:  isChosen("Reviewers"),
 		Assignees:  isChosen("Assignees"),
 		Labels:     isChosen("Labels"),
-		Projects:   isChosen("Projects"),
+		ProjectsV1: isChosen("Projects") && projectsV1Support == gh.ProjectsV1Supported,
+		ProjectsV2: isChosen("Projects"),
 		Milestones: isChosen("Milestone"),
 	}
 	metadataResult, err := fetcher.RepoMetadataFetch(metadataInput)
@@ -267,7 +268,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	}
 	if isChosen("Projects") {
 		if len(projects) > 0 {
-			selected, err := p.MultiSelect("Projects", state.Projects, projects)
+			selected, err := p.MultiSelect("Projects", state.ProjectTitles, projects)
 			if err != nil {
 				return err
 			}
@@ -316,7 +317,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		state.Labels = values.Labels
 	}
 	if isChosen("Projects") {
-		state.Projects = values.Projects
+		state.ProjectTitles = values.Projects
 	}
 	if isChosen("Milestone") {
 		if values.Milestone != "" && values.Milestone != noMilestone {

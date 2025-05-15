@@ -316,7 +316,7 @@ func TestWatchRun(t *testing.T) {
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
-					httpmock.StatusJSONResponse(404, api.HTTPError{
+					httpmock.JSONErrorResponse(404, api.HTTPError{
 						StatusCode: 404,
 						Message:    "run 1234 not found",
 					}),

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	accessibilityCmd "github.com/cli/cli/v2/pkg/cmd/accessibility"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
@@ -122,6 +123,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 
 	// Child commands
 	cmd.AddCommand(versionCmd.NewCmdVersion(f, version, buildDate))
+	cmd.AddCommand(accessibilityCmd.NewCmdAccessibility(f))
 	cmd.AddCommand(actionsCmd.NewCmdActions(f))
 	cmd.AddCommand(aliasCmd.NewCmdAlias(f))
 	cmd.AddCommand(authCmd.NewCmdAuth(f))

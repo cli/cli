@@ -137,7 +137,7 @@ func (e Editable) ProjectIds() (*[]string, error) {
 		s.RemoveValues(e.Projects.Remove)
 		e.Projects.Value = s.ToSlice()
 	}
-	p, _, err := e.Metadata.ProjectsToIDs(e.Projects.Value)
+	p, _, err := e.Metadata.ProjectsTitlesToIDs(e.Projects.Value)
 	return &p, err
 }
 
@@ -171,14 +171,14 @@ func (e Editable) ProjectV2Ids() (*[]string, *[]string, error) {
 	var err error
 
 	if addTitles.Len() > 0 {
-		_, addIds, err = e.Metadata.ProjectsToIDs(addTitles.ToSlice())
+		_, addIds, err = e.Metadata.ProjectsTitlesToIDs(addTitles.ToSlice())
 		if err != nil {
 			return nil, nil, err
 		}
 	}
 
 	if removeTitles.Len() > 0 {
-		_, removeIds, err = e.Metadata.ProjectsToIDs(removeTitles.ToSlice())
+		_, removeIds, err = e.Metadata.ProjectsTitlesToIDs(removeTitles.ToSlice())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -381,7 +381,8 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 		Reviewers:  editable.Reviewers.Edited,
 		Assignees:  editable.Assignees.Edited,
 		Labels:     editable.Labels.Edited,
-		Projects:   editable.Projects.Edited,
+		ProjectsV1: editable.Projects.Edited,
+		ProjectsV2: editable.Projects.Edited,
 		Milestones: editable.Milestone.Edited,
 	}
 	metadata, err := api.RepoMetadata(client, repo, input)

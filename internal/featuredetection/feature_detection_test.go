@@ -5,8 +5,10 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIssueFeatures(t *testing.T) {
@@ -365,4 +367,20 @@ func TestRepositoryFeatures(t *testing.T) {
 			assert.Equal(t, tt.wantFeatures, gotFeatures)
 		})
 	}
+}
+
+func TestProjectV1Support(t *testing.T) {
+	t.Parallel()
+
+	t.Run("when the host is enterprise, project v1 is supported", func(t *testing.T) {
+		detector := detector{host: "my.ghes.com"}
+		isProjectV1Supported := detector.ProjectsV1()
+		require.Equal(t, gh.ProjectsV1Supported, isProjectV1Supported)
+	})
+
+	t.Run("when the host is not enterprise, project v1 is not supported", func(t *testing.T) {
+		detector := detector{host: "github.com"}
+		isProjectV1Supported := detector.ProjectsV1()
+		require.Equal(t, gh.ProjectsV1Unsupported, isProjectV1Supported)
+	})
 }
