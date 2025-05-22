@@ -211,7 +211,11 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 				return runF(opts)
 			}
 
-			opts.SigstoreVerifier = verification.NewLiveSigstoreVerifier(config)
+			sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(config)
+			if err != nil {
+				return fmt.Errorf("error creating Sigstore verifier: %w", err)
+			}
+			opts.SigstoreVerifier = sigstoreVerifier
 			opts.Config = f.Config
 
 			if err := runVerify(opts); err != nil {
@@ -283,14 +287,6 @@ func runVerify(opts *Options) error {
 	}
 	// Print the message signifying success fetching attestations
 	opts.Logger.Println(logMsg)
-
-	// Apply predicate type filter to returned attestations
-	filteredAttestations := verification.FilterAttestations(ec.PredicateType, attestations)
-	if len(filteredAttestations) == 0 {
-		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found with predicate type: %s\n"), opts.PredicateType)
-		return fmt.Errorf("no matching predicate found")
-	}
-	attestations = filteredAttestations
 
 	// print information about the policy that will be enforced against attestations
 	opts.Logger.Println("\nThe following policy criteria will be enforced:")

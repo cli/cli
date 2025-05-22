@@ -93,25 +93,29 @@ var PullRequestFields = append(IssueFields,
 type CodeResult struct {
 	IncompleteResults bool   `json:"incomplete_results"`
 	Items             []Code `json:"items"`
-	Total             int    `json:"total_count"`
+	// Number of code search results matching the query on the server. Ignoring limit.
+	Total int `json:"total_count"`
 }
 
 type CommitsResult struct {
 	IncompleteResults bool     `json:"incomplete_results"`
 	Items             []Commit `json:"items"`
-	Total             int      `json:"total_count"`
+	// Number of commits matching the query on the server. Ignoring limit.
+	Total int `json:"total_count"`
 }
 
 type RepositoriesResult struct {
 	IncompleteResults bool         `json:"incomplete_results"`
 	Items             []Repository `json:"items"`
-	Total             int          `json:"total_count"`
+	// Number of repositories matching the query on the server. Ignoring limit.
+	Total int `json:"total_count"`
 }
 
 type IssuesResult struct {
 	IncompleteResults bool    `json:"incomplete_results"`
 	Items             []Issue `json:"items"`
-	Total             int     `json:"total_count"`
+	// Number of isssues matching the query on the server. Ignoring limit.
+	Total int `json:"total_count"`
 }
 
 type Code struct {

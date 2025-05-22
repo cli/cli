@@ -53,7 +53,7 @@ func TestPRReopen(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("123", &api.PullRequest{
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
 		ID:     "THE-ID",
 		Number: 123,
 		State:  "CLOSED",
@@ -78,7 +78,7 @@ func TestPRReopen_alreadyOpen(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("123", &api.PullRequest{
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
 		ID:     "THE-ID",
 		Number: 123,
 		State:  "OPEN",
@@ -95,7 +95,7 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("123", &api.PullRequest{
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
 		ID:     "THE-ID",
 		Number: 123,
 		State:  "MERGED",
@@ -112,7 +112,7 @@ func TestPRReopen_withComment(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("123", &api.PullRequest{
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
 		ID:     "THE-ID",
 		Number: 123,
 		State:  "CLOSED",

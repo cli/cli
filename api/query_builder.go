@@ -20,6 +20,25 @@ func shortenQuery(q string) string {
 	return strings.Map(squeeze, q)
 }
 
+var assignedActors = shortenQuery(`
+	assignedActors(first: 10) {
+		nodes {
+			...on User {
+				id,
+				login,
+				name,
+				__typename
+			}
+			...on Bot {
+				id,
+				login,
+				__typename
+			}
+		},
+		totalCount
+	}
+`)
+
 var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
@@ -53,6 +72,25 @@ var issueCommentLast = shortenQuery(`
 			reactionGroups{content,users{totalCount}}
 		},
 		totalCount
+	}
+`)
+
+var issueClosedByPullRequestsReferences = shortenQuery(`
+	closedByPullRequestsReferences(first: 100) {
+		nodes {
+			id,
+			number,
+			url,
+			repository {
+				id,
+				name,
+				owner {
+					id,
+					login
+				}
+			}
+		}
+		pageInfo{hasNextPage,endCursor}
 	}
 `)
 
@@ -129,6 +167,25 @@ var prCommits = shortenQuery(`
 				authoredDate
 			}
 		}
+	}
+`)
+
+var prClosingIssuesReferences = shortenQuery(`
+	closingIssuesReferences(first: 100) {
+		nodes {
+			id,
+			number,
+			url,
+			repository {
+				id,
+				name,
+				owner {
+					id,
+					login
+				}
+			}
+		}
+		pageInfo{hasNextPage,endCursor}
 	}
 `)
 
@@ -277,6 +334,7 @@ var sharedIssuePRFields = []string{
 var issueOnlyFields = []string{
 	"isPinned",
 	"stateReason",
+	"closedByPullRequestsReferences",
 }
 
 var IssueFields = append(sharedIssuePRFields, issueOnlyFields...)
@@ -287,6 +345,7 @@ var PullRequestFields = append(sharedIssuePRFields,
 	"baseRefName",
 	"baseRefOid",
 	"changedFiles",
+	"closingIssuesReferences",
 	"commits",
 	"deletions",
 	"files",
@@ -326,6 +385,8 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `headRepository{id,name}`)
 		case "assignees":
 			q = append(q, `assignees(first:100){nodes{id,login,name},totalCount}`)
+		case "assignedActors":
+			q = append(q, assignedActors)
 		case "labels":
 			q = append(q, `labels(first:100){nodes{id,name,description,color},totalCount}`)
 		case "projectCards":
@@ -366,6 +427,10 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, StatusCheckRollupGraphQLWithoutCountByState(""))
 		case "statusCheckRollupWithCountByState": // pseudo-field
 			q = append(q, StatusCheckRollupGraphQLWithCountByState())
+		case "closingIssuesReferences":
+			q = append(q, prClosingIssuesReferences)
+		case "closedByPullRequestsReferences":
+			q = append(q, issueClosedByPullRequestsReferences)
 		default:
 			q = append(q, field)
 		}

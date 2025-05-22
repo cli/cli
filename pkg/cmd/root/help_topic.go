@@ -84,6 +84,8 @@ var HelpTopics = []helpTopic{
 			%[1]sGH_COLOR_LABELS%[1]s: set to any value to display labels using their RGB hex color codes in terminals that
 			support truecolor.
 
+			%[1]sGH_ACCESSIBLE_COLORS%[1]s (preview): set to a truthy value to use customizable, 4-bit accessible colors.
+
 			%[1]sGH_FORCE_TTY%[1]s: set to any value to force terminal-style output even when the output is
 			redirected. When the value is a number, it is interpreted as the number of columns
 			available in the viewport. When the value is a percentage, it will be applied against
@@ -114,6 +116,9 @@ var HelpTopics = []helpTopic{
 
 			%[1]sGH_ACCESSIBLE_PROMPTER%[1]s (preview): set to a truthy value to enable prompts that are
 			more compatible with speech synthesis and braille screen readers.
+
+			%[1]sGH_SPINNER_DISABLED%[1]s: set to a truthy value to replace the spinner animation with
+			a textual progress indicator.
 		`, "`"),
 	},
 	{

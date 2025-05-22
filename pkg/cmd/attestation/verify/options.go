@@ -53,6 +53,12 @@ func (opts *Options) Clean() {
 	}
 }
 
+// FetchAttestationsFromGitHubAPI returns true if the command should fetch attestations from the GitHub API
+// It checks that a bundle path is not provided and that the "use bundle from registry" flag is not set
+func (opts *Options) FetchAttestationsFromGitHubAPI() bool {
+	return opts.BundlePath == "" && !opts.UseBundleFromRegistry
+}
+
 // AreFlagsValid checks that the provided flag combination is valid
 // and returns an error otherwise
 func (opts *Options) AreFlagsValid() error {

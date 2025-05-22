@@ -177,7 +177,7 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{KeyID: "ABC123", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "user/gpg_keys"), httpmock.StatusStringResponse(200, keysResp))
-				reg.Register(httpmock.REST("DELETE", "user/gpg_keys/123"), httpmock.StatusJSONResponse(404, api.HTTPError{
+				reg.Register(httpmock.REST("DELETE", "user/gpg_keys/123"), httpmock.JSONErrorResponse(404, api.HTTPError{
 					StatusCode: 404,
 					Message:    "GPG key 123 not found",
 				}))

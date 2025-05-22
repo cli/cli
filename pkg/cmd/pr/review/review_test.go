@@ -235,7 +235,7 @@ func TestPRReview(t *testing.T) {
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 
-			shared.RunCommandFinder("", &api.PullRequest{ID: "THE-ID"}, ghrepo.New("OWNER", "REPO"))
+			shared.StubFinderForRunCommandStyleTests(t, "", &api.PullRequest{ID: "THE-ID"}, ghrepo.New("OWNER", "REPO"))
 
 			http.Register(
 				httpmock.GraphQL(`mutation PullRequestReviewAdd\b`),
@@ -261,7 +261,7 @@ func TestPRReview_interactive(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("", &api.PullRequest{ID: "THE-ID", Number: 123}, ghrepo.New("OWNER", "REPO"))
+	shared.StubFinderForRunCommandStyleTests(t, "", &api.PullRequest{ID: "THE-ID", Number: 123}, ghrepo.New("OWNER", "REPO"))
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestReviewAdd\b`),
@@ -293,7 +293,7 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("", &api.PullRequest{ID: "THE-ID", Number: 123}, ghrepo.New("OWNER", "REPO"))
+	shared.StubFinderForRunCommandStyleTests(t, "", &api.PullRequest{ID: "THE-ID", Number: 123}, ghrepo.New("OWNER", "REPO"))
 
 	pm := &prompter.PrompterMock{
 		SelectFunc:         func(_, _ string, _ []string) (int, error) { return 2, nil },
@@ -308,7 +308,7 @@ func TestPRReview_interactive_blank_approve(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("", &api.PullRequest{ID: "THE-ID", Number: 123}, ghrepo.New("OWNER", "REPO"))
+	shared.StubFinderForRunCommandStyleTests(t, "", &api.PullRequest{ID: "THE-ID", Number: 123}, ghrepo.New("OWNER", "REPO"))
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestReviewAdd\b`),

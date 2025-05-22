@@ -12,6 +12,7 @@ defer gh repo delete --yes ${ORG}/${REPO}
 
 # Create a fork
 exec gh repo fork ${ORG}/${REPO} --org ${ORG} --fork-name ${REPO}-fork
+sleep 5
 
 # Defer fork cleanup
 defer gh repo delete --yes ${ORG}/${REPO}-fork

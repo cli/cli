@@ -7,7 +7,7 @@ defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
 # Ensure that no default is set
 cd $SCRIPT_NAME-$RANDOM_STRING
 exec gh repo set-default --view
-stderr 'no default repository has been set; use `gh repo set-default` to select one'
+stderr 'No default remote repository has been set. To learn more about the default repository, run: gh repo set-default --help'
 
 # Set the default
 exec gh repo set-default $ORG/$SCRIPT_NAME-$RANDOM_STRING

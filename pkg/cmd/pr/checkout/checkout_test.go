@@ -518,7 +518,7 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
-	finder := shared.RunCommandFinder("123", pr, baseRepo)
+	finder := shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 	finder.ExpectFields([]string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository", "maintainerCanModify"})
 
 	cs, cmdTeardown := run.Stub()
@@ -539,7 +539,7 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -570,7 +570,7 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO", "hubot/REPO:feature")
-	finder := shared.RunCommandFinder("123", pr, baseRepo)
+	finder := shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 	finder.ExpectFields([]string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository", "maintainerCanModify"})
 
 	cs, cmdTeardown := run.Stub()
@@ -590,7 +590,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
-	finder := shared.RunCommandFinder("123", pr, baseRepo)
+	finder := shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 	finder.ExpectFields([]string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository", "maintainerCanModify"})
 
 	cs, cmdTeardown := run.Stub()
@@ -613,7 +613,7 @@ func TestPRCheckout_differentRepoForce(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
-	finder := shared.RunCommandFinder("123", pr, baseRepo)
+	finder := shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 	finder.ExpectFields([]string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository", "maintainerCanModify"})
 
 	cs, cmdTeardown := run.Stub()
@@ -636,7 +636,7 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -655,7 +655,7 @@ func TestPRCheckout_detachedHead(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -674,7 +674,7 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -693,7 +693,7 @@ func TestPRCheckout_differentRepo_invalidBranchName(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO", "hubot/REPO:-foo")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -711,7 +711,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 
 	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
 	pr.MaintainerCanModify = true
-	shared.RunCommandFinder("123", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -732,7 +732,7 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	http := &httpmock.Registry{}
 
 	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -753,7 +753,7 @@ func TestPRCheckout_force(t *testing.T) {
 	http := &httpmock.Registry{}
 
 	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -774,7 +774,7 @@ func TestPRCheckout_detach(t *testing.T) {
 	defer http.Verify(t)
 
 	baseRepo, pr := stubPR("OWNER/REPO:master", "hubot/REPO:feature")
-	shared.RunCommandFinder("123", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)

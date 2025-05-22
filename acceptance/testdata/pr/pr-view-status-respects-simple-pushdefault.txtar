@@ -18,7 +18,8 @@ cd ${REPO}
 exec git config push.default simple
 
 # Prepare a branch where changes are pulled from the default branch instead of remote branch of same name
-exec git checkout -b feature-branch origin/main
+exec git checkout -b feature-branch
+exec git branch --set-upstream-to origin/main
 
 # Create the PR
 exec git commit --allow-empty -m 'Empty Commit'

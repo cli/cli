@@ -27,6 +27,28 @@ const (
 // Allow injecting backoff interval in tests.
 var getAttestationRetryInterval = time.Millisecond * 200
 
+// FetchParams are the parameters for fetching attestations from the GitHub API
+type FetchParams struct {
+	Digest        string
+	Limit         int
+	Owner         string
+	PredicateType string
+	Repo          string
+}
+
+func (p *FetchParams) Validate() error {
+	if p.Digest == "" {
+		return fmt.Errorf("digest must be provided")
+	}
+	if p.Limit <= 0 || p.Limit > maxLimitForFlag {
+		return fmt.Errorf("limit must be greater than 0 and less than or equal to %d", maxLimitForFlag)
+	}
+	if p.Repo == "" && p.Owner == "" {
+		return fmt.Errorf("owner or repo must be provided")
+	}
+	return nil
+}
+
 // githubApiClient makes REST calls to the GitHub API
 type githubApiClient interface {
 	REST(hostname, method, p string, body io.Reader, data interface{}) error
@@ -39,8 +61,7 @@ type httpClient interface {
 }
 
 type Client interface {
-	GetByRepoAndDigest(repo, digest string, limit int) ([]*Attestation, error)
-	GetByOwnerAndDigest(owner, digest string, limit int) ([]*Attestation, error)
+	GetByDigest(params FetchParams) ([]*Attestation, error)
 	GetTrustDomain() (string, error)
 }
 
@@ -60,22 +81,11 @@ func NewLiveClient(hc *http.Client, host string, l *ioconfig.Handler) *LiveClien
 	}
 }
 
-// GetByRepoAndDigest fetches the attestation by repo and digest
-func (c *LiveClient) GetByRepoAndDigest(repo, digest string, limit int) ([]*Attestation, error) {
-	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
-	url := fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, repo, digest)
-	return c.getByURL(url, limit)
-}
-
-// GetByOwnerAndDigest fetches attestation by owner and digest
-func (c *LiveClient) GetByOwnerAndDigest(owner, digest string, limit int) ([]*Attestation, error) {
-	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
-	url := fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, owner, digest)
-	return c.getByURL(url, limit)
-}
-
-func (c *LiveClient) getByURL(url string, limit int) ([]*Attestation, error) {
-	attestations, err := c.getAttestations(url, limit)
+// GetByDigest fetches the attestation by digest and either owner or repo
+// depending on which is provided
+func (c *LiveClient) GetByDigest(params FetchParams) ([]*Attestation, error) {
+	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", params.Digest)
+	attestations, err := c.getAttestations(params)
 	if err != nil {
 		return nil, err
 	}
@@ -88,40 +98,52 @@ func (c *LiveClient) getByURL(url string, limit int) ([]*Attestation, error) {
 	return bundles, nil
 }
 
-// GetTrustDomain returns the current trust domain. If the default is used
-// the empty string is returned
-func (c *LiveClient) GetTrustDomain() (string, error) {
-	return c.getTrustDomain(MetaPath)
-}
-
-func (c *LiveClient) getAttestations(url string, limit int) ([]*Attestation, error) {
-	perPage := limit
-	if perPage <= 0 || perPage > maxLimitForFlag {
-		return nil, fmt.Errorf("limit must be greater than 0 and less than or equal to %d", maxLimitForFlag)
+func (c *LiveClient) buildRequestURL(params FetchParams) (string, error) {
+	if err := params.Validate(); err != nil {
+		return "", err
 	}
 
+	var url string
+	if params.Repo != "" {
+		// check if Repo is set first because if Repo has been set, Owner will be set using the value of Repo.
+		// If Repo is not set, the field will remain empty. It will not be populated using the value of Owner.
+		url = fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, params.Repo, params.Digest)
+	} else {
+		url = fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, params.Owner, params.Digest)
+	}
+
+	perPage := params.Limit
 	if perPage > maxLimitForFetch {
 		perPage = maxLimitForFetch
 	}
 
 	// ref: https://github.com/cli/go-gh/blob/d32c104a9a25c9de3d7c7b07a43ae0091441c858/example_gh_test.go#L96
 	url = fmt.Sprintf("%s?per_page=%d", url, perPage)
+	if params.PredicateType != "" {
+		url = fmt.Sprintf("%s&predicate_type=%s", url, params.PredicateType)
+	}
+	return url, nil
+}
+
+func (c *LiveClient) getAttestations(params FetchParams) ([]*Attestation, error) {
+	url, err := c.buildRequestURL(params)
+	if err != nil {
+		return nil, err
+	}
 
 	var attestations []*Attestation
 	var resp AttestationsResponse
 	bo := backoff.NewConstantBackOff(getAttestationRetryInterval)
 
 	// if no attestation or less than limit, then keep fetching
-	for url != "" && len(attestations) < limit {
+	for url != "" && len(attestations) < params.Limit {
 		err := backoff.Retry(func() error {
 			newURL, restErr := c.githubAPI.RESTWithNext(c.host, http.MethodGet, url, nil, &resp)
-
 			if restErr != nil {
 				if shouldRetry(restErr) {
 					return restErr
-				} else {
-					return backoff.Permanent(restErr)
 				}
+				return backoff.Permanent(restErr)
 			}
 
 			url = newURL
@@ -140,8 +162,8 @@ func (c *LiveClient) getAttestations(url string, limit int) ([]*Attestation, err
 		return nil, ErrNoAttestationsFound
 	}
 
-	if len(attestations) > limit {
-		return attestations[:limit], nil
+	if len(attestations) > params.Limit {
+		return attestations[:params.Limit], nil
 	}
 
 	return attestations, nil
@@ -239,6 +261,12 @@ func shouldRetry(err error) bool {
 	}
 
 	return false
+}
+
+// GetTrustDomain returns the current trust domain. If the default is used
+// the empty string is returned
+func (c *LiveClient) GetTrustDomain() (string, error) {
+	return c.getTrustDomain(MetaPath)
 }
 
 func (c *LiveClient) getTrustDomain(url string) (string, error) {

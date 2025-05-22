@@ -101,6 +101,9 @@ func Test_listRun(t *testing.T) {
 				http_unix_socket=
 				browser=brave
 				color_labels=disabled
+				accessible_colors=disabled
+				accessible_prompter=disabled
+				spinner=enabled
 			`),
 		},
 	}

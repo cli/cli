@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -226,7 +227,7 @@ func newBrowser(f *cmdutil.Factory) browser.Browser {
 func newPrompter(f *cmdutil.Factory) prompter.Prompter {
 	editor, _ := cmdutil.DetermineEditor(f.Config)
 	io := f.IOStreams
-	return prompter.New(editor, io.In, io.Out, io.ErrOut)
+	return prompter.New(editor, io)
 }
 
 func configFunc() func() (gh.Config, error) {
@@ -281,6 +282,26 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 		io.SetNeverPrompt(true)
 	} else if prompt := cfg.Prompt(""); prompt.Value == "disabled" {
 		io.SetNeverPrompt(true)
+	}
+
+	falseyValues := []string{"false", "0", "no", ""}
+
+	accessiblePrompterValue, accessiblePrompterIsSet := os.LookupEnv("GH_ACCESSIBLE_PROMPTER")
+	if accessiblePrompterIsSet {
+		if !slices.Contains(falseyValues, accessiblePrompterValue) {
+			io.SetAccessiblePrompterEnabled(true)
+		}
+	} else if prompt := cfg.AccessiblePrompter(""); prompt.Value == "enabled" {
+		io.SetAccessiblePrompterEnabled(true)
+	}
+
+	ghSpinnerDisabledValue, ghSpinnerDisabledIsSet := os.LookupEnv("GH_SPINNER_DISABLED")
+	if ghSpinnerDisabledIsSet {
+		if !slices.Contains(falseyValues, ghSpinnerDisabledValue) {
+			io.SetSpinnerDisabled(true)
+		}
+	} else if spinnerDisabled := cfg.Spinner(""); spinnerDisabled.Value == "disabled" {
+		io.SetSpinnerDisabled(true)
 	}
 
 	// Pager precedence

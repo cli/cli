@@ -10,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -22,6 +23,9 @@ import (
 type ViewOptions struct {
 	IO      *iostreams.IOStreams
 	Browser browser.Browser
+	// TODO projectsV1Deprecation
+	// Remove this detector since it is only used for test validation.
+	Detector fd.Detector
 
 	Finder   shared.PRFinder
 	Exporter cmdutil.Exporter
@@ -89,6 +93,7 @@ func viewRun(opts *ViewOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
 		Fields:   defaultFields,
+		Detector: opts.Detector,
 	}
 	if opts.BrowserMode {
 		findOptions.Fields = []string{"url"}

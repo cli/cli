@@ -9,12 +9,15 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/cli/go-gh/v2/pkg/api"
 )
 
 type Matcher func(req *http.Request) bool
 type Responder func(req *http.Request) (*http.Response, error)
 
 type Stub struct {
+	Stack     string
 	matched   bool
 	Matcher   Matcher
 	Responder Responder
@@ -160,6 +163,9 @@ func JSONResponse(body interface{}) Responder {
 	}
 }
 
+// StatusJSONResponse turns the given argument into a JSON response.
+//
+// The argument is not meant to be a JSON string, unless it's intentional.
 func StatusJSONResponse(status int, body interface{}) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		b, _ := json.Marshal(body)
@@ -168,6 +174,12 @@ func StatusJSONResponse(status int, body interface{}) Responder {
 		}
 		return httpResponseWithHeader(status, req, bytes.NewBuffer(b), header), nil
 	}
+}
+
+// JSONErrorResponse is a type-safe helper to avoid confusion around the
+// provided argument.
+func JSONErrorResponse(status int, err api.HTTPError) Responder {
+	return StatusJSONResponse(status, err)
 }
 
 func FileResponse(filename string) Responder {

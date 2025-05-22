@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -165,9 +166,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Assignees: shared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Edited: true,
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -179,9 +182,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Assignees: shared.EditableSlice{
-						Remove: []string{"monalisa", "hubot"},
-						Edited: true,
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Remove: []string{"monalisa", "hubot"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -359,10 +364,12 @@ func Test_editRun(t *testing.T) {
 						Remove: []string{"dependabot"},
 						Edited: true,
 					},
-					Assignees: shared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Remove: []string{"octocat"},
-						Edited: true,
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
 					},
 					Labels: shared.EditableSlice{
 						Add:    []string{"feature", "TODO", "bug"},
@@ -386,6 +393,7 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				mockRepoMetadata(reg, false)
 				mockPullRequestUpdate(reg)
+				mockPullRequestUpdateActorAssignees(reg)
 				mockPullRequestReviewersUpdate(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
@@ -413,10 +421,12 @@ func Test_editRun(t *testing.T) {
 						Value:  "base-branch-name",
 						Edited: true,
 					},
-					Assignees: shared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Remove: []string{"octocat"},
-						Edited: true,
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
 					},
 					Labels: shared.EditableSlice{
 						Add:    []string{"feature", "TODO", "bug"},
@@ -440,7 +450,69 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				mockRepoMetadata(reg, true)
 				mockPullRequestUpdate(reg)
+				mockPullRequestUpdateActorAssignees(reg)
 				mockPullRequestUpdateLabels(reg)
+				mockProjectV2ItemUpdate(reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
+			name: "non-interactive remove all reviewers",
+			input: &EditOptions{
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+				}, ghrepo.New("OWNER", "REPO")),
+				Interactive: false,
+				Editable: shared.Editable{
+					Title: shared.EditableString{
+						Value:  "new title",
+						Edited: true,
+					},
+					Body: shared.EditableString{
+						Value:  "new body",
+						Edited: true,
+					},
+					Base: shared.EditableString{
+						Value:  "base-branch-name",
+						Edited: true,
+					},
+					Reviewers: shared.EditableSlice{
+						Remove: []string{"OWNER/core", "OWNER/external", "monalisa", "hubot", "dependabot"},
+						Edited: true,
+					},
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
+					},
+					Labels: shared.EditableSlice{
+						Add:    []string{"feature", "TODO", "bug"},
+						Remove: []string{"docs"},
+						Edited: true,
+					},
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"Cleanup", "CleanupV2"},
+							Remove: []string{"Roadmap", "RoadmapV2"},
+							Edited: true,
+						},
+					},
+					Milestone: shared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
+				},
+				Fetcher: testFetcher{},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, false)
+				mockPullRequestUpdate(reg)
+				mockPullRequestReviewersUpdate(reg)
+				mockPullRequestUpdateLabels(reg)
+				mockPullRequestUpdateActorAssignees(reg)
 				mockProjectV2ItemUpdate(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
@@ -460,6 +532,7 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				mockRepoMetadata(reg, false)
 				mockPullRequestUpdate(reg)
+				mockPullRequestUpdateActorAssignees(reg)
 				mockPullRequestReviewersUpdate(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
@@ -481,8 +554,69 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				mockRepoMetadata(reg, true)
 				mockPullRequestUpdate(reg)
+				mockPullRequestUpdateActorAssignees(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
+			name: "interactive remove all reviewers",
+			input: &EditOptions{
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+				}, ghrepo.New("OWNER", "REPO")),
+				Interactive:     true,
+				Surveyor:        testSurveyor{removeAllReviewers: true},
+				Fetcher:         testFetcher{},
+				EditorRetriever: testEditorRetriever{},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, false)
+				mockPullRequestUpdate(reg)
+				mockPullRequestReviewersUpdate(reg)
+				mockPullRequestUpdateActorAssignees(reg)
+				mockPullRequestUpdateLabels(reg)
+				mockProjectV2ItemUpdate(reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
+			name: "Legacy assignee users are fetched and updated on unsupported GitHub Hosts",
+			input: &EditOptions{
+				Detector:    &fd.DisabledDetectorMock{},
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+				}, ghrepo.New("OWNER", "REPO")),
+				Interactive: false,
+				Editable: shared.Editable{
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
+					},
+				},
+				Fetcher: testFetcher{},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				// Notice there is no call to mockReplaceActorsForAssignable()
+				// and no GraphQL call to RepositoryAssignableActors below.
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "assignableUsers": {
+						"nodes": [
+							{ "login": "hubot", "id": "HUBOTID" },
+							{ "login": "MonaLisa", "id": "MONAID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				mockPullRequestUpdate(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -499,9 +633,11 @@ func Test_editRun(t *testing.T) {
 			tt.httpStubs(reg)
 
 			httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
+			baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 
 			tt.input.IO = ios
 			tt.input.HttpClient = httpClient
+			tt.input.BaseRepo = baseRepo
 
 			err := editRun(tt.input)
 			assert.NoError(t, err)
@@ -513,16 +649,16 @@ func Test_editRun(t *testing.T) {
 
 func mockRepoMetadata(reg *httpmock.Registry, skipReviewers bool) {
 	reg.Register(
-		httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
+		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
 		httpmock.StringResponse(`
-		{ "data": { "repository": { "assignableUsers": {
-			"nodes": [
-				{ "login": "hubot", "id": "HUBOTID" },
-				{ "login": "MonaLisa", "id": "MONAID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
+			{ "data": { "repository": { "suggestedActors": {
+				"nodes": [
+					{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
+					{ "login": "MonaLisa", "id": "MONAID", "__typename": "User" }
+				],
+				"pageInfo": { "hasNextPage": false }
+			} } } }
+			`))
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryLabelList\b`),
 		httpmock.StringResponse(`
@@ -625,6 +761,15 @@ func mockPullRequestUpdate(reg *httpmock.Registry) {
 		httpmock.StringResponse(`{}`))
 }
 
+func mockPullRequestUpdateActorAssignees(reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+}
+
 func mockPullRequestReviewersUpdate(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation PullRequestUpdateRequestReviews\b`),
@@ -657,7 +802,8 @@ func mockProjectV2ItemUpdate(reg *httpmock.Registry) {
 
 type testFetcher struct{}
 type testSurveyor struct {
-	skipReviewers bool
+	skipReviewers      bool
+	removeAllReviewers bool
 }
 type testEditorRetriever struct{}
 
@@ -682,7 +828,11 @@ func (s testSurveyor) EditFields(e *shared.Editable, _ string) error {
 	e.Title.Value = "new title"
 	e.Body.Value = "new body"
 	if !s.skipReviewers {
-		e.Reviewers.Value = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
+		if s.removeAllReviewers {
+			e.Reviewers.Remove = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external", "dependabot"}
+		} else {
+			e.Reviewers.Value = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
+		}
 	}
 	e.Assignees.Value = []string{"monalisa", "hubot"}
 	e.Labels.Value = []string{"feature", "TODO", "bug"}
@@ -695,4 +845,74 @@ func (s testSurveyor) EditFields(e *shared.Editable, _ string) error {
 
 func (t testEditorRetriever) Retrieve() (string, error) {
 	return "vim", nil
+}
+
+// TODO projectsV1Deprecation
+// Remove this test.
+func TestProjectsV1Deprecation(t *testing.T) {
+	t.Run("when projects v1 is supported, is included in query", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Register(
+			httpmock.GraphQL(`projectCards`),
+			// Simulate a GraphQL error to early exit the test.
+			httpmock.StatusStringResponse(500, ""),
+		)
+
+		f := &cmdutil.Factory{
+			IOStreams: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+		}
+
+		// Ignore the error because we have no way to really stub it without
+		// fully stubbing a GQL error structure in the request body.
+		_ = editRun(&EditOptions{
+			IO: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			Detector: &fd.EnabledDetectorMock{},
+
+			Finder: shared.NewFinder(f),
+
+			SelectorArg: "https://github.com/cli/cli/pull/123",
+		})
+
+		// Verify that our request contained projectCards
+		reg.Verify(t)
+	})
+
+	t.Run("when projects v1 is not supported, is not included in query", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Exclude(t, httpmock.GraphQL(`projectCards`))
+
+		f := &cmdutil.Factory{
+			IOStreams: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+		}
+
+		// Ignore the error because we have no way to really stub it without
+		// fully stubbing a GQL error structure in the request body.
+		_ = editRun(&EditOptions{
+			IO: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			Detector: &fd.DisabledDetectorMock{},
+
+			Finder: shared.NewFinder(f),
+
+			SelectorArg: "https://github.com/cli/cli/pull/123",
+		})
+
+		// Verify that our request did not contain projectCards
+		reg.Verify(t)
+	})
 }

@@ -165,10 +165,24 @@ func downloadRun(opts *DownloadOptions) error {
 	var toDownload []shared.ReleaseAsset
 	isArchive := false
 	if opts.ArchiveType != "" {
-		var archiveURL = release.ZipballURL
+		var archiveURL string
 		if opts.ArchiveType == "tar.gz" {
 			archiveURL = release.TarballURL
+		} else {
+			archiveURL = release.ZipballURL
 		}
+
+		if archiveURL == "" {
+			errMessage := fmt.Sprintf(
+				"release %q with tag %q, does not have a %q archive asset.",
+				release.Name, release.TagName, opts.ArchiveType,
+			)
+			if release.IsDraft {
+				errMessage += " Most likely, this is because it is a draft."
+			}
+			return errors.New(errMessage)
+		}
+
 		// create pseudo-Asset with no name and pointing to ZipBallURL or TarBallURL
 		toDownload = append(toDownload, shared.ReleaseAsset{APIURL: archiveURL})
 		isArchive = true
