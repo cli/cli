@@ -90,7 +90,7 @@ func listRun(opts *ListOptions) error {
 		}
 		t.AddField(sshType)
 		t.AddField(deployKey.Key, tableprinter.WithTruncate(truncateMiddle))
-		t.AddTimeField(now, deployKey.CreatedAt, cs.Gray)
+		t.AddTimeField(now, deployKey.CreatedAt, cs.Muted)
 		t.EndRow()
 	}
 

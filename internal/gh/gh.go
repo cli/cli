@@ -37,6 +37,8 @@ type Config interface {
 
 	// Browser returns the configured browser, optionally scoped by host.
 	Browser(hostname string) ConfigEntry
+	// ColorLabels returns the configured color_label setting, optionally scoped by host.
+	ColorLabels(hostname string) ConfigEntry
 	// Editor returns the configured editor, optionally scoped by host.
 	Editor(hostname string) ConfigEntry
 	// GitProtocol returns the configured git protocol, optionally scoped by host.

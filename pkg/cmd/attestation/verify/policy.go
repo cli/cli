@@ -161,7 +161,7 @@ func validateSignerWorkflow(hostname, signerWorkflow string) (string, error) {
 	// if the provided workflow did not match the expect format
 	// we move onto creating a signer workflow using the provided host name
 	if hostname == "" {
-		return "", errors.New("unknown host")
+		return "", errors.New("unknown signer workflow host")
 	}
 
 	return fmt.Sprintf("^https://%s/%s", hostname, signerWorkflow), nil

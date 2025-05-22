@@ -879,37 +879,37 @@ func renderPullRequestPlain(w io.Writer, params map[string]interface{}, state *s
 }
 
 func renderPullRequestTTY(io *iostreams.IOStreams, params map[string]interface{}, state *shared.IssueMetadataState) error {
-	iofmt := io.ColorScheme()
+	cs := io.ColorScheme()
 	out := io.Out
 
 	fmt.Fprint(out, "Would have created a Pull Request with:\n")
-	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Title"), params["title"].(string))
-	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("Draft"), params["draft"])
-	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Base"), params["baseRefName"])
-	fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Head"), params["headRefName"])
+	fmt.Fprintf(out, "%s: %s\n", cs.Bold("Title"), params["title"].(string))
+	fmt.Fprintf(out, "%s: %t\n", cs.Bold("Draft"), params["draft"])
+	fmt.Fprintf(out, "%s: %s\n", cs.Bold("Base"), params["baseRefName"])
+	fmt.Fprintf(out, "%s: %s\n", cs.Bold("Head"), params["headRefName"])
 	if len(state.Labels) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Labels"), strings.Join(state.Labels, ", "))
+		fmt.Fprintf(out, "%s: %s\n", cs.Bold("Labels"), strings.Join(state.Labels, ", "))
 	}
 	if len(state.Reviewers) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Reviewers"), strings.Join(state.Reviewers, ", "))
+		fmt.Fprintf(out, "%s: %s\n", cs.Bold("Reviewers"), strings.Join(state.Reviewers, ", "))
 	}
 	if len(state.Assignees) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Assignees"), strings.Join(state.Assignees, ", "))
+		fmt.Fprintf(out, "%s: %s\n", cs.Bold("Assignees"), strings.Join(state.Assignees, ", "))
 	}
 	if len(state.Milestones) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Milestones"), strings.Join(state.Milestones, ", "))
+		fmt.Fprintf(out, "%s: %s\n", cs.Bold("Milestones"), strings.Join(state.Milestones, ", "))
 	}
 	if len(state.Projects) != 0 {
-		fmt.Fprintf(out, "%s: %s\n", iofmt.Bold("Projects"), strings.Join(state.Projects, ", "))
+		fmt.Fprintf(out, "%s: %s\n", cs.Bold("Projects"), strings.Join(state.Projects, ", "))
 	}
-	fmt.Fprintf(out, "%s: %t\n", iofmt.Bold("MaintainerCanModify"), params["maintainerCanModify"])
+	fmt.Fprintf(out, "%s: %t\n", cs.Bold("MaintainerCanModify"), params["maintainerCanModify"])
 
-	fmt.Fprintf(out, "%s\n", iofmt.Bold("Body:"))
+	fmt.Fprintf(out, "%s\n", cs.Bold("Body:"))
 	// Body
 	var md string
 	var err error
 	if len(params["body"].(string)) == 0 {
-		md = fmt.Sprintf("%s\n", iofmt.Gray("No description provided"))
+		md = fmt.Sprintf("%s\n", cs.Muted("No description provided"))
 	} else {
 		md, err = markdown.Render(params["body"].(string),
 			markdown.WithTheme(io.TerminalTheme()),

@@ -316,6 +316,6 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 	}
 	remaining := totalCount - len(prs)
 	if remaining > 0 {
-		fmt.Fprintf(w, cs.Gray("  And %d more\n"), remaining)
+		fmt.Fprintln(w, cs.Mutedf("  And %d more", remaining))
 	}
 }

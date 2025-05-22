@@ -31,6 +31,9 @@ var _ gh.Config = &ConfigMock{}
 //			CacheDirFunc: func() string {
 //				panic("mock out the CacheDir method")
 //			},
+//			ColorLabelsFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the ColorLabels method")
+//			},
 //			EditorFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Editor method")
 //			},
@@ -83,6 +86,9 @@ type ConfigMock struct {
 	// CacheDirFunc mocks the CacheDir method.
 	CacheDirFunc func() string
 
+	// ColorLabelsFunc mocks the ColorLabels method.
+	ColorLabelsFunc func(hostname string) gh.ConfigEntry
+
 	// EditorFunc mocks the Editor method.
 	EditorFunc func(hostname string) gh.ConfigEntry
 
@@ -131,6 +137,11 @@ type ConfigMock struct {
 		}
 		// CacheDir holds details about calls to the CacheDir method.
 		CacheDir []struct {
+		}
+		// ColorLabels holds details about calls to the ColorLabels method.
+		ColorLabels []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
 		}
 		// Editor holds details about calls to the Editor method.
 		Editor []struct {
@@ -194,6 +205,7 @@ type ConfigMock struct {
 	lockAuthentication     sync.RWMutex
 	lockBrowser            sync.RWMutex
 	lockCacheDir           sync.RWMutex
+	lockColorLabels        sync.RWMutex
 	lockEditor             sync.RWMutex
 	lockGetOrDefault       sync.RWMutex
 	lockGitProtocol        sync.RWMutex
@@ -317,6 +329,38 @@ func (mock *ConfigMock) CacheDirCalls() []struct {
 	mock.lockCacheDir.RLock()
 	calls = mock.calls.CacheDir
 	mock.lockCacheDir.RUnlock()
+	return calls
+}
+
+// ColorLabels calls ColorLabelsFunc.
+func (mock *ConfigMock) ColorLabels(hostname string) gh.ConfigEntry {
+	if mock.ColorLabelsFunc == nil {
+		panic("ConfigMock.ColorLabelsFunc: method is nil but Config.ColorLabels was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockColorLabels.Lock()
+	mock.calls.ColorLabels = append(mock.calls.ColorLabels, callInfo)
+	mock.lockColorLabels.Unlock()
+	return mock.ColorLabelsFunc(hostname)
+}
+
+// ColorLabelsCalls gets all the calls that were made to ColorLabels.
+// Check the length with:
+//
+//	len(mockedConfig.ColorLabelsCalls())
+func (mock *ConfigMock) ColorLabelsCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockColorLabels.RLock()
+	calls = mock.calls.ColorLabels
+	mock.lockColorLabels.RUnlock()
 	return calls
 }
 

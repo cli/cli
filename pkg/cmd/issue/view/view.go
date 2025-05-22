@@ -228,7 +228,7 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 	var md string
 	var err error
 	if issue.Body == "" {
-		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
+		md = fmt.Sprintf("\n  %s\n\n", cs.Muted("No description provided"))
 	} else {
 		md, err = markdown.Render(issue.Body,
 			markdown.WithTheme(opts.IO.TerminalTheme()),
@@ -250,7 +250,7 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 	}
 
 	// Footer
-	fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s\n"), issue.URL)
+	fmt.Fprintf(out, cs.Muted("View this issue on GitHub: %s\n"), issue.URL)
 
 	return nil
 }
@@ -317,7 +317,7 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme) string {
 		if cs == nil {
 			labelNames[i] = label.Name
 		} else {
-			labelNames[i] = cs.HexToRGB(label.Color, label.Name)
+			labelNames[i] = cs.Label(label.Color, label.Name)
 		}
 	}
 

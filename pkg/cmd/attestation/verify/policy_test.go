@@ -275,7 +275,7 @@ func TestValidateSignerWorkflow(t *testing.T) {
 			name:                   "workflow with no host specified",
 			providedSignerWorkflow: "github/artifact-attestations-workflows/.github/workflows/attest.yml",
 			expectErr:              true,
-			errContains:            "unknown host",
+			errContains:            "unknown signer workflow host",
 		},
 		{
 			name:                   "workflow with default host",

@@ -432,6 +432,84 @@ func Test_ioStreams_prompt(t *testing.T) {
 	}
 }
 
+func Test_ioStreams_colorLabels(t *testing.T) {
+	tests := []struct {
+		name               string
+		config             gh.Config
+		colorLabelsEnabled bool
+		env                map[string]string
+	}{
+		{
+			name:               "default config",
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "config with colorLabels enabled",
+			config:             enableColorLabelsConfig(),
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "config with colorLabels disabled",
+			config:             disableColorLabelsConfig(),
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels enabled via `1` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "1"},
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "colorLabels enabled via `true` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "true"},
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "colorLabels enabled via `yes` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "yes"},
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "colorLabels disable via empty string in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": ""},
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels disabled via `0` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "0"},
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels disabled via `false` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "false"},
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels disabled via `no` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "no"},
+			colorLabelsEnabled: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					t.Setenv(k, v)
+				}
+			}
+			f := New("1")
+			f.Config = func() (gh.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
+			io := ioStreams(f)
+			assert.Equal(t, tt.colorLabelsEnabled, io.ColorLabels())
+		})
+	}
+}
+
 func TestSSOURL(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -536,4 +614,12 @@ func pagerConfig() gh.Config {
 
 func disablePromptConfig() gh.Config {
 	return config.NewFromString("prompt: disabled")
+}
+
+func disableColorLabelsConfig() gh.Config {
+	return config.NewFromString("color_labels: disabled")
+}
+
+func enableColorLabelsConfig() gh.Config {
+	return config.NewFromString("color_labels: enabled")
 }

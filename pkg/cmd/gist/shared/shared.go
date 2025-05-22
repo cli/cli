@@ -230,7 +230,7 @@ func PromptGists(prompter prompter.Prompter, client *http.Client, host string, c
 	for i, gist := range gists {
 		gistTime := text.FuzzyAgo(time.Now(), gist.UpdatedAt)
 		// TODO: support dynamic maxWidth
-		opts[i] = fmt.Sprintf("%s %s %s", cs.Bold(gist.Filename()), gist.TruncDescription(), cs.Gray(gistTime))
+		opts[i] = fmt.Sprintf("%s %s %s", cs.Bold(gist.Filename()), gist.TruncDescription(), cs.Muted(gistTime))
 	}
 
 	result, err := prompter.Select("Select a gist", "", opts)

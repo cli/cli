@@ -92,26 +92,37 @@ func CommentableRun(opts *CommentableOptions) error {
 		return err
 	}
 	opts.Host = repo.RepoHost()
-	if opts.EditLast {
-		err := updateComment(commentable, opts)
-		if !errors.Is(err, errNoUserComments) {
+
+	// Create new comment, bail before complexities of updating the last comment
+	if !opts.EditLast {
+		return createComment(commentable, opts)
+	}
+
+	// Update the last comment, handling success or unexpected errors accordingly
+	err = updateComment(commentable, opts)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, errNoUserComments) {
+		return err
+	}
+
+	// Determine whether to create new comment, prompt user if interactive and missing option
+	if !opts.CreateIfNone && opts.Interactive {
+		opts.CreateIfNone, err = opts.ConfirmCreateIfNoneSurvey()
+		if err != nil {
 			return err
 		}
-
-		if opts.Interactive {
-			if opts.CreateIfNone {
-				fmt.Fprintln(opts.IO.ErrOut, "No comments found. Creating a new comment.")
-			} else {
-				ok, err := opts.ConfirmCreateIfNoneSurvey()
-				if err != nil {
-					return err
-				}
-				if !ok {
-					return errNoUserComments
-				}
-			}
-		}
 	}
+	if !opts.CreateIfNone {
+		return errNoUserComments
+	}
+
+	// Create new comment because updating the last comment failed due to no user comments
+	if opts.Interactive {
+		fmt.Fprintln(opts.IO.ErrOut, "No comments found. Creating a new comment.")
+	}
+
 	return createComment(commentable, opts)
 }
 

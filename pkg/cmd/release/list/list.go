@@ -88,7 +88,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	table := tableprinter.New(opts.IO, tableprinter.WithHeader("Title", "Type", "Tag name", "Published"))
-	iofmt := opts.IO.ColorScheme()
+	cs := opts.IO.ColorScheme()
 	for _, rel := range releases {
 		title := text.RemoveExcessiveWhitespace(rel.Name)
 		if title == "" {
@@ -100,13 +100,13 @@ func listRun(opts *ListOptions) error {
 		var badgeColor func(string) string
 		if rel.IsLatest {
 			badge = "Latest"
-			badgeColor = iofmt.Green
+			badgeColor = cs.Green
 		} else if rel.IsDraft {
 			badge = "Draft"
-			badgeColor = iofmt.Red
+			badgeColor = cs.Red
 		} else if rel.IsPrerelease {
 			badge = "Pre-release"
-			badgeColor = iofmt.Yellow
+			badgeColor = cs.Yellow
 		}
 		table.AddField(badge, tableprinter.WithColor(badgeColor))
 
@@ -116,7 +116,7 @@ func listRun(opts *ListOptions) error {
 		if rel.PublishedAt.IsZero() {
 			pubDate = rel.CreatedAt
 		}
-		table.AddTimeField(time.Now(), pubDate, iofmt.Gray)
+		table.AddTimeField(time.Now(), pubDate, cs.Muted)
 		table.EndRow()
 	}
 	err = table.Render()

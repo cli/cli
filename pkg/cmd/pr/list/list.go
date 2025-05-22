@@ -224,7 +224,7 @@ func listRun(opts *ListOptions) error {
 		if !isTTY {
 			table.AddField(shared.PrStateWithDraft(&pr))
 		}
-		table.AddTimeField(opts.Now(), pr.CreatedAt, cs.Gray)
+		table.AddTimeField(opts.Now(), pr.CreatedAt, cs.Muted)
 		table.EndRow()
 	}
 	err = table.Render()

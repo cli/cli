@@ -428,9 +428,6 @@ Breaking this command down:
  * `/dlib` points to the previously extracted DLL
  * `/dmdf` points to the previously created metadata file
 
-> [!WARNING]
-> The [`GoReleaser` signing hook](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.goreleaser.yml#L43) can currently call `./script/sign` on a non-windows machine, but this is an artifact from pre-HSM that should be removed.
-
 ## <a id="release">[release](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L250-L395)</a>
 
 <details>

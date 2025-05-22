@@ -30,58 +30,107 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			Verify the integrity and provenance of an artifact using its associated
 			cryptographically signed attestations.
 
-			In order to verify an attestation, you must validate the identity of the Actions
-			workflow that produced the attestation (a.k.a. the signer workflow). Given this
-			identity, the verification process checks the signatures in the attestations,
-			and confirms that the attestation refers to provided artifact.
+			## Understanding Verification
 
-			To specify the artifact, the command requires:
+			An attestation is a claim (i.e. a provenance statement) made by an actor
+			(i.e. a GitHub Actions workflow) regarding a subject (i.e. an artifact).
+
+			In order to verify an attestation, you must provide an artifact and validate:
+			* the identity of the actor that produced the attestation
+			* the expected attestation predicate type (the nature of the claim)
+
+			By default, this command enforces the %[1]s%[2]s%[1]s
+			predicate type. To verify other attestation predicate types use the
+			%[1]s--predicate-type%[1]s flag.
+
+			The "actor identity" consists of:
+			* the repository or the repository owner the artifact is linked with
+			* the Actions workflow that produced the attestation (a.k.a the
+			  signer workflow)
+
+			This identity is then validated against the attestation's certificate's
+			SourceRepository, SourceRepositoryOwner, and SubjectAlternativeName
+			(SAN) fields, among others.
+
+			It is up to you to decide how precisely you want to enforce this identity.
+
+			At a minimum, this command requires either:
+			* the %[1]s--owner%[1]s flag (e.g. --owner github), or
+			* the %[1]s--repo%[1]s flag (e.g. --repo github/example)
+
+			The more precisely you specify the identity, the more control you will
+			have over the security guarantees offered by the verification process.
+
+			Ideally, the path of the signer workflow is also validated using the
+			%[1]s--signer-workflow%[1]s or %[1]s--cert-identity%[1]s flags.
+
+			Please note: if your attestation was generated via a reusable workflow then
+			that reusable workflow is the signer whose identity needs to be validated.
+			In this situation, you must use either the %[1]s--signer-workflow%[1]s or
+			the %[1]s--signer-repo%[1]s flag.
+
+			For more options, see the other available flags.
+
+			## Loading Artifacts And Attestations
+
+			To specify the artifact, this command requires:
 			* a file path to an artifact, or
 			* a container image URI (e.g. %[1]soci://<image-uri>%[1]s)
 			  * (note that if you provide an OCI URL, you must already be authenticated with
 			its container registry)
 
-			To fetch the attestation, and validate the identity of the signer, the command
-			requires either:
-			* the %[1]s--repo%[1]s flag (e.g. --repo github/example).
-			* the %[1]s--owner%[1]s flag (e.g. --owner github), or
+			By default, this command will attempt to fetch relevant attestations via the
+			GitHub API using the values provided to %[1]s--owner%[1]s or  %[1]s--repo%[1]s.
 
-			The %[1]s--repo%[1]s flag value must match the name of the GitHub repository
-			that the artifact is linked with.
+			To instead fetch attestations from your artifact's OCI registry, use the
+			%[1]s--bundle-from-oci%[1]s flag.
 
-			The %[1]s--owner%[1]s flag value must match the name of the GitHub organization
-			that the artifact's linked repository belongs to.
+			For offline verification using attestations stored on disk (c.f. the download command)
+			provide a path to the %[1]s--bundle%[1]s flag.
 
-			By default, the verify command will:
-			- only verify provenance attestations
-			- attempt to fetch relevant attestations via the GitHub API.
+			## Additional Policy Enforcement
 
-			To verify other types of attestations, use the %[1]s--predicate-type%[1]s flag.
+			Given the %[1]s--format=json%[1]s flag, upon successful verification this
+			command will output a JSON array containing one entry per verified attestation.
 
-			To use your artifact's OCI registry instead of GitHub's API, use the
-			%[1]s--bundle-from-oci%[1]s flag. For offline verification, using attestations
-			stored on desk (c.f. the download command), provide a path to the %[1]s--bundle%[1]s flag.
+			This output can then be used for additional policy enforcement, i.e. by being
+			piped into a policy engine.
 
-			To see the full results that are generated upon successful verification, i.e.
-			for use with a policy engine, provide the %[1]s--format=json%[1]s flag.
+			Each object in the array contains two properties:
+			* an %[1]sattestation%[1]s object, which contains the bundle that was verified
+			* a %[1]sverificationResult%[1]s object, which is a parsed representation of the
+			  contents of the bundle that was verified.
 
-			The signer workflow's identity is validated against the Subject Alternative Name (SAN)
-			within the attestation certificate. Often, the signer workflow is the
-			same workflow that started the run and generated the attestation, and will be
-			located inside your repository. For this reason, by default this command uses
-			either the %[1]s--repo%[1]s or the %[1]s--owner%[1]s flag value to validate the SAN.
+			Within the %[1]sverificationResult%[1]s object you will find:
+			* %[1]ssignature.certificate%[1]s, which is a parsed representation of the X.509
+			  certificate embedded in the attestation,
+			* %[1]sverifiedTimestamps%[1]s, an array of objects denoting when the attestation
+			  was witnessed by a transparency log or a timestamp authority
+			* %[1]sstatement%[1]s, which contains the %[1]ssubject%[1]s array referencing artifacts,
+			  the %[1]spredicateType%[1]s field, and the %[1]spredicate%[1]s object which contains
+			  additional, often user-controllable, metadata
 
-			However, sometimes the caller workflow is not the same workflow that
-			performed the signing. If your attestation was generated via a reusable
-			workflow, then that reusable workflow is the signer whose identity needs to be
-			validated. In this situation, the signer workflow may or may not be located
-			inside your %[1]s--repo%[1]s or %[1]s--owner%[1]s.
+			IMPORTANT: please note that only the %[1]ssignature.certificate%[1]s and the
+			%[1]sverifiedTimestamps%[1]s properties contain values that cannot be
+			manipulated by the workflow that originated the attestation.
 
-			When using reusable workflows, use the %[1]s--signer-repo%[1]s, %[1]s--signer-workflow%[1]s,
-			or %[1]s--cert-identity%[1]s flags to validate the signer workflow's identity.
+			When dealing with attestations created within GitHub Actions, the contents of
+			%[1]ssignature.certificate%[1]s are populated directly from the OpenID Connect
+			token that GitHub has generated. The contents of the %[1]sverifiedTimestamps%[1]s
+			array are populated from the signed timestamps originating from either a
+			transparency log or a timestamp authority – and likewise cannot be forged by users.
 
-			For more policy verification options, see the other available flags.
-			`, "`"),
+			When designing policy enforcement using this output, special care must be taken
+			when examining the contents of the %[1]sstatement.predicate%[1]s property:
+			should an attacker gain access to your workflow's execution context, they
+			could then falsify the contents of the %[1]sstatement.predicate%[1]s.
+
+			To mitigate this attack vector, consider using a "trusted builder": when generating
+			an artifact, have the build and attestation signing occur within a reusable workflow
+			whose execution cannot be influenced by input provided through the caller workflow.
+
+			See above re: %[1]s--signer-workflow%[1]s.
+			`, "`", verification.SLSAPredicateV1),
 		Example: heredoc.Doc(`
 			# Verify an artifact linked with a repository
 			$ gh attestation verify example.bin --repo github/example
@@ -181,23 +230,23 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Repository name in the format <owner>/<repo>")
 	verifyCmd.MarkFlagsMutuallyExclusive("owner", "repo")
 	verifyCmd.MarkFlagsOneRequired("owner", "repo")
-	verifyCmd.Flags().StringVarP(&opts.PredicateType, "predicate-type", "", verification.SLSAPredicateV1, "Filter attestations by provided predicate type")
 	verifyCmd.Flags().BoolVarP(&opts.NoPublicGood, "no-public-good", "", false, "Do not verify attestations signed with Sigstore public good instance")
 	verifyCmd.Flags().StringVarP(&opts.TrustedRoot, "custom-trusted-root", "", "", "Path to a trusted_root.jsonl file; likely for offline verification")
 	verifyCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
 	cmdutil.AddFormatFlags(verifyCmd, &opts.exporter)
-	// policy enforcement flags
-	verifyCmd.Flags().BoolVarP(&opts.DenySelfHostedRunner, "deny-self-hosted-runners", "", false, "Fail verification for attestations generated on self-hosted runners")
-	verifyCmd.Flags().StringVarP(&opts.SAN, "cert-identity", "", "", "Enforce that the certificate's subject alternative name matches the provided value exactly")
-	verifyCmd.Flags().StringVarP(&opts.SANRegex, "cert-identity-regex", "i", "", "Enforce that the certificate's subject alternative name matches the provided regex")
-	verifyCmd.Flags().StringVarP(&opts.SignerRepo, "signer-repo", "", "", "Repository of reusable workflow that signed attestation in the format <owner>/<repo>")
-	verifyCmd.Flags().StringVarP(&opts.SignerWorkflow, "signer-workflow", "", "", "Workflow that signed attestation in the format [host/]<owner>/<repo>/<path>/<to>/<workflow>")
-	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex", "signer-repo", "signer-workflow")
-	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", verification.GitHubOIDCIssuer, "Issuer of the OIDC token")
 	verifyCmd.Flags().StringVarP(&opts.Hostname, "hostname", "", "", "Configure host to use")
-	verifyCmd.Flags().StringVarP(&opts.SignerDigest, "signer-digest", "", "", "Digest associated with the signer workflow")
-	verifyCmd.Flags().StringVarP(&opts.SourceRef, "source-ref", "", "", "Ref associated with the source workflow")
-	verifyCmd.Flags().StringVarP(&opts.SourceDigest, "source-digest", "", "", "Digest associated with the source workflow")
+	// policy enforcement flags
+	verifyCmd.Flags().StringVarP(&opts.PredicateType, "predicate-type", "", verification.SLSAPredicateV1, "Enforce that verified attestations' predicate type matches the provided value")
+	verifyCmd.Flags().BoolVarP(&opts.DenySelfHostedRunner, "deny-self-hosted-runners", "", false, "Fail verification for attestations generated on self-hosted runners")
+	verifyCmd.Flags().StringVarP(&opts.SAN, "cert-identity", "", "", "Enforce that the certificate's SubjectAlternativeName matches the provided value exactly")
+	verifyCmd.Flags().StringVarP(&opts.SANRegex, "cert-identity-regex", "i", "", "Enforce that the certificate's SubjectAlternativeName matches the provided regex")
+	verifyCmd.Flags().StringVarP(&opts.SignerRepo, "signer-repo", "", "", "Enforce that the workflow that signed the attestation's repository matches the provided value (<owner>/<repo>)")
+	verifyCmd.Flags().StringVarP(&opts.SignerWorkflow, "signer-workflow", "", "", "Enforce that the workflow that signed the attestation matches the provided value ([host/]<owner>/<repo>/<path>/<to>/<workflow>)")
+	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex", "signer-repo", "signer-workflow")
+	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", verification.GitHubOIDCIssuer, "Enforce that the issuer of the OIDC token matches the provided value")
+	verifyCmd.Flags().StringVarP(&opts.SignerDigest, "signer-digest", "", "", "Enforce that the digest associated with the signer workflow matches the provided value")
+	verifyCmd.Flags().StringVarP(&opts.SourceRef, "source-ref", "", "", "Enforce that the git ref associated with the source repository matches the provided value")
+	verifyCmd.Flags().StringVarP(&opts.SourceDigest, "source-digest", "", "", "Enforce that the digest associated with the source repository matches the provided value")
 
 	return verifyCmd
 }
