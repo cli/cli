@@ -377,13 +377,11 @@ func runView(opts *ViewOptions) error {
 		return nil
 	}
 
-	compact := false
-
 	if selectedJob == nil {
 		fmt.Fprintln(out, cs.Bold("JOBS"))
-		fmt.Fprintln(out, shared.RenderJobs(cs, jobs, opts.Verbose, compact))
+		fmt.Fprintln(out, shared.RenderJobs(cs, jobs, opts.Verbose))
 	} else {
-		fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true, compact))
+		fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
 	}
 
 	if missingAnnotationsPermissions {

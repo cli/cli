@@ -25,7 +25,7 @@ func RenderRunHeader(cs *iostreams.ColorScheme, run Run, ago, prNumber string, a
 	return header
 }
 
-func RenderJobs(cs *iostreams.ColorScheme, jobs []Job, verbose, compact bool) string {
+func RenderJobs(cs *iostreams.ColorScheme, jobs []Job, verbose bool) string {
 	lines := []string{}
 	for _, job := range jobs {
 		elapsed := job.CompletedAt.Sub(job.StartedAt)
@@ -37,27 +37,52 @@ func RenderJobs(cs *iostreams.ColorScheme, jobs []Job, verbose, compact bool) st
 		id := cs.Cyanf("%d", job.ID)
 		lines = append(lines, fmt.Sprintf("%s %s%s (ID %s)", symbolColor(symbol), cs.Bold(job.Name), elapsedStr, id))
 		if verbose || IsFailureState(job.Conclusion) {
-			stepLogs := []string{}
 			for _, step := range job.Steps {
 				stepSymbol, stepSymColor := Symbol(cs, step.Status, step.Conclusion)
-
-				if compact {
-					if step.Status == InProgress || step.Status == Completed {
-						stepLogs = append(stepLogs, fmt.Sprintf("  %s %s", stepSymColor(stepSymbol), step.Name))
-
-						if len(stepLogs) > 1 {
-							stepLogs = stepLogs[len(stepLogs)-1:]
-						}
-
-						if IsFailureState(step.Conclusion) {
-							break
-						}
-					}
-				} else {
-					stepLogs = append(stepLogs, fmt.Sprintf("  %s %s", stepSymColor(stepSymbol), step.Name))
-				}
+				lines = append(lines, fmt.Sprintf("  %s %s", stepSymColor(stepSymbol), step.Name))
 			}
-			lines = append(lines, stepLogs...)
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func RenderJobsInCompactMode(cs *iostreams.ColorScheme, jobs []Job) string {
+	lines := []string{}
+	for _, job := range jobs {
+		elapsed := job.CompletedAt.Sub(job.StartedAt)
+		elapsedStr := fmt.Sprintf(" in %s", elapsed)
+		if elapsed < 0 {
+			elapsedStr = ""
+		}
+		symbol, symbolColor := Symbol(cs, job.Status, job.Conclusion)
+		id := cs.Cyanf("%d", job.ID)
+		lines = append(lines, fmt.Sprintf("%s %s%s (ID %s)", symbolColor(symbol), cs.Bold(job.Name), elapsedStr, id))
+
+		if job.Status == Completed && job.Conclusion == Success {
+			continue
+		}
+
+		var inProgressStepLine string
+		var failedStepLines []string
+
+		for _, step := range job.Steps {
+			stepSymbol, stepSymColor := Symbol(cs, step.Status, step.Conclusion)
+			stepLine := fmt.Sprintf("  %s %s", stepSymColor(stepSymbol), step.Name)
+
+			if IsFailureState(step.Conclusion) {
+				failedStepLines = append(failedStepLines, stepLine)
+			}
+
+			if step.Status == InProgress {
+				inProgressStepLine = stepLine
+			}
+		}
+
+		lines = append(lines, failedStepLines...)
+
+		if job.Status == InProgress {
+			lines = append(lines, inProgressStepLine)
 		}
 	}
 
