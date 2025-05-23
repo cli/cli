@@ -47,7 +47,7 @@ func RenderJobs(cs *iostreams.ColorScheme, jobs []Job, verbose bool) string {
 	return strings.Join(lines, "\n")
 }
 
-func RenderJobsInCompactMode(cs *iostreams.ColorScheme, jobs []Job) string {
+func RenderJobsCompact(cs *iostreams.ColorScheme, jobs []Job) string {
 	lines := []string{}
 	for _, job := range jobs {
 		elapsed := job.CompletedAt.Sub(job.StartedAt)
@@ -81,7 +81,7 @@ func RenderJobsInCompactMode(cs *iostreams.ColorScheme, jobs []Job) string {
 
 		lines = append(lines, failedStepLines...)
 
-		if job.Status == InProgress {
+		if inProgressStepLine != "" {
 			lines = append(lines, inProgressStepLine)
 		}
 	}
