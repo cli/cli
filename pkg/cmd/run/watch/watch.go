@@ -49,8 +49,8 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 		Long: heredoc.Docf(`
 			Watch a run until it completes, showing its progress.
 
-			By default, all steps are displayed. The %[1]s--compact%[1]s option can be used
-			to only show the relevant/failed steps.
+			By default, all steps are displayed. The %[1]s--compact%[1]s option can be used to only
+			show the relevant/failed steps.
 
 			This command does not support authenticating via fine grained PATs
 			as it is not currently possible to create a PAT with the %[1]schecks:read%[1]s permission.
