@@ -44,7 +44,7 @@ require (
 	github.com/rivo/tview v0.0.0-20221029100920-c4a7e501810d
 	github.com/shurcooL/githubv4 v0.0.0-20240120211514-18a1ae0e79dc
 	github.com/sigstore/protobuf-specs v0.4.1
-	github.com/sigstore/sigstore-go v0.7.2
+	github.com/sigstore/sigstore-go v0.7.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
@@ -155,9 +155,9 @@ require (
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466 // indirect
-	github.com/sigstore/rekor v1.3.9 // indirect
-	github.com/sigstore/sigstore v1.9.1 // indirect
-	github.com/sigstore/timestamp-authority v1.2.5 // indirect
+	github.com/sigstore/rekor v1.3.10 // indirect
+	github.com/sigstore/sigstore v1.9.4 // indirect
+	github.com/sigstore/timestamp-authority v1.2.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
@@ -175,17 +175,17 @@ require (
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
 	go.mongodb.org/mongo-driver v1.14.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	go.opentelemetry.io/otel v1.34.0 // indirect
-	go.opentelemetry.io/otel/metric v1.34.0 // indirect
-	go.opentelemetry.io/otel/trace v1.34.0 // indirect
+	go.opentelemetry.io/otel v1.35.0 // indirect
+	go.opentelemetry.io/otel/metric v1.35.0 // indirect
+	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/exp v0.0.0-20240325151524-a685a6edb6d8 // indirect
+	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/tools v0.29.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250313205543-e70fdf4c4cb4 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 )
