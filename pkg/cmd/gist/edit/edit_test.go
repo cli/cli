@@ -567,7 +567,7 @@ func Test_editRun(t *testing.T) {
 				Files: map[string]*shared.GistFile{},
 				Owner: &shared.GistOwner{Login: "octocat"},
 			},
-			wantErr: "no file in this gist.",
+			wantErr: "no file in the gist",
 		},
 		{
 			name: "edit no-file gist, nil map (#10626)",
@@ -579,7 +579,7 @@ func Test_editRun(t *testing.T) {
 				Files: nil,
 				Owner: &shared.GistOwner{Login: "octocat"},
 			},
-			wantErr: "no file in this gist.",
+			wantErr: "no file in the gist",
 		},
 	}
 
