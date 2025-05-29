@@ -1,4 +1,4 @@
-name: homebrew-bump-debug
+name: romaleu_house_ci
 
 permissions:
   contents: write
