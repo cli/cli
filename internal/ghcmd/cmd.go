@@ -148,7 +148,7 @@ func Main() exitCode {
 		}
 
 		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
+		if (errors.As(err, &httpErr) && httpErr.StatusCode == 401) || err.Error() == `non-200 OK status code: 401 Unauthorized body: "{\"message\":\"Bad credentials\",\"documentation_url\":\"https://docs.github.com/graphql\"}"` {
 			fmt.Fprintln(stderr, "Try authenticating with:  gh auth login")
 		} else if u := factory.SSOURL(); u != "" {
 			// handles organization SAML enforcement error
