@@ -119,9 +119,9 @@ func renderLicense(license *api.License, opts *ViewOptions) error {
 	cs := opts.IO.ColorScheme()
 	var out strings.Builder
 	if opts.IO.IsStdoutTTY() {
-		out.WriteString(fmt.Sprintf("\n%s\n", cs.Gray(license.Description)))
-		out.WriteString(fmt.Sprintf("\n%s\n", cs.Grayf("To implement: %s", license.Implementation)))
-		out.WriteString(fmt.Sprintf("\n%s\n\n", cs.Grayf("For more information, see: %s", license.HTMLURL)))
+		out.WriteString(fmt.Sprintf("\n%s\n", cs.Muted(license.Description)))
+		out.WriteString(fmt.Sprintf("\n%s\n", cs.Mutedf("To implement: %s", license.Implementation)))
+		out.WriteString(fmt.Sprintf("\n%s\n\n", cs.Mutedf("For more information, see: %s", license.HTMLURL)))
 	}
 	out.WriteString(license.Body)
 	_, err := opts.IO.Out.Write([]byte(out.String()))

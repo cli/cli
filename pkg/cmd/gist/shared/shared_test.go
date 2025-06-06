@@ -163,6 +163,33 @@ func TestPromptGists(t *testing.T) {
 			response: `{ "data": { "viewer": { "gists": { "nodes": [] } } } }`,
 			wantOut:  Gist{},
 		},
+		{
+			name: "prompt list contains no-file gist (#10626)",
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a gist",
+					[]string{"  about 6 hours ago", "gistfile0.txt  about 6 hours ago"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "  about 6 hours ago")
+					})
+			},
+			response: `{ "data": { "viewer": { "gists": { "nodes": [
+							{
+								"name": "1234",
+								"files": [],
+								"description": "",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							},
+							{
+								"name": "5678",
+								"files": [{ "name": "gistfile0.txt" }],
+								"description": "",
+								"updatedAt": "%[1]v",
+								"isPublic": true
+							}
+						] } } } }`,
+			wantOut: Gist{ID: "1234", Files: map[string]*GistFile{}, UpdatedAt: sixHoursAgo, Public: true},
+		},
 	}
 
 	ios, _, _, _ := iostreams.Test()

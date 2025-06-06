@@ -5,13 +5,17 @@ import (
 	"testing"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
-	sgData "github.com/sigstore/sigstore-go/pkg/testing/data"
 )
 
 //go:embed sigstore-js-2.1.0-bundle.json
 var SigstoreBundleRaw []byte
 
-// SigstoreBundle returns a test *sigstore.Bundle
+// SigstoreBundle returns a test sigstore-go bundle.Bundle
 func SigstoreBundle(t *testing.T) *bundle.Bundle {
-	return sgData.TestBundle(t, SigstoreBundleRaw)
+	b := &bundle.Bundle{}
+	err := b.UnmarshalJSON(SigstoreBundleRaw)
+	if err != nil {
+		t.Fatalf("failed to unmarshal sigstore bundle: %v", err)
+	}
+	return b
 }

@@ -307,7 +307,7 @@ func TestPrMerge(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -348,7 +348,7 @@ func TestPrMerge_blocked(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -379,7 +379,7 @@ func TestPrMerge_dirty(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -413,7 +413,7 @@ func TestPrMerge_nontty(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -451,7 +451,7 @@ func TestPrMerge_editMessage_nontty(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -490,7 +490,7 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -529,7 +529,7 @@ func TestPrMerge_withMatchCommitHeadFlag(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -570,7 +570,7 @@ func TestPrMerge_withAuthorFlag(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -612,7 +612,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"",
 		&api.PullRequest{
 			ID:               "PR_10",
@@ -663,7 +663,7 @@ func TestPrMerge_deleteBranch_mergeQueue(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"",
 		&api.PullRequest{
 			ID:                  "PR_10",
@@ -686,7 +686,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"",
 		&api.PullRequest{
 			ID:               "PR_10",
@@ -737,7 +737,7 @@ func TestPrMerge_deleteBranch_onlyLocally(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"",
 		&api.PullRequest{
 			ID:                  "PR_10",
@@ -785,7 +785,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"",
 		&api.PullRequest{
 			ID:               "PR_10",
@@ -836,7 +836,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"blueberries",
 		&api.PullRequest{
 			ID:               "PR_10",
@@ -893,7 +893,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	}
 	stubCommit(pr, "COMMITSHA1")
 
-	shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "main"))
+	shared.StubFinderForRunCommandStyleTests(t, "", pr, baseRepo("OWNER", "REPO", "main"))
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -933,7 +933,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	}
 	stubCommit(pr, "COMMITSHA1")
 
-	shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "main"))
+	shared.StubFinderForRunCommandStyleTests(t, "", pr, baseRepo("OWNER", "REPO", "main"))
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -964,7 +964,7 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"",
 		&api.PullRequest{
 			ID:               "PR_10",
@@ -1003,7 +1003,7 @@ func TestPrMerge_rebase(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"2",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -1044,7 +1044,7 @@ func TestPrMerge_squash(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"3",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -1084,7 +1084,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"4",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -1129,7 +1129,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"4",
 		&api.PullRequest{
 			ID:                  "THE-ID",
@@ -1159,7 +1159,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"4",
 		&api.PullRequest{
 			ID:                  "THE-ID",
@@ -1200,7 +1200,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"4",
 		&api.PullRequest{
 			ID:                  "THE-ID",
@@ -1239,7 +1239,7 @@ func TestPRMergeTTY(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -1305,7 +1305,7 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -1468,7 +1468,7 @@ func TestPRMergeEmptyStrategyNonTTY(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",
@@ -1495,7 +1495,7 @@ func TestPRTTY_cancelled(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"",
 		&api.PullRequest{ID: "THE-ID", Number: 123, Title: "title", MergeStateStatus: "CLEAN"},
 		ghrepo.New("OWNER", "REPO"),
@@ -1679,7 +1679,7 @@ func TestPrInMergeQueue(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:                  "THE-ID",
@@ -1710,7 +1710,7 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:                  "THE-ID",
@@ -1748,7 +1748,7 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:                  "THE-ID",
@@ -1788,7 +1788,7 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:                  "THE-ID",
@@ -1828,7 +1828,7 @@ func TestPrAddToMergeQueueAdmin(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:                  "THE-ID",
@@ -1897,7 +1897,7 @@ func TestPrAddToMergeQueueAdminWithMergeStrategy(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
-	shared.RunCommandFinder(
+	shared.StubFinderForRunCommandStyleTests(t,
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",

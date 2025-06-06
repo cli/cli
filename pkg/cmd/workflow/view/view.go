@@ -175,7 +175,7 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Inte
 		out := opts.IO.Out
 
 		fileName := workflow.Base()
-		fmt.Fprintf(out, "%s - %s\n", cs.Bold(workflow.Name), cs.Gray(fileName))
+		fmt.Fprintf(out, "%s - %s\n", cs.Bold(workflow.Name), cs.Muted(fileName))
 		fmt.Fprintf(out, "ID: %s", cs.Cyanf("%d", workflow.ID))
 
 		codeBlock := fmt.Sprintf("```yaml\n%s\n```", yaml)

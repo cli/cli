@@ -46,7 +46,7 @@ func Stub() (*CommandStubber, func(T)) {
 			return
 		}
 		t.Helper()
-		t.Errorf("unmatched stubs (%d): %s", len(unmatched), strings.Join(unmatched, ", "))
+		t.Errorf("unmatched exec stubs (%d): %s", len(unmatched), strings.Join(unmatched, ", "))
 	}
 }
 

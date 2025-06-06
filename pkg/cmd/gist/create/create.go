@@ -138,7 +138,7 @@ func createRun(opts *CreateOptions) error {
 			processMessage = fmt.Sprintf("Creating gist %s", gistName)
 		}
 	}
-	fmt.Fprintf(errOut, "%s %s\n", cs.Gray("-"), processMessage)
+	fmt.Fprintf(errOut, "%s %s\n", cs.Muted("-"), processMessage)
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {

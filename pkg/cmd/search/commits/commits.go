@@ -161,7 +161,7 @@ func displayResults(io *iostreams.IOStreams, now time.Time, results search.Commi
 		tp.AddField(commit.Sha)
 		tp.AddField(text.RemoveExcessiveWhitespace(commit.Info.Message))
 		tp.AddField(commit.Author.Login)
-		tp.AddTimeField(now, commit.Info.Author.Date, cs.Gray)
+		tp.AddTimeField(now, commit.Info.Author.Date, cs.Muted)
 		tp.EndRow()
 	}
 	if io.IsStdoutTTY() {

@@ -118,6 +118,10 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			This command does not support authenticating via fine grained PATs
 			as it is not currently possible to create a PAT with the %[1]schecks:read%[1]s permission.
+
+			Due to platform limitations, %[1]sgh%[1]s may not always be able to associate log lines with a
+			particular step in a job. In this case, the step name in the log output will be replaced with
+			%[1]sUNKNOWN STEP%[1]s.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
@@ -397,7 +401,7 @@ func runView(opts *ViewOptions) error {
 			for _, a := range artifacts {
 				expiredBadge := ""
 				if a.Expired {
-					expiredBadge = cs.Gray(" (expired)")
+					expiredBadge = cs.Muted(" (expired)")
 				}
 				fmt.Fprintf(out, "%s%s\n", a.Name, expiredBadge)
 			}
@@ -411,7 +415,7 @@ func runView(opts *ViewOptions) error {
 		} else {
 			fmt.Fprintf(out, "For more information about a job, try: gh run view --job=<job-id>\n")
 		}
-		fmt.Fprintf(out, cs.Gray("View this run on GitHub: %s\n"), run.URL)
+		fmt.Fprintln(out, cs.Mutedf("View this run on GitHub: %s", run.URL))
 
 		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
 			return cmdutil.SilentError
@@ -423,7 +427,7 @@ func runView(opts *ViewOptions) error {
 		} else {
 			fmt.Fprintf(out, "To see the full job log, try: gh run view --log --job=%d\n", selectedJob.ID)
 		}
-		fmt.Fprintf(out, cs.Gray("View this run on GitHub: %s\n"), run.URL)
+		fmt.Fprintln(out, cs.Mutedf("View this run on GitHub: %s", run.URL))
 
 		if opts.ExitStatus && shared.IsFailureState(selectedJob.Conclusion) {
 			return cmdutil.SilentError
@@ -533,7 +537,7 @@ func promptForJob(prompter shared.Prompter, cs *iostreams.ColorScheme, jobs []sh
 
 const JOB_NAME_MAX_LENGTH = 90
 
-func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
+func getJobNameForLogFilename(name string) string {
 	// As described in https://github.com/cli/cli/issues/5011#issuecomment-1570713070, there are a number of steps
 	// the server can take when producing the downloaded zip file that can result in a mismatch between the job name
 	// and the filename in the zip including:
@@ -545,10 +549,31 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	// * Strip `/` which occur when composite action job names are constructed of the form `<JOB_NAME`> / <ACTION_NAME>`
 	// * Truncate long job names
 	//
-	sanitizedJobName := strings.ReplaceAll(job.Name, "/", "")
+	sanitizedJobName := strings.ReplaceAll(name, "/", "")
 	sanitizedJobName = strings.ReplaceAll(sanitizedJobName, ":", "")
 	sanitizedJobName = truncateAsUTF16(sanitizedJobName, JOB_NAME_MAX_LENGTH)
-	re := fmt.Sprintf(`^%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
+	return sanitizedJobName
+}
+
+// A job run log file is a top-level .txt file whose name starts with an ordinal
+// number; e.g., "0_jobname.txt".
+func jobLogFilenameRegexp(job shared.Job) *regexp.Regexp {
+	sanitizedJobName := getJobNameForLogFilename(job.Name)
+	re := fmt.Sprintf(`^\d+_%s\.txt$`, regexp.QuoteMeta(sanitizedJobName))
+	return regexp.MustCompile(re)
+}
+
+// A legacy job run log file is a top-level .txt file whose name starts with a
+// negative number which is the ID of the run; e.g., "-2147483648_jobname.txt".
+func legacyJobLogFilenameRegexp(job shared.Job) *regexp.Regexp {
+	sanitizedJobName := getJobNameForLogFilename(job.Name)
+	re := fmt.Sprintf(`^-\d+_%s\.txt$`, regexp.QuoteMeta(sanitizedJobName))
+	return regexp.MustCompile(re)
+}
+
+func stepLogFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
+	sanitizedJobName := getJobNameForLogFilename(job.Name)
+	re := fmt.Sprintf(`^%s\/%d_.*\.txt$`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
 }
 
@@ -627,29 +652,60 @@ func truncateAsUTF16(str string, max int) string {
 //	│   ├── 2_anotherstepname.txt
 //	│   ├── 3_stepstepname.txt
 //	│   └── 4_laststepname.txt
-//	└── jobname2/
-//	    ├── 1_stepname.txt
-//	    └── 2_somestepname.txt
+//	├── jobname2/
+//	|   ├── 1_stepname.txt
+//	|   └── 2_somestepname.txt
+//	├── 0_jobname1.txt
+//	├── 1_jobname2.txt
+//	└── -9999999999_jobname3.txt
 //
 // It iterates through the list of jobs and tries to find the matching
 // log in the zip file. If the matching log is found it is attached
 // to the job.
+//
+// The top-level .txt files include the logs for an entire job run. Note that
+// the prefixed number is either:
+//   - An ordinal and cannot be mapped to the corresponding job's ID.
+//   - A negative integer which is the ID of the job in the old Actions service.
+//     The service right now tries to get logs and use an ordinal in a loop.
+//     However, if it doesn't get the logs, it falls back to an old service
+//     where the ID can apparently be negative.
 func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 	for i, job := range jobs {
+		// As a highest priority, we try to use the step logs first. We have seen zips that surprisingly contain
+		// step logs, normal job logs and legacy job logs. In this case, both job logs would be ignored. We have
+		// never seen a zip containing both job logs and no step logs, however, it may be possible. In that case
+		// let's prioritise the normal log over the legacy one.
+		jobLog := matchFileInZIPArchive(rlz, jobLogFilenameRegexp(job))
+		if jobLog == nil {
+			jobLog = matchFileInZIPArchive(rlz, legacyJobLogFilenameRegexp(job))
+		}
+		jobs[i].Log = jobLog
+
 		for j, step := range job.Steps {
-			re := logFilenameRegexp(job, step)
-			for _, file := range rlz.File {
-				if re.MatchString(file.Name) {
-					jobs[i].Steps[j].Log = file
-					break
-				}
-			}
+			jobs[i].Steps[j].Log = matchFileInZIPArchive(rlz, stepLogFilenameRegexp(job, step))
 		}
 	}
 }
 
+func matchFileInZIPArchive(zr *zip.Reader, re *regexp.Regexp) *zip.File {
+	for _, file := range zr.File {
+		if re.MatchString(file.Name) {
+			return file
+		}
+	}
+	return nil
+}
+
 func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
 	for _, job := range jobs {
+		// To display a run log, we first try to compile it from individual step
+		// logs, because this way we can prepend lines with the corresponding
+		// step name. However, at the time of writing, logs are sometimes being
+		// served by a service that doesn’t include the step logs (none of them),
+		// in which case we fall back to print the entire job run log.
+		var hasStepLogs bool
+
 		steps := job.Steps
 		sort.Sort(steps)
 		for _, step := range steps {
@@ -659,18 +715,49 @@ func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
 			if step.Log == nil {
 				continue
 			}
+			hasStepLogs = true
 			prefix := fmt.Sprintf("%s\t%s\t", job.Name, step.Name)
-			f, err := step.Log.Open()
-			if err != nil {
+			if err := printZIPFile(w, step.Log, prefix); err != nil {
 				return err
 			}
-			scanner := bufio.NewScanner(f)
-			for scanner.Scan() {
-				fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
-			}
-			f.Close()
+		}
+
+		if hasStepLogs {
+			continue
+		}
+
+		if failed && !shared.IsFailureState(job.Conclusion) {
+			continue
+		}
+
+		if job.Log == nil {
+			continue
+		}
+
+		// Here, we fall back to the job run log, which means we do not know
+		// the step name of lines. However, we want to keep the same line
+		// formatting to avoid breaking any code or script that rely on the
+		// tab-delimited formatting. So, an unknown-step placeholder is used
+		// instead of the actual step name.
+		prefix := fmt.Sprintf("%s\tUNKNOWN STEP\t", job.Name)
+		if err := printZIPFile(w, job.Log, prefix); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func printZIPFile(w io.Writer, file *zip.File, prefix string) error {
+	f, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
+	}
 	return nil
 }

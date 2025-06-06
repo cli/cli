@@ -62,7 +62,7 @@ func CommentList(io *iostreams.IOStreams, comments api.Comments, reviews api.Pul
 	hiddenCount := totalCount - retrievedCount
 
 	if preview && hiddenCount > 0 {
-		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Not showing %s ————————", text.Pluralize(hiddenCount, "comment"))))
+		fmt.Fprint(&b, cs.Muted(fmt.Sprintf("———————— Not showing %s ————————", text.Pluralize(hiddenCount, "comment"))))
 		fmt.Fprintf(&b, "\n\n\n")
 	}
 
@@ -79,7 +79,7 @@ func CommentList(io *iostreams.IOStreams, comments api.Comments, reviews api.Pul
 	}
 
 	if preview && hiddenCount > 0 {
-		fmt.Fprint(&b, cs.Gray("Use --comments to view the full conversation"))
+		fmt.Fprint(&b, cs.Muted("Use --comments to view the full conversation"))
 		fmt.Fprintln(&b)
 	}
 
@@ -122,7 +122,7 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 	var md string
 	var err error
 	if comment.Content() == "" {
-		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No body provided"))
+		md = fmt.Sprintf("\n  %s\n\n", cs.Muted("No body provided"))
 	} else {
 		md, err = markdown.Render(comment.Content(),
 			markdown.WithTheme(io.TerminalTheme()),
@@ -135,7 +135,7 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 
 	// Footer
 	if comment.Link() != "" {
-		fmt.Fprintf(&b, cs.Gray("View the full review: %s\n\n"), comment.Link())
+		fmt.Fprintf(&b, cs.Muted("View the full review: %s\n\n"), comment.Link())
 	}
 
 	return b.String(), nil

@@ -71,6 +71,7 @@ type ReleaseAsset struct {
 	Name   string
 	Label  string
 	Size   int64
+	Digest *string
 	State  string
 	APIURL string `json:"url"`
 
@@ -107,6 +108,7 @@ func (rel *Release) ExportData(fields []string) map[string]interface{} {
 					"name":          a.Name,
 					"label":         a.Label,
 					"size":          a.Size,
+					"digest":        a.Digest,
 					"state":         a.State,
 					"createdAt":     a.CreatedAt,
 					"updatedAt":     a.UpdatedAt,

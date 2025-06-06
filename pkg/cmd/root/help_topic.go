@@ -81,6 +81,11 @@ var HelpTopics = []helpTopic{
 			%[1]sCLICOLOR_FORCE%[1]s: set to a value other than %[1]s0%[1]s to keep ANSI colors in output
 			even when the output is piped.
 
+			%[1]sGH_COLOR_LABELS%[1]s: set to any value to display labels using their RGB hex color codes in terminals that
+			support truecolor.
+
+			%[1]sGH_ACCESSIBLE_COLORS%[1]s (preview): set to a truthy value to use customizable, 4-bit accessible colors.
+
 			%[1]sGH_FORCE_TTY%[1]s: set to any value to force terminal-style output even when the output is
 			redirected. When the value is a number, it is interpreted as the number of columns
 			available in the viewport. When the value is a percentage, it will be applied against
@@ -108,6 +113,12 @@ var HelpTopics = []helpTopic{
 			%[1]sGH_MDWIDTH%[1]s: default maximum width for markdown render wrapping.  The max width of lines
 			wrapped on the terminal will be taken as the lesser of the terminal width, this value, or 120 if
 			not specified.  This value is used, for example, with %[1]spr view%[1]s subcommand.
+
+			%[1]sGH_ACCESSIBLE_PROMPTER%[1]s (preview): set to a truthy value to enable prompts that are
+			more compatible with speech synthesis and braille screen readers.
+
+			%[1]sGH_SPINNER_DISABLED%[1]s: set to a truthy value to replace the spinner animation with
+			a textual progress indicator.
 		`, "`"),
 	},
 	{
@@ -138,6 +149,7 @@ var HelpTopics = []helpTopic{
 
 			The %[1]s--template%[1]s flag requires a string argument in Go template syntax, and will only print
 			those JSON values which match the query.
+
 			In addition to the Go template functions in the standard library, the following functions can be used
 			with this formatting directive:
 			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
@@ -150,6 +162,14 @@ var HelpTopics = []helpTopic{
 			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's %[1]sTime.Format%[1]s function
 			- %[1]struncate <length> <input>%[1]s: ensures input fits within length
 			- %[1]shyperlink <url> <text>%[1]s: renders a terminal hyperlink
+
+			The following Sprig template library functions can also be used with this formatting directive:
+			- %[1]scontains <arg> <string>%[1]s: checks if %[1]sstring%[1]s contains %[1]sarg%[1]s
+			- %[1]shasPrefix <prefix> <string>%[1]s: checks if %[1]sstring%[1]s starts with %[1]sprefix%[1]s
+			- %[1]shasSuffix <suffix> <string>%[1]s: checks if %[1]sstring%[1]s ends with %[1]ssuffix%[1]s
+			- %[1]sregexMatch <regex> <string>%[1]s: checks if %[1]sstring%[1]s has any matches for %[1]sregex%[1]s
+
+			For more information about the Sprig library, see <https://masterminds.github.io/sprig/>.
 
 			To learn more about Go templates, see: <https://golang.org/pkg/text/template/>.
 		`, "`"),

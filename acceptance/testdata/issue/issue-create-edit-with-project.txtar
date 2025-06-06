@@ -1,0 +1,43 @@
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes ${ORG}/${REPO}
+
+# Create a project
+env PROJECT_TITLE=${REPO}-project
+exec gh project create --owner=${ORG} --title=${PROJECT_TITLE} --format='json' --jq='.number'
+stdout2env PROJECT_NUMBER
+
+defer gh project delete --owner=${ORG} ${PROJECT_NUMBER}
+
+# Clone the repo
+exec gh repo clone ${ORG}/${REPO}
+
+# Create an issue in the repo
+cd ${REPO}
+exec gh issue create --title 'Feature Request' --body 'Feature Body' --project ${PROJECT_TITLE}
+stdout2env ISSUE_URL
+
+# Check that default issue view is working
+exec gh issue view ${ISSUE_URL}
+
+# Check the issue was added to the project
+exec gh issue view ${ISSUE_URL} --json projectItems --jq '.projectItems[0].title'
+stdout ${PROJECT_TITLE}
+
+# Remove the issue from the project
+exec gh issue edit ${ISSUE_URL} --remove-project ${PROJECT_TITLE}
+
+# Check the issue was removed from the project
+exec gh issue view ${ISSUE_URL} --json projectItems --jq '.projectItems[0].title'
+! stdout ${PROJECT_TITLE}
+
+# Re add the issue to the project
+exec gh issue edit ${ISSUE_URL} --add-project ${PROJECT_TITLE}
+
+# Check the issue was added to the project
+exec gh issue view ${ISSUE_URL} --json projectItems --jq '.projectItems[0].title'
+stdout ${PROJECT_TITLE}

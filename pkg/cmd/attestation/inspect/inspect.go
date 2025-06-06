@@ -77,13 +77,18 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 				opts.Hostname, _ = ghauth.DefaultHost()
 			}
 
-			err := auth.IsHostSupported(opts.Hostname)
+			if err := auth.IsHostSupported(opts.Hostname); err != nil {
+				return err
+			}
+
+			hc, err := f.HttpClient()
 			if err != nil {
 				return err
 			}
 
 			config := verification.SigstoreConfig{
-				Logger: opts.Logger,
+				HttpClient: hc,
+				Logger:     opts.Logger,
 			}
 
 			if ghauth.IsTenancy(opts.Hostname) {
@@ -105,7 +110,11 @@ func NewInspectCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command
 				config.TrustDomain = td
 			}
 
-			opts.SigstoreVerifier = verification.NewLiveSigstoreVerifier(config)
+			sgVerifier, err := verification.NewLiveSigstoreVerifier(config)
+			if err != nil {
+				return fmt.Errorf("failed to create Sigstore verifier: %w", err)
+			}
+			opts.SigstoreVerifier = sgVerifier
 
 			if runF != nil {
 				return runF(opts)

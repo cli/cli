@@ -14,3 +14,9 @@ if ! $ghBuildPath attestation verify "$ghCLIArtifact" --digest-alg=sha256 --owne
     echo "Failed to verify"
     exit 1
 fi
+
+# Try to verify when specifying a predicate type that does not match the attestation
+if $ghBuildPath attestation verify "$ghCLIArtifact" --digest-alg=sha256 --owner=cli --predicate-type=my-custom-predicate-type; then
+    echo "Verification should have failed"
+    exit 1
+fi

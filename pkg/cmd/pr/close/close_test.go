@@ -110,7 +110,7 @@ func TestPrClose(t *testing.T) {
 
 	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
 	pr.Title = "The title of the PR"
-	shared.RunCommandFinder("96", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "96", pr, baseRepo)
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
@@ -133,7 +133,7 @@ func TestPrClose_alreadyClosed(t *testing.T) {
 	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
 	pr.State = "CLOSED"
 	pr.Title = "The title of the PR"
-	shared.RunCommandFinder("96", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "96", pr, baseRepo)
 
 	output, err := runCommand(http, true, "96")
 	assert.NoError(t, err)
@@ -147,7 +147,7 @@ func TestPrClose_deleteBranch_sameRepo(t *testing.T) {
 
 	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:blueberries")
 	pr.Title = "The title of the PR"
-	shared.RunCommandFinder("96", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "96", pr, baseRepo)
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
@@ -181,7 +181,7 @@ func TestPrClose_deleteBranch_crossRepo(t *testing.T) {
 
 	baseRepo, pr := stubPR("OWNER/REPO", "hubot/REPO:blueberries")
 	pr.Title = "The title of the PR"
-	shared.RunCommandFinder("96", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "96", pr, baseRepo)
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
@@ -213,7 +213,7 @@ func TestPrClose_deleteBranch_sameBranch(t *testing.T) {
 
 	baseRepo, pr := stubPR("OWNER/REPO:main", "OWNER/REPO:trunk")
 	pr.Title = "The title of the PR"
-	shared.RunCommandFinder("96", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "96", pr, baseRepo)
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
@@ -248,7 +248,7 @@ func TestPrClose_deleteBranch_notInGitRepo(t *testing.T) {
 
 	baseRepo, pr := stubPR("OWNER/REPO:main", "OWNER/REPO:trunk")
 	pr.Title = "The title of the PR"
-	shared.RunCommandFinder("96", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "96", pr, baseRepo)
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestClose\b`),
@@ -282,7 +282,7 @@ func TestPrClose_withComment(t *testing.T) {
 
 	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
 	pr.Title = "The title of the PR"
-	shared.RunCommandFinder("96", pr, baseRepo)
+	shared.StubFinderForRunCommandStyleTests(t, "96", pr, baseRepo)
 
 	http.Register(
 		httpmock.GraphQL(`mutation CommentCreate\b`),
