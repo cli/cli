@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -190,14 +191,18 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 		return err
 	}
 
+	branchName := opts.Name
+	if branchName == "" {
+		branchName = text.GenerateBranchName(issue.Number, issue.Title)
+	}
+
 	opts.IO.StartProgressIndicator()
-	branchName, err := api.CreateLinkedBranch(apiClient, branchRepo.RepoHost(), repoID, issue.ID, branchID, opts.Name)
+	createdBranchName, err := api.CreateLinkedBranch(apiClient, branchRepo.RepoHost(), repoID, issue.ID, branchID, branchName)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
-	// Remember which branch to target when creating a PR.
 	if opts.BaseBranch != "" {
 		err = opts.GitClient.SetBranchConfig(ctx.Background(), branchName, git.MergeBaseConfig, opts.BaseBranch)
 		if err != nil {
@@ -205,9 +210,9 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 		}
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s/%s/tree/%s\n", branchRepo.RepoHost(), ghrepo.FullName(branchRepo), branchName)
+	fmt.Fprintf(opts.IO.Out, "%s/%s/tree/%s\n", branchRepo.RepoHost(), ghrepo.FullName(branchRepo), createdBranchName)
 
-	return checkoutBranch(opts, branchRepo, branchName)
+	return checkoutBranch(opts, branchRepo, createdBranchName)
 }
 
 func developRunList(opts *DevelopOptions, apiClient *api.Client, issueRepo ghrepo.Interface, issue *api.Issue) error {

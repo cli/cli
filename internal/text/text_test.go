@@ -181,3 +181,67 @@ func TestDisplayURL(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateBranchName(t *testing.T) {
+	tests := []struct {
+		name        string
+		issueNumber int
+		title       string
+		want        string
+	}{
+		{
+			name:        "simple title",
+			issueNumber: 123,
+			title:       "Fix bug in parser",
+			want:        "123-fix-bug-in-parser",
+		},
+		{
+			name:        "title with special characters",
+			issueNumber: 456,
+			title:       "Add support for @mentions & #hashtags!",
+			want:        "456-add-support-for-mentions-hashtags",
+		},
+		{
+			name:        "title with accents",
+			issueNumber: 789,
+			title:       "Améliorer la qualité du código",
+			want:        "789-ameliorer-la-qualite-du-codigo",
+		},
+		{
+			name:        "empty title",
+			issueNumber: 999,
+			title:       "",
+			want:        "999",
+		},
+		{
+			name:        "title with only special characters",
+			issueNumber: 111,
+			title:       "!!!@@@###",
+			want:        "111",
+		},
+		{
+			name:        "very long title",
+			issueNumber: 222,
+			title:       "This is a very long title that should be truncated because it exceeds the maximum length limit of 200 characters and we need to make sure it gets properly truncated without breaking the branch name format and functionality",
+			want:        "222-this-is-a-very-long-title-that-should-be-truncated-because-it-exceeds-the-maximum-length-limit-of-200-characters-and-we-need-to-make-sure-it-gets-properly-truncated-without-breaking-the-branch-name-fo",
+		},
+		{
+			name:        "title with multiple consecutive special chars",
+			issueNumber: 333,
+			title:       "Fix   multiple---spaces___and___dashes",
+			want:        "333-fix-multiple-spaces-and-dashes",
+		},
+		{
+			name:        "title starting and ending with special chars",
+			issueNumber: 444,
+			title:       "---Fix this issue---",
+			want:        "444-fix-this-issue",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, GenerateBranchName(tt.issueNumber, tt.title))
+		})
+	}
+}

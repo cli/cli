@@ -149,3 +149,25 @@ func FormatSlice(values []string, lineLength uint, indent uint, prependWith stri
 	}
 	return builder.String()
 }
+
+// GenerateBranchName creates a sanitized branch name from an issue number and title.
+// The resulting branch name follows the format "{issueNumber}-{cleanTitle}" or just "{issueNumber}"
+// if the title becomes empty after sanitization.
+func GenerateBranchName(issueNumber int, title string) string {
+	cleanTitle := RemoveDiacritics(title)
+
+	cleanTitle = strings.ToLower(cleanTitle)
+	cleanTitle = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(cleanTitle, "-")
+	cleanTitle = strings.Trim(cleanTitle, "-")
+
+	if len(cleanTitle) > 200 {
+		cleanTitle = cleanTitle[:200]
+		cleanTitle = strings.Trim(cleanTitle, "-")
+	}
+
+	if cleanTitle == "" {
+		return fmt.Sprintf("%d", issueNumber)
+	}
+
+	return fmt.Sprintf("%d-%s", issueNumber, cleanTitle)
+}

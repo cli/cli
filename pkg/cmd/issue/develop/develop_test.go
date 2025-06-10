@@ -511,6 +511,117 @@ func TestDevelopRun(t *testing.T) {
 			},
 			wantErr: "could not find branch \"does-not-exist-branch\" in OWNER/REPO",
 		},
+		{
+			name: "develop new branch with accents in title",
+			opts: &DevelopOptions{
+				IssueNumber: 456,
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "ISSUEID","number":456,"title":"Créer les tâches avec açã"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","defaultBranchRef":{"target":{"oid":"DEFAULTOID"}},"ref":{"target":{"oid":""}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"3","ref":{"name":"456-creer-les-taches-avec-aca"}}}}}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "ISSUEID", inputs["issueId"])
+							assert.Equal(t, "DEFAULTOID", inputs["oid"])
+							assert.Equal(t, "456-creer-les-taches-avec-aca", inputs["name"])
+						}),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/456-creer-les-taches-avec-aca:refs/remotes/origin/456-creer-les-taches-avec-aca`, 0, "")
+			},
+			expectedOut: "github.com/OWNER/REPO/tree/456-creer-les-taches-avec-aca\n",
+		},
+		{
+			name: "develop new branch with mixed international characters",
+			opts: &DevelopOptions{
+				IssueNumber: 789,
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "MIXEDID","number":789,"title":"Añadir función para niños & múltiples caractères spéciaux"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","defaultBranchRef":{"target":{"oid":"DEFAULTOID"}},"ref":{"target":{"oid":""}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"4","ref":{"name":"789-anadir-funcion-para-ninos-multiples-caracteres-speciaux"}}}}}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "MIXEDID", inputs["issueId"])
+							assert.Equal(t, "DEFAULTOID", inputs["oid"])
+							assert.Equal(t, "789-anadir-funcion-para-ninos-multiples-caracteres-speciaux", inputs["name"])
+						}),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/789-anadir-funcion-para-ninos-multiples-caracteres-speciaux:refs/remotes/origin/789-anadir-funcion-para-ninos-multiples-caracteres-speciaux`, 0, "")
+			},
+			expectedOut: "github.com/OWNER/REPO/tree/789-anadir-funcion-para-ninos-multiples-caracteres-speciaux\n",
+		},
+		{
+			name: "develop new branch with special characters only",
+			opts: &DevelopOptions{
+				IssueNumber: 999,
+			},
+			remotes: map[string]string{
+				"origin": "OWNER/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranchFeature\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id": "SPECIALID","number":999,"title":"!@#$%^&*()"}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query FindRepoBranchID\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"id":"REPOID","defaultBranchRef":{"target":{"oid":"DEFAULTOID"}},"ref":{"target":{"oid":""}}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQLMutation(`{"data":{"createLinkedBranch":{"linkedBranch":{"id":"5","ref":{"name":"999"}}}}}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "SPECIALID", inputs["issueId"])
+							assert.Equal(t, "DEFAULTOID", inputs["oid"])
+							assert.Equal(t, "999", inputs["name"])
+						}),
+				)
+			},
+			runStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git fetch origin \+refs/heads/999:refs/remotes/origin/999`, 0, "")
+			},
+			expectedOut: "github.com/OWNER/REPO/tree/999\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
