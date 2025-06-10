@@ -15,6 +15,7 @@ import (
 )
 
 var whitespaceRE = regexp.MustCompile(`\s+`)
+var nonAlphanumericRE = regexp.MustCompile(`[^a-z0-9]+`)
 
 func Indent(s, indent string) string {
 	return text.Indent(s, indent)
@@ -157,7 +158,7 @@ func GenerateBranchName(issueNumber int, title string) string {
 	cleanTitle := RemoveDiacritics(title)
 
 	cleanTitle = strings.ToLower(cleanTitle)
-	cleanTitle = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(cleanTitle, "-")
+	cleanTitle = nonAlphanumericRE.ReplaceAllString(cleanTitle, "-")
 	cleanTitle = strings.Trim(cleanTitle, "-")
 
 	if len(cleanTitle) > 200 {
