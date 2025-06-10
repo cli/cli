@@ -191,20 +191,20 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 		return err
 	}
 
-	branchName := opts.Name
-	if branchName == "" {
-		branchName = text.GenerateBranchName(issue.Number, issue.Title)
+	requestedBranchName := opts.Name
+	if requestedBranchName == "" {
+		requestedBranchName = text.GenerateBranchName(issue.Number, issue.Title)
 	}
 
 	opts.IO.StartProgressIndicator()
-	createdBranchName, err := api.CreateLinkedBranch(apiClient, branchRepo.RepoHost(), repoID, issue.ID, branchID, branchName)
+	createdBranchName, err := api.CreateLinkedBranch(apiClient, branchRepo.RepoHost(), repoID, issue.ID, branchID, requestedBranchName)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
 	if opts.BaseBranch != "" {
-		err = opts.GitClient.SetBranchConfig(ctx.Background(), branchName, git.MergeBaseConfig, opts.BaseBranch)
+		err = opts.GitClient.SetBranchConfig(ctx.Background(), requestedBranchName, git.MergeBaseConfig, opts.BaseBranch)
 		if err != nil {
 			return err
 		}
