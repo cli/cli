@@ -171,6 +171,9 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 	remoteBranch := fmt.Sprintf("%s/%s", remote.Name, pr.HeadRefName)
 
 	refSpec := fmt.Sprintf("+refs/heads/%s", pr.HeadRefName)
+	if !pr.IsOpen() {
+		refSpec = fmt.Sprintf("+refs/pull/%d/head", pr.Number)
+	}
 	if !opts.Detach {
 		refSpec += fmt.Sprintf(":refs/remotes/%s", remoteBranch)
 	}

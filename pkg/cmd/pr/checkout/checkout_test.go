@@ -554,6 +554,26 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	assert.Equal(t, "", output.Stderr())
 }
 
+func TestPRCheckout_closedPR(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	baseRepo, pr := _stubPR("OWNER/REPO", "OWNER/REPO:feature", 123, "PR title", "CLOSED", false)
+	shared.StubFinderForRunCommandStyleTests(t, "123", pr, baseRepo)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git fetch origin \+refs/pull/123/head:refs/remotes/origin/feature --no-tags`, 0, "")
+	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
+	cs.Register(`git checkout feature`, 0, "")
+	cs.Register(`git merge --ff-only refs/remotes/origin/feature`, 0, "")
+
+	output, err := runCommand(http, nil, "master", `123`, baseRepo)
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
+}
+
 func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	remotes := context.Remotes{
 		{
