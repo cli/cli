@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# === Konfigurasi ===
+REPO_OWNER="your-github-username"     # Ganti dengan username GitHub Anda
+REPO_NAME="batavia-reserve"           # Ganti dengan nama repositori GitHub
+APK_FILE="app-release.apk"            # Ganti jika nama file APK berbeda
+TAG="v1.0.0"                           # Tag versi
+RELEASE_NAME="Batavia Reserve APK v1.0.0"
+RELEASE_BODY="APK final Batavia Reserve versi 1.0.0. Siap diunduh."
+
+# === Autentikasi GitHub CLI ===
+echo "Autentikasi GitHub CLI..."
+gh auth login
+
+# === Push tag ke GitHub (jika belum) ===
+git tag $TAG
+git push origin $TAG
+
+# === Upload APK ke GitHub Release ===
+echo "Mengunggah $APK_FILE ke $REPO_OWNER/$REPO_NAME..."
+gh release create "$TAG" "$APK_FILE" \
+  --repo "$REPO_OWNER/$REPO_NAME" \
+  --title "$RELEASE_NAME" \
+  --notes "$RELEASE_BODY"
+
+echo "✅ Selesai. Cek di: https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$TAG"
