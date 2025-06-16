@@ -27,17 +27,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Verify dependencies
-        run: |
-          go mod verify
-          go mod download
-
-          LINT_VERSION=1.63.4
-          curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v${LINT_VERSION}/golangci-lint-${LINT_VERSION}-linux-amd64.tar.gz | \
-            tar xz --strip-components 1 --wildcards \*/golangci-lint
-          mkdir -p bin && mv golangci-lint bin/
-
-      - name: Run checks
+      - name: Ensure go.mod and go.sum are up to date
         run: |
           STATUS=0
           assert-nothing-changed() {
@@ -49,10 +39,10 @@ jobs:
               STATUS=1
             fi
           }
-
-          assert-nothing-changed go fmt ./...
           assert-nothing-changed go mod tidy
-
-          bin/golangci-lint run --out-format=colored-line-number --timeout=3m || STATUS=$?
-
           exit $STATUS
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9
+        with:
+          version: v2.1.6

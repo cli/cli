@@ -1,7 +1,17 @@
+version: "2"
+
 linters:
   enable:
-  - gofmt
-  - nolintlint
+    - nolintlint
+  disable:
+   # The following linters are disabled purely because this config was migrated to v2 where they are in the default
+   # set, and we should have separate work to enable them if we truly want them.
+   - staticcheck
+   - errcheck
+
+formatters:
+  enable:
+    - gofmt
 
 issues:
   max-issues-per-linter: 0
