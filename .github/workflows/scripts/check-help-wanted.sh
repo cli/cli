@@ -26,11 +26,11 @@ if [ -z "$CLOSING_ISSUES" ]; then
     exit 0
 fi
 
-# Check each closing issue for help-wanted label
+# Check each closing issue for 'help-wanted' label
 ISSUES_WITHOUT_HELP_WANTED=()
 
 for issue_num in $CLOSING_ISSUES; do
-    echo "Checking issue #$issue_num for help-wanted label..."
+    echo "Checking issue #$issue_num for 'help wanted' label..."
 
     # Get issue labels
     LABELS=$(gh issue view "$issue_num" --json labels --jq '.labels[].name')
@@ -46,18 +46,18 @@ for issue_num in $CLOSING_ISSUES; do
         continue
     fi
 
-    # Check if help-wanted label exists
-    if ! echo "$LABELS" | grep -q "help-wanted"; then
+    # Check if 'help wanted' label exists
+    if ! echo "$LABELS" | grep -q "help wanted"; then
         ISSUES_WITHOUT_HELP_WANTED+=("$issue_num")
-        echo "Issue #$issue_num does not have help-wanted label"
+        echo "Issue #$issue_num does not have 'help wanted' label"
     else
-        echo "Issue #$issue_num has help-wanted label"
+        echo "Issue #$issue_num has 'help wanted' label"
     fi
 done
 
-# If we found issues without help-wanted label, post a comment
+# If we found issues without 'help wanted' label, post a comment
 if [ ${#ISSUES_WITHOUT_HELP_WANTED[@]} -gt 0 ]; then
-    echo "Found ${#ISSUES_WITHOUT_HELP_WANTED[@]} issues without help-wanted label"
+    echo "Found ${#ISSUES_WITHOUT_HELP_WANTED[@]} issues without 'help wanted' label"
 
     # Build issue list for comment
     ISSUE_LIST=""
@@ -69,20 +69,20 @@ if [ ${#ISSUES_WITHOUT_HELP_WANTED[@]} -gt 0 ]; then
     gh pr comment "$PR_URL" --body-file - <<EOF
 Thank you for your pull request! 🎉
 
-This PR appears to fix the following issues that are not labeled with \`help-wanted\`:
+This PR appears to fix the following issues that are not labeled with \`help wanted\`:
 
 $ISSUE_LIST
-As outlined in our [Contributing Guidelines](https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md), we expect that PRs are only created for issues that have been labeled \`help-wanted\`.
+As outlined in our [Contributing Guidelines](https://github.com/cli/cli/blob/trunk/.github/CONTRIBUTING.md), we expect that PRs are only created for issues that have been labeled \`help wanted\`.
 
 While we appreciate your initiative, please note that:
 
-- **PRs for non-\`help-wanted\` issues may not be reviewed immediately** as they might not align with our current priorities
+- **PRs for non-\`help wanted\` issues may not be reviewed immediately** as they might not align with our current priorities
 - **The issue might already be assigned** to a team member or planned for a specific release
 - **We may need to close this PR**. For example, if it conflicts with ongoing work or architectural decisions
 
 **What happens next:**
 - Our team will review this PR and the associated issues
-- We may add the \`help-wanted\` label to the issues, if appropriate, and review this pull request
+- We may add the \`help wanted\` label to the issues, if appropriate, and review this pull request
 - In some cases, we may need to close the PR. For example, if it doesn't fit our current roadmap
 
 Thank you for your understanding and contribution to the project! 🙏
@@ -92,5 +92,5 @@ EOF
 
     echo "Posted comment on PR #$PR_NUM"
 else
-    echo "All closing issues have help-wanted label - no action needed"
+    echo "All closing issues have 'help wanted' label - no action needed"
 fi
