@@ -1,0 +1,53 @@
+{
+	"publisher": {
+		"userAgent": "boulder/1.0",
+		"blockProfileRate": 1000000000,
+		"chains": [
+			[
+				"test/certs/webpki/int-rsa-a.cert.pem",
+				"test/certs/webpki/root-rsa.cert.pem"
+			],
+			[
+				"test/certs/webpki/int-rsa-b.cert.pem",
+				"test/certs/webpki/root-rsa.cert.pem"
+			],
+			[
+				"test/certs/webpki/int-ecdsa-a.cert.pem",
+				"test/certs/webpki/root-ecdsa.cert.pem"
+			],
+			[
+				"test/certs/webpki/int-ecdsa-b.cert.pem",
+				"test/certs/webpki/root-ecdsa.cert.pem"
+			]
+		],
+		"grpc": {
+			"maxConnectionAge": "30s",
+			"services": {
+				"Publisher": {
+					"clientNames": [
+						"ra.boulder"
+					]
+				},
+				"grpc.health.v1.Health": {
+					"clientNames": [
+						"health-checker.boulder"
+					]
+				}
+			}
+		},
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/publisher.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/publisher.boulder/key.pem"
+		},
+		"features": {}
+	},
+	"syslog": {
+		"stdoutlevel": 6,
+		"sysloglevel": -1
+	},
+	"openTelemetry": {
+		"endpoint": "bjaeger:4317",
+		"sampleratio": 1
+	}
+}

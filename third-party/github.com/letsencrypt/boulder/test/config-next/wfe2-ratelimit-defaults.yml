@@ -1,0 +1,24 @@
+NewRegistrationsPerIPAddress:
+  count: 10000
+  burst: 10000
+  period: 168h
+NewRegistrationsPerIPv6Range:
+  count: 99999
+  burst: 99999
+  period: 168h
+CertificatesPerDomain:
+  count: 2
+  burst: 2
+  period: 2160h
+FailedAuthorizationsPerDomainPerAccount:
+  count: 3
+  burst: 3
+  period: 5m
+NewOrdersPerAccount:
+  count: 1500
+  burst: 1500
+  period: 3h
+CertificatesPerFQDNSet:
+  count: 6
+  burst: 6
+  period: 168h

@@ -1,0 +1,209 @@
+services:
+  boulder:
+    # The `letsencrypt/boulder-tools:latest` tag is automatically built in local
+    # dev environments. In CI a specific BOULDER_TOOLS_TAG is passed, and it is
+    # pulled with `docker compose pull`.
+    image: &boulder_tools_image letsencrypt/boulder-tools:${BOULDER_TOOLS_TAG:-latest}
+    build:
+      context: test/boulder-tools/
+      # Should match one of the GO_CI_VERSIONS in test/boulder-tools/tag_and_upload.sh.
+      args:
+        GO_VERSION: 1.22.2
+    environment:
+      # To solve HTTP-01 and TLS-ALPN-01 challenges, change the IP in FAKE_DNS
+      # to the IP address where your ACME client's solver is listening.
+      # FAKE_DNS: 172.17.0.1
+      FAKE_DNS: 10.77.77.77
+      BOULDER_CONFIG_DIR: test/config
+      GOCACHE: /boulder/.gocache/go-build
+      GOFLAGS: -mod=vendor
+    volumes:
+      - .:/boulder:cached
+      - ./.gocache:/root/.cache/go-build:cached
+      - ./test/certs/.softhsm-tokens/:/var/lib/softhsm/tokens/:cached
+    networks:
+      bouldernet:
+        ipv4_address: 10.77.77.77
+      integrationtestnet:
+        ipv4_address: 10.88.88.88
+      redisnet:
+        ipv4_address: 10.33.33.33
+      consulnet:
+        ipv4_address: 10.55.55.55
+    # Use consul as a backup to Docker's embedded DNS server. If there's a name
+    # Docker's DNS server doesn't know about, it will forward the query to this
+    # IP (running consul).
+    # (https://docs.docker.com/config/containers/container-networking/#dns-services).
+    # This is used to look up service names via A records (like ra.service.consul) that
+    # are configured via the ServerAddress field of cmd.GRPCClientConfig.
+    # TODO: Remove this when ServerAddress is deprecated in favor of SRV records
+    # and DNSAuthority.
+    dns: 10.55.55.10
+    extra_hosts:
+      # Allow the boulder container to be reached as "ca.example.org", so that
+      # we can put that name inside our integration test certs (e.g. as a crl
+      # url) and have it look like a publicly-accessible name.
+      - "ca.example.org:10.77.77.77"
+    ports:
+      - 4001:4001 # ACMEv2
+      - 4002:4002 # OCSP
+      - 4003:4003 # OCSP
+    depends_on:
+      - bmysql
+      - bproxysql
+      - bredis_1
+      - bredis_2
+      - bredis_3
+      - bredis_4
+      - bconsul
+      - bjaeger
+      - bpkilint
+    entrypoint: test/entrypoint.sh
+    working_dir: &boulder_working_dir /boulder
+
+  bsetup:
+    image: *boulder_tools_image
+    volumes:
+      - .:/boulder:cached
+      - ./.gocache:/root/.cache/go-build:cached
+      - ./test/certs/.softhsm-tokens/:/var/lib/softhsm/tokens/:cached
+    entrypoint: test/certs/generate.sh
+    working_dir: *boulder_working_dir
+    profiles:
+      # Adding a profile to this container means that it won't be started by a
+      # normal "docker compose up/run boulder", only when specifically invoked
+      # with a "docker compose up bsetup".
+      - setup
+
+  bmysql:
+    image: mariadb:10.5
+    networks:
+      bouldernet:
+        aliases:
+          - boulder-mysql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    # Send slow queries to a table so we can check for them in the
+    # integration tests. For now we ignore queries not using indexes,
+    # because that seems to trigger based on the optimizer's choice to not
+    # use an index for certain queries, particularly when tables are still
+    # small.
+    command: mysqld --bind-address=0.0.0.0 --slow-query-log --log-output=TABLE --log-queries-not-using-indexes=ON
+    logging:
+      driver: none
+  bproxysql:
+    image: proxysql/proxysql:2.5.4
+    # The --initial flag force resets the ProxySQL database on startup. By
+    # default, ProxySQL ignores new configuration if the database already
+    # exists. Without this flag, new configuration wouldn't be applied until you
+    # ran `docker compose down`.
+    entrypoint: proxysql -f --idle-threads -c /test/proxysql/proxysql.cnf --initial
+    volumes:
+      - ./test/:/test/:cached
+    depends_on:
+      - bmysql
+    networks:
+      bouldernet:
+        aliases:
+          - boulder-proxysql
+
+  bredis_1:
+    image: redis:6.2.7
+    volumes:
+      - ./test/:/test/:cached
+    command: redis-server /test/redis-ocsp.config
+    networks:
+      redisnet:
+        ipv4_address: 10.33.33.2
+
+  bredis_2:
+    image: redis:6.2.7
+    volumes:
+      - ./test/:/test/:cached
+    command: redis-server /test/redis-ocsp.config
+    networks:
+      redisnet:
+        ipv4_address: 10.33.33.3
+
+  bredis_3:
+    image: redis:6.2.7
+    volumes:
+      - ./test/:/test/:cached
+    command: redis-server /test/redis-ratelimits.config
+    networks:
+      redisnet:
+        ipv4_address: 10.33.33.4
+
+  bredis_4:
+    image: redis:6.2.7
+    volumes:
+      - ./test/:/test/:cached
+    command: redis-server /test/redis-ratelimits.config
+    networks:
+      redisnet:
+        ipv4_address: 10.33.33.5
+
+  bconsul:
+    image: hashicorp/consul:1.15.4
+    volumes:
+     - ./test/:/test/:cached
+    networks:
+      consulnet:
+        ipv4_address: 10.55.55.10
+      bouldernet:
+        ipv4_address: 10.77.77.10
+    command: "consul agent -dev -config-format=hcl -config-file=/test/consul/config.hcl"
+
+  bjaeger:
+    image: jaegertracing/all-in-one:1.50
+    networks:
+      bouldernet:
+        ipv4_address: 10.77.77.17
+
+  bpkilint:
+    image: ghcr.io/digicert/pkilint:v0.10.1
+    networks:
+      bouldernet:
+        ipv4_address: 10.77.77.9
+    command: "gunicorn -w 8 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:80 pkilint.rest:app"
+
+networks:
+  # This network is primarily used for boulder services. It is also used by
+  # challtestsrv, which is used in the integration tests.
+  bouldernet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.77.77.0/24
+
+  # This network is used for two things in the integration tests:
+  #  - challtestsrv binds to 10.88.88.88:443 for its tls-alpn-01 challenge
+  #    responder, to avoid interfering with the HTTPS port used for testing
+  #    HTTP->HTTPS redirects during http-01 challenges. Note: this could
+  #    probably be updated in the future so that challtestsrv can handle
+  #    both tls-alpn-01 and HTTPS on the same port.
+  #  - test/v2_integration.py has some test cases that start their own HTTP
+  #    server instead of relying on challtestsrv, because they want very
+  #    specific behavior. For these cases, v2_integration.py creates a Python
+  #    HTTP server and binds it to 10.88.88.88:80.
+  integrationtestnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.88.88.0/24
+
+  redisnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.33.33.0/24
+
+  consulnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.55.55.0/24

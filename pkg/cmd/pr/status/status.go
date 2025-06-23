@@ -102,43 +102,34 @@ func statusRun(opts *StatusOptions) error {
 			return fmt.Errorf("could not query for pull request for current branch: %w", err)
 		}
 
-		branchConfig, err := opts.GitClient.ReadBranchConfig(ctx, currentBranchName)
-		if err != nil {
-			return err
-		}
-		// Determine if the branch is configured to merge to a special PR ref
-		prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
-		if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
-			currentPRNumber, _ = strconv.Atoi(m[1])
-		}
-
-		if currentPRNumber == 0 {
-			remotes, err := opts.Remotes()
+		if !errors.Is(err, git.ErrNotOnAnyBranch) {
+			branchConfig, err := opts.GitClient.ReadBranchConfig(ctx, currentBranchName)
 			if err != nil {
 				return err
 			}
-			// Suppressing these errors as we have other means of computing the PullRequestRefs when these fail.
-			parsedPushRevision, _ := opts.GitClient.ParsePushRevision(ctx, currentBranchName)
-
-			remotePushDefault, err := opts.GitClient.RemotePushDefault(ctx)
-			if err != nil {
-				return err
+			// Determine if the branch is configured to merge to a special PR ref
+			prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)
+			if m := prHeadRE.FindStringSubmatch(branchConfig.MergeRef); m != nil {
+				currentPRNumber, _ = strconv.Atoi(m[1])
 			}
 
-			pushDefault, err := opts.GitClient.PushDefault(ctx)
-			if err != nil {
-				return err
-			}
+			if currentPRNumber == 0 {
+				prRefsResolver := shared.NewPullRequestFindRefsResolver(
+					// We requested the branch config already, so let's cache that
+					shared.CachedBranchConfigGitConfigClient{
+						CachedBranchConfig: branchConfig,
+						GitConfigClient:    opts.GitClient,
+					},
+					opts.Remotes,
+				)
 
-			prRefs, err := shared.ParsePRRefs(currentBranchName, branchConfig, parsedPushRevision, pushDefault, remotePushDefault, baseRefRepo, remotes)
-			if err != nil {
-				return err
-			}
-			currentHeadRefBranchName = prRefs.BranchName
-		}
+				prRefs, err := prRefsResolver.ResolvePullRequestRefs(baseRefRepo, "", currentBranchName)
+				if err != nil {
+					return err
+				}
 
-		if err != nil {
-			return fmt.Errorf("could not query for pull request for current branch: %w", err)
+				currentHeadRefBranchName = prRefs.QualifiedHeadRef()
+			}
 		}
 	}
 
@@ -316,6 +307,6 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 	}
 	remaining := totalCount - len(prs)
 	if remaining > 0 {
-		fmt.Fprintf(w, cs.Gray("  And %d more\n"), remaining)
+		fmt.Fprintln(w, cs.Mutedf("  And %d more", remaining))
 	}
 }

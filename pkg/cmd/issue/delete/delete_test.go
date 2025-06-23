@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/pkg/cmd/issue/argparsetest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -19,6 +20,10 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestNewCmdDelete(t *testing.T) {
+	argparsetest.TestArgParsing(t, NewCmdDelete)
+}
 
 func runCommand(rt http.RoundTripper, pm *prompter.MockPrompter, isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()

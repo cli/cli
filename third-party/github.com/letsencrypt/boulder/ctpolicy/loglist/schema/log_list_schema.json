@@ -1,0 +1,280 @@
+{
+  "type": "object",
+  "id": "https://www.gstatic.com/ct/log_list/v3/log_list_schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "required": [
+    "operators"
+  ],
+  "definitions": {
+    "state": {
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "description": "The time at which the log entered this state.",
+          "type": "string",
+          "format": "date-time",
+          "examples": [
+            "2018-01-01T00:00:00Z"
+          ]
+        }
+      },
+      "required": [
+        "timestamp"
+      ]
+    }
+  },
+  "properties": {
+    "version": {
+      "type": "string",
+      "title": "Version of this log list",
+      "description": "The version will change whenever a change is made to any part of this log list.",
+      "examples": [
+        "1",
+        "1.0.0",
+        "1.0.0b"
+      ]
+    },
+    "log_list_timestamp": {
+      "description": "The time at which this version of the log list was published.",
+      "type": "string",
+      "format": "date-time",
+      "examples": [
+        "2018-01-01T00:00:00Z"
+      ]
+    },
+    "operators": {
+      "title": "CT log operators",
+      "description": "People/organizations that run Certificate Transparency logs.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "logs"
+        ],
+        "properties": {
+          "name": {
+            "title": "Name of this log operator",
+            "type": "string"
+          },
+          "email": {
+            "title": "CT log operator email addresses",
+            "description": "The log operator can be contacted using any of these email addresses.",
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "email"
+            }
+          },
+          "logs": {
+            "description": "Details of Certificate Transparency logs run by this operator.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "key",
+                "log_id",
+                "mmd",
+                "url"
+              ],
+              "properties": {
+                "description": {
+                  "title": "Description of the CT log",
+                  "description": "A human-readable description that can be used to identify this log.",
+                  "type": "string"
+                },
+                "key": {
+                  "title": "The public key of the CT log",
+                  "description": "The log's public key as a DER-encoded ASN.1 SubjectPublicKeyInfo structure, then encoded as base64 (https://tools.ietf.org/html/rfc5280#section-4.1.2.7).",
+                  "type": "string"
+                },
+                "log_id": {
+                  "title": "The SHA-256 hash of the CT log's public key, base64-encoded",
+                  "description": "This is the LogID found in SCTs issued by this log (https://tools.ietf.org/html/rfc6962#section-3.2).",
+                  "type": "string",
+                  "minLength": 44,
+                  "maxLength": 44
+                },
+                "mmd": {
+                  "title": "The Maximum Merge Delay, in seconds",
+                  "description": "The CT log should not take longer than this to incorporate a certificate (https://tools.ietf.org/html/rfc6962#section-3).",
+                  "type": "number",
+                  "minimum": 1,
+                  "default": 86400
+                },
+                "url": {
+                  "title": "The base URL of the CT log's HTTP API",
+                  "description": "The API endpoints are defined in https://tools.ietf.org/html/rfc6962#section-4.",
+                  "type": "string",
+                  "format": "uri",
+                  "examples": [
+                    "https://ct.googleapis.com/pilot/"
+                  ]
+                },
+                "dns": {
+                  "title": "The domain name of the CT log's DNS API",
+                  "description": "The API endpoints are defined in https://github.com/google/certificate-transparency-rfcs/blob/master/dns/draft-ct-over-dns.md.",
+                  "type": "string",
+                  "format": "hostname",
+                  "examples": [
+                    "pilot.ct.googleapis.com"
+                  ]
+                },
+                "temporal_interval": {
+                  "description": "The log will only accept certificates that expire (have a NotAfter date) between these dates.",
+                  "type": "object",
+                  "required": [
+                    "start_inclusive",
+                    "end_exclusive"
+                  ],
+                  "properties": {
+                    "start_inclusive": {
+                      "description": "All certificates must expire on this date or later.",
+                      "type": "string",
+                      "format": "date-time",
+                      "examples": [
+                        "2018-01-01T00:00:00Z"
+                      ]
+                    },
+                    "end_exclusive": {
+                      "description": "All certificates must expire before this date.",
+                      "type": "string",
+                      "format": "date-time",
+                      "examples": [
+                        "2019-01-01T00:00:00Z"
+                      ]
+                    }
+                  }
+                },
+                "log_type": {
+                  "description": "The purpose of this log, e.g. test.",
+                  "type": "string",
+                  "enum": [
+                    "prod",
+                    "test"
+                  ]
+                },
+                "state": {
+                  "title": "The state of the log from the log list distributor's perspective.",
+                  "type": "object",
+                  "properties": {
+                    "pending": {
+                      "$ref": "#/definitions/state"
+                    },
+                    "qualified": {
+                      "$ref": "#/definitions/state"
+                    },
+                    "usable": {
+                      "$ref": "#/definitions/state"
+                    },
+                    "readonly": {
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/state"
+                        },
+                        {
+                          "required": [
+                            "final_tree_head"
+                          ],
+                          "properties": {
+                            "final_tree_head": {
+                              "description": "The tree head (tree size and root hash) at which the log was made read-only.",
+                              "type": "object",
+                              "required": [
+                                "tree_size",
+                                "sha256_root_hash"
+                              ],
+                              "properties": {
+                                "tree_size": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "sha256_root_hash": {
+                                  "type": "string",
+                                  "minLength": 44,
+                                  "maxLength": 44
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "retired": {
+                      "$ref": "#/definitions/state"
+                    },
+                    "rejected": {
+                      "$ref": "#/definitions/state"
+                    }
+                  },
+                  "oneOf": [
+                    {
+                      "required": [
+                        "pending"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "qualified"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "usable"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "readonly"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "retired"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "rejected"
+                      ]
+                    }
+                  ]
+                },
+                "previous_operators": {
+                  "title": "Previous operators that ran this log in the past, if any.",
+                  "description": "If the log has changed operators, this will contain a list of the previous operators, along with the timestamp when they stopped operating the log.",
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "end_time"
+                    ],
+                    "properties": {
+                      "name": {
+                        "title": "Name of the log operator",
+                        "type": "string"
+                      },
+                       "end_time": {
+                        "description": "The time at which this operator stopped operating this log.",
+                        "type": "string",
+                        "format": "date-time",
+                        "examples": [
+                          "2018-01-01T00:00:00Z"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -43,7 +43,7 @@ func NewCmdUpdateBranch(f *cmdutil.Factory, runF func(*UpdateBranchOptions) erro
 			Without an argument, the pull request that belongs to the current branch is selected.
 
 			The default behavior is to update with a merge commit (i.e., merging the base branch
-			into the the PR's branch). To reconcile the changes with rebasing on top of the base
+			into the PR's branch). To reconcile the changes with rebasing on top of the base
 			branch, the %[1]s--rebase%[1]s option should be provided.
 		`, "`"),
 		Example: heredoc.Doc(`

@@ -53,7 +53,15 @@ var tasks = map[string]func(string) error{
 			ldflags = fmt.Sprintf("-X github.com/cli/cli/v2/internal/authflow.oauthClientID=%s %s", os.Getenv("GH_OAUTH_CLIENT_ID"), ldflags)
 		}
 
-		return run("go", "build", "-trimpath", "-ldflags", ldflags, "-o", exe, "./cmd/gh")
+		buildTags, _ := os.LookupEnv("GO_BUILDTAGS")
+
+		args := []string{"go", "build", "-trimpath"}
+		if buildTags != "" {
+			args = append(args, "-tags", buildTags)
+		}
+		args = append(args, "-ldflags", ldflags, "-o", exe, "./cmd/gh")
+
+		return run(args...)
 	},
 	"manpages": func(_ string) error {
 		return run("go", "run", "./cmd/gen-docs", "--man-page", "--doc-path", "./share/man/man1/")

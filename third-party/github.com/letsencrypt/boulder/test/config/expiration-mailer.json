@@ -1,0 +1,41 @@
+{
+	"mailer": {
+		"server": "localhost",
+		"port": "9380",
+		"username": "cert-manager@example.com",
+		"from": "Expiry bot <expiration-mailer@test.org>",
+		"passwordFile": "test/secrets/smtp_password",
+		"db": {
+			"dbConnectFile": "test/secrets/mailer_dburl",
+			"maxOpenConns": 10
+		},
+		"certLimit": 100000,
+		"nagTimes": [
+			"480h",
+			"240h"
+		],
+		"emailTemplate": "test/config/expiration-mailer.gotmpl",
+		"debugAddr": ":8008",
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/expiration-mailer.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/expiration-mailer.boulder/key.pem"
+		},
+		"saService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "sa",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "sa.boulder"
+		},
+		"SMTPTrustedRootFile": "test/certs/ipki/minica.pem",
+		"frequency": "1h"
+	},
+	"syslog": {
+		"stdoutlevel": 6,
+		"sysloglevel": 6
+	}
+}

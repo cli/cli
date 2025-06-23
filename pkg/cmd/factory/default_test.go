@@ -432,6 +432,230 @@ func Test_ioStreams_prompt(t *testing.T) {
 	}
 }
 
+func Test_ioStreams_spinnerDisabled(t *testing.T) {
+	tests := []struct {
+		name            string
+		config          gh.Config
+		spinnerDisabled bool
+		env             map[string]string
+	}{
+		{
+			name:            "default config",
+			spinnerDisabled: false,
+		},
+		{
+			name:            "config with spinner disabled",
+			config:          disableSpinnersConfig(),
+			spinnerDisabled: true,
+		},
+		{
+			name:            "config with spinner enabled",
+			config:          enableSpinnersConfig(),
+			spinnerDisabled: false,
+		},
+		{
+			name:            "spinner disabled via GH_SPINNER_DISABLED env var = 0",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "0"},
+			spinnerDisabled: false,
+		},
+		{
+			name:            "spinner disabled via GH_SPINNER_DISABLED env var = false",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "false"},
+			spinnerDisabled: false,
+		},
+		{
+			name:            "spinner disabled via GH_SPINNER_DISABLED env var = no",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "no"},
+			spinnerDisabled: false,
+		},
+		{
+			name:            "spinner enabled via GH_SPINNER_DISABLED env var = 1",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "1"},
+			spinnerDisabled: true,
+		},
+		{
+			name:            "spinner enabled via GH_SPINNER_DISABLED env var = true",
+			env:             map[string]string{"GH_SPINNER_DISABLED": "true"},
+			spinnerDisabled: true,
+		},
+		{
+			name:            "config enabled but env disabled, respects env",
+			config:          enableSpinnersConfig(),
+			env:             map[string]string{"GH_SPINNER_DISABLED": "true"},
+			spinnerDisabled: true,
+		},
+		{
+			name:            "config disabled but env enabled, respects env",
+			config:          disableSpinnersConfig(),
+			env:             map[string]string{"GH_SPINNER_DISABLED": "false"},
+			spinnerDisabled: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			f := New("1")
+			f.Config = func() (gh.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
+			io := ioStreams(f)
+			assert.Equal(t, tt.spinnerDisabled, io.GetSpinnerDisabled())
+		})
+	}
+}
+
+func Test_ioStreams_accessiblePrompterEnabled(t *testing.T) {
+	tests := []struct {
+		name                      string
+		config                    gh.Config
+		accessiblePrompterEnabled bool
+		env                       map[string]string
+	}{
+		{
+			name:                      "default config",
+			accessiblePrompterEnabled: false,
+		},
+		{
+			name:                      "config with accessible prompter enabled",
+			config:                    enableAccessiblePrompterConfig(),
+			accessiblePrompterEnabled: true,
+		},
+		{
+			name:                      "config with accessible prompter disabled",
+			config:                    disableAccessiblePrompterConfig(),
+			accessiblePrompterEnabled: false,
+		},
+		{
+			name:                      "accessible prompter enabled via GH_ACCESSIBLE_PROMPTER env var = 1",
+			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "1"},
+			accessiblePrompterEnabled: true,
+		},
+		{
+			name:                      "accessible prompter enabled via GH_ACCESSIBLE_PROMPTER env var = true",
+			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "true"},
+			accessiblePrompterEnabled: true,
+		},
+		{
+			name:                      "accessible prompter disabled via GH_ACCESSIBLE_PROMPTER env var = 0",
+			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "0"},
+			accessiblePrompterEnabled: false,
+		},
+		{
+			name:                      "config disabled but env enabled, respects env",
+			config:                    disableAccessiblePrompterConfig(),
+			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "true"},
+			accessiblePrompterEnabled: true,
+		},
+		{
+			name:                      "config enabled but env disabled, respects env",
+			config:                    enableAccessiblePrompterConfig(),
+			env:                       map[string]string{"GH_ACCESSIBLE_PROMPTER": "false"},
+			accessiblePrompterEnabled: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			f := New("1")
+			f.Config = func() (gh.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
+			io := ioStreams(f)
+			assert.Equal(t, tt.accessiblePrompterEnabled, io.AccessiblePrompterEnabled())
+		})
+	}
+}
+
+func Test_ioStreams_colorLabels(t *testing.T) {
+	tests := []struct {
+		name               string
+		config             gh.Config
+		colorLabelsEnabled bool
+		env                map[string]string
+	}{
+		{
+			name:               "default config",
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "config with colorLabels enabled",
+			config:             enableColorLabelsConfig(),
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "config with colorLabels disabled",
+			config:             disableColorLabelsConfig(),
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels enabled via `1` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "1"},
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "colorLabels enabled via `true` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "true"},
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "colorLabels enabled via `yes` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "yes"},
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "colorLabels disable via empty string in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": ""},
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels disabled via `0` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "0"},
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels disabled via `false` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "false"},
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels disabled via `no` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "no"},
+			colorLabelsEnabled: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					t.Setenv(k, v)
+				}
+			}
+			f := New("1")
+			f.Config = func() (gh.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
+			io := ioStreams(f)
+			assert.Equal(t, tt.colorLabelsEnabled, io.ColorLabels())
+		})
+	}
+}
+
 func TestSSOURL(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -536,4 +760,28 @@ func pagerConfig() gh.Config {
 
 func disablePromptConfig() gh.Config {
 	return config.NewFromString("prompt: disabled")
+}
+
+func enableAccessiblePrompterConfig() gh.Config {
+	return config.NewFromString("accessible_prompter: enabled")
+}
+
+func disableAccessiblePrompterConfig() gh.Config {
+	return config.NewFromString("accessible_prompter: disabled")
+}
+
+func disableSpinnersConfig() gh.Config {
+	return config.NewFromString("spinner: disabled")
+}
+
+func enableSpinnersConfig() gh.Config {
+	return config.NewFromString("spinner: enabled")
+}
+
+func disableColorLabelsConfig() gh.Config {
+	return config.NewFromString("color_labels: disabled")
+}
+
+func enableColorLabelsConfig() gh.Config {
+	return config.NewFromString("color_labels: enabled")
 }

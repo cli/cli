@@ -48,13 +48,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "create [<filename>... | -]",
+		Use:   "create [<filename>... | <pattern>... | -]",
 		Short: "Create a new gist",
 		Long: heredoc.Docf(`
 			Create a new GitHub gist with given contents.
 
 			Gists can be created from one or multiple files. Alternatively, pass %[1]s-%[1]s as
-			file name to read from standard input.
+			filename to read from standard input.
 
 			By default, gists are secret; use %[1]s--public%[1]s to make publicly listed ones.
 		`, "`"),
@@ -67,6 +67,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			# Create a gist containing several files
 			$ gh gist create hello.py world.py cool.txt
+
+			# Create a gist containing several files using patterns
+			$ gh gist create *.md *.txt artifact.*
 
 			# Read from standard input to create a gist
 			$ gh gist create -
@@ -102,12 +105,23 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	fileArgs := opts.Filenames
-	if len(fileArgs) == 0 {
-		fileArgs = []string{"-"}
+
+	readFromStdInArg, filenames := cmdutil.Partition(opts.Filenames, func(f string) bool {
+		return f == "-"
+	})
+
+	filenames, err := cmdutil.GlobPaths(filenames)
+	if err != nil {
+		return err
 	}
 
-	files, err := processFiles(opts.IO.In, opts.FilenameOverride, fileArgs)
+	filenames = append(filenames, readFromStdInArg...)
+
+	if len(filenames) == 0 {
+		filenames = []string{"-"}
+	}
+
+	files, err := processFiles(opts.IO.In, opts.FilenameOverride, filenames)
 	if err != nil {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
@@ -124,7 +138,7 @@ func createRun(opts *CreateOptions) error {
 			processMessage = fmt.Sprintf("Creating gist %s", gistName)
 		}
 	}
-	fmt.Fprintf(errOut, "%s %s\n", cs.Gray("-"), processMessage)
+	fmt.Fprintf(errOut, "%s %s\n", cs.Muted("-"), processMessage)
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {

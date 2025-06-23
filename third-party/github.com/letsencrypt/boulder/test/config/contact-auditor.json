@@ -1,0 +1,8 @@
+{
+	"contactAuditor": {
+		"db": {
+			"dbConnectFile": "test/secrets/mailer_dburl",
+			"maxOpenConns": 10
+		}
+	}
+}

@@ -1,0 +1,18 @@
+[e_pkilint_lint_cabf_serverauth_cert]
+pkilint_addr = "http://10.77.77.9"
+pkilint_timeout = 200000000 # 200 milliseconds
+ignore_lints = [
+  # We include the CN in (almost) all of our certificates, on purpose.
+  # See https://github.com/letsencrypt/boulder/issues/5112 for details.
+  "DvSubcriberAttributeAllowanceValidator:cabf.serverauth.dv.common_name_attribute_present",
+  # We include the SKID in all of our certs, on purpose.
+  # See https://github.com/letsencrypt/boulder/issues/7446 for details.
+  "SubscriberExtensionAllowanceValidator:cabf.serverauth.subscriber.subject_key_identifier_extension_present",
+  # We compute the skid using RFC7093 Method 1, on purpose.
+  # See https://github.com/letsencrypt/boulder/pull/7179 for details.
+  "SubjectKeyIdentifierValidator:pkix.subject_key_identifier_rfc7093_method_1_identified",
+  # We include the keyEncipherment key usage in RSA certs, on purpose.
+  # It is only necessary for old versions of TLS, and is included for backwards
+  # compatibility. We intend to remove this in the short-lived profile.
+  "SubscriberKeyUsageValidator:cabf.serverauth.subscriber_rsa_digitalsignature_and_keyencipherment_present",
+]

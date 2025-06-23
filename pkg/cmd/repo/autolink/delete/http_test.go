@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,10 +15,10 @@ func TestAutolinkDeleter_Delete(t *testing.T) {
 	repo := ghrepo.New("OWNER", "REPO")
 
 	tests := []struct {
-		name         string
-		id           string
-		stubStatus   int
-		stubRespJSON string
+		name       string
+		id         string
+		stubStatus int
+		stubResp   any
 
 		expectErr      bool
 		expectedErrMsg string
@@ -31,17 +32,18 @@ func TestAutolinkDeleter_Delete(t *testing.T) {
 			name:           "404 repo or autolink not found",
 			id:             "123",
 			stubStatus:     http.StatusNotFound,
-			stubRespJSON:   `{}`, // API response not used in output
 			expectErr:      true,
 			expectedErrMsg: "error deleting autolink: HTTP 404: Perhaps you are missing admin rights to the repository? (https://api.github.com/repos/OWNER/REPO/autolinks/123)",
 		},
 		{
-			name:           "500 unexpected error",
-			id:             "123",
-			stubRespJSON:   `{"messsage": "arbitrary error"}`,
+			name: "500 unexpected error",
+			id:   "123",
+			stubResp: api.HTTPError{
+				Message: "arbitrary error",
+			},
 			stubStatus:     http.StatusInternalServerError,
 			expectErr:      true,
-			expectedErrMsg: "HTTP 500 (https://api.github.com/repos/OWNER/REPO/autolinks/123)",
+			expectedErrMsg: "HTTP 500: arbitrary error (https://api.github.com/repos/OWNER/REPO/autolinks/123)",
 		},
 	}
 
@@ -53,7 +55,7 @@ func TestAutolinkDeleter_Delete(t *testing.T) {
 					http.MethodDelete,
 					fmt.Sprintf("repos/%s/%s/autolinks/%s", repo.RepoOwner(), repo.RepoName(), tt.id),
 				),
-				httpmock.StatusJSONResponse(tt.stubStatus, tt.stubRespJSON),
+				httpmock.StatusJSONResponse(tt.stubStatus, tt.stubResp),
 			)
 			defer reg.Verify(t)
 

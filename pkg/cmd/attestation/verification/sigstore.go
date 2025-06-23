@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
@@ -33,6 +34,7 @@ type SigstoreConfig struct {
 	TrustedRoot  string
 	Logger       *io.Handler
 	NoPublicGood bool
+	HttpClient   *http.Client
 	// If tenancy mode is not used, trust domain is empty
 	TrustDomain string
 	// TUFMetadataDir
@@ -44,12 +46,11 @@ type SigstoreVerifier interface {
 }
 
 type LiveSigstoreVerifier struct {
-	TrustedRoot  string
 	Logger       *io.Handler
 	NoPublicGood bool
-	// If tenancy mode is not used, trust domain is empty
-	TrustDomain    string
-	TUFMetadataDir o.Option[string]
+	PublicGood   *verify.Verifier
+	GitHub       *verify.Verifier
+	Custom       map[string]*verify.Verifier
 }
 
 var ErrNoAttestationsVerified = errors.New("no attestations were verified")
@@ -57,56 +58,43 @@ var ErrNoAttestationsVerified = errors.New("no attestations were verified")
 // NewLiveSigstoreVerifier creates a new LiveSigstoreVerifier struct
 // that is used to verify artifacts and attestations against the
 // Public Good, GitHub, or a custom trusted root.
-func NewLiveSigstoreVerifier(config SigstoreConfig) *LiveSigstoreVerifier {
-	return &LiveSigstoreVerifier{
-		TrustedRoot:    config.TrustedRoot,
-		Logger:         config.Logger,
-		NoPublicGood:   config.NoPublicGood,
-		TrustDomain:    config.TrustDomain,
-		TUFMetadataDir: config.TUFMetadataDir,
+func NewLiveSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, error) {
+	liveVerifier := &LiveSigstoreVerifier{
+		Logger:       config.Logger,
+		NoPublicGood: config.NoPublicGood,
 	}
-}
-
-func getBundleIssuer(b *bundle.Bundle) (string, error) {
-	if !b.MinVersion("0.2") {
-		return "", fmt.Errorf("unsupported bundle version: %s", b.MediaType)
-	}
-	verifyContent, err := b.VerificationContent()
-	if err != nil {
-		return "", fmt.Errorf("failed to get bundle verification content: %v", err)
-	}
-	leafCert := verifyContent.Certificate()
-	if leafCert == nil {
-		return "", fmt.Errorf("leaf cert not found")
-	}
-	if len(leafCert.Issuer.Organization) != 1 {
-		return "", fmt.Errorf("expected the leaf certificate issuer to only have one organization")
-	}
-	return leafCert.Issuer.Organization[0], nil
-}
-
-func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEntityVerifier, error) {
-	// if no custom trusted root is set, attempt to create a Public Good or
-	// GitHub Sigstore verifier
-	if v.TrustedRoot == "" {
-		switch issuer {
-		case PublicGoodIssuerOrg:
-			if v.NoPublicGood {
-				return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
-			}
-			return newPublicGoodVerifier(v.TUFMetadataDir)
-		case GitHubIssuerOrg:
-			return newGitHubVerifier(v.TrustDomain, v.TUFMetadataDir)
-		default:
-			return nil, fmt.Errorf("leaf certificate issuer is not recognized")
+	// if a custom trusted root is set, configure custom verifiers
+	if config.TrustedRoot != "" {
+		customVerifiers, err := createCustomVerifiers(config.TrustedRoot, config.NoPublicGood)
+		if err != nil {
+			return nil, err
 		}
+		liveVerifier.Custom = customVerifiers
+		return liveVerifier, nil
 	}
-
-	customTrustRoots, err := os.ReadFile(v.TrustedRoot)
+	if !config.NoPublicGood {
+		publicGoodVerifier, err := newPublicGoodVerifier(config.TUFMetadataDir, config.HttpClient)
+		if err != nil {
+			return nil, err
+		}
+		liveVerifier.PublicGood = publicGoodVerifier
+	}
+	github, err := newGitHubVerifier(config.TrustDomain, config.TUFMetadataDir, config.HttpClient)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read file %s: %v", v.TrustedRoot, err)
+		return nil, err
+	}
+	liveVerifier.GitHub = github
+
+	return liveVerifier, nil
+}
+
+func createCustomVerifiers(trustedRoot string, noPublicGood bool) (map[string]*verify.Verifier, error) {
+	customTrustRoots, err := os.ReadFile(trustedRoot)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read file %s: %v", trustedRoot, err)
 	}
 
+	verifiers := make(map[string]*verify.Verifier)
 	reader := bufio.NewReader(bytes.NewReader(customTrustRoots))
 	var line []byte
 	var readError error
@@ -130,10 +118,11 @@ func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEnti
 				return nil, err
 			}
 
-			// if the custom trusted root issuer is not set or doesn't match the given issuer, skip it
-			if len(lowestCert.Issuer.Organization) == 0 || lowestCert.Issuer.Organization[0] != issuer {
+			// if the custom trusted root issuer is not set, skip it
+			if len(lowestCert.Issuer.Organization) == 0 {
 				continue
 			}
+			issuer := lowestCert.Issuer.Organization[0]
 
 			// Determine what policy to use with this trusted root.
 			//
@@ -141,21 +130,88 @@ func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEnti
 			// issuer. We *must* use the trusted root provided.
 			switch issuer {
 			case PublicGoodIssuerOrg:
-				if v.NoPublicGood {
+				if noPublicGood {
 					return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
 				}
-				return newPublicGoodVerifierWithTrustedRoot(trustedRoot)
+				if _, ok := verifiers[PublicGoodIssuerOrg]; ok {
+					// we have already created a public good verifier with this custom trusted root
+					// so we skip it
+					continue
+				}
+				publicGood, err := newPublicGoodVerifierWithTrustedRoot(trustedRoot)
+				if err != nil {
+					return nil, err
+				}
+				verifiers[PublicGoodIssuerOrg] = publicGood
 			case GitHubIssuerOrg:
-				return newGitHubVerifierWithTrustedRoot(trustedRoot)
+				if _, ok := verifiers[GitHubIssuerOrg]; ok {
+					// we have already created a github verifier with this custom trusted root
+					// so we skip it
+					continue
+				}
+				github, err := newGitHubVerifierWithTrustedRoot(trustedRoot)
+				if err != nil {
+					return nil, err
+				}
+				verifiers[GitHubIssuerOrg] = github
 			default:
+				if _, ok := verifiers[issuer]; ok {
+					// we have already created a custom verifier with this custom trusted root
+					// so we skip it
+					continue
+				}
 				// Make best guess at reasonable policy
-				return newCustomVerifier(trustedRoot)
+				custom, err := newCustomVerifier(trustedRoot)
+				if err != nil {
+					return nil, err
+				}
+				verifiers[issuer] = custom
 			}
 		}
 		line, readError = reader.ReadBytes('\n')
 	}
+	return verifiers, nil
+}
 
-	return nil, fmt.Errorf("unable to use provided trusted roots")
+func getBundleIssuer(b *bundle.Bundle) (string, error) {
+	if !b.MinVersion("0.2") {
+		return "", fmt.Errorf("unsupported bundle version: %s", b.MediaType)
+	}
+	verifyContent, err := b.VerificationContent()
+	if err != nil {
+		return "", fmt.Errorf("failed to get bundle verification content: %v", err)
+	}
+	leafCert := verifyContent.Certificate()
+	if leafCert == nil {
+		return "", fmt.Errorf("leaf cert not found")
+	}
+	if len(leafCert.Issuer.Organization) != 1 {
+		return "", fmt.Errorf("expected the leaf certificate issuer to only have one organization")
+	}
+	return leafCert.Issuer.Organization[0], nil
+}
+
+func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.Verifier, error) {
+	// if no custom trusted root is set, return either the Public Good or GitHub verifier
+	// If the chosen verifier has not yet been created, create it as a LiveSigstoreVerifier field for use in future calls
+	if v.Custom != nil {
+		custom, ok := v.Custom[issuer]
+		if !ok {
+			return nil, fmt.Errorf("no custom verifier found for issuer \"%s\"", issuer)
+		}
+		return custom, nil
+	}
+	switch issuer {
+	case PublicGoodIssuerOrg:
+		if v.NoPublicGood {
+			return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
+		}
+		return v.PublicGood, nil
+	case GitHubIssuerOrg:
+		return v.GitHub, nil
+	default:
+		return nil, fmt.Errorf("leaf certificate issuer is not recognized")
+	}
 }
 
 func getLowestCertInChain(ca *root.FulcioCertificateAuthority) (*x509.Certificate, error) {
@@ -177,7 +233,7 @@ func (v *LiveSigstoreVerifier) verify(attestation *api.Attestation, policy verif
 	// determine which verifier should attempt verification against the bundle
 	verifier, err := v.chooseVerifier(issuer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find recognized issuer from bundle content: %v", err)
+		return nil, fmt.Errorf("failed to choose verifier based on provided bundle issuer: %v", err)
 	}
 
 	v.Logger.VerbosePrintf("Attempting verification against issuer \"%s\"\n", issuer)
@@ -237,7 +293,7 @@ func (v *LiveSigstoreVerifier) Verify(attestations []*api.Attestation, policy ve
 	return results, nil
 }
 
-func newCustomVerifier(trustedRoot *root.TrustedRoot) (*verify.SignedEntityVerifier, error) {
+func newCustomVerifier(trustedRoot *root.TrustedRoot) (*verify.Verifier, error) {
 	// All we know about this trust root is its configuration so make some
 	// educated guesses as to what the policy should be.
 	verifierConfig := []verify.VerifierOption{}
@@ -252,7 +308,7 @@ func newCustomVerifier(trustedRoot *root.TrustedRoot) (*verify.SignedEntityVerif
 		verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1))
 	}
 
-	gv, err := verify.NewSignedEntityVerifier(trustedRoot, verifierConfig...)
+	gv, err := verify.NewVerifier(trustedRoot, verifierConfig...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create custom verifier: %v", err)
 	}
@@ -260,10 +316,10 @@ func newCustomVerifier(trustedRoot *root.TrustedRoot) (*verify.SignedEntityVerif
 	return gv, nil
 }
 
-func newGitHubVerifier(trustDomain string, tufMetadataDir o.Option[string]) (*verify.SignedEntityVerifier, error) {
+func newGitHubVerifier(trustDomain string, tufMetadataDir o.Option[string], hc *http.Client) (*verify.Verifier, error) {
 	var tr string
 
-	opts := GitHubTUFOptions(tufMetadataDir)
+	opts := GitHubTUFOptions(tufMetadataDir, hc)
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client: %v", err)
@@ -285,8 +341,8 @@ func newGitHubVerifier(trustDomain string, tufMetadataDir o.Option[string]) (*ve
 	return newGitHubVerifierWithTrustedRoot(trustedRoot)
 }
 
-func newGitHubVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verify.SignedEntityVerifier, error) {
-	gv, err := verify.NewSignedEntityVerifier(trustedRoot, verify.WithSignedTimestamps(1))
+func newGitHubVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verify.Verifier, error) {
+	gv, err := verify.NewVerifier(trustedRoot, verify.WithSignedTimestamps(1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GitHub verifier: %v", err)
 	}
@@ -294,8 +350,8 @@ func newGitHubVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verify.Si
 	return gv, nil
 }
 
-func newPublicGoodVerifier(tufMetadataDir o.Option[string]) (*verify.SignedEntityVerifier, error) {
-	opts := DefaultOptionsWithCacheSetting(tufMetadataDir)
+func newPublicGoodVerifier(tufMetadataDir o.Option[string], hc *http.Client) (*verify.Verifier, error) {
+	opts := DefaultOptionsWithCacheSetting(tufMetadataDir, hc)
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client: %v", err)
@@ -308,8 +364,8 @@ func newPublicGoodVerifier(tufMetadataDir o.Option[string]) (*verify.SignedEntit
 	return newPublicGoodVerifierWithTrustedRoot(trustedRoot)
 }
 
-func newPublicGoodVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verify.SignedEntityVerifier, error) {
-	sv, err := verify.NewSignedEntityVerifier(trustedRoot, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+func newPublicGoodVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verify.Verifier, error) {
+	sv, err := verify.NewVerifier(trustedRoot, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Public Good verifier: %v", err)
 	}

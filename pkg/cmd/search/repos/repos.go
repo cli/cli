@@ -171,14 +171,14 @@ func displayResults(io *iostreams.IOStreams, now time.Time, results search.Repos
 			tags = append(tags, "archived")
 		}
 		info := strings.Join(tags, ", ")
-		infoColor := cs.Gray
+		infoColor := cs.Muted
 		if repo.IsPrivate {
 			infoColor = cs.Yellow
 		}
 		tp.AddField(repo.FullName, tableprinter.WithColor(cs.Bold))
 		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description))
 		tp.AddField(info, tableprinter.WithColor(infoColor))
-		tp.AddTimeField(now, repo.UpdatedAt, cs.Gray)
+		tp.AddTimeField(now, repo.UpdatedAt, cs.Muted)
 		tp.EndRow()
 	}
 	if io.IsStdoutTTY() {

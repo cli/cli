@@ -32,6 +32,7 @@ func TestNewConfigProvidesFallback(t *testing.T) {
 	requireKeyWithValue(t, spiedCfg, []string{aliasesKey, "co"}, "pr checkout")
 	requireKeyWithValue(t, spiedCfg, []string{httpUnixSocketKey}, "")
 	requireKeyWithValue(t, spiedCfg, []string{browserKey}, "")
+	requireKeyWithValue(t, spiedCfg, []string{colorLabelsKey}, "disabled")
 }
 
 func TestGetOrDefaultApplicationDefaults(t *testing.T) {
@@ -137,6 +138,7 @@ func TestFallbackConfig(t *testing.T) {
 	requireKeyWithValue(t, cfg, []string{aliasesKey, "co"}, "pr checkout")
 	requireKeyWithValue(t, cfg, []string{httpUnixSocketKey}, "")
 	requireKeyWithValue(t, cfg, []string{browserKey}, "")
+	requireKeyWithValue(t, cfg, []string{colorLabelsKey}, "disabled")
 	requireNoKey(t, cfg, []string{"unknown"})
 }
 

@@ -84,15 +84,28 @@ type PullRequest struct {
 	}
 
 	Assignees      Assignees
-	Labels         Labels
-	ProjectCards   ProjectCards
-	ProjectItems   ProjectItems
-	Milestone      *Milestone
-	Comments       Comments
-	ReactionGroups ReactionGroups
-	Reviews        PullRequestReviews
-	LatestReviews  PullRequestReviews
-	ReviewRequests ReviewRequests
+	AssignedActors AssignedActors
+	// AssignedActorsUsed is a GIGANTIC hack to carry around whether we expected AssignedActors to be requested
+	// on this PR. This is required because the Feature Detection of support for AssignedActors occurs inside the
+	// PR Finder, but knowledge of support is required at the command level. However, we can't easily construct
+	// the feature detector at the command level because it needs knowledge of the BaseRepo, which is only available
+	// inside the PR Finder. This is bad and we should feel bad.
+	//
+	// The right solution is to extract argument parsing from the PR Finder into each command, so that we have access
+	// to the BaseRepo and can construct the feature detector there. This is what happens in the issue commands with
+	// `shared.ParseIssueFromArg`.
+	AssignedActorsUsed bool
+	Labels             Labels
+	ProjectCards       ProjectCards
+	ProjectItems       ProjectItems
+	Milestone          *Milestone
+	Comments           Comments
+	ReactionGroups     ReactionGroups
+	Reviews            PullRequestReviews
+	LatestReviews      PullRequestReviews
+	ReviewRequests     ReviewRequests
+
+	ClosingIssuesReferences ClosingIssuesReferences
 }
 
 type StatusCheckRollupNode struct {
@@ -105,6 +118,26 @@ type StatusCheckRollupCommit struct {
 
 type CommitStatusCheckRollup struct {
 	Contexts CheckContexts
+}
+
+type ClosingIssuesReferences struct {
+	Nodes []struct {
+		ID         string
+		Number     int
+		URL        string
+		Repository struct {
+			ID    string
+			Name  string
+			Owner struct {
+				ID    string
+				Login string
+			}
+		}
+	}
+	PageInfo struct {
+		HasNextPage bool
+		EndCursor   string
+	}
 }
 
 // https://docs.github.com/en/graphql/reference/enums#checkrunstate

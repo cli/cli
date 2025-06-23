@@ -18,6 +18,10 @@ func TestRunWithCommit(id int64, s Status, c Conclusion, commit string) Run {
 	return TestRunWithWorkflowAndCommit(123, id, s, c, commit)
 }
 
+func TestRunWithOrgRequiredWorkflow(id int64, s Status, c Conclusion, commit string) Run {
+	return TestRunWithWorkflowAndCommit(456, id, s, c, commit)
+}
+
 func TestRunWithWorkflowAndCommit(workflowId, runId int64, s Status, c Conclusion, commit string) Run {
 	return Run{
 		WorkflowID: workflowId,
@@ -57,6 +61,18 @@ var TestRuns []Run = []Run{
 	TestRun(10, Completed, Stale),
 }
 
+var TestRunsWithOrgRequiredWorkflows []Run = []Run{
+	TestRunWithOrgRequiredWorkflow(1, Completed, TimedOut, "cool commit"),
+	TestRunWithOrgRequiredWorkflow(2, InProgress, "", "cool commit"),
+	TestRunWithOrgRequiredWorkflow(3, Completed, Success, "cool commit"),
+	TestRunWithOrgRequiredWorkflow(4, Completed, Cancelled, "cool commit"),
+	TestRun(5, Completed, Failure),
+	TestRun(6, Completed, Neutral),
+	TestRun(7, Completed, Skipped),
+	TestRun(8, Requested, ""),
+	TestRun(9, Queued, ""),
+}
+
 var WorkflowRuns []Run = []Run{
 	TestRun(2, InProgress, ""),
 	SuccessfulRun,
@@ -88,6 +104,60 @@ var SuccessfulJob Job = Job{
 	},
 }
 
+// Note that this run *has* steps, but in the ZIP archive the step logs are not
+// included.
+var SuccessfulJobWithoutStepLogs Job = Job{
+	ID:          11,
+	Status:      Completed,
+	Conclusion:  Success,
+	Name:        "cool job with no step logs",
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+	URL:         "https://github.com/jobs/11",
+	RunID:       3,
+	Steps: []Step{
+		{
+			Name:       "fob the barz",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     1,
+		},
+		{
+			Name:       "barz the fob",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     2,
+		},
+	},
+}
+
+// Note that this run *has* steps, but in the ZIP archive the step logs are not
+// included.
+var LegacySuccessfulJobWithoutStepLogs Job = Job{
+	ID:          12,
+	Status:      Completed,
+	Conclusion:  Success,
+	Name:        "legacy cool job with no step logs",
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+	URL:         "https://github.com/jobs/12",
+	RunID:       3,
+	Steps: []Step{
+		{
+			Name:       "fob the barz",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     1,
+		},
+		{
+			Name:       "barz the fob",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     2,
+		},
+	},
+}
+
 var FailedJob Job = Job{
 	ID:          20,
 	Status:      Completed,
@@ -96,6 +166,60 @@ var FailedJob Job = Job{
 	StartedAt:   TestRunStartTime,
 	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 	URL:         "https://github.com/jobs/20",
+	RunID:       1234,
+	Steps: []Step{
+		{
+			Name:       "barf the quux",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     1,
+		},
+		{
+			Name:       "quux the barf",
+			Status:     Completed,
+			Conclusion: Failure,
+			Number:     2,
+		},
+	},
+}
+
+// Note that this run *has* steps, but in the ZIP archive the step logs are not
+// included.
+var FailedJobWithoutStepLogs Job = Job{
+	ID:          21,
+	Status:      Completed,
+	Conclusion:  Failure,
+	Name:        "sad job with no step logs",
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+	URL:         "https://github.com/jobs/21",
+	RunID:       1234,
+	Steps: []Step{
+		{
+			Name:       "barf the quux",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     1,
+		},
+		{
+			Name:       "quux the barf",
+			Status:     Completed,
+			Conclusion: Failure,
+			Number:     2,
+		},
+	},
+}
+
+// Note that this run *has* steps, but in the ZIP archive the step logs are not
+// included.
+var LegacyFailedJobWithoutStepLogs Job = Job{
+	ID:          22,
+	Status:      Completed,
+	Conclusion:  Failure,
+	Name:        "legacy sad job with no step logs",
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+	URL:         "https://github.com/jobs/22",
 	RunID:       1234,
 	Steps: []Step{
 		{

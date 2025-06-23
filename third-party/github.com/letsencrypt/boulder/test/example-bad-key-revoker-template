@@ -1,0 +1,8 @@
+Hello,
+
+The public key associated with certificates which you have issued has been marked as compromised. As such we are required to revoke any certificates which contain this public key.
+
+The following currently unexpired certificates that you've issued contain this public key and have been revoked:
+{{range . -}}
+{{.}}
+{{end}}

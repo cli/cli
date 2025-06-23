@@ -1,0 +1,55 @@
+{
+	"sa": {
+		"db": {
+			"dbConnectFile": "test/secrets/sa_dburl",
+			"maxOpenConns": 100
+		},
+		"readOnlyDB": {
+			"dbConnectFile": "test/secrets/sa_ro_dburl",
+			"maxOpenConns": 100
+		},
+		"ParallelismPerRPC": 20,
+		"debugAddr": ":8003",
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/sa.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/sa.boulder/key.pem"
+		},
+		"grpc": {
+			"maxConnectionAge": "30s",
+			"address": ":9095",
+			"services": {
+				"sa.StorageAuthority": {
+					"clientNames": [
+						"admin-revoker.boulder",
+						"ca.boulder",
+						"crl-updater.boulder",
+						"expiration-mailer.boulder",
+						"ocsp-responder.boulder",
+						"ra.boulder",
+						"wfe.boulder"
+					]
+				},
+				"sa.StorageAuthorityReadOnly": {
+					"clientNames": [
+						"admin-revoker.boulder",
+						"crl-updater.boulder",
+						"ocsp-responder.boulder",
+						"wfe.boulder"
+					]
+				},
+				"grpc.health.v1.Health": {
+					"clientNames": [
+						"health-checker.boulder",
+						"consul.boulder"
+					]
+				}
+			}
+		},
+		"features": {}
+	},
+	"syslog": {
+		"stdoutlevel": 6,
+		"sysloglevel": 6
+	}
+}

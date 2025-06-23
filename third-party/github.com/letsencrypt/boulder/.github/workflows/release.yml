@@ -1,0 +1,50 @@
+# Build the Boulder Debian package on every PR, push to main, and tag push. On
+# tag pushes, additionally create a GitHub release and with the resulting Debian
+# package.
+# Keep in sync with try-release.yml, with the exception that try-release.yml
+# can have multiple entries in its matrix but this should only have one.
+name: Build release
+on:
+  push:
+    tags:
+      - release-*
+
+jobs:
+  push-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        GO_VERSION:
+          - "1.22.3"
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build .deb
+        id: build
+        env:
+          GO_VERSION: ${{ matrix.GO_VERSION }}
+        run: ./tools/make-assets.sh
+
+      - name: Compute checksums
+        id: checksums
+        # The files listed on this line must be identical to the files uploaded
+        # in the last step.
+        run: sha256sum boulder*.deb boulder*.tar.gz >| checksums.txt
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # https://cli.github.com/manual/gh_release_create
+        run: gh release create "${GITHUB_REF_NAME}"
+        continue-on-error: true
+
+      - name: Upload release files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # https://cli.github.com/manual/gh_release_upload
+        run: gh release upload "${GITHUB_REF_NAME}" boulder*.deb boulder*.tar.gz checksums.txt

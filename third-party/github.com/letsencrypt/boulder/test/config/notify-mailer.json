@@ -1,0 +1,16 @@
+{
+	"notifyMailer": {
+		"server": "localhost",
+		"port": "9380",
+		"username": "cert-manager@example.com",
+		"passwordFile": "test/secrets/smtp_password",
+		"db": {
+			"dbConnectFile": "test/secrets/mailer_dburl",
+			"maxOpenConns": 10
+		}
+	},
+	"syslog": {
+		"stdoutLevel": 7,
+		"syslogLevel": 7
+	}
+}

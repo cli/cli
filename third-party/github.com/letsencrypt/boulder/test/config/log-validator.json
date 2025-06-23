@@ -1,0 +1,22 @@
+{
+	"syslog": {
+		"stdoutLevel": 7
+	},
+	"debugAddr": ":8016",
+	"files": [
+		"/var/log/akamai-purger.log",
+		"/var/log/bad-key-revoker.log",
+		"/var/log/boulder-ca.log",
+		"/var/log/boulder-observer.log",
+		"/var/log/boulder-publisher.log",
+		"/var/log/boulder-ra.log",
+		"/var/log/boulder-remoteva.log",
+		"/var/log/boulder-sa.log",
+		"/var/log/boulder-va.log",
+		"/var/log/boulder-wfe2.log",
+		"/var/log/crl-storer.log",
+		"/var/log/crl-updater.log",
+		"/var/log/nonce-service.log",
+		"/var/log/ocsp-responder.log"
+	]
+}

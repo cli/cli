@@ -44,6 +44,9 @@ func (g Gist) Filename() string {
 	for fn := range g.Files {
 		filenames = append(filenames, fn)
 	}
+	if len(filenames) == 0 {
+		return ""
+	}
 	sort.Strings(filenames)
 	return filenames[0]
 }
@@ -230,7 +233,7 @@ func PromptGists(prompter prompter.Prompter, client *http.Client, host string, c
 	for i, gist := range gists {
 		gistTime := text.FuzzyAgo(time.Now(), gist.UpdatedAt)
 		// TODO: support dynamic maxWidth
-		opts[i] = fmt.Sprintf("%s %s %s", cs.Bold(gist.Filename()), gist.TruncDescription(), cs.Gray(gistTime))
+		opts[i] = fmt.Sprintf("%s %s %s", cs.Bold(gist.Filename()), gist.TruncDescription(), cs.Muted(gistTime))
 	}
 
 	result, err := prompter.Select("Select a gist", "", opts)

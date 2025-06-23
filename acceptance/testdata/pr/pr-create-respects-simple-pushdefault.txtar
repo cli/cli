@@ -1,0 +1,34 @@
+# Setup environment variables used for testscript
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
+
+# Use gh as a credential helper
+exec gh auth setup-git
+
+# Create a repository with a file so it has a default branch
+exec gh repo create ${ORG}/${REPO} --add-readme --private
+
+# Defer repo cleanup of repo
+defer gh repo delete --yes ${ORG}/${REPO}
+exec gh repo view ${ORG}/${REPO} --json id --jq '.id'
+stdout2env REPO_ID
+
+# Clone the repo
+exec gh repo clone ${ORG}/${REPO}
+cd ${REPO}
+
+# Configure default push behavior so local and remote branches have to be the same
+exec git config push.default simple
+
+# Prepare a branch where changes are pulled from the default branch instead of remote branch of same name
+exec git checkout -b feature-branch
+exec git branch --set-upstream-to origin/main
+exec git commit --allow-empty -m 'Empty Commit'
+exec git push origin feature-branch
+
+# Create the PR
+exec gh pr create --title 'Feature Title' --body 'Feature Body'
+stdout https://${GH_HOST}/${ORG}/${REPO}/pull/1
+
+# Assert that the PR was created with the correct head repository and refs
+exec gh pr view --json headRefName,headRepository,baseRefName,isCrossRepository
+stdout {"baseRefName":"main","headRefName":"feature-branch","headRepository":{"id":"${REPO_ID}","name":"${REPO}"},"isCrossRepository":false}

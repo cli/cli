@@ -10,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -22,6 +23,9 @@ import (
 type ViewOptions struct {
 	IO      *iostreams.IOStreams
 	Browser browser.Browser
+	// TODO projectsV1Deprecation
+	// Remove this detector since it is only used for test validation.
+	Detector fd.Detector
 
 	Finder   shared.PRFinder
 	Exporter cmdutil.Exporter
@@ -89,6 +93,7 @@ func viewRun(opts *ViewOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
 		Fields:   defaultFields,
+		Detector: opts.Detector,
 	}
 	if opts.BrowserMode {
 		findOptions.Fields = []string{"url"}
@@ -260,7 +265,7 @@ func printHumanPrPreview(opts *ViewOptions, baseRepo ghrepo.Interface, pr *api.P
 	var md string
 	var err error
 	if pr.Body == "" {
-		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
+		md = fmt.Sprintf("\n  %s\n\n", cs.Muted("No description provided"))
 	} else {
 		md, err = markdown.Render(pr.Body,
 			markdown.WithTheme(opts.IO.TerminalTheme()),
@@ -282,7 +287,7 @@ func printHumanPrPreview(opts *ViewOptions, baseRepo ghrepo.Interface, pr *api.P
 	}
 
 	// Footer
-	fmt.Fprintf(out, cs.Gray("View this pull request on GitHub: %s\n"), pr.URL)
+	fmt.Fprintf(out, cs.Muted("View this pull request on GitHub: %s\n"), pr.URL)
 
 	return nil
 }
@@ -423,7 +428,7 @@ func prLabelList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 
 	labelNames := make([]string, 0, len(pr.Labels.Nodes))
 	for _, label := range pr.Labels.Nodes {
-		labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
+		labelNames = append(labelNames, cs.Label(label.Color, label.Name))
 	}
 
 	list := strings.Join(labelNames, ", ")

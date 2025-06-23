@@ -1,0 +1,33 @@
+#
+# Example YAML Boulder hostname policy
+#
+# This is *not* a production ready policy file and not reflective of Let's
+# Encrypt's policies! It is just an example.
+
+# ExactBlockedNames prevent issuance for the exact names listed, as well as
+# their wildcard form.
+ExactBlockedNames:
+  - "highrisk.le-test.hoffman-andrews.com"
+  - "exactblacklist.letsencrypt.org"
+
+# HighRiskBlockedNames prevent issuance for the exact names listed as well as
+# all subdomains/wildcards.
+HighRiskBlockedNames:
+  # See RFC 3152
+  - "ipv6.arpa"
+  # See RFC 2317
+  - "in-addr.arpa"
+  # Etc etc etc
+  - "example"
+  - "example.net"
+  - "example.org"
+  - "invalid"
+  - "local"
+  - "localhost"
+  - "test"
+
+# AdminBlockedNames are treated the same as HighRiskBlockedNames by Boulder but
+# since they change more frequently based on administrative action over time
+# they are separated into their own list.
+AdminBlockedNames:
+  - "sealand"

@@ -7,46 +7,32 @@ import (
 
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/issue/argparsetest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdClose(t *testing.T) {
+	// Test shared parsing of issue number / URL.
+	argparsetest.TestArgParsing(t, NewCmdClose)
+
 	tests := []struct {
-		name    string
-		input   string
-		output  CloseOptions
-		wantErr bool
-		errMsg  string
+		name             string
+		input            string
+		output           CloseOptions
+		expectedBaseRepo ghrepo.Interface
+		wantErr          bool
+		errMsg           string
 	}{
-		{
-			name:    "no argument",
-			input:   "",
-			wantErr: true,
-			errMsg:  "accepts 1 arg(s), received 0",
-		},
-		{
-			name:  "issue number",
-			input: "123",
-			output: CloseOptions{
-				SelectorArg: "123",
-			},
-		},
-		{
-			name:  "issue url",
-			input: "https://github.com/cli/cli/3",
-			output: CloseOptions{
-				SelectorArg: "https://github.com/cli/cli/3",
-			},
-		},
 		{
 			name:  "comment",
 			input: "123 --comment 'closing comment'",
 			output: CloseOptions{
-				SelectorArg: "123",
+				IssueNumber: 123,
 				Comment:     "closing comment",
 			},
 		},
@@ -54,7 +40,7 @@ func TestNewCmdClose(t *testing.T) {
 			name:  "reason",
 			input: "123 --reason 'not planned'",
 			output: CloseOptions{
-				SelectorArg: "123",
+				IssueNumber: 123,
 				Reason:      "not planned",
 			},
 		},
@@ -79,15 +65,24 @@ func TestNewCmdClose(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Equal(t, tt.errMsg, err.Error())
 				return
 			}
 
-			assert.NoError(t, err)
-			assert.Equal(t, tt.output.SelectorArg, gotOpts.SelectorArg)
+			require.NoError(t, err)
+			assert.Equal(t, tt.output.IssueNumber, gotOpts.IssueNumber)
 			assert.Equal(t, tt.output.Comment, gotOpts.Comment)
 			assert.Equal(t, tt.output.Reason, gotOpts.Reason)
+			if tt.expectedBaseRepo != nil {
+				baseRepo, err := gotOpts.BaseRepo()
+				require.NoError(t, err)
+				require.True(
+					t,
+					ghrepo.IsSame(tt.expectedBaseRepo, baseRepo),
+					"expected base repo %+v, got %+v", tt.expectedBaseRepo, baseRepo,
+				)
+			}
 		})
 	}
 }
@@ -104,7 +99,7 @@ func TestCloseRun(t *testing.T) {
 		{
 			name: "close issue by number",
 			opts: &CloseOptions{
-				SelectorArg: "13",
+				IssueNumber: 13,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -128,7 +123,7 @@ func TestCloseRun(t *testing.T) {
 		{
 			name: "close issue with comment",
 			opts: &CloseOptions{
-				SelectorArg: "13",
+				IssueNumber: 13,
 				Comment:     "closing comment",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -164,7 +159,7 @@ func TestCloseRun(t *testing.T) {
 		{
 			name: "close issue with reason",
 			opts: &CloseOptions{
-				SelectorArg: "13",
+				IssueNumber: 13,
 				Reason:      "not planned",
 				Detector:    &fd.EnabledDetectorMock{},
 			},
@@ -192,7 +187,7 @@ func TestCloseRun(t *testing.T) {
 		{
 			name: "close issue with reason when reason is not supported",
 			opts: &CloseOptions{
-				SelectorArg: "13",
+				IssueNumber: 13,
 				Reason:      "not planned",
 				Detector:    &fd.DisabledDetectorMock{},
 			},
@@ -219,7 +214,7 @@ func TestCloseRun(t *testing.T) {
 		{
 			name: "issue already closed",
 			opts: &CloseOptions{
-				SelectorArg: "13",
+				IssueNumber: 13,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -236,7 +231,7 @@ func TestCloseRun(t *testing.T) {
 		{
 			name: "issues disabled",
 			opts: &CloseOptions{
-				SelectorArg: "13",
+				IssueNumber: 13,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(

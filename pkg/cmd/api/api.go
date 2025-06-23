@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -264,8 +263,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			); err != nil {
 				return err
 			}
-
-			opts.RequestPath = escapePackageNameInPath(opts.RequestPath)
 
 			if runF != nil {
 				return runF(&opts)
@@ -693,38 +690,4 @@ func previewNamesToMIMETypes(names []string) string {
 		types = append(types, fmt.Sprintf("application/vnd.github.%s-preview", p))
 	}
 	return strings.Join(types, ", ")
-}
-
-// The package name part in the `packages` endpoints may contain slashes and
-// other characters that need to be URL encoded.
-//
-// The `escapePackageNameInPath` function extracts and normalizes package names
-// in the path. The regex `pathWithPackageNameRE` is being used to extract the
-// package name with a capture group named `package`.
-//
-// See https://docs.github.com/en/rest/packages/packages APIs for more details.
-//
-// Here's an example:
-//
-// The package name `orders/cache` needs to be URL encoded because it contains
-// a slash `/`. The `escapePackageNameInPath` function will extract the
-// `orders/cache` part, perform the URL encoding, and return the normalized API
-// endpoint with `%2F` replacing the slash `/` in the package name part only.
-//
-// - Package name: `orders/cache`
-// - API endpoint: `/users/USER/packages/container/orders/cache`
-// - Normalized:   `/users/USER/packages/container/orders%2Fcache`
-
-var pathWithPackageNameRE = regexp.MustCompile(`^\/(?:orgs|user|users)(?:\/.*)?\/packages\/(?:npm|maven|rubygems|docker|nuget|container)\/(?<package>.*?)(?:\/(?:restore|versions)|$)`)
-
-func escapePackageNameInPath(path string) string {
-	matches := pathWithPackageNameRE.FindStringSubmatch(path)
-	if len(matches) > 0 {
-		i := pathWithPackageNameRE.SubexpIndex("package")
-		packageName := matches[i]
-		if packageName != "" {
-			return strings.Replace(path, packageName, url.QueryEscape(packageName), 1)
-		}
-	}
-	return path
 }

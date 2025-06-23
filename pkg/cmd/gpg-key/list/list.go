@@ -78,7 +78,7 @@ func listRun(opts *ListOptions) error {
 		t.AddField(gpgKey.Emails.String())
 		t.AddField(gpgKey.KeyID)
 		t.AddField(gpgKey.PublicKey, tableprinter.WithTruncate(truncateMiddle))
-		t.AddTimeField(now, gpgKey.CreatedAt, cs.Gray)
+		t.AddTimeField(now, gpgKey.CreatedAt, cs.Muted)
 		expiresAt := gpgKey.ExpiresAt.Format(time.RFC3339)
 		if t.IsTTY() {
 			if gpgKey.ExpiresAt.IsZero() {
@@ -87,7 +87,7 @@ func listRun(opts *ListOptions) error {
 				expiresAt = gpgKey.ExpiresAt.Format("2006-01-02")
 			}
 		}
-		t.AddField(expiresAt, tableprinter.WithColor(cs.Gray))
+		t.AddField(expiresAt, tableprinter.WithColor(cs.Muted))
 		t.EndRow()
 	}
 

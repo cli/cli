@@ -952,7 +952,7 @@ func TestClientPushDefault(t *testing.T) {
 	tests := []struct {
 		name            string
 		commandResult   commandResult
-		wantPushDefault string
+		wantPushDefault PushDefault
 		wantError       *GitError
 	}{
 		{
@@ -961,7 +961,7 @@ func TestClientPushDefault(t *testing.T) {
 				ExitStatus: 1,
 				Stderr:     "error: key does not contain a section: remote.pushDefault",
 			},
-			wantPushDefault: "simple",
+			wantPushDefault: PushDefaultSimple,
 			wantError:       nil,
 		},
 		{
@@ -970,7 +970,7 @@ func TestClientPushDefault(t *testing.T) {
 				ExitStatus: 0,
 				Stdout:     "current",
 			},
-			wantPushDefault: "current",
+			wantPushDefault: PushDefaultCurrent,
 			wantError:       nil,
 		},
 		{
@@ -1077,17 +1077,17 @@ func TestClientParsePushRevision(t *testing.T) {
 		name                   string
 		branch                 string
 		commandResult          commandResult
-		wantParsedPushRevision string
-		wantError              *GitError
+		wantParsedPushRevision RemoteTrackingRef
+		wantError              error
 	}{
 		{
-			name:   "@{push} resolves to origin/branchName",
+			name:   "@{push} resolves to refs/remotes/origin/branchName",
 			branch: "branchName",
 			commandResult: commandResult{
 				ExitStatus: 0,
-				Stdout:     "origin/branchName",
+				Stdout:     "refs/remotes/origin/branchName",
 			},
-			wantParsedPushRevision: "origin/branchName",
+			wantParsedPushRevision: RemoteTrackingRef{Remote: "origin", Branch: "branchName"},
 		},
 		{
 			name: "@{push} doesn't resolve",
@@ -1095,16 +1095,25 @@ func TestClientParsePushRevision(t *testing.T) {
 				ExitStatus: 128,
 				Stderr:     "fatal: git error",
 			},
-			wantParsedPushRevision: "",
+			wantParsedPushRevision: RemoteTrackingRef{},
 			wantError: &GitError{
 				ExitCode: 128,
 				Stderr:   "fatal: git error",
 			},
 		},
+		{
+			name: "@{push} resolves to something surprising",
+			commandResult: commandResult{
+				ExitStatus: 0,
+				Stdout:     "not/a/valid/remote/ref",
+			},
+			wantParsedPushRevision: RemoteTrackingRef{},
+			wantError:              fmt.Errorf("could not parse push revision: remote tracking branch must have format refs/remotes/<remote>/<branch> but was: not/a/valid/remote/ref"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := fmt.Sprintf("path/to/git rev-parse --abbrev-ref %s@{push}", tt.branch)
+			cmd := fmt.Sprintf("path/to/git rev-parse --symbolic-full-name %s@{push}", tt.branch)
 			cmdCtx := createMockedCommandContext(t, mockedCommands{
 				args(cmd): tt.commandResult,
 			})
@@ -1112,18 +1121,114 @@ func TestClientParsePushRevision(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
-			pushDefault, err := client.ParsePushRevision(context.Background(), tt.branch)
+			trackingRef, err := client.PushRevision(context.Background(), tt.branch)
 			if tt.wantError != nil {
-				var gitError *GitError
-				require.ErrorAs(t, err, &gitError)
-				assert.Equal(t, tt.wantError.ExitCode, gitError.ExitCode)
-				assert.Equal(t, tt.wantError.Stderr, gitError.Stderr)
+				var wantErrorAsGit *GitError
+				if errors.As(err, &wantErrorAsGit) {
+					var gitError *GitError
+					require.ErrorAs(t, err, &gitError)
+					assert.Equal(t, wantErrorAsGit.ExitCode, gitError.ExitCode)
+					assert.Equal(t, wantErrorAsGit.Stderr, gitError.Stderr)
+				} else {
+					assert.Equal(t, err, tt.wantError)
+				}
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Equal(t, tt.wantParsedPushRevision, pushDefault)
+			assert.Equal(t, tt.wantParsedPushRevision, trackingRef)
 		})
 	}
+}
+
+func TestRemoteTrackingRef(t *testing.T) {
+	t.Run("parsing", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name                  string
+			remoteTrackingRef     string
+			wantRemoteTrackingRef RemoteTrackingRef
+			wantError             error
+		}{
+			{
+				name:              "valid remote tracking ref without slash in branch name",
+				remoteTrackingRef: "refs/remotes/origin/branchName",
+				wantRemoteTrackingRef: RemoteTrackingRef{
+					Remote: "origin",
+					Branch: "branchName",
+				},
+			},
+			{
+				name:              "valid remote tracking ref with slash in branch name",
+				remoteTrackingRef: "refs/remotes/origin/branch/name",
+				wantRemoteTrackingRef: RemoteTrackingRef{
+					Remote: "origin",
+					Branch: "branch/name",
+				},
+			},
+			// TODO: Uncomment when we support slashes in remote names
+			// {
+			// 	name: "valid remote tracking ref with slash in remote name",
+			// 	remoteTrackingRef: "refs/remotes/my/origin/branchName",
+			// 	wantRemoteTrackingRef: RemoteTrackingRef{
+			// 		Remote: "my/origin",
+			// 		Branch: "branchName",
+			// 	},
+			// },
+			// {
+			// 	name: 			"valid remote tracking ref with slash in remote name and branch name",
+			// 	remoteTrackingRef: "refs/remotes/my/origin/branch/name",
+			// 	wantRemoteTrackingRef: RemoteTrackingRef{
+			// 		Remote: "my/origin",
+			// 		Branch: "branch/name",
+			// 	},
+			// },
+			{
+				name:                  "incorrect parts",
+				remoteTrackingRef:     "refs/remotes/origin",
+				wantRemoteTrackingRef: RemoteTrackingRef{},
+				wantError:             fmt.Errorf("remote tracking branch must have format refs/remotes/<remote>/<branch> but was: refs/remotes/origin"),
+			},
+			{
+				name:                  "incorrect prefix type",
+				remoteTrackingRef:     "invalid/remotes/origin/branchName",
+				wantRemoteTrackingRef: RemoteTrackingRef{},
+				wantError:             fmt.Errorf("remote tracking branch must have format refs/remotes/<remote>/<branch> but was: invalid/remotes/origin/branchName"),
+			},
+			{
+				name:                  "incorrect ref type",
+				remoteTrackingRef:     "refs/invalid/origin/branchName",
+				wantRemoteTrackingRef: RemoteTrackingRef{},
+				wantError:             fmt.Errorf("remote tracking branch must have format refs/remotes/<remote>/<branch> but was: refs/invalid/origin/branchName"),
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				trackingRef, err := ParseRemoteTrackingRef(tt.remoteTrackingRef)
+				if tt.wantError != nil {
+					require.Equal(t, tt.wantError, err)
+					return
+				}
+
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantRemoteTrackingRef, trackingRef)
+			})
+		}
+	})
+
+	t.Run("stringifying", func(t *testing.T) {
+		t.Parallel()
+
+		remoteTrackingRef := RemoteTrackingRef{
+			Remote: "origin",
+			Branch: "branchName",
+		}
+
+		require.Equal(t, "refs/remotes/origin/branchName", remoteTrackingRef.String())
+	})
 }
 
 func TestClientDeleteLocalTag(t *testing.T) {
@@ -1990,6 +2095,41 @@ func TestCredentialPatternFromHost(t *testing.T) {
 			require.Equal(t, tt.wantCredentialPattern, credentialPattern)
 		})
 	}
+}
+
+func TestPushDefault(t *testing.T) {
+	t.Run("it parses valid values correctly", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			value               string
+			expectedPushDefault PushDefault
+		}{
+			{"nothing", PushDefaultNothing},
+			{"current", PushDefaultCurrent},
+			{"upstream", PushDefaultUpstream},
+			{"tracking", PushDefaultTracking},
+			{"simple", PushDefaultSimple},
+			{"matching", PushDefaultMatching},
+		}
+
+		for _, test := range tests {
+			t.Run(test.value, func(t *testing.T) {
+				t.Parallel()
+
+				pushDefault, err := ParsePushDefault(test.value)
+				require.NoError(t, err)
+				assert.Equal(t, test.expectedPushDefault, pushDefault)
+			})
+		}
+	})
+
+	t.Run("it returns an error for invalid values", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := ParsePushDefault("invalid")
+		require.Error(t, err)
+	})
 }
 
 func createCommandContext(t *testing.T, exitStatus int, stdout, stderr string) (*exec.Cmd, commandCtx) {

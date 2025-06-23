@@ -1,0 +1,18 @@
+global:
+  scrape_interval:     1s
+
+scrape_configs:
+  - job_name: 'boulder'
+    static_configs:
+      - targets:
+        - boulder:8000
+        - boulder:8001
+        - boulder:8002
+        - boulder:8003
+        - boulder:8004
+        - boulder:8005
+        - boulder:8007
+        - boulder:8008
+        - boulder:8009
+        - boulder:8010
+        - boulder:8040

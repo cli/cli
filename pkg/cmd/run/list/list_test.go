@@ -367,6 +367,44 @@ func TestListRun(t *testing.T) {
 			`),
 		},
 		{
+			name: "org ruleset workflow in runs list shows with empty workflow name",
+			opts: &ListOptions{
+				Limit: defaultLimit,
+				now:   shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRunsWithOrgRequiredWorkflows,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/456"),
+					httpmock.StatusStringResponse(404, "not found"),
+				)
+			},
+			wantOut: heredoc.Doc(`
+				STATUS  TITLE        WORKFLOW  BRANCH  EVENT  ID  ELAPSED  AGE
+				X       cool commit            trunk   push   1   4m34s    about 4 minutes ago
+				*       cool commit            trunk   push   2   4m34s    about 4 minutes ago
+				✓       cool commit            trunk   push   3   4m34s    about 4 minutes ago
+				X       cool commit            trunk   push   4   4m34s    about 4 minutes ago
+				X       cool commit  CI        trunk   push   5   4m34s    about 4 minutes ago
+				-       cool commit  CI        trunk   push   6   4m34s    about 4 minutes ago
+				-       cool commit  CI        trunk   push   7   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   8   4m34s    about 4 minutes ago
+				*       cool commit  CI        trunk   push   9   4m34s    about 4 minutes ago
+			`),
+		},
+		{
 			name: "pagination",
 			opts: &ListOptions{
 				Limit: 101,

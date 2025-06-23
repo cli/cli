@@ -1,0 +1,26 @@
+#
+# List of blocked keys
+#
+# Each blocked entry is a Base64 encoded SHA256 hash of a SubjectPublicKeyInfo.
+#
+# Use the test/block-a-key utility to generate new additions.
+#
+# NOTE: This list is loaded all-at-once in-memory by Boulder and is intended
+#       to be used infrequently. Alternative mechanisms should be explored if
+#       large scale blocks are required.
+#
+blocked:
+  # test/block-a-key/test/test.ecdsa.cert.pem
+  - cuwGhNNI6nfob5aqY90e7BleU6l7rfxku4X3UTJ3Z7M=
+  # test/block-a-key/test/test.rsa.cert.pem
+  - Qebc1V3SkX3izkYRGNJilm9Bcuvf0oox4U2Rn+b4JOE=
+  # test/block-a-key/test/test.ecdsa.jwk.json
+  - cuwGhNNI6nfob5aqY90e7BleU6l7rfxku4X3UTJ3Z7M=
+  # test/block-a-key/test/test.rsa.jwk.json
+  - Qebc1V3SkX3izkYRGNJilm9Bcuvf0oox4U2Rn+b4JOE=
+  # test/hierarchy/int-r4.cert.pem
+  - +//lPMatuGvtf7yesXNv6FSf0UovKbP3BKdQZ23L4BY=
+blockedHashesHex:
+  - 41e6dcd55dd2917de2ce461118d262966f4172ebdfd28a31e14d919fe6f824e1
+
+

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package storer;
+option go_package = "github.com/letsencrypt/boulder/crl/storer/proto";
+
+import "google/protobuf/empty.proto";
+
+service CRLStorer {
+  rpc UploadCRL(stream UploadCRLRequest) returns (google.protobuf.Empty) {}
+}
+
+message UploadCRLRequest {
+  oneof payload {
+    CRLMetadata metadata = 1;
+    bytes crlChunk = 2;
+  }
+}
+
+message CRLMetadata {
+  int64 issuerNameID = 1;
+  int64 number = 2;
+  int64 shardIdx = 3;
+}

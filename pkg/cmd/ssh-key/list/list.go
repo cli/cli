@@ -89,11 +89,11 @@ func listRun(opts *ListOptions) error {
 			t.AddField(id)
 			t.AddField(sshKey.Key, tableprinter.WithTruncate(truncateMiddle))
 			t.AddField(sshKey.Type)
-			t.AddTimeField(now, sshKey.CreatedAt, cs.Gray)
+			t.AddTimeField(now, sshKey.CreatedAt, cs.Muted)
 		} else {
 			t.AddField(sshKey.Title)
 			t.AddField(sshKey.Key)
-			t.AddTimeField(now, sshKey.CreatedAt, cs.Gray)
+			t.AddTimeField(now, sshKey.CreatedAt, cs.Muted)
 			t.AddField(id)
 			t.AddField(sshKey.Type)
 		}

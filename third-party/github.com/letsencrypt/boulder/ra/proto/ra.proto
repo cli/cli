@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package ra;
+option go_package = "github.com/letsencrypt/boulder/ra/proto";
+
+import "core/proto/core.proto";
+import "ca/proto/ca.proto";
+import "google/protobuf/empty.proto";
+
+service RegistrationAuthority {
+  rpc NewRegistration(core.Registration) returns (core.Registration) {}
+  rpc UpdateRegistration(UpdateRegistrationRequest) returns (core.Registration) {}
+  rpc PerformValidation(PerformValidationRequest) returns (core.Authorization) {}
+  rpc DeactivateRegistration(core.Registration) returns (google.protobuf.Empty) {}
+  rpc DeactivateAuthorization(core.Authorization) returns (google.protobuf.Empty) {}
+  rpc RevokeCertByApplicant(RevokeCertByApplicantRequest) returns (google.protobuf.Empty) {}
+  rpc RevokeCertByKey(RevokeCertByKeyRequest) returns (google.protobuf.Empty) {}
+  rpc AdministrativelyRevokeCertificate(AdministrativelyRevokeCertificateRequest) returns (google.protobuf.Empty) {}
+  rpc NewOrder(NewOrderRequest) returns (core.Order) {}
+  rpc FinalizeOrder(FinalizeOrderRequest) returns (core.Order) {}
+  // Generate an OCSP response based on the DB's current status and reason code.
+  rpc GenerateOCSP(GenerateOCSPRequest) returns (ca.OCSPResponse) {}
+  rpc UnpauseAccount(UnpauseAccountRequest) returns (google.protobuf.Empty) {}
+}
+
+message GenerateOCSPRequest {
+  string serial = 1;
+}
+
+message UpdateRegistrationRequest {
+  core.Registration base = 1;
+  core.Registration update = 2;
+}
+
+message UpdateAuthorizationRequest {
+  core.Authorization authz = 1;
+  int64 challengeIndex = 2;
+  core.Challenge response = 3;
+}
+
+message PerformValidationRequest {
+  core.Authorization authz = 1;
+  int64 challengeIndex = 2;
+}
+
+message RevokeCertByApplicantRequest {
+  bytes cert = 1;
+  int64 code = 2;
+  int64 regID = 3;
+}
+
+message RevokeCertByKeyRequest {
+  bytes cert = 1;
+  reserved 2; // previously code
+}
+
+message AdministrativelyRevokeCertificateRequest {
+  // Deprecated: this field is ignored.
+  bytes cert = 1;
+  // The `serial` field is required.
+  string serial = 4;
+  int64 code = 2;
+  string adminName = 3;
+  bool skipBlockKey = 5;
+  // If the malformed flag is set, the RA will not attempt to parse the
+  // certificate in question. In this case, the keyCompromise reason cannot be
+  // specified, because the key cannot be blocked.
+  bool malformed = 6;
+}
+
+message NewOrderRequest {
+  // Next unused field number: 6
+  int64 registrationID = 1;
+  repeated string names = 2;
+  string replacesSerial = 3;
+  bool limitsExempt = 4;
+  string certificateProfileName = 5;
+}
+
+message FinalizeOrderRequest {
+  core.Order order = 1;
+  bytes csr = 2;
+}
+
+message UnpauseAccountRequest {
+  // Next unused field number: 2
+
+  // The registrationID to be unpaused so issuance can be resumed.
+  int64 registrationID = 1;
+}

@@ -1,0 +1,35 @@
+# Try building the Boulder Debian package on every PR and push to main.
+# This is to make sure the actual release job will succeed when we tag a
+# release.
+# Keep in sync with release.yml
+name: Try release
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  try-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        GO_VERSION:
+          - "1.22.3"
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build .deb
+        id: build
+        env:
+          GO_VERSION: ${{ matrix.GO_VERSION }}
+        run: ./tools/make-assets.sh
+
+      - name: Compute checksums
+        id: checksums
+        # The files listed on this line must be identical to the files uploaded
+        # in the last step of the real release action.
+        run: sha256sum boulder*.deb boulder*.tar.gz

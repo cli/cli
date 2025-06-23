@@ -1,0 +1,221 @@
+{
+  "version": "0.1",
+  "log_list_timestamp": "1970-01-01T00:00:01Z",
+  "operators": [
+    {
+      "name": "Operator A",
+      "email": ["fake@example.org"],
+      "logs": [
+        {
+          "description": "A1 Current",
+          "log_id": "OJiMlNA1mMOTLd/pI7q68npCDrlsQeFaqAwasPwEvQM=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExhriVaEwBOtdNzg5EOtJBHl/u+ua1FtCR/CBXQ1kvpFelcP3gozLNXyxV/UexuifpmzTN31CdfdHv1kK3KDIxQ==",
+          "url": "http://boulder.service.consul:4600",
+          "temporal_interval": {
+            "start_inclusive": "1970-01-01T00:00:00Z",
+            "end_exclusive": "2070-01-01T00:00:00Z"
+          },
+          "state": {
+            "usable": {
+              "timestamp": "2000-00-00T00:00:00Z"
+            }
+          }
+        },
+        {
+          "description": "A1 Future",
+          "log_id": "2OHE0zamM5iS1NRFWJf9N6CWxdJ93je+leBX371vC+k=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7uzW0zXQpWIk7MZUBdTu1muNzekMCIv/kn16+ifndQ584DElobOJ0ZlcACz9WdFyGTjOCfAqBmFybX2OJKfFVg==",
+          "url": "http://boulder.service.consul:4601",
+          "temporal_interval": {
+            "start_inclusive": "2070-01-01T00:00:00Z",
+            "end_exclusive": "3070-01-01T00:00:00Z"
+          },
+          "state": {
+            "usable": {
+              "timestamp": "2000-00-00T00:00:00Z"
+            }
+          }
+        },
+        {
+          "description": "A2 Past",
+          "log_id": "z7banNzwEtmRiittSviBYKjWmVltXNBhLfudmDXIcoU=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE/s5W5OHfowdLA7KerJ+mOizfHJE6Snfib8ueoBYl8Y12lpOoJTtCmmrx4m9KAb9AptInWpGrIaLY+5Y29l2eGw==",
+          "url": "http://boulder.service.consul:4602",
+          "temporal_interval": {
+            "start_inclusive": "1870-01-01T00:00:00Z",
+            "end_exclusive": "1970-01-01T00:00:00Z"
+          },
+          "state": {
+            "usable": {
+              "timestamp": "2000-00-00T00:00:00Z"
+            }
+          }
+        },
+        {
+          "description": "A2 Current",
+          "log_id": "HRrTQca8iy14Qbrw6/itgVzVWTcaENF3tWnJP743pq8=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2EFdA2UBfbJ2Sw1413hBN9YESyABmTGbdgcMh0l/GyV3eFrFjcVS0laNphkfRZ+qkcMbeF+IIHqVzxHAM/2mQQ==",
+          "url": "http://boulder.service.consul:4603",
+          "temporal_interval": {
+            "start_inclusive": "1970-01-01T00:00:00Z",
+            "end_exclusive": "2070-01-01T00:00:00Z"
+          },
+          "state": {
+            "usable": {
+              "timestamp": "2000-00-00T00:00:00Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operator B",
+      "email": ["fake@example.org"],
+      "logs": [
+        {
+          "description": "B1",
+          "log_id": "UtToynGEyMkkXDMQei8Ll54oMwWHI0IieDEKs12/Td4=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAMSHwrzvr/KvNmUT55+uQo7CXQLPx1X+qEdKGekUg1q/InN/E37bCY/x45wC00qgiE0D3xoxnUJbKaCQcAX39w==",
+          "url": "http://boulder.service.consul:4604",
+          "temporal_interval": {
+            "start_inclusive": "1970-01-01T00:00:00Z",
+            "end_exclusive": "2070-01-01T00:00:00Z"
+          },
+          "state": {
+            "usable": {
+              "timestamp": "2000-00-00T00:00:00Z"
+            }
+          }
+        },
+        {
+          "description": "B2",
+          "log_id": "EOPWVkKfDlS3lQe5brFUMsEYAJ8I7uZr7z55geKzv7c=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzmpksKS/mHgJZ821po3ldwonsz3K19jwsZgNSGYvEuzAVtWbGfY+6aUXua7f8WK8l2amHETISOY4JTRwk5QFyw==",
+          "url": "http://boulder.service.consul:4605",
+          "temporal_interval": {
+            "start_inclusive": "1970-01-01T00:00:00Z",
+            "end_exclusive": "2070-01-01T00:00:00Z"
+          },
+          "state": {
+            "usable": {
+              "timestamp": "2000-00-00T00:00:00Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operator C",
+      "email": ["fake@example.org"],
+      "logs": [
+        {
+          "description": "C1",
+          "log_id": "Oqk/Tv0cUSnEJ4bZa0eprm3IQQ4XgNcv20/bXixlxnQ=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE31BxBVCdehxOC35jJzvAPNrU4ZjNXbmxS+zSN5DSkpJWQUp5wUHPGnXiSCtx7jXnTYLVzslIyXWpNN8m8BiKjQ==",
+          "url": "http://boulder.service.consul:4606",
+          "state": {
+            "usable": {
+              "timestamp": "2000-00-00T00:00:00Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operator D",
+      "email": ["fake@example.org"],
+      "logs": [
+        {
+          "description": "D1",
+          "log_id": "e90gTyc4KkZpHv2pgeSOS224Md6/21UmWIxRF9mXveI=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAjRx6Mhc/U4Ye7NzsZ7bbKMGhKVpGZHpZJMzLzNIveBAPh5OBDHpSdn9RY58t4diH8YLjqCi9o+k1T5RwiFbfQ==",
+          "url": "http://boulder.service.consul:4607",
+          "temporal_interval": {
+            "start_inclusive": "1970-01-01T00:00:00Z",
+            "end_exclusive": "2070-01-01T00:00:00Z"
+          },
+          "state": {
+            "usable": {
+              "timestamp": "2000-00-00T00:00:00Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operator E",
+      "email": ["fake@example.org"],
+      "logs": [
+        {
+          "description": "E1",
+          "log_id": "ck+wYNY31I+5XBC7htsdNdYVjOSm4YgnDxlzO9PouwQ=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsHFSkgrlrwIY0PG79tOZhPvBzrnrpbrWa3pG2FfkLeEJQ2Uvgw1oTZZ+oXcrm4Yb3khWDbpkzDbupI+e8xloeA==",
+          "url": "http://boulder.service.consul:4608",
+          "state": {
+            "retired": {
+              "timestamp": "2000-01-01T00:00:00Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operator F",
+      "email": ["fake@example.org"],
+      "logs": [
+        {
+          "description": "F1",
+          "log_id": "FWPcPPStmIK3l/jogz7yLYUtafS44cpLs6hQ3HrjdUQ=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEMVjHUOxzh2flagPhuEYy/AhAlpD9qqACg4fGcCxOhLU35r21CQXzKDdCHMu69QDFd6EAe8iGFsybg+Yn4/njtA==",
+          "url": "http://boulder.service.consul:4609",
+          "temporal_interval": {
+            "start_inclusive": "1970-01-01T00:00:00Z",
+            "end_exclusive": "2070-01-01T00:00:00Z"
+          },
+          "state": {
+            "pending": {
+              "timestamp": "2000-01-01T00:00:00Z"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Unused",
+      "email": ["fake@example.org"],
+      "logs": [
+        {
+          "description": "This Log Has Every Field To Ensure We Can Parse It",
+          "log_id": "BaseSixtyFourEncodingOfSHA256HashOfPublicKey=",
+          "key": "BaseSixtyFourEncodingOfDEREncodingOfPublicKey=",
+          "url": "https://example.com/ct/",
+          "mmd": 86400,
+          "state": {
+            "readonly": {
+              "timestamp": "2020-01-01T00:00:01Z",
+              "final_tree_head": {
+                "sha256_root_hash": "D1H4wAJmq0MRCeLfeOtrsZ9Am015anO5MkeasNhnQWI=",
+                "tree_size": 123456789
+              }
+            }
+          },
+          "temporal_interval": {
+            "start_inclusive": "1970-01-01T00:00:01Z",
+            "end_exclusive": "2070-01-01T00:00:01Z"
+          }
+        },
+        {
+          "description": "This Log Is Missing State To Ensure We Can Handle It",
+          "log_id": "SomeOtherFakeLogID=",
+          "key": "SomeOtherFakeKey=",
+          "url": "https://example.net/ct/",
+          "mmd": 86400,
+          "temporal_interval": {
+            "start_inclusive": "1970-01-01T00:00:01Z",
+            "end_exclusive": "2070-01-01T00:00:01Z"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -14,17 +14,23 @@ import (
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
+// Important: some of the following configuration settings are used outside of `cli/cli`,
+// they are defined here to avoid `cli/cli` being changed unexpectedly.
 const (
+	accessibleColorsKey   = "accessible_colors" // used by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
+	accessiblePrompterKey = "accessible_prompter"
 	aliasesKey            = "aliases"
-	browserKey            = "browser"
-	editorKey             = "editor"
+	browserKey            = "browser" // used by cli/go-gh to open URLs in web browsers
+	colorLabelsKey        = "color_labels"
+	editorKey             = "editor" // used by cli/go-gh to open interactive text editor
 	gitProtocolKey        = "git_protocol"
-	hostsKey              = "hosts"
+	hostsKey              = "hosts" // used by cli/go-gh to locate authenticated host tokens
 	httpUnixSocketKey     = "http_unix_socket"
-	oauthTokenKey         = "oauth_token"
+	oauthTokenKey         = "oauth_token" // used by cli/go-gh to locate authenticated host tokens
 	pagerKey              = "pager"
 	promptKey             = "prompt"
 	preferEditorPromptKey = "prefer_editor_prompt"
+	spinnerKey            = "spinner"
 	userKey               = "user"
 	usersKey              = "users"
 	versionKey            = "version"
@@ -108,9 +114,24 @@ func (c *cfg) Authentication() gh.AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
 }
 
+func (c *cfg) AccessibleColors(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, accessibleColorsKey).Unwrap()
+}
+
+func (c *cfg) AccessiblePrompter(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, accessiblePrompterKey).Unwrap()
+}
+
 func (c *cfg) Browser(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, browserKey).Unwrap()
+}
+
+func (c *cfg) ColorLabels(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, colorLabelsKey).Unwrap()
 }
 
 func (c *cfg) Editor(hostname string) gh.ConfigEntry {
@@ -141,6 +162,11 @@ func (c *cfg) Prompt(hostname string) gh.ConfigEntry {
 func (c *cfg) PreferEditorPrompt(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, preferEditorPromptKey).Unwrap()
+}
+
+func (c *cfg) Spinner(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, spinnerKey).Unwrap()
 }
 
 func (c *cfg) Version() o.Option[string] {
@@ -532,6 +558,14 @@ aliases:
 http_unix_socket:
 # What web browser gh should use when opening URLs. If blank, will refer to environment.
 browser:
+# Whether to display labels using their RGB hex color codes in terminals that support truecolor. Supported values: enabled, disabled
+color_labels: disabled
+# Whether customizable, 4-bit accessible colors should be used. Supported values: enabled, disabled
+accessible_colors: disabled
+# Whether an accessible prompter should be used. Supported values: enabled, disabled
+accessible_prompter: disabled
+# Whether to use a animated spinner as a progress indicator. If disabled, a textual progress indicator is used instead. Supported values: enabled, disabled
+spinner: enabled
 `
 
 type ConfigOption struct {
@@ -600,6 +634,42 @@ var Options = []ConfigOption{
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Browser(hostname).Value
+		},
+	},
+	{
+		Key:           colorLabelsKey,
+		Description:   "whether to display labels using their RGB hex color codes in terminals that support truecolor",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.ColorLabels(hostname).Value
+		},
+	},
+	{
+		Key:           accessibleColorsKey,
+		Description:   "whether customizable, 4-bit accessible colors should be used",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.AccessibleColors(hostname).Value
+		},
+	},
+	{
+		Key:           accessiblePrompterKey,
+		Description:   "whether an accessible prompter should be used",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.AccessiblePrompter(hostname).Value
+		},
+	},
+	{
+		Key:           spinnerKey,
+		Description:   "whether to use a animated spinner as a progress indicator",
+		DefaultValue:  "enabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.Spinner(hostname).Value
 		},
 	},
 }

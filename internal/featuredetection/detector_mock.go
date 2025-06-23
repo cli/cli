@@ -1,5 +1,7 @@
 package featuredetection
 
+import "github.com/cli/cli/v2/internal/gh"
+
 type DisabledDetectorMock struct{}
 
 func (md *DisabledDetectorMock) IssueFeatures() (IssueFeatures, error) {
@@ -14,6 +16,10 @@ func (md *DisabledDetectorMock) RepositoryFeatures() (RepositoryFeatures, error)
 	return RepositoryFeatures{}, nil
 }
 
+func (md *DisabledDetectorMock) ProjectsV1() gh.ProjectsV1Support {
+	return gh.ProjectsV1Unsupported
+}
+
 type EnabledDetectorMock struct{}
 
 func (md *EnabledDetectorMock) IssueFeatures() (IssueFeatures, error) {
@@ -26,4 +32,8 @@ func (md *EnabledDetectorMock) PullRequestFeatures() (PullRequestFeatures, error
 
 func (md *EnabledDetectorMock) RepositoryFeatures() (RepositoryFeatures, error) {
 	return allRepositoryFeatures, nil
+}
+
+func (md *EnabledDetectorMock) ProjectsV1() gh.ProjectsV1Support {
+	return gh.ProjectsV1Supported
 }

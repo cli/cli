@@ -163,7 +163,8 @@ func (e *Extension) IsPinned() bool {
 			isPinned = manifest.IsPinned
 		}
 	case GitKind:
-		pinPath := filepath.Join(e.Path(), fmt.Sprintf(".pin-%s", e.CurrentVersion()))
+		extDir := filepath.Dir(e.path)
+		pinPath := filepath.Join(extDir, fmt.Sprintf(".pin-%s", e.CurrentVersion()))
 		if _, err := os.Stat(pinPath); err == nil {
 			isPinned = true
 		} else {

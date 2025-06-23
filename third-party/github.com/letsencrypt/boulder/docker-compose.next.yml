@@ -1,0 +1,7 @@
+services:
+  boulder:
+    environment:
+      FAKE_DNS: 10.77.77.77
+      BOULDER_CONFIG_DIR: test/config-next
+      GOFLAGS: -mod=vendor
+      GOCACHE: /boulder/.gocache/go-build-next

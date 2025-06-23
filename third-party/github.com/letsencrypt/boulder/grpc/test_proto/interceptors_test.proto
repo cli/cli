@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option go_package = "github.com/letsencrypt/boulder/grpc/test_proto";
+
+import "google/protobuf/duration.proto";
+
+service Chiller {
+  // Sleep for the given amount of time, and return the amount of time slept.
+  rpc Chill(Time) returns (Time) {}
+}
+
+message Time {
+  // Next unused field number: 3
+  reserved 1; // previously timeNS
+  google.protobuf.Duration duration = 2;
+ }

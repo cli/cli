@@ -1,0 +1,27 @@
+name: PR Help Wanted Check
+on:
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  contents: none
+  issues: read
+  pull-requests: write
+
+jobs:
+  check-help-wanted:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for issues without help-wanted label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+          PR_AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+        if: "!github.event.pull_request.draft"
+        run: |
+          # Run the script to check for issues without help-wanted label
+          bash .github/workflows/scripts/check-help-wanted.sh ${{ github.event.pull_request.html_url }}

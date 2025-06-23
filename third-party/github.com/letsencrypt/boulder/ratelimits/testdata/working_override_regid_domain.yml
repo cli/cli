@@ -1,0 +1,7 @@
+- CertificatesPerDomain:
+    burst: 40
+    count: 40
+    period: 1s
+    ids:
+      - id: example.com
+        comment: Foo

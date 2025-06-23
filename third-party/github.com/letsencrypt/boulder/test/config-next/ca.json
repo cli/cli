@@ -1,0 +1,171 @@
+{
+	"ca": {
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/ca.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/ca.boulder/key.pem"
+		},
+		"hostnamePolicyFile": "test/hostname-policy.yaml",
+		"grpcCA": {
+			"maxConnectionAge": "30s",
+			"services": {
+				"ca.CertificateAuthority": {
+					"clientNames": [
+						"ra.boulder"
+					]
+				},
+				"ca.OCSPGenerator": {
+					"clientNames": [
+						"ra.boulder"
+					]
+				},
+				"ca.CRLGenerator": {
+					"clientNames": [
+						"crl-updater.boulder"
+					]
+				},
+				"grpc.health.v1.Health": {
+					"clientNames": [
+						"health-checker.boulder"
+					]
+				}
+			}
+		},
+		"saService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "sa",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "sa.boulder"
+		},
+		"issuance": {
+			"defaultCertificateProfileName": "defaultBoulderCertificateProfile",
+			"certProfiles": {
+				"defaultBoulderCertificateProfile": {
+					"allowMustStaple": true,
+					"allowCTPoison": true,
+					"allowSCTList": true,
+					"allowCommonName": true,
+					"policies": [
+						{
+							"oid": "2.23.140.1.2.1"
+						}
+					],
+					"maxValidityPeriod": "7776000s",
+					"maxValidityBackdate": "1h5m"
+				}
+			},
+			"crlProfile": {
+				"validityInterval": "216h",
+				"maxBackdate": "1h5m"
+			},
+			"issuers": [
+				{
+					"active": true,
+					"issuerURL": "http://ca.example.org:4502/int-ecdsa-a",
+					"ocspURL": "http://ca.example.org:4002/",
+					"crlURLBase": "http://ca.example.org:4501/ecdsa-a/",
+					"location": {
+						"configFile": "test/certs/webpki/int-ecdsa-a.pkcs11.json",
+						"certFile": "test/certs/webpki/int-ecdsa-a.cert.pem",
+						"numSessions": 2
+					}
+				},
+				{
+					"active": true,
+					"issuerURL": "http://ca.example.org:4502/int-ecdsa-b",
+					"ocspURL": "http://ca.example.org:4002/",
+					"crlURLBase": "http://ca.example.org:4501/ecdsa-b/",
+					"location": {
+						"configFile": "test/certs/webpki/int-ecdsa-b.pkcs11.json",
+						"certFile": "test/certs/webpki/int-ecdsa-b.cert.pem",
+						"numSessions": 2
+					}
+				},
+				{
+					"active": false,
+					"issuerURL": "http://ca.example.org:4502/int-ecdsa-c",
+					"ocspURL": "http://ca.example.org:4002/",
+					"crlURLBase": "http://ca.example.org:4501/ecdsa-c/",
+					"location": {
+						"configFile": "test/certs/webpki/int-ecdsa-c.pkcs11.json",
+						"certFile": "test/certs/webpki/int-ecdsa-c.cert.pem",
+						"numSessions": 2
+					}
+				},
+				{
+					"active": true,
+					"issuerURL": "http://ca.example.org:4502/int-rsa-a",
+					"ocspURL": "http://ca.example.org:4002/",
+					"crlURLBase": "http://ca.example.org:4501/rsa-a/",
+					"location": {
+						"configFile": "test/certs/webpki/int-rsa-a.pkcs11.json",
+						"certFile": "test/certs/webpki/int-rsa-a.cert.pem",
+						"numSessions": 2
+					}
+				},
+				{
+					"active": true,
+					"issuerURL": "http://ca.example.org:4502/int-rsa-b",
+					"ocspURL": "http://ca.example.org:4002/",
+					"crlURLBase": "http://ca.example.org:4501/rsa-b/",
+					"location": {
+						"configFile": "test/certs/webpki/int-rsa-b.pkcs11.json",
+						"certFile": "test/certs/webpki/int-rsa-b.cert.pem",
+						"numSessions": 2
+					}
+				},
+				{
+					"active": false,
+					"issuerURL": "http://ca.example.org:4502/int-rsa-c",
+					"ocspURL": "http://ca.example.org:4002/",
+					"crlURLBase": "http://ca.example.org:4501/rsa-c/",
+					"location": {
+						"configFile": "test/certs/webpki/int-rsa-c.pkcs11.json",
+						"certFile": "test/certs/webpki/int-rsa-c.cert.pem",
+						"numSessions": 2
+					}
+				}
+			],
+			"lintConfig": "test/config-next/zlint.toml",
+			"ignoredLints": [
+				"w_subject_common_name_included",
+				"w_sub_cert_aia_contains_internal_names"
+			]
+		},
+		"expiry": "7776000s",
+		"backdate": "1h",
+		"serialPrefix": 127,
+		"maxNames": 100,
+		"lifespanOCSP": "96h",
+		"goodkey": {
+			"weakKeyFile": "test/example-weak-keys.json",
+			"blockedKeyFile": "test/example-blocked-keys.yaml",
+			"fermatRounds": 100
+		},
+		"ocspLogMaxLength": 4000,
+		"ocspLogPeriod": "500ms",
+		"ctLogListFile": "test/ct-test-srv/log_list.json",
+		"features": {
+			"ECDSAForAll": true
+		}
+	},
+	"pa": {
+		"challenges": {
+			"http-01": true,
+			"dns-01": true,
+			"tls-alpn-01": true
+		}
+	},
+	"syslog": {
+		"stdoutlevel": 4,
+		"sysloglevel": -1
+	},
+	"openTelemetry": {
+		"endpoint": "bjaeger:4317",
+		"sampleratio": 1
+	}
+}

@@ -21,13 +21,13 @@ func RequestableReviewersForCompletion(httpClient *http.Client, repo ghrepo.Inte
 
 	results := []string{}
 	for _, user := range metadata.AssignableUsers {
-		if strings.EqualFold(user.Login, metadata.CurrentLogin) {
+		if strings.EqualFold(user.Login(), metadata.CurrentLogin) {
 			continue
 		}
-		if user.Name != "" {
-			results = append(results, fmt.Sprintf("%s\t%s", user.Login, user.Name))
+		if user.Name() != "" {
+			results = append(results, fmt.Sprintf("%s\t%s", user.Login(), user.Name()))
 		} else {
-			results = append(results, user.Login)
+			results = append(results, user.Login())
 		}
 	}
 	for _, team := range metadata.Teams {

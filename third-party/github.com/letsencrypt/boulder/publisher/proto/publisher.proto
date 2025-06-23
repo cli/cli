@@ -1,0 +1,25 @@
+syntax = "proto3";
+option go_package = "github.com/letsencrypt/boulder/publisher/proto";
+
+service Publisher {
+  rpc SubmitToSingleCTWithResult(Request) returns (Result) {}
+}
+
+enum SubmissionType {
+  unknown = 0;
+  sct = 1; // Submitting a precert with the intent of getting SCTs
+  info = 2; // Submitting a precert on a best-effort basis
+  final = 3; // Submitting a final cert on a best-effort basis
+}
+
+message Request {
+  bytes der = 1;
+  string LogURL = 2;
+  string LogPublicKey = 3;
+  reserved 4; // Previously precert
+  SubmissionType kind = 5;
+}
+
+message Result {
+  bytes sct = 1;
+}

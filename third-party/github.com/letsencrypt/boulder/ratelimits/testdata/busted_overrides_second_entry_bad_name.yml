@@ -1,0 +1,14 @@
+- NewRegistrationsPerIPAddress:
+    burst: 40
+    count: 40
+    period: 1s
+    ids:
+      - id: 10.0.0.2
+        comment: Foo
+- UsageRequestsPerIPv10Address:
+    burst: 40
+    count: 40
+    period: 1s
+    ids:
+      - id: 10.0.0.5
+        comment: Bar

@@ -24,12 +24,12 @@ type DevelopOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
 
-	IssueSelector string
-	Name          string
-	BranchRepo    string
-	BaseBranch    string
-	Checkout      bool
-	List          bool
+	IssueNumber int
+	Name        string
+	BranchRepo  string
+	BaseBranch  string
+	Checkout    bool
+	List        bool
 }
 
 func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.Command {
@@ -89,9 +89,23 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
-			opts.IssueSelector = args[0]
+			issueNumber, baseRepo, err := shared.ParseIssueFromArg(args[0])
+			if err != nil {
+				return err
+			}
+
+			// If the args provided the base repo then use that directly.
+			if baseRepo, present := baseRepo.Value(); present {
+				opts.BaseRepo = func() (ghrepo.Interface, error) {
+					return baseRepo, nil
+				}
+			} else {
+				// support `-R, --repo` override
+				opts.BaseRepo = f.BaseRepo
+			}
+
+			opts.IssueNumber = issueNumber
+
 			if err := cmdutil.MutuallyExclusive("specify only one of `--list` or `--branch-repo`", opts.List, opts.BranchRepo != ""); err != nil {
 				return err
 			}
@@ -131,8 +145,13 @@ func developRun(opts *DevelopOptions) error {
 		return err
 	}
 
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
 	opts.IO.StartProgressIndicator()
-	issue, issueRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.IssueSelector, []string{"id", "number"})
+	issue, err := shared.FindIssueOrPR(httpClient, baseRepo, opts.IssueNumber, []string{"id", "number"})
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -141,16 +160,16 @@ func developRun(opts *DevelopOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	err = api.CheckLinkedBranchFeature(apiClient, issueRepo.RepoHost())
+	err = api.CheckLinkedBranchFeature(apiClient, baseRepo.RepoHost())
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
 	if opts.List {
-		return developRunList(opts, apiClient, issueRepo, issue)
+		return developRunList(opts, apiClient, baseRepo, issue)
 	}
-	return developRunCreate(opts, apiClient, issueRepo, issue)
+	return developRunCreate(opts, apiClient, baseRepo, issue)
 }
 
 func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghrepo.Interface, issue *api.Issue) error {

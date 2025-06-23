@@ -991,6 +991,619 @@ func TestViewRun(t *testing.T) {
 			wantOut: quuxTheBarfLogOutput,
 		},
 		{
+			name: "interactive with log, with no step logs available (#10551)",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt: true,
+				Log:    true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJobWithoutStepLogs,
+							shared.FailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool commit, CI [trunk] Feb 23, 2021")
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job with no step logs", "X sad job with no step logs"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool job with no step logs")
+					})
+			},
+			wantOut: coolJobRunWithNoStepLogsLogOutput,
+		},
+		{
+			name: "noninteractive with log, with no step logs available (#10551)",
+			opts: &ViewOptions{
+				JobID: "11",
+				Log:   true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/11"),
+					httpmock.JSONResponse(shared.SuccessfulJobWithoutStepLogs))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: coolJobRunWithNoStepLogsLogOutput,
+		},
+		{
+			name: "interactive with log-failed, with no step logs available (#10551)",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt:    true,
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJobWithoutStepLogs,
+							shared.FailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return 4, nil
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job with no step logs", "X sad job with no step logs"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "X sad job with no step logs")
+					})
+			},
+			wantOut: sadJobRunWithNoStepLogsLogOutput,
+		},
+		{
+			name: "noninteractive with log-failed, with no step logs available (#10551)",
+			opts: &ViewOptions{
+				JobID:     "21",
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/21"),
+					httpmock.JSONResponse(shared.FailedJobWithoutStepLogs))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: sadJobRunWithNoStepLogsLogOutput,
+		},
+		{
+			name: "interactive with run log, with no step logs available (#10551)",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt: true,
+				Log:    true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJobWithoutStepLogs,
+							shared.FailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool commit, CI [trunk] Feb 23, 2021")
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job with no step logs", "X sad job with no step logs"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "View all jobs in this run")
+					})
+			},
+			wantOut: expectedRunLogOutputWithNoSteps,
+		},
+		{
+			name: "noninteractive with run log, with no step logs available (#10551)",
+			opts: &ViewOptions{
+				RunID: "3",
+				Log:   true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJobWithoutStepLogs,
+							shared.FailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: expectedRunLogOutputWithNoSteps,
+		},
+		{
+			name: "interactive with run log-failed, with no step logs available (#10551)",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt:    true,
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJobWithoutStepLogs,
+							shared.FailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return 4, nil
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job with no step logs", "X sad job with no step logs"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "View all jobs in this run")
+					})
+			},
+			wantOut: sadJobRunWithNoStepLogsLogOutput,
+		},
+		{
+			name: "noninteractive with run log-failed, with no step logs available (#10551)",
+			opts: &ViewOptions{
+				RunID:     "1234",
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJobWithoutStepLogs,
+							shared.FailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: sadJobRunWithNoStepLogsLogOutput,
+		},
+		{
+			name: "interactive with log, legacy service data, with no step logs available",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt: true,
+				Log:    true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.LegacySuccessfulJobWithoutStepLogs,
+							shared.LegacyFailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool commit, CI [trunk] Feb 23, 2021")
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ legacy cool job with no step logs", "X legacy sad job with no step logs"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ legacy cool job with no step logs")
+					})
+			},
+			wantOut: legacyCoolJobRunWithNoStepLogsLogOutput,
+		},
+		{
+			name: "noninteractive with log, legacy service data, with no step logs available",
+			opts: &ViewOptions{
+				JobID: "12",
+				Log:   true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/12"),
+					httpmock.JSONResponse(shared.LegacySuccessfulJobWithoutStepLogs))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: legacyCoolJobRunWithNoStepLogsLogOutput,
+		},
+
+		{
+			name: "interactive with log-failed, legacy service data, with no step logs available (#10551)",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt:    true,
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.LegacySuccessfulJobWithoutStepLogs,
+							shared.LegacyFailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return 4, nil
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ legacy cool job with no step logs", "X legacy sad job with no step logs"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "X legacy sad job with no step logs")
+					})
+			},
+			wantOut: legacySadJobRunWithNoStepLogsLogOutput,
+		},
+		{
+			name: "noninteractive with log-failed, legacy service data, with no step logs available (#10551)",
+			opts: &ViewOptions{
+				JobID:     "22",
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/22"),
+					httpmock.JSONResponse(shared.LegacyFailedJobWithoutStepLogs))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: legacySadJobRunWithNoStepLogsLogOutput,
+		},
+		{
+			name: "interactive with run log, legacy service data, with no step logs available (#10551)",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt: true,
+				Log:    true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.LegacySuccessfulJobWithoutStepLogs,
+							shared.LegacyFailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool commit, CI [trunk] Feb 23, 2021")
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ legacy cool job with no step logs", "X legacy sad job with no step logs"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "View all jobs in this run")
+					})
+			},
+			wantOut: expectedLegacyRunLogOutputWithNoSteps,
+		},
+		{
+			name: "noninteractive with run log, legacy service data, with no step logs available (#10551)",
+			opts: &ViewOptions{
+				RunID: "3",
+				Log:   true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.LegacySuccessfulJobWithoutStepLogs,
+							shared.LegacyFailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: expectedLegacyRunLogOutputWithNoSteps,
+		},
+		{
+			name: "interactive with run log-failed, legacy service data, with no step logs available (#10551)",
+			tty:  true,
+			opts: &ViewOptions{
+				Prompt:    true,
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: shared.TestRuns,
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.LegacySuccessfulJobWithoutStepLogs,
+							shared.LegacyFailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "✓ cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "- cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "* cool commit, CI [trunk] Feb 23, 2021", "X cool commit, CI [trunk] Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return 4, nil
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ legacy cool job with no step logs", "X legacy sad job with no step logs"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "View all jobs in this run")
+					})
+			},
+			wantOut: legacySadJobRunWithNoStepLogsLogOutput,
+		},
+		{
+			name: "noninteractive with run log-failed, legacy service data, with no step logs available (#10551)",
+			opts: &ViewOptions{
+				RunID:     "1234",
+				LogFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.LegacySuccessfulJobWithoutStepLogs,
+							shared.LegacyFailedJobWithoutStepLogs,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.FileResponse("./fixtures/run_log.zip"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: legacySadJobRunWithNoStepLogsLogOutput,
+		},
+		{
 			name: "run log but run is not done",
 			tty:  true,
 			opts: &ViewOptions{
@@ -1419,14 +2032,24 @@ func TestViewRun(t *testing.T) {
 //	├── sad job/
 //	│   ├── 1_barf the quux.txt
 //	│   └── 2_quux the barf.txt
-//	└── ad job/
-//	    └── 1_barf the quux.txt
+//	├── ad job/
+//	|   └── 1_barf the quux.txt
+//	├── 0_cool job.txt
+//	├── 1_sad job.txt
+//	├── 2_cool job with no step logs.txt
+//	├── 3_sad job with no step logs.txt
+//	├── -9999999999_legacy cool job with no step logs.txt
+//	├── -9999999999_legacy sad job with no step logs.txt
+//	├── 4_cool job with both legacy and new logs.txt
+//	└── -9999999999_cool job with both legacy and new logs.txt
 func Test_attachRunLog(t *testing.T) {
 	tests := []struct {
-		name         string
-		job          shared.Job
-		wantMatch    bool
-		wantFilename string
+		name             string
+		job              shared.Job
+		wantJobMatch     bool
+		wantJobFilename  string
+		wantStepMatch    bool
+		wantStepFilename string
 	}{
 		{
 			name: "matching job name and step number 1",
@@ -1437,8 +2060,10 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "cool job/1_fob the barz.txt",
+			wantJobMatch:     true,
+			wantJobFilename:  "0_cool job.txt",
+			wantStepMatch:    true,
+			wantStepFilename: "cool job/1_fob the barz.txt",
 		},
 		{
 			name: "matching job name and step number 2",
@@ -1449,8 +2074,10 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 2,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "cool job/2_barz the fob.txt",
+			wantJobMatch:     true,
+			wantJobFilename:  "0_cool job.txt",
+			wantStepMatch:    true,
+			wantStepFilename: "cool job/2_barz the fob.txt",
 		},
 		{
 			name: "matching job name and step number and mismatch step name",
@@ -1461,8 +2088,10 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "cool job/1_fob the barz.txt",
+			wantJobMatch:     true,
+			wantJobFilename:  "0_cool job.txt",
+			wantStepMatch:    true,
+			wantStepFilename: "cool job/1_fob the barz.txt",
 		},
 		{
 			name: "matching job name and mismatch step number",
@@ -1473,7 +2102,62 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 3,
 				}},
 			},
-			wantMatch: false,
+			wantJobMatch:    true,
+			wantJobFilename: "0_cool job.txt",
+			wantStepMatch:   false,
+		},
+		{
+			name: "matching job name with no step logs",
+			job: shared.Job{
+				Name: "cool job with no step logs",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 1,
+				}},
+			},
+			wantJobMatch:    true,
+			wantJobFilename: "2_cool job with no step logs.txt",
+			wantStepMatch:   false,
+		},
+		{
+			name: "matching job name with no step data",
+			job: shared.Job{
+				Name: "cool job with no step logs",
+			},
+			wantJobMatch:    true,
+			wantJobFilename: "2_cool job with no step logs.txt",
+			wantStepMatch:   false,
+		},
+		{
+			name: "matching job name with legacy filename and no step logs",
+			job: shared.Job{
+				Name: "legacy cool job with no step logs",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 1,
+				}},
+			},
+			wantJobMatch:    true,
+			wantJobFilename: "-9999999999_legacy cool job with no step logs.txt",
+			wantStepMatch:   false,
+		},
+		{
+			name: "matching job name with legacy filename and no step data",
+			job: shared.Job{
+				Name: "legacy cool job with no step logs",
+			},
+			wantJobMatch:    true,
+			wantJobFilename: "-9999999999_legacy cool job with no step logs.txt",
+			wantStepMatch:   false,
+		},
+		{
+			name: "matching job name with both normal and legacy filename",
+			job: shared.Job{
+				Name: "cool job with both legacy and new logs",
+			},
+			wantJobMatch:    true,
+			wantJobFilename: "4_cool job with both legacy and new logs.txt",
+			wantStepMatch:   false,
 		},
 		{
 			name: "one job name is a suffix of another",
@@ -1484,8 +2168,8 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "ad job/1_barf the quux.txt",
+			wantStepMatch:    true,
+			wantStepFilename: "ad job/1_barf the quux.txt",
 		},
 		{
 			name: "escape metacharacters in job name",
@@ -1496,7 +2180,8 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 0,
 				}},
 			},
-			wantMatch: false,
+			wantJobMatch:  false,
+			wantStepMatch: false,
 		},
 		{
 			name: "mismatching job name",
@@ -1507,7 +2192,8 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch: false,
+			wantJobMatch:  false,
+			wantStepMatch: false,
 		},
 		{
 			name: "job name with forward slash matches dir with slash removed",
@@ -1518,9 +2204,10 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch: true,
+			wantJobMatch:  false,
+			wantStepMatch: true,
 			// not the double space in the dir name, as the slash has been removed
-			wantFilename: "cool job  with slash/1_fob the barz.txt",
+			wantStepFilename: "cool job  with slash/1_fob the barz.txt",
 		},
 		{
 			name: "job name with colon matches dir with colon removed",
@@ -1531,8 +2218,9 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "cool job  with colon/1_fob the barz.txt",
+			wantJobMatch:     false,
+			wantStepMatch:    true,
+			wantStepFilename: "cool job  with colon/1_fob the barz.txt",
 		},
 		{
 			name: "Job name with really long name (over the ZIP limit)",
@@ -1543,8 +2231,9 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnine/1_Long Name Job.txt",
+			wantJobMatch:     false,
+			wantStepMatch:    true,
+			wantStepFilename: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnine/1_Long Name Job.txt",
 		},
 		{
 			name: "Job name that would be truncated by the C# server to split a grapheme",
@@ -1555,8 +2244,9 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "Emoji Test 😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅�/1_Emoji Job.txt",
+			wantJobMatch:     false,
+			wantStepMatch:    true,
+			wantStepFilename: "Emoji Test 😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅�/1_Emoji Job.txt",
 		},
 	}
 
@@ -1566,17 +2256,27 @@ func Test_attachRunLog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			jobs := []shared.Job{tt.job}
 
-			attachRunLog(&run_log_zip_reader.Reader, []shared.Job{tt.job})
+			attachRunLog(&run_log_zip_reader.Reader, jobs)
 
 			t.Logf("Job details: ")
 
-			for _, step := range tt.job.Steps {
-				log := step.Log
-				logPresent := log != nil
-				require.Equal(t, tt.wantMatch, logPresent, "log not present")
-				if logPresent {
-					require.Equal(t, tt.wantFilename, log.Name, "Filename mismatch")
+			job := jobs[0]
+
+			jobLog := job.Log
+			jobLogPresent := jobLog != nil
+			require.Equal(t, tt.wantJobMatch, jobLogPresent, "job log not present")
+			if jobLogPresent {
+				require.Equal(t, tt.wantJobFilename, jobLog.Name, "job log filename mismatch")
+			}
+
+			for _, step := range job.Steps {
+				stepLog := step.Log
+				stepLogPresent := stepLog != nil
+				require.Equal(t, tt.wantStepMatch, stepLogPresent, "step log not present")
+				if stepLogPresent {
+					require.Equal(t, tt.wantStepFilename, stepLog.Name, "step log filename mismatch")
 				}
 			}
 		})
@@ -1607,9 +2307,35 @@ sad job	quux the barf	log line 2
 sad job	quux the barf	log line 3
 `)
 
+var coolJobRunWithNoStepLogsLogOutput = heredoc.Doc(`
+cool job with no step logs	UNKNOWN STEP	log line 1
+cool job with no step logs	UNKNOWN STEP	log line 2
+cool job with no step logs	UNKNOWN STEP	log line 3
+`)
+
+var legacyCoolJobRunWithNoStepLogsLogOutput = heredoc.Doc(`
+legacy cool job with no step logs	UNKNOWN STEP	log line 1
+legacy cool job with no step logs	UNKNOWN STEP	log line 2
+legacy cool job with no step logs	UNKNOWN STEP	log line 3
+`)
+
+var sadJobRunWithNoStepLogsLogOutput = heredoc.Doc(`
+sad job with no step logs	UNKNOWN STEP	log line 1
+sad job with no step logs	UNKNOWN STEP	log line 2
+sad job with no step logs	UNKNOWN STEP	log line 3
+`)
+
+var legacySadJobRunWithNoStepLogsLogOutput = heredoc.Doc(`
+legacy sad job with no step logs	UNKNOWN STEP	log line 1
+legacy sad job with no step logs	UNKNOWN STEP	log line 2
+legacy sad job with no step logs	UNKNOWN STEP	log line 3
+`)
+
 var coolJobRunLogOutput = fmt.Sprintf("%s%s", fobTheBarzLogOutput, barfTheFobLogOutput)
 var sadJobRunLogOutput = fmt.Sprintf("%s%s", barfTheQuuxLogOutput, quuxTheBarfLogOutput)
 var expectedRunLogOutput = fmt.Sprintf("%s%s", coolJobRunLogOutput, sadJobRunLogOutput)
+var expectedRunLogOutputWithNoSteps = fmt.Sprintf("%s%s", coolJobRunWithNoStepLogsLogOutput, sadJobRunWithNoStepLogsLogOutput)
+var expectedLegacyRunLogOutputWithNoSteps = fmt.Sprintf("%s%s", legacyCoolJobRunWithNoStepLogsLogOutput, legacySadJobRunWithNoStepLogsLogOutput)
 
 func TestRunLog(t *testing.T) {
 	t.Run("when the cache dir doesn't exist, exists return false", func(t *testing.T) {

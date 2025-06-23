@@ -236,6 +236,8 @@ func editRun(opts *EditOptions) error {
 		if filename == "" {
 			if len(candidates) == 1 {
 				filename = candidates[0]
+			} else if len(candidates) == 0 {
+				return errors.New("no file in the gist")
 			} else {
 				if !opts.IO.CanPrompt() {
 					return errors.New("unsure what file to edit; either specify --filename or run interactively")

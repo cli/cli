@@ -225,9 +225,33 @@ func Test_createRun(t *testing.T) {
 			responseStatus: http.StatusOK,
 		},
 		{
-			name: "multiple files",
+			name: "when both a file and the stdin '-' are provided, it matches on all the files passed in and stdin",
 			opts: &CreateOptions{
 				Filenames: []string{fixtureFile, "-"},
+			},
+			stdin:      "cool stdin content",
+			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
+			wantStderr: "- Creating gist with multiple files\n✓ Created secret gist fixture.txt\n",
+			wantErr:    false,
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"fixture.txt": map[string]interface{}{
+						"content": "{}",
+					},
+					"gistfile1.txt": map[string]interface{}{
+						"content": "cool stdin content",
+					},
+				},
+			},
+			responseStatus: http.StatusOK,
+		},
+		{
+			name: "when both a file and the stdin '-' are provided, but '-' is not the last argument, it matches on all the files provided and stdin",
+			opts: &CreateOptions{
+				Filenames: []string{"-", fixtureFile},
 			},
 			stdin:      "cool stdin content",
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",

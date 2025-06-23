@@ -28,6 +28,12 @@ func TestNewTrustedRootCmd(t *testing.T) {
 		Config: func() (gh.Config, error) {
 			return &ghmock.ConfigMock{}, nil
 		},
+		HttpClient: func() (*http.Client, error) {
+			reg := &httpmock.Registry{}
+			client := &http.Client{}
+			httpmock.ReplaceTripper(client, reg)
+			return client, nil
+		},
 	}
 
 	testcases := []struct {
@@ -113,6 +119,7 @@ func TestNewTrustedRootWithTenancy(t *testing.T) {
 					},
 				}, nil
 			},
+			HttpClient: httpClientFunc,
 		}
 
 		cmd := NewTrustedRootCmd(f, func(_ *Options) error {
@@ -171,15 +178,19 @@ func TestGetTrustedRoot(t *testing.T) {
 		TufRootPath: root,
 	}
 
+	reg := &httpmock.Registry{}
+	client := &http.Client{}
+	httpmock.ReplaceTripper(client, reg)
+
 	t.Run("failed to create TUF root", func(t *testing.T) {
-		err := getTrustedRoot(newTUFErrClient, opts)
+		err := getTrustedRoot(newTUFErrClient, opts, client)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to create TUF client")
 	})
 
 	t.Run("fails because the root cannot be found", func(t *testing.T) {
 		opts.TufRootPath = test.NormalizeRelativePath("./does/not/exist/root.json")
-		err := getTrustedRoot(tuf.New, opts)
+		err := getTrustedRoot(tuf.New, opts, client)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to read root file")
 	})

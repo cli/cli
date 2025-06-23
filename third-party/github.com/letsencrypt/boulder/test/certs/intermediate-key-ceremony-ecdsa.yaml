@@ -1,0 +1,12 @@
+ceremony-type: key
+pkcs11:
+    module: /usr/lib/softhsm/libsofthsm2.so
+    pin: 1234
+    store-key-in-slot: {{ .SlotID }}
+    store-key-with-label: {{ .Label }}
+key:
+    type: ecdsa
+    ecdsa-curve: P-384
+outputs:
+    public-key-path: test/certs/webpki/{{ .FileName }}.pubkey.pem
+    pkcs11-config-path: test/certs/webpki/{{ .FileName }}.pkcs11.json

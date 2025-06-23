@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package nonce;
+option go_package = "github.com/letsencrypt/boulder/nonce/proto";
+
+import "google/protobuf/empty.proto";
+
+service NonceService {
+  rpc Nonce(google.protobuf.Empty) returns (NonceMessage) {}
+  rpc Redeem(NonceMessage) returns (ValidMessage) {}
+}
+
+message NonceMessage {
+  string nonce = 1;
+}
+
+message ValidMessage {
+  bool valid = 1;
+}

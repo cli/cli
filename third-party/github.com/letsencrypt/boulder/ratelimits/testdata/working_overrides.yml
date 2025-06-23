@@ -1,0 +1,24 @@
+- NewRegistrationsPerIPAddress:
+    burst: 40
+    count: 40
+    period: 1s
+    ids:
+      - id: 10.0.0.2
+        comment: Foo
+- NewRegistrationsPerIPv6Range:
+    burst: 50
+    count: 50
+    period: 2s
+    ids:
+      - id: 2001:0db8:0000::/48
+        comment: Foo
+- FailedAuthorizationsPerDomainPerAccount:
+    burst: 60
+    count: 60
+    period: 3s
+    ids:
+      - id: 1234
+        comment: Foo
+      - id: 5678
+        comment: Foo
+
