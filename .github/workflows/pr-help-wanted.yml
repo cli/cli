@@ -2,6 +2,12 @@ name: PR Help Wanted Check
 on:
   pull_request_target:
     types: [opened]
+  workflow_dispatch:
+    inputs:
+      pr_url:
+        description: "Pull Request URL to check"
+        required: true
+        type: string
 
 permissions:
   contents: none
@@ -15,13 +21,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set PR variables for workflow_dispatch event
+        id: pr-vars-dispatch
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.inputs.pr_url }}
+        run: |
+          # We only need to grab the URL from the dispatch event input,
+          # and the isDraft status of the PR. The draft status is
+          # used to decide whether to run the help-wanted check/script.
+          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+          echo "is_draft=$(gh pr view "${PR_URL}" --json isDraft --jq '.isDraft')" >> $GITHUB_OUTPUT
+
       - name: Check for issues without help-wanted label
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            # These variables are optionally used in the check-help-wanted.sh
+            # script for additional checks; but they are not strictly necessary
+            # for the script to run. This is why we are okay with them being
+            # empty when the event is workflow_dispatch.
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
           PR_AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
-        if: "!github.event.pull_request.draft"
+          PR_URL: ${{ github.event.pull_request.html_url || steps.pr-vars-dispatch.outputs.pr_url }}
+        if: github.event.pull_request.draft == 'false' || steps.pr-vars-dispatch.outputs.is_draft == 'false'
         run: |
           # Run the script to check for issues without help-wanted label
-          bash .github/workflows/scripts/check-help-wanted.sh ${{ github.event.pull_request.html_url }}
+          bash .github/workflows/scripts/check-help-wanted.sh "${PR_URL}"
