@@ -46,7 +46,7 @@ jobs:
           PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
           PR_AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
           PR_URL: ${{ github.event.pull_request.html_url || steps.pr-vars-dispatch.outputs.pr_url }}
-        if: github.event.pull_request.draft == 'false' || steps.pr-vars-dispatch.outputs.is_draft == 'false'
+          PR_IS_DRAFT: ${{ github.event.pull_request.draft == 'false' || steps.pr-vars-dispatch.outputs.is_draft == 'false' }}
         run: |
           # Run the script to check for issues without help-wanted label
           bash .github/workflows/scripts/check-help-wanted.sh "${PR_URL}"

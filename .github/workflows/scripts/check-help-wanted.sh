@@ -15,6 +15,9 @@ fi
 # Skip if PR is from a bot or org member
 if [ "$PR_AUTHOR_TYPE" = "Bot" ] || [ "$PR_AUTHOR_ASSOCIATION" = "MEMBER" ] || [ "$PR_AUTHOR_ASSOCIATION" = "OWNER" ]; then
     echo "Skipping check for PR #$PR_URL as it is from a bot ($PR_AUTHOR_TYPE) or an org member ($PR_AUTHOR_ASSOCIATION: MEMBER/OWNER)"
+# Skip if PR is a draft
+if [ "$PR_IS_DRAFT" = "true" ]; then
+    echo "Skipping check for PR $PR_URL as it is a draft"
     exit 0
 fi
 
