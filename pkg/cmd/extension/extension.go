@@ -214,7 +214,7 @@ func (e *Extension) UpdateAvailable() bool {
 	if e.IsLocal() ||
 		e.CurrentVersion() == "" ||
 		e.LatestVersion(e.httpClient) == "" ||
-		e.CurrentVersion() == e.LatestVersion() {
+		e.CurrentVersion() == e.LatestVersion(e.httpClient) {
 		return false
 	}
 	return true
