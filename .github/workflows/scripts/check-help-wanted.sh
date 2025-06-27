@@ -19,7 +19,7 @@ if [ "$PR_AUTHOR_TYPE" = "Bot" ] || [ "$PR_AUTHOR_ASSOCIATION" = "MEMBER" ] || [
 fi
 
 # Skip if PR is a draft
-if [ "$PR_IS_DRAFT" = "true" ]; then
+if [ "$PR_IS_DRAFT" != "false" ]; then
     echo "Skipping check for PR $PR_URL as it is a draft"
     exit 0
 fi
