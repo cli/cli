@@ -290,7 +290,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			},
 		},
 		func() *cobra.Command {
-			var forceFlag bool
+			var forceUpgradeFlag bool // Renamed
+			var forceAuthSkipFlag bool // New flag
 			var pinFlag string
 			cmd := &cobra.Command{
 				Use:   "install <repository>",
@@ -338,6 +339,17 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				`),
 				Args: cmdutil.MinimumArgs(1, "must specify a repository to install from"),
 				RunE: func(cmd *cobra.Command, args []string) error {
+					var installClient *http.Client
+					if forceAuthSkipFlag {
+						installClient = api.NewHTTPClient(api.HTTPClientOptions{})
+					} else {
+						var err error
+						installClient, err = httpClient()
+						if err != nil {
+							return err
+						}
+					}
+
 					if args[0] == "." {
 						if pinFlag != "" {
 							return fmt.Errorf("local extensions cannot be pinned")
@@ -371,9 +383,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					cs := io.ColorScheme()
 
 					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName(), repo.RepoOwner()); err != nil {
-						// If an existing extension was found and --force was specified, attempt to upgrade.
-						if forceFlag && ext != nil {
-							return upgradeFunc(ext.Name(), forceFlag)
+						// If an existing extension was found and --force-upgrade was specified, attempt to upgrade.
+						if forceUpgradeFlag && ext != nil {
+							return upgradeFunc(ext.Name(), forceUpgradeFlag)
 						}
 
 						if errors.Is(err, alreadyInstalledError) {
@@ -385,7 +397,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					}
 
 					io.StartProgressIndicator()
-					err = m.Install(repo, pinFlag)
+					err = m.Install(installClient, repo, pinFlag) // Pass the client here
 					io.StopProgressIndicator()
 
 					if err != nil {
@@ -411,7 +423,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return nil
 				},
 			}
-			cmd.Flags().BoolVar(&forceFlag, "force", false, "Force upgrade extension, or ignore if latest already installed")
+			cmd.Flags().BoolVar(&forceUpgradeFlag, "force", false, "Force upgrade extension, or ignore if latest already installed") // Renamed flag
+			cmd.Flags().BoolVar(&forceAuthSkipFlag, "force-no-auth", false, "Install extension without authentication") // New flag
 			cmd.Flags().StringVar(&pinFlag, "pin", "", "Pin extension to a release tag or commit ref")
 			return cmd
 		}(),

@@ -159,7 +159,6 @@ func (m *Manager) list(includeMetadata bool) ([]*Extension, error) {
 				results = append(results, &Extension{
 					path:       filepath.Join(dir, f.Name(), f.Name()),
 					kind:       BinaryKind,
-					httpClient: m.client,
 				})
 			} else {
 				results = append(results, &Extension{
@@ -199,7 +198,7 @@ func (m *Manager) populateLatestVersions(exts []*Extension) {
 		wg.Add(1)
 		go func(e *Extension) {
 			defer wg.Done()
-			e.LatestVersion()
+			e.LatestVersion(m.client)
 		}(ext)
 	}
 	wg.Wait()
@@ -246,11 +245,11 @@ type binManifest struct {
 }
 
 // Install installs an extension from repo, and pins to commitish if provided
-func (m *Manager) Install(repo ghrepo.Interface, target string) error {
-	isBin, err := isBinExtension(m.client, repo)
+func (m *Manager) Install(client *http.Client, repo ghrepo.Interface, target string) error {
+	isBin, err := isBinExtension(client, repo)
 	if err != nil {
 		if errors.Is(err, releaseNotFoundErr) {
-			if ok, err := repoExists(m.client, repo); err != nil {
+			if ok, err := repoExists(client, repo); err != nil {
 				return err
 			} else if !ok {
 				return repositoryNotFoundErr
@@ -260,10 +259,10 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 		}
 	}
 	if isBin {
-		return m.installBin(repo, target)
+		return m.installBin(client, repo, target)
 	}
 
-	hs, err := hasScript(m.client, repo)
+	hs, err := hasScript(client, repo)
 	if err != nil {
 		return err
 	}
@@ -274,14 +273,14 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 	return m.installGit(repo, target)
 }
 
-func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
+func (m *Manager) installBin(client *http.Client, repo ghrepo.Interface, target string) error {
 	var r *release
 	var err error
 	isPinned := target != ""
 	if isPinned {
-		r, err = fetchReleaseFromTag(m.client, repo, target)
+		r, err = fetchReleaseFromTag(client, repo, target)
 	} else {
-		r, err = fetchLatestRelease(m.client, repo)
+		r, err = fetchLatestRelease(client, repo)
 	}
 	if err != nil {
 		return err
@@ -346,7 +345,7 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	err = downloadAsset(m.client, *asset, binPath)
+	err = downloadAsset(client, *asset, binPath)
 	if err != nil {
 		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
 	}
@@ -471,7 +470,7 @@ func (m *Manager) Upgrade(name string, force bool) error {
 			return localExtensionUpgradeError
 		}
 		// For single extensions manually retrieve latest version since we forgo doing it during list.
-		if latestVersion := f.LatestVersion(); latestVersion == "" {
+		if latestVersion := f.LatestVersion(m.client); latestVersion == "" {
 			return fmt.Errorf("unable to retrieve latest version for extension %q", name)
 		}
 		return m.upgradeExtensions([]*Extension{f}, force)
@@ -567,7 +566,7 @@ func (m *Manager) upgradeBinExtension(ext *Extension) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse URL %s: %w", ext.URL(), err)
 	}
-	return m.installBin(repo, "")
+	return m.installBin(m.client, repo, "")
 }
 
 func (m *Manager) Remove(name string) error {

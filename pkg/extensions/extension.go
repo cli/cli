@@ -20,7 +20,7 @@ type Extension interface {
 	Path() string // Path to executable
 	URL() string
 	CurrentVersion() string
-	LatestVersion() string
+	LatestVersion(client *http.Client) string
 	IsPinned() bool
 	UpdateAvailable() bool
 	IsBinary() bool

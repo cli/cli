@@ -25,19 +25,18 @@ const (
 )
 
 type Extension struct {
-	path       string
-	kind       ExtensionKind
-	gitClient  gitClient
-	httpClient *http.Client
+	path string
+	kind ExtensionKind
+	gitClient gitClient
 
 	mu sync.RWMutex
 
 	// These fields get resolved dynamically:
-	url            string
-	isPinned       *bool
+	url string
+	isPinned *bool
 	currentVersion string
-	latestVersion  string
-	owner          string
+	latestVersion string
+	owner string
 }
 
 func (e *Extension) Name() string {
@@ -113,7 +112,7 @@ func (e *Extension) CurrentVersion() string {
 	return e.currentVersion
 }
 
-func (e *Extension) LatestVersion() string {
+func (e *Extension) LatestVersion(client *http.Client) string {
 	e.mu.RLock()
 	if e.latestVersion != "" {
 		defer e.mu.RUnlock()
@@ -129,7 +128,7 @@ func (e *Extension) LatestVersion() string {
 		if err != nil {
 			return ""
 		}
-		release, err := fetchLatestRelease(e.httpClient, repo)
+		release, err := fetchLatestRelease(client, repo)
 		if err != nil {
 			return ""
 		}
@@ -214,7 +213,7 @@ func (e *Extension) Owner() string {
 func (e *Extension) UpdateAvailable() bool {
 	if e.IsLocal() ||
 		e.CurrentVersion() == "" ||
-		e.LatestVersion() == "" ||
+		e.LatestVersion(e.httpClient) == "" ||
 		e.CurrentVersion() == e.LatestVersion() {
 		return false
 	}
