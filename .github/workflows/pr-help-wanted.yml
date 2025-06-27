@@ -4,8 +4,8 @@ on:
     types: [opened]
   workflow_dispatch:
     inputs:
-      pr_url:
-        description: "Pull Request URL to check"
+      pr_number:
+        description: "Pull Request number to check"
         required: true
         type: string
 
@@ -26,11 +26,12 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ github.event.inputs.pr_url }}
+          PR_NUMBER: ${{ github.event.inputs.pr_number }}
         run: |
-          # We only need to grab the URL from the dispatch event input,
+          # We only need to construct the PR URL from the dispatch event input,
           # and the isDraft status of the PR. The draft status is
           # used to decide whether to run the help-wanted check/script.
+          PR_URL="https://github.com/cli/cli/pull/${PR_NUMBER}"
           echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
           echo "is_draft=$(gh pr view "${PR_URL}" --json isDraft --jq '.isDraft')" >> $GITHUB_OUTPUT
 
