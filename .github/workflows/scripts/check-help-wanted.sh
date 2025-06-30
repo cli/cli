@@ -19,7 +19,7 @@ if [ "$PR_AUTHOR_TYPE" = "Bot" ] || [ "$PR_AUTHOR_ASSOCIATION" = "MEMBER" ] || [
 fi
 
 # Skip if PR is a draft
-if [ "$PR_IS_DRAFT" != "false" ]; then
+if [ "$(gh pr view "${PR_URL}" --json isDraft --jq '.isDraft')" != "false" ]; then
     echo "Skipping check for PR $PR_URL as it is a draft"
     exit 0
 fi

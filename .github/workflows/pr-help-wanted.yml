@@ -28,12 +28,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.inputs.pr_number }}
         run: |
-          # We only need to construct the PR URL from the dispatch event input,
-          # and the isDraft status of the PR. The draft status is
-          # used to decide whether to run the help-wanted check/script.
-          PR_URL="https://github.com/cli/cli/pull/${PR_NUMBER}"
-          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
-          echo "is_draft=$(gh pr view "${PR_URL}" --json isDraft --jq '.isDraft')" >> $GITHUB_OUTPUT
+          # We only need to construct the PR URL from the dispatch event input.
+          echo "pr_url=https://github.com/cli/cli/pull/${PR_NUMBER}" >> $GITHUB_OUTPUT
 
       - name: Check for issues without help-wanted label
         env:
@@ -46,7 +42,6 @@ jobs:
           PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
           PR_AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
           PR_URL: ${{ github.event.pull_request.html_url || steps.pr-vars-dispatch.outputs.pr_url }}
-          PR_IS_DRAFT: ${{ github.event.pull_request.draft == 'false' || steps.pr-vars-dispatch.outputs.is_draft == 'false' }}
         run: |
           # Run the script to check for issues without help-wanted label
           bash .github/workflows/scripts/check-help-wanted.sh "${PR_URL}"
