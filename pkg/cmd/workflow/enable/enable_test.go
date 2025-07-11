@@ -293,7 +293,7 @@ func TestEnableRun(t *testing.T) {
 					}))
 			},
 			wantErr:    true,
-			wantErrOut: "could not resolve to a unique workflow; found: disabled.yml anotherDisabled.yml",
+			wantErrOut: "could not resolve a unique workflow; found: disabled.yml anotherDisabled.yml",
 		},
 	}
 

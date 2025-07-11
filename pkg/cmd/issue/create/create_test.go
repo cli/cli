@@ -816,7 +816,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 			"errors": [{
 				"type": "NOT_FOUND",
 				"path": [ "organization" ],
-				"message": "Could not resolve to an Organization with the login of 'OWNER'."
+				"message": "Could not resolve an Organization with the login of 'OWNER'."
 			}]
 		}
 		`))

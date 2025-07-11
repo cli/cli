@@ -67,7 +67,7 @@ func OrganizationTeam(client *Client, hostname string, org string, teamSlug stri
 		return nil, err
 	}
 	if query.Organization.Team.ID == "" {
-		return nil, fmt.Errorf("could not resolve to a Team with the slug of '%s'", teamSlug)
+		return nil, fmt.Errorf("could not resolve a Team with the slug of '%s'", teamSlug)
 	}
 
 	return &query.Organization.Team, nil

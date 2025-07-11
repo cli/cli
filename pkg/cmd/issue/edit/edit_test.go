@@ -494,7 +494,7 @@ func Test_editRun(t *testing.T) {
 						{ "errors": [
 							{
 								"type": "NOT_FOUND",
-								"message": "Could not resolve to an Issue with the number of 9999."
+								"message": "Could not resolve an Issue with the number of 9999."
 							}
 						] }`),
 				)

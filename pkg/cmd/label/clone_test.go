@@ -417,7 +417,7 @@ func TestCloneRun(t *testing.T) {
 									"column": 1
 								  }
 								],
-								"message": "Could not resolve to a Repository with the name 'cli/invalid'."
+								"message": "Could not resolve a Repository with the name 'cli/invalid'."
 							  }
 							]
 						}`),
@@ -427,7 +427,7 @@ func TestCloneRun(t *testing.T) {
 				)
 			},
 			wantErr:    true,
-			wantErrMsg: "GraphQL: Could not resolve to a Repository with the name 'cli/invalid'. (repository)",
+			wantErrMsg: "GraphQL: Could not resolve a Repository with the name 'cli/invalid'. (repository)",
 		},
 		{
 			name: "create error",

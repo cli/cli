@@ -239,7 +239,7 @@ func TestCloseRun(t *testing.T) {
 					httpmock.StringResponse(`{
             "data": { "repository": { "hasIssuesEnabled": false, "issue": null } },
             "errors": [ { "type": "NOT_FOUND", "path": [ "repository", "issue" ],
-            "message": "Could not resolve to an issue or pull request with the number of 13."
+            "message": "Could not resolve an issue or pull request with the number of 13."
 					} ] }`),
 				)
 			},

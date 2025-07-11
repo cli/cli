@@ -140,7 +140,7 @@ func TestIssueReopen_issuesDisabled(t *testing.T) {
 						"repository",
 						"issue"
 					],
-					"message": "Could not resolve to an issue or pull request with the number of 2."
+					"message": "Could not resolve an issue or pull request with the number of 2."
 				}
 			]
 		}`),

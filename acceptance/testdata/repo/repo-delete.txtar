@@ -10,4 +10,4 @@ exec gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
 
 # Ensure that the repo was deleted
 ! exec gh repo view $ORG/$SCRIPT_NAME-$RANDOM_STRING
-stderr 'Could not resolve to a Repository with the name'
+stderr 'Could not resolve a Repository with the name'

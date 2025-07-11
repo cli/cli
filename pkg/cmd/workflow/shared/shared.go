@@ -222,7 +222,7 @@ func ResolveWorkflow(p iprompter, io *iostreams.IOStreams, client *api.Client, r
 	}
 
 	if !io.CanPrompt() {
-		errMsg := "could not resolve to a unique workflow; found:"
+		errMsg := "could not resolve a unique workflow; found:"
 		for _, workflow := range workflows {
 			errMsg += fmt.Sprintf(" %s", workflow.Base())
 		}

@@ -303,7 +303,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
 			{ "errors": [
-				{ "message": "Could not resolve to an Issue with the number of 9999." }
+				{ "message": "Could not resolve an Issue with the number of 9999." }
 			] }
 			`),
 	)
@@ -312,7 +312,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 	defer cmdTeardown(t)
 
 	_, err := runCommand(http, true, "-w 9999")
-	if err == nil || err.Error() != "GraphQL: Could not resolve to an Issue with the number of 9999." {
+	if err == nil || err.Error() != "GraphQL: Could not resolve an Issue with the number of 9999." {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 }
@@ -338,7 +338,7 @@ func TestIssueView_disabledIssues(t *testing.T) {
 							"repository",
 							"issue"
 						],
-						"message": "Could not resolve to an issue or pull request with the number of 6666."
+						"message": "Could not resolve an issue or pull request with the number of 6666."
 					}
 				]
 			}

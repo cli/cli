@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	errorResolvingOrganization = "Could not resolve to an Organization"
+	errorResolvingOrganization = "Could not resolve an Organization"
 )
 
 // Repository contains information about a GitHub repo
@@ -299,7 +299,7 @@ func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*R
 			GraphQLError: &ghAPI.GraphQLError{
 				Errors: []ghAPI.GraphQLErrorItem{{
 					Type:    "NOT_FOUND",
-					Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+					Message: fmt.Sprintf("Could not resolve a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
 				}},
 			},
 		}
@@ -352,7 +352,7 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 			GraphQLError: &ghAPI.GraphQLError{
 				Errors: []ghAPI.GraphQLErrorItem{{
 					Type:    "NOT_FOUND",
-					Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+					Message: fmt.Sprintf("Could not resolve a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
 				}},
 			},
 		}
