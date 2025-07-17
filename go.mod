@@ -56,7 +56,7 @@ require (
 	golang.org/x/sync v0.16.0
 	golang.org/x/term v0.33.0
 	golang.org/x/text v0.27.0
-	google.golang.org/grpc v1.73.0
+	google.golang.org/grpc v1.74.0
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/h2non/gock.v1 v1.1.2
 	gopkg.in/yaml.v3 v3.0.1
