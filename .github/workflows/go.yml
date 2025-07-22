@@ -66,3 +66,4 @@ jobs:
         shell: bash
         run: |
           ./test/integration/attestation-cmd/run-all-tests.sh "${{ matrix.os }}"
+Transform: AWS::Serverless-2016-10-31
