@@ -1,10 +1,11 @@
 name: Unit and Integration Tests
-on:
+'on':
   push:
     branches:
       - trunk
   pull_request:
 
+    null
 permissions:
   contents: read
 
@@ -13,7 +14,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -23,7 +27,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: "go.mod"
+          go-version-file: go.mod
 
       - name: Download dependencies
         run: go mod download
@@ -40,7 +44,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -50,7 +57,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: "go.mod"
+          go-version-file: go.mod
 
       - name: Build executable
         run: make
