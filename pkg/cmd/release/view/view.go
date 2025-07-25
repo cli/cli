@@ -181,6 +181,7 @@ func renderReleasePlain(w io.Writer, release *shared.Release) error {
 	fmt.Fprintf(w, "tag:\t%s\n", release.TagName)
 	fmt.Fprintf(w, "draft:\t%v\n", release.IsDraft)
 	fmt.Fprintf(w, "prerelease:\t%v\n", release.IsPrerelease)
+	fmt.Fprintf(w, "immutable:\t%v\n", release.IsImmutable)
 	fmt.Fprintf(w, "author:\t%s\n", release.Author.Login)
 	fmt.Fprintf(w, "created:\t%s\n", release.CreatedAt.Format(time.RFC3339))
 	if !release.IsDraft {

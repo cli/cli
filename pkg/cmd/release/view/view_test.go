@@ -31,6 +31,7 @@ func TestJSONFields(t *testing.T) {
 		"id",
 		"isDraft",
 		"isPrerelease",
+		"isImmutable",
 		"name",
 		"publishedAt",
 		"tagName",
@@ -196,6 +197,7 @@ func Test_viewRun(t *testing.T) {
 				tag:	v1.2.3
 				draft:	false
 				prerelease:	false
+				immutable:	true
 				author:	MonaLisa
 				created:	2020-08-31T15:44:24+02:00
 				published:	2020-08-31T15:44:24+02:00
@@ -220,6 +222,7 @@ func Test_viewRun(t *testing.T) {
 				tag:	v1.2.3
 				draft:	false
 				prerelease:	false
+				immutable:	true
 				author:	MonaLisa
 				created:	2020-08-31T15:44:24+02:00
 				published:	2020-08-31T15:44:24+02:00
@@ -244,6 +247,7 @@ func Test_viewRun(t *testing.T) {
 			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", tt.opts.TagName, fmt.Sprintf(`{
 				"tag_name": "v1.2.3",
 				"draft": false,
+				"immutable": true,
 				"author": { "login": "MonaLisa" },
 				"body": "%[2]s",
 				"created_at": "%[1]s",

@@ -319,6 +319,10 @@ func IsFailureState(c Conclusion) bool {
 	}
 }
 
+func IsSkipped(c Conclusion) bool {
+	return c == Skipped
+}
+
 type RunsPayload struct {
 	TotalCount   int   `json:"total_count"`
 	WorkflowRuns []Run `json:"workflow_runs"`

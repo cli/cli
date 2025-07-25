@@ -16,6 +16,7 @@ import (
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 )
 
@@ -68,6 +69,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Adding an issue to projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
+
+			The %[1]s--assignee%[1]s flag supports the following special values:
+			- %[1]s@me%[1]s: assign yourself
+			- %[1]s@copilot%[1]s: assign Copilot (not supported on GitHub Enterprise Server)
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh issue create --title "I found a bug" --body "Nothing works"
@@ -75,6 +80,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --label bug --label "help wanted"
 			$ gh issue create --assignee monalisa,hubot
 			$ gh issue create --assignee "@me"
+			$ gh issue create --assignee "@copilot"
 			$ gh issue create --project "Roadmap"
 			$ gh issue create --template "Bug Report"
 		`),
@@ -158,6 +164,10 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	projectsV1Support := opts.Detector.ProjectsV1()
+	issueFeatures, err := opts.Detector.IssueFeatures()
+	if err != nil {
+		return err
+	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
 
@@ -166,20 +176,30 @@ func createRun(opts *CreateOptions) (err error) {
 		milestones = []string{opts.Milestone}
 	}
 
+	// Replace special values in assignees
+	// For web mode, @copilot should be replaced by name; otherwise, login.
+	assigneeSet := set.NewStringSet()
 	meReplacer := prShared.NewMeReplacer(apiClient, baseRepo.RepoHost())
+	copilotReplacer := prShared.NewCopilotReplacer(!opts.WebMode)
 	assignees, err := meReplacer.ReplaceSlice(opts.Assignees)
 	if err != nil {
 		return err
 	}
 
+	if issueFeatures.ActorIsAssignable {
+		assignees = copilotReplacer.ReplaceSlice(assignees)
+	}
+	assigneeSet.AddValues(assignees)
+
 	tb := prShared.IssueMetadataState{
-		Type:          prShared.IssueMetadata,
-		Assignees:     assignees,
-		Labels:        opts.Labels,
-		ProjectTitles: opts.Projects,
-		Milestones:    milestones,
-		Title:         opts.Title,
-		Body:          opts.Body,
+		Type:           prShared.IssueMetadata,
+		ActorAssignees: issueFeatures.ActorIsAssignable,
+		Assignees:      assigneeSet.ToSlice(),
+		Labels:         opts.Labels,
+		ProjectTitles:  opts.Projects,
+		Milestones:     milestones,
+		Title:          opts.Title,
+		Body:           opts.Body,
 	}
 
 	if opts.RecoverFile != "" {

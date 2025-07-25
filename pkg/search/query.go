@@ -64,6 +64,7 @@ type Qualifiers struct {
 	Milestone           string
 	No                  []string
 	Parent              string
+	Path                string
 	Project             string
 	Pushed              string
 	Reactions           string

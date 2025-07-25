@@ -192,16 +192,25 @@ func TestCopilotReplacer_ReplaceSlice(t *testing.T) {
 		handles []string
 	}
 	tests := []struct {
-		name string
-		args args
-		want []string
+		name        string
+		returnLogin bool
+		args        args
+		want        []string
 	}{
 		{
-			name: "replaces @copilot with copilot-swe-agent",
+			name:        "replaces @copilot with login",
+			returnLogin: true,
 			args: args{
 				handles: []string{"monalisa", "@copilot", "hubot"},
 			},
 			want: []string{"monalisa", "copilot-swe-agent", "hubot"},
+		},
+		{
+			name: "replaces @copilot with name",
+			args: args{
+				handles: []string{"monalisa", "@copilot", "hubot"},
+			},
+			want: []string{"monalisa", "Copilot", "hubot"},
 		},
 		{
 			name: "handles no @copilot mentions",
@@ -211,14 +220,16 @@ func TestCopilotReplacer_ReplaceSlice(t *testing.T) {
 			want: []string{"monalisa", "user", "hubot"},
 		},
 		{
-			name: "replaces multiple @copilot mentions",
+			name:        "replaces multiple @copilot mentions",
+			returnLogin: true,
 			args: args{
 				handles: []string{"@copilot", "user", "@copilot"},
 			},
 			want: []string{"copilot-swe-agent", "user", "copilot-swe-agent"},
 		},
 		{
-			name: "handles @copilot case-insensitively",
+			name:        "handles @copilot case-insensitively",
+			returnLogin: true,
 			args: args{
 				handles: []string{"@Copilot", "user", "@CoPiLoT"},
 			},
@@ -241,7 +252,7 @@ func TestCopilotReplacer_ReplaceSlice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := NewCopilotReplacer()
+			r := NewCopilotReplacer(tt.returnLogin)
 			got := r.ReplaceSlice(tt.args.handles)
 			require.Equal(t, tt.want, got)
 		})

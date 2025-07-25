@@ -919,6 +919,7 @@ type RepoMetadataInput struct {
 	Assignees      bool
 	ActorAssignees bool
 	Reviewers      bool
+	TeamReviewers  bool
 	Labels         bool
 	ProjectsV1     bool
 	ProjectsV2     bool
@@ -964,7 +965,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 		}
 	}
 
-	if input.Reviewers {
+	if input.Reviewers && input.TeamReviewers {
 		g.Go(func() error {
 			teams, err := OrganizationTeams(client, repo)
 			// TODO: better detection of non-org repos
@@ -1033,114 +1034,6 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	return &result, nil
 }
 
-type RepoResolveInput struct {
-	Assignees  []string
-	Reviewers  []string
-	Labels     []string
-	ProjectsV1 bool
-	ProjectsV2 bool
-	Milestones []string
-}
-
-// RepoResolveMetadataIDs looks up GraphQL node IDs in bulk
-func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoResolveInput) (*RepoMetadataResult, error) {
-	users := input.Assignees
-	hasUser := func(target string) bool {
-		for _, u := range users {
-			if strings.EqualFold(u, target) {
-				return true
-			}
-		}
-		return false
-	}
-
-	var teams []string
-	for _, r := range input.Reviewers {
-		if i := strings.IndexRune(r, '/'); i > -1 {
-			teams = append(teams, r[i+1:])
-		} else if !hasUser(r) {
-			users = append(users, r)
-		}
-	}
-
-	// there is no way to look up projects nor milestones by name, so preload them all
-	mi := RepoMetadataInput{
-		ProjectsV1: input.ProjectsV1,
-		ProjectsV2: input.ProjectsV2,
-		Milestones: len(input.Milestones) > 0,
-	}
-	result, err := RepoMetadata(client, repo, mi)
-	if err != nil {
-		return result, err
-	}
-	if len(users) == 0 && len(teams) == 0 && len(input.Labels) == 0 {
-		return result, nil
-	}
-
-	query := &bytes.Buffer{}
-	fmt.Fprint(query, "query RepositoryResolveMetadataIDs {\n")
-	for i, u := range users {
-		fmt.Fprintf(query, "u%03d: user(login:%q){id,login}\n", i, u)
-	}
-	if len(input.Labels) > 0 {
-		fmt.Fprintf(query, "repository(owner:%q,name:%q){\n", repo.RepoOwner(), repo.RepoName())
-		for i, l := range input.Labels {
-			fmt.Fprintf(query, "l%03d: label(name:%q){id,name}\n", i, l)
-		}
-		fmt.Fprint(query, "}\n")
-	}
-	if len(teams) > 0 {
-		fmt.Fprintf(query, "organization(login:%q){\n", repo.RepoOwner())
-		for i, t := range teams {
-			fmt.Fprintf(query, "t%03d: team(slug:%q){id,slug}\n", i, t)
-		}
-		fmt.Fprint(query, "}\n")
-	}
-	fmt.Fprint(query, "}\n")
-
-	response := make(map[string]json.RawMessage)
-	err = client.GraphQL(repo.RepoHost(), query.String(), nil, &response)
-	if err != nil {
-		return result, err
-	}
-
-	for key, v := range response {
-		switch key {
-		case "repository":
-			repoResponse := make(map[string]RepoLabel)
-			err := json.Unmarshal(v, &repoResponse)
-			if err != nil {
-				return result, err
-			}
-			for _, l := range repoResponse {
-				result.Labels = append(result.Labels, l)
-			}
-		case "organization":
-			orgResponse := make(map[string]OrgTeam)
-			err := json.Unmarshal(v, &orgResponse)
-			if err != nil {
-				return result, err
-			}
-			for _, t := range orgResponse {
-				result.Teams = append(result.Teams, t)
-			}
-		default:
-			user := struct {
-				Id    string
-				Login string
-				Name  string
-			}{}
-			err := json.Unmarshal(v, &user)
-			if err != nil {
-				return result, err
-			}
-			result.AssignableUsers = append(result.AssignableUsers, NewAssignableUser(user.Id, user.Login, user.Name))
-		}
-	}
-
-	return result, nil
-}
-
 type RepoProject struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
@@ -1190,6 +1083,7 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 // This is returned from assignable actors and issue/pr assigned actors.
 // We use this to check if the actor is Copilot.
 const CopilotActorLogin = "copilot-swe-agent"
+const CopilotActorName = "Copilot"
 
 type AssignableActor interface {
 	DisplayName() string
@@ -1250,7 +1144,7 @@ func NewAssignableBot(id, login string) AssignableBot {
 
 func (b AssignableBot) DisplayName() string {
 	if b.login == CopilotActorLogin {
-		return "Copilot (AI)"
+		return fmt.Sprintf("%s (AI)", CopilotActorName)
 	}
 	return b.Login()
 }

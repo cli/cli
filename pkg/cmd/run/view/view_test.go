@@ -2255,6 +2255,29 @@ func TestViewRun(t *testing.T) {
 			errMsg:  "job 20 is still in progress; logs will be available when it is complete",
 		},
 		{
+			name: "job log but job is skipped",
+			tty:  false,
+			opts: &ViewOptions{
+				JobID: "13",
+				Log:   true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/13"),
+					httpmock.JSONResponse(shared.SkippedJob))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3/logs"),
+					httpmock.BinaryResponse(emptyZipArchive))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: "",
+		},
+		{
 			name: "noninteractive with job",
 			opts: &ViewOptions{
 				JobID: "10",

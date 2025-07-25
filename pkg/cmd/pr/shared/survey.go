@@ -3,6 +3,7 @@ package shared
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -177,13 +178,15 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		state.Metadata = append(state.Metadata, extraFieldsOptions[i])
 	}
 
+	// Retrieve and process data for survey prompts based on the extra fields selected
 	metadataInput := api.RepoMetadataInput{
-		Reviewers:  isChosen("Reviewers"),
-		Assignees:  isChosen("Assignees"),
-		Labels:     isChosen("Labels"),
-		ProjectsV1: isChosen("Projects") && projectsV1Support == gh.ProjectsV1Supported,
-		ProjectsV2: isChosen("Projects"),
-		Milestones: isChosen("Milestone"),
+		Reviewers:      isChosen("Reviewers"),
+		Assignees:      isChosen("Assignees"),
+		ActorAssignees: isChosen("Assignees") && state.ActorAssignees,
+		Labels:         isChosen("Labels"),
+		ProjectsV1:     isChosen("Projects") && projectsV1Support == gh.ProjectsV1Supported,
+		ProjectsV2:     isChosen("Projects"),
+		Milestones:     isChosen("Milestone"),
 	}
 	metadataResult, err := fetcher.RepoMetadataFetch(metadataInput)
 	if err != nil {
@@ -199,9 +202,28 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	for _, t := range metadataResult.Teams {
 		reviewers = append(reviewers, fmt.Sprintf("%s/%s", baseRepo.RepoOwner(), t.Slug))
 	}
+
+	// Populate the list of selectable assignees and their default selections.
+	// This logic maps the default assignees from `state` to the corresponding actors or users
+	// so that the correct display names are preselected in the prompt.
 	var assignees []string
-	for _, u := range metadataResult.AssignableUsers {
-		assignees = append(assignees, u.DisplayName())
+	var assigneesDefault []string
+	if state.ActorAssignees {
+		for _, u := range metadataResult.AssignableActors {
+			assignees = append(assignees, u.DisplayName())
+
+			if slices.Contains(state.Assignees, u.Login()) {
+				assigneesDefault = append(assigneesDefault, u.DisplayName())
+			}
+		}
+	} else {
+		for _, u := range metadataResult.AssignableUsers {
+			assignees = append(assignees, u.DisplayName())
+
+			if slices.Contains(state.Assignees, u.Login()) {
+				assigneesDefault = append(assigneesDefault, u.DisplayName())
+			}
+		}
 	}
 	var labels []string
 	for _, l := range metadataResult.Labels {
@@ -219,6 +241,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		milestones = append(milestones, m.Title)
 	}
 
+	// Prompt user for additional metadata based on selected fields
 	values := struct {
 		Reviewers []string
 		Assignees []string
@@ -242,12 +265,20 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	}
 	if isChosen("Assignees") {
 		if len(assignees) > 0 {
-			selected, err := p.MultiSelect("Assignees", state.Assignees, assignees)
+			selected, err := p.MultiSelect("Assignees", assigneesDefault, assignees)
 			if err != nil {
 				return err
 			}
 			for _, i := range selected {
-				values.Assignees = append(values.Assignees, assignees[i])
+				// Previously, this logic relied upon `assignees` being in `<login>` or `<login> (<name>)` form,
+				// however the inclusion of actors breaks this convention.
+				// Instead, we map the selected indexes to the source that populated `assignees` rather than
+				// relying on parsing the information out.
+				if state.ActorAssignees {
+					values.Assignees = append(values.Assignees, metadataResult.AssignableActors[i].Login())
+				} else {
+					values.Assignees = append(values.Assignees, metadataResult.AssignableUsers[i].Login())
+				}
 			}
 		} else {
 			fmt.Fprintln(io.ErrOut, "warning: no assignable users")
@@ -297,6 +328,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		}
 	}
 
+	// Update issue / pull request metadata state
 	if isChosen("Reviewers") {
 		var logins []string
 		for _, r := range values.Reviewers {
@@ -306,12 +338,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		state.Reviewers = logins
 	}
 	if isChosen("Assignees") {
-		var logins []string
-		for _, a := range values.Assignees {
-			// Extract user login from display name
-			logins = append(logins, (strings.Split(a, " "))[0])
-		}
-		state.Assignees = logins
+		state.Assignees = values.Assignees
 	}
 	if isChosen("Labels") {
 		state.Labels = values.Labels

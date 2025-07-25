@@ -1,5 +1,9 @@
 name: Unit and Integration Tests
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - trunk
+  pull_request:
 
 permissions:
   contents: read

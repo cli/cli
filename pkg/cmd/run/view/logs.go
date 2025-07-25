@@ -91,6 +91,10 @@ func populateLogSegments(httpClient *http.Client, repo ghrepo.Interface, jobs []
 
 	apiLogFetcherCount := 0
 	for _, job := range jobs {
+		if shared.IsSkipped(job.Conclusion) {
+			continue
+		}
+
 		if onlyFailed && !shared.IsFailureState(job.Conclusion) {
 			continue
 		}

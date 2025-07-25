@@ -30,6 +30,7 @@ var ReleaseFields = []string{
 	"id",
 	"isDraft",
 	"isPrerelease",
+	"isImmutable",
 	"name",
 	"publishedAt",
 	"tagName",
@@ -48,6 +49,7 @@ type Release struct {
 	Body         string     `json:"body"`
 	IsDraft      bool       `json:"draft"`
 	IsPrerelease bool       `json:"prerelease"`
+	IsImmutable  bool       `json:"immutable"`
 	CreatedAt    time.Time  `json:"created_at"`
 	PublishedAt  *time.Time `json:"published_at"`
 

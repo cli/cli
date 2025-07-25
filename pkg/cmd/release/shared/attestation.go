@@ -46,7 +46,7 @@ func (v *AttestationVerifier) VerifyAttestation(art *artifact.DigestedArtifact, 
 		return nil, err
 	}
 
-	policy := buildVerificationPolicy(*art)
+	policy := buildVerificationPolicy(*art, td)
 	sigstoreVerified, err := verifier.Verify([]*api.Attestation{att}, policy)
 	if err != nil {
 		return nil, err
@@ -99,9 +99,13 @@ func FilterAttestationsByFileDigest(attestations []*api.Attestation, fileDigest 
 }
 
 // buildVerificationPolicy constructs a verification policy for GitHub releases
-func buildVerificationPolicy(a artifact.DigestedArtifact) verify.PolicyBuilder {
+func buildVerificationPolicy(a artifact.DigestedArtifact, trustDomain string) verify.PolicyBuilder {
+	// If no trust domain is specified, default to "dotcom"
+	if trustDomain == "" {
+		trustDomain = "dotcom"
+	}
 	// SAN must match the GitHub releases domain. No issuer extension (match anything)
-	sanMatcher, _ := verify.NewSANMatcher("", "^https://.*\\.releases\\.github\\.com$")
+	sanMatcher, _ := verify.NewSANMatcher("", fmt.Sprintf("^https://%s\\.releases\\.github\\.com$", trustDomain))
 	issuerMatcher, _ := verify.NewIssuerMatcher("", ".*")
 	certId, _ := verify.NewCertificateIdentity(sanMatcher, issuerMatcher, certificate.Extensions{})
 
