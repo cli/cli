@@ -1,0 +1,164 @@
+# Boulder CI test suite workflow
+
+name: Boulder CI
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches:
+      - main
+      - release-branch-*
+  pull_request:
+    branches:
+      - '**'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: read
+
+jobs:
+  #  Main test jobs. This looks like a single job, but the matrix
+  #  items will multiply it. For example every entry in the
+  #  BOULDER_TOOLS_TAG list will run with every test. If there were two
+  #  tags and 5 tests there would be 10 jobs run.
+  b:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-24.04
+
+    strategy:
+      # When set to true, GitHub cancels all in-progress jobs if any matrix job fails. Default: true
+      fail-fast: false
+      # Test matrix.
+      matrix:
+        # Add additional docker image tags here and all tests will be run with the additional image.
+        BOULDER_TOOLS_TAG:
+          - go1.24.4_2025-06-06
+        # Tests command definitions. Use the entire "docker compose" command you want to run.
+        tests:
+          # Run ./test.sh --help for a description of each of the flags.
+          - "./t.sh --lints --generate"
+          - "./t.sh --integration"
+          # Testing Config Changes:
+          # Config changes that have landed in main but not yet been applied to
+          # production can be made in `test/config-next/<component>.json`.
+          #
+          # Testing DB Schema Changes:
+          # Database migrations in `sa/_db-next/migrations` are only performed
+          # when `docker compose` is called using `-f docker-compose.yml -f
+          # docker-compose.next.yml`.
+          - "./tn.sh --integration"
+          - "./t.sh --unit --enable-race-detection"
+          - "./tn.sh --unit --enable-race-detection"
+          - "./t.sh --start-py"
+
+    env:
+      # This sets the docker image tag for the boulder-tools repository to
+      # use in tests. It will be set appropriately for each tag in the list
+      # defined in the matrix.
+      BOULDER_TOOLS_TAG: ${{ matrix.BOULDER_TOOLS_TAG }}
+
+    # Sequence of tasks that will be executed as part of the job.
+    steps:
+      # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Docker Login
+        # You may pin to the exact commit or the version.
+        # uses: docker/login-action@f3364599c6aa293cdc2b8391b1b56d0c30e45c8a
+        uses: docker/login-action@v3.4.0
+        with:
+          # Username used to log against the Docker registry
+          username: ${{ secrets.DOCKER_USERNAME}}
+          # Password or personal access token used to log against the Docker registry
+          password: ${{ secrets.DOCKER_PASSWORD}}
+          # Log out from the Docker registry at the end of a job
+          logout: true
+        continue-on-error: true
+
+      # Print the env variable being used to pull the docker image. For
+      # informational use.
+      - name: Print BOULDER_TOOLS_TAG
+        run: echo "Using BOULDER_TOOLS_TAG ${BOULDER_TOOLS_TAG}"
+
+      # Pre-pull the docker containers before running the tests.
+      - name: docker compose pull
+        run: docker compose pull
+
+      # Run the test matrix. This will run
+      - name: "Run Test: ${{ matrix.tests }}"
+        run: ${{ matrix.tests }}
+
+  govulncheck:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+
+    steps:
+      # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          # When Go produces a security release, we want govulncheck to run
+          # against the most recently released Go version.
+          check-latest: true
+          go-version: "stable"
+
+      - name: Run govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  vendorcheck:
+    runs-on: ubuntu-24.04
+    strategy:
+      # When set to true, GitHub cancels all in-progress jobs if any matrix job fails. Default: true
+      fail-fast: false
+      matrix:
+        go-version: [ '1.24.1' ]
+
+    steps:
+      # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Verify vendor
+        shell: bash
+        run: |
+          go mod tidy
+          go mod vendor
+          git diff --exit-code
+
+
+  # This is a utility build job to detect if the status of any of the
+  # above jobs have failed and fail if so. It is needed so there can be
+  # one static job name that can be used to determine success of the job
+  # in GitHub branch protection.
+  # It does not block on the result of govulncheck so that a new vulnerability
+  # disclosure does not prevent any other PRs from being merged.
+  boulder_ci_test_matrix_status:
+    permissions:
+      contents: none
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    name: Boulder CI Test Matrix
+    needs:
+      - b
+      - vendorcheck
+    steps:
+      - name: Check boulder ci test matrix status
+        if: ${{ needs.b.result != 'success' || needs.vendorcheck.result != 'success' }}
+        run: exit 1

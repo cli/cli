@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package va;
+option go_package = "github.com/letsencrypt/boulder/va/proto";
+
+import "core/proto/core.proto";
+
+service VA {
+  rpc DoDCV(PerformValidationRequest) returns (ValidationResult) {}
+}
+
+service CAA {
+  rpc DoCAA(IsCAAValidRequest) returns (IsCAAValidResponse) {}
+}
+
+message IsCAAValidRequest {
+  // Next unused field number: 6
+  reserved 1; // Previously domain
+  // NOTE: For DNS identifiers, the value may be a wildcard domain name (e.g.
+  // `*.example.com`).
+  core.Identifier identifier = 5;
+  string validationMethod = 2;
+  int64 accountURIID = 3;
+  string authzID = 4;
+}
+
+// If CAA is valid for the requested domain, the problem will be empty
+message IsCAAValidResponse {
+  core.ProblemDetails problem = 1;
+  string perspective = 3;
+  string rir = 4;
+}
+
+message PerformValidationRequest {
+  // Next unused field number: 6
+  reserved 1; // Previously dnsName
+  core.Identifier identifier = 5;
+  core.Challenge challenge = 2;
+  AuthzMeta authz = 3;
+  string expectedKeyAuthorization = 4;
+}
+
+message AuthzMeta {
+  string id = 1;
+  int64 regID = 2;
+}
+
+message ValidationResult {
+  repeated core.ValidationRecord records = 1;
+  core.ProblemDetails problem = 2;
+  string perspective = 3;
+  string rir = 4;
+}

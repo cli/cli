@@ -3,6 +3,7 @@
 package verify
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
@@ -20,6 +21,7 @@ func TestVerifyIntegration(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
+		HttpClient:     http.DefaultClient,
 		Logger:         logger,
 		TUFMetadataDir: o.Some(t.TempDir()),
 	}
@@ -136,6 +138,7 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
+		HttpClient:     http.DefaultClient,
 		Logger:         logger,
 		TUFMetadataDir: o.Some(t.TempDir()),
 	}
@@ -209,6 +212,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
+		HttpClient:     http.DefaultClient,
 		Logger:         logger,
 		TUFMetadataDir: o.Some(t.TempDir()),
 	}
@@ -301,6 +305,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
+		HttpClient:     http.DefaultClient,
 		Logger:         logger,
 		TUFMetadataDir: o.Some(t.TempDir()),
 	}

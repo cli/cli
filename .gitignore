@@ -15,6 +15,9 @@
 /pkg_payload
 /build/macOS/resources
 
+# Windows resource files
+/cmd/gh/*.syso
+
 # VS Code
 .vscode
 

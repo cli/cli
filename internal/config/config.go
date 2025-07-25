@@ -234,8 +234,18 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	}
 	token, source := ghauth.TokenFromEnvOrConfig(hostname)
 	if token == "" {
+		var user string
 		var err error
-		token, err = c.TokenFromKeyring(hostname)
+		if user, err = c.ActiveUser(hostname); err == nil {
+			token, err = c.TokenFromKeyringForUser(hostname, user)
+		}
+		if err != nil {
+			// We should generally be able to find a token for the active user,
+			// but in some cases such as if the keyring was set up in a very old
+			// version of the CLI, it may only have a unkeyed token, so fallback
+			// to it.
+			token, err = c.TokenFromKeyring(hostname)
+		}
 		if err == nil {
 			source = "keyring"
 		}
@@ -554,7 +564,7 @@ pager:
 # Aliases allow you to create nicknames for gh commands
 aliases:
   co: pr checkout
-# The path to a unix socket through which send HTTP connections. If blank, HTTP traffic will be handled by net/http.DefaultTransport.
+# The path to a unix socket through which to send HTTP connections. If blank, HTTP traffic will be handled by net/http.DefaultTransport.
 http_unix_socket:
 # What web browser gh should use when opening URLs. If blank, will refer to environment.
 browser:

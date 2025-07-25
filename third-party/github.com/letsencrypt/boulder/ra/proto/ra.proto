@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package ra;
+option go_package = "github.com/letsencrypt/boulder/ra/proto";
+
+import "core/proto/core.proto";
+import "ca/proto/ca.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+
+service RegistrationAuthority {
+  rpc NewRegistration(core.Registration) returns (core.Registration) {}
+  rpc UpdateRegistrationContact(UpdateRegistrationContactRequest) returns (core.Registration) {}
+  rpc UpdateRegistrationKey(UpdateRegistrationKeyRequest) returns (core.Registration) {}
+  rpc DeactivateRegistration(DeactivateRegistrationRequest) returns (core.Registration) {}
+  rpc PerformValidation(PerformValidationRequest) returns (core.Authorization) {}
+  rpc DeactivateAuthorization(core.Authorization) returns (google.protobuf.Empty) {}
+  rpc RevokeCertByApplicant(RevokeCertByApplicantRequest) returns (google.protobuf.Empty) {}
+  rpc RevokeCertByKey(RevokeCertByKeyRequest) returns (google.protobuf.Empty) {}
+  rpc AdministrativelyRevokeCertificate(AdministrativelyRevokeCertificateRequest) returns (google.protobuf.Empty) {}
+  rpc NewOrder(NewOrderRequest) returns (core.Order) {}
+  rpc GetAuthorization(GetAuthorizationRequest) returns (core.Authorization) {}
+  rpc FinalizeOrder(FinalizeOrderRequest) returns (core.Order) {}
+  // Generate an OCSP response based on the DB's current status and reason code.
+  rpc GenerateOCSP(GenerateOCSPRequest) returns (ca.OCSPResponse) {}
+  rpc UnpauseAccount(UnpauseAccountRequest) returns (UnpauseAccountResponse) {}
+  rpc AddRateLimitOverride(AddRateLimitOverrideRequest) returns (AddRateLimitOverrideResponse) {}
+}
+
+service SCTProvider {
+  rpc GetSCTs(SCTRequest) returns (SCTResponse) {}
+}
+
+message SCTRequest {
+  bytes precertDER = 1;
+}
+
+message SCTResponse {
+  repeated bytes sctDER = 1;
+}
+
+message GenerateOCSPRequest {
+  string serial = 1;
+}
+
+message UpdateRegistrationContactRequest {
+  int64 registrationID = 1;
+  repeated string contacts = 2;
+}
+
+message UpdateRegistrationKeyRequest {
+  int64 registrationID = 1;
+  bytes jwk = 2;
+}
+
+message DeactivateRegistrationRequest {
+  int64 registrationID = 1;
+}
+
+message UpdateAuthorizationRequest {
+  core.Authorization authz = 1;
+  int64 challengeIndex = 2;
+  core.Challenge response = 3;
+}
+
+message PerformValidationRequest {
+  core.Authorization authz = 1;
+  int64 challengeIndex = 2;
+}
+
+message RevokeCertByApplicantRequest {
+  bytes cert = 1;
+  int64 code = 2;
+  int64 regID = 3;
+}
+
+message RevokeCertByKeyRequest {
+  bytes cert = 1;
+  reserved 2; // previously code
+}
+
+message AdministrativelyRevokeCertificateRequest {
+  // Deprecated: this field is ignored.
+  bytes cert = 1;
+  // The `serial` field is required.
+  string serial = 4;
+  int64 code = 2;
+  string adminName = 3;
+  bool skipBlockKey = 5;
+  // If the malformed flag is set, the RA will not attempt to parse the
+  // certificate in question. In this case, the keyCompromise reason cannot be
+  // specified, because the key cannot be blocked.
+  bool malformed = 6;
+  // The CRL shard to store the revocation in.
+  //
+  // This is used when revoking malformed certificates, to allow human judgement
+  // in setting the CRL shard instead of automatically determining it by parsing
+  // the certificate.
+  //
+  // Passing a nonzero crlShard with malformed=false returns error.
+  int64 crlShard = 7;
+}
+
+message NewOrderRequest {
+  // Next unused field number: 9
+  int64 registrationID = 1;
+  reserved 2; // previously dnsNames
+  repeated core.Identifier identifiers = 8;
+  string certificateProfileName = 5;
+  // Replaces is the ARI certificate Id that this order replaces.
+  string replaces = 7;
+  // ReplacesSerial is the serial number of the certificate that this order replaces.
+  string replacesSerial = 3;
+  reserved 4; // previously isARIRenewal
+  reserved 6; // previously isRenewal
+}
+
+message GetAuthorizationRequest {
+  int64 id = 1;
+}
+
+message FinalizeOrderRequest {
+  core.Order order = 1;
+  bytes csr = 2;
+}
+
+message UnpauseAccountRequest {
+  // Next unused field number: 2
+
+  // The registrationID to be unpaused so issuance can be resumed.
+  int64 registrationID = 1;
+}
+
+message UnpauseAccountResponse {
+  // Next unused field number: 2
+
+  // Count is the number of identifiers which were unpaused for the input regid.
+  int64 count = 1;
+}
+
+message AddRateLimitOverrideRequest {
+  int64 limitEnum      = 1;
+  string bucketKey = 2;
+  string comment    = 3;
+  google.protobuf.Duration period = 4;
+  int64 count      = 5;
+  int64 burst      = 6;
+}
+
+message AddRateLimitOverrideResponse {
+  bool inserted = 1;
+  bool enabled = 2;
+}

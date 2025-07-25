@@ -1,0 +1,24 @@
+Hello,
+
+Your certificate (or certificates) for the names listed below will expire in
+{{.DaysToExpiration}} days (on {{.ExpirationDate}}). Please make sure to renew
+your certificate before then, or visitors to your website will encounter errors.
+
+{{.DNSNames}}
+
+For any questions or support, please visit https://community.letsencrypt.org/.
+Unfortunately, we can't provide support by email.
+
+For details about when we send these emails, please visit
+https://letsencrypt.org/docs/expiration-emails/. In particular, note
+that this reminder email is still sent if you've obtained a slightly
+different certificate by adding or removing names. If you've replaced
+this certificate with a newer one that covers more or fewer names than
+the list above, you may be able to ignore this message.
+
+If you want to stop receiving all email from this address, click
+*|UNSUB:https://mandrillapp.com/unsub|*
+(Warning: this is a one-click action that cannot be undone)
+
+Regards,
+The Let's Encrypt Team

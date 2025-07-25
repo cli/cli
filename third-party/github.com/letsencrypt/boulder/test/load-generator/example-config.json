@@ -1,0 +1,22 @@
+{
+    "plan": {
+        "actions": [
+            "newAccount",
+            "newOrder",
+            "fulfillOrder",
+            "finalizeOrder"
+        ],
+        "rate": 5,
+        "runtime": "5m",
+        "rateDelta": "5/1m"
+    },
+    "apiBase": "http://localhost:4001",
+    "domainBase": "com",
+    "httpOneAddr": "localhost:80",
+    "regKeySize": 2048,
+    "regEmail": "loadtesting@letsencrypt.org",
+    "maxRegs": 20,
+    "maxNamesPerCert": 20,
+    "dontSaveState": true,
+    "results": "v2-example-latency.json"
+}

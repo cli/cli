@@ -53,6 +53,11 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		Prompter:   f.Prompter,
 	}
 
+	// It is possible for a user to say `--no-repos-selected=false --repos cli/cli` and that would be equivalent to not
+	// specifying the flag at all. We could avoid this by checking whether the flag was set at all, but it seems like
+	// more trouble than it's worth since anyone who does `--no-repos-selected=false` is gonna get what's coming to them.
+	var noRepositoriesSelected bool
+
 	cmd := &cobra.Command{
 		Use:   "set <secret-name>",
 		Short: "Create or update secrets",
@@ -89,6 +94,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 			# Set organization-level secret visible to specific repositories
 			$ gh secret set MYSECRET --org myOrg --repos repo1,repo2,repo3
+
+			# Set organization-level secret visible to no repositories
+			$ gh secret set MYSECRET --org myOrg --no-repos-selected
 
 			# Set user-level secret for Codespaces
 			$ gh secret set MYSECRET --user
@@ -131,6 +139,14 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive("specify only one of `--repos` or `--no-repos-selected`", len(opts.RepositoryNames) > 0, noRepositoriesSelected); err != nil {
+				return err
+			}
+
+			if err := cmdutil.MutuallyExclusive("`--no-repos-selected` must be omitted when used with `--user`", opts.UserSecrets, noRepositoriesSelected); err != nil {
+				return err
+			}
+
 			if len(args) == 0 {
 				if !opts.DoNotStore && opts.EnvFile == "" {
 					return cmdutil.FlagErrorf("must pass name argument")
@@ -148,11 +164,16 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 					return cmdutil.FlagErrorf("`--repos` is only supported with `--visibility=selected`")
 				}
 
-				if opts.Visibility == shared.Selected && len(opts.RepositoryNames) == 0 {
-					return cmdutil.FlagErrorf("`--repos` list required with `--visibility=selected`")
+				if opts.Visibility != shared.Selected && noRepositoriesSelected {
+					return cmdutil.FlagErrorf("`--no-repos-selected` is only supported with `--visibility=selected`")
 				}
+
+				if opts.Visibility == shared.Selected && (len(opts.RepositoryNames) == 0 && !noRepositoriesSelected) {
+					return cmdutil.FlagErrorf("`--repos` or `--no-repos-selected` required with `--visibility=selected`")
+				}
+
 			} else {
-				if len(opts.RepositoryNames) > 0 {
+				if len(opts.RepositoryNames) > 0 || noRepositoriesSelected {
 					opts.Visibility = shared.Selected
 				}
 			}
@@ -170,6 +191,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "Set a secret for your user")
 	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "v", shared.Private, []string{shared.All, shared.Private, shared.Selected}, "Set visibility for an organization secret")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization or user secret")
+	cmd.Flags().BoolVar(&noRepositoriesSelected, "no-repos-selected", false, "No repositories can access the organization secret")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the secret (reads from standard input if not specified)")
 	cmd.Flags().BoolVar(&opts.DoNotStore, "no-store", false, "Print the encrypted, base64-encoded value instead of storing it on GitHub")
 	cmd.Flags().StringVarP(&opts.EnvFile, "env-file", "f", "", "Load secret names and values from a dotenv-formatted `file`")

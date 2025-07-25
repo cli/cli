@@ -1,0 +1,42 @@
+{
+	"BadKeyRevoker": {
+		"db": {
+			"dbConnectFile": "test/secrets/badkeyrevoker_dburl",
+			"maxOpenConns": 10
+		},
+		"debugAddr": ":8020",
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/bad-key-revoker.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/bad-key-revoker.boulder/key.pem"
+		},
+		"raService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "ra",
+				"domain": "service.consul"
+			},
+			"hostOverride": "ra.boulder",
+			"noWaitForReady": true,
+			"timeout": "15s"
+		},
+		"mailer": {
+			"server": "localhost",
+			"port": "9380",
+			"username": "cert-manager@example.com",
+			"from": "bad key revoker <bad-key-revoker@test.org>",
+			"passwordFile": "test/secrets/smtp_password",
+			"SMTPTrustedRootFile": "test/certs/ipki/minica.pem",
+			"emailSubject": "Certificates you've issued have been revoked due to key compromise",
+			"emailTemplate": "test/example-bad-key-revoker-template"
+		},
+		"maximumRevocations": 15,
+		"findCertificatesBatchSize": 10,
+		"interval": "50ms",
+		"backoffIntervalMax": "2s"
+	},
+	"syslog": {
+		"stdoutlevel": 4,
+		"sysloglevel": 4
+	}
+}

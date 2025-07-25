@@ -1,0 +1,89 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - asciicheck
+    - bidichk
+    - errcheck
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nolintlint
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - wastedassign
+  settings:
+    errcheck:
+      exclude-functions:
+        - (net/http.ResponseWriter).Write
+        - (net.Conn).Write
+        - encoding/binary.Write
+        - io.Write
+        - net/http.Write
+        - os.Remove
+        - github.com/miekg/dns.WriteMsg
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
+      enable-all: true
+      settings:
+        printf:
+          funcs:
+            - (github.com/letsencrypt/boulder/log.Logger).Errf
+            - (github.com/letsencrypt/boulder/log.Logger).Warningf
+            - (github.com/letsencrypt/boulder/log.Logger).Infof
+            - (github.com/letsencrypt/boulder/log.Logger).Debugf
+            - (github.com/letsencrypt/boulder/log.Logger).AuditInfof
+            - (github.com/letsencrypt/boulder/log.Logger).AuditErrf
+            - (github.com/letsencrypt/boulder/ocsp/responder).SampledError
+            - (github.com/letsencrypt/boulder/web.RequestEvent).AddError
+    gosec:
+      excludes:
+        # TODO: Identify, fix, and remove violations of most of these rules
+        - G101 # Potential hardcoded credentials
+        - G102 # Binds to all network interfaces
+        - G104 # Errors unhandled
+        - G107 # Potential HTTP request made with variable url
+        - G201 # SQL string formatting
+        - G202 # SQL string concatenation
+        - G204 # Subprocess launched with variable
+        - G302 # Expect file permissions to be 0600 or less
+        - G306 # Expect WriteFile permissions to be 0600 or less
+        - G304 # Potential file inclusion via variable
+        - G401 # Use of weak cryptographic primitive
+        - G402 # TLS InsecureSkipVerify set true.
+        - G403 # RSA keys should be at least 2048 bits
+        - G404 # Use of weak random number generator
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    staticcheck:
+      checks:
+        - all
+        # TODO: Identify, fix, and remove violations of most of these rules
+        - -S1029  # Range over the string directly
+        - -SA1019 # Using a deprecated function, variable, constant or field
+        - -SA6003 # Converting a string to a slice of runes before ranging over it
+        - -ST1000 # Incorrect or missing package comment
+        - -ST1003 # Poorly chosen identifier
+        - -ST1005 # Incorrectly formatted error string
+        - -QF1001 # Could apply De Morgan's law
+        - -QF1003 # Could use tagged switch
+        - -QF1004 # Could use strings.Split instead
+        - -QF1007 # Could merge conditional assignment into variable declaration
+        - -QF1008 # Could remove embedded field from selector
+        - -QF1009 # Probably want to use time.Time.Equal
+        - -QF1012 # Use fmt.Fprintf(...) instead of Write(fmt.Sprintf(...))
+  exclusions:
+    presets:
+      - std-error-handling
+formatters:
+  enable:
+    - gofmt

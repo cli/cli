@@ -557,6 +557,30 @@ func Test_editRun(t *testing.T) {
 			},
 			wantErr: "gist ID or URL required when not running interactively",
 		},
+		{
+			name: "edit no-file gist (#10626)",
+			opts: &EditOptions{
+				Selector: "1234",
+			},
+			mockGist: &shared.Gist{
+				ID:    "1234",
+				Files: map[string]*shared.GistFile{},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			wantErr: "no file in the gist",
+		},
+		{
+			name: "edit no-file gist, nil map (#10626)",
+			opts: &EditOptions{
+				Selector: "1234",
+			},
+			mockGist: &shared.Gist{
+				ID:    "1234",
+				Files: nil,
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			wantErr: "no file in the gist",
+		},
 	}
 
 	for _, tt := range tests {

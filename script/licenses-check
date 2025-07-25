@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Manage go-licenses version externally for CI
+if [ "$CI" != "true" ]; then
+    go install github.com/google/go-licenses@latest
+fi
+
+# Setup temporary directory for generated license reports
+export TEMPDIR="$(mktemp -d)"
+trap "rm -fr ${TEMPDIR}" EXIT
+
+for goos in linux darwin windows ; do
+    # Note: we ignore warnings because we want the command to succeed, however the output should be checked
+    #       for any new warnings, and potentially we may need to add license information.
+    #
+    #       Normally these warnings are packages containing non go code, which may or may not require explicit attribution,
+    #       depending on the license.
+    echo "Checking licenses for ${goos}..."
+    GOOS="${goos}" go-licenses report ./... --template .github/licenses.tmpl --ignore github.com/cli/cli > "${TEMPDIR}/third-party-licenses.${goos}.md" || echo "Ignore warnings"
+    if ! diff -s "${TEMPDIR}/third-party-licenses.${goos}.md" "third-party-licenses.${goos}.md"; then
+        echo "::error title=License check failed::Please update the license files by running \`make licenses\` and committing the output."
+        exit 1
+    fi
+done
+
+echo "License check passed for all platforms."

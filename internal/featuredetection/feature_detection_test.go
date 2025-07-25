@@ -23,7 +23,8 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "github.com",
 			hostname: "github.com",
 			wantFeatures: IssueFeatures{
-				StateReason: true,
+				StateReason:       true,
+				ActorIsAssignable: true,
 			},
 			wantErr: false,
 		},
@@ -31,7 +32,8 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "ghec data residency (ghe.com)",
 			hostname: "stampname.ghe.com",
 			wantFeatures: IssueFeatures{
-				StateReason: true,
+				StateReason:       true,
+				ActorIsAssignable: true,
 			},
 			wantErr: false,
 		},
@@ -42,7 +44,8 @@ func TestIssueFeatures(t *testing.T) {
 				`query Issue_fields\b`: `{"data": {}}`,
 			},
 			wantFeatures: IssueFeatures{
-				StateReason: false,
+				StateReason:       false,
+				ActorIsAssignable: false,
 			},
 			wantErr: false,
 		},

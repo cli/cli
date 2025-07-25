@@ -1,0 +1,38 @@
+[files]
+extend-exclude = [
+    ".git/",
+    "go.mod",
+    "go.sum",
+    "vendor/",
+]
+ignore-hidden = false
+
+[default]
+extend-ignore-re = [
+    # Anything base64 or base64url longer than 36 chars is probably encoded.
+    '\b[0-9A-Za-z+/]{36,}\b',
+    '\b[0-9A-Za-z_-]{36,}\b',
+    "0002a4ba3cf408927759",
+    "65CuDAA",
+    '"sql_warnings", "TrUe"',
+    '"tx_read_only", "FalSe"',
+    "evenMOREcaps",
+    '"iSsUe"',
+]
+
+[default.extend-words]
+# Extended DNS Error
+"ede" = "ede"
+# Alternative spelling
+"unmarshaling" = "unmarshaling"
+
+[default.extend-identifiers]
+"caaFailer" = "caaFailer"
+"challStrat" = "challStrat"
+"ExpectedStratType" = "ExpectedStratType"
+"otConf" = "otConf"
+"serInt" = "serInt"
+"StratName" = "StratName"
+"typ" = "typ"
+"UPDATEs" = "UPDATEs"
+"vai" = "vai"

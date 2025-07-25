@@ -12,7 +12,7 @@ For [installation options see below](#installation), for usage instructions [see
 
 ## Contributing
 
-If anything feels off, or if you feel that some functionality is missing, please check out the [contributing page][contributing]. There you will find instructions for sharing your feedback, building the tool locally, and submitting pull requests to the project.
+If anything feels off or if you feel that some functionality is missing, please check out the [contributing page][contributing]. There you will find instructions for sharing your feedback, building the tool locally, and submitting pull requests to the project.
 
 If you are a hubber and are interested in shipping new commands for the CLI, check out our [doc on internal contributions][intake-doc].
 
@@ -58,7 +58,7 @@ Additional Conda installation options available on the [gh-feedstock page](https
 | ----------------------------------- | ---------------- |
 | `curl -sS https://webi.sh/gh \| sh` | `webi gh@stable` |
 
-For more information about the Webi installer see [its homepage](https://webinstall.dev/).
+For more information about the Webi installer, see [its homepage](https://webinstall.dev/).
 
 #### Flox
 
@@ -127,9 +127,9 @@ Download packaged binaries from the [releases page][].
 
 #### Verification of binaries
 
-Since version 2.50.0 `gh` has been producing [Build Provenance Attestation](https://github.blog/changelog/2024-06-25-artifact-attestations-is-generally-available/) enabling a cryptographically verifiable paper-trail back to the origin GitHub repository, git revision and build instructions used. The build provenance attestations are signed and relies on Public Good [Sigstore](https://www.sigstore.dev/) for PKI.
+Since version 2.50.0, `gh` has been producing [Build Provenance Attestation](https://github.blog/changelog/2024-06-25-artifact-attestations-is-generally-available/), enabling a cryptographically verifiable paper-trail back to the origin GitHub repository, git revision, and build instructions used. The build provenance attestations are signed and rely on Public Good [Sigstore](https://www.sigstore.dev/) for PKI.
 
-There are two common ways to verify a downloaded release, depending if `gh` is already installed or not. If `gh` is installed, it's trivial to verify a new release:
+There are two common ways to verify a downloaded release, depending on whether `gh` is already installed or not. If `gh` is installed, it's trivial to verify a new release:
 
 - **Option 1: Using `gh` if already installed:**
 

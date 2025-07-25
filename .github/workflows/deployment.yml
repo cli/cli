@@ -309,7 +309,7 @@ jobs:
           rpmsign --addsign dist/*.rpm
       - name: Attest release artifacts
         if: inputs.environment == 'production'
-        uses: actions/attest-build-provenance@db473fddc028af60658334401dc6fa3ffd8669fd # v2.3.0
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: "dist/gh_*"
       - name: Run createrepo
@@ -384,7 +384,7 @@ jobs:
             git diff --name-status @{upstream}..
           fi
       - name: Bump homebrew-core formula
-        uses: mislav/bump-homebrew-formula-action@942e550c6344cfdb9e1ab29b9bb9bf0c43efa19b
+        uses: mislav/bump-homebrew-formula-action@8e2baa47daaa8db10fcdeb04105dfa6850eb0d68
         if: inputs.environment == 'production' && !contains(inputs.tag_name, '-')
         with:
           formula-name: gh

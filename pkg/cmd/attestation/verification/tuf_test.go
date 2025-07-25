@@ -12,7 +12,7 @@ import (
 
 func TestGitHubTUFOptionsNoMetadataDir(t *testing.T) {
 	os.Setenv("CODESPACES", "true")
-	opts := GitHubTUFOptions(o.None[string]())
+	opts := GitHubTUFOptions(o.None[string](), nil)
 
 	require.Equal(t, GitHubTUFMirror, opts.RepositoryBaseURL)
 	require.NotNil(t, opts.Root)
@@ -21,6 +21,6 @@ func TestGitHubTUFOptionsNoMetadataDir(t *testing.T) {
 }
 
 func TestGitHubTUFOptionsWithMetadataDir(t *testing.T) {
-	opts := GitHubTUFOptions(o.Some("anything"))
+	opts := GitHubTUFOptions(o.Some("anything"), nil)
 	require.Equal(t, "anything", opts.CachePath)
 }

@@ -1,0 +1,61 @@
+{
+	"sa": {
+		"db": {
+			"dbConnectFile": "test/secrets/sa_dburl",
+			"maxOpenConns": 100
+		},
+		"readOnlyDB": {
+			"dbConnectFile": "test/secrets/sa_ro_dburl",
+			"maxOpenConns": 100
+		},
+		"incidentsDB": {
+			"dbConnectFile": "test/secrets/incidents_dburl",
+			"maxOpenConns": 100
+		},
+		"ParallelismPerRPC": 20,
+		"debugAddr": ":8003",
+		"lagFactor": "200ms",
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/sa.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/sa.boulder/key.pem"
+		},
+		"grpc": {
+			"maxConnectionAge": "30s",
+			"address": ":9095",
+			"services": {
+				"sa.StorageAuthority": {
+					"clientNames": [
+						"admin.boulder",
+						"ca.boulder",
+						"crl-updater.boulder",
+						"ra.boulder"
+					]
+				},
+				"sa.StorageAuthorityReadOnly": {
+					"clientNames": [
+						"admin.boulder",
+						"ocsp-responder.boulder",
+						"wfe.boulder",
+						"sfe.boulder"
+					]
+				},
+				"grpc.health.v1.Health": {
+					"clientNames": [
+						"health-checker.boulder",
+						"consul.boulder"
+					]
+				}
+			}
+		},
+		"features": {
+			"MultipleCertificateProfiles": true,
+			"InsertAuthzsIndividually": true,
+			"IgnoreAccountContacts": true
+		}
+	},
+	"syslog": {
+		"stdoutlevel": 6,
+		"sysloglevel": 6
+	}
+}

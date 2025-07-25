@@ -14,7 +14,7 @@ type Editable struct {
 	Body      EditableString
 	Base      EditableString
 	Reviewers EditableSlice
-	Assignees EditableSlice
+	Assignees EditableAssignees
 	Labels    EditableSlice
 	Projects  EditableProjects
 	Milestone EditableString
@@ -36,6 +36,14 @@ type EditableSlice struct {
 	Options []string
 	Edited  bool
 	Allowed bool
+}
+
+// EditableAssignees is a special case of EditableSlice.
+// It contains a flag to indicate whether the assignees are actors or not.
+type EditableAssignees struct {
+	EditableSlice
+	ActorAssignees bool
+	DefaultLogins  []string // For disambiguating actors from display names
 }
 
 // ProjectsV2 mutations require a mapping of an item ID to a project ID.
@@ -105,21 +113,56 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	if !e.Assignees.Edited {
 		return nil, nil
 	}
+
+	// If assignees came in from command line flags, we need to
+	// curate the final list of assignees from the default list.
 	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
 		meReplacer := NewMeReplacer(client, repo.RepoHost())
-		s := set.NewStringSet()
-		s.AddValues(e.Assignees.Default)
-		add, err := meReplacer.ReplaceSlice(e.Assignees.Add)
+		copilotReplacer := NewCopilotReplacer(true)
+
+		replaceSpecialAssigneeNames := func(value []string) ([]string, error) {
+			replaced, err := meReplacer.ReplaceSlice(value)
+			if err != nil {
+				return nil, err
+			}
+
+			// Only suppported for actor assignees.
+			if e.Assignees.ActorAssignees {
+				replaced = copilotReplacer.ReplaceSlice(replaced)
+			}
+
+			return replaced, nil
+		}
+
+		assigneeSet := set.NewStringSet()
+
+		// This check below is required because in a non-interactive flow,
+		// the user gives us a login and not the DisplayName, and when
+		// we have actor assignees e.Assignees.Default will contain
+		// DisplayNames and not logins (this is to accommodate special actor
+		// display names in the interactive flow).
+		// So, we need to add the default logins here instead of the DisplayNames.
+		// Otherwise, the value the user provided won't be found in the
+		// set to be added or removed, causing unexpected behavior.
+		if e.Assignees.ActorAssignees {
+			assigneeSet.AddValues(e.Assignees.DefaultLogins)
+		} else {
+			assigneeSet.AddValues(e.Assignees.Default)
+		}
+
+		add, err := replaceSpecialAssigneeNames(e.Assignees.Add)
 		if err != nil {
 			return nil, err
 		}
-		s.AddValues(add)
-		remove, err := meReplacer.ReplaceSlice(e.Assignees.Remove)
+		assigneeSet.AddValues(add)
+
+		remove, err := replaceSpecialAssigneeNames(e.Assignees.Remove)
 		if err != nil {
 			return nil, err
 		}
-		s.RemoveValues(remove)
-		e.Assignees.Value = s.ToSlice()
+		assigneeSet.RemoveValues(remove)
+
+		e.Assignees.Value = assigneeSet.ToSlice()
 	}
 	a, err := e.Metadata.MembersToIDs(e.Assignees.Value)
 	return &a, err
@@ -243,6 +286,14 @@ func (es *EditableSlice) clone() EditableSlice {
 	copy(cpy.Value, es.Value)
 	copy(cpy.Default, es.Default)
 	return cpy
+}
+
+func (ea *EditableAssignees) clone() EditableAssignees {
+	return EditableAssignees{
+		EditableSlice:  ea.EditableSlice.clone(),
+		ActorAssignees: ea.ActorAssignees,
+		DefaultLogins:  ea.DefaultLogins,
+	}
 }
 
 func (ep *EditableProjects) clone() EditableProjects {
@@ -378,12 +429,22 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 
 func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable) error {
 	input := api.RepoMetadataInput{
-		Reviewers:  editable.Reviewers.Edited,
-		Assignees:  editable.Assignees.Edited,
-		Labels:     editable.Labels.Edited,
-		ProjectsV1: editable.Projects.Edited,
-		ProjectsV2: editable.Projects.Edited,
-		Milestones: editable.Milestone.Edited,
+		Reviewers: editable.Reviewers.Edited,
+		// TeamReviewers is always true if Reviewers is true because
+		// this is the existing `pr edit` behavior. This means
+		// always fetch teams.
+		// TODO: evaluate whether this can follow the same logic as
+		// `pr create` to conditionally fetch teams if a reviewer contains
+		// a slash.
+		// See https://github.com/cli/cli/blob/449920b40fc8a5015d1578ca10a301aa385a1914/pkg/cmd/pr/shared/params.go#L67-L71
+		// See https://github.com/cli/cli/issues/11360
+		TeamReviewers:  editable.Reviewers.Edited,
+		Assignees:      editable.Assignees.Edited,
+		ActorAssignees: editable.Assignees.ActorAssignees,
+		Labels:         editable.Labels.Edited,
+		ProjectsV1:     editable.Projects.Edited,
+		ProjectsV2:     editable.Projects.Edited,
+		Milestones:     editable.Milestone.Edited,
 	}
 	metadata, err := api.RepoMetadata(client, repo, input)
 	if err != nil {
@@ -392,7 +453,11 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 
 	var users []string
 	for _, u := range metadata.AssignableUsers {
-		users = append(users, u.Login)
+		users = append(users, u.Login())
+	}
+	var actors []string
+	for _, a := range metadata.AssignableActors {
+		actors = append(actors, a.DisplayName())
 	}
 	var teams []string
 	for _, t := range metadata.Teams {
@@ -416,7 +481,11 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 
 	editable.Metadata = *metadata
 	editable.Reviewers.Options = append(users, teams...)
-	editable.Assignees.Options = users
+	if editable.Assignees.ActorAssignees {
+		editable.Assignees.Options = actors
+	} else {
+		editable.Assignees.Options = users
+	}
 	editable.Labels.Options = labels
 	editable.Projects.Options = projects
 	editable.Milestone.Options = milestones

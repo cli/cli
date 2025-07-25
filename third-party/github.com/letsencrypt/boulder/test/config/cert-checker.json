@@ -1,0 +1,36 @@
+{
+	"certChecker": {
+		"db": {
+			"dbConnectFile": "test/secrets/cert_checker_dburl",
+			"maxOpenConns": 10
+		},
+		"hostnamePolicyFile": "test/hostname-policy.yaml",
+		"workers": 16,
+		"unexpiredOnly": true,
+		"badResultsOnly": true,
+		"checkPeriod": "72h",
+		"acceptableValidityDurations": [
+			"7776000s"
+		],
+		"ignoredLints": [
+			"w_subject_common_name_included",
+			"w_ext_subject_key_identifier_missing_sub_cert",
+			"w_ext_subject_key_identifier_not_recommended_subscriber"
+		],
+		"ctLogListFile": "test/ct-test-srv/log_list.json"
+	},
+	"pa": {
+		"challenges": {
+			"http-01": true,
+			"dns-01": true,
+			"tls-alpn-01": true
+		},
+		"identifiers": {
+			"dns": true
+		}
+	},
+	"syslog": {
+		"stdoutlevel": 6,
+		"sysloglevel": 6
+	}
+}

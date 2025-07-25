@@ -60,11 +60,17 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			Editing issues' projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
+
+			The %[1]s--add-assignee%[1]s and %[1]s--remove-assignee%[1]s flags both support
+			the following special values:
+			- %[1]s@me%[1]s: assign or unassign yourself
+			- %[1]s@copilot%[1]s: assign or unassign Copilot (not supported on GitHub Enterprise Server)
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh issue edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh issue edit 23 --add-label "bug,help wanted" --remove-label "core"
 			$ gh issue edit 23 --add-assignee "@me" --remove-assignee monalisa,hubot
+			$ gh issue edit 23 --add-assignee "@copilot"
 			$ gh issue edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh issue edit 23 --milestone "Version 1"
 			$ gh issue edit 23 --remove-milestone
@@ -165,8 +171,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Editable.Title.Value, "title", "t", "", "Set the new title.")
 	cmd.Flags().StringVarP(&opts.Editable.Body.Value, "body", "b", "", "Set the new body.")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
-	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Add, "add-assignee", nil, "Add assigned users by their `login`. Use \"@me\" to assign yourself.")
-	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Remove, "remove-assignee", nil, "Remove assigned users by their `login`. Use \"@me\" to unassign yourself.")
+	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Add, "add-assignee", nil, "Add assigned users by their `login`. Use \"@me\" to assign yourself, or \"@copilot\" to assign Copilot.")
+	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Remove, "remove-assignee", nil, "Remove assigned users by their `login`. Use \"@me\" to unassign yourself, or \"@copilot\" to unassign Copilot.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Labels.Add, "add-label", nil, "Add labels by `name`")
 	cmd.Flags().StringSliceVar(&opts.Editable.Labels.Remove, "remove-label", nil, "Remove labels by `name`")
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Add, "add-project", nil, "Add the issue to projects by `title`")
@@ -197,9 +203,24 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+
+	issueFeatures, err := opts.Detector.IssueFeatures()
+	if err != nil {
+		return err
+	}
+
 	lookupFields := []string{"id", "number", "title", "body", "url"}
 	if editable.Assignees.Edited {
-		lookupFields = append(lookupFields, "assignees")
+		if issueFeatures.ActorIsAssignable {
+			editable.Assignees.ActorAssignees = true
+			lookupFields = append(lookupFields, "assignedActors")
+		} else {
+			lookupFields = append(lookupFields, "assignees")
+		}
 	}
 	if editable.Labels.Edited {
 		lookupFields = append(lookupFields, "labels")
@@ -207,11 +228,6 @@ func editRun(opts *EditOptions) error {
 	if editable.Projects.Edited {
 		// TODO projectsV1Deprecation
 		// Remove this section as we should no longer add projectCards
-		if opts.Detector == nil {
-			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
-		}
-
 		projectsV1Support := opts.Detector.ProjectsV1()
 		if projectsV1Support == gh.ProjectsV1Supported {
 			lookupFields = append(lookupFields, "projectCards")
@@ -254,7 +270,14 @@ func editRun(opts *EditOptions) error {
 
 		editable.Title.Default = issue.Title
 		editable.Body.Default = issue.Body
-		editable.Assignees.Default = issue.Assignees.Logins()
+		// We use Actors as the default assignees if Actors are assignable
+		// on this GitHub host.
+		if editable.Assignees.ActorAssignees {
+			editable.Assignees.Default = issue.AssignedActors.DisplayNames()
+			editable.Assignees.DefaultLogins = issue.AssignedActors.Logins()
+		} else {
+			editable.Assignees.Default = issue.Assignees.Logins()
+		}
 		editable.Labels.Default = issue.Labels.Names()
 		editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
 		projectItems := map[string]string{}

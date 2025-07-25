@@ -1,0 +1,10 @@
+{
+	"grpc": {
+		"timeout": "1s"
+	},
+	"tls": {
+		"caCertFile": "test/certs/ipki/minica.pem",
+		"certFile": "test/certs/ipki/health-checker.boulder/cert.pem",
+		"keyFile": "test/certs/ipki/health-checker.boulder/key.pem"
+	}
+}

@@ -1,0 +1,7 @@
+- NewRegistrationsPerIPAddress:
+    burst: 40
+    count: 40
+    period: 1s
+    ids:
+      - id: 64.112.117.1
+        comment: Foo

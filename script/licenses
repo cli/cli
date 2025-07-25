@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Manage go-licenses version externally for CI
+if [ "$CI" != "true" ]; then
+    go install github.com/google/go-licenses@latest
+fi
+
+# Setup temporary directory to collect updated third-party source code
+export TEMPDIR="$(mktemp -d)"
+trap "rm -fr ${TEMPDIR}" EXIT
+
+# Clear third-party source code to avoid stale content
+rm -rf third-party
+mkdir -p third-party
+
+for goos in linux darwin windows ; do
+    # Note: we ignore warnings because we want the command to succeed, however the output should be checked
+    #       for any new warnings, and potentially we may need to add license information.
+    #
+    #       Normally these warnings are packages containing non go code, which may or may not require explicit attribution,
+    #       depending on the license.
+    echo "Generating licenses for ${goos}..."
+    GOOS="${goos}" go-licenses save ./... --save_path="${TEMPDIR}/${goos}" --force || echo "Ignore warnings"
+    GOOS="${goos}" go-licenses report ./... --template .github/licenses.tmpl --ignore github.com/cli/cli > third-party-licenses.${goos}.md || echo "Ignore warnings"
+    cp -fR "${TEMPDIR}/${goos}"/* third-party/
+done
+
+echo "Licenses generated for all platforms."

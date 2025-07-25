@@ -154,10 +154,14 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 
 	if len(release.Assets) > 0 {
 		fmt.Fprintln(w, cs.Bold("Assets"))
-		//nolint:staticcheck // SA1019: Showing NAME|SIZE headers adds nothing to table.
-		table := tableprinter.New(io, tableprinter.NoHeader)
+		table := tableprinter.New(io, tableprinter.WithHeader("Name", "Digest", "Size"))
 		for _, a := range release.Assets {
 			table.AddField(a.Name)
+			if a.Digest == nil {
+				table.AddField("")
+			} else {
+				table.AddField(*a.Digest)
+			}
 			table.AddField(humanFileSize(a.Size))
 			table.EndRow()
 		}
@@ -177,6 +181,7 @@ func renderReleasePlain(w io.Writer, release *shared.Release) error {
 	fmt.Fprintf(w, "tag:\t%s\n", release.TagName)
 	fmt.Fprintf(w, "draft:\t%v\n", release.IsDraft)
 	fmt.Fprintf(w, "prerelease:\t%v\n", release.IsPrerelease)
+	fmt.Fprintf(w, "immutable:\t%v\n", release.IsImmutable)
 	fmt.Fprintf(w, "author:\t%s\n", release.Author.Login)
 	fmt.Fprintf(w, "created:\t%s\n", release.CreatedAt.Format(time.RFC3339))
 	if !release.IsDraft {

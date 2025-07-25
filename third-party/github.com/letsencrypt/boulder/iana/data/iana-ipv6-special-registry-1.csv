@@ -1,0 +1,28 @@
+Address Block,Name,RFC,Allocation Date,Termination Date,Source,Destination,Forwardable,Globally Reachable,Reserved-by-Protocol
+::1/128,Loopback Address,[RFC4291],2006-02,N/A,False,False,False,False,True
+::/128,Unspecified Address,[RFC4291],2006-02,N/A,True,False,False,False,True
+::ffff:0:0/96,IPv4-mapped Address,[RFC4291],2006-02,N/A,False,False,False,False,True
+64:ff9b::/96,IPv4-IPv6 Translat.,[RFC6052],2010-10,N/A,True,True,True,True,False
+64:ff9b:1::/48,IPv4-IPv6 Translat.,[RFC8215],2017-06,N/A,True,True,True,False,False
+100::/64,Discard-Only Address Block,[RFC6666],2012-06,N/A,True,True,True,False,False
+100:0:0:1::/64,Dummy IPv6 Prefix,[RFC9780],2025-04,N/A,True,False,False,False,False
+2001::/23,IETF Protocol Assignments,[RFC2928],2000-09,N/A,False [1],False [1],False [1],False [1],False
+2001::/32,TEREDO,"[RFC4380]
+        [RFC8190]",2006-01,N/A,True,True,True,N/A [2],False
+2001:1::1/128,Port Control Protocol Anycast,[RFC7723],2015-10,N/A,True,True,True,True,False
+2001:1::2/128,Traversal Using Relays around NAT Anycast,[RFC8155],2017-02,N/A,True,True,True,True,False
+2001:1::3/128,DNS-SD Service Registration Protocol Anycast,[RFC9665],2024-04,N/A,True,True,True,True,False
+2001:2::/48,Benchmarking,[RFC5180][RFC Errata 1752],2008-04,N/A,True,True,True,False,False
+2001:3::/32,AMT,[RFC7450],2014-12,N/A,True,True,True,True,False
+2001:4:112::/48,AS112-v6,[RFC7535],2014-12,N/A,True,True,True,True,False
+2001:10::/28,Deprecated (previously ORCHID),[RFC4843],2007-03,2014-03,,,,,
+2001:20::/28,ORCHIDv2,[RFC7343],2014-07,N/A,True,True,True,True,False
+2001:30::/28,Drone Remote ID Protocol Entity Tags (DETs) Prefix,[RFC9374],2022-12,N/A,True,True,True,True,False
+2001:db8::/32,Documentation,[RFC3849],2004-07,N/A,False,False,False,False,False
+2002::/16 [3],6to4,[RFC3056],2001-02,N/A,True,True,True,N/A [3],False
+2620:4f:8000::/48,Direct Delegation AS112 Service,[RFC7534],2011-05,N/A,True,True,True,True,False
+3fff::/20,Documentation,[RFC9637],2024-07,N/A,False,False,False,False,False
+5f00::/16,Segment Routing (SRv6) SIDs,[RFC9602],2024-04,N/A,True,True,True,False,False
+fc00::/7,Unique-Local,"[RFC4193]
+        [RFC8190]",2005-10,N/A,True,True,True,False [4],False
+fe80::/10,Link-Local Unicast,[RFC4291],2006-02,N/A,True,True,False,False,True

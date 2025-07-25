@@ -1,0 +1,5 @@
+- UsageRequestsPerIPv10Address:
+    burst: 40
+    count: 40
+    period: 1s
+    ids: []

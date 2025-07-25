@@ -1,0 +1,25 @@
+ceremony-type: root
+pkcs11:
+    module: /usr/lib/softhsm/libsofthsm2.so
+    pin: 1234
+    store-key-in-slot: {{ .SlotID }}
+    store-key-with-label: root ecdsa
+key:
+    type: ecdsa
+    ecdsa-curve: P-384
+outputs:
+    public-key-path: test/certs/webpki/root-ecdsa.pubkey.pem
+    certificate-path: test/certs/webpki/root-ecdsa.cert.pem
+certificate-profile:
+    signature-algorithm: ECDSAWithSHA384
+    common-name: root ecdsa
+    organization: good guys
+    country: US
+    not-before: 2020-01-01 12:00:00
+    not-after: 2040-01-01 12:00:00
+    key-usages:
+        - Cert Sign
+        - CRL Sign
+skip-lints:
+   # Our roots don't sign OCSP, so they don't need the Digital Signature KU.
+   - n_ca_digital_signature_not_set

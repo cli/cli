@@ -14,6 +14,70 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		arg      string
+		wantRepo ghrepo.Interface
+		wantNum  int
+		wantErr  string
+	}{
+		{
+			name:     "valid HTTPS URL",
+			arg:      "https://example.com/owner/repo/pull/123",
+			wantRepo: ghrepo.NewWithHost("owner", "repo", "example.com"),
+			wantNum:  123,
+		},
+		{
+			name:     "valid HTTP URL",
+			arg:      "http://example.com/owner/repo/pull/123",
+			wantRepo: ghrepo.NewWithHost("owner", "repo", "example.com"),
+			wantNum:  123,
+		},
+		{
+			name:    "empty URL",
+			wantErr: "invalid URL: \"\"",
+		},
+		{
+			name:    "invalid scheme",
+			arg:     "ftp://github.com/owner/repo/pull/123",
+			wantErr: "invalid scheme: ftp",
+		},
+		{
+			name:    "incorrect path",
+			arg:     "https://github.com/owner/repo/issues/123",
+			wantErr: "not a pull request URL: https://github.com/owner/repo/issues/123",
+		},
+		{
+			name:    "no PR number",
+			arg:     "https://github.com/owner/repo/pull/",
+			wantErr: "not a pull request URL: https://github.com/owner/repo/pull/",
+		},
+		{
+			name:    "invalid PR number",
+			arg:     "https://github.com/owner/repo/pull/foo",
+			wantErr: "not a pull request URL: https://github.com/owner/repo/pull/foo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, num, err := ParseURL(tt.arg)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Equal(t, tt.wantErr, err.Error())
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.wantNum, num)
+			require.NotNil(t, repo)
+			require.True(t, ghrepo.IsSame(tt.wantRepo, repo))
+		})
+	}
+}
+
 type args struct {
 	baseRepoFn      func() (ghrepo.Interface, error)
 	branchFn        func() (string, error)
@@ -164,6 +228,23 @@ func TestFind(t *testing.T) {
 			httpStub: nil,
 			wantPR:   13,
 			wantRepo: "https://github.com/ORIGINOWNER/REPO",
+		},
+		{
+			name: "pr number zero",
+			args: args{
+				selector:   "0",
+				fields:     []string{"number"},
+				baseRepoFn: stubBaseRepoFn(ghrepo.New("ORIGINOWNER", "REPO"), nil),
+				branchFn: func() (string, error) {
+					return "blueberries", nil
+				},
+				gitConfigClient: stubGitConfigClient{
+					readBranchConfigFn:  stubBranchConfig(git.BranchConfig{}, nil),
+					pushDefaultFn:       stubPushDefault(git.PushDefaultSimple, nil),
+					remotePushDefaultFn: stubRemotePushDefault("", nil),
+				},
+			},
+			wantErr: true,
 		},
 		{
 			name: "number with hash argument",

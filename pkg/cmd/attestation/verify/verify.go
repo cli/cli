@@ -186,9 +186,10 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			opts.APIClient = api.NewLiveClient(hc, opts.Hostname, opts.Logger)
 
 			config := verification.SigstoreConfig{
-				TrustedRoot:  opts.TrustedRoot,
+				HttpClient:   hc,
 				Logger:       opts.Logger,
 				NoPublicGood: opts.NoPublicGood,
+				TrustedRoot:  opts.TrustedRoot,
 			}
 
 			// Prepare for tenancy if detected
@@ -287,14 +288,6 @@ func runVerify(opts *Options) error {
 	}
 	// Print the message signifying success fetching attestations
 	opts.Logger.Println(logMsg)
-
-	// Apply predicate type filter to returned attestations
-	filteredAttestations := verification.FilterAttestations(ec.PredicateType, attestations)
-	if len(filteredAttestations) == 0 {
-		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found with predicate type: %s\n"), opts.PredicateType)
-		return fmt.Errorf("no matching predicate found")
-	}
-	attestations = filteredAttestations
 
 	// print information about the policy that will be enforced against attestations
 	opts.Logger.Println("\nThe following policy criteria will be enforced:")

@@ -105,10 +105,10 @@ func TestAccessControlEntriesToVisibility(t *testing.T) {
 
 func TestIsInternalPort(t *testing.T) {
 	internalPort := &tunnels.TunnelPort{
-		Tags: []string{"InternalPort"},
+		Labels: []string{"InternalPort"},
 	}
 	userForwardedPort := &tunnels.TunnelPort{
-		Tags: []string{"UserForwardedPort"},
+		Labels: []string{"UserForwardedPort"},
 	}
 
 	tests := []struct {
@@ -135,5 +135,133 @@ func TestIsInternalPort(t *testing.T) {
 				t.Errorf("expected %v, got %v", test.expected, isInternal)
 			}
 		})
+	}
+}
+
+func TestForwardPortDefaultsToHTTPProtocol(t *testing.T) {
+	codespace := &api.Codespace{
+		Name:  "codespace-name",
+		State: api.CodespaceStateAvailable,
+		Connection: api.CodespaceConnection{
+			TunnelProperties: api.TunnelProperties{
+				ConnectAccessToken:     "tunnel access-token",
+				ManagePortsAccessToken: "manage-ports-token",
+				ServiceUri:             "http://global.rel.tunnels.api.visualstudio.com/",
+				TunnelId:               "tunnel-id",
+				ClusterId:              "usw2",
+				Domain:                 "domain.com",
+			},
+		},
+		RuntimeConstraints: api.RuntimeConstraints{
+			AllowedPortPrivacySettings: []string{"public", "private"},
+		},
+	}
+
+	// Given there are no forwarded ports.
+	tunnelPorts := map[int]tunnels.TunnelPort{}
+
+	httpClient, err := connection.NewMockHttpClient(
+		connection.WithSpecificPorts(tunnelPorts),
+	)
+	if err != nil {
+		t.Fatalf("NewMockHttpClient returned an error: %v", err)
+	}
+
+	connection, err := connection.NewCodespaceConnection(t.Context(), codespace, httpClient)
+	if err != nil {
+		t.Fatalf("NewCodespaceConnection returned an error: %v", err)
+	}
+
+	fwd, err := NewPortForwarder(t.Context(), connection)
+	if err != nil {
+		t.Fatalf("NewPortForwarder returned an error: %v", err)
+	}
+
+	// When we forward a port without an existing one to use for a protocol, it should default to HTTP.
+	if err := fwd.ForwardPort(t.Context(), ForwardPortOpts{
+		Port: 1337,
+	}); err != nil {
+		t.Fatalf("ForwardPort returned an error: %v", err)
+	}
+
+	ports, err := fwd.ListPorts(t.Context())
+	if err != nil {
+		t.Fatalf("ListPorts returned an error: %v", err)
+	}
+
+	if len(ports) != 1 {
+		t.Fatalf("expected 1 port, got %d", len(ports))
+	}
+
+	if ports[0].Protocol != string(tunnels.TunnelProtocolHttp) {
+		t.Fatalf("expected port protocol to be http, got %s", ports[0].Protocol)
+	}
+}
+
+func TestForwardPortRespectsProtocolOfExistingTunneledPorts(t *testing.T) {
+	codespace := &api.Codespace{
+		Name:  "codespace-name",
+		State: api.CodespaceStateAvailable,
+		Connection: api.CodespaceConnection{
+			TunnelProperties: api.TunnelProperties{
+				ConnectAccessToken:     "tunnel access-token",
+				ManagePortsAccessToken: "manage-ports-token",
+				ServiceUri:             "http://global.rel.tunnels.api.visualstudio.com/",
+				TunnelId:               "tunnel-id",
+				ClusterId:              "usw2",
+				Domain:                 "domain.com",
+			},
+		},
+		RuntimeConstraints: api.RuntimeConstraints{
+			AllowedPortPrivacySettings: []string{"public", "private"},
+		},
+	}
+
+	// Given we already have a port forwarded with an HTTPS protocol.
+	tunnelPorts := map[int]tunnels.TunnelPort{
+		1337: {
+			Protocol: string(tunnels.TunnelProtocolHttps),
+			AccessControl: &tunnels.TunnelAccessControl{
+				Entries: []tunnels.TunnelAccessControlEntry{},
+			},
+		},
+	}
+
+	httpClient, err := connection.NewMockHttpClient(
+		connection.WithSpecificPorts(tunnelPorts),
+	)
+	if err != nil {
+		t.Fatalf("NewMockHttpClient returned an error: %v", err)
+	}
+
+	connection, err := connection.NewCodespaceConnection(t.Context(), codespace, httpClient)
+	if err != nil {
+		t.Fatalf("NewCodespaceConnection returned an error: %v", err)
+	}
+
+	fwd, err := NewPortForwarder(t.Context(), connection)
+	if err != nil {
+		t.Fatalf("NewPortForwarder returned an error: %v", err)
+	}
+
+	// When we forward a port, it would typically default to HTTP, to which the mock server would respond with a 400,
+	// but it should respect the existing port's protocol and forward it as HTTPS.
+	if err := fwd.ForwardPort(t.Context(), ForwardPortOpts{
+		Port: 1337,
+	}); err != nil {
+		t.Fatalf("ForwardPort returned an error: %v", err)
+	}
+
+	ports, err := fwd.ListPorts(t.Context())
+	if err != nil {
+		t.Fatalf("ListPorts returned an error: %v", err)
+	}
+
+	if len(ports) != 1 {
+		t.Fatalf("expected 1 port, got %d", len(ports))
+	}
+
+	if ports[0].Protocol != string(tunnels.TunnelProtocolHttps) {
+		t.Fatalf("expected port protocol to be https, got %s", ports[0].Protocol)
 	}
 }

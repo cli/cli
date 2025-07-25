@@ -44,6 +44,9 @@ func (g Gist) Filename() string {
 	for fn := range g.Files {
 		filenames = append(filenames, fn)
 	}
+	if len(filenames) == 0 {
+		return ""
+	}
 	sort.Strings(filenames)
 	return filenames[0]
 }

@@ -1,0 +1,36 @@
+NewRegistrationsPerIPAddress:
+  count: 10000
+  burst: 10000
+  period: 168h
+NewRegistrationsPerIPv6Range:
+  count: 99999
+  burst: 99999
+  period: 168h
+CertificatesPerDomain:
+  count: 2
+  burst: 2
+  period: 2160h
+FailedAuthorizationsPerDomainPerAccount:
+  count: 3
+  burst: 3
+  period: 5m
+# The burst represents failing 40 times per day for 90 days. The count and
+# period grant one "freebie" failure per day. In combination, these parameters
+# mean that:
+# - Failing 120 times per day results in being paused after 30.25 days
+# - Failing 40 times per day results in being paused after 92.3 days
+# - Failing 20 times per day results in being paused after 6.2 months
+# - Failing 4 times per day results in being paused after 3.3 years
+# - Failing once per day results in never being paused
+FailedAuthorizationsForPausingPerDomainPerAccount:
+  count: 1
+  burst: 3600
+  period: 24h
+NewOrdersPerAccount:
+  count: 1500
+  burst: 1500
+  period: 3h
+CertificatesPerFQDNSet:
+  count: 2
+  burst: 2
+  period: 3h

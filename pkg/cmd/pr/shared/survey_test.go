@@ -28,9 +28,9 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 
 	fetcher := &metadataFetcher{
 		metadataResult: &api.RepoMetadataResult{
-			AssignableUsers: []api.RepoAssignee{
-				{Login: "hubot"},
-				{Login: "monalisa"},
+			AssignableUsers: []api.AssignableUser{
+				api.NewAssignableUser("", "hubot", ""),
+				api.NewAssignableUser("", "monalisa", ""),
 			},
 			Labels: []api.RepoLabel{
 				{Name: "help wanted"},

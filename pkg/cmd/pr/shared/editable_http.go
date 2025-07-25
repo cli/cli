@@ -60,23 +60,76 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR
 
 	if dirtyExcludingLabels(options) {
 		wg.Go(func() error {
-			return replaceIssueFields(httpClient, repo, id, isPR, options)
+			// updateIssue mutation does not support Actors so assignment needs to
+			// be in a separate request when our assignees are Actors.
+			// Note: this is intentionally done synchronously with updating
+			// other issue fields to ensure consistency with how legacy
+			// user assignees are handled.
+			// https://github.com/cli/cli/pull/10960#discussion_r2086725348
+			if options.Assignees.Edited && options.Assignees.ActorAssignees {
+				apiClient := api.NewClientFromHTTP(httpClient)
+				assigneeIds, err := options.AssigneeIds(apiClient, repo)
+				if err != nil {
+					return err
+				}
+
+				err = replaceActorAssigneesForEditable(apiClient, repo, id, assigneeIds)
+				if err != nil {
+					return err
+				}
+			}
+			err := replaceIssueFields(httpClient, repo, id, isPR, options)
+			if err != nil {
+				return err
+			}
+
+			return nil
 		})
 	}
 
 	return wg.Wait()
 }
 
-func replaceIssueFields(httpClient *http.Client, repo ghrepo.Interface, id string, isPR bool, options Editable) error {
-	apiClient := api.NewClientFromHTTP(httpClient)
-	assigneeIds, err := options.AssigneeIds(apiClient, repo)
+func replaceActorAssigneesForEditable(apiClient *api.Client, repo ghrepo.Interface, id string, assigneeIds *[]string) error {
+	type ReplaceActorsForAssignableInput struct {
+		AssignableID githubv4.ID   `json:"assignableId"`
+		ActorIDs     []githubv4.ID `json:"actorIds"`
+	}
+
+	params := ReplaceActorsForAssignableInput{
+		AssignableID: githubv4.ID(id),
+		ActorIDs:     *ghIds(assigneeIds),
+	}
+
+	var mutation struct {
+		ReplaceActorsForAssignable struct {
+			TypeName string `graphql:"__typename"`
+		} `graphql:"replaceActorsForAssignable(input: $input)"`
+	}
+
+	variables := map[string]interface{}{"input": params}
+	err := apiClient.Mutate(repo.RepoHost(), "ReplaceActorsForAssignable", &mutation, variables)
 	if err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func replaceIssueFields(httpClient *http.Client, repo ghrepo.Interface, id string, isPR bool, options Editable) error {
+	apiClient := api.NewClientFromHTTP(httpClient)
+
 	projectIds, err := options.ProjectIds()
 	if err != nil {
 		return err
+	}
+
+	var assigneeIds *[]string
+	if !options.Assignees.ActorAssignees {
+		assigneeIds, err = options.AssigneeIds(apiClient, repo)
+		if err != nil {
+			return err
+		}
 	}
 
 	milestoneId, err := options.MilestoneId()

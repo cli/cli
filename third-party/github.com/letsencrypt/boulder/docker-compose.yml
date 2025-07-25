@@ -1,0 +1,218 @@
+services:
+  boulder:
+    # The `letsencrypt/boulder-tools:latest` tag is automatically built in local
+    # dev environments. In CI a specific BOULDER_TOOLS_TAG is passed, and it is
+    # pulled with `docker compose pull`.
+    image: &boulder_tools_image letsencrypt/boulder-tools:${BOULDER_TOOLS_TAG:-latest}
+    build:
+      context: test/boulder-tools/
+      # Should match one of the GO_CI_VERSIONS in test/boulder-tools/tag_and_upload.sh.
+      args:
+        GO_VERSION: 1.24.1
+    environment:
+      # To solve HTTP-01 and TLS-ALPN-01 challenges, change the IP in FAKE_DNS
+      # to the IP address where your ACME client's solver is listening. This is
+      # pointing at the boulder service's "public" IP, where challtestsrv is.
+      FAKE_DNS: 64.112.117.122
+      BOULDER_CONFIG_DIR: test/config
+      GOCACHE: /boulder/.gocache/go-build
+      GOFLAGS: -mod=vendor
+    volumes:
+      - .:/boulder:cached
+      - ./.gocache:/root/.cache/go-build:cached
+      - ./test/certs/.softhsm-tokens/:/var/lib/softhsm/tokens/:cached
+    networks:
+      bouldernet:
+        ipv4_address: 10.77.77.77
+      publicnet:
+        ipv4_address: 64.112.117.122
+      publicnet2:
+        ipv4_address: 64.112.117.134
+    # Use consul as a backup to Docker's embedded DNS server. If there's a name
+    # Docker's DNS server doesn't know about, it will forward the query to this
+    # IP (running consul).
+    # (https://docs.docker.com/config/containers/container-networking/#dns-services).
+    # This is used to look up service names via A records (like ra.service.consul) that
+    # are configured via the ServerAddress field of cmd.GRPCClientConfig.
+    # TODO: Remove this when ServerAddress is deprecated in favor of SRV records
+    # and DNSAuthority.
+    dns: 10.77.77.10
+    extra_hosts:
+      # Allow the boulder container to be reached as "ca.example.org", so we
+      # can put that name inside our integration test certs (e.g. as a crl
+      # url) and have it look like a publicly-accessible name.
+      # TODO(#8215): Move s3-test-srv to a separate service.
+      - "ca.example.org:64.112.117.122"
+      # Allow the boulder container to be reached as "integration.trust", for
+      # similar reasons, but intended for use as a SAN rather than a CRLDP.
+      # TODO(#8215): Move observer's probe target to a separate service.
+      - "integration.trust:64.112.117.122"
+    ports:
+      - 4001:4001 # ACMEv2
+      - 4002:4002 # OCSP
+      - 4003:4003 # SFE
+    depends_on:
+      - bmysql
+      - bproxysql
+      - bredis_1
+      - bredis_2
+      - bredis_3
+      - bredis_4
+      - bconsul
+      - bjaeger
+      - bpkimetal
+    entrypoint: test/entrypoint.sh
+    working_dir: &boulder_working_dir /boulder
+
+  bsetup:
+    image: *boulder_tools_image
+    volumes:
+      - .:/boulder:cached
+      - ./.gocache:/root/.cache/go-build:cached
+      - ./test/certs/.softhsm-tokens/:/var/lib/softhsm/tokens/:cached
+    entrypoint: test/certs/generate.sh
+    working_dir: *boulder_working_dir
+    profiles:
+      # Adding a profile to this container means that it won't be started by a
+      # normal "docker compose up/run boulder", only when specifically invoked
+      # with a "docker compose up bsetup".
+      - setup
+
+  bmysql:
+    image: mariadb:10.6.22
+    networks:
+      bouldernet:
+        aliases:
+          - boulder-mysql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    # Send slow queries to a table so we can check for them in the
+    # integration tests. For now we ignore queries not using indexes,
+    # because that seems to trigger based on the optimizer's choice to not
+    # use an index for certain queries, particularly when tables are still
+    # small.
+    command: mysqld --bind-address=0.0.0.0 --slow-query-log --log-output=TABLE --log-queries-not-using-indexes=ON
+    logging:
+      driver: none
+
+  bproxysql:
+    image: proxysql/proxysql:2.5.4
+    # The --initial flag force resets the ProxySQL database on startup. By
+    # default, ProxySQL ignores new configuration if the database already
+    # exists. Without this flag, new configuration wouldn't be applied until you
+    # ran `docker compose down`.
+    entrypoint: proxysql -f --idle-threads -c /test/proxysql/proxysql.cnf --initial
+    volumes:
+      - ./test/:/test/:cached
+    depends_on:
+      - bmysql
+    networks:
+      bouldernet:
+        aliases:
+          - boulder-proxysql
+
+  bredis_1:
+    image: redis:6.2.7
+    volumes:
+      - ./test/:/test/:cached
+    command: redis-server /test/redis-ocsp.config
+    networks:
+      bouldernet:
+        # TODO(#8215): Remove this static IP allocation (and similar below) when
+        # we tear down ocsp-responder. We only have it because ocsp-responder
+        # requires IPs in its "ShardAddrs" config, while ratelimit redis
+        # supports looking up shards via hostname and SRV record.
+        ipv4_address: 10.77.77.2
+
+  bredis_2:
+    image: redis:6.2.7
+    volumes:
+      - ./test/:/test/:cached
+    command: redis-server /test/redis-ocsp.config
+    networks:
+      bouldernet:
+        ipv4_address: 10.77.77.3
+
+  bredis_3:
+    image: redis:6.2.7
+    volumes:
+      - ./test/:/test/:cached
+    command: redis-server /test/redis-ratelimits.config
+    networks:
+      bouldernet:
+        ipv4_address: 10.77.77.4
+
+  bredis_4:
+    image: redis:6.2.7
+    volumes:
+      - ./test/:/test/:cached
+    command: redis-server /test/redis-ratelimits.config
+    networks:
+      bouldernet:
+        ipv4_address: 10.77.77.5
+
+  bconsul:
+    image: hashicorp/consul:1.15.4
+    volumes:
+     - ./test/:/test/:cached
+    networks:
+      bouldernet:
+        ipv4_address: 10.77.77.10
+    command: "consul agent -dev -config-format=hcl -config-file=/test/consul/config.hcl"
+
+  bjaeger:
+    image: jaegertracing/all-in-one:1.50
+    networks:
+      - bouldernet
+
+  bpkimetal:
+    image: ghcr.io/pkimetal/pkimetal:v1.20.0
+    networks:
+      - bouldernet
+
+networks:
+  # This network represents the data-center internal network. It is used for
+  # boulder services and their infrastructure, such as consul, mariadb, and
+  # redis.
+  bouldernet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.77.77.0/24
+          # Only issue DHCP addresses in the top half of the range, to avoid
+          # conflict with static addresses.
+          ip_range: 10.77.77.128/25
+
+  # This network represents the public internet. It uses a real public IP space
+  # (that Let's Encrypt controls) so that our integration tests are happy to
+  # validate and issue for it. It is used by challtestsrv, which binds to
+  # 64.112.117.122:80 and :443 for its HTTP-01 challenge responder.
+  #
+  # TODO(#8215): Put akamai-test-srv and s3-test-srv on this network.
+  publicnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 64.112.117.0/25
+
+  # This network is used for two things in the integration tests:
+  #  - challtestsrv binds to 64.112.117.134:443 for its tls-alpn-01 challenge
+  #    responder, to avoid interfering with the HTTPS port used for testing
+  #    HTTP->HTTPS redirects during http-01 challenges. Note: this could
+  #    probably be updated in the future so that challtestsrv can handle
+  #    both tls-alpn-01 and HTTPS on the same port.
+  #  - test/v2_integration.py has some test cases that start their own HTTP
+  #    server instead of relying on challtestsrv, because they want very
+  #    specific behavior. For these cases, v2_integration.py creates a Python
+  #    HTTP server and binds it to 64.112.117.134:80.
+  #
+  # TODO(#8215): Deprecate this network, replacing it with individual IPs within
+  # the existing publicnet.
+  publicnet2:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 64.112.117.128/25

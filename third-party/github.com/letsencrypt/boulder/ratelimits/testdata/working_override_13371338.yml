@@ -1,0 +1,21 @@
+- CertificatesPerDomainPerAccount:
+    burst: 1337
+    count: 1337
+    period: 2160h
+    ids:
+      - id: 13371338
+        comment: Used to test the TransactionBuilder
+- FailedAuthorizationsPerDomainPerAccount:
+    burst: 1337
+    count: 1337
+    period: 5m
+    ids:
+      - id: 13371338
+        comment: Used to test the TransactionBuilder
+- FailedAuthorizationsForPausingPerDomainPerAccount:
+    burst: 1337
+    count: 1
+    period: 24h
+    ids:
+      - id: 13371338
+        comment: Used to test the TransactionBuilder

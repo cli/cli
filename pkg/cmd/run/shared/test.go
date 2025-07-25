@@ -158,6 +158,18 @@ var LegacySuccessfulJobWithoutStepLogs Job = Job{
 	},
 }
 
+var SkippedJob Job = Job{
+	ID:          13,
+	Status:      Completed,
+	Conclusion:  Skipped,
+	Name:        "cool job",
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime,
+	URL:         "https://github.com/jobs/13",
+	RunID:       3,
+	Steps:       []Step{},
+}
+
 var FailedJob Job = Job{
 	ID:          20,
 	Status:      Completed,

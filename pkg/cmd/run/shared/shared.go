@@ -1,7 +1,6 @@
 package shared
 
 import (
-	"archive/zip"
 	"errors"
 	"fmt"
 	"net/http"
@@ -230,8 +229,6 @@ type Job struct {
 	CompletedAt time.Time `json:"completed_at"`
 	URL         string    `json:"html_url"`
 	RunID       int64     `json:"run_id"`
-
-	Log *zip.File
 }
 
 type Step struct {
@@ -241,8 +238,6 @@ type Step struct {
 	Number      int
 	StartedAt   time.Time `json:"started_at"`
 	CompletedAt time.Time `json:"completed_at"`
-
-	Log *zip.File
 }
 
 type Steps []Step
@@ -322,6 +317,10 @@ func IsFailureState(c Conclusion) bool {
 	default:
 		return false
 	}
+}
+
+func IsSkipped(c Conclusion) bool {
+	return c == Skipped
 }
 
 type RunsPayload struct {

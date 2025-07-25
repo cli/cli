@@ -210,17 +210,10 @@ func createTestDir(t *testing.T) (cleanupFn func()) {
 	rootDir := t.TempDir()
 
 	// Move workspace to temporary directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = os.Chdir(rootDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Chdir(rootDir)
 
 	// Make subdirectories
-	err = os.Mkdir(filepath.Join(rootDir, "subDir1"), 0755)
+	err := os.Mkdir(filepath.Join(rootDir, "subDir1"), 0755)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,10 +246,6 @@ func createTestDir(t *testing.T) (cleanupFn func()) {
 
 	cleanupFn = func() {
 		os.RemoveAll(rootDir)
-		err = os.Chdir(cwd)
-		if err != nil {
-			t.Fatal(err)
-		}
 	}
 	return cleanupFn
 }

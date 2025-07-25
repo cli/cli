@@ -1,0 +1,68 @@
+{
+	"crlUpdater": {
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/crl-updater.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/crl-updater.boulder/key.pem"
+		},
+		"saService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "sa",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "sa.boulder"
+		},
+		"crlGeneratorService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "ca",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "ca.boulder"
+		},
+		"crlStorerService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "crl-storer",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "crl-storer.boulder"
+		},
+		"issuerCerts": [
+			"test/certs/webpki/int-rsa-a.cert.pem",
+			"test/certs/webpki/int-rsa-b.cert.pem",
+			"test/certs/webpki/int-rsa-c.cert.pem",
+			"test/certs/webpki/int-ecdsa-a.cert.pem",
+			"test/certs/webpki/int-ecdsa-b.cert.pem",
+			"test/certs/webpki/int-ecdsa-c.cert.pem"
+		],
+		"numShards": 10,
+		"shardWidth": "240h",
+		"lookbackPeriod": "24h",
+		"updatePeriod": "10m",
+		"updateTimeout": "1m",
+		"expiresMargin": "5m",
+		"cacheControl": "stale-if-error=60",
+		"temporallyShardedSerialPrefixes": [
+			"7f"
+		],
+		"maxParallelism": 10,
+		"maxAttempts": 2,
+		"features": {}
+	},
+	"syslog": {
+		"stdoutlevel": 4,
+		"sysloglevel": -1
+	},
+	"openTelemetry": {
+		"endpoint": "bjaeger:4317",
+		"sampleratio": 1
+	}
+}

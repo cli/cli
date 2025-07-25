@@ -77,10 +77,40 @@ func (p *accessiblePrompter) newForm(groups ...*huh.Group) *huh.Form {
 		WithOutput(p.stdout)
 }
 
-func (p *accessiblePrompter) Select(prompt, _ string, options []string) (int, error) {
+// addDefaultsToPrompt adds default values to the prompt string.
+func (p *accessiblePrompter) addDefaultsToPrompt(prompt string, defaultValues []string) string {
+	// Removing empty defaults from the slice.
+	defaultValues = slices.DeleteFunc(defaultValues, func(s string) bool {
+		return s == ""
+	})
+
+	// Pluralizing the prompt if there are multiple default values.
+	if len(defaultValues) == 1 {
+		prompt = fmt.Sprintf("%s (default: %s)", prompt, defaultValues[0])
+	} else if len(defaultValues) > 1 {
+		prompt = fmt.Sprintf("%s (defaults: %s)", prompt, strings.Join(defaultValues, ", "))
+	}
+
+	// Zero-length defaultValues means return prompt unchanged.
+	return prompt
+}
+
+func (p *accessiblePrompter) Select(prompt, defaultValue string, options []string) (int, error) {
 	var result int
+
+	// Remove invalid default values from the defaults slice.
+	if !slices.Contains(options, defaultValue) {
+		defaultValue = ""
+	}
+
+	prompt = p.addDefaultsToPrompt(prompt, []string{defaultValue})
 	formOptions := []huh.Option[int]{}
 	for i, o := range options {
+		// If this option is the default value, assign its index
+		// to the result variable. huh will treat it as a default selection.
+		if defaultValue == o {
+			result = i
+		}
 		formOptions = append(formOptions, huh.NewOption(o, i))
 	}
 
@@ -99,12 +129,18 @@ func (p *accessiblePrompter) Select(prompt, _ string, options []string) (int, er
 
 func (p *accessiblePrompter) MultiSelect(prompt string, defaults []string, options []string) ([]int, error) {
 	var result []int
+
+	// Remove invalid default values from the defaults slice.
+	defaults = slices.DeleteFunc(defaults, func(s string) bool {
+		return !slices.Contains(options, s)
+	})
+
+	prompt = p.addDefaultsToPrompt(prompt, defaults)
 	formOptions := make([]huh.Option[int], len(options))
 	for i, o := range options {
 		// If this option is in the defaults slice,
 		// let's add its index to the result slice and huh
 		// will treat it as a default selection.
-		// TODO: does an invalid default value constitute a panic?
 		if slices.Contains(defaults, o) {
 			result = append(result, i)
 		}
@@ -131,7 +167,7 @@ func (p *accessiblePrompter) MultiSelect(prompt string, defaults []string, optio
 
 func (p *accessiblePrompter) Input(prompt, defaultValue string) (string, error) {
 	result := defaultValue
-	prompt = fmt.Sprintf("%s (%s)", prompt, defaultValue)
+	prompt = p.addDefaultsToPrompt(prompt, []string{defaultValue})
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -167,6 +203,13 @@ func (p *accessiblePrompter) Password(prompt string) (string, error) {
 
 func (p *accessiblePrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
 	result := defaultValue
+
+	if defaultValue {
+		prompt = p.addDefaultsToPrompt(prompt, []string{"yes"})
+	} else {
+		prompt = p.addDefaultsToPrompt(prompt, []string{"no"})
+	}
+
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewConfirm().
@@ -174,6 +217,7 @@ func (p *accessiblePrompter) Confirm(prompt string, defaultValue bool) (bool, er
 				Value(&result),
 		),
 	)
+
 	if err := form.Run(); err != nil {
 		return false, err
 	}

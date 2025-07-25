@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	githubSubjectId      = "1"
-	InternalPortTag      = "InternalPort"
-	UserForwardedPortTag = "UserForwardedPort"
+	githubSubjectId        = "1"
+	InternalPortLabel      = "InternalPort"
+	UserForwardedPortLabel = "UserForwardedPort"
 )
 
 const (
@@ -108,7 +108,26 @@ func (fwd *CodespacesPortForwarder) ForwardPort(ctx context.Context, opts Forwar
 		return fmt.Errorf("error converting port: %w", err)
 	}
 
-	tunnelPort := tunnels.NewTunnelPort(port, "", "", tunnels.TunnelProtocolHttp)
+	// In v0.0.25 of dev-tunnels, the dev-tunnel manager `CreateTunnelPort` would "accept" requests that
+	// change the port protocol but they would not result in any actual change. This has changed, resulting in
+	// an error `Invalid arguments. The tunnel port protocol cannot be changed.`. It's not clear why the previous
+	// behaviour existed, whether it was truly the API version, or whether the `If-Not-Match` header being set inside
+	// `CreateTunnelPort` avoided the server accepting the request to change the protocol and that has since regressed.
+	//
+	// In any case, now we check whether a port exists with the given port number, if it does, we use the existing protocol.
+	// If it doesn't exist, we default to HTTP, which was the previous behaviour for all ports.
+	protocol := tunnels.TunnelProtocolHttp
+
+	existingPort, err := fwd.connection.TunnelManager.GetTunnelPort(ctx, fwd.connection.Tunnel, opts.Port, fwd.connection.Options)
+	if err != nil && !strings.Contains(err.Error(), "404") {
+		return fmt.Errorf("error checking whether tunnel port already exists: %v", err)
+	}
+
+	if existingPort != nil {
+		protocol = tunnels.TunnelProtocol(existingPort.Protocol)
+	}
+
+	tunnelPort := tunnels.NewTunnelPort(port, "", "", protocol)
 
 	// If no visibility is provided, Dev Tunnels will use the default (private)
 	if opts.Visibility != "" {
@@ -136,9 +155,9 @@ func (fwd *CodespacesPortForwarder) ForwardPort(ctx context.Context, opts Forwar
 
 	// Tag the port as internal or user forwarded so we know if it needs to be shown in the UI
 	if opts.Internal {
-		tunnelPort.Tags = []string{InternalPortTag}
+		tunnelPort.Labels = []string{InternalPortLabel}
 	} else {
-		tunnelPort.Tags = []string{UserForwardedPortTag}
+		tunnelPort.Labels = []string{UserForwardedPortLabel}
 	}
 
 	// Create the tunnel port
@@ -362,8 +381,8 @@ func visibilityToAccessControlEntries(visibility string) []tunnels.TunnelAccessC
 
 // IsInternalPort returns true if the port is internal.
 func IsInternalPort(port *tunnels.TunnelPort) bool {
-	for _, tag := range port.Tags {
-		if strings.EqualFold(tag, InternalPortTag) {
+	for _, label := range port.Labels {
+		if strings.EqualFold(label, InternalPortLabel) {
 			return true
 		}
 	}

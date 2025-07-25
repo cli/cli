@@ -24,6 +24,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/test"
+	ghapi "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -657,6 +658,103 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 		✓ Deleted local branch blueberries and switched to branch main
 		✓ Deleted remote branch blueberries
 	`), output.Stderr())
+}
+
+func TestPrMerge_deleteBranch_apiError(t *testing.T) {
+	tests := []struct {
+		name       string
+		apiError   ghapi.HTTPError
+		wantErr    string
+		wantStderr string
+	}{
+		{
+			name: "branch already deleted (422: Reference does not exist)",
+			apiError: ghapi.HTTPError{
+				Message:    "Reference does not exist",
+				StatusCode: http.StatusUnprocessableEntity, // 422
+			},
+			wantStderr: heredoc.Doc(`
+				✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
+				✓ Deleted local branch blueberries and switched to branch main
+				✓ Deleted remote branch blueberries
+			`),
+		},
+		{
+			name: "branch already deleted (404: Reference does not exist) (#11187)",
+			apiError: ghapi.HTTPError{
+				Message:    "Reference does not exist",
+				StatusCode: http.StatusNotFound, // 404
+			},
+			wantStderr: heredoc.Doc(`
+				✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
+				✓ Deleted local branch blueberries and switched to branch main
+				✓ Deleted remote branch blueberries
+			`),
+		},
+		{
+			name: "unknown API error",
+			apiError: ghapi.HTTPError{
+				Message:    "blah blah",
+				StatusCode: http.StatusInternalServerError, // 500
+			},
+			wantStderr: heredoc.Doc(`
+				✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
+				✓ Deleted local branch blueberries and switched to branch main
+			`),
+			wantErr: "failed to delete remote branch blueberries: HTTP 500: blah blah (https://api.github.com/repos/OWNER/REPO/git/refs/heads/blueberries)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			http := initFakeHTTP()
+			defer http.Verify(t)
+
+			shared.StubFinderForRunCommandStyleTests(t,
+				"",
+				&api.PullRequest{
+					ID:               "PR_10",
+					Number:           10,
+					State:            "OPEN",
+					Title:            "Blueberries are a good fruit",
+					HeadRefName:      "blueberries",
+					BaseRefName:      "main",
+					MergeStateStatus: "CLEAN",
+				},
+				baseRepo("OWNER", "REPO", "main"),
+			)
+
+			http.Register(
+				httpmock.GraphQL(`mutation PullRequestMerge\b`),
+				httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+					assert.Equal(t, "PR_10", input["pullRequestId"].(string))
+					assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+					assert.NotContains(t, input, "commitHeadline")
+				}))
+			http.Register(
+				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+				httpmock.JSONErrorResponse(tt.apiError.StatusCode, tt.apiError))
+
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+
+			cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
+			cs.Register(`git checkout main`, 0, "")
+			cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+			cs.Register(`git branch -D blueberries`, 0, "")
+			cs.Register(`git pull --ff-only`, 0, "")
+
+			output, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
+			assert.Equal(t, "", output.String())
+			assert.Equal(t, tt.wantStderr, output.Stderr())
+
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestPrMerge_deleteBranch_mergeQueue(t *testing.T) {

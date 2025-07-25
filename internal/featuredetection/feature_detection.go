@@ -18,11 +18,13 @@ type Detector interface {
 }
 
 type IssueFeatures struct {
-	StateReason bool
+	StateReason       bool
+	ActorIsAssignable bool
 }
 
 var allIssueFeatures = IssueFeatures{
-	StateReason: true,
+	StateReason:       true,
+	ActorIsAssignable: true,
 }
 
 type PullRequestFeatures struct {
@@ -70,7 +72,8 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 	}
 
 	features := IssueFeatures{
-		StateReason: false,
+		StateReason:       false,
+		ActorIsAssignable: false, // replaceActorsForAssignable GraphQL mutation unavailable on GHES
 	}
 
 	var featureDetection struct {

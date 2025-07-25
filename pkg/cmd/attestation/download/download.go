@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 
@@ -127,13 +126,16 @@ func runDownload(opts *Options) error {
 
 	opts.Logger.VerbosePrintf("Downloading trusted metadata for artifact %s\n\n", opts.ArtifactPath)
 
-	params := verification.FetchRemoteAttestationsParams{
+	if opts.APIClient == nil {
+		return fmt.Errorf("no APIClient provided")
+	}
+	params := api.FetchParams{
 		Digest: artifact.DigestWithAlg(),
 		Limit:  opts.Limit,
 		Owner:  opts.Owner,
 		Repo:   opts.Repo,
 	}
-	attestations, err := verification.GetRemoteAttestations(opts.APIClient, params)
+	attestations, err := opts.APIClient.GetByDigest(params)
 	if err != nil {
 		if errors.Is(err, api.ErrNoAttestationsFound) {
 			fmt.Fprintf(opts.Logger.IO.Out, "No attestations found for %s\n", opts.ArtifactPath)
@@ -144,10 +146,9 @@ func runDownload(opts *Options) error {
 
 	// Apply predicate type filter to returned attestations
 	if opts.PredicateType != "" {
-		filteredAttestations := verification.FilterAttestations(opts.PredicateType, attestations)
-
-		if len(filteredAttestations) == 0 {
-			return fmt.Errorf("no attestations found with predicate type: %s", opts.PredicateType)
+		filteredAttestations, err := api.FilterAttestations(opts.PredicateType, attestations)
+		if err != nil {
+			return fmt.Errorf("failed to filter attestations: %v", err)
 		}
 
 		attestations = filteredAttestations

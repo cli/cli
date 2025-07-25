@@ -3,6 +3,7 @@
 package verify
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
@@ -26,6 +27,7 @@ func getAttestationsFor(t *testing.T, bundlePath string) []*api.Attestation {
 
 func TestVerifyAttestations(t *testing.T) {
 	sgVerifier, err := verification.NewLiveSigstoreVerifier(verification.SigstoreConfig{
+		HttpClient:     http.DefaultClient,
 		Logger:         io.NewTestHandler(),
 		TUFMetadataDir: o.Some(t.TempDir()),
 	})

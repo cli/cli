@@ -1,0 +1,69 @@
+name: Check PR for changes that trigger CP/CPS review
+
+on:
+  pull_request:
+    types: [ready_for_review, review_requested]
+    paths:
+      - 'features/features.go'
+
+jobs:
+  check-features:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
+      - name: Checkout Upstream
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+      - name: Get Current Flags
+        run: go run ./test/list-features/list-features.go | sort >| /tmp/currflags.txt
+
+      - name: Checkout PR
+        uses: actions/checkout@v4
+      - name: Get PR Flags
+        run: go run ./test/list-features/list-features.go | sort >| /tmp/prflags.txt
+
+      - name: Identify New Flags
+        id: newflags
+        run: echo flagnames=$(comm -13 /tmp/currflags.txt /tmp/prflags.txt | paste -sd,) >> $GITHUB_OUTPUT
+
+      - name: Comment PR
+        if: ${{ steps.newflags.outputs.flagnames != '' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo, number: issue_number } = context.issue;
+
+            // No need to comment if the PR description already has a CPS review.
+            const reviewRegexp = /^CPS Compliance Review:/;
+            if (reviewRegexp.test(context.payload.pull_request.body)) {
+              return;
+            }
+
+            // No need to comment if this task has previously commented on this PR.
+            const commentMarker = '<!-- cps_review_check -->';
+            const comments = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number
+            });
+            if (comments.data.find(c => c.body.includes(commentMarker))) {
+              return;
+            }
+
+            // No existing review or comment found, post the comment.
+            const prAuthor = context.payload.pull_request.user.login;
+            const flagNames = '${{ steps.newflags.outputs.flagnames }}';
+            const commentBody = `${commentMarker}\n@${prAuthor}, this PR adds one or more new feature flags: ${flagNames}. As such, this PR must be accompanied by a review of the Let's Encrypt CP/CPS to ensure that our behavior both before and after this flag is flipped is compliant with that document.\n\nPlease conduct such a review, then add your findings to the PR description in a paragraph beginning with "CPS Compliance Review:".`;
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: commentBody
+            });

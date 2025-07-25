@@ -18,7 +18,8 @@ const (
 type IssueMetadataState struct {
 	Type metadataStateType
 
-	Draft bool
+	Draft          bool
+	ActorAssignees bool
 
 	Body  string
 	Title string

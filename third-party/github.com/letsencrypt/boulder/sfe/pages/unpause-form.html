@@ -1,0 +1,73 @@
+{{ template "header" }}
+
+<div class="section">
+    <h1>Action required to unpause your account</h1>
+    <p>
+        You have been directed to this page because your ACME account (ID: {{
+        .AccountID }}) is temporarily restricted from requesting new
+        certificates for certain identifiers including, but not limited to, the
+        following:
+    </p>
+    <ul>
+        {{ range $identifier := .Idents }}<li>{{ $identifier}}</li>{{ end }}
+    </ul>
+    <p>
+        These identifiers were paused after consistently failing validation
+        attempts without any successes over an extended period.
+    </p>
+</div>
+
+<div class="section">
+    <h1>Why did this happen?</h1>
+    <p>
+        This often happens when domain names expire, point to new hosts, or if
+        there are issues with the DNS configuration or web server settings.
+        These problems prevent your ACME client from successfully
+        <a href="https://letsencrypt.org/how-it-works/">validating control over
+        the domain</a>, which is necessary for issuing TLS certificates.
+    </p>
+</div>
+
+<div class="section highlight">
+    <h1>What can you do?</h1>
+    <p>
+        Please check the DNS configuration and web server settings for the
+        affected identifiers. Ensure they are properly set up to respond to ACME
+        challenges. This could include:
+    <ul>
+        <li>updating DNS records,</li>
+        <li>renewing domain registrations, or</li>
+        <li>adjusting web server configurations.</li>
+    </ul>
+
+    If you use a hosting provider or third-party service for domain management,
+    you may need to coordinate with them. If you believe you've fixed the
+    underlying issue, consider attempting issuance against our <a
+    href="https://letsencrypt.org/docs/staging-environment/">staging
+    environment</a> to verify your fix.
+    </p>
+</div>
+
+<div class="section">
+    <h1>Ready to unpause?</h1>
+    <p>
+        If you believe these issues have been addressed, click the button below
+        to remove the pause on your account. This action will allow you to
+        resume requesting certificates for all affected identifiers associated
+        with your account, not just those listed above.
+    </p>
+    <form action="{{ .PostPath }}?jwt={{ .JWT }}" method="POST">
+        <button class="primary" id="submit">Please Unpause My Account</button>
+    </form>
+</div>
+
+<div class="section">
+    <p>
+        <b>Note:</b> If you encounter difficulties unpausing your account, or
+        you need more help, our <a
+        href="https://community.letsencrypt.org">community support forum</a> is
+        a great resource for troubleshooting and advice.
+    </p>
+</div>
+
+{{template "footer"}}

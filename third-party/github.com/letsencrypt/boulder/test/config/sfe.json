@@ -1,0 +1,48 @@
+{
+	"sfe": {
+		"listenAddress": "0.0.0.0:4003",
+		"debugAddr": ":8015",
+		"timeout": "30s",
+		"shutdownStopTimeout": "10s",
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/sfe.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/sfe.boulder/key.pem"
+		},
+		"raService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "ra",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "ra.boulder"
+		},
+		"saService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "sa",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "sa.boulder"
+		},
+		"unpauseHMACKey": {
+			"keyFile": "test/secrets/sfe_unpause_key"
+		},
+		"features": {}
+	},
+	"syslog": {
+		"stdoutlevel": 6,
+		"sysloglevel": -1
+	},
+	"openTelemetry": {
+		"endpoint": "bjaeger:4317",
+		"sampleratio": 1
+	},
+	"openTelemetryHttpConfig": {
+		"trustIncomingSpans": true
+	}
+}

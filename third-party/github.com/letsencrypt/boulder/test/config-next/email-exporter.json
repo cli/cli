@@ -1,0 +1,42 @@
+{
+	"emailExporter": {
+		"debugAddr": ":8114",
+		"grpc": {
+			"maxConnectionAge": "30s",
+			"address": ":9603",
+			"services": {
+				"email.Exporter": {
+					"clientNames": [
+						"wfe.boulder"
+					]
+				},
+				"grpc.health.v1.Health": {
+					"clientNames": [
+						"health-checker.boulder"
+					]
+				}
+			}
+		},
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/email-exporter.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/email-exporter.boulder/key.pem"
+		},
+		"perDayLimit": 999999,
+		"maxConcurrentRequests": 5,
+		"pardotBusinessUnit": "test-business-unit",
+		"clientId": {
+			"passwordFile": "test/secrets/salesforce_client_id"
+		},
+		"clientSecret": {
+			"passwordFile": "test/secrets/salesforce_client_secret"
+		},
+		"salesforceBaseURL": "http://localhost:9601",
+		"pardotBaseURL": "http://localhost:9602",
+		"emailCacheSize": 100000
+	},
+	"syslog": {
+		"stdoutlevel": 6,
+		"sysloglevel": -1
+	}
+}

@@ -1358,7 +1358,12 @@ func Test_apiRun_cache(t *testing.T) {
 		Config: func() (gh.Config, error) {
 			return &ghmock.ConfigMock{
 				AuthenticationFunc: func() gh.AuthConfig {
-					return &config.AuthConfig{}
+					cfg := &config.AuthConfig{}
+					// Required because the http client tries to get the active token and otherwise
+					// this goes down to to go-gh config and panics. Pretty bad solution, it would
+					// be better if this were black box.
+					cfg.SetActiveToken("token", "stub")
+					return cfg
 				},
 				// Cached responses are stored in a tempdir that gets automatically cleaned up
 				CacheDirFunc: func() string {

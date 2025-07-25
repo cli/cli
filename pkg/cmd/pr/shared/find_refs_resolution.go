@@ -129,7 +129,7 @@ func NewPullRequestFindRefsResolver(gitConfigClient GitConfigClient, remotesFn f
 	}
 }
 
-// ResolvePullRequests takes a base repository, a base branch name and a local branch name and uses the git configuration to
+// ResolvePullRequestRefs takes a base repository, a base branch name and a local branch name and uses the git configuration to
 // determine the head repository and remote branch name. If we were unable to determine this from git, we default the head
 // repository to the base repository.
 func (r *PullRequestFindRefsResolver) ResolvePullRequestRefs(baseRepo ghrepo.Interface, baseBranchName, localBranchName string) (PRFindRefs, error) {

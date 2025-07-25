@@ -1,0 +1,47 @@
+# Try building the Boulder Debian package on every PR and push to main.
+# This is to make sure the actual release job will succeed when we tag a
+# release.
+# Keep in sync with release.yml
+name: Try release
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  try-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        GO_VERSION:
+          - "1.24.4"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build .deb
+        id: build
+        env:
+          GO_VERSION: ${{ matrix.GO_VERSION }}
+        run: docker run -v $PWD:/boulder -e GO_VERSION=$GO_VERSION -e COMMIT_ID="$(git rev-parse --short=8 HEAD)" ubuntu:24.04 bash -c 'apt update && apt -y install gnupg2 curl sudo git gcc && cd /boulder/ && ./tools/make-assets.sh'
+
+      - name: Compute checksums
+        id: checksums
+        # The files listed on this line must be identical to the files uploaded
+        # in the last step of the real release action.
+        run: sha256sum boulder*.deb boulder*.tar.gz >| boulder-${{ matrix.GO_VERSION }}.$(date +%s)-$(git rev-parse --short=8 HEAD).checksums.txt
+
+      - name: List files
+        id: files
+        run: ls boulder*.deb boulder*.tar.gz boulder*.checksums.txt
+
+      - name: Show checksums
+        id: check
+        run: cat boulder*.checksums.txt
+
+      - name: Build ct-test-srv Container
+        run: docker buildx build . --build-arg "GO_VERSION=${{ matrix.GO_VERSION }}" -f test/ct-test-srv/Dockerfile -t "ghcr.io/letsencrypt/ct-test-srv:${{ github.sha }}-go${{ matrix.GO_VERSION }}"

@@ -1,0 +1,73 @@
+{
+	"webFooEnd": {
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/wfe.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/wfe.boulder/key.pem"
+		},
+		"caseOne": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookups": [
+				{
+					"service": "case1a",
+					"domain": "service.consul"
+				},
+				{
+					"service": "case1b",
+					"domain": "service.consul"
+				}
+			],
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "nonce.boulder"
+		},
+		"caseTwo": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookups": [
+				{
+					"service": "case2a",
+					"domain": "service.consul"
+				},
+				{
+					"service": "case2b",
+					"domain": "service.consul"
+				}
+			],
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "nonce.boulder"
+		},
+		"caseThree": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookups": [
+				{
+					"service": "case3a",
+					"domain": "service.consul"
+				},
+				{
+					"service": "case3b",
+					"domain": "service.consul"
+				}
+			],
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "nonce.boulder"
+		},
+		"caseFour": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookups": [
+				{
+					"service": "case4a",
+					"domain": "service.consul"
+				},
+				{
+					"service": "case4b",
+					"domain": "service.consul"
+				}
+			],
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "nonce.boulder"
+		}
+	}
+}

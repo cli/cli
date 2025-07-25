@@ -1,0 +1,42 @@
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.so
+*.pyc
+
+# Folders
+_obj
+_test
+bin
+.gocache
+
+# Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
+
+# Vim swap files
+*.sw?
+
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+_testmain.go
+
+*.sw?
+*.exe
+*.test
+*.prof
+*.coverprofile
+
+tags
+
+# IDE support files
+.idea
+
+.vscode/*
+
+# ProxySQL log files
+test/proxysql/*.log*

@@ -5,6 +5,7 @@ package prompter_test
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -32,6 +33,9 @@ import (
 // are sufficient to ensure that the accessible prompter behaves roughly as expected
 // but doesn't mandate that prompts always look exactly the same.
 func TestAccessiblePrompter(t *testing.T) {
+
+	beforePasswordSendTimeout := 100 * time.Microsecond
+
 	t.Run("Select", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
@@ -49,6 +53,73 @@ func TestAccessiblePrompter(t *testing.T) {
 		selectValue, err := p.Select("Select a number", "", []string{"1", "2", "3"})
 		require.NoError(t, err)
 		assert.Equal(t, 0, selectValue)
+	})
+
+	t.Run("Select - blank input returns default value", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValue := "12345abcdefg"
+		options := []string{"1", "2", dummyDefaultValue}
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Input a number between 1 and 3:")
+			require.NoError(t, err)
+
+			// Just press enter to accept the default
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		selectValue, err := p.Select("Select a number", dummyDefaultValue, options)
+		require.NoError(t, err)
+
+		expectedIndex := slices.Index(options, dummyDefaultValue)
+		assert.Equal(t, expectedIndex, selectValue)
+	})
+
+	t.Run("Select - default value is in prompt and in readable format", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValue := "12345abcdefg"
+		options := []string{"1", "2", dummyDefaultValue}
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select a number (default: 12345abcdefg)")
+			require.NoError(t, err)
+
+			// Just press enter to accept the default
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		selectValue, err := p.Select("Select a number", dummyDefaultValue, options)
+		require.NoError(t, err)
+
+		expectedIndex := slices.Index(options, dummyDefaultValue)
+		assert.Equal(t, expectedIndex, selectValue)
+	})
+
+	t.Run("Select - invalid defaults are excluded from prompt", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValue := "foo"
+		options := []string{"1", "2"}
+
+		go func() {
+			// Wait for prompt to appear without the invalid default value
+			_, err := console.ExpectString("Select a number \r\n")
+			require.NoError(t, err)
+
+			// Select option 2
+			_, err = console.SendLine("2")
+			require.NoError(t, err)
+		}()
+
+		selectValue, err := p.Select("Select a number", dummyDefaultValue, options)
+		require.NoError(t, err)
+		assert.Equal(t, 1, selectValue)
 	})
 
 	t.Run("MultiSelect", func(t *testing.T) {
@@ -97,6 +168,62 @@ func TestAccessiblePrompter(t *testing.T) {
 		assert.Equal(t, []int{1}, multiSelectValue)
 	})
 
+	t.Run("MultiSelect - default value is in prompt and in readable format", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValues := []string{"foo", "bar"}
+		options := []string{"1", "2"}
+		options = append(options, dummyDefaultValues...)
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select a number (defaults: foo, bar)")
+			require.NoError(t, err)
+
+			// Don't select anything because the defaults should be selected.
+
+			// This confirms selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+
+		multiSelectValues, err := p.MultiSelect("Select a number", dummyDefaultValues, options)
+		require.NoError(t, err)
+		var expectedIndices []int
+
+		// Get the indices of the default values within the options slice
+		// as that's what we expect the prompter to return when no selections are made.
+		for _, defaultValue := range dummyDefaultValues {
+			expectedIndices = append(expectedIndices, slices.Index(options, defaultValue))
+		}
+		assert.Equal(t, expectedIndices, multiSelectValues)
+	})
+
+	t.Run("MultiSelect - invalid defaults are excluded from prompt", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValues := []string{"foo", "bar"}
+		options := []string{"1", "2"}
+
+		go func() {
+			// Wait for prompt to appear without the invalid default values
+			_, err := console.ExpectString("Select a number \r\n")
+			require.NoError(t, err)
+
+			// Not selecting anything will fail because there are no defaults.
+			_, err = console.SendLine("2")
+			require.NoError(t, err)
+
+			// This confirms selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+
+		multiSelectValues, err := p.MultiSelect("Select a number", dummyDefaultValues, options)
+		require.NoError(t, err)
+		assert.Equal(t, []int{1}, multiSelectValues)
+	})
+
 	t.Run("Input", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
@@ -137,6 +264,26 @@ func TestAccessiblePrompter(t *testing.T) {
 		assert.Equal(t, dummyDefaultValue, inputValue)
 	})
 
+	t.Run("Input - default value is in prompt and in readable format", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValue := "12345abcdefg"
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Enter some characters (default: 12345abcdefg)")
+			require.NoError(t, err)
+
+			// Enter nothing
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		inputValue, err := p.Input("Enter some characters", dummyDefaultValue)
+		require.NoError(t, err)
+		assert.Equal(t, dummyDefaultValue, inputValue)
+	})
+
 	t.Run("Password", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
@@ -146,6 +293,9 @@ func TestAccessiblePrompter(t *testing.T) {
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Enter password")
 			require.NoError(t, err)
+
+			// Wait to ensure huh has time to set the echo mode
+			time.Sleep(beforePasswordSendTimeout)
 
 			// Enter a number
 			_, err = console.SendLine(dummyPassword)
@@ -158,7 +308,12 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		// Ensure the dummy password is not printed to the screen,
 		// asserting that echo mode is disabled.
-		_, err = console.ExpectString(" \r\n\r\n")
+		//
+		// Note that since console.ExpectString returns successful if the
+		// expected string matches any part of the stream, we have to use an
+		// anchored regexp (i.e., with ^ and $) to make sure the password/token
+		// is not printed at all.
+		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
 		require.NoError(t, err)
 	})
 
@@ -200,6 +355,26 @@ func TestAccessiblePrompter(t *testing.T) {
 		require.Equal(t, false, confirmValue)
 	})
 
+	t.Run("Confirm - default value is in prompt and in readable format", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		defaultValue := true
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Are you sure (default: yes)")
+			require.NoError(t, err)
+
+			// Enter nothing
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		confirmValue, err := p.Confirm("Are you sure", defaultValue)
+		require.NoError(t, err)
+		require.Equal(t, defaultValue, confirmValue)
+	})
+
 	t.Run("AuthToken", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
@@ -209,6 +384,9 @@ func TestAccessiblePrompter(t *testing.T) {
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Paste your authentication token:")
 			require.NoError(t, err)
+
+			// Wait to ensure huh has time to set the echo mode
+			time.Sleep(beforePasswordSendTimeout)
 
 			// Enter some dummy auth token
 			_, err = console.SendLine(dummyAuthToken)
@@ -221,7 +399,12 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		// Ensure the dummy password is not printed to the screen,
 		// asserting that echo mode is disabled.
-		_, err = console.ExpectString(" \r\n\r\n")
+		//
+		// Note that since console.ExpectString returns successful if the
+		// expected string matches any part of the stream, we have to use an
+		// anchored regexp (i.e., with ^ and $) to make sure the password/token
+		// is not printed at all.
+		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
 		require.NoError(t, err)
 	})
 
@@ -243,6 +426,13 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err = console.ExpectString("token is required")
 			require.NoError(t, err)
 
+			// Wait for the retry prompt
+			_, err = console.ExpectString("Paste your authentication token:")
+			require.NoError(t, err)
+
+			// Wait to ensure huh has time to set the echo mode
+			time.Sleep(beforePasswordSendTimeout)
+
 			// Now enter some dummy auth token to return control back to the test
 			_, err = console.SendLine(dummyAuthTokenForAfterFailure)
 			require.NoError(t, err)
@@ -254,7 +444,12 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		// Ensure the dummy password is not printed to the screen,
 		// asserting that echo mode is disabled.
-		_, err = console.ExpectString(" \r\n\r\n")
+		//
+		// Note that since console.ExpectString returns successful if the
+		// expected string matches any part of the stream, we have to use an
+		// anchored regexp (i.e., with ^ and $) to make sure the password/token
+		// is not printed at all.
+		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
 		require.NoError(t, err)
 	})
 

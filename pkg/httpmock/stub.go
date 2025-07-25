@@ -127,6 +127,12 @@ func StringResponse(body string) Responder {
 	}
 }
 
+func BinaryResponse(body []byte) Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		return httpResponse(200, req, bytes.NewBuffer(body)), nil
+	}
+}
+
 func WithHost(matcher Matcher, host string) Matcher {
 	return func(req *http.Request) bool {
 		if !strings.EqualFold(req.Host, host) {

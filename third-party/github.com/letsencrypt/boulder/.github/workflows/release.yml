@@ -1,0 +1,66 @@
+# Build the Boulder Debian package on every PR, push to main, and tag push. On
+# tag pushes, additionally create a GitHub release and with the resulting Debian
+# package.
+# Keep in sync with try-release.yml, with the exception that try-release.yml
+# can have multiple entries in its matrix but this should only have one.
+name: Build release
+on:
+  push:
+    tags:
+      - release-*
+
+jobs:
+  push-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        GO_VERSION:
+          - "1.24.4"
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: '0' # Needed for verify-release-ancestry.sh to see origin/main
+
+      - name: Verify release ancestry
+        run: ./tools/verify-release-ancestry.sh "$GITHUB_SHA"
+
+      - name: Build .deb
+        id: build
+        env:
+          GO_VERSION: ${{ matrix.GO_VERSION }}
+        run: docker run -v $PWD:/boulder -e GO_VERSION=$GO_VERSION -e COMMIT_ID="$(git rev-parse --short=8 HEAD)" ubuntu:24.04 bash -c 'apt update && apt -y install gnupg2 curl sudo git gcc && cd /boulder/ && ./tools/make-assets.sh'
+
+      - name: Compute checksums
+        id: checksums
+        # The files listed on this line must be identical to the files uploaded
+        # in the last step.
+        run: sha256sum boulder*.deb boulder*.tar.gz >| boulder-${{ matrix.GO_VERSION }}.$(date +%s)-$(git rev-parse --short=8 HEAD).checksums.txt
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # https://cli.github.com/manual/gh_release_create
+        run: gh release create "${GITHUB_REF_NAME}"
+        continue-on-error: true
+
+      - name: Upload release files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # https://cli.github.com/manual/gh_release_upload
+        run: gh release upload "${GITHUB_REF_NAME}" boulder*.deb boulder*.tar.gz boulder*.checksums.txt
+
+      - name: Build ct-test-srv Container
+        run: docker buildx build . --build-arg "GO_VERSION=${{ matrix.GO_VERSION }}" -f test/ct-test-srv/Dockerfile -t "ghcr.io/letsencrypt/ct-test-srv:${{ github.ref_name }}-go${{ matrix.GO_VERSION }}"
+
+      - name: Login to ghcr.io
+        run: printenv GITHUB_TOKEN | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push ct-test-srv Container
+        run: docker push "ghcr.io/letsencrypt/ct-test-srv:${{ github.ref_name }}-go${{ matrix.GO_VERSION }}"

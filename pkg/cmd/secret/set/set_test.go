@@ -27,88 +27,120 @@ import (
 
 func TestNewCmdSet(t *testing.T) {
 	tests := []struct {
-		name     string
-		cli      string
-		wants    SetOptions
-		stdinTTY bool
-		wantsErr bool
+		name            string
+		args            string
+		wants           SetOptions
+		stdinTTY        bool
+		wantsErr        bool
+		wantsErrMessage string
 	}{
 		{
 			name:     "invalid visibility",
-			cli:      "cool_secret --org coolOrg -v'mistyVeil'",
+			args:     "cool_secret --org coolOrg -v mistyVeil",
 			wantsErr: true,
 		},
 		{
-			name:     "invalid visibility",
-			cli:      "cool_secret --org coolOrg -v'selected'",
+			name:            "when visibility is selected, requires indication of repos",
+			args:            "cool_secret --org coolOrg -v selected",
+			wantsErr:        true,
+			wantsErrMessage: "`--repos` or `--no-repos-selected` required with `--visibility=selected`",
+		},
+		{
+			name:            "visibilities other than selected do not accept --repos",
+			args:            "cool_secret --org coolOrg -v private -r coolRepo",
+			wantsErr:        true,
+			wantsErrMessage: "`--repos` is only supported with `--visibility=selected`",
+		},
+		{
+			name:            "visibilities other than selected do not accept --no-repos-selected",
+			args:            "cool_secret --org coolOrg -v private --no-repos-selected",
+			wantsErr:        true,
+			wantsErrMessage: "`--no-repos-selected` is only supported with `--visibility=selected`",
+		},
+		{
+			name:            "--repos and --no-repos-selected are mutually exclusive",
+			args:            `--repos coolRepo --no-repos-selected cool_secret`,
+			wantsErr:        true,
+			wantsErrMessage: "specify only one of `--repos` or `--no-repos-selected`",
+		},
+		{
+			name:     "secret name is required",
+			args:     "",
 			wantsErr: true,
 		},
 		{
-			name:     "repos with wrong vis",
-			cli:      "cool_secret --org coolOrg -v'private' -rcoolRepo",
+			name:     "multiple positional arguments are not allowed",
+			args:     "cool_secret good_secret",
 			wantsErr: true,
 		},
 		{
-			name:     "no name",
-			cli:      "",
+			name:     "visibility is only allowed with --org",
+			args:     "cool_secret -v all",
 			wantsErr: true,
 		},
 		{
-			name:     "multiple names",
-			cli:      "cool_secret good_secret",
-			wantsErr: true,
-		},
-		{
-			name:     "visibility without org",
-			cli:      "cool_secret -vall",
-			wantsErr: true,
-		},
-		{
-			name: "repos without vis",
-			cli:  "cool_secret -bs --org coolOrg -rcoolRepo",
+			name: "providing --repos without --visibility implies selected visibility",
+			args: "cool_secret --body secret-body --org coolOrg --repos coolRepo",
 			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"coolRepo"},
-				Body:            "s",
+				Body:            "secret-body",
+				OrgName:         "coolOrg",
+			},
+		},
+		{
+			name: "providing --no-repos-selected without --visibility implies selected visibility",
+			args: "cool_secret --body secret-body --org coolOrg --no-repos-selected",
+			wants: SetOptions{
+				SecretName:      "cool_secret",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{},
+				Body:            "secret-body",
 				OrgName:         "coolOrg",
 			},
 		},
 		{
 			name: "org with selected repo",
-			cli:  "-ocoolOrg -bs -vselected -rcoolRepo cool_secret",
+			args: "-o coolOrg --body secret-body -v selected -r coolRepo cool_secret",
 			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"coolRepo"},
-				Body:            "s",
+				Body:            "secret-body",
 				OrgName:         "coolOrg",
 			},
 		},
 		{
 			name: "org with selected repos",
-			cli:  `--org=coolOrg -bs -vselected -r="coolRepo,radRepo,goodRepo" cool_secret`,
+			args: `--org coolOrg --body secret-body -v selected --repos "coolRepo,radRepo,goodRepo" cool_secret`,
 			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"coolRepo", "goodRepo", "radRepo"},
-				Body:            "s",
+				Body:            "secret-body",
 				OrgName:         "coolOrg",
 			},
 		},
 		{
 			name: "user with selected repos",
-			cli:  `-u -bs -r"monalisa/coolRepo,cli/cli,github/hub" cool_secret`,
+			args: `-u --body secret-body -r "monalisa/coolRepo,cli/cli,github/hub" cool_secret`,
 			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"monalisa/coolRepo", "cli/cli", "github/hub"},
-				Body:            "s",
+				Body:            "secret-body",
 			},
 		},
 		{
+			name:            "--user is mutually exclusive with --no-repos-selected",
+			args:            `-u --no-repos-selected cool_secret`,
+			wantsErr:        true,
+			wantsErrMessage: "`--no-repos-selected` must be omitted when used with `--user`",
+		},
+		{
 			name: "repo",
-			cli:  `cool_secret -b"a secret"`,
+			args: `cool_secret --body "a secret"`,
 			wants: SetOptions{
 				SecretName: "cool_secret",
 				Visibility: shared.Private,
@@ -118,7 +150,7 @@ func TestNewCmdSet(t *testing.T) {
 		},
 		{
 			name: "env",
-			cli:  `cool_secret -b"a secret" -eRelease`,
+			args: `cool_secret --body "a secret" --env Release`,
 			wants: SetOptions{
 				SecretName: "cool_secret",
 				Visibility: shared.Private,
@@ -129,7 +161,7 @@ func TestNewCmdSet(t *testing.T) {
 		},
 		{
 			name: "vis all",
-			cli:  `cool_secret --org coolOrg -b"cool" -vall`,
+			args: `cool_secret --org coolOrg --body "cool" --visibility all`,
 			wants: SetOptions{
 				SecretName: "cool_secret",
 				Visibility: shared.All,
@@ -139,7 +171,7 @@ func TestNewCmdSet(t *testing.T) {
 		},
 		{
 			name: "no store",
-			cli:  `cool_secret --no-store`,
+			args: `cool_secret --no-store`,
 			wants: SetOptions{
 				SecretName: "cool_secret",
 				Visibility: shared.Private,
@@ -148,7 +180,7 @@ func TestNewCmdSet(t *testing.T) {
 		},
 		{
 			name: "Dependabot repo",
-			cli:  `cool_secret -b"a secret" --app Dependabot`,
+			args: `cool_secret --body "a secret" --app Dependabot`,
 			wants: SetOptions{
 				SecretName:  "cool_secret",
 				Visibility:  shared.Private,
@@ -159,19 +191,19 @@ func TestNewCmdSet(t *testing.T) {
 		},
 		{
 			name: "Dependabot org",
-			cli:  "-ocoolOrg -bs -vselected -rcoolRepo cool_secret -aDependabot",
+			args: "--org coolOrg --body secret-body --visibility selected --repos coolRepo cool_secret --app Dependabot",
 			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"coolRepo"},
-				Body:            "s",
+				Body:            "secret-body",
 				OrgName:         "coolOrg",
 				Application:     "Dependabot",
 			},
 		},
 		{
 			name: "Codespaces org",
-			cli:  `random_secret -ocoolOrg -b"random value" -vselected -r"coolRepo,cli/cli" -aCodespaces`,
+			args: `random_secret --org coolOrg --body "random value" --visibility selected --repos "coolRepo,cli/cli" --app Codespaces`,
 			wants: SetOptions{
 				SecretName:      "random_secret",
 				Visibility:      shared.Selected,
@@ -192,7 +224,7 @@ func TestNewCmdSet(t *testing.T) {
 
 			ios.SetStdinTTY(tt.stdinTTY)
 
-			argv, err := shlex.Split(tt.cli)
+			argv, err := shlex.Split(tt.args)
 			assert.NoError(t, err)
 
 			var gotOpts *SetOptions
@@ -208,6 +240,9 @@ func TestNewCmdSet(t *testing.T) {
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
 				assert.Error(t, err)
+				if tt.wantsErrMessage != "" {
+					assert.EqualError(t, err, tt.wantsErrMessage)
+				}
 				return
 			}
 			assert.NoError(t, err)
@@ -498,6 +533,16 @@ func Test_setRun_org(t *testing.T) {
 			wantApp:          "actions",
 		},
 		{
+			name: "no repos visibility",
+			opts: &SetOptions{
+				OrgName:         "UmbrellaCorporation",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{},
+			},
+			wantRepositories: []int64{},
+			wantApp:          "actions",
+		},
+		{
 			name: "Dependabot",
 			opts: &SetOptions{
 				OrgName:     "UmbrellaCorporation",
@@ -516,6 +561,17 @@ func Test_setRun_org(t *testing.T) {
 			},
 			wantDependabotRepositories: []string{"1", "2"},
 			wantApp:                    "dependabot",
+		},
+		{
+			name: "Dependabot no repos visibility",
+			opts: &SetOptions{
+				OrgName:         "UmbrellaCorporation",
+				Visibility:      shared.Selected,
+				Application:     shared.Dependabot,
+				RepositoryNames: []string{},
+			},
+			wantRepositories: []int64{},
+			wantApp:          "dependabot",
 		},
 	}
 

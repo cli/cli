@@ -1,0 +1,27 @@
+Hello,
+
+[ Note: This message is from the Let's Encrypt staging environment. It
+likely is not relevant to any live web site. ]
+
+You issued a testing cert (not a live one) from Let's Encrypt staging
+environment. This mail takes the place of what would normally be a renewal
+reminder, but instead is demonstrating delivery of renewal notices. Have a nice
+day!
+
+Details:
+DNS Names: {{.DNSNames}}
+Expiration Date: {{.ExpirationDate}})
+Days to Expiration: {{.DaysToExpiration}}
+
+For any questions or support, please visit https://community.letsencrypt.org/.
+Unfortunately, we can't provide support by email.
+
+For details about when we send these emails, please visit
+https://letsencrypt.org/docs/expiration-emails/.
+
+If you want to stop receiving all email from this address, click
+*|UNSUB:https://mandrillapp.com/unsub|*
+(Warning: this is a one-click action that cannot be undone)
+
+Regards,
+The Let's Encrypt Team

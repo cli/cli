@@ -1,0 +1,208 @@
+{
+	"ra": {
+		"limiter": {
+			"redis": {
+				"username": "boulder-wfe",
+				"passwordFile": "test/secrets/wfe_ratelimits_redis_password",
+				"lookups": [
+					{
+						"Service": "redisratelimits",
+						"Domain": "service.consul"
+					}
+				],
+				"lookupDNSAuthority": "consul.service.consul",
+				"readTimeout": "250ms",
+				"writeTimeout": "250ms",
+				"poolSize": 100,
+				"routeRandomly": true,
+				"tls": {
+					"caCertFile": "test/certs/ipki/minica.pem",
+					"certFile": "test/certs/ipki/wfe.boulder/cert.pem",
+					"keyFile": "test/certs/ipki/wfe.boulder/key.pem"
+				}
+			},
+			"Defaults": "test/config-next/wfe2-ratelimit-defaults.yml",
+			"Overrides": "test/config-next/wfe2-ratelimit-overrides.yml"
+		},
+		"maxContactsPerRegistration": 3,
+		"hostnamePolicyFile": "test/hostname-policy.yaml",
+		"goodkey": {},
+		"finalizeTimeout": "30s",
+		"issuerCerts": [
+			"test/certs/webpki/int-rsa-a.cert.pem",
+			"test/certs/webpki/int-rsa-b.cert.pem",
+			"test/certs/webpki/int-rsa-c.cert.pem",
+			"test/certs/webpki/int-ecdsa-a.cert.pem",
+			"test/certs/webpki/int-ecdsa-b.cert.pem",
+			"test/certs/webpki/int-ecdsa-c.cert.pem"
+		],
+		"validationProfiles": {
+			"legacy": {
+				"pendingAuthzLifetime": "168h",
+				"validAuthzLifetime": "720h",
+				"orderLifetime": "168h",
+				"maxNames": 100,
+				"identifierTypes": [
+					"dns"
+				]
+			},
+			"modern": {
+				"pendingAuthzLifetime": "7h",
+				"validAuthzLifetime": "7h",
+				"orderLifetime": "7h",
+				"maxNames": 10,
+				"identifierTypes": [
+					"dns"
+				]
+			},
+			"shortlived": {
+				"pendingAuthzLifetime": "7h",
+				"validAuthzLifetime": "7h",
+				"orderLifetime": "7h",
+				"maxNames": 10,
+				"identifierTypes": [
+					"dns",
+					"ip"
+				]
+			}
+		},
+		"defaultProfileName": "legacy",
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/ra.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/ra.boulder/key.pem"
+		},
+		"vaService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "va",
+				"domain": "service.consul"
+			},
+			"timeout": "20s",
+			"noWaitForReady": true,
+			"hostOverride": "va.boulder"
+		},
+		"caService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "ca",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "ca.boulder"
+		},
+		"ocspService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "ca",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "ca.boulder"
+		},
+		"publisherService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "publisher",
+				"domain": "service.consul"
+			},
+			"timeout": "300s",
+			"noWaitForReady": true,
+			"hostOverride": "publisher.boulder"
+		},
+		"saService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "sa",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "sa.boulder"
+		},
+		"akamaiPurgerService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "akamai-purger",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "akamai-purger.boulder"
+		},
+		"grpc": {
+			"maxConnectionAge": "30s",
+			"services": {
+				"ra.RegistrationAuthority": {
+					"clientNames": [
+						"admin.boulder",
+						"bad-key-revoker.boulder",
+						"ocsp-responder.boulder",
+						"wfe.boulder",
+						"sfe.boulder"
+					]
+				},
+				"ra.SCTProvider": {
+					"clientNames": [
+						"ca.boulder"
+					]
+				},
+				"grpc.health.v1.Health": {
+					"clientNames": [
+						"health-checker.boulder"
+					]
+				}
+			}
+		},
+		"features": {
+			"AsyncFinalize": true,
+			"AutomaticallyPauseZombieClients": true,
+			"NoPendingAuthzReuse": true
+		},
+		"ctLogs": {
+			"stagger": "500ms",
+			"logListFile": "test/ct-test-srv/log_list.json",
+			"sctLogs": [
+				"A1 Current",
+				"A1 Future",
+				"A2 Past",
+				"A2 Current",
+				"B1",
+				"B2",
+				"C1",
+				"D1",
+				"E1"
+			],
+			"infoLogs": [
+				"F1"
+			],
+			"finalLogs": [
+				"A1 Current",
+				"A1 Future",
+				"C1",
+				"F1"
+			]
+		}
+	},
+	"pa": {
+		"challenges": {
+			"http-01": true,
+			"dns-01": true,
+			"tls-alpn-01": true
+		},
+		"identifiers": {
+			"dns": true,
+			"ip": true
+		}
+	},
+	"syslog": {
+		"stdoutlevel": 6,
+		"sysloglevel": 6
+	},
+	"openTelemetry": {
+		"endpoint": "bjaeger:4317",
+		"sampleratio": 1
+	}
+}

@@ -460,10 +460,22 @@ func (m *mergeContext) deleteRemoteBranch() error {
 	if !m.merged {
 		apiClient := api.NewClientFromHTTP(m.httpClient)
 		err := api.BranchDeleteRemote(apiClient, m.baseRepo, m.pr.HeadRefName)
-		var httpErr api.HTTPError
-		// The ref might have already been deleted by GitHub
-		if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode != 422) {
-			return fmt.Errorf("failed to delete remote branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
+		if err != nil {
+			// Normally, the API returns 422, with the message "Reference does not exist"
+			// when the branch has already been deleted. It also returns 404 with the same
+			// message, but that rarely happens. In both cases, we should not return an
+			// error because the goal is already achieved.
+
+			var isAlreadyDeletedError bool
+			if httpErr := (api.HTTPError{}); errors.As(err, &httpErr) {
+				// TODO: since the API returns 422 for a couple of other reasons, for more accuracy
+				// we might want to check the error message against "Reference does not exist".
+				isAlreadyDeletedError = httpErr.StatusCode == http.StatusUnprocessableEntity || httpErr.StatusCode == http.StatusNotFound
+			}
+
+			if !isAlreadyDeletedError {
+				return fmt.Errorf("failed to delete remote branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
+			}
 		}
 	}
 

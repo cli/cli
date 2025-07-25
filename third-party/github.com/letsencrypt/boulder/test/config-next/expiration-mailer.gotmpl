@@ -1,0 +1,6 @@
+Hello,
+
+Your SSL certificate for names {{.TruncatedDNSNames}}{{if(gt .NumDNSNamesOmitted 0)}} (and {{.NumDNSNamesOmitted}} more){{end}} is going to expire in {{.DaysToExpiration}}
+days ({{.ExpirationDate}}), make sure you run the renewer before then!
+
+Regards

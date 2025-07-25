@@ -1,5 +1,6 @@
 name: Discussion Triage
 run-name: ${{ github.event_name == 'issues' && github.event.issue.title || github.event.pull_request.title }}
+permissions: {}
 on:
   issues:
     types:

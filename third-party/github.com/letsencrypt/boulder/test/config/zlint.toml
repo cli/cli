@@ -1,0 +1,24 @@
+[e_pkimetal_lint_cabf_serverauth_cert]
+addr = "http://bpkimetal:8080"
+severity = "notice"
+timeout = 2000000000 # 2 seconds
+ignore_lints = [
+  # We continue to include the Common Name in our "classic" profile, but have
+  # removed it from our "tlsserver" and "shortlived" profiles.
+  "pkilint:cabf.serverauth.dv.common_name_attribute_present",
+  "zlint:w_subject_common_name_included",
+  # We continue to include the SKID extension in our "classic" profile, but have
+  # removed it from our "tlsserver" and "shortlived" profiles.
+  "pkilint:cabf.serverauth.subscriber.subject_key_identifier_extension_present",
+  "zlint:w_ext_subject_key_identifier_not_recommended_subscriber",
+  # We continue to include the Key Encipherment Key Usage for RSA certificates
+  # issued under the "classic" profile, but have removed it from our "tlsserver"
+  # and "shortlived" profiles.
+  "pkilint:cabf.serverauth.subscriber_rsa_digitalsignature_and_keyencipherment_present",
+]
+
+[e_pkimetal_lint_cabf_serverauth_crl]
+addr = "http://bpkimetal:8080"
+severity = "notice"
+timeout = 2000000000 # 2 seconds
+ignore_lints = []

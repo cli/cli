@@ -1,0 +1,28 @@
+- CertificatesPerFQDNSet:
+    burst: 40
+    count: 40
+    period: 1s
+    ids:
+      - id: example.com
+        comment: Foo
+- CertificatesPerFQDNSet:
+    burst: 50
+    count: 50
+    period: 2s
+    ids:
+      - id: "example.com,example.net"
+        comment: Foo
+- CertificatesPerFQDNSet:
+    burst: 60
+    count: 60
+    period: 3s
+    ids:
+      - id: "example.com,example.net,example.org"
+        comment: Foo
+- CertificatesPerFQDNSet:
+    burst: 60
+    count: 60
+    period: 4s
+    ids:
+      - id: "2602:80a:6000::1,9.9.9.9,example.com"
+        comment: Foo
