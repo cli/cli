@@ -8,11 +8,21 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 )
 
+// GitClientInterface defines the methods we need from git.Client for testing
+type GitClientInterface interface {
+	IsLocalGitRepo(ctx context.Context) (bool, error)
+	Config(ctx context.Context, name string) (string, error)
+}
+
 // MaybeAutomaticUserSwitch checks for a gh.user git config setting and switches the active
 // GitHub user if necessary. This should be called before authentication-dependent operations.
 func MaybeAutomaticUserSwitch(cfg gh.Config) error {
-	// Skip if we're not in a git repository
-	gitClient := &git.Client{}
+	return maybeAutomaticUserSwitchWithGitClient(cfg, &git.Client{})
+}
+
+// maybeAutomaticUserSwitchWithGitClient is the internal implementation that accepts a git client
+// for testing purposes.
+func maybeAutomaticUserSwitchWithGitClient(cfg gh.Config, gitClient GitClientInterface) error {
 	ctx := context.Background()
 	
 	// Check if we're in a git repo
