@@ -192,6 +192,13 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 		if err != nil {
 			return nil, err
 		}
+		
+		// Check for git config gh.user and automatically switch if needed
+		if err := config.MaybeAutomaticUserSwitch(cfg); err != nil {
+			// Don't fail the operation, just log the error
+			fmt.Fprintf(io.ErrOut, "Warning: failed to automatically switch user: %v\n", err)
+		}
+		
 		opts := api.HTTPClientOptions{
 			Config:      cfg.Authentication(),
 			Log:         io.ErrOut,
