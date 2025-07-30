@@ -919,6 +919,7 @@ type RepoMetadataInput struct {
 	Assignees      bool
 	ActorAssignees bool
 	Reviewers      bool
+	TeamReviewers  bool
 	Labels         bool
 	ProjectsV1     bool
 	ProjectsV2     bool
@@ -964,7 +965,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 		}
 	}
 
-	if input.Reviewers {
+	if input.Reviewers && input.TeamReviewers {
 		g.Go(func() error {
 			teams, err := OrganizationTeams(client, repo)
 			// TODO: better detection of non-org repos

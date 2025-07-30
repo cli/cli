@@ -48,7 +48,7 @@ jobs:
 
       - name: Filter SARIF for third-party code
         if: matrix.language == 'go'
-        uses: advanced-security/filter-sarif@bc96d9fb9338c5b48cc440b1b4d0a350b26a20db # v1.0.0
+        uses: advanced-security/filter-sarif@f3b8118a9349d88f7b1c0c488476411145b6270d # v1.0.1
         with:
           patterns: |
             -third-party/**

@@ -3,6 +3,7 @@ package shared
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -63,7 +64,10 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	// Retrieve minimal information needed to resolve metadata if this was not previously cached from additional metadata survey.
 	if tb.MetadataResult == nil {
 		input := api.RepoMetadataInput{
-			Reviewers:      len(tb.Reviewers) > 0,
+			Reviewers: len(tb.Reviewers) > 0,
+			TeamReviewers: len(tb.Reviewers) > 0 && slices.ContainsFunc(tb.Reviewers, func(r string) bool {
+				return strings.ContainsRune(r, '/')
+			}),
 			Assignees:      len(tb.Assignees) > 0,
 			ActorAssignees: tb.ActorAssignees,
 			Labels:         len(tb.Labels) > 0,

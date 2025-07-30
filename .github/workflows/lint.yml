@@ -16,14 +16,11 @@ on:
       - go.sum
       - ".github/licenses.tmpl"
       - "script/licenses*"
-
 permissions:
   contents: read
-
 jobs:
   lint:
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -64,3 +61,22 @@ jobs:
           export PATH=${GOROOT}/bin:$PATH
           go install github.com/google/go-licenses@5348b744d0983d85713295ea08a20cca1654a45e
           make licenses-check
+
+  # Discover vulnerabilities within Go standard libraries used to build GitHub CLI using govulncheck.
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      # `govulncheck` exits unsuccessfully if vulnerabilities are found, providing results in stdout.
+      # See https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck#hdr-Exit_codes for more information on exit codes.
+      - name: Check Go vulnerabilities
+        run: |
+          make
+          go run golang.org/x/vuln/cmd/govulncheck@d1f380186385b4f64e00313f31743df8e4b89a77 -mode=binary bin/gh

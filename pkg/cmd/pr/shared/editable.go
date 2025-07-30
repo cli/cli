@@ -429,7 +429,16 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 
 func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable) error {
 	input := api.RepoMetadataInput{
-		Reviewers:      editable.Reviewers.Edited,
+		Reviewers: editable.Reviewers.Edited,
+		// TeamReviewers is always true if Reviewers is true because
+		// this is the existing `pr edit` behavior. This means
+		// always fetch teams.
+		// TODO: evaluate whether this can follow the same logic as
+		// `pr create` to conditionally fetch teams if a reviewer contains
+		// a slash.
+		// See https://github.com/cli/cli/blob/449920b40fc8a5015d1578ca10a301aa385a1914/pkg/cmd/pr/shared/params.go#L67-L71
+		// See https://github.com/cli/cli/issues/11360
+		TeamReviewers:  editable.Reviewers.Edited,
 		Assignees:      editable.Assignees.Edited,
 		ActorAssignees: editable.Assignees.ActorAssignees,
 		Labels:         editable.Labels.Edited,
