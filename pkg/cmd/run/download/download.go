@@ -29,6 +29,7 @@ type DownloadOptions struct {
 type platform interface {
 	List(runID string) ([]shared.Artifact, error)
 	Download(url string, dir safepaths.Absolute) error
+	DownloadWithProgress(url string, dir safepaths.Absolute, name string, size uint64, ioStreams *iostreams.IOStreams) error
 }
 
 type iprompter interface {
@@ -150,8 +151,9 @@ func runDownload(opts *DownloadOptions) error {
 		}
 	}
 
-	opts.IO.StartProgressIndicator()
-	defer opts.IO.StopProgressIndicator()
+	// Don't start the generic progress indicator since we'll show detailed progress for each artifact
+	// opts.IO.StartProgressIndicator()
+	// defer opts.IO.StopProgressIndicator()
 
 	// track downloaded artifacts and avoid re-downloading any of the same name, isolate if multiple artifacts
 	downloaded := set.NewStringSet()
@@ -187,7 +189,8 @@ func runDownload(opts *DownloadOptions) error {
 			}
 		}
 
-		err := opts.Platform.Download(a.DownloadURL, destDir)
+		// Using the progress-aware download method
+		err := opts.Platform.DownloadWithProgress(a.DownloadURL, destDir, a.Name, a.Size, opts.IO)
 		if err != nil {
 			return fmt.Errorf("error downloading %s: %w", a.Name, err)
 		}
