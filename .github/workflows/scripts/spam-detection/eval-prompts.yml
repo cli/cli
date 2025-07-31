@@ -675,7 +675,7 @@ testData:
   - name: 'spam, #10075 (https://github.com/cli/cli/issues/10075)'
     expected: FAIL
     input: "<TITLE>\nRHEL 9 installation update\n</TITLE>\n\n<BODY>\n### Describe the bug\r\n\r\nsteps to install on RHEL9 \r\n\r\n### Steps to reproduce the behavior\r\n\r\n\r\n### Expected vs actual behavior\r\n\r\n```\r\nsudo dnf install dnf-plugins-core.noarch\r\nsudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo\r\nsudo dnf install gh --repo gh-cli\r\n```\n</BODY>"
-  - name: not-spam, staff issue
+  - name: not spam, staff issue
     expected: PASS
     input: |
       <TITLE>
@@ -783,7 +783,7 @@ testData:
               <!-- Note: Set `GH_DEBUG=true` for verbose logs or `GH_DEBUG=api` for verbose logs with HTTP traffic details. -->
 
       </BODY>
-  - name: not-spam, short/focused
+  - name: not spam, short/focused
     expected: PASS
     input: |
       <TITLE>
