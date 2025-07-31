@@ -10,126 +10,6 @@ evaluators:
     string:
       equals: "{{expected}}"
 testData:
-  - name: not-spam, staff issue
-    expected: PASS
-    input: |
-      <TITLE>
-      Automatically update third party licenses during Dependabot PRs
-      </TITLE>
-
-      <BODY>
-      ## Overview
-
-      With `cli/cli` lint process erring if 3rd party license information is not updated in https://github.com/cli/cli/pull/11047, Dependabot PRs will require maintainers to manually run `make licenses`.
-
-      Recently, @williammartin opened https://github.com/cli/cli/pull/11269 with the [`script/fix-dependabot-licenses.sh`](https://github.com/cli/cli/blob/26d70bfb7bcc0b41dbdd50bfc51f827f1a5ad4c4/script/fix-dependabot-licenses.sh) script for maintainers to run that will find all Dependabot PRs and attempt to fix them where the lint workflow failed.  This script is a manual repair effort, however it is possible to [use a GitHub Actions workflow to run the `make license` script for Dependabot PRs](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions):
-
-      > ```yaml
-      > name: Dependabot fetch metadata
-      > on: pull_request
-      >
-      > permissions:
-      >   pull-requests: write
-      >   issues: write
-      >
-      > jobs:
-      >   dependabot:
-      >     runs-on: ubuntu-latest
-      >     if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'owner/my_repo'
-      >     steps:
-      >       - name: Dependabot metadata
-      >         id: metadata
-      >         uses: dependabot/fetch-metadata@d7267f607e9d3fb96fc2fbe83e0af444713e90b7
-      >         with:
-      >           github-token: "${{ secrets.GITHUB_TOKEN }}"
-      >       # The following properties are now available:
-      >       #  - steps.metadata.outputs.dependency-names
-      >       #  - steps.metadata.outputs.dependency-type
-      >       #  - steps.metadata.outputs.update-type
-      > ```
-
-      This issue is aimed at implementing GitHub Actions workflow changes that will automatically update `third-party` license source code and `third-party-*.md` reports, eliminating the need for maintainers to manually repair Dependabot PRs.
-
-      > [!NOTE]
-      > To download the `script/fix-dependabot-licenses.sh` script, run the following command:
-      > ```shell
-      > curl -o fix-dependabot-licenses.sh https://raw.githubusercontent.com/cli/cli/26d70bfb7bcc0b41dbdd50bfc51f827f1a5ad4c4/script/fix-dependabot-licenses.sh
-      > ```
-      >
-      > Or checkout the original PR:
-      >
-      > ```shell
-      > gh pr checkout https://github.com/cli/cli/pull/11269
-      > ```
-
-      ## Expected outcomes
-
-      - When Dependabot PRs are opened, automation attempts to regenerate and commit updated license information via `make licenses`
-      - When Dependabot PRs are updated, status checks pass without maintainer action outside of reviewing PR
-          - name: not-spam, template-based
-          spam: true
-          title: |
-              Incorrect check summary with v2.45 and v2.75
-          body: |
-              ### Describe the bug
-
-              I got below confusing reports with v2.45 CLI on Ubuntu 22.04:
-
-              ```sh
-              $ gh pr status
-
-              Relevant pull requests in micropython/micropython
-              ...
-              Created by you
-              #17660  tests/extmod: Close UDP timely. [yf13:pull-udp-close]
-              ✓ Checks passing
-              #17638  unix/make: Drop i686-linux-gnu path. [yf13:pull-drop-i686-linux-gnu]
-              × 1/94 checks failing
-              $ gh pr checks 17638
-              All checks were successful
-              0 cancelled, 0 failing, 48 successful, 0 skipped, and 0 pending checks
-              ```
-              I downloaded latest v2.75 CLI but it is the same.
-
-              Meanwhile. from browser UI it seems checks passed.
-
-              ### Affected version
-
-              Please run `gh version` and paste the output below.
-
-              ```
-              $ gh version
-              gh version 2.75.0 (2025-07-09)
-              https://github.com/cli/cli/releases/tag/v2.75.0
-              ```
-
-              ### Steps to reproduce the behavior
-
-              see above descriptions.
-
-              ### Expected vs actual behavior
-
-              A clear and concise description of what you expected to happen and what actually happened.
-
-              ### Logs
-
-              Paste the activity from your command line. Redact if needed.
-
-              <!-- Note: Set `GH_DEBUG=true` for verbose logs or `GH_DEBUG=api` for verbose logs with HTTP traffic details. -->
-
-      </BODY>
-  - name: not-spam, short/focused
-    expected: PASS
-    input: |
-      <TITLE>
-      Include `isImmutable` in `release list`
-      </TITLE>
-
-      <BODY>
-      Update the list of available JSON fields in the `release list` command to include `isImmutable` flag.
-
-      This boolean flag indicates whether a particular release has been marked as immutable.
-      </BODY>
   - name: spam, two words
     expected: FAIL
     input: |
@@ -294,34 +174,6 @@ testData:
       ### Additional context
 
       Add any other context like screenshots or mockups are helpful, if applicable.
-      </BODY>
-  - name: 'spam, legit but too general #10368 (https://github.com/cli/cli/issues/10368)'
-    expected: FAIL
-    input: |-
-      <TITLE>
-      Instructions in install_linux.md do not result in installation
-      </TITLE>
-
-      <BODY>
-      ### Describe the bug
-
-      Bug: the instructions meant to install gh instead don't install gh.
-
-      ### Affected version
-
-      Latest
-
-      ### Steps to reproduce the behavior
-
-      Follow instructions in install_linux.md
-
-      ### Expected vs actual behavior
-
-      Expect: gh is installed and can be used.
-
-      ### Logs
-
-      A bunch of errors
       </BODY>
   - name: 'spam, #11304 (https://github.com/cli/cli/issues/11304)'
     expected: FAIL
@@ -820,6 +672,157 @@ testData:
   - name: 'spam, #9928 (https://github.com/cli/cli/issues/9928)'
     expected: FAIL
     input: "<TITLE>\nNote that an earlier version of the instructions used the location `/usr/share/keyrings` instead of `/etc/apt/keyrings` in the `sources.list.d` file, so I had to update that to make it work with the above update instructions, and remove the old keyring file from `/usr/share/keyrings`.\n</TITLE>\n\n<BODY>\n              Note that an earlier version of the instructions used the location `/usr/share/keyrings` instead of `/etc/apt/keyrings` in the `sources.list.d` file, so I had to update that to make it work with the above update instructions, and remove the old keyring file from `/usr/share/keyrings`.\r\n\r\nAlternatively, one could of course download the updated key to `/usr/share/keyrings`, but we don't really want to pollute `/usr` with non-packaged files!\r\n\r\n_Originally posted by @rrthomas in https://github.com/cli/cli/issues/9569#issuecomment-2333981674_\r\n            \n</BODY>"
+  - name: 'spam, #10075 (https://github.com/cli/cli/issues/10075)'
+    expected: FAIL
+    input: "<TITLE>\nRHEL 9 installation update\n</TITLE>\n\n<BODY>\n### Describe the bug\r\n\r\nsteps to install on RHEL9 \r\n\r\n### Steps to reproduce the behavior\r\n\r\n\r\n### Expected vs actual behavior\r\n\r\n```\r\nsudo dnf install dnf-plugins-core.noarch\r\nsudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo\r\nsudo dnf install gh --repo gh-cli\r\n```\n</BODY>"
+  - name: not-spam, staff issue
+    expected: PASS
+    input: |
+      <TITLE>
+      Automatically update third party licenses during Dependabot PRs
+      </TITLE>
+
+      <BODY>
+      ## Overview
+
+      With `cli/cli` lint process erring if 3rd party license information is not updated in https://github.com/cli/cli/pull/11047, Dependabot PRs will require maintainers to manually run `make licenses`.
+
+      Recently, @williammartin opened https://github.com/cli/cli/pull/11269 with the [`script/fix-dependabot-licenses.sh`](https://github.com/cli/cli/blob/26d70bfb7bcc0b41dbdd50bfc51f827f1a5ad4c4/script/fix-dependabot-licenses.sh) script for maintainers to run that will find all Dependabot PRs and attempt to fix them where the lint workflow failed.  This script is a manual repair effort, however it is possible to [use a GitHub Actions workflow to run the `make license` script for Dependabot PRs](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions):
+
+      > ```yaml
+      > name: Dependabot fetch metadata
+      > on: pull_request
+      >
+      > permissions:
+      >   pull-requests: write
+      >   issues: write
+      >
+      > jobs:
+      >   dependabot:
+      >     runs-on: ubuntu-latest
+      >     if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'owner/my_repo'
+      >     steps:
+      >       - name: Dependabot metadata
+      >         id: metadata
+      >         uses: dependabot/fetch-metadata@d7267f607e9d3fb96fc2fbe83e0af444713e90b7
+      >         with:
+      >           github-token: "${{ secrets.GITHUB_TOKEN }}"
+      >       # The following properties are now available:
+      >       #  - steps.metadata.outputs.dependency-names
+      >       #  - steps.metadata.outputs.dependency-type
+      >       #  - steps.metadata.outputs.update-type
+      > ```
+
+      This issue is aimed at implementing GitHub Actions workflow changes that will automatically update `third-party` license source code and `third-party-*.md` reports, eliminating the need for maintainers to manually repair Dependabot PRs.
+
+      > [!NOTE]
+      > To download the `script/fix-dependabot-licenses.sh` script, run the following command:
+      > ```shell
+      > curl -o fix-dependabot-licenses.sh https://raw.githubusercontent.com/cli/cli/26d70bfb7bcc0b41dbdd50bfc51f827f1a5ad4c4/script/fix-dependabot-licenses.sh
+      > ```
+      >
+      > Or checkout the original PR:
+      >
+      > ```shell
+      > gh pr checkout https://github.com/cli/cli/pull/11269
+      > ```
+
+      ## Expected outcomes
+
+      - When Dependabot PRs are opened, automation attempts to regenerate and commit updated license information via `make licenses`
+      - When Dependabot PRs are updated, status checks pass without maintainer action outside of reviewing PR
+          - name: not-spam, template-based
+          spam: true
+          title: |
+              Incorrect check summary with v2.45 and v2.75
+          body: |
+              ### Describe the bug
+
+              I got below confusing reports with v2.45 CLI on Ubuntu 22.04:
+
+              ```sh
+              $ gh pr status
+
+              Relevant pull requests in micropython/micropython
+              ...
+              Created by you
+              #17660  tests/extmod: Close UDP timely. [yf13:pull-udp-close]
+              ✓ Checks passing
+              #17638  unix/make: Drop i686-linux-gnu path. [yf13:pull-drop-i686-linux-gnu]
+              × 1/94 checks failing
+              $ gh pr checks 17638
+              All checks were successful
+              0 cancelled, 0 failing, 48 successful, 0 skipped, and 0 pending checks
+              ```
+              I downloaded latest v2.75 CLI but it is the same.
+
+              Meanwhile. from browser UI it seems checks passed.
+
+              ### Affected version
+
+              Please run `gh version` and paste the output below.
+
+              ```
+              $ gh version
+              gh version 2.75.0 (2025-07-09)
+              https://github.com/cli/cli/releases/tag/v2.75.0
+              ```
+
+              ### Steps to reproduce the behavior
+
+              see above descriptions.
+
+              ### Expected vs actual behavior
+
+              A clear and concise description of what you expected to happen and what actually happened.
+
+              ### Logs
+
+              Paste the activity from your command line. Redact if needed.
+
+              <!-- Note: Set `GH_DEBUG=true` for verbose logs or `GH_DEBUG=api` for verbose logs with HTTP traffic details. -->
+
+      </BODY>
+  - name: not-spam, short/focused
+    expected: PASS
+    input: |
+      <TITLE>
+      Include `isImmutable` in `release list`
+      </TITLE>
+
+      <BODY>
+      Update the list of available JSON fields in the `release list` command to include `isImmutable` flag.
+
+      This boolean flag indicates whether a particular release has been marked as immutable.
+      </BODY>
+  - name: 'not spam, legit but too general #10368 (https://github.com/cli/cli/issues/10368)'
+    expected: PASS
+    input: |-
+      <TITLE>
+      Instructions in install_linux.md do not result in installation
+      </TITLE>
+
+      <BODY>
+      ### Describe the bug
+
+      Bug: the instructions meant to install gh instead don't install gh.
+
+      ### Affected version
+
+      Latest
+
+      ### Steps to reproduce the behavior
+
+      Follow instructions in install_linux.md
+
+      ### Expected vs actual behavior
+
+      Expect: gh is installed and can be used.
+
+      ### Logs
+
+      A bunch of errors
+      </BODY>
   - name: 'not spam, #11277 (https://github.com/cli/cli/issues/11277)'
     expected: PASS
     input: |-
@@ -4482,9 +4485,6 @@ testData:
   - name: 'not spam, #10076 (https://github.com/cli/cli/issues/10076)'
     expected: PASS
     input: "<TITLE>\n`gh run list` does not work with organization ruleset required workflows\n</TITLE>\n\n<BODY>\n### Describe the bug\r\n\r\nSimilar bug mentioned https://github.com/cli/cli/issues/3437, but gh run view or list all return a 404. The URL returned seems right based on REST api docs but not getting any response. When comparing the ID `gh run list` doesn't seem to be correct based on the ids from `gh workflow list`\r\n\r\n**gh cli version:** `gh version 2.63.2 (2024-12-05)`\r\n**ghe version:** `3.13.4`\r\n\r\n### Steps to reproduce the behavior\r\n\r\n1. Complete login to the enterprise server with Github CLI\r\n2. Go to a repository directory that uses that server as a remote\r\n3. Run gh run list returns 404\r\n\r\n### Expected vs actual behavior\r\n\r\nThe gh run list prints out list of workflow runs for the repo to choose from\r\n\r\n### Logs\r\n\r\n```bash\r\n[git remote -v]\r\n[git config --get-regexp ^remote\\..*\\.gh-resolved$]\r\n* Request at 2024-12-13 00:23:19.723417 -0600 CST m=+0.101249251\r\n* Request to https://{SERVER_URL}/api/graphql\r\n* Request took 281.385ms\r\n⣾* Request at 2024-12-13 00:23:20.040818 -0600 CST m=+0.418510918\r\n* Request to https://{SERVER_URL}/api/v3/repos/{ORG}/{REPO}/actions/runs?per_page=20&exclude_pull_requests=true\r\n⢿* Request took 421.362291ms\r\n⡿* Request at 2024-12-13 00:23:20.534045 -0600 CST m=+0.911535293\r\n* Request to https://{SERVER_URL}/api/v3/repos/{ORG}/{REPO}/actions/workflows?per_page=100&page=1\r\n⣟* Request took 105.218541ms\r\n* Request at 2024-12-13 00:23:20.700194 -0600 CST m=+1.077616418\r\n* Request to https://{SERVER_URL}/api/v3/repos/{ORG}/{REPO}/actions/workflows/63737\r\n⣯* Request took 121.476458ms\r\nfailed to get runs: HTTP 404: Not Found (https://{SERVER_URL}/api/v3/repos/{ORG}/{REPO}/actions/workflows/63737)\r\n```\r\n</BODY>"
-  - name: 'not spam, #10075 (https://github.com/cli/cli/issues/10075)'
-    expected: PASS
-    input: "<TITLE>\nRHEL 9 installation update\n</TITLE>\n\n<BODY>\n### Describe the bug\r\n\r\nsteps to install on RHEL9 \r\n\r\n### Steps to reproduce the behavior\r\n\r\n\r\n### Expected vs actual behavior\r\n\r\n```\r\nsudo dnf install dnf-plugins-core.noarch\r\nsudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo\r\nsudo dnf install gh --repo gh-cli\r\n```\n</BODY>"
   - name: 'not spam, #10073 (https://github.com/cli/cli/issues/10073)'
     expected: PASS
     input: "<TITLE>\n`gh gist delete` does not prompt for a gist to delete or prompt for confirmation before deletion\n</TITLE>\n\n<BODY>\n### Describe the bug\n\n- `gh gist delete` doesn't prompt for a gist to delete. This seems like it might be an oversight when compared to the behavior of other `gh gist` and `gh <some-command> delete` operations.\n- `gh gist delete` should prompt for a gist to delete and confirm the selection to delete.\n- `gh gist delete` also does not currently support `--yes` for non-interactive confirmation - perhaps it should? \n\n### Steps to reproduce the behavior\n\n```\ngh gist delete\n```\n### Expected vs actual behavior\n\n**Expected**\n\n```\n❯ gh gist delete\n? Select a gist to delete [Use arrows to move, type to filter]\n> test.md test gist about 4 days ago\n  draft.md  about 2 months ago\n? Are you sure you want to delete gist test.md (Y/n)\n```\n\n**Actual**\n```\ngh gist delete\n❯ gh gist delete\ncannot delete: gist argument required\n\nUsage:  gh gist delete {<id> | <url>} [flags]\n```\n\n### Notes\n\nDiscovered in #10042 \n</BODY>"
