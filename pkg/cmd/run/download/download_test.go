@@ -187,6 +187,10 @@ func (f *fakePlatform) List(runID string) ([]shared.Artifact, error) {
 }
 
 func (f *fakePlatform) Download(url string, dir safepaths.Absolute) error {
+	return f.DownloadWithProgress(url, dir, "", 0, nil)
+}
+
+func (f *fakePlatform) DownloadWithProgress(url string, dir safepaths.Absolute, name string, size uint64, ioStreams *iostreams.IOStreams) error {
 	if err := os.MkdirAll(dir.String(), 0755); err != nil {
 		return err
 	}
@@ -232,6 +236,7 @@ func Test_runDownload(t *testing.T) {
 							{
 								artifact: shared.Artifact{
 									Name:        "artifact-1",
+									Size:        1024 * 1024, // 1MB
 									DownloadURL: "http://download.com/artifact1.zip",
 									Expired:     false,
 								},
@@ -242,6 +247,7 @@ func Test_runDownload(t *testing.T) {
 							{
 								artifact: shared.Artifact{
 									Name:        "expired-artifact",
+									Size:        512 * 1024, // 512KB
 									DownloadURL: "http://download.com/expired.zip",
 									Expired:     true,
 								},
@@ -252,6 +258,7 @@ func Test_runDownload(t *testing.T) {
 							{
 								artifact: shared.Artifact{
 									Name:        "artifact-2",
+									Size:        2 * 1024 * 1024, // 2MB
 									DownloadURL: "http://download.com/artifact2.zip",
 									Expired:     false,
 								},
