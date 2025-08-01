@@ -564,6 +564,14 @@ pager:
 # Aliases allow you to create nicknames for gh commands
 aliases:
   co: pr checkout
+  commits: commit
+  issues: issue
+  prs: pr
+  repos: repo
+  search commit: search commits
+  search issue: search issues
+  search pr: search prs
+  search repo: search repos
 # The path to a unix socket through which to send HTTP connections. If blank, HTTP traffic will be handled by net/http.DefaultTransport.
 http_unix_socket:
 # What web browser gh should use when opening URLs. If blank, will refer to environment.
