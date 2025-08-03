@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,7 +26,28 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func NewMockHttpClient() (*http.Client, error) {
+type mockClientOpts struct {
+	ports map[int]tunnels.TunnelPort // Port number to protocol
+}
+
+type mockClientOpt func(*mockClientOpts)
+
+// WithSpecificPorts allows you to specify a map of ports to TunnelPorts that will be returned by the mock HTTP client.
+// Note that this does not take a copy of the map, so you should not modify the map after passing it to this function.
+func WithSpecificPorts(ports map[int]tunnels.TunnelPort) mockClientOpt {
+	return func(opts *mockClientOpts) {
+		opts.ports = ports
+	}
+}
+
+func NewMockHttpClient(opts ...mockClientOpt) (*http.Client, error) {
+	mockClientOpts := &mockClientOpts{}
+	for _, opt := range opts {
+		opt(mockClientOpts)
+	}
+
+	specifiedPorts := mockClientOpts.ports
+
 	accessToken := "tunnel access-token"
 	relayServer, err := newMockrelayServer(withAccessToken(accessToken))
 	if err != nil {
@@ -35,7 +57,7 @@ func NewMockHttpClient() (*http.Client, error) {
 	hostURL := strings.Replace(relayServer.URL(), "http://", "ws://", 1)
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var response []byte
-		if r.URL.Path == "/api/v1/tunnels/tunnel-id" {
+		if r.URL.Path == "/tunnels/tunnel-id" {
 			tunnel := &tunnels.Tunnel{
 				AccessTokens: map[tunnels.TunnelAccessScope]string{
 					tunnels.TunnelAccessScopeConnect: accessToken,
@@ -54,54 +76,141 @@ func NewMockHttpClient() (*http.Client, error) {
 			if err != nil {
 				log.Fatalf("json.Marshal returned an error: %v", err)
 			}
-		} else if strings.HasPrefix(r.URL.Path, "/api/v1/tunnels/tunnel-id/ports") {
-			// Use regex to check if the path ends with a number
-			match, err := regexp.MatchString(`\/\d+$`, r.URL.Path)
-			if err != nil {
-				log.Fatalf("regexp.MatchString returned an error: %v", err)
-			}
 
-			// If the path ends with a number, it's a request for a specific port
-			if match || r.Method == http.MethodPost {
+			_, _ = w.Write(response)
+			return
+		} else if strings.HasPrefix(r.URL.Path, "/tunnels/tunnel-id/ports") {
+			// Use regex to capture the port number from the end of the path
+			re := regexp.MustCompile(`\/(\d+)$`)
+			matches := re.FindStringSubmatch(r.URL.Path)
+			targetingSpecificPort := len(matches) > 0
+
+			if targetingSpecificPort {
 				if r.Method == http.MethodDelete {
 					w.WriteHeader(http.StatusOK)
 					return
 				}
 
-				tunnelPort := &tunnels.TunnelPort{
+				if r.Method == http.MethodGet {
+					// If no ports were configured, then we assume that every request for a port is valid.
+					if specifiedPorts == nil {
+						response, err := json.Marshal(tunnels.TunnelPort{
+							AccessControl: &tunnels.TunnelAccessControl{
+								Entries: []tunnels.TunnelAccessControlEntry{},
+							},
+						})
+
+						if err != nil {
+							log.Fatalf("json.Marshal returned an error: %v", err)
+						}
+
+						_, _ = w.Write(response)
+						return
+					} else {
+						// Otherwise we'll fetch the port from our configured ports and include the protocol in the response.
+						port, err := strconv.Atoi(matches[1])
+						if err != nil {
+							log.Fatalf("strconv.Atoi returned an error: %v", err)
+						}
+
+						tunnelPort, ok := specifiedPorts[port]
+						if !ok {
+							w.WriteHeader(http.StatusNotFound)
+							return
+						}
+
+						response, err := json.Marshal(tunnelPort)
+
+						if err != nil {
+							log.Fatalf("json.Marshal returned an error: %v", err)
+						}
+
+						_, _ = w.Write(response)
+						return
+					}
+				}
+
+				// Else this is an unexpected request, fall through to 404 at the bottom
+			}
+
+			// If it's a PUT request, we assume it's for creating a new port so we'll do some validation
+			// and then return a stub.
+			if r.Method == http.MethodPut {
+				// If a port was already configured with this number, and the protocol has changed, return a 400 Bad Request.
+				if specifiedPorts != nil {
+					port, err := strconv.Atoi(matches[1])
+					if err != nil {
+						log.Fatalf("strconv.Atoi returned an error: %v", err)
+					}
+
+					var portRequest tunnels.TunnelPort
+					if err := json.NewDecoder(r.Body).Decode(&portRequest); err != nil {
+						log.Fatalf("json.NewDecoder returned an error: %v", err)
+					}
+
+					tunnelPort, ok := specifiedPorts[port]
+					if ok {
+						if tunnelPort.Protocol != portRequest.Protocol {
+							w.WriteHeader(http.StatusBadRequest)
+							return
+						}
+					}
+
+					// Create or update the new port entry.
+					specifiedPorts[port] = portRequest
+				}
+
+				response, err := json.Marshal(tunnels.TunnelPort{
 					AccessControl: &tunnels.TunnelAccessControl{
 						Entries: []tunnels.TunnelAccessControlEntry{},
 					},
-				}
+				})
 
-				// Convert the tunnel to JSON and write it to the response
-				response, err = json.Marshal(*tunnelPort)
 				if err != nil {
 					log.Fatalf("json.Marshal returned an error: %v", err)
 				}
-			} else {
-				// If the path doesn't end with a number and we aren't making a POST request, return an array of ports
-				tunnelPorts := []tunnels.TunnelPort{
-					{
-						AccessControl: &tunnels.TunnelAccessControl{
-							Entries: []tunnels.TunnelAccessControlEntry{},
-						},
-					},
-				}
 
-				response, err = json.Marshal(tunnelPorts)
-				if err != nil {
-					log.Fatalf("json.Marshal returned an error: %v", err)
-				}
+				_, _ = w.Write(response)
+				return
 			}
 
+			// Finally, if it's not targeting a specific port or a POST request, we return a list of ports, either
+			// totally stubbed, or whatever was configured in the mock client options.
+			if specifiedPorts == nil {
+				response, err := json.Marshal(tunnels.TunnelPortListResponse{
+					Value: []tunnels.TunnelPort{
+						{
+							AccessControl: &tunnels.TunnelAccessControl{
+								Entries: []tunnels.TunnelAccessControlEntry{},
+							},
+						},
+					},
+				})
+				if err != nil {
+					log.Fatalf("json.Marshal returned an error: %v", err)
+				}
+
+				_, _ = w.Write(response)
+				return
+			} else {
+				var ports []tunnels.TunnelPort
+				for _, tunnelPort := range specifiedPorts {
+					ports = append(ports, tunnelPort)
+				}
+				response, err := json.Marshal(tunnels.TunnelPortListResponse{
+					Value: ports,
+				})
+				if err != nil {
+					log.Fatalf("json.Marshal returned an error: %v", err)
+				}
+
+				_, _ = w.Write(response)
+				return
+			}
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-
-		// Write the response
-		_, _ = w.Write(response)
 	}))
 
 	url, err := url.Parse(mockServer.URL)

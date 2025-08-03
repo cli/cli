@@ -1,0 +1,97 @@
+---
+buckets: [.001, .002, .005, .01, .02, .05, .1, .2, .5, 1, 2, 5, 10]
+syslog:
+  stdoutlevel: 6
+  sysloglevel: 6
+monitors:
+  -
+    period: 5s
+    kind: DNS
+    settings:
+      protocol: udp
+      server: owen.ns.cloudflare.com:53
+      recurse: false
+      query_name: letsencrypt.org
+      query_type: A
+  -
+    period: 5s
+    kind: DNS
+    settings:
+      protocol: udp
+      server: 1.1.1.1:53
+      recurse: true
+      query_name: google.com
+      query_type: A
+  -
+    period: 10s
+    kind: DNS
+    settings:
+      protocol: tcp
+      server: 8.8.8.8:53
+      recurse: true
+      query_name: google.com
+      query_type: A
+  -
+    period: 2s
+    kind: HTTP
+    settings:
+      url: https://letsencrypt.org
+      rcodes: [200]
+      useragent: "letsencrypt/boulder-observer-http-client"
+  -
+    period: 5s
+    kind: DNS
+    settings:
+      protocol: tcp
+      server: owen.ns.cloudflare.com:53
+      recurse: false
+      query_name: letsencrypt.org
+      query_type: A
+  -
+    period: 5s
+    kind: DNS
+    settings:
+      protocol: tcp
+      server: 1.1.1.1:53
+      recurse: true
+      query_name: google.com
+      query_type: A
+  -
+    period: 10s
+    kind: DNS
+    settings:
+      protocol: udp
+      server: 8.8.8.8:53
+      recurse: true
+      query_name: google.com
+      query_type: A
+  -
+    period: 5s
+    kind: DNS
+    settings:
+      protocol: tcp
+      server: "[2606:4700:4700::1111]:53"
+      recurse: true
+      query_name: google.com
+      query_type: A
+  -
+    period: 5s
+    kind: DNS
+    settings:
+      protocol: udp
+      server: "[2606:4700:4700::1111]:53"
+      recurse: true
+      query_name: google.com
+      query_type: A
+  -
+    period: 2s
+    kind: HTTP
+    settings:
+      url: http://letsencrypt.org/foo
+      rcodes: [200, 404]
+      useragent: "letsencrypt/boulder-observer-http-client"
+  -
+    period: 10s
+    kind: TCP
+    settings:
+      hostport: acme-v02.api.letsencrypt.org:443

@@ -11,89 +11,74 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/issue/argparsetest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdDevelop(t *testing.T) {
+	// Test shared parsing of issue number / URL.
+	argparsetest.TestArgParsing(t, NewCmdDevelop)
+
 	tests := []struct {
-		name       string
-		input      string
-		output     DevelopOptions
-		wantStdout string
-		wantStderr string
-		wantErr    bool
-		errMsg     string
+		name             string
+		input            string
+		output           DevelopOptions
+		expectedBaseRepo ghrepo.Interface
+		wantStdout       string
+		wantStderr       string
+		wantErr          bool
+		errMsg           string
 	}{
-		{
-			name:    "no argument",
-			input:   "",
-			output:  DevelopOptions{},
-			wantErr: true,
-			errMsg:  "issue number or url is required",
-		},
-		{
-			name:  "issue number",
-			input: "1",
-			output: DevelopOptions{
-				IssueSelector: "1",
-			},
-		},
-		{
-			name:  "issue url",
-			input: "https://github.com/cli/cli/issues/1",
-			output: DevelopOptions{
-				IssueSelector: "https://github.com/cli/cli/issues/1",
-			},
-		},
 		{
 			name:  "branch-repo flag",
 			input: "1 --branch-repo owner/repo",
 			output: DevelopOptions{
-				IssueSelector: "1",
-				BranchRepo:    "owner/repo",
+				IssueNumber: 1,
+				BranchRepo:  "owner/repo",
 			},
 		},
 		{
 			name:  "base flag",
 			input: "1 --base feature",
 			output: DevelopOptions{
-				IssueSelector: "1",
-				BaseBranch:    "feature",
+				IssueNumber: 1,
+				BaseBranch:  "feature",
 			},
 		},
 		{
 			name:  "checkout flag",
 			input: "1 --checkout",
 			output: DevelopOptions{
-				IssueSelector: "1",
-				Checkout:      true,
+				IssueNumber: 1,
+				Checkout:    true,
 			},
 		},
 		{
 			name:  "list flag",
 			input: "1 --list",
 			output: DevelopOptions{
-				IssueSelector: "1",
-				List:          true,
+				IssueNumber: 1,
+				List:        true,
 			},
 		},
 		{
 			name:  "name flag",
 			input: "1 --name feature",
 			output: DevelopOptions{
-				IssueSelector: "1",
-				Name:          "feature",
+				IssueNumber: 1,
+				Name:        "feature",
 			},
 		},
 		{
 			name:  "issue-repo flag",
 			input: "1 --issue-repo cli/cli",
 			output: DevelopOptions{
-				IssueSelector: "1",
+				IssueNumber: 1,
 			},
 			wantStdout: "Flag --issue-repo has been deprecated, use `--repo` instead\n",
 		},
@@ -143,18 +128,27 @@ func TestNewCmdDevelop(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr {
-				assert.EqualError(t, err, tt.errMsg)
+				require.EqualError(t, err, tt.errMsg)
 				return
 			}
 
-			assert.NoError(t, err)
-			assert.Equal(t, tt.output.IssueSelector, gotOpts.IssueSelector)
+			require.NoError(t, err)
+			assert.Equal(t, tt.output.IssueNumber, gotOpts.IssueNumber)
 			assert.Equal(t, tt.output.Name, gotOpts.Name)
 			assert.Equal(t, tt.output.BaseBranch, gotOpts.BaseBranch)
 			assert.Equal(t, tt.output.Checkout, gotOpts.Checkout)
 			assert.Equal(t, tt.output.List, gotOpts.List)
 			assert.Equal(t, tt.wantStdout, stdOut.String())
 			assert.Equal(t, tt.wantStderr, stdErr.String())
+			if tt.expectedBaseRepo != nil {
+				baseRepo, err := gotOpts.BaseRepo()
+				require.NoError(t, err)
+				require.True(
+					t,
+					ghrepo.IsSame(tt.expectedBaseRepo, baseRepo),
+					"expected base repo %+v, got %+v", tt.expectedBaseRepo, baseRepo,
+				)
+			}
 		})
 	}
 }
@@ -178,8 +172,8 @@ func TestDevelopRun(t *testing.T) {
 		{
 			name: "returns an error when the feature is not supported by the API",
 			opts: &DevelopOptions{
-				IssueSelector: "42",
-				List:          true,
+				IssueNumber: 42,
+				List:        true,
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
@@ -196,8 +190,8 @@ func TestDevelopRun(t *testing.T) {
 		{
 			name: "list branches for an issue",
 			opts: &DevelopOptions{
-				IssueSelector: "42",
-				List:          true,
+				IssueNumber: 42,
+				List:        true,
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
@@ -223,8 +217,8 @@ func TestDevelopRun(t *testing.T) {
 		{
 			name: "list branches for an issue in tty",
 			opts: &DevelopOptions{
-				IssueSelector: "42",
-				List:          true,
+				IssueNumber: 42,
+				List:        true,
 			},
 			tty: true,
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
@@ -256,36 +250,9 @@ func TestDevelopRun(t *testing.T) {
 			`),
 		},
 		{
-			name: "list branches for an issue providing an issue url",
-			opts: &DevelopOptions{
-				IssueSelector: "https://github.com/cli/cli/issues/42",
-				List:          true,
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.Register(
-					httpmock.GraphQL(`query IssueByNumber\b`),
-					httpmock.StringResponse(`{"data":{"repository":{"hasIssuesEnabled":true,"issue":{"id":"SOMEID","number":42}}}}`),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query LinkedBranchFeature\b`),
-					httpmock.StringResponse(featureEnabledPayload),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query ListLinkedBranches\b`),
-					httpmock.GraphQLQuery(`
-		        {"data":{"repository":{"issue":{"linkedBranches":{"nodes":[{"ref":{"name":"foo","repository":{"url":"https://github.com/OWNER/REPO"}}},{"ref":{"name":"bar","repository":{"url":"https://github.com/OWNER/OTHER-REPO"}}}]}}}}}
-					`, func(query string, inputs map[string]interface{}) {
-						assert.Equal(t, float64(42), inputs["number"])
-						assert.Equal(t, "cli", inputs["owner"])
-						assert.Equal(t, "cli", inputs["name"])
-					}))
-			},
-			expectedOut: "foo\thttps://github.com/OWNER/REPO/tree/foo\nbar\thttps://github.com/OWNER/OTHER-REPO/tree/bar\n",
-		},
-		{
 			name: "develop new branch",
 			opts: &DevelopOptions{
-				IssueSelector: "123",
+				IssueNumber: 123,
 			},
 			remotes: map[string]string{
 				"origin": "OWNER/REPO",
@@ -321,8 +288,8 @@ func TestDevelopRun(t *testing.T) {
 		{
 			name: "develop new branch in different repo than issue",
 			opts: &DevelopOptions{
-				IssueSelector: "123",
-				BranchRepo:    "OWNER2/REPO",
+				IssueNumber: 123,
+				BranchRepo:  "OWNER2/REPO",
 			},
 			remotes: map[string]string{
 				"origin": "OWNER2/REPO",
@@ -367,9 +334,9 @@ func TestDevelopRun(t *testing.T) {
 		{
 			name: "develop new branch with name and base specified",
 			opts: &DevelopOptions{
-				Name:          "my-branch",
-				BaseBranch:    "main",
-				IssueSelector: "123",
+				Name:        "my-branch",
+				BaseBranch:  "main",
+				IssueNumber: 123,
 			},
 			remotes: map[string]string{
 				"origin": "OWNER/REPO",
@@ -406,7 +373,10 @@ func TestDevelopRun(t *testing.T) {
 		{
 			name: "develop new branch outside of local git repo",
 			opts: &DevelopOptions{
-				IssueSelector: "https://github.com/cli/cli/issues/123",
+				IssueNumber: 123,
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.New("cli", "cli"), nil
+				},
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
@@ -436,9 +406,9 @@ func TestDevelopRun(t *testing.T) {
 		{
 			name: "develop new branch with checkout when local branch exists",
 			opts: &DevelopOptions{
-				Name:          "my-branch",
-				IssueSelector: "123",
-				Checkout:      true,
+				Name:        "my-branch",
+				IssueNumber: 123,
+				Checkout:    true,
 			},
 			remotes: map[string]string{
 				"origin": "OWNER/REPO",
@@ -478,9 +448,9 @@ func TestDevelopRun(t *testing.T) {
 		{
 			name: "develop new branch with checkout when local branch does not exist",
 			opts: &DevelopOptions{
-				Name:          "my-branch",
-				IssueSelector: "123",
-				Checkout:      true,
+				Name:        "my-branch",
+				IssueNumber: 123,
+				Checkout:    true,
 			},
 			remotes: map[string]string{
 				"origin": "OWNER/REPO",
@@ -519,8 +489,8 @@ func TestDevelopRun(t *testing.T) {
 		{
 			name: "develop with base branch which does not exist",
 			opts: &DevelopOptions{
-				IssueSelector: "123",
-				BaseBranch:    "does-not-exist-branch",
+				IssueNumber: 123,
+				BaseBranch:  "does-not-exist-branch",
 			},
 			remotes: map[string]string{
 				"origin": "OWNER/REPO",
@@ -561,8 +531,10 @@ func TestDevelopRun(t *testing.T) {
 			ios.SetStderrTTY(tt.tty)
 			opts.IO = ios
 
-			opts.BaseRepo = func() (ghrepo.Interface, error) {
-				return ghrepo.New("OWNER", "REPO"), nil
+			if opts.BaseRepo == nil {
+				opts.BaseRepo = func() (ghrepo.Interface, error) {
+					return ghrepo.New("OWNER", "REPO"), nil
+				}
 			}
 
 			opts.Remotes = func() (context.Remotes, error) {

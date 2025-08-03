@@ -1,0 +1,17 @@
+# This GitHub Action runs only on pushes to main or a hotfix branch. It can
+# be used by tag protection rules to ensure that tags may only be pushed if
+# their corresponding commit was first pushed to one of those branches.
+name: Merged to main (or hotfix)
+on:
+  push:
+    branches:
+      - main
+      - release-branch-*
+jobs:
+  merged-to-main:
+    name: Merged to main (or hotfix)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false

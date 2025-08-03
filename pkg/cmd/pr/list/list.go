@@ -64,6 +64,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			# List PRs authored by you
 			$ gh pr list --author "@me"
 
+			# List PRs with a specific head branch name
+			$ gh pr list --head "typo"
+
 			# List only PRs with all of the given labels
 			$ gh pr list --label bug --label "priority 1"
 
@@ -102,7 +105,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
 	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "merged", "all"}, "Filter by state")
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
-	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
+	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", `Filter by head branch ("<owner>:<branch>" syntax not supported)`)
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")

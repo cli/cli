@@ -1,7 +1,6 @@
 package shared
 
 import (
-	"archive/zip"
 	"errors"
 	"fmt"
 	"net/http"
@@ -239,7 +238,6 @@ type Step struct {
 	Number      int
 	StartedAt   time.Time `json:"started_at"`
 	CompletedAt time.Time `json:"completed_at"`
-	Log         *zip.File
 }
 
 type Steps []Step
@@ -319,6 +317,10 @@ func IsFailureState(c Conclusion) bool {
 	default:
 		return false
 	}
+}
+
+func IsSkipped(c Conclusion) bool {
+	return c == Skipped
 }
 
 type RunsPayload struct {
@@ -575,7 +577,7 @@ func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (st
 		case Success:
 			return cs.SuccessIconWithColor(noColor), cs.Green
 		case Skipped, Neutral:
-			return "-", cs.Gray
+			return "-", cs.Muted
 		default:
 			return cs.FailureIconWithColor(noColor), cs.Red
 		}

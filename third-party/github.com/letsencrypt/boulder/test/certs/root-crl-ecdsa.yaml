@@ -1,0 +1,14 @@
+ceremony-type: crl
+pkcs11:
+    module: /usr/lib/softhsm/libsofthsm2.so
+    pin: 1234
+    signing-key-slot: {{ .SlotID }}
+    signing-key-label: root ecdsa
+inputs:
+    issuer-certificate-path: test/certs/webpki/root-ecdsa.cert.pem
+outputs:
+    crl-path: test/certs/webpki/root-ecdsa.crl.pem
+crl-profile:
+    this-update: 2023-01-01 12:00:00
+    next-update: 2023-12-15 12:00:00
+    number: 100

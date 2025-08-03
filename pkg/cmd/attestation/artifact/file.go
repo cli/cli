@@ -10,7 +10,7 @@ import (
 func digestLocalFileArtifact(filename, digestAlg string) (*DigestedArtifact, error) {
 	data, err := os.Open(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get open local artifact: %v", err)
+		return nil, fmt.Errorf("failed to open local artifact: %v", err)
 	}
 	defer data.Close()
 	digest, err := digest.CalculateDigestWithAlgorithm(data, digestAlg)

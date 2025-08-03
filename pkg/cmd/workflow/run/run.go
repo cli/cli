@@ -330,7 +330,7 @@ func runRun(opts *RunOptions) error {
 		fmt.Fprintln(out)
 
 		fmt.Fprintf(out, "To see runs for this workflow, try: %s\n",
-			cs.Boldf("gh run list --workflow=%s", workflow.Base()))
+			cs.Boldf("gh run list --workflow=%q", workflow.Base()))
 	}
 
 	return nil

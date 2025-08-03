@@ -1,0 +1,164 @@
+version: 2.1
+
+orbs:
+  win: circleci/windows@2.2.0
+
+references:
+  environment: &ENVIRONMENT
+    TEST_RESULTS_PATH: &TEST_RESULTS_PATH /tmp/test-results
+    WIN_TEST_RESULTS: &WIN_TEST_RESULTS c:\Users\circleci\AppData\Local\Temp\test-results
+
+commands:
+  run-gotests:
+    parameters:
+      cmd:
+        type: string
+      platform:
+        type: string
+    steps:
+      - run:
+          name: "Run go tests"
+          command: |
+            PACKAGE_NAMES=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
+            echo "Running $(echo $PACKAGE_NAMES | wc -w) packages"
+            echo $PACKAGE_NAMES
+            << parameters.cmd >> --format=short-verbose --junitfile $TEST_RESULTS_PATH/go-multierror/gotestsum-report.xml -- -p 2 -cover -coverprofile=<< parameters.platform >>_cov_$CIRCLE_NODE_INDEX.part $PACKAGE_NAMES
+        
+jobs:
+  linux-tests:
+    docker:
+      - image: docker.mirror.hashicorp.services/circleci/golang:<< parameters.go-version >>
+    parameters:
+      go-version:
+        type: string
+    environment: 
+      <<: *ENVIRONMENT
+    parallelism: 4
+    steps:
+      - run: go version
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: mkdir -p $TEST_RESULTS_PATH/go-multierror
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          keys:
+            - linux-gomod-cache-v1-{{ checksum "go.mod" }}
+
+      - run: go mod download
+
+      # Save go module cache if the go.mod file has changed
+      - save_cache:
+          key: linux-gomod-cache-v1-{{ checksum "go.mod" }}
+          paths:
+            - "/go/pkg/mod"
+
+      # Check go fmt output because it does not report non-zero when there are fmt changes
+      - run:
+          name: check go fmt
+          command: |
+            files=$(go fmt ./...)
+            if [ -n "$files" ]; then
+              echo "The following file(s) do not conform to go fmt:"
+              echo "$files"
+              exit 1
+            fi
+      # Run go tests with gotestsum
+      - run-gotests:
+          cmd: "gotestsum"
+          platform: "linux"
+
+      # Save coverage report parts
+      - persist_to_workspace:
+          root: .
+          paths:
+            - linux_cov_*.part
+
+      - store_test_results:
+          path: *TEST_RESULTS_PATH
+      - store_artifacts:
+          path: *TEST_RESULTS_PATH
+
+  windows-tests:
+    executor: 
+      name: win/default
+      shell: bash --login -eo pipefail
+    environment:
+      <<: *ENVIRONMENT
+    working_directory: c:\gopath\src\github.com\hashicorp\go-multierror
+    parameters:
+      go-version:
+        type: string
+      gotestsum-version:
+        type: string
+    steps: 
+      - run: git config --global core.autocrlf false
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: 
+          name: Setup (remove pre-installed go)
+          command: |
+            rm -rf "c:\Go"
+            mkdir -p $TEST_RESULTS_PATH/go-multierror
+      - restore_cache:
+          keys:
+            - win-golang-<< parameters.go-version >>-cache-v1
+            - win-gomod-cache-{{ checksum "go.mod" }}-v1
+
+      - run: 
+          name: Install go version << parameters.go-version >>
+          command: | 
+            if [ ! -d "c:\go" ]; then
+              echo "Cache not found, installing new version of go"
+              curl --fail --location https://dl.google.com/go/go<< parameters.go-version >>.windows-amd64.zip --output go.zip
+              unzip go.zip -d "/c"
+            fi
+      - run: 
+          command: go mod download
+
+      - save_cache:
+          key: win-golang-<< parameters.go-version >>-cache-v1
+          paths:
+            - /go
+
+      - save_cache:
+          key: win-gomod-cache-{{ checksum "go.mod" }}-v1
+          paths:
+            - c:\Windows\system32\config\systemprofile\go\pkg\mod
+
+      - run:
+          name: Install gotestsum
+          command: |
+            curl --fail --location https://github.com/gotestyourself/gotestsum/releases/download/v<< parameters.gotestsum-version >>/gotestsum_<< parameters.gotestsum-version >>_windows_amd64.tar.gz --output gotestsum.tar.gz
+            tar -xvzf gotestsum.tar.gz
+      - run-gotests:
+          cmd: "./gotestsum.exe"
+          platform: "win"
+
+      # Save coverage report parts
+      - persist_to_workspace:
+          root: .
+          paths:
+            - win_cov_*.part
+
+      - store_test_results:
+          path: *WIN_TEST_RESULTS
+      - store_artifacts:
+          path: *WIN_TEST_RESULTS
+
+workflows:
+  go-multierror:
+    jobs:
+      - linux-tests:
+          matrix:
+            parameters:
+              go-version: ["1.13", "1.14", "1.15"]
+          name: linux-test-go-<< matrix.go-version >>
+      - windows-tests:
+          matrix:
+            parameters:
+              go-version: ["1.13", "1.14", "1.15"]
+              gotestsum-version: ["1.6.2"]
+          name: win-test-go-<< matrix.go-version >>

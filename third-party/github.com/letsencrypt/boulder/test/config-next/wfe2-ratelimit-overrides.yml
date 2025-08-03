@@ -1,0 +1,60 @@
+- NewRegistrationsPerIPAddress:
+    burst: 1000000
+    count: 1000000
+    period: 168h
+    ids:
+      - id: 64.112.117.1
+        comment: test
+- CertificatesPerDomain:
+    burst: 1
+    count: 1
+    period: 2160h
+    ids:
+      - id: ratelimit.me
+        comment: Rate Limit Test Domain
+- CertificatesPerDomain:
+    burst: 10000
+    count: 10000
+    period: 2160h
+    ids:
+      - id: le.wtf
+        comment: Let's Encrypt Test Domain
+      - id: le1.wtf
+        comment: Let's Encrypt Test Domain 1
+      - id: le2.wtf
+        comment: Let's Encrypt Test Domain 2
+      - id: le3.wtf
+        comment: Let's Encrypt Test Domain 3
+      - id: nginx.wtf
+        comment: Nginx Test Domain
+      - id: good-caa-reserved.com
+        comment: Good CAA Reserved Domain
+      - id: bad-caa-reserved.com
+        comment: Bad CAA Reserved Domain
+      - id: ecdsa.le.wtf
+        comment: ECDSA Let's Encrypt Test Domain
+      - id: must-staple.le.wtf
+        comment: Must-Staple Let's Encrypt Test Domain
+- CertificatesPerFQDNSet:
+    burst: 10000
+    count: 10000
+    period: 168h
+    ids:
+      - id: le.wtf
+        comment: Let's Encrypt Test Domain
+      - id: le1.wtf
+        comment: Let's Encrypt Test Domain 1
+      - id: le2.wtf
+        comment: Let's Encrypt Test Domain 2
+      - id: le3.wtf
+        comment: Let's Encrypt Test Domain 3
+      - id: le.wtf,le1.wtf
+        comment: Let's Encrypt Test Domain, Let's Encrypt Test Domain 1
+      - id: good-caa-reserved.com
+        comment: Good CAA Reserved Domain
+      - id: nginx.wtf
+        comment: Nginx Test Domain
+      - id: ecdsa.le.wtf
+        comment: ECDSA Let's Encrypt Test Domain
+      - id: must-staple.le.wtf
+        comment: Must-Staple Let's Encrypt Test Domain

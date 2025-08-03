@@ -106,3 +106,11 @@ ifndef VERSION
 endif
 	./script/release --local "$(VERSION)" --platform macos
 	./script/pkgmacos $(VERSION)
+
+.PHONY: licenses
+licenses:
+	./script/licenses
+
+.PHONY: licenses-check
+licenses-check:
+	./script/licenses-check

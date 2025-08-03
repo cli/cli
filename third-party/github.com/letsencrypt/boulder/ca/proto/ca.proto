@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package ca;
+option go_package = "github.com/letsencrypt/boulder/ca/proto";
+
+import "core/proto/core.proto";
+import "google/protobuf/timestamp.proto";
+
+// CertificateAuthority issues certificates.
+service CertificateAuthority {
+  // IssueCertificate issues a precertificate, gets SCTs, issues a certificate, and returns that.
+  rpc IssueCertificate(IssueCertificateRequest) returns (IssueCertificateResponse) {}
+}
+
+message IssueCertificateRequest {
+  // Next unused field number: 6
+  bytes csr = 1;
+  int64 registrationID = 2;
+  int64 orderID = 3;
+  reserved 4; // Previously issuerNameID
+
+  // certProfileName is a human readable name provided by the RA and used to
+  // determine if the CA can issue for that profile. A default name will be
+  // assigned inside the CA during *Profile construction if no name is provided.
+  // The value of this field should not be relied upon inside the RA.
+  string certProfileName = 5;
+}
+
+message IssueCertificateResponse {
+  bytes DER = 1;
+}
+
+// OCSPGenerator generates OCSP. We separate this out from
+// CertificateAuthority so that we can restrict access to a different subset of
+// hosts, so the hosts that need to request OCSP generation don't need to be
+// able to request certificate issuance.
+service OCSPGenerator {
+  rpc GenerateOCSP(GenerateOCSPRequest) returns (OCSPResponse) {}
+}
+
+// Exactly one of certDER or [serial and issuerID] must be set.
+message GenerateOCSPRequest {
+  // Next unused field number: 8
+  string status = 2;
+  int32 reason = 3;
+  reserved 4; // Previously revokedAtNS
+  google.protobuf.Timestamp revokedAt = 7;
+  string serial = 5;
+  int64 issuerID = 6;
+}
+
+message OCSPResponse {
+  bytes response = 1;
+}
+
+// CRLGenerator signs CRLs. It is separated for the same reason as OCSPGenerator.
+service CRLGenerator {
+  rpc GenerateCRL(stream GenerateCRLRequest) returns (stream GenerateCRLResponse) {}
+}
+
+message GenerateCRLRequest {
+  oneof payload {
+    CRLMetadata metadata = 1;
+    core.CRLEntry entry = 2;
+  }
+}
+
+message CRLMetadata {
+  // Next unused field number: 5
+  int64 issuerNameID = 1;
+  reserved 2; // Previously thisUpdateNS
+  google.protobuf.Timestamp thisUpdate = 4;
+  int64 shardIdx = 3;
+}
+
+message GenerateCRLResponse {
+  bytes chunk = 1;
+}

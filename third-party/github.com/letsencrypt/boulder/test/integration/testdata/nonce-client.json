@@ -1,0 +1,39 @@
+{
+	"notwfe": {
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/wfe.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/wfe.boulder/key.pem"
+		},
+		"getNonceService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "nonce-taro",
+				"domain": "service.consul"
+			},
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "nonce.boulder"
+		},
+		"redeemNonceService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookups": [
+				{
+					"service": "nonce-taro",
+					"domain": "service.consul"
+				},
+				{
+					"service": "nonce-zinc",
+					"domain": "service.consul"
+				}
+			],
+			"srvResolver": "nonce-srv",
+			"timeout": "15s",
+			"noWaitForReady": true,
+			"hostOverride": "nonce.boulder"
+		},
+		"nonceHMACKey": {
+			"keyFile": "test/secrets/nonce_prefix_key"
+		}
+    }
+}

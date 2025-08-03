@@ -1,0 +1,8 @@
+NewRegistrationsPerIPAddress:
+  burst: 20
+  count: 20
+  period: 1s
+NewRegistrationsPerIPv6Range:
+  burst: 30
+  count: 30
+  period: 2s

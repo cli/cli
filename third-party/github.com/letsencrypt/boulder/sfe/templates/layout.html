@@ -1,0 +1,117 @@
+{{define "header"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Let's Encrypt - Portal</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <style>
+        * {
+            font-family: system-ui, sans-serif;
+        }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        html {
+            line-height: 1.15;
+        }
+        div {
+            display: block;
+            unicode-bidi: isolate;
+        }
+        body {
+            flex: 1;
+            align-items: center;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #003C66;
+            font-weight: normal;
+        }
+        h1 {
+            font-size: 2em;
+            margin: .67em 0;
+            display: block;
+        }
+        a, a:hover {
+            color: #285999;
+        }
+        .header, .footer {
+            width: 100%;
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #eee;
+        }
+        .header {
+            padding: 10px 20px;
+            box-sizing: border-box;
+        }
+        .footer {
+            margin-top: auto;
+        }
+        .container {
+            max-width: 45em;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .section, .highlight {
+            width: 100%;
+            max-width: 45em;
+            padding: 10px 20px;
+            box-sizing: border-box;
+        }
+        .section {
+            padding: 10px 20px;
+            margin-bottom: -20px;
+        }
+        .highlight {
+            margin-top: 20px;
+            margin-bottom: 5px;
+            background-color: #e9f0fa;
+            border-left: 5px solid #003C66;
+            border-radius: 8px;
+        }
+        button.primary {
+            color: #fff;
+            background-color: #003C66;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            border-radius: 8px;
+            margin: 10px 0px 0px;
+            font-family: inherit;
+            font-size: 100%;
+            line-height: 1.15;
+            overflow: visible;
+            text-transform: none;
+        }
+        button.primary:hover {
+            background-color: #285999;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <img src="/static/logo.svg" alt="Let's Encrypt" style="height: 50px;">
+        </div>
+    </div>
+{{ end }}
+
+{{ define "footer" }}
+<div class="footer">
+    <div class="container">
+        <p>
+            <a href="https://letsencrypt.org">Let's Encrypt</a> is a free, automated, and open certificate authority brought to you by the nonprofit <a href="https://www.isrg.org/">Internet Security Research Group (ISRG)</a>.
+        </p>
+    </div>
+</div>
+</body>
+</html>
+{{ end }}

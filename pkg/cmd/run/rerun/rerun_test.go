@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -374,7 +375,7 @@ func TestRerun(t *testing.T) {
 			errOut:  "no recent runs have failed; please specify a specific `<run-id>`",
 		},
 		{
-			name: "unrerunnable",
+			name: "API error (403)",
 			tty:  true,
 			opts: &RerunOptions{
 				RunID: "3",
@@ -392,10 +393,42 @@ func TestRerun(t *testing.T) {
 					}))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/3/rerun"),
-					httpmock.StatusStringResponse(403, "no"))
+					httpmock.JSONErrorResponse(403, api.HTTPError{
+						StatusCode: 403,
+						Message:    "blah blah",
+					}),
+				)
 			},
 			wantErr: true,
-			errOut:  "run 3 cannot be rerun; its workflow file may be broken",
+			errOut:  "run 3 cannot be rerun; blah blah",
+		},
+		{
+			name: "API error (non-403)",
+			tty:  true,
+			opts: &RerunOptions{
+				RunID: "3",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/3/rerun"),
+					httpmock.JSONErrorResponse(500, api.HTTPError{
+						StatusCode: 500,
+						Message:    "blah blah",
+					}),
+				)
+			},
+			wantErr: true,
+			errOut:  "failed to rerun: HTTP 500: blah blah (https://api.github.com/repos/OWNER/REPO/actions/runs/3/rerun)",
 		},
 	}
 

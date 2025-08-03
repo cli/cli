@@ -1,0 +1,36 @@
+name: Add feature-request comment
+on:
+  issues:
+    types:
+      - labeled
+
+permissions:
+  issues: write
+
+jobs:
+  add-comment-to-feature-request-issues:
+    if: github.event.label.name == 'enhancement'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.issue.number }}
+      BODY: >
+        Thank you for your issue! We have categorized it as a feature request,
+        and it has been added to our backlog. In doing so, **we are not
+        committing to implementing this feature at this time**, but, we will
+        consider it for future releases based on community feedback and our own
+        product roadmap. 
+
+
+        Unless you see the
+        https://github.com/cli/cli/labels/help%20wanted label, we are
+        not currently looking for external contributions for this feature.
+
+
+        **If you come across this issue and would like to see it implemented,
+        please add a thumbs up!** This will help us prioritize the feature.
+        Please only comment if you have additional information or viewpoints to
+        contribute.
+    steps:
+      - run: gh issue comment "$NUMBER" --body "$BODY"

@@ -58,6 +58,7 @@ type IOStreams struct {
 	progressIndicatorEnabled bool
 	progressIndicator        *spinner.Spinner
 	progressIndicatorMu      sync.Mutex
+	spinnerDisabled          bool
 
 	alternateScreenBufferEnabled bool
 	alternateScreenBufferActive  bool
@@ -72,12 +73,14 @@ type IOStreams struct {
 
 	colorOverride           bool
 	colorEnabled            bool
+	colorLabels             bool
 	accessibleColorsEnabled bool
 
 	pagerCommand string
 	pagerProcess *os.Process
 
-	neverPrompt bool
+	neverPrompt               bool
+	accessiblePrompterEnabled bool
 
 	TempFileOverride *os.File
 }
@@ -101,6 +104,10 @@ func (s *IOStreams) HasTrueColor() bool {
 		return s.colorEnabled
 	}
 	return s.term.IsTrueColorSupported()
+}
+
+func (s *IOStreams) ColorLabels() bool {
+	return s.colorLabels
 }
 
 // DetectTerminalTheme is a utility to call before starting the output pager so that the terminal background
@@ -133,6 +140,10 @@ func (s *IOStreams) TerminalTheme() string {
 func (s *IOStreams) SetColorEnabled(colorEnabled bool) {
 	s.colorOverride = true
 	s.colorEnabled = colorEnabled
+}
+
+func (s *IOStreams) SetColorLabels(colorLabels bool) {
+	s.colorLabels = colorLabels
 }
 
 func (s *IOStreams) SetStdinTTY(isTTY bool) {
@@ -264,12 +275,29 @@ func (s *IOStreams) SetNeverPrompt(v bool) {
 	s.neverPrompt = v
 }
 
+func (s *IOStreams) GetSpinnerDisabled() bool {
+	return s.spinnerDisabled
+}
+
+func (s *IOStreams) SetSpinnerDisabled(v bool) {
+	s.spinnerDisabled = v
+}
+
 func (s *IOStreams) StartProgressIndicator() {
 	s.StartProgressIndicatorWithLabel("")
 }
 
 func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 	if !s.progressIndicatorEnabled {
+		return
+	}
+
+	if s.spinnerDisabled {
+		// If the spinner is disabled, simply print a
+		// textual progress indicator and return.
+		// This means that s.ProgressIndicator will be nil.
+		// See also: the comment on StopProgressIndicator()
+		s.startTextualProgressIndicator(label)
 		return
 	}
 
@@ -286,8 +314,10 @@ func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 	}
 
 	// https://github.com/briandowns/spinner#available-character-sets
-	dotStyle := spinner.CharSets[11]
-	sp := spinner.New(dotStyle, 120*time.Millisecond, spinner.WithWriter(s.ErrOut), spinner.WithColor("fgCyan"))
+	// ⣾ ⣷ ⣽ ⣻ ⡿
+	spinnerStyle := spinner.CharSets[11]
+
+	sp := spinner.New(spinnerStyle, 120*time.Millisecond, spinner.WithWriter(s.ErrOut), spinner.WithColor("fgCyan"))
 	if label != "" {
 		sp.Prefix = label + " "
 	}
@@ -296,6 +326,27 @@ func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 	s.progressIndicator = sp
 }
 
+func (s *IOStreams) startTextualProgressIndicator(label string) {
+	s.progressIndicatorMu.Lock()
+	defer s.progressIndicatorMu.Unlock()
+
+	// Default label when spinner disabled is "Working..."
+	if label == "" {
+		label = "Working..."
+	}
+
+	// Add an ellipsis to the label if it doesn't already have one.
+	ellipsis := "..."
+	if !strings.HasSuffix(label, ellipsis) {
+		label = label + ellipsis
+	}
+
+	fmt.Fprintf(s.ErrOut, "%s%s", s.ColorScheme().Cyan(label), "\n")
+}
+
+// StopProgressIndicator stops the progress indicator if it is running.
+// Note that a textual progess indicator does not create a progress indicator,
+// so this method is a no-op in that case.
 func (s *IOStreams) StopProgressIndicator() {
 	s.progressIndicatorMu.Lock()
 	defer s.progressIndicatorMu.Unlock()
@@ -367,7 +418,14 @@ func (s *IOStreams) TerminalWidth() int {
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
-	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256(), s.HasTrueColor(), s.AccessibleColorsEnabled(), s.TerminalTheme())
+	return &ColorScheme{
+		Enabled:       s.ColorEnabled(),
+		EightBitColor: s.ColorSupport256(),
+		TrueColor:     s.HasTrueColor(),
+		Accessible:    s.AccessibleColorsEnabled(),
+		ColorLabels:   s.ColorLabels(),
+		Theme:         s.TerminalTheme(),
+	}
 }
 
 func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
@@ -398,6 +456,14 @@ func (s *IOStreams) SetAccessibleColorsEnabled(enabled bool) {
 
 func (s *IOStreams) AccessibleColorsEnabled() bool {
 	return s.accessibleColorsEnabled
+}
+
+func (s *IOStreams) SetAccessiblePrompterEnabled(enabled bool) {
+	s.accessiblePrompterEnabled = enabled
+}
+
+func (s *IOStreams) AccessiblePrompterEnabled() bool {
+	return s.accessiblePrompterEnabled
 }
 
 func System() *IOStreams {

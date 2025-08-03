@@ -1,0 +1,36 @@
+{
+	"NonceService": {
+		"maxUsed": 131072,
+		"nonceHMACKey": {
+			"keyFile": "test/secrets/nonce_prefix_key"
+		},
+		"syslog": {
+			"stdoutLevel": 6,
+			"syslogLevel": -1
+		},
+		"openTelemetry": {
+			"endpoint": "bjaeger:4317",
+			"sampleratio": 1
+		},
+		"grpc": {
+			"maxConnectionAge": "30s",
+			"services": {
+				"nonce.NonceService": {
+					"clientNames": [
+						"wfe.boulder"
+					]
+				},
+				"grpc.health.v1.Health": {
+					"clientNames": [
+						"health-checker.boulder"
+					]
+				}
+			}
+		},
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/nonce.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/nonce.boulder/key.pem"
+		}
+	}
+}

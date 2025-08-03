@@ -1,0 +1,7 @@
+name: Detect spam
+model: openai/gpt-4o-mini
+messages:
+  - role: system
+    content: "" # Since it's not a fix value, it should be generated and replaced at runtime
+  - role: user
+    content: "" # This will be replaced at runtime

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -91,14 +92,19 @@ func Test_listRun(t *testing.T) {
 				return cfg
 			}(),
 			input: &ListOptions{Hostname: "HOST"},
-			stdout: `git_protocol=ssh
-editor=/usr/bin/vim
-prompt=disabled
-prefer_editor_prompt=enabled
-pager=less
-http_unix_socket=
-browser=brave
-`,
+			stdout: heredoc.Doc(`
+				git_protocol=ssh
+				editor=/usr/bin/vim
+				prompt=disabled
+				prefer_editor_prompt=enabled
+				pager=less
+				http_unix_socket=
+				browser=brave
+				color_labels=disabled
+				accessible_colors=disabled
+				accessible_prompter=disabled
+				spinner=enabled
+			`),
 		},
 	}
 

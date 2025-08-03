@@ -43,7 +43,7 @@ var HelpTopics = []helpTopic{
 		short: "Environment variables that can be used with gh",
 		long: heredoc.Docf(`
 			%[1]sGH_TOKEN%[1]s, %[1]sGITHUB_TOKEN%[1]s (in order of precedence): an authentication token that will be used when
-			a command targets either <github.com> or a subdomain of <ghe.com>. Setting this avoids being prompted to
+			a command targets either %[1]sgithub.com%[1]s or a subdomain of %[1]sghe.com%[1]s. Setting this avoids being prompted to
 			authenticate and takes precedence over previously stored credentials.
 
 			%[1]sGH_ENTERPRISE_TOKEN%[1]s, %[1]sGITHUB_ENTERPRISE_TOKEN%[1]s (in order of precedence): an authentication
@@ -81,6 +81,11 @@ var HelpTopics = []helpTopic{
 			%[1]sCLICOLOR_FORCE%[1]s: set to a value other than %[1]s0%[1]s to keep ANSI colors in output
 			even when the output is piped.
 
+			%[1]sGH_COLOR_LABELS%[1]s: set to any value to display labels using their RGB hex color codes in terminals that
+			support truecolor.
+
+			%[1]sGH_ACCESSIBLE_COLORS%[1]s (preview): set to a truthy value to use customizable, 4-bit accessible colors.
+
 			%[1]sGH_FORCE_TTY%[1]s: set to any value to force terminal-style output even when the output is
 			redirected. When the value is a number, it is interpreted as the number of columns
 			available in the viewport. When the value is a percentage, it will be applied against
@@ -108,6 +113,12 @@ var HelpTopics = []helpTopic{
 			%[1]sGH_MDWIDTH%[1]s: default maximum width for markdown render wrapping.  The max width of lines
 			wrapped on the terminal will be taken as the lesser of the terminal width, this value, or 120 if
 			not specified.  This value is used, for example, with %[1]spr view%[1]s subcommand.
+
+			%[1]sGH_ACCESSIBLE_PROMPTER%[1]s (preview): set to a truthy value to enable prompts that are
+			more compatible with speech synthesis and braille screen readers.
+
+			%[1]sGH_SPINNER_DISABLED%[1]s: set to a truthy value to replace the spinner animation with
+			a textual progress indicator.
 		`, "`"),
 	},
 	{

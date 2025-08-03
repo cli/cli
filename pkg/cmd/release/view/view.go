@@ -129,19 +129,19 @@ func viewRun(opts *ViewOptions) error {
 }
 
 func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
-	iofmt := io.ColorScheme()
+	cs := io.ColorScheme()
 	w := io.Out
 
-	fmt.Fprintf(w, "%s\n", iofmt.Bold(release.TagName))
+	fmt.Fprintf(w, "%s\n", cs.Bold(release.TagName))
 	if release.IsDraft {
-		fmt.Fprintf(w, "%s • ", iofmt.Red("Draft"))
+		fmt.Fprintf(w, "%s • ", cs.Red("Draft"))
 	} else if release.IsPrerelease {
-		fmt.Fprintf(w, "%s • ", iofmt.Yellow("Pre-release"))
+		fmt.Fprintf(w, "%s • ", cs.Yellow("Pre-release"))
 	}
 	if release.IsDraft {
-		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s created this %s", release.Author.Login, text.FuzzyAgo(time.Now(), release.CreatedAt))))
+		fmt.Fprintln(w, cs.Mutedf("%s created this %s", release.Author.Login, text.FuzzyAgo(time.Now(), release.CreatedAt)))
 	} else {
-		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, text.FuzzyAgo(time.Now(), *release.PublishedAt))))
+		fmt.Fprintln(w, cs.Mutedf("%s released this %s", release.Author.Login, text.FuzzyAgo(time.Now(), *release.PublishedAt)))
 	}
 
 	renderedDescription, err := markdown.Render(release.Body,
@@ -153,11 +153,15 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 	fmt.Fprintln(w, renderedDescription)
 
 	if len(release.Assets) > 0 {
-		fmt.Fprintf(w, "%s\n", iofmt.Bold("Assets"))
-		//nolint:staticcheck // SA1019: Showing NAME|SIZE headers adds nothing to table.
-		table := tableprinter.New(io, tableprinter.NoHeader)
+		fmt.Fprintln(w, cs.Bold("Assets"))
+		table := tableprinter.New(io, tableprinter.WithHeader("Name", "Digest", "Size"))
 		for _, a := range release.Assets {
 			table.AddField(a.Name)
+			if a.Digest == nil {
+				table.AddField("")
+			} else {
+				table.AddField(*a.Digest)
+			}
 			table.AddField(humanFileSize(a.Size))
 			table.EndRow()
 		}
@@ -168,7 +172,7 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 		fmt.Fprint(w, "\n")
 	}
 
-	fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("View on GitHub: %s", release.URL)))
+	fmt.Fprintln(w, cs.Mutedf("View on GitHub: %s", release.URL))
 	return nil
 }
 
@@ -177,6 +181,7 @@ func renderReleasePlain(w io.Writer, release *shared.Release) error {
 	fmt.Fprintf(w, "tag:\t%s\n", release.TagName)
 	fmt.Fprintf(w, "draft:\t%v\n", release.IsDraft)
 	fmt.Fprintf(w, "prerelease:\t%v\n", release.IsPrerelease)
+	fmt.Fprintf(w, "immutable:\t%v\n", release.IsImmutable)
 	fmt.Fprintf(w, "author:\t%s\n", release.Author.Login)
 	fmt.Fprintf(w, "created:\t%s\n", release.CreatedAt.Format(time.RFC3339))
 	if !release.IsDraft {

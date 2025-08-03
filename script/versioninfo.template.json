@@ -1,0 +1,43 @@
+{
+    "FixedFileInfo": {
+        "FileVersion": {
+            "Major": 0,
+            "Minor": 0,
+            "Patch": 0,
+            "Build": 0
+        },
+        "ProductVersion": {
+            "Major": 0,
+            "Minor": 0,
+            "Patch": 0,
+            "Build": 0
+        },
+        "FileFlagsMask": "3f",
+        "FileFlags ": "00",
+        "FileOS": "040004",
+        "FileType": "01",
+        "FileSubType": "00"
+    },
+    "StringFileInfo": {
+        "Comments": "",
+        "CompanyName": "GitHub",
+        "FileDescription": "GitHub CLI",
+        "FileVersion": "",
+        "InternalName": "gh",
+        "LegalCopyright": "",
+        "LegalTrademarks": "",
+        "OriginalFilename": "gh.exe",
+        "PrivateBuild": "",
+        "ProductName": "GitHub CLI",
+        "ProductVersion": "",
+        "SpecialBuild": ""
+    },
+    "VarFileInfo": {
+        "Translation": {
+            "LangID": "0409",
+            "CharsetID": "04B0"
+        }
+    },
+    "IconPath": "",
+    "ManifestPath": ""
+}

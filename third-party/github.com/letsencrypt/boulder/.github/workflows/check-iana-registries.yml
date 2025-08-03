@@ -1,0 +1,53 @@
+name: Check for IANA special-purpose address registry updates
+
+on:
+  schedule:
+    - cron: "20 16 * * *"
+  workflow_dispatch:
+
+jobs:
+  check-iana-registries:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout iana/data from main branch
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: iana/data
+
+      # If the branch already exists, this will fail, which will remind us about
+      # the outstanding PR.
+      - name: Create an iana-registries-gha branch
+        run: |
+            git checkout --track origin/main -b iana-registries-gha
+
+      - name: Retrieve the IANA special-purpose address registries
+        run: |
+            IANA_IPV4="https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry-1.csv"
+            IANA_IPV6="https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry-1.csv"
+
+            REPO_IPV4="iana/data/iana-ipv4-special-registry-1.csv"
+            REPO_IPV6="iana/data/iana-ipv6-special-registry-1.csv"
+
+            curl --fail --location --show-error --silent --output "${REPO_IPV4}" "${IANA_IPV4}"
+            curl --fail --location --show-error --silent --output "${REPO_IPV6}" "${IANA_IPV6}"
+
+      - name: Create a commit and pull request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell:
+          bash
+        # `git diff --exit-code` returns an error code if there are any changes.
+        run: |
+            if ! git diff --exit-code; then
+                git add iana/data/
+                git config user.name "Irwin the IANA Bot"
+                git commit \
+                    --message "Update IANA special-purpose address registries"
+                git push origin HEAD
+                gh pr create --fill
+            fi

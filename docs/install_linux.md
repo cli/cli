@@ -14,11 +14,12 @@ our release schedule.
 Install:
 
 ```bash
-(type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+(type -p wget >/dev/null || (sudo apt update && sudo apt install wget -y)) \
 	&& sudo mkdir -p -m 755 /etc/apt/keyrings \
-        && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-        && cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+	&& out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+	&& cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
 	&& sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+	&& sudo mkdir -p -m 755 /etc/apt/sources.list.d \
 	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
 	&& sudo apt update \
 	&& sudo apt install gh -y
@@ -163,6 +164,20 @@ Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
 pkg install gh
 ```
 
+### MidnightBSD
+
+MidnightBSD users can install from [mports](https://www.midnightbsd.org/documentation/mports/index.html)
+
+```bash
+cd /usr/mports/devel/gh/ && make install clean
+```
+
+Or via [mport(1)](http://man.midnightbsd.org/cgi-bin/man.cgi/mport):
+
+```bash
+mport install gh
+```
+
 ### NetBSD/pkgsrc
 
 NetBSD users and those on [platforms supported by pkgsrc](https://pkgsrc.org/#index4h1) can install the [gh package](https://pkgsrc.se/net/gh):
@@ -281,6 +296,15 @@ Manjaro Linux users can install from the [official extra repository](https://man
 ```bash
 pamac install github-cli
 ```
+
+### Solus Linux
+Solus Linux users can install using [eopkg package manager](https://help.getsol.us/docs/user/package-management/basics/):
+
+```bash
+sudo eopkg install github-cli
+```
+
+For more information about the `github-cli` package, see [the package definition](https://github.com/getsolus/packages/blob/main/packages/g/github-cli/package.yml) in the `getsolus/packages` repository.
 
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/extra/x86_64/github-cli

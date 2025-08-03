@@ -38,13 +38,13 @@ func PrintIssues(io *iostreams.IOStreams, now time.Time, prefix string, totalCou
 		}
 		table.AddField(text.RemoveExcessiveWhitespace(issue.Title))
 		table.AddField(issueLabelList(&issue, cs, isTTY))
-		table.AddTimeField(now, issue.UpdatedAt, cs.Gray)
+		table.AddTimeField(now, issue.UpdatedAt, cs.Muted)
 		table.EndRow()
 	}
 	_ = table.Render()
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
-		fmt.Fprintf(io.Out, cs.Gray("%sAnd %d more\n"), prefix, remaining)
+		fmt.Fprintf(io.Out, cs.Muted("%sAnd %d more\n"), prefix, remaining)
 	}
 }
 
@@ -56,7 +56,7 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme, colorize bool) 
 	labelNames := make([]string, 0, len(issue.Labels.Nodes))
 	for _, label := range issue.Labels.Nodes {
 		if colorize {
-			labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
+			labelNames = append(labelNames, cs.Label(label.Color, label.Name))
 		} else {
 			labelNames = append(labelNames, label.Name)
 		}

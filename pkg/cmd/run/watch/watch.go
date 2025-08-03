@@ -28,6 +28,7 @@ type WatchOptions struct {
 	RunID      string
 	Interval   int
 	ExitStatus bool
+	Compact    bool
 
 	Prompt bool
 
@@ -48,12 +49,18 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 		Long: heredoc.Docf(`
 			Watch a run until it completes, showing its progress.
 
+			By default, all steps are displayed. The %[1]s--compact%[1]s option can be used to only
+			show the relevant/failed steps.
+
 			This command does not support authenticating via fine grained PATs
 			as it is not currently possible to create a PAT with the %[1]schecks:read%[1]s permission.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Watch a run until it's done
 			$ gh run watch
+
+			# Watch a run in compact mode
+			$ gh run watch --compact
 
 			# Run some other command when the run is finished
 			$ gh run watch && notify-send 'run is done!'
@@ -78,6 +85,7 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 		},
 	}
 	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if run fails")
+	cmd.Flags().BoolVar(&opts.Compact, "compact", false, "Show only relevant/failed steps")
 	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", defaultInterval, "Refresh interval in seconds")
 
 	return cmd
@@ -252,8 +260,11 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 	}
 
 	fmt.Fprintln(out, cs.Bold("JOBS"))
-
-	fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
+	if opts.Compact {
+		fmt.Fprintln(out, shared.RenderJobsCompact(cs, jobs))
+	} else {
+		fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
+	}
 
 	if missingAnnotationsPermissions {
 		fmt.Fprintln(out)

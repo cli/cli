@@ -137,7 +137,12 @@ func printLabels(io *iostreams.IOStreams, labels []label) error {
 	table := tableprinter.New(io, tableprinter.WithHeader("NAME", "DESCRIPTION", "COLOR"))
 
 	for _, label := range labels {
-		table.AddField(label.Name, tableprinter.WithColor(cs.ColorFromRGB(label.Color)))
+		// Colorize the label using tableprinter's WithColor function for it to handle non-TTY situations
+		labelColor := tableprinter.WithColor(func(s string) string {
+			return cs.Label(label.Color, s)
+		})
+
+		table.AddField(label.Name, labelColor)
 		table.AddField(label.Description)
 		table.AddField("#" + label.Color)
 

@@ -1251,9 +1251,10 @@ func TestManager_repo_not_found(t *testing.T) {
 }
 
 func TestManager_Create(t *testing.T) {
-	chdirTemp(t)
+	tempDir := t.TempDir()
+	t.Chdir(tempDir)
 	err := os.MkdirAll("gh-test", 0755)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ios, _, stdout, stderr := iostreams.Test()
 
@@ -1279,9 +1280,10 @@ func TestManager_Create(t *testing.T) {
 }
 
 func TestManager_Create_go_binary(t *testing.T) {
-	chdirTemp(t)
+	tempDir := t.TempDir()
+	t.Chdir(tempDir)
 	err := os.MkdirAll("gh-test", 0755)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
@@ -1329,9 +1331,10 @@ func TestManager_Create_go_binary(t *testing.T) {
 }
 
 func TestManager_Create_other_binary(t *testing.T) {
-	chdirTemp(t)
+	tempDir := t.TempDir()
+	t.Chdir(tempDir)
 	err := os.MkdirAll("gh-test", 0755)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ios, _, stdout, stderr := iostreams.Test()
 
@@ -1390,18 +1393,6 @@ func Test_ensurePrefixed(t *testing.T) {
 			require.Equal(t, tt.expected, normalizeExtension(tt.input))
 		})
 	}
-}
-
-// chdirTemp changes the current working directory to a temporary directory for the duration of the test.
-func chdirTemp(t *testing.T) {
-	oldWd, _ := os.Getwd()
-	tempDir := t.TempDir()
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(oldWd)
-	})
 }
 
 func fileNames(files []os.DirEntry) []string {

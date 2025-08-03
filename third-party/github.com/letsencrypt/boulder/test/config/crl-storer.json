@@ -1,0 +1,42 @@
+{
+	"crlStorer": {
+		"debugAddr": ":9667",
+		"tls": {
+			"caCertfile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/crl-storer.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/crl-storer.boulder/key.pem"
+		},
+		"grpc": {
+			"address": ":9309",
+			"maxConnectionAge": "30s",
+			"services": {
+				"storer.CRLStorer": {
+					"clientNames": [
+						"crl-updater.boulder"
+					]
+				},
+				"grpc.health.v1.Health": {
+					"clientNames": [
+						"health-checker.boulder"
+					]
+				}
+			}
+		},
+		"issuerCerts": [
+			"test/certs/webpki/int-rsa-a.cert.pem",
+			"test/certs/webpki/int-rsa-b.cert.pem",
+			"test/certs/webpki/int-rsa-c.cert.pem",
+			"test/certs/webpki/int-ecdsa-a.cert.pem",
+			"test/certs/webpki/int-ecdsa-b.cert.pem",
+			"test/certs/webpki/int-ecdsa-c.cert.pem"
+		],
+		"s3Endpoint": "http://localhost:4501",
+		"s3Bucket": "lets-encrypt-crls",
+		"awsConfigFile": "test/config/crl-storer.ini",
+		"awsCredsFile": "test/secrets/aws_creds.ini"
+	},
+	"syslog": {
+		"stdoutlevel": 6,
+		"sysloglevel": 6
+	}
+}

@@ -11,6 +11,8 @@ before:
       {{ if eq .Runtime.Goos "windows" }}echo{{ end }} make manpages GH_VERSION={{.Version}}
     - >- # On linux the completions are used in nfpms below, but on macos they are used outside in the deployment build.
       {{ if eq .Runtime.Goos "windows" }}echo{{ end }} make completions
+    - >- # We need to create the `.syso` files (per architecture) to embed Windows resources (version info)
+      {{ if ne .Runtime.Goos "windows" }}echo{{ end }} pwsh '.\script\gen-winres.ps1' '{{ .Version }} ({{time "2006-01-02"}})' '{{ .Version }}' '.\script\versioninfo.template.json' '.\cmd\gh\'
 builds:
   - id: macos #build:macos
     goos: [darwin]

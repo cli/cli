@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package email;
+option go_package = "github.com/letsencrypt/boulder/email/proto";
+
+import "google/protobuf/empty.proto";
+
+service Exporter {
+  rpc SendContacts (SendContactsRequest) returns (google.protobuf.Empty);
+}
+
+message SendContactsRequest {
+  repeated string emails = 1;
+}

@@ -447,7 +447,7 @@ jobs:
 				"ref": "trunk",
 			},
 			httpStubs: stubs,
-			wantOut:   "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=workflow.yml\n",
+			wantOut:   "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=\"workflow.yml\"\n",
 		},
 		{
 			name: "nontty good JSON",
@@ -494,7 +494,7 @@ jobs:
 				"ref": "good-branch",
 			},
 			httpStubs: stubs,
-			wantOut:   "✓ Created workflow_dispatch event for workflow.yml at good-branch\n\nTo see runs for this workflow, try: gh run list --workflow=workflow.yml\n",
+			wantOut:   "✓ Created workflow_dispatch event for workflow.yml at good-branch\n\nTo see runs for this workflow, try: gh run list --workflow=\"workflow.yml\"\n",
 		},
 		{
 			// TODO this test is somewhat silly; it's more of a placeholder in case I decide to handle the API error more elegantly
@@ -634,7 +634,7 @@ jobs:
 				"inputs": map[string]interface{}{},
 				"ref":    "trunk",
 			},
-			wantOut: "✓ Created workflow_dispatch event for minimal.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=minimal.yml\n",
+			wantOut: "✓ Created workflow_dispatch event for minimal.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=\"minimal.yml\"\n",
 		},
 		{
 			name: "prompt",
@@ -682,7 +682,7 @@ jobs:
 				},
 				"ref": "trunk",
 			},
-			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=workflow.yml\n",
+			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=\"workflow.yml\"\n",
 		},
 		{
 			name: "prompt, workflow choice input",
@@ -731,7 +731,7 @@ jobs:
 				},
 				"ref": "trunk",
 			},
-			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=workflow.yml\n",
+			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=\"workflow.yml\"\n",
 		},
 		{
 			name: "prompt, workflow choice missing input",

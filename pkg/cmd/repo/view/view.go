@@ -181,7 +181,7 @@ func viewRun(opts *ViewOptions) error {
 
 	var readmeContent string
 	if readme == nil {
-		readmeContent = cs.Gray("This repository does not have a README")
+		readmeContent = cs.Muted("This repository does not have a README")
 	} else if isMarkdownFile(readme.Filename) {
 		var err error
 		readmeContent, err = markdown.Render(readme.Content,
@@ -197,7 +197,7 @@ func viewRun(opts *ViewOptions) error {
 
 	description := repo.Description
 	if description == "" {
-		description = cs.Gray("No description provided")
+		description = cs.Muted("No description provided")
 	}
 
 	repoData := struct {
@@ -209,7 +209,7 @@ func viewRun(opts *ViewOptions) error {
 		FullName:    cs.Bold(fullName),
 		Description: description,
 		Readme:      readmeContent,
-		View:        cs.Gray(fmt.Sprintf("View this repository on GitHub: %s", openURL)),
+		View:        cs.Mutedf("View this repository on GitHub: %s", openURL),
 	}
 
 	return tmpl.Execute(stdout, repoData)

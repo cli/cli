@@ -23,15 +23,14 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdExtension(t *testing.T) {
 	tempDir := t.TempDir()
-	oldWd, _ := os.Getwd()
 	localExtensionTempDir := filepath.Join(tempDir, "gh-hello")
-	assert.NoError(t, os.MkdirAll(localExtensionTempDir, 0755))
-	assert.NoError(t, os.Chdir(localExtensionTempDir))
-	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+	require.NoError(t, os.MkdirAll(localExtensionTempDir, 0755))
+	t.Chdir(localExtensionTempDir)
 
 	tests := []struct {
 		name          string

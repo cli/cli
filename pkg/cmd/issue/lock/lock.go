@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -99,20 +100,33 @@ type LockOptions struct {
 
 	ParentCmd   string
 	Reason      string
-	SelectorArg string
+	IssueNumber int
 	Interactive bool
 }
 
-func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, args []string) {
+func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, args []string) error {
 	opts.IO = f.IOStreams
 	opts.HttpClient = f.HttpClient
 	opts.Config = f.Config
 
-	// support `-R, --repo` override
-	opts.BaseRepo = f.BaseRepo
+	issueNumber, baseRepo, err := shared.ParseIssueFromArg(args[0])
+	if err != nil {
+		return err
+	}
 
-	opts.SelectorArg = args[0]
+	// If the args provided the base repo then use that directly.
+	if baseRepo, present := baseRepo.Value(); present {
+		opts.BaseRepo = func() (ghrepo.Interface, error) {
+			return baseRepo, nil
+		}
+	} else {
+		// support `-R, --repo` override
+		opts.BaseRepo = f.BaseRepo
+	}
 
+	opts.IssueNumber = issueNumber
+
+	return nil
 }
 
 func NewCmdLock(f *cmdutil.Factory, parentName string, runF func(string, *LockOptions) error) *cobra.Command {
@@ -129,7 +143,9 @@ func NewCmdLock(f *cmdutil.Factory, parentName string, runF func(string, *LockOp
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.setCommonOptions(f, args)
+			if err := opts.setCommonOptions(f, args); err != nil {
+				return err
+			}
 
 			reasonProvided := cmd.Flags().Changed("reason")
 			if reasonProvided {
@@ -172,7 +188,9 @@ func NewCmdUnlock(f *cmdutil.Factory, parentName string, runF func(string, *Lock
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.setCommonOptions(f, args)
+			if err := opts.setCommonOptions(f, args); err != nil {
+				return err
+			}
 
 			if runF != nil {
 				return runF(Unlock, opts)
@@ -214,13 +232,18 @@ func lockRun(state string, opts *LockOptions) error {
 		return err
 	}
 
-	issuePr, baseRepo, err := issueShared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, fields())
-
-	parent := alias[opts.ParentCmd]
-
+	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
-	} else if parent.Typename != issuePr.Typename {
+	}
+
+	issuePr, err := issueShared.FindIssueOrPR(httpClient, baseRepo, opts.IssueNumber, fields())
+	if err != nil {
+		return err
+	}
+
+	parent := alias[opts.ParentCmd]
+	if parent.Typename != issuePr.Typename {
 		currentType := alias[parent.Typename]
 		correctType := alias[issuePr.Typename]
 

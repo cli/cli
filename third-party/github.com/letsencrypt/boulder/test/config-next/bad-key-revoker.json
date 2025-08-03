@@ -1,0 +1,35 @@
+{
+	"BadKeyRevoker": {
+		"db": {
+			"dbConnectFile": "test/secrets/badkeyrevoker_dburl",
+			"maxOpenConns": 10
+		},
+		"tls": {
+			"caCertFile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/bad-key-revoker.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/bad-key-revoker.boulder/key.pem"
+		},
+		"raService": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "ra",
+				"domain": "service.consul"
+			},
+			"hostOverride": "ra.boulder",
+			"noWaitForReady": true,
+			"timeout": "15s"
+		},
+		"maximumRevocations": 15,
+		"findCertificatesBatchSize": 10,
+		"interval": "50ms",
+		"backoffIntervalMax": "2s"
+	},
+	"syslog": {
+		"stdoutlevel": 4,
+		"sysloglevel": -1
+	},
+	"openTelemetry": {
+		"endpoint": "bjaeger:4317",
+		"sampleratio": 1
+	}
+}

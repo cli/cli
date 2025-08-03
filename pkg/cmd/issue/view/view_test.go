@@ -10,9 +10,11 @@ import (
 
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/issue/argparsetest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -29,6 +31,7 @@ func TestJSONFields(t *testing.T) {
 		"body",
 		"closed",
 		"comments",
+		"closedByPullRequestsReferences",
 		"createdAt",
 		"closedAt",
 		"id",
@@ -45,6 +48,11 @@ func TestJSONFields(t *testing.T) {
 		"isPinned",
 		"stateReason",
 	})
+}
+
+func TestNewCmdView(t *testing.T) {
+	// Test shared parsing of issue number / URL.
+	argparsetest.TestArgParsing(t, NewCmdView)
 }
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
@@ -116,7 +124,7 @@ func TestIssueView_web(t *testing.T) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
 		WebMode:     true,
-		SelectorArg: "123",
+		IssueNumber: 123,
 	})
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
@@ -273,7 +281,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},
-				SelectorArg: "123",
+				IssueNumber: 123,
 			}
 
 			err := viewRun(&opts)
@@ -489,4 +497,67 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
 	}
+}
+
+// TODO projectsV1Deprecation
+// Remove this test.
+func TestProjectsV1Deprecation(t *testing.T) {
+	t.Run("when projects v1 is supported, is included in query", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Register(
+			httpmock.GraphQL(`projectCards`),
+			// Simulate a GraphQL error to early exit the test.
+			httpmock.StatusStringResponse(500, ""),
+		)
+
+		_, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		// Ignore the error because we have no way to really stub it without
+		// fully stubbing a GQL error structure in the request body.
+		_ = viewRun(&ViewOptions{
+			IO: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			BaseRepo: func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			},
+
+			Detector:    &fd.EnabledDetectorMock{},
+			IssueNumber: 123,
+		})
+
+		// Verify that our request contained projectCards
+		reg.Verify(t)
+	})
+
+	t.Run("when projects v1 is not supported, is not included in query", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Exclude(t, httpmock.GraphQL(`projectCards`))
+
+		_, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		// Ignore the error because we're not really interested in it.
+		_ = viewRun(&ViewOptions{
+			IO: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			BaseRepo: func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			},
+
+			Detector:    &fd.DisabledDetectorMock{},
+			IssueNumber: 123,
+		})
+
+		// Verify that our request contained projectCards
+		reg.Verify(t)
+	})
 }

@@ -104,6 +104,72 @@ var SuccessfulJob Job = Job{
 	},
 }
 
+// Note that this run *has* steps, but in the ZIP archive the step logs are not
+// included.
+var SuccessfulJobWithoutStepLogs Job = Job{
+	ID:          11,
+	Status:      Completed,
+	Conclusion:  Success,
+	Name:        "cool job with no step logs",
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+	URL:         "https://github.com/jobs/11",
+	RunID:       3,
+	Steps: []Step{
+		{
+			Name:       "fob the barz",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     1,
+		},
+		{
+			Name:       "barz the fob",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     2,
+		},
+	},
+}
+
+// Note that this run *has* steps, but in the ZIP archive the step logs are not
+// included.
+var LegacySuccessfulJobWithoutStepLogs Job = Job{
+	ID:          12,
+	Status:      Completed,
+	Conclusion:  Success,
+	Name:        "legacy cool job with no step logs",
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+	URL:         "https://github.com/jobs/12",
+	RunID:       3,
+	Steps: []Step{
+		{
+			Name:       "fob the barz",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     1,
+		},
+		{
+			Name:       "barz the fob",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     2,
+		},
+	},
+}
+
+var SkippedJob Job = Job{
+	ID:          13,
+	Status:      Completed,
+	Conclusion:  Skipped,
+	Name:        "cool job",
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime,
+	URL:         "https://github.com/jobs/13",
+	RunID:       3,
+	Steps:       []Step{},
+}
+
 var FailedJob Job = Job{
 	ID:          20,
 	Status:      Completed,
@@ -112,6 +178,60 @@ var FailedJob Job = Job{
 	StartedAt:   TestRunStartTime,
 	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 	URL:         "https://github.com/jobs/20",
+	RunID:       1234,
+	Steps: []Step{
+		{
+			Name:       "barf the quux",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     1,
+		},
+		{
+			Name:       "quux the barf",
+			Status:     Completed,
+			Conclusion: Failure,
+			Number:     2,
+		},
+	},
+}
+
+// Note that this run *has* steps, but in the ZIP archive the step logs are not
+// included.
+var FailedJobWithoutStepLogs Job = Job{
+	ID:          21,
+	Status:      Completed,
+	Conclusion:  Failure,
+	Name:        "sad job with no step logs",
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+	URL:         "https://github.com/jobs/21",
+	RunID:       1234,
+	Steps: []Step{
+		{
+			Name:       "barf the quux",
+			Status:     Completed,
+			Conclusion: Success,
+			Number:     1,
+		},
+		{
+			Name:       "quux the barf",
+			Status:     Completed,
+			Conclusion: Failure,
+			Number:     2,
+		},
+	},
+}
+
+// Note that this run *has* steps, but in the ZIP archive the step logs are not
+// included.
+var LegacyFailedJobWithoutStepLogs Job = Job{
+	ID:          22,
+	Status:      Completed,
+	Conclusion:  Failure,
+	Name:        "legacy sad job with no step logs",
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
+	URL:         "https://github.com/jobs/22",
 	RunID:       1234,
 	Steps: []Step{
 		{

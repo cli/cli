@@ -1,0 +1,52 @@
+{
+	"rva": {
+		"userAgent": "remoteva-c",
+		"dnsTries": 3,
+		"dnsStaticResolvers": [
+			"10.77.77.77:8343",
+			"10.77.77.77:8443"
+		],
+		"dnsTimeout": "1s",
+		"issuerDomain": "happy-hacker-ca.invalid",
+		"tls": {
+			"caCertfile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/rva.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/rva.boulder/key.pem"
+		},
+		"skipGRPCClientCertVerification": true,
+		"grpc": {
+			"maxConnectionAge": "30s",
+			"services": {
+				"va.VA": {
+					"clientNames": [
+						"va.boulder"
+					]
+				},
+				"va.CAA": {
+					"clientNames": [
+						"va.boulder"
+					]
+				},
+				"grpc.health.v1.Health": {
+					"clientNames": [
+						"health-checker.boulder"
+					]
+				}
+			}
+		},
+		"accountURIPrefixes": [
+			"http://boulder.service.consul:4000/acme/reg/",
+			"http://boulder.service.consul:4001/acme/acct/"
+		],
+		"perspective": "cubist",
+		"rir": "ARIN"
+	},
+	"syslog": {
+		"stdoutlevel": 4,
+		"sysloglevel": -1
+	},
+	"openTelemetry": {
+		"endpoint": "bjaeger:4317",
+		"sampleratio": 1
+	}
+}

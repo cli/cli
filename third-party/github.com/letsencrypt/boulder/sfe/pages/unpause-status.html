@@ -1,0 +1,47 @@
+{{ template "header" }}
+
+<div class="section">
+
+    {{ if and .Successful (gt .Count 0) (lt .Count .Limit) }}
+    <h1>Successfully unpaused all {{ .Count }} identifier(s)</h1>
+    <p>
+        To obtain a new certificate, re-attempt issuance with your ACME client.
+        Future repeated validation failures with no successes will result in
+        identifiers being paused again.
+    </p>
+
+    {{ else if and .Successful (eq .Count .Limit)}}
+    <h1>Some identifiers were unpaused</h1>
+    <p>
+        We can only unpause a limited number of identifiers for each request ({{
+        .Limit }}). There are potentially more identifiers paused for your
+        account.
+    </p>
+    <p>
+        To attempt to unpause more identifiers, visit the unpause URL from
+        your logs again and click the "Please Unpause My Account" button.
+    </p>
+
+    {{ else if and .Successful (eq .Count 0) }}
+    <h1>Account already unpaused</h1>
+    <p>
+        There were no identifiers to unpause for your account. If you face
+        continued difficulties, please visit our <a
+        href="https://community.letsencrypt.org">community support forum</a>
+        for troubleshooting and advice.
+    </p>
+
+    {{ else }}
+    <h1>An error occurred while unpausing your account</h1>
+    <p>
+        Please try again later. If you face continued difficulties, please visit
+        our <a href="https://community.letsencrypt.org">community support
+        forum</a>
+        for troubleshooting and advice.
+    </p>
+
+    {{ end }}
+
+</div>
+
+{{ template "footer" }}

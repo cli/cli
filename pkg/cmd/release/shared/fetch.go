@@ -30,6 +30,7 @@ var ReleaseFields = []string{
 	"id",
 	"isDraft",
 	"isPrerelease",
+	"isImmutable",
 	"name",
 	"publishedAt",
 	"tagName",
@@ -48,6 +49,7 @@ type Release struct {
 	Body         string     `json:"body"`
 	IsDraft      bool       `json:"draft"`
 	IsPrerelease bool       `json:"prerelease"`
+	IsImmutable  bool       `json:"immutable"`
 	CreatedAt    time.Time  `json:"created_at"`
 	PublishedAt  *time.Time `json:"published_at"`
 
@@ -71,6 +73,7 @@ type ReleaseAsset struct {
 	Name   string
 	Label  string
 	Size   int64
+	Digest *string
 	State  string
 	APIURL string `json:"url"`
 
@@ -107,6 +110,7 @@ func (rel *Release) ExportData(fields []string) map[string]interface{} {
 					"name":          a.Name,
 					"label":         a.Label,
 					"size":          a.Size,
+					"digest":        a.Digest,
 					"state":         a.State,
 					"createdAt":     a.CreatedAt,
 					"updatedAt":     a.UpdatedAt,
@@ -129,6 +133,41 @@ var ErrReleaseNotFound = errors.New("release not found")
 type fetchResult struct {
 	release *Release
 	error   error
+}
+
+func FetchRefSHA(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, tagName string) (string, error) {
+	path := fmt.Sprintf("repos/%s/%s/git/refs/tags/%s", repo.RepoOwner(), repo.RepoName(), tagName)
+	req, err := http.NewRequestWithContext(ctx, "GET", ghinstance.RESTPrefix(repo.RepoHost())+path, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		// ErrRefNotFound
+		return "", ErrReleaseNotFound
+	}
+
+	if resp.StatusCode > 299 {
+		return "", api.HandleHTTPError(resp)
+	}
+
+	var ref struct {
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&ref); err != nil {
+		return "", err
+	}
+
+	return ref.Object.SHA, nil
 }
 
 // FetchRelease finds a published repository release by its tagName, or a draft release by its pending tag name.
@@ -211,7 +250,7 @@ func fetchReleasePath(ctx context.Context, httpClient *http.Client, host string,
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
+	if resp.StatusCode == http.StatusNotFound {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, ErrReleaseNotFound
 	} else if resp.StatusCode > 299 {
@@ -245,4 +284,12 @@ func StubFetchRelease(t *testing.T, reg *httpmock.Registry, owner, repoName, tag
 				}),
 		)
 	}
+}
+
+func StubFetchRefSHA(t *testing.T, reg *httpmock.Registry, owner, repoName, tagName, sha string) {
+	path := fmt.Sprintf("repos/%s/%s/git/refs/tags/%s", owner, repoName, tagName)
+	reg.Register(
+		httpmock.REST("GET", path),
+		httpmock.StringResponse(fmt.Sprintf(`{"object": {"sha": "%s"}}`, sha)),
+	)
 }

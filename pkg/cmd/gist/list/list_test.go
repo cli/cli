@@ -654,50 +654,57 @@ func Test_highlightMatch(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
-		color bool
+		cs    *iostreams.ColorScheme
 		want  string
 	}{
 		{
 			name:  "single match",
 			input: "Octo",
+			cs:    &iostreams.ColorScheme{},
 			want:  "Octo",
 		},
 		{
 			name:  "single match (color)",
 			input: "Octo",
-			color: true,
-			want:  "\x1b[0;30;43mOcto\x1b[0m",
+			cs: &iostreams.ColorScheme{
+				Enabled: true,
+			},
+			want: "\x1b[0;30;43mOcto\x1b[0m",
 		},
 		{
 			name:  "single match with extra",
 			input: "Hello, Octocat!",
+			cs:    &iostreams.ColorScheme{},
 			want:  "Hello, Octocat!",
 		},
 		{
 			name:  "single match with extra (color)",
 			input: "Hello, Octocat!",
-			color: true,
-			want:  "\x1b[0;34mHello, \x1b[0m\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat!\x1b[0m",
+			cs: &iostreams.ColorScheme{
+				Enabled: true,
+			},
+			want: "\x1b[0;34mHello, \x1b[0m\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat!\x1b[0m",
 		},
 		{
 			name:  "multiple matches",
 			input: "Octocat/octo",
+			cs:    &iostreams.ColorScheme{},
 			want:  "Octocat/octo",
 		},
 		{
 			name:  "multiple matches (color)",
 			input: "Octocat/octo",
-			color: true,
-			want:  "\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat/\x1b[0m\x1b[0;30;43mocto\x1b[0m",
+			cs: &iostreams.ColorScheme{
+				Enabled: true,
+			},
+			want: "\x1b[0;30;43mOcto\x1b[0m\x1b[0;34mcat/\x1b[0m\x1b[0;30;43mocto\x1b[0m",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs := iostreams.NewColorScheme(tt.color, false, false, false, iostreams.NoTheme)
-
 			matched := false
-			got, err := highlightMatch(tt.input, regex, &matched, cs.Blue, cs.Highlight)
+			got, err := highlightMatch(tt.input, regex, &matched, tt.cs.Blue, tt.cs.Highlight)
 			assert.NoError(t, err)
 			assert.True(t, matched)
 			assert.Equal(t, tt.want, got)

@@ -227,7 +227,7 @@ func TestRenameRun(t *testing.T) {
 				newRepoSelector: "org/new-name",
 			},
 			wantErr: true,
-			errMsg:  "New repository name cannot contain '/' character - to transfer a repository to a new owner, you must follow additional steps on <github.com>. For more information on transferring repository ownership, see <https://docs.github.com/en/repositories/creating-and-managing-repositories/transferring-a-repository>.",
+			errMsg:  "New repository name cannot contain '/' character - to transfer a repository to a new owner, see <https://docs.github.com/en/repositories/creating-and-managing-repositories/transferring-a-repository>.",
 		},
 	}
 

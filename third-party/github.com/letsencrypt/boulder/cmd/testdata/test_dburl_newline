@@ -1,0 +1,2 @@
+test@tcp(testhost:3306)/testDB?readTimeout=800ms&writeTimeout=800ms
+

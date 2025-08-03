@@ -1,0 +1,143 @@
+datadir = "/var/lib/proxysql";
+errorlog = "/test/proxysql/proxysql.log";
+admin_variables =
+{
+	# https://proxysql.com/documentation/global-variables/admin-variables Note
+	# that while admin variables are documented with an 'admin-' prefix, they
+	# are specified in the configuration with the prefix stripped.
+	mysql_ifaces = "0.0.0.0:6032";
+	# admin:admin is only used for local connections. For remote connections,
+	# use radmin:radmin
+	admin_credentials = "admin:admin;radmin:radmin";
+	web_enabled = "true";
+	# Web UI is disabled by default.
+	web_port = 6080;
+	# These are the credentials used for the web interface.
+	stats_credentials = "stats:stats";
+	debug = True;
+};
+mysql_variables =
+{
+	threads = 4;
+	max_connections = 10240;
+	have_compress = True;
+	poll_timeout = 2000;
+	interfaces = "0.0.0.0:6033";
+	stacksize = 1048576;
+	max_allowed_packet = 16777216;
+	# Allow up to 20 seconds to find a server, to limit how many failures
+	# Boulder sees when we do a primary swap
+	connect_timeout_server = 20000;
+	connect_timeout_server_max = 20000;
+	monitor_username = "proxysql";
+	monitor_password = "";
+	monitor_history = 600000;
+	monitor_connect_interval = 60000;
+	monitor_ping_interval = 10000;
+	monitor_read_only_interval = 1000;
+	monitor_read_only_timeout = 500;
+	monitor_writer_is_also_reader = False;
+	commands_stats = True;
+	sessions_sort = True;
+	connect_retries_on_failure = 10;
+	# Keep 90% of configured connections open.
+	free_connections_pct = 90;
+	connection_warming = True;
+	# If mysql_query_rules are marked log=1, they will be logged here. If unset,
+	# no queries are logged.
+	# eventslog_filename="/test/proxysql/events.log"
+	eventslog_filesize = 104857600;
+	eventslog_default_log = 1;
+	# The audit logs, if unset, are not logged. If set, every connection gets
+	# logged. Given Boulder's connection strategy, this can be noisy.
+	# auditlog_filename="/test/proxysql/audit.log"
+	auditlog_filesize = 104857600;
+};
+mysql_servers =
+(
+	{
+		address = "boulder-mysql";
+		port = 3306;
+		hostgroup = 0;
+		max_connections = 100;
+		max_latency_ms = 200;
+	}
+);
+mysql_users =
+(
+	{
+		username = "root";
+	},
+	{
+		username = "policy";
+	},
+	{
+		username = "sa";
+	},
+	{
+		username = "sa_ro";
+	},
+	{
+		username = "ocsp_resp";
+	},
+	{
+		username = "revoker";
+	},
+	{
+		username = "importer";
+	},
+	{
+		username = "mailer";
+	},
+	{
+		username = "cert_checker";
+	},
+	{
+		username = "test_setup";
+	},
+	{
+		username = "badkeyrevoker";
+	},
+	{
+		username = "incidents_sa";
+	}
+);
+mysql_query_rules =
+(
+	{
+		rule_id = 1;
+		active = 1;
+		match_digest = ".";
+		log = 0;
+		apply = 0;
+	},
+	{
+		rule_id = 10;
+		username = "sa";
+		timeout = 4900;
+	},
+	{
+		rule_id = 11;
+		username = "sa_ro";
+		timeout = 4900;
+	},
+	{
+		rule_id = 16;
+		username = "badkeyrevoker";
+		timeout = 3600000;
+	},
+	{
+		rule_id = 17;
+		username = "mailer";
+		timeout = 1800000;
+	},
+	{
+		rule_id = 18;
+		username = "ocsp_resp";
+		timeout = 4900;
+	}
+);
+scheduler =
+(
+
+);

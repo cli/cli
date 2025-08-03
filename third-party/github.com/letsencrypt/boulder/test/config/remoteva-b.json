@@ -1,0 +1,55 @@
+{
+	"rva": {
+		"userAgent": "remoteva-b",
+		"debugAddr": ":8212",
+		"dnsTries": 3,
+		"dnsProvider": {
+			"dnsAuthority": "consul.service.consul",
+			"srvLookup": {
+				"service": "doh",
+				"domain": "service.consul"
+			}
+		},
+		"dnsTimeout": "1s",
+		"issuerDomain": "happy-hacker-ca.invalid",
+		"tls": {
+			"caCertfile": "test/certs/ipki/minica.pem",
+			"certFile": "test/certs/ipki/rva.boulder/cert.pem",
+			"keyFile": "test/certs/ipki/rva.boulder/key.pem"
+		},
+		"grpc": {
+			"maxConnectionAge": "30s",
+			"address": ":9998",
+			"services": {
+				"va.VA": {
+					"clientNames": [
+						"va.boulder"
+					]
+				},
+				"va.CAA": {
+					"clientNames": [
+						"va.boulder"
+					]
+				},
+				"grpc.health.v1.Health": {
+					"clientNames": [
+						"health-checker.boulder"
+					]
+				}
+			}
+		},
+		"features": {
+			"DOH": true
+		},
+		"accountURIPrefixes": [
+			"http://boulder.service.consul:4000/acme/reg/",
+			"http://boulder.service.consul:4001/acme/acct/"
+		],
+		"perspective": "surrealist",
+		"rir": "RIPE"
+	},
+	"syslog": {
+		"stdoutlevel": 4,
+		"sysloglevel": 4
+	}
+}

@@ -4,16 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +27,7 @@ type CreateOptions struct {
 	BaseRepo         func() (ghrepo.Interface, error)
 	Browser          browser.Browser
 	Prompter         prShared.Prompt
+	Detector         fd.Detector
 	TitledEditSurvey func(string, string) (string, string, error)
 
 	RootDirOverride string
@@ -46,11 +50,12 @@ type CreateOptions struct {
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
-		IO:               f.IOStreams,
-		HttpClient:       f.HttpClient,
-		Config:           f.Config,
-		Browser:          f.Browser,
-		Prompter:         f.Prompter,
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+		Config:     f.Config,
+		Browser:    f.Browser,
+		Prompter:   f.Prompter,
+
 		TitledEditSurvey: prShared.TitledEditSurvey(&prShared.UserEditor{Config: f.Config, IO: f.IOStreams}),
 	}
 
@@ -64,6 +69,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Adding an issue to projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
+
+			The %[1]s--assignee%[1]s flag supports the following special values:
+			- %[1]s@me%[1]s: assign yourself
+			- %[1]s@copilot%[1]s: assign Copilot (not supported on GitHub Enterprise Server)
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh issue create --title "I found a bug" --body "Nothing works"
@@ -71,6 +80,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --label bug --label "help wanted"
 			$ gh issue create --assignee monalisa,hubot
 			$ gh issue create --assignee "@me"
+			$ gh issue create --assignee "@copilot"
 			$ gh issue create --project "Roadmap"
 			$ gh issue create --template "Bug Report"
 		`),
@@ -146,6 +156,19 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
+	// TODO projectsV1Deprecation
+	// Remove this section as we should no longer need to detect
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+
+	projectsV1Support := opts.Detector.ProjectsV1()
+	issueFeatures, err := opts.Detector.IssueFeatures()
+	if err != nil {
+		return err
+	}
+
 	isTerminal := opts.IO.IsStdoutTTY()
 
 	var milestones []string
@@ -153,20 +176,30 @@ func createRun(opts *CreateOptions) (err error) {
 		milestones = []string{opts.Milestone}
 	}
 
+	// Replace special values in assignees
+	// For web mode, @copilot should be replaced by name; otherwise, login.
+	assigneeSet := set.NewStringSet()
 	meReplacer := prShared.NewMeReplacer(apiClient, baseRepo.RepoHost())
+	copilotReplacer := prShared.NewCopilotReplacer(!opts.WebMode)
 	assignees, err := meReplacer.ReplaceSlice(opts.Assignees)
 	if err != nil {
 		return err
 	}
 
+	if issueFeatures.ActorIsAssignable {
+		assignees = copilotReplacer.ReplaceSlice(assignees)
+	}
+	assigneeSet.AddValues(assignees)
+
 	tb := prShared.IssueMetadataState{
-		Type:       prShared.IssueMetadata,
-		Assignees:  assignees,
-		Labels:     opts.Labels,
-		Projects:   opts.Projects,
-		Milestones: milestones,
-		Title:      opts.Title,
-		Body:       opts.Body,
+		Type:           prShared.IssueMetadata,
+		ActorAssignees: issueFeatures.ActorIsAssignable,
+		Assignees:      assigneeSet.ToSlice(),
+		Labels:         opts.Labels,
+		ProjectTitles:  opts.Projects,
+		Milestones:     milestones,
+		Title:          opts.Title,
+		Body:           opts.Body,
 	}
 
 	if opts.RecoverFile != "" {
@@ -182,7 +215,7 @@ func createRun(opts *CreateOptions) (err error) {
 	if opts.WebMode {
 		var openURL string
 		if opts.Title != "" || opts.Body != "" || tb.HasMetadata() {
-			openURL, err = generatePreviewURL(apiClient, baseRepo, tb)
+			openURL, err = generatePreviewURL(apiClient, baseRepo, tb, projectsV1Support)
 			if err != nil {
 				return
 			}
@@ -260,7 +293,7 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
-		openURL, err = generatePreviewURL(apiClient, baseRepo, tb)
+		openURL, err = generatePreviewURL(apiClient, baseRepo, tb, projectsV1Support)
 		if err != nil {
 			return
 		}
@@ -279,7 +312,7 @@ func createRun(opts *CreateOptions) (err error) {
 				Repo:      baseRepo,
 				State:     &tb,
 			}
-			err = prShared.MetadataSurvey(opts.Prompter, opts.IO, baseRepo, fetcher, &tb)
+			err = prShared.MetadataSurvey(opts.Prompter, opts.IO, baseRepo, fetcher, &tb, projectsV1Support)
 			if err != nil {
 				return
 			}
@@ -335,7 +368,7 @@ func createRun(opts *CreateOptions) (err error) {
 			params["issueTemplate"] = templateNameForSubmit
 		}
 
-		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb)
+		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb, projectsV1Support)
 		if err != nil {
 			return
 		}
@@ -354,7 +387,7 @@ func createRun(opts *CreateOptions) (err error) {
 	return
 }
 
-func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb prShared.IssueMetadataState) (string, error) {
+func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb prShared.IssueMetadataState, projectsV1Support gh.ProjectsV1Support) (string, error) {
 	openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
-	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb)
+	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb, projectsV1Support)
 }

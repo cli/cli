@@ -95,7 +95,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			# Start interactive setup
 			$ gh auth login
 
-			# Authenticate against <github.com> by reading the token from a file
+			# Authenticate against github.com by reading the token from a file
 			$ gh auth login --with-token < mytoken.txt
 
 			# Authenticate with specific host

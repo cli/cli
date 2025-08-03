@@ -1,0 +1,27 @@
+{
+    "plan": {
+        "actions": [
+            "newAccount",
+            "newOrder",
+            "fulfillOrder",
+            "finalizeOrder",
+            "revokeCertificate"
+        ],
+        "rate": 1,
+        "runtime": "10s",
+        "rateDelta": "5/1m"
+    },
+    "directoryURL": "http://boulder.service.consul:4001/directory",
+    "domainBase": "com",
+    "challengeStrategy": "random",
+    "httpOneAddrs": [":80"],
+    "tlsAlpnOneAddrs": [":443"],
+    "dnsAddrs": [":8053", ":8054"],
+    "fakeDNS": "10.77.77.77",
+    "regKeySize": 2048,
+    "regEmail": "loadtesting@letsencrypt.org",
+    "maxRegs": 20,
+    "maxNamesPerCert": 20,
+    "dontSaveState": true,
+    "revokeChance": 0.5
+}

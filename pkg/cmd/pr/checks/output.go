@@ -30,7 +30,7 @@ func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 		markColor = cs.Yellow
 	case "skipping", "cancel":
 		mark = "-"
-		markColor = cs.Gray
+		markColor = cs.Muted
 	}
 
 	if io.IsStdoutTTY() {

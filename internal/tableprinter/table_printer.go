@@ -73,7 +73,7 @@ func NewWithWriter(w io.Writer, isTTY bool, maxWidth int, cs *iostreams.ColorSch
 		// was not padded. In tests cs.Enabled() is false which allows us to avoid having to fix up
 		// numerous tests that verify header padding.
 		var paddingFunc func(int, string) string
-		if cs.Enabled() {
+		if cs.Enabled {
 			paddingFunc = text.PadRight
 		}
 

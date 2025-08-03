@@ -124,7 +124,7 @@ func TestPRReady(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("123", &api.PullRequest{
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
 		ID:      "THE-ID",
 		Number:  123,
 		State:   "OPEN",
@@ -149,7 +149,7 @@ func TestPRReady_alreadyReady(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("123", &api.PullRequest{
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
 		ID:      "THE-ID",
 		Number:  123,
 		State:   "OPEN",
@@ -166,7 +166,7 @@ func TestPRReadyUndo(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("123", &api.PullRequest{
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
 		ID:      "THE-ID",
 		Number:  123,
 		State:   "OPEN",
@@ -191,7 +191,7 @@ func TestPRReadyUndo_alreadyDraft(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("123", &api.PullRequest{
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
 		ID:      "THE-ID",
 		Number:  123,
 		State:   "OPEN",
@@ -208,7 +208,7 @@ func TestPRReady_closed(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("123", &api.PullRequest{
+	shared.StubFinderForRunCommandStyleTests(t, "123", &api.PullRequest{
 		ID:      "THE-ID",
 		Number:  123,
 		State:   "CLOSED",
