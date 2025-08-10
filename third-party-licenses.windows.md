@@ -178,7 +178,7 @@ Some packages may only be included on certain architectures or operating systems
 - [github.com/spf13/afero](https://pkg.go.dev/github.com/spf13/afero) ([Apache-2.0](https://github.com/spf13/afero/blob/v1.14.0/LICENSE.txt))
 - [github.com/spf13/cast](https://pkg.go.dev/github.com/spf13/cast) ([MIT](https://github.com/spf13/cast/blob/v1.9.2/LICENSE))
 - [github.com/spf13/cobra](https://pkg.go.dev/github.com/spf13/cobra) ([Apache-2.0](https://github.com/spf13/cobra/blob/v1.9.1/LICENSE.txt))
-- [github.com/spf13/pflag](https://pkg.go.dev/github.com/spf13/pflag) ([BSD-3-Clause](https://github.com/spf13/pflag/blob/v1.0.6/LICENSE))
+- [github.com/spf13/pflag](https://pkg.go.dev/github.com/spf13/pflag) ([BSD-3-Clause](https://github.com/spf13/pflag/blob/v1.0.7/LICENSE))
 - [github.com/spf13/viper](https://pkg.go.dev/github.com/spf13/viper) ([MIT](https://github.com/spf13/viper/blob/v1.20.1/LICENSE))
 - [github.com/spiffe/go-spiffe/v2](https://pkg.go.dev/github.com/spiffe/go-spiffe/v2) ([Apache-2.0](https://github.com/spiffe/go-spiffe/blob/v2.5.0/v2/LICENSE))
 - [github.com/stretchr/objx](https://pkg.go.dev/github.com/stretchr/objx) ([MIT](https://github.com/stretchr/objx/blob/v0.5.2/LICENSE))
