@@ -164,7 +164,8 @@ func FetchRefSHA(ctx context.Context, httpClient *http.Client, repo ghrepo.Inter
 		} `json:"object"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&ref); err != nil {
-		return "", err
+		// release not found
+		return "", ErrReleaseNotFound
 	}
 
 	return ref.Object.SHA, nil
