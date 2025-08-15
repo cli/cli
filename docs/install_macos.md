@@ -68,6 +68,16 @@ To upgrade:
 flox upgrade toplevel
 ```
 
+### gah
+
+[gah](https://github.com/marverix/gah) is an GitHub Releases app installer, that DOES NOT REQUIRE SUDO! It is a simple bash script that downloads the latest release of an app from GitHub and installs it in `~/.local/bin`.
+
+To install:
+
+```bash
+gah install gh
+```
+
 ### MacPorts
 
 [MacPorts](https://www.macports.org/) is an open-source community initiative to design an easy-to-use system for compiling, installing, and upgrading either command-line, X11 or Aqua based open-source software on the Mac operating system.

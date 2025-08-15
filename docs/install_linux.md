@@ -272,6 +272,16 @@ ego sync
 emerge -u github-cli
 ```
 
+### gah
+
+[gah](https://github.com/marverix/gah) is an GitHub Releases app installer, that DOES NOT REQUIRE SUDO! It is a simple bash script that downloads the latest release of an app from GitHub and installs it in `~/.local/bin`.
+
+To install:
+
+```bash
+gah install gh
+```
+
 ### Gentoo
 
 The [GitHub CLI portage](https://packages.gentoo.org/packages/dev-util/github-cli) is supported by the Gentoo community with updates powered by [Gentoo portage](https://gitweb.gentoo.org/repo/gentoo.git/tree/dev-util/github-cli).
