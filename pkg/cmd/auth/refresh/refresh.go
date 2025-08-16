@@ -33,18 +33,19 @@ type RefreshOptions struct {
 	Scopes       []string
 	RemoveScopes []string
 	ResetScopes  bool
-	AuthFlow     func(*iostreams.IOStreams, string, []string, bool) (token, username, error)
+	AuthFlow     func(*iostreams.IOStreams, string, []string, bool, bool) (token, username, error)
 
 	Interactive     bool
 	InsecureStorage bool
+	Clipboard       bool
 }
 
 func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.Command {
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(io *iostreams.IOStreams, hostname string, scopes []string, interactive bool) (token, username, error) {
-			t, u, err := authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser)
+		AuthFlow: func(io *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool) (token, username, error) {
+			t, u, err := authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser, clipboard)
 			return token(t), username(u), err
 		},
 		HttpClient: &http.Client{},
@@ -89,6 +90,9 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 
 			# Open a browser to re-authenticate with the default minimum scopes
 			$ gh auth refresh --reset-scopes
+
+			# Automatically copy one-time OAuth code
+			$ gh auth login --clipboard
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Interactive = opts.IO.CanPrompt()
@@ -109,6 +113,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
 	cmd.Flags().StringSliceVarP(&opts.RemoveScopes, "remove-scopes", "r", nil, "Authentication scopes to remove from gh")
 	cmd.Flags().BoolVar(&opts.ResetScopes, "reset-scopes", false, "Reset authentication scopes to the default minimum set of scopes")
+	cmd.Flags().BoolVarP(&opts.Clipboard, "clipboard", "c", false, "Copy one-time OAuth device code to clipboard")
 	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
 	var secureStorage bool
 	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store")
@@ -199,7 +204,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	authedToken, authedUser, err := opts.AuthFlow(opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive)
+	authedToken, authedUser, err := opts.AuthFlow(opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, opts.Clipboard)
 	if err != nil {
 		return err
 	}

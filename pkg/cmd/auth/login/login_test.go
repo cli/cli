@@ -130,6 +130,26 @@ func Test_NewCmdLogin(t *testing.T) {
 			},
 		},
 		{
+			name:     "tty web and clipboard",
+			stdinTTY: true,
+			cli:      "--web --clipboard",
+			wants: LoginOptions{
+				Hostname:    "github.com",
+				Web:         true,
+				Interactive: true,
+				Clipboard:   true,
+			},
+		},
+		{
+			name: "nontty web and clipboard",
+			cli:  "--web --clipboard",
+			wants: LoginOptions{
+				Hostname:  "github.com",
+				Web:       true,
+				Clipboard: true,
+			},
+		},
+		{
 			name:     "tty web",
 			stdinTTY: true,
 			cli:      "--web",
@@ -273,6 +293,7 @@ func Test_NewCmdLogin(t *testing.T) {
 			assert.Equal(t, tt.wants.Web, gotOpts.Web)
 			assert.Equal(t, tt.wants.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.wants.Scopes, gotOpts.Scopes)
+			assert.Equal(t, tt.wants.Clipboard, gotOpts.Clipboard)
 		})
 	}
 }

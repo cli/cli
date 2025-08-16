@@ -40,6 +40,7 @@ type LoginOptions struct {
 	CredentialFlow   *GitCredentialFlow
 	SecureStorage    bool
 	SkipSSHKeyPrompt bool
+	CopyToClipboard  bool
 
 	sshContext ssh.Context
 }
@@ -148,7 +149,7 @@ func Login(opts *LoginOptions) error {
 
 	if authMode == 0 {
 		var err error
-		authToken, username, err = authflow.AuthFlow(hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser)
+		authToken, username, err = authflow.AuthFlow(hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
