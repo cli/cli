@@ -58,9 +58,12 @@ func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 		DisplayCode: func(code, verificationURL string) error {
 			if isCopyToClipboard {
 				if err := clipboard.WriteAll(code); err != nil {
-					return err
+					fmt.Fprintf(w, "%s Failed to copy one-time code to clipboard\n", cs.Red("!"))
+					fmt.Fprintf(w, "  %s\n", err)
+					fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
+				} else {
+					fmt.Fprintf(w, "%s One-time code (%s) copied to clipboard\n", cs.Yellow("!"), cs.Bold(code))
 				}
-				fmt.Fprintf(w, "%s One-time code (%s) copied to clipboard\n", cs.Yellow("!"), cs.Bold(code))
 			} else {
 				fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
 			}
