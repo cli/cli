@@ -53,6 +53,17 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				opts.RepoArg = args[0]
 			}
 
+			// Ignore --yes when no argument provided to prevent accidental deletion
+			if len(args) == 0 && opts.Confirmed {
+				if opts.IO.CanPrompt() {
+					// Interactive mode: ignore --yes flag and force confirmation
+					opts.Confirmed = false
+				} else {
+					// Non-interactive mode: return error
+					return cmdutil.FlagErrorf("--yes flag is ignored when no repository argument is provided. Please specify a repository to delete or run interactively")
+				}
+			}
+
 			if !opts.IO.CanPrompt() && !opts.Confirmed {
 				return cmdutil.FlagErrorf("--yes required when not running interactively")
 			}
