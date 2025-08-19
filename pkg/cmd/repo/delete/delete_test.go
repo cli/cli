@@ -59,7 +59,7 @@ func TestNewCmdDelete(t *testing.T) {
 			input:   "--yes",
 			output:  DeleteOptions{},
 			wantErr: true,
-			errMsg:  "--yes flag is ignored when no repository argument is provided. Please specify a repository to delete or run interactively",
+			errMsg:  "cannot non-interactively delete current repository. Please specify a repository or run interactively",
 		},
 		{
 			name:   "confirm flag also ignored when no argument tty",
