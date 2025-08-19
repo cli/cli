@@ -61,6 +61,12 @@ func TestNewCmdDelete(t *testing.T) {
 			wantErr: true,
 			errMsg:  "--yes flag is ignored when no repository argument is provided. Please specify a repository to delete or run interactively",
 		},
+		{
+			name:   "confirm flag also ignored when no argument tty",
+			tty:    true,
+			input:  "--confirm",
+			output: DeleteOptions{Confirmed: false}, // --confirm should also be ignored
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
