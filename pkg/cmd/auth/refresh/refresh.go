@@ -92,7 +92,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			$ gh auth refresh --reset-scopes
 
 			# Automatically copy one-time OAuth code
-			$ gh auth login --clipboard
+			$ gh auth refresh --clipboard
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Interactive = opts.IO.CanPrompt()
