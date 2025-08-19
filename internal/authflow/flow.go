@@ -60,7 +60,7 @@ func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 				if err := clipboard.WriteAll(code); err != nil {
 					return err
 				}
-				fmt.Fprintf(w, "One-time code copied (%s) to clipboard\n", cs.Bold(code))
+				fmt.Fprintf(w, "%s One-time code (%s) copied to clipboard\n", cs.Yellow("!"), cs.Bold(code))
 			} else {
 				fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
 			}
