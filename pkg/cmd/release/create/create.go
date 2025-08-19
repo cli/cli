@@ -94,9 +94,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a release from an annotated git tag, first create one locally with
 			git, push the tag to GitHub, then run this command.
-			Use %[1]s--notes-from-tag%[1]s to automatically generate the release notes
+			Use %[1]s--notes-from-tag%[1]s to get the release notes
 			from the annotated git tag.
+			It will use annotation of git tag if it is annotated, associated with tag commit's message otherwise.
 
+			Use %[1]s--generate-notes%[1]s to automatically generate notes using GitHub Release Notes API.
 			When using automatically generated release notes, a release title will also be automatically
 			generated unless a title was explicitly passed. Additional release notes can be prepended to
 			automatically generated notes by using the %[1]s--notes%[1]s flag.
@@ -116,13 +118,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			# Non-interactively create a release
 			$ gh release create v1.2.3 --notes "bugfix release"
 
-			# Use automatically generated release notes
+			# Use automatically generated via GitHub Release Notes API release notes
 			$ gh release create v1.2.3 --generate-notes
 
 			# Use release notes from a file
 			$ gh release create v1.2.3 -F release-notes.md
 
-			# Use annotated tag notes
+			# Use tag annotation or associated commit message as notes
 			$ gh release create v1.2.3 --notes-from-tag
 
 			# Don't mark the release as latest
@@ -198,11 +200,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
-	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
+	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release via GitHub Release Notes API")
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
 	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default [automatic based on date and version]). --latest=false to explicitly NOT set as latest")
 	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
-	cmd.Flags().BoolVarP(&opts.NotesFromTag, "notes-from-tag", "", false, "Automatically generate notes from annotated tag")
+	cmd.Flags().BoolVarP(&opts.NotesFromTag, "notes-from-tag", "", false, "Fetch notes from the tag annotation or message of commit associated with tag")
 	cmd.Flags().BoolVar(&opts.FailOnNoCommits, "fail-on-no-commits", false, "Fail if there are no commits since the last release (no impact on the first release)")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
