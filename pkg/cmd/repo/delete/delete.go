@@ -43,6 +43,10 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			Delete a GitHub repository.
 
 			With no argument, deletes the current repository. Otherwise, deletes the specified repository.
+			
+			For safety, when no repository argument is provided, the %[1]s--yes%[1]s and %[1]s--confirm%[1]s flags are ignored 
+			and you will be prompted for confirmation. To delete the current repository non-interactively, 
+			specify it explicitly (e.g., %[1]sgh repo delete owner/repo --yes%[1]s).
 
 			Deletion requires authorization with the %[1]sdelete_repo%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s delete_repo%[1]s
