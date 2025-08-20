@@ -44,7 +44,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 
 			With no argument, deletes the current repository. Otherwise, deletes the specified repository.
 			
-			For safety, when no repository argument is provided, the %[1]s--yes%[1]s and %[1]s--confirm%[1]s flags are ignored 
+			For safety, when no repository argument is provided, the %[1]s--yes%[1]s flag is ignored 
 			and you will be prompted for confirmation. To delete the current repository non-interactively, 
 			specify it explicitly (e.g., %[1]sgh repo delete owner/repo --yes%[1]s).
 
