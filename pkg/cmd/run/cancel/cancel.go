@@ -57,7 +57,7 @@ func NewCmdCancel(f *cmdutil.Factory, runF func(*CancelOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Force cancel a workflow run")
+	cmd.Flags().BoolVar(&opts.Force, "force", false, "Force cancel a workflow run")
 
 	return cmd
 }
