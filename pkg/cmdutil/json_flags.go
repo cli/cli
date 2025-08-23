@@ -269,9 +269,8 @@ type exportable interface {
 	ExportData([]string) map[string]interface{}
 }
 
-var exportableType = reflect.TypeOf((*exportable)(nil)).Elem()
-var sliceOfEmptyInterface []interface{}
-var emptyInterfaceType = reflect.TypeOf(sliceOfEmptyInterface).Elem()
+var exportableType = reflect.TypeFor[exportable]()
+var emptyInterfaceType = reflect.TypeFor[interface{}]()
 
 // Basic function that can be used with structs that need to implement
 // the exportable interface. It has numerous limitations so verify
