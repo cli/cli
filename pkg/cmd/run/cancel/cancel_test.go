@@ -41,6 +41,15 @@ func TestNewCmdCancel(t *testing.T) {
 			cli:  "1234",
 			wants: CancelOptions{
 				RunID: "1234",
+				Force: false,
+			},
+		},
+		{
+			name: "with arg and force flag",
+			cli:  "1234 --force",
+			wants: CancelOptions{
+				RunID: "1234",
+				Force: true,
 			},
 		},
 	}
@@ -78,6 +87,7 @@ func TestNewCmdCancel(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.RunID, gotOpts.RunID)
+			assert.Equal(t, tt.wants.Force, gotOpts.Force)
 		})
 	}
 }
@@ -212,6 +222,47 @@ func TestRunCancel(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "invalid run-id \"12\\n34\"",
+		},
+		{
+			name: "force cancel run",
+			opts: &CancelOptions{
+				RunID: "1234",
+				Force: true,
+			},
+			wantErr: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(inProgressRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/force-cancel"),
+					httpmock.StatusStringResponse(202, "{}"))
+			},
+			wantOut: "✓ Request to force cancel workflow 1234 submitted.\n",
+		},
+		{
+			name: "force and completed",
+			opts: &CancelOptions{
+				RunID: "4567",
+				Force: true,
+			},
+			wantErr: true,
+			errMsg:  "Cannot cancel a workflow run that is completed",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/4567"),
+					httpmock.JSONResponse(completedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/4567/force-cancel"),
+					httpmock.StatusStringResponse(409, ""),
+				)
+			},
 		},
 	}
 

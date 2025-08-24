@@ -23,6 +23,7 @@ type CancelOptions struct {
 	Prompt bool
 
 	RunID string
+	Force bool
 }
 
 func NewCmdCancel(f *cmdutil.Factory, runF func(*CancelOptions) error) *cobra.Command {
@@ -55,6 +56,8 @@ func NewCmdCancel(f *cmdutil.Factory, runF func(*CancelOptions) error) *cobra.Co
 			return runCancel(opts)
 		},
 	}
+
+	cmd.Flags().BoolVar(&opts.Force, "force", false, "Force cancel a workflow run")
 
 	return cmd
 }
@@ -115,7 +118,9 @@ func runCancel(opts *CancelOptions) error {
 		}
 	}
 
-	err = cancelWorkflowRun(client, repo, fmt.Sprintf("%d", run.ID))
+	force := opts.Force
+
+	err = cancelWorkflowRun(client, repo, fmt.Sprintf("%d", run.ID), force)
 	if err != nil {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) {
@@ -127,13 +132,22 @@ func runCancel(opts *CancelOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s Request to cancel workflow %s submitted.\n", cs.SuccessIcon(), runID)
+	if force {
+		fmt.Fprintf(opts.IO.Out, "%s Request to force cancel workflow %s submitted.\n", cs.SuccessIcon(), runID)
+	} else {
+		fmt.Fprintf(opts.IO.Out, "%s Request to cancel workflow %s submitted.\n", cs.SuccessIcon(), runID)
+	}
 
 	return nil
 }
 
-func cancelWorkflowRun(client *api.Client, repo ghrepo.Interface, runID string) error {
-	path := fmt.Sprintf("repos/%s/actions/runs/%s/cancel", ghrepo.FullName(repo), runID)
+func cancelWorkflowRun(client *api.Client, repo ghrepo.Interface, runID string, force bool) error {
+	var path string
+	if force {
+		path = fmt.Sprintf("repos/%s/actions/runs/%s/force-cancel", ghrepo.FullName(repo), runID)
+	} else {
+		path = fmt.Sprintf("repos/%s/actions/runs/%s/cancel", ghrepo.FullName(repo), runID)
+	}
 
 	err := client.REST(repo.RepoHost(), "POST", path, nil, nil)
 	if err != nil {
