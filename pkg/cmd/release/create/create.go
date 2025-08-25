@@ -94,9 +94,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a release from an annotated git tag, first create one locally with
 			git, push the tag to GitHub, then run this command.
-			Use %[1]s--notes-from-tag%[1]s to get the release notes
-			from the annotated git tag.
-			It will use annotation of git tag if it is annotated, associated with tag commit's message otherwise.
+			Use %[1]s--notes-from-tag%[1]s to get the release notes from the annotated git tag.
+			If the tag is not annotated, the commit message will be used instead.
 
 			Use %[1]s--generate-notes%[1]s to automatically generate notes using GitHub Release Notes API.
 			When using automatically generated release notes, a release title will also be automatically
