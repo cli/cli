@@ -96,7 +96,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			# Start interactive setup
 			$ gh auth login
 
-			# Login with your browser and copy OAuth code
+			# Open a browser to authenticate and copy one-time OAuth code to clipboard
 			$ gh auth login --web --clipboard
 
 			# Authenticate against github.com by reading the token from a file

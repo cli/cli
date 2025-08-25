@@ -91,7 +91,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			# Open a browser to re-authenticate with the default minimum scopes
 			$ gh auth refresh --reset-scopes
 
-			# Automatically copy one-time OAuth code
+			# Open a browser to re-authenticate and copy one-time OAuth code to clipboard
 			$ gh auth refresh --clipboard
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
