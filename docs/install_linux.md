@@ -14,12 +14,12 @@ These packages are supported by the GitHub CLI maintainers with updates powered 
 
 To install:
 
-With curl:
+With `curl`:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cli/cli/trunk/script/install-gh-apt.sh | bash
 ```
 
-With wget:
+With `wget`:
 ```bash
 wget -qO- https://raw.githubusercontent.com/cli/cli/trunk/script/install-gh-apt.sh | bash
 ```
