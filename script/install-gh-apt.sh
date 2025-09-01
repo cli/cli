@@ -12,7 +12,7 @@ sudo mkdir -p -m 755 /etc/apt/keyrings
 
 # Download key
 out=$(mktemp)
-wget -nv -O "$out" https://cli.github.com/packages/githubcli-archive-keyring.gpg
+wget --https-only --secure-protocol=TLSv1_2 --fail -nv -O "$out" https://cli.github.com/packages/githubcli-archive-keyring.gpg
 sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg < "$out" > /dev/null
 sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
 
