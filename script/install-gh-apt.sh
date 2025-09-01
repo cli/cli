@@ -14,6 +14,7 @@ sudo mkdir -p -m 755 /etc/apt/keyrings
 out=$(mktemp)
 wget --https-only --secure-protocol=TLSv1_2 --fail -nv -O "$out" https://cli.github.com/packages/githubcli-archive-keyring.gpg
 sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg < "$out" > /dev/null
+rm -f "$out"
 sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
 
 # Add sources.list entry
