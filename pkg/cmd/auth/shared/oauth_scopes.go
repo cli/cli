@@ -40,7 +40,7 @@ func GetScopes(httpClient httpClient, hostname, authToken string) (string, error
 		return "", err
 	}
 
-	req.Header.Set("Authorization", "token "+authToken)
+	req.Header.Set("Authorization", "Bearer "+authToken)
 
 	res, err := httpClient.Do(req)
 	if err != nil {

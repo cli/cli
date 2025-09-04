@@ -52,7 +52,7 @@ func Test_HasMinimumScopes(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, gotAuthorization, "token ATOKEN")
+			assert.Equal(t, gotAuthorization, "Bearer ATOKEN")
 		})
 	}
 }

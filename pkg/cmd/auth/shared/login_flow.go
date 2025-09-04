@@ -262,7 +262,7 @@ func GetCurrentLogin(httpClient httpClient, hostname, authToken string) (string,
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Authorization", "token "+authToken)
+	req.Header.Set("Authorization", "Bearer "+authToken)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		return "", err

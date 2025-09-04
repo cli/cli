@@ -100,7 +100,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 			if !redirectHostnameChange {
 				hostname := ghauth.NormalizeHostname(getHost(req))
 				if token, _ := cfg.ActiveToken(hostname); token != "" {
-					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
+					req.Header.Set(authorization, fmt.Sprintf("Bearer %s", token))
 				}
 			}
 		}

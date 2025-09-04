@@ -38,7 +38,7 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "github.com",
 			wantHeader: map[string]string{
-				"authorization": "token MYTOKEN",
+				"authorization": "Bearer MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
 				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
@@ -52,7 +52,7 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "example.com",
 			wantHeader: map[string]string{
-				"authorization": "token GHETOKEN",
+				"authorization": "Bearer GHETOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
 				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
@@ -97,7 +97,7 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "github.com",
 			wantHeader: map[string]string{
-				"authorization": "token MYTOKEN",
+				"authorization": "Bearer MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
 				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
@@ -107,7 +107,7 @@ func TestNewHTTPClient(t *testing.T) {
 				> GET / HTTP/1.1
 				> Host: github.com
 				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
-				> Authorization: token ████████████████████
+				> Authorization: Bearer ████████████████████
 				> Content-Type: application/json; charset=utf-8
 				> Time-Zone: <timezone>
 				> User-Agent: GitHub CLI v1.2.3
@@ -186,7 +186,7 @@ func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
 	res, err := client.Do(req)
 	require.NoError(t, err)
 
-	assert.Equal(t, "token REDIRECT-TOKEN", redirectRequest.Header.Get(authorization))
+	assert.Equal(t, "Bearer REDIRECT-TOKEN", redirectRequest.Header.Get(authorization))
 	assert.Equal(t, "", request.Header.Get(authorization))
 	assert.Equal(t, 204, res.StatusCode)
 }
