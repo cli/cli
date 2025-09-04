@@ -59,9 +59,34 @@ func TestNewCmdDelete(t *testing.T) {
 			wantsErr: "--succeed-on-no-caches must be used in conjunction with --all",
 		},
 		{
+			name:     "key argument and delete all flag",
+			cli:      "cache-key --all",
+			wantsErr: "specify only one of cache id, cache key, or --all",
+		},
+		{
 			name:     "id argument and delete all flag",
 			cli:      "1 --all",
 			wantsErr: "specify only one of cache id, cache key, or --all",
+		},
+		{
+			name:  "key argument with ref",
+			cli:   "cache-key --ref refs/heads/main",
+			wants: DeleteOptions{Identifier: "cache-key", Ref: "refs/heads/main"},
+		},
+		{
+			name:     "ref flag without cache key",
+			cli:      "--ref refs/heads/main",
+			wantsErr: "must provide a cache key",
+		},
+		{
+			name:     "ref flag with cache id",
+			cli:      "123 --ref refs/heads/main",
+			wantsErr: "--ref cannot be used with cache ID",
+		},
+		{
+			name:     "ref flag with all flag",
+			cli:      "--all --ref refs/heads/main",
+			wantsErr: "--ref cannot be used with --all",
 		},
 	}
 
@@ -89,6 +114,7 @@ func TestNewCmdDelete(t *testing.T) {
 			assert.Equal(t, tt.wants.DeleteAll, gotOpts.DeleteAll)
 			assert.Equal(t, tt.wants.SucceedOnNoCaches, gotOpts.SucceedOnNoCaches)
 			assert.Equal(t, tt.wants.Identifier, gotOpts.Identifier)
+			assert.Equal(t, tt.wants.Ref, gotOpts.Ref)
 		})
 	}
 }
@@ -209,7 +235,8 @@ func TestDeleteRun(t *testing.T) {
 					httpmock.QueryMatcher("DELETE", "repos/OWNER/REPO/actions/caches", url.Values{
 						"key": []string{"a weird＿cache+key"},
 					}),
-					httpmock.StatusStringResponse(204, ""),
+					// The response is a JSON object but we don't need it here.
+					httpmock.StatusStringResponse(200, "{}"),
 				)
 			},
 			tty:        true,
@@ -262,6 +289,54 @@ func TestDeleteRun(t *testing.T) {
 			tty:        false,
 			wantErr:    false,
 			wantStdout: "",
+		},
+		{
+			name: "deletes cache with ref tty",
+			opts: DeleteOptions{Identifier: "cache-key", Ref: "refs/heads/main"},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("DELETE", "repos/OWNER/REPO/actions/caches", url.Values{
+						"key": []string{"cache-key"},
+						"ref": []string{"refs/heads/main"},
+					}),
+					// The response is a JSON object but we don't need it here.
+					httpmock.StatusStringResponse(200, "{}"),
+				)
+			},
+			tty:        true,
+			wantStdout: "✓ Deleted 1 cache from OWNER/REPO\n",
+		},
+		{
+			name: "deletes cache with ref non-tty",
+			opts: DeleteOptions{Identifier: "cache-key", Ref: "refs/heads/main"},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("DELETE", "repos/OWNER/REPO/actions/caches", url.Values{
+						"key": []string{"cache-key"},
+						"ref": []string{"refs/heads/main"},
+					}),
+					// The response is a JSON object but we don't need it here.
+					httpmock.StatusStringResponse(200, "{}"),
+				)
+			},
+			tty:        false,
+			wantStdout: "",
+		},
+		{
+			// As of now, the API returns HTTP 404 for invalid or non-existent refs.
+			name: "cache key exists but ref is invalid/not-found",
+			opts: DeleteOptions{Identifier: "existing-cache-key", Ref: "invalid-ref"},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("DELETE", "repos/OWNER/REPO/actions/caches", url.Values{
+						"key": []string{"existing-cache-key"},
+						"ref": []string{"invalid-ref"},
+					}),
+					httpmock.StatusStringResponse(404, ""),
+				)
+			},
+			wantErr:    true,
+			wantErrMsg: "X Could not find a cache matching existing-cache-key (with ref invalid-ref) in OWNER/REPO",
 		},
 	}
 

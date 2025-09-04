@@ -25,6 +25,7 @@ type DeleteOptions struct {
 	DeleteAll         bool
 	SucceedOnNoCaches bool
 	Identifier        string
+	Ref               string
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
@@ -51,6 +52,12 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			# Delete a cache by id in a specific repo
 			$ gh cache delete 1234 --repo cli/cli
 
+			# Delete a cache by key and branch ref
+			$ gh cache delete cache-key --ref refs/heads/feature-branch
+
+			# Delete a cache by key and PR ref
+			$ gh cache delete cache-key --ref refs/pull/<PR-number>/merge
+
 			# Delete all caches (exit code 1 on no caches)
 			$ gh cache delete --all
 
@@ -69,12 +76,29 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"--ref cannot be used with --all",
+				opts.DeleteAll, opts.Ref != "",
+			); err != nil {
+				return err
+			}
+
 			if !opts.DeleteAll && opts.SucceedOnNoCaches {
 				return cmdutil.FlagErrorf("--succeed-on-no-caches must be used in conjunction with --all")
 			}
 
+			if opts.Ref != "" && len(args) == 0 {
+				return cmdutil.FlagErrorf("must provide a cache key")
+			}
+
 			if !opts.DeleteAll && len(args) == 0 {
 				return cmdutil.FlagErrorf("must provide either cache id, cache key, or use --all")
+			}
+
+			if len(args) > 0 && opts.Ref != "" {
+				if _, ok := parseCacheID(args[0]); ok {
+					return cmdutil.FlagErrorf("--ref cannot be used with cache ID")
+				}
 			}
 
 			if len(args) == 1 {
@@ -90,6 +114,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().BoolVarP(&opts.DeleteAll, "all", "a", false, "Delete all caches")
+	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "Delete by cache key and ref, formatted as refs/heads/<branch name> or refs/pull/<number>/merge")
 	cmd.Flags().BoolVar(&opts.SucceedOnNoCaches, "succeed-on-no-caches", false, "Return exit code 0 if no caches found. Must be used in conjunction with `--all`")
 
 	return cmd
@@ -142,11 +167,27 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 	base := fmt.Sprintf("repos/%s/actions/caches", repoName)
 
 	for _, cache := range toDelete {
+		// TODO(babakks): We use two different endpoints here which have different
+		// response schemas:
+		//
+		//   1. /repos/OWNER/REPO/actions/caches/ID (for deleting by cache ID)
+		//      - returns HTTP 204 (NO CONTENT) on success
+		//   2. /repos/OWNER/REPO/actions/caches?key=KEY[&ref=REF] (for deleting by cache key, and optionally a ref)
+		//      - returns HTTP 200 on success including information about the deleted caches
+		//
+		// So, if/when we decided to use the data in the response body we need
+		// to be careful with parsing. Probably want to split these API calls
+		// into separate functions.
+
 		path := ""
-		if id, err := strconv.Atoi(cache); err == nil {
+		if id, ok := parseCacheID(cache); ok {
 			path = fmt.Sprintf("%s/%d", base, id)
 		} else {
 			path = fmt.Sprintf("%s?key=%s", base, url.QueryEscape(cache))
+
+			if opts.Ref != "" {
+				path += fmt.Sprintf("&ref=%s", url.QueryEscape(opts.Ref))
+			}
 		}
 
 		err := client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
@@ -154,7 +195,11 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 			var httpErr api.HTTPError
 			if errors.As(err, &httpErr) {
 				if httpErr.StatusCode == http.StatusNotFound {
-					err = fmt.Errorf("%s Could not find a cache matching %s in %s", cs.FailureIcon(), cache, repoName)
+					if opts.Ref == "" {
+						err = fmt.Errorf("%s Could not find a cache matching %s in %s", cs.FailureIcon(), cache, repoName)
+					} else {
+						err = fmt.Errorf("%s Could not find a cache matching %s (with ref %s) in %s", cs.FailureIcon(), cache, opts.Ref, repoName)
+					}
 				} else {
 					err = fmt.Errorf("%s Failed to delete cache: %w", cs.FailureIcon(), err)
 				}
@@ -171,4 +216,9 @@ func deleteCaches(opts *DeleteOptions, client *api.Client, repo ghrepo.Interface
 	}
 
 	return nil
+}
+
+func parseCacheID(arg string) (int, bool) {
+	id, err := strconv.Atoi(arg)
+	return id, err == nil
 }

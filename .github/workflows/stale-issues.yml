@@ -10,7 +10,7 @@ jobs:
   mark-stale-issues:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@v10
         with:
           start-date: "2025-07-10T00:00:00Z"  # Skip for issues created before this date
           days-before-issue-stale: 30

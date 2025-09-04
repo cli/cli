@@ -46,7 +46,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
       - name: Install GoReleaser
@@ -81,7 +81,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
       - name: Configure macOS signing
@@ -153,7 +153,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
       - name: Install GoReleaser

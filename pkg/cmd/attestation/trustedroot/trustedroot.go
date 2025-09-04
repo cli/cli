@@ -37,8 +37,6 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 		Args:  cobra.ExactArgs(0),
 		Short: "Output trusted_root.jsonl contents, likely for offline verification",
 		Long: heredoc.Docf(`
-			### NOTE: This feature is currently in public preview, and subject to change.
-
 			Output contents for a trusted_root.jsonl file, likely for offline verification.
 
 			When using %[1]sgh attestation verify%[1]s, if your machine is on the internet,
