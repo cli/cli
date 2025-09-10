@@ -60,23 +60,54 @@ func UpdateProjectV2Items(client *Client, repo ghrepo.Interface, addProjectItems
 	return client.GraphQL(repo.RepoHost(), query, variables, nil)
 }
 
+// Common types for ProjectV2 items
+type projectV2ItemStatus struct {
+	StatusFragment struct {
+		OptionID string `json:"optionId"`
+		Name     string `json:"name"`
+	} `graphql:"... on ProjectV2ItemFieldSingleSelectValue"`
+}
+
+type projectV2Item struct {
+	ID      string `json:"id"`
+	Project *struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}
+	Status projectV2ItemStatus `graphql:"status:fieldValueByName(name: \"Status\")"`
+}
+
+// convertProjectV2Items converts GraphQL projectV2Item nodes to ProjectV2Item structs
+func convertProjectV2Items(nodes []*projectV2Item) []*ProjectV2Item {
+	var items []*ProjectV2Item
+	for _, node := range nodes {
+		// Skip nil nodes - these can occur when the GraphQL API returns items
+		// that the user doesn't have permission to view (returns null instead)
+		if node == nil {
+			continue
+		}
+		item := &ProjectV2Item{
+			ID: node.ID,
+			Status: ProjectV2ItemStatus{
+				OptionID: node.Status.StatusFragment.OptionID,
+				Name:     node.Status.StatusFragment.Name,
+			},
+		}
+		// Project field can be nil when the item exists but isn't associated with
+		// a project, or when the user lacks permission to view project details
+		if node.Project != nil {
+			item.Project = ProjectV2ItemProject{
+				ID:    node.Project.ID,
+				Title: node.Project.Title,
+			}
+		}
+		items = append(items, item)
+	}
+	return items
+}
+
 // ProjectsV2ItemsForIssue fetches all ProjectItems for an issue.
 func ProjectsV2ItemsForIssue(client *Client, repo ghrepo.Interface, issue *Issue) error {
-	type projectV2ItemStatus struct {
-		StatusFragment struct {
-			OptionID string `json:"optionId"`
-			Name     string `json:"name"`
-		} `graphql:"... on ProjectV2ItemFieldSingleSelectValue"`
-	}
-
-	type projectV2Item struct {
-		ID      string `json:"id"`
-		Project struct {
-			ID    string `json:"id"`
-			Title string `json:"title"`
-		}
-		Status projectV2ItemStatus `graphql:"status:fieldValueByName(name: \"Status\")"`
-	}
 
 	type response struct {
 		Repository struct {
@@ -105,19 +136,7 @@ func ProjectsV2ItemsForIssue(client *Client, repo ghrepo.Interface, issue *Issue
 		if err != nil {
 			return err
 		}
-		for _, projectItemNode := range query.Repository.Issue.ProjectItems.Nodes {
-			items.Nodes = append(items.Nodes, &ProjectV2Item{
-				ID: projectItemNode.ID,
-				Project: ProjectV2ItemProject{
-					ID:    projectItemNode.Project.ID,
-					Title: projectItemNode.Project.Title,
-				},
-				Status: ProjectV2ItemStatus{
-					OptionID: projectItemNode.Status.StatusFragment.OptionID,
-					Name:     projectItemNode.Status.StatusFragment.Name,
-				},
-			})
-		}
+		items.Nodes = append(items.Nodes, convertProjectV2Items(query.Repository.Issue.ProjectItems.Nodes)...)
 
 		if !query.Repository.Issue.ProjectItems.PageInfo.HasNextPage {
 			break
@@ -130,22 +149,6 @@ func ProjectsV2ItemsForIssue(client *Client, repo ghrepo.Interface, issue *Issue
 
 // ProjectsV2ItemsForPullRequest fetches all ProjectItems for a pull request.
 func ProjectsV2ItemsForPullRequest(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
-	type projectV2ItemStatus struct {
-		StatusFragment struct {
-			OptionID string `json:"optionId"`
-			Name     string `json:"name"`
-		} `graphql:"... on ProjectV2ItemFieldSingleSelectValue"`
-	}
-
-	type projectV2Item struct {
-		ID      string `json:"id"`
-		Project struct {
-			ID    string `json:"id"`
-			Title string `json:"title"`
-		}
-		Status projectV2ItemStatus `graphql:"status:fieldValueByName(name: \"Status\")"`
-	}
-
 	type response struct {
 		Repository struct {
 			PullRequest struct {
@@ -173,20 +176,7 @@ func ProjectsV2ItemsForPullRequest(client *Client, repo ghrepo.Interface, pr *Pu
 		if err != nil {
 			return err
 		}
-
-		for _, projectItemNode := range query.Repository.PullRequest.ProjectItems.Nodes {
-			items.Nodes = append(items.Nodes, &ProjectV2Item{
-				ID: projectItemNode.ID,
-				Project: ProjectV2ItemProject{
-					ID:    projectItemNode.Project.ID,
-					Title: projectItemNode.Project.Title,
-				},
-				Status: ProjectV2ItemStatus{
-					OptionID: projectItemNode.Status.StatusFragment.OptionID,
-					Name:     projectItemNode.Status.StatusFragment.Name,
-				},
-			})
-		}
+		items.Nodes = append(items.Nodes, convertProjectV2Items(query.Repository.PullRequest.ProjectItems.Nodes)...)
 
 		if !query.Repository.PullRequest.ProjectItems.PageInfo.HasNextPage {
 			break
