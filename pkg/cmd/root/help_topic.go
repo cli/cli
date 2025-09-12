@@ -49,6 +49,9 @@ var HelpTopics = []helpTopic{
 			%[1]sGH_ENTERPRISE_TOKEN%[1]s, %[1]sGITHUB_ENTERPRISE_TOKEN%[1]s (in order of precedence): an authentication
 			token that will be used when a command targets a GitHub Enterprise Server host.
 
+			%[1]sGH_AUTH_SCHEME%[1]s: the authentication scheme to use for API requests. Defaults to %[1]stoken%[1]s for
+			backward compatibility. Set to %[1]sBearer%[1]s to use Bearer token authentication format.
+
 			%[1]sGH_HOST%[1]s: specify the GitHub hostname for commands where a hostname has not been provided, or
 			cannot be inferred from the context of a local Git repository. If this host was previously
 			authenticated with, the stored credentials will be used. Otherwise, setting %[1]sGH_TOKEN%[1]s or

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -189,6 +190,73 @@ func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
 	assert.Equal(t, "token REDIRECT-TOKEN", redirectRequest.Header.Get(authorization))
 	assert.Equal(t, "", request.Header.Get(authorization))
 	assert.Equal(t, 204, res.StatusCode)
+}
+
+func TestAddAuthTokenHeaderWithCustomScheme(t *testing.T) {
+	tests := []struct {
+		name           string
+		authScheme     string
+		expectedHeader string
+	}{
+		{
+			name:           "default token scheme",
+			authScheme:     "",
+			expectedHeader: "token MYTOKEN",
+		},
+		{
+			name:           "Bearer scheme",
+			authScheme:     "Bearer",
+			expectedHeader: "Bearer MYTOKEN",
+		},
+		{
+			name:           "custom scheme",
+			authScheme:     "Custom",
+			expectedHeader: "Custom MYTOKEN",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save original env var
+			originalScheme := os.Getenv("GH_AUTH_SCHEME")
+			defer func() {
+				if originalScheme != "" {
+					os.Setenv("GH_AUTH_SCHEME", originalScheme)
+				} else {
+					os.Unsetenv("GH_AUTH_SCHEME")
+				}
+			}()
+
+			// Set test env var
+			if tt.authScheme != "" {
+				os.Setenv("GH_AUTH_SCHEME", tt.authScheme)
+			} else {
+				os.Unsetenv("GH_AUTH_SCHEME")
+			}
+
+			var gotReq *http.Request
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotReq = r
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			defer ts.Close()
+
+			client, err := NewHTTPClient(HTTPClientOptions{
+				Config: tinyConfig{"github.com:oauth_token": "MYTOKEN"},
+			})
+			require.NoError(t, err)
+
+			req, err := http.NewRequest("GET", ts.URL, nil)
+			req.Host = "github.com"
+			require.NoError(t, err)
+
+			res, err := client.Do(req)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedHeader, gotReq.Header.Get("Authorization"))
+			assert.Equal(t, 204, res.StatusCode)
+		})
+	}
 }
 
 func TestHTTPClientSanitizeJSONControlCharactersC0(t *testing.T) {

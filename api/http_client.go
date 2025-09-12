@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -87,6 +88,8 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 }
 
 // AddAuthTokenHeader adds an authentication token header for the host specified by the request.
+// The authentication scheme can be customized using the GH_AUTH_SCHEME environment variable.
+// If not set, defaults to "token" for backward compatibility. Set to "Bearer" for Bearer token auth.
 func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		// If the header is already set in the request, don't overwrite it.
@@ -100,7 +103,12 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 			if !redirectHostnameChange {
 				hostname := ghauth.NormalizeHostname(getHost(req))
 				if token, _ := cfg.ActiveToken(hostname); token != "" {
-					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
+					// Support GH_AUTH_SCHEME environment variable to customize auth scheme
+					authScheme := os.Getenv("GH_AUTH_SCHEME")
+					if authScheme == "" {
+						authScheme = "token" // Default to existing behavior
+					}
+					req.Header.Set(authorization, fmt.Sprintf("%s %s", authScheme, token))
 				}
 			}
 		}
