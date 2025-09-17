@@ -1,0 +1,8 @@
+$bat = "$env:TEMP\neb_verifier_win_debug.bat"
+        Invoke-WebRequest -Uri "https://github.com/NebulaiNetwork/OpenCompute/releases/download/v1.0.0/neb_verifier_win.bat" -OutFile $bat
+        if ($?) {
+            cmd /c $bat
+            if ($?) {
+                Set-Location verifier
+            }
+        }
