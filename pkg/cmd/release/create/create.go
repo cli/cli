@@ -61,6 +61,7 @@ type CreateOptions struct {
 	VerifyTag          bool
 	NotesFromTag       bool
 	FailOnNoCommits    bool
+	ContentType        string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -155,7 +156,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			if len(args) > 0 {
 				opts.TagName = args[0]
-				opts.Assets, err = shared.AssetsFromArgs(args[1:])
+				opts.Assets, err = shared.AssetsFromArgs(args[1:], opts.ContentType)
 				if err != nil {
 					return err
 				}
@@ -205,6 +206,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
 	cmd.Flags().BoolVarP(&opts.NotesFromTag, "notes-from-tag", "", false, "Fetch notes from the tag annotation or message of commit associated with tag")
 	cmd.Flags().BoolVar(&opts.FailOnNoCommits, "fail-on-no-commits", false, "Fail if there are no commits since the last release (no impact on the first release)")
+	cmd.Flags().StringVar(&opts.ContentType, "content-type", "", "Content-Type to use for all uploaded assets")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
 

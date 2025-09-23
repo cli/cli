@@ -27,6 +27,7 @@ type UploadOptions struct {
 	// maximum number of simultaneous uploads
 	Concurrency       int
 	OverwriteExisting bool
+	ContentType       string
 }
 
 func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Command {
@@ -43,6 +44,9 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 
 			To define a display label for an asset, append text starting with %[1]s#%[1]s after the
 			file name.
+
+			By default, the Content-Type of each asset is automatically detected based on the file
+			extension. Use %[1]s--content-type%[1]s to manually specify a Content-Type for all assets.
 		`, "`"),
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,7 +56,7 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 			opts.TagName = args[0]
 
 			var err error
-			opts.Assets, err = shared.AssetsFromArgs(args[1:])
+			opts.Assets, err = shared.AssetsFromArgs(args[1:], opts.ContentType)
 			if err != nil {
 				return err
 			}
@@ -67,6 +71,7 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing assets of the same name")
+	cmd.Flags().StringVar(&opts.ContentType, "content-type", "", "Content-Type to use for all uploaded assets")
 
 	return cmd
 }

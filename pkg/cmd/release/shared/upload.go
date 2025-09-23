@@ -36,7 +36,7 @@ type AssetForUpload struct {
 	ExistingURL string
 }
 
-func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
+func AssetsFromArgs(args []string, mimeType string) (assets []*AssetForUpload, err error) {
 	labeledArgs, unlabeledArgs := cmdutil.Partition(args, func(arg string) bool {
 		return strings.Contains(arg, "#")
 	})
@@ -62,6 +62,10 @@ func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
 			return
 		}
 
+		if mimeType == "" {
+			mimeType = typeForFilename(fi.Name())
+		}
+
 		assets = append(assets, &AssetForUpload{
 			Open: func() (io.ReadCloser, error) {
 				return os.Open(fn)
@@ -69,7 +73,7 @@ func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
 			Size:     fi.Size(),
 			Name:     fi.Name(),
 			Label:    label,
-			MIMEType: typeForFilename(fi.Name()),
+			MIMEType: mimeType,
 		})
 	}
 	return
