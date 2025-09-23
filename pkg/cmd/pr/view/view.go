@@ -2,6 +2,8 @@ package view
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -21,8 +24,9 @@ import (
 )
 
 type ViewOptions struct {
-	IO      *iostreams.IOStreams
-	Browser browser.Browser
+	IO         *iostreams.IOStreams
+	Browser    browser.Browser
+	HttpClient func() (*http.Client, error)
 	// TODO projectsV1Deprecation
 	// Remove this detector since it is only used for test validation.
 	Detector fd.Detector
@@ -33,15 +37,17 @@ type ViewOptions struct {
 	SelectorArg string
 	BrowserMode bool
 	Comments    bool
+	Inline      bool
 
 	Now func() time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
-		IO:      f.IOStreams,
-		Browser: f.Browser,
-		Now:     time.Now,
+		IO:         f.IOStreams,
+		Browser:    f.Browser,
+		HttpClient: f.HttpClient,
+		Now:        time.Now,
 	}
 
 	cmd := &cobra.Command{
@@ -54,6 +60,9 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			is displayed.
 
 			With %[1]s--web%[1]s flag, open the pull request in a web browser instead.
+
+			With %[1]s--inline%[1]s flag, show inline comments with their associated
+			code context.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -76,6 +85,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open a pull request in the browser")
 	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View pull request comments")
+	cmd.Flags().BoolVarP(&opts.Inline, "inline", "i", false, "View inline comments with code context")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
@@ -99,6 +109,9 @@ func viewRun(opts *ViewOptions) error {
 		findOptions.Fields = []string{"url"}
 	} else if opts.Exporter != nil {
 		findOptions.Fields = opts.Exporter.Fields()
+	} else if opts.Inline {
+		// Add reviewThreads to fetch inline comments
+		findOptions.Fields = append(defaultFields, "reviewThreads", "files")
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -124,6 +137,10 @@ func viewRun(opts *ViewOptions) error {
 
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, pr)
+	}
+
+	if opts.Inline {
+		return printInlineComments(opts, baseRepo, pr)
 	}
 
 	if connectedToTerminal {
@@ -480,4 +497,242 @@ func prStateWithDraft(pr *api.PullRequest) string {
 	}
 
 	return pr.State
+}
+
+func printInlineComments(opts *ViewOptions, baseRepo ghrepo.Interface, pr *api.PullRequest) error {
+	out := opts.IO.Out
+	cs := opts.IO.ColorScheme()
+
+	// Group review threads by file
+	fileThreads := make(map[string][]api.PullRequestReviewThread)
+	for _, thread := range pr.ReviewThreads.Nodes {
+		if thread.Path != "" {
+			fileThreads[thread.Path] = append(fileThreads[thread.Path], thread)
+		}
+	}
+
+	if len(fileThreads) == 0 {
+		fmt.Fprintf(out, "No inline comments found in this pull request.\n")
+		return nil
+	}
+
+	// Sort files by path for consistent output
+	var sortedFiles []string
+	for filePath := range fileThreads {
+		sortedFiles = append(sortedFiles, filePath)
+	}
+	sort.Strings(sortedFiles)
+
+	fmt.Fprintf(out, "%s\n\n", cs.Bold("Inline Comments"))
+
+	for i, filePath := range sortedFiles {
+		if i > 0 {
+			fmt.Fprintf(out, "\n")
+		}
+
+		threads := fileThreads[filePath]
+
+		// Sort threads by line number
+		sort.Slice(threads, func(i, j int) bool {
+			lineI := 0
+			if threads[i].Line != nil {
+				lineI = *threads[i].Line
+			}
+			lineJ := 0
+			if threads[j].Line != nil {
+				lineJ = *threads[j].Line
+			}
+			return lineI < lineJ
+		})
+
+		fmt.Fprintf(out, "%s %s\n", cs.Bold("📄"), cs.Bold(filePath))
+
+		for _, thread := range threads {
+			err := printReviewThread(out, cs, thread, opts.Now, opts.HttpClient, baseRepo, pr.HeadRefName)
+			if err != nil {
+				// If we can't fetch code context, still show the comment
+				fmt.Fprintf(out, "    %s Error fetching code context: %v\n", cs.Yellow("⚠️"), err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func printReviewThread(out io.Writer, cs *iostreams.ColorScheme, thread api.PullRequestReviewThread, now func() time.Time, httpClient func() (*http.Client, error), baseRepo ghrepo.Interface, headRef string) error {
+	// Print thread header with line information
+	if thread.Line != nil {
+		if thread.StartLine != nil && *thread.StartLine != *thread.Line {
+			fmt.Fprintf(out, "  %s Lines %d-%d", cs.Cyan("🔗"), *thread.StartLine, *thread.Line)
+		} else {
+			fmt.Fprintf(out, "  %s Line %d", cs.Cyan("🔗"), *thread.Line)
+		}
+
+		if thread.DiffSide == "LEFT" {
+			fmt.Fprintf(out, " (removed)")
+		} else if thread.DiffSide == "RIGHT" {
+			fmt.Fprintf(out, " (added)")
+		}
+
+		if thread.IsResolved {
+			fmt.Fprintf(out, " %s", cs.Green("✓ Resolved"))
+		}
+
+		fmt.Fprintf(out, "\n")
+
+		// Fetch and display code context
+		if err := printCodeContext(out, cs, thread, httpClient, baseRepo, headRef); err != nil {
+			fmt.Fprintf(out, "    %s Unable to fetch code context\n", cs.Yellow("⚠️"))
+		}
+
+		fmt.Fprintf(out, "\n")
+	}
+
+	// Print all comments in the thread
+	for i, comment := range thread.Comments.Nodes {
+		if i > 0 {
+			fmt.Fprintf(out, "\n")
+		}
+
+		// Comment header
+		fmt.Fprintf(out, "    %s %s", cs.Bold("💬"), cs.Bold(comment.AuthorLogin()))
+
+		if comment.AuthorAssociation != "NONE" && comment.AuthorAssociation != "" {
+			fmt.Fprintf(out, " %s", cs.Muted(fmt.Sprintf("(%s)", strings.ToLower(comment.AuthorAssociation))))
+		}
+
+		fmt.Fprintf(out, " %s", cs.Muted(fmt.Sprintf("• %s", text.FuzzyAgoAbbr(now(), comment.CreatedAt))))
+
+		if comment.IsEdited() {
+			fmt.Fprintf(out, " %s", cs.Muted("• Edited"))
+		}
+
+		fmt.Fprintf(out, ":\n")
+
+		// Comment body with indentation
+		if comment.Body != "" {
+			// Render markdown and indent each line
+			md, err := markdown.Render(comment.Body,
+				markdown.WithTheme("dark"),
+				markdown.WithWrap(0)) // No wrap for now
+			if err != nil {
+				// Fallback to plain text if markdown rendering fails
+				lines := strings.Split(comment.Body, "\n")
+				for _, line := range lines {
+					fmt.Fprintf(out, "      %s\n", line)
+				}
+			} else {
+				lines := strings.Split(strings.TrimRight(md, "\n"), "\n")
+				for _, line := range lines {
+					fmt.Fprintf(out, "      %s\n", line)
+				}
+			}
+		} else {
+			fmt.Fprintf(out, "      %s\n", cs.Muted("(no comment body)"))
+		}
+
+		// Add reactions if any
+		if reactions := shared.ReactionGroupList(comment.ReactionGroups); reactions != "" {
+			fmt.Fprintf(out, "      %s\n", reactions)
+		}
+	}
+
+	fmt.Fprintf(out, "\n")
+	return nil
+}
+
+func printCodeContext(out io.Writer, cs *iostreams.ColorScheme, thread api.PullRequestReviewThread, httpClient func() (*http.Client, error), baseRepo ghrepo.Interface, headRef string) error {
+	if thread.Line == nil || thread.Path == "" {
+		return nil
+	}
+
+	client, err := httpClient()
+	if err != nil {
+		return err
+	}
+
+	// Fetch file content from GitHub API
+	fileContent, err := fetchFileContent(client, baseRepo, thread.Path, headRef)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(fileContent, "\n")
+	targetLine := *thread.Line
+
+	// Calculate context range (show 2 lines above and below)
+	contextLines := 2
+	startLine := targetLine - contextLines
+	if startLine < 1 {
+		startLine = 1
+	}
+	endLine := targetLine + contextLines
+	if endLine > len(lines) {
+		endLine = len(lines)
+	}
+
+	// Display code context
+	fmt.Fprintf(out, "    %s Code context:\n", cs.Bold("📝"))
+	for lineNum := startLine; lineNum <= endLine; lineNum++ {
+		lineIndex := lineNum - 1
+		if lineIndex >= 0 && lineIndex < len(lines) {
+			line := lines[lineIndex]
+
+			// Highlight the target line(s)
+			isTargetLine := lineNum >= targetLine
+			if thread.StartLine != nil {
+				isTargetLine = lineNum >= *thread.StartLine && lineNum <= *thread.Line
+			} else {
+				isTargetLine = lineNum == targetLine
+			}
+
+			lineNumStr := fmt.Sprintf("%4d", lineNum)
+			if isTargetLine {
+				// Highlight the line with the comment
+				fmt.Fprintf(out, "    %s %s %s\n",
+					cs.Yellow("►"),
+					cs.Blue(lineNumStr),
+					cs.Bold(line))
+			} else {
+				// Regular context line
+				fmt.Fprintf(out, "      %s %s\n",
+					cs.Muted(lineNumStr),
+					line)
+			}
+		}
+	}
+
+	return nil
+}
+
+func fetchFileContent(client *http.Client, repo ghrepo.Interface, path, ref string) (string, error) {
+	url := fmt.Sprintf("%srepos/%s/contents/%s?ref=%s",
+		ghinstance.RESTPrefix(repo.RepoHost()),
+		ghrepo.FullName(repo),
+		path,
+		ref)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Accept", "application/vnd.github.v3.raw")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", api.HandleHTTPError(resp)
+	}
+
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(content), nil
 }

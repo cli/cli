@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"testing/iotest"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
@@ -34,6 +35,20 @@ func Test_NewCmdDiff(t *testing.T) {
 			args: "--name-only",
 			want: DiffOptions{
 				NameOnly: true,
+			},
+		},
+		{
+			name: "comments flag",
+			args: "--comments",
+			want: DiffOptions{
+				Comments: true,
+			},
+		},
+		{
+			name: "comments short flag",
+			args: "-c",
+			want: DiffOptions{
+				Comments: true,
 			},
 		},
 		{
@@ -402,4 +417,87 @@ func Test_sanitizedReader(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestDiffWithInlineComments(t *testing.T) {
+	tests := []struct {
+		name           string
+		diff           string
+		reviewThreads  api.PullRequestReviewThreads
+		useColor       bool
+		expectedOutput string
+	}{
+		{
+			name: "diff with inline comments",
+			diff: `diff --git a/test.go b/test.go
+index 1234567..abcdefg 100644
+--- a/test.go
++++ b/test.go
+@@ -1,4 +1,5 @@
+ func main() {
++    fmt.Println("Hello")
+     return nil
+ }`,
+			reviewThreads: api.PullRequestReviewThreads{
+				Nodes: []api.PullRequestReviewThread{
+					{
+						ID:           "thread1",
+						Line:         intPtr(2),
+						Path:         "test.go",
+						DiffSide:     "RIGHT",
+						IsResolved:   false,
+						Comments: api.PullRequestReviewComments{
+							Nodes: []api.PullRequestReviewComment{
+								{
+									ID:     "comment1",
+									Author: api.CommentAuthor{Login: "reviewer1"},
+									Body:   "Good addition!",
+									AuthorAssociation: "MEMBER",
+									CreatedAt: mustParseTime("2023-01-01T00:00:00Z"),
+								},
+							},
+						},
+					},
+				},
+			},
+			useColor: false,
+			expectedOutput: `diff --git a/test.go b/test.go
+index 1234567..abcdefg 100644
+--- a/test.go
++++ b/test.go
+@@ -1,4 +1,5 @@
+ func main() {
++    fmt.Println("Hello")
+    💬 reviewer1 (member) • Jan  1, 2023:
+    Good addition!
+
+     return nil
+ }
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			diffReader := strings.NewReader(tt.diff)
+
+			err := diffWithInlineComments(&buf, diffReader, tt.reviewThreads, tt.useColor)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedOutput, buf.String())
+		})
+	}
+}
+
+func intPtr(i int) *int {
+	return &i
+}
+
+func mustParseTime(timeStr string) time.Time {
+	t, err := time.Parse(time.RFC3339, timeStr)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }

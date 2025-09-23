@@ -94,6 +94,7 @@ type PullRequest struct {
 	Reviews        PullRequestReviews
 	LatestReviews  PullRequestReviews
 	ReviewRequests ReviewRequests
+	ReviewThreads  PullRequestReviewThreads
 
 	ClosingIssuesReferences ClosingIssuesReferences
 }
@@ -108,6 +109,95 @@ type StatusCheckRollupCommit struct {
 
 type CommitStatusCheckRollup struct {
 	Contexts CheckContexts
+}
+
+type PullRequestReviewThreads struct {
+	Nodes      []PullRequestReviewThread
+	TotalCount int
+	PageInfo   struct {
+		HasNextPage bool
+		EndCursor   string
+	}
+}
+
+type PullRequestReviewThread struct {
+	ID           string                     `json:"id"`
+	Line         *int                       `json:"line"`
+	OriginalLine *int                       `json:"originalLine"`
+	Path         string                     `json:"path"`
+	DiffSide     string                     `json:"diffSide"`
+	StartLine    *int                       `json:"startLine"`
+	IsResolved   bool                       `json:"isResolved"`
+	Comments     PullRequestReviewComments  `json:"comments"`
+}
+
+type PullRequestReviewComments struct {
+	Nodes      []PullRequestReviewComment
+	TotalCount int
+	PageInfo   struct {
+		HasNextPage bool
+		EndCursor   string
+	}
+}
+
+type PullRequestReviewComment struct {
+	ID                  string         `json:"id"`
+	Author              CommentAuthor  `json:"author"`
+	AuthorAssociation   string         `json:"authorAssociation"`
+	Body                string         `json:"body"`
+	CreatedAt           time.Time      `json:"createdAt"`
+	UpdatedAt           time.Time      `json:"updatedAt"`
+	IncludesCreatedEdit bool           `json:"includesCreatedEdit"`
+	IsMinimized         bool           `json:"isMinimized"`
+	MinimizedReason     string         `json:"minimizedReason"`
+	ReactionGroups      ReactionGroups `json:"reactionGroups"`
+	URL                 string         `json:"url,omitempty"`
+	ViewerDidAuthor     bool           `json:"viewerDidAuthor"`
+}
+
+// Implement Comment interface for PullRequestReviewComment
+func (c PullRequestReviewComment) Identifier() string {
+	return c.ID
+}
+
+func (c PullRequestReviewComment) AuthorLogin() string {
+	return c.Author.Login
+}
+
+func (c PullRequestReviewComment) Association() string {
+	return c.AuthorAssociation
+}
+
+func (c PullRequestReviewComment) Content() string {
+	return c.Body
+}
+
+func (c PullRequestReviewComment) Created() time.Time {
+	return c.CreatedAt
+}
+
+func (c PullRequestReviewComment) HiddenReason() string {
+	return c.MinimizedReason
+}
+
+func (c PullRequestReviewComment) IsEdited() bool {
+	return c.IncludesCreatedEdit
+}
+
+func (c PullRequestReviewComment) IsHidden() bool {
+	return c.IsMinimized
+}
+
+func (c PullRequestReviewComment) Link() string {
+	return c.URL
+}
+
+func (c PullRequestReviewComment) Reactions() ReactionGroups {
+	return c.ReactionGroups
+}
+
+func (c PullRequestReviewComment) Status() string {
+	return ""
 }
 
 type ClosingIssuesReferences struct {

@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -36,6 +38,7 @@ type DiffOptions struct {
 	Patch       bool
 	NameOnly    bool
 	BrowserMode bool
+	Comments    bool
 }
 
 func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Command {
@@ -57,6 +60,9 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			is selected.
 
 			With %[1]s--web%[1]s flag, open the pull request diff in a web browser instead.
+
+			With %[1]s--comments%[1]s flag, include inline comments and review threads
+			overlaid on the diff output.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -92,6 +98,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
 	cmd.Flags().BoolVar(&opts.NameOnly, "name-only", false, "Display only names of changed files")
 	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open the pull request diff in the browser")
+	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "Include inline comments in diff output")
 
 	return cmd
 }
@@ -104,6 +111,8 @@ func diffRun(opts *DiffOptions) error {
 
 	if opts.BrowserMode {
 		findOptions.Fields = []string{"url"}
+	} else if opts.Comments {
+		findOptions.Fields = []string{"number", "reviewThreads"}
 	}
 
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
@@ -147,6 +156,10 @@ func diffRun(opts *DiffOptions) error {
 
 	if opts.NameOnly {
 		return changedFilesNames(opts.IO.Out, diff)
+	}
+
+	if opts.Comments {
+		return diffWithInlineComments(opts.IO.Out, diff, pr.ReviewThreads, opts.UseColor)
 	}
 
 	if !opts.UseColor {
@@ -356,4 +369,207 @@ func (t sanitizer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err e
 // isPrint reports if a rune is safe to be printed to a terminal
 func isPrint(r rune) bool {
 	return r == '\n' || r == '\r' || r == '\t' || unicode.IsPrint(r)
+}
+
+type diffLine struct {
+	content  string
+	lineType string // "header", "addition", "removal", "context"
+	filePath string
+	lineNum  int
+	oldLineNum int
+}
+
+func diffWithInlineComments(w io.Writer, r io.Reader, reviewThreads api.PullRequestReviewThreads, useColor bool) error {
+	// First, parse the diff to understand line numbers and file paths
+	diffContent, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(diffContent), "\n")
+	parsedLines := parseDiffLines(lines)
+
+	// Create a map of file paths and line numbers to comments
+	commentMap := buildCommentMap(reviewThreads)
+
+	// Now output the diff with comments interspersed
+	for _, line := range parsedLines {
+		// Output the diff line first
+		if useColor {
+			outputColoredDiffLine(w, line)
+		} else {
+			fmt.Fprintf(w, "%s\n", line.content)
+		}
+
+		// Check if there are comments for this line
+		if comments, exists := commentMap[commentKey{line.filePath, line.lineNum}]; exists {
+			outputInlineComments(w, comments, useColor)
+		}
+	}
+
+	return nil
+}
+
+type commentKey struct {
+	filePath string
+	lineNum  int
+}
+
+func buildCommentMap(reviewThreads api.PullRequestReviewThreads) map[commentKey][]api.PullRequestReviewComment {
+	commentMap := make(map[commentKey][]api.PullRequestReviewComment)
+
+	for _, thread := range reviewThreads.Nodes {
+		if thread.Line == nil {
+			continue
+		}
+
+		key := commentKey{
+			filePath: thread.Path,
+			lineNum:  *thread.Line,
+		}
+
+		for _, comment := range thread.Comments.Nodes {
+			commentMap[key] = append(commentMap[key], comment)
+		}
+	}
+
+	return commentMap
+}
+
+func parseDiffLines(lines []string) []diffLine {
+	var parsedLines []diffLine
+	var currentFile string
+	var leftLineNum, rightLineNum int
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "diff --git") {
+			// Extract file path
+			parts := strings.Fields(line)
+			if len(parts) >= 4 {
+				currentFile = strings.TrimPrefix(parts[3], "b/")
+			}
+			parsedLines = append(parsedLines, diffLine{
+				content:  line,
+				lineType: "header",
+				filePath: currentFile,
+			})
+		} else if strings.HasPrefix(line, "@@") {
+			// Parse hunk header to get line numbers
+			re := regexp.MustCompile(`@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@`)
+			matches := re.FindStringSubmatch(line)
+			if len(matches) >= 3 {
+				leftLineNum, _ = strconv.Atoi(matches[1])
+				rightLineNum, _ = strconv.Atoi(matches[2])
+			}
+			parsedLines = append(parsedLines, diffLine{
+				content:  line,
+				lineType: "header",
+				filePath: currentFile,
+			})
+		} else if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+			parsedLines = append(parsedLines, diffLine{
+				content:    line,
+				lineType:   "addition",
+				filePath:   currentFile,
+				lineNum:    rightLineNum,
+				oldLineNum: -1,
+			})
+			rightLineNum++
+		} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+			parsedLines = append(parsedLines, diffLine{
+				content:    line,
+				lineType:   "removal",
+				filePath:   currentFile,
+				lineNum:    -1,
+				oldLineNum: leftLineNum,
+			})
+			leftLineNum++
+		} else if strings.HasPrefix(line, " ") {
+			parsedLines = append(parsedLines, diffLine{
+				content:    line,
+				lineType:   "context",
+				filePath:   currentFile,
+				lineNum:    rightLineNum,
+				oldLineNum: leftLineNum,
+			})
+			leftLineNum++
+			rightLineNum++
+		} else {
+			parsedLines = append(parsedLines, diffLine{
+				content:  line,
+				lineType: "header",
+				filePath: currentFile,
+			})
+		}
+	}
+
+	return parsedLines
+}
+
+func outputColoredDiffLine(w io.Writer, line diffLine) {
+	var color []byte
+	switch line.lineType {
+	case "header":
+		color = colorHeader
+	case "addition":
+		color = colorAddition
+	case "removal":
+		color = colorRemoval
+	}
+
+	if color != nil {
+		w.Write(color)
+	}
+
+	fmt.Fprintf(w, "%s", line.content)
+
+	if color != nil {
+		w.Write(colorReset)
+	}
+
+	fmt.Fprintf(w, "\n")
+}
+
+func outputInlineComments(w io.Writer, comments []api.PullRequestReviewComment, useColor bool) {
+	if len(comments) == 0 {
+		return
+	}
+
+	for i, comment := range comments {
+		// Add some visual separation
+		if useColor {
+			fmt.Fprintf(w, "\x1b[36m")  // Cyan color for comment indicator
+		}
+		fmt.Fprintf(w, "    💬 %s", comment.AuthorLogin())
+		if useColor {
+			fmt.Fprintf(w, "\x1b[m")   // Reset color
+		}
+
+		if comment.Association() != "NONE" && comment.Association() != "" {
+			fmt.Fprintf(w, " (%s)", strings.ToLower(comment.Association()))
+		}
+
+		fmt.Fprintf(w, " • %s", text.FuzzyAgoAbbr(time.Now(), comment.CreatedAt))
+
+		if comment.IsEdited() {
+			fmt.Fprintf(w, " • Edited")
+		}
+
+		fmt.Fprintf(w, ":\n")
+
+		// Format the comment body
+		if comment.Body != "" {
+			// Simple indentation for now - could use markdown rendering for better formatting
+			bodyLines := strings.Split(comment.Body, "\n")
+			for _, bodyLine := range bodyLines {
+				fmt.Fprintf(w, "    %s\n", bodyLine)
+			}
+		}
+
+		if i < len(comments)-1 {
+			fmt.Fprintf(w, "\n")
+		}
+	}
+
+	fmt.Fprintf(w, "\n")
 }

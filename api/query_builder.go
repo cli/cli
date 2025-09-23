@@ -139,6 +139,38 @@ var prLatestReviews = shortenQuery(`
 	}
 `)
 
+var prReviewThreads = shortenQuery(`
+	reviewThreads(first: 100) {
+		nodes {
+			id,
+			line,
+			originalLine,
+			path,
+			diffSide,
+			startLine,
+			isResolved,
+			comments(first: 100) {
+				nodes {
+					id,
+					author{login,...on User{id,name}},
+					authorAssociation,
+					body,
+					createdAt,
+					updatedAt,
+					includesCreatedEdit,
+					isMinimized,
+					minimizedReason,
+					reactionGroups{content,users{totalCount}},
+					url,
+					viewerDidAuthor
+				},
+				totalCount
+			}
+		},
+		totalCount
+	}
+`)
+
 var prFiles = shortenQuery(`
 	files(first: 100) {
 		nodes {
@@ -366,6 +398,7 @@ var PullRequestFields = append(sharedIssuePRFields,
 	"potentialMergeCommit",
 	"reviewDecision",
 	"reviewRequests",
+	"reviewThreads",
 	"reviews",
 	"statusCheckRollup",
 )
@@ -411,6 +444,8 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, prReviewRequests)
 		case "reviews":
 			q = append(q, prReviews)
+		case "reviewThreads":
+			q = append(q, prReviewThreads)
 		case "latestReviews":
 			q = append(q, prLatestReviews)
 		case "files":

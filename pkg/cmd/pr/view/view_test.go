@@ -68,6 +68,7 @@ func TestJSONFields(t *testing.T) {
 		"reactionGroups",
 		"reviewDecision",
 		"reviewRequests",
+		"reviewThreads",
 		"reviews",
 		"state",
 		"statusCheckRollup",
@@ -110,6 +111,24 @@ func Test_NewCmdView(t *testing.T) {
 			want: ViewOptions{
 				SelectorArg: "123",
 				BrowserMode: true,
+			},
+		},
+		{
+			name:  "inline mode",
+			args:  "123 --inline",
+			isTTY: true,
+			want: ViewOptions{
+				SelectorArg: "123",
+				Inline:      true,
+			},
+		},
+		{
+			name:  "inline short flag",
+			args:  "123 -i",
+			isTTY: true,
+			want: ViewOptions{
+				SelectorArg: "123",
+				Inline:      true,
 			},
 		},
 		{
