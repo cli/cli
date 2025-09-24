@@ -656,6 +656,31 @@ func Test_apiRun(t *testing.T) {
 			stderr: ``,
 			isatty: true,
 		},
+		{
+			name: "jq filter with template functions",
+			options: ApiOptions{
+				FilterOutput: `map(.time | timefmt("Mon, 02 Jan 2006 15:04:05 MST"))`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(bytes.NewBufferString(`[{"time":"2025-01-20T01:08:15Z"}]`)),
+			},
+			stdout: "[\"Mon, 20 Jan 2025 01:08:15 UTC\"]\n",
+		},
+		{
+			name: "jq filter with library path",
+			options: ApiOptions{
+				FilterOutput: `import "mod" as m; map(m::inc)`,
+				LibraryPaths: []string{"testdata"},
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(bytes.NewBufferString(`[1,2]`)),
+			},
+			stdout: "[2,3]\n",
+		},
 	}
 
 	for _, tt := range tests {
