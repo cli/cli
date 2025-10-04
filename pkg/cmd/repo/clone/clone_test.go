@@ -47,6 +47,24 @@ func TestNewCmdClone(t *testing.T) {
 			},
 		},
 		{
+			name: "mirror flag",
+			args: "OWNER/REPO --mirror",
+			wantOpts: CloneOptions{
+				Repository: "OWNER/REPO",
+				GitArgs:    []string{"OWNER/REPO"},
+				Mirror:     true,
+			},
+		},
+		{
+			name: "mirror flag with git args",
+			args: "OWNER/REPO --mirror -- --depth 1",
+			wantOpts: CloneOptions{
+				Repository: "OWNER/REPO",
+				GitArgs:    []string{"--depth", "1"},
+				Mirror:     true,
+			},
+		},
+		{
 			name: "git clone arguments",
 			args: "OWNER/REPO -- --depth 1 --recurse-submodules",
 			wantOpts: CloneOptions{
@@ -92,6 +110,7 @@ func TestNewCmdClone(t *testing.T) {
 
 			assert.Equal(t, tt.wantOpts.Repository, opts.Repository)
 			assert.Equal(t, tt.wantOpts.GitArgs, opts.GitArgs)
+			assert.Equal(t, tt.wantOpts.Mirror, opts.Mirror)
 		})
 	}
 }
@@ -194,6 +213,21 @@ func Test_RepoClone(t *testing.T) {
 			name: "wiki URL with extra path parts",
 			args: "https://github.com/owner/repo.wiki/extra/path?key=value#fragment",
 			want: "git clone https://github.com/OWNER/REPO.wiki.git",
+		},
+		{
+			name: "mirror flag",
+			args: "OWNER/REPO --mirror",
+			want: "git clone https://github.com/OWNER/REPO.git OWNER/REPO",
+		},
+		{
+			name: "mirror flag with git args",
+			args: "OWNER/REPO --mirror -- --depth 1",
+			want: "git clone --depth 1 https://github.com/OWNER/REPO.git OWNER/REPO",
+		},
+		{
+			name: "mirror flag with explicit directory is ignored",
+			args: "OWNER/REPO custom_dir --mirror",
+			want: "git clone https://github.com/OWNER/REPO.git custom_dir",
 		},
 	}
 	for _, tt := range tests {

@@ -27,6 +27,7 @@ type CloneOptions struct {
 	GitArgs      []string
 	Repository   string
 	UpstreamName string
+	Mirror       bool
 }
 
 func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Command {
@@ -77,6 +78,9 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 
 			# Clone a repository with additional git clone flags
 			$ gh repo clone cli/cli -- --depth=1
+
+			# Clone into an owner/repo directory structure
+			$ gh repo clone cli/cli --mirror
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Repository = args[0]
@@ -91,6 +95,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.UpstreamName, "upstream-remote-name", "u", "upstream", "Upstream remote name when cloning a fork")
+	cmd.Flags().BoolVarP(&opts.Mirror, "mirror", "m", false, "Clone into a directory structure matching owner/repo")
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		if err == pflag.ErrHelp {
 			return err
@@ -180,7 +185,28 @@ func cloneRun(opts *CloneOptions) error {
 
 	gitClient := opts.GitClient
 	ctx := context.Background()
-	cloneDir, err := gitClient.Clone(ctx, canonicalCloneURL, opts.GitArgs)
+	
+	// If --mirror flag is used, modify GitArgs to include the owner/repo directory structure
+	gitArgs := opts.GitArgs
+	if opts.Mirror {
+		// Check if user already specified a directory (first non-flag argument)
+		hasExplicitDir := false
+		for _, arg := range gitArgs {
+			if !strings.HasPrefix(arg, "-") {
+				hasExplicitDir = true
+				break
+			}
+		}
+		
+		// Only add directory structure if user didn't specify one
+		// Prepend directory to gitArgs so parseCloneArgs picks it up as target
+		if !hasExplicitDir {
+			mirrorDir := fmt.Sprintf("%s/%s", canonicalRepo.RepoOwner(), canonicalRepo.RepoName())
+			gitArgs = append([]string{mirrorDir}, gitArgs...)
+		}
+	}
+	
+	cloneDir, err := gitClient.Clone(ctx, canonicalCloneURL, gitArgs)
 	if err != nil {
 		return err
 	}
