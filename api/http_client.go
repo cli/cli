@@ -3,14 +3,35 @@ package api
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/utils"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
+
+// NewPlainHTTPClient returns an http.Client that respects the http_unix_socket configuration.
+// It is plain in that it does not add any of the default headers that NewHTTPClient adds.
+func NewPlainHTTPClient() (*http.Client, error) {
+	var transport http.RoundTripper = http.DefaultTransport
+	if cfg, err := config.NewConfig(); err == nil {
+		if unixSocket := cfg.HTTPUnixSocket(""); unixSocket.Value != "" {
+			dial := func(network, addr string) (net.Conn, error) {
+				return net.Dial("unix", unixSocket.Value)
+			}
+			transport = &http.Transport{
+				Dial:              dial,
+				DialTLS:           dial,
+				DisableKeepAlives: true,
+			}
+		}
+	}
+	return &http.Client{Transport: transport}, nil
+}
 
 type tokenGetter interface {
 	ActiveToken(string) (string, string)

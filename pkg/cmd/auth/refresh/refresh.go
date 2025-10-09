@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/gh"
@@ -48,7 +49,6 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			t, u, err := authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser, clipboard)
 			return token(t), username(u), err
 		},
-		HttpClient: &http.Client{},
 		GitClient:  f.GitClient,
 		Prompter:   f.Prompter,
 	}
@@ -100,6 +100,12 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			if !opts.Interactive && opts.Hostname == "" {
 				return cmdutil.FlagErrorf("--hostname required when not running interactively")
 			}
+
+			httpClient, err := api.NewPlainHTTPClient()
+			if err != nil {
+				return err
+			}
+			opts.HttpClient = httpClient
 
 			opts.MainExecutable = f.Executable()
 			if runF != nil {

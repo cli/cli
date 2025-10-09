@@ -17,24 +17,22 @@ import (
 	"github.com/cli/cli/v2/utils"
 	"github.com/cli/oauth"
 	"github.com/henvic/httpretty"
-
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
-
 var (
 	// The "GitHub CLI" OAuth app
 	oauthClientID = "178c6fc778ccc68e1d6a"
 	// This value is safe to be embedded in version control
 	oauthClientSecret = "34ddeff2b558a23d38fba8a6de74f086ede1cc0b"
-
 	jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 )
-
 func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, b browser.Browser, isCopyToClipboard bool) (string, string, error) {
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
-
-	httpClient := &http.Client{}
+	httpClient, err := api.NewPlainHTTPClient()
+	if err != nil {
+		return "", "", err
+	}
 	debugEnabled, debugValue := utils.IsDebugEnabled()
 	if debugEnabled {
 		logTraffic := strings.Contains(debugValue, "api")
