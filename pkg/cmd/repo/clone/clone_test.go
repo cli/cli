@@ -47,11 +47,28 @@ func TestNewCmdClone(t *testing.T) {
 			},
 		},
 		{
+			name: "directory argument",
+			args: "OWNER/REPO mydir another",
+			wantOpts: CloneOptions{
+				Repository: "OWNER/REPO",
+				GitArgs:    []string{"mydir", "another"},
+			},
+		},
+		{
 			name: "mirror flag",
 			args: "OWNER/REPO --match",
 			wantOpts: CloneOptions{
 				Repository: "OWNER/REPO",
 				GitArgs:    []string{"OWNER/REPO"},
+				Match:      true,
+			},
+		},
+		{
+			name: "mirror flag",
+			args: "OWNER/REPO mydir --match",
+			wantOpts: CloneOptions{
+				Repository: "OWNER/REPO",
+				GitArgs:    []string{"OWNER/REPO", "mydir"},
 				Match:      true,
 			},
 		},

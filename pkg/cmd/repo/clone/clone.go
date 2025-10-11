@@ -79,14 +79,16 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 			# Clone a repository with additional git clone flags
 			$ gh repo clone cli/cli -- --depth=1
 
-			# Clone into an owner/repo directory structure (takes precedence over directory argument)
+			# Clone into an owner/repo directory matching structure
 			$ gh repo clone cli/cli --match
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Repository = args[0]
 			opts.GitArgs = args[1:]
 			if opts.Match {
+				// Match flag will take precedence over the directory argument
 				opts.GitArgs = append([]string{opts.Repository}, opts.GitArgs...)
+
 			}
 
 			if runF != nil {
