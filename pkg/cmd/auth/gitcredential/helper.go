@@ -125,19 +125,26 @@ func helperRun(opts *CredentialOptions) error {
 		// If the host starts with "gist.", try without the prefix
 		if strings.HasPrefix(host, "gist.") {
 			strippedHost := strings.TrimPrefix(host, "gist.")
-			return lookup(strippedHost)
+			fallbackToken, fallbackSrc, fallbackErr := lookup(strippedHost)
+			if fallbackErr == nil && fallbackToken != "" {
+				return fallbackToken, fallbackSrc, nil
+			}
+			return fallbackToken, fallbackSrc, fallbackErr
 		}
 		return token, src, err
 	}
 
-	// Check if environment variables provide a token (highest priority)
-	envToken, envSource, _ := tryBothHosts(lookupHost, func(host string) (string, string, error) {
+	// Helper to wrap ActiveToken for use with tryBothHosts
+	activeTokenLookup := func(host string) (string, string, error) {
 		token, src := cfg.ActiveToken(host)
 		if token == "" {
 			return "", "", fmt.Errorf("no token")
 		}
 		return token, src, nil
-	})
+	}
+
+	// Check if environment variables provide a token (highest priority)
+	envToken, envSource, _ := tryBothHosts(lookupHost, activeTokenLookup)
 
 	// If environment token is found, use it regardless of username
 	if strings.HasSuffix(envSource, "_TOKEN") {
@@ -155,14 +162,10 @@ func helperRun(opts *CredentialOptions) error {
 		}
 
 		// If user-specific token lookup failed, fall back to active token/user
+		// We intentionally discard the error here since an empty token will be
+		// caught by the validation check below (line 189)
 		if gotToken == "" {
-			gotToken, source, _ = tryBothHosts(lookupHost, func(host string) (string, string, error) {
-				token, src := cfg.ActiveToken(host)
-				if token == "" {
-					return "", "", fmt.Errorf("no token")
-				}
-				return token, src, nil
-			})
+			gotToken, source, _ = tryBothHosts(lookupHost, activeTokenLookup)
 		}
 	} else {
 		// No username provided, use active token
