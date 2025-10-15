@@ -116,12 +116,28 @@ func helperRun(opts *CredentialOptions) error {
 	var gotToken string
 	var source string
 
-	// Check if environment variables provide a token (highest priority)
-	envToken, envSource := cfg.ActiveToken(lookupHost)
-	if envToken == "" && strings.HasPrefix(lookupHost, "gist.") {
-		lookupHost = strings.TrimPrefix(lookupHost, "gist.")
-		envToken, envSource = cfg.ActiveToken(lookupHost)
+	// Helper function to try both the original host and the gist-prefixed variant
+	tryBothHosts := func(host string, lookup func(string) (string, string, error)) (string, string, error) {
+		token, src, err := lookup(host)
+		if err == nil && token != "" {
+			return token, src, nil
+		}
+		// If the host starts with "gist.", try without the prefix
+		if strings.HasPrefix(host, "gist.") {
+			strippedHost := strings.TrimPrefix(host, "gist.")
+			return lookup(strippedHost)
+		}
+		return token, src, err
 	}
+
+	// Check if environment variables provide a token (highest priority)
+	envToken, envSource, _ := tryBothHosts(lookupHost, func(host string) (string, string, error) {
+		token, src := cfg.ActiveToken(host)
+		if token == "" {
+			return "", "", fmt.Errorf("no token")
+		}
+		return token, src, nil
+	})
 
 	// If environment token is found, use it regardless of username
 	if strings.HasSuffix(envSource, "_TOKEN") {
@@ -131,25 +147,22 @@ func helperRun(opts *CredentialOptions) error {
 	} else if wants["username"] != "" {
 		// No environment token, look up token for specific user
 		var err error
-		gotToken, source, err = cfg.TokenForUser(lookupHost, wants["username"])
+		gotToken, source, err = tryBothHosts(lookupHost, func(host string) (string, string, error) {
+			return cfg.TokenForUser(host, wants["username"])
+		})
 		if err == nil {
 			gotUser = wants["username"]
-		} else if strings.HasPrefix(wants["host"], "gist.") {
-			// Try without gist. prefix for user lookup
-			lookupHost = strings.TrimPrefix(wants["host"], "gist.")
-			gotToken, source, err = cfg.TokenForUser(lookupHost, wants["username"])
-			if err == nil {
-				gotUser = wants["username"]
-			}
 		}
 
 		// If user-specific token lookup failed, fall back to active token/user
 		if gotToken == "" {
-			gotToken, source = cfg.ActiveToken(lookupHost)
-			if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
-				lookupHost = strings.TrimPrefix(lookupHost, "gist.")
-				gotToken, source = cfg.ActiveToken(lookupHost)
-			}
+			gotToken, source, _ = tryBothHosts(lookupHost, func(host string) (string, string, error) {
+				token, src := cfg.ActiveToken(host)
+				if token == "" {
+					return "", "", fmt.Errorf("no token")
+				}
+				return token, src, nil
+			})
 		}
 	} else {
 		// No username provided, use active token
@@ -163,6 +176,10 @@ func helperRun(opts *CredentialOptions) error {
 			gotUser = tokenUser
 		} else {
 			gotUser, _ = cfg.ActiveUser(lookupHost)
+			if gotUser == "" && strings.HasPrefix(lookupHost, "gist.") {
+				strippedHost := strings.TrimPrefix(lookupHost, "gist.")
+				gotUser, _ = cfg.ActiveUser(strippedHost)
+			}
 			if gotUser == "" {
 				gotUser = tokenUser
 			}
