@@ -18,6 +18,14 @@ func (c tinyConfig) ActiveUser(host string) (string, error) {
 	return c[fmt.Sprintf("%s:%s", host, "user")], nil
 }
 
+func (c tinyConfig) TokenForUser(hostname, user string) (string, string, error) {
+	token := c[fmt.Sprintf("%s:%s:oauth_token", hostname, user)]
+	if token == "" {
+		return "", "", fmt.Errorf("no token found for '%s'", user)
+	}
+	return token, c["_source"], nil
+}
+
 func Test_helperRun(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -33,9 +41,10 @@ func Test_helperRun(t *testing.T) {
 				Operation: "get",
 				Config: func() (config, error) {
 					return tinyConfig{
-						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
-						"example.com:user":        "monalisa",
-						"example.com:oauth_token": "OTOKEN",
+						"_source":                          "/Users/monalisa/.config/gh/hosts.yml",
+						"example.com:user":                 "monalisa",
+						"example.com:oauth_token":          "OTOKEN",
+						"example.com:monalisa:oauth_token": "OTOKEN",
 					}, nil
 				},
 			},
@@ -58,9 +67,10 @@ func Test_helperRun(t *testing.T) {
 				Operation: "get",
 				Config: func() (config, error) {
 					return tinyConfig{
-						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
-						"example.com:user":        "monalisa",
-						"example.com:oauth_token": "OTOKEN",
+						"_source":                          "/Users/monalisa/.config/gh/hosts.yml",
+						"example.com:user":                 "monalisa",
+						"example.com:oauth_token":          "OTOKEN",
+						"example.com:monalisa:oauth_token": "OTOKEN",
 					}, nil
 				},
 			},
@@ -84,9 +94,10 @@ func Test_helperRun(t *testing.T) {
 				Operation: "get",
 				Config: func() (config, error) {
 					return tinyConfig{
-						"_source":                "/Users/monalisa/.config/gh/hosts.yml",
-						"github.com:user":        "monalisa",
-						"github.com:oauth_token": "OTOKEN",
+						"_source":                         "/Users/monalisa/.config/gh/hosts.yml",
+						"github.com:user":                 "monalisa",
+						"github.com:oauth_token":          "OTOKEN",
+						"github.com:monalisa:oauth_token": "OTOKEN",
 					}, nil
 				},
 			},
@@ -110,9 +121,10 @@ func Test_helperRun(t *testing.T) {
 				Operation: "get",
 				Config: func() (config, error) {
 					return tinyConfig{
-						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
-						"example.com:user":        "monalisa",
-						"example.com:oauth_token": "OTOKEN",
+						"_source":                          "/Users/monalisa/.config/gh/hosts.yml",
+						"example.com:user":                 "monalisa",
+						"example.com:oauth_token":          "OTOKEN",
+						"example.com:monalisa:oauth_token": "OTOKEN",
 					}, nil
 				},
 			},
@@ -148,14 +160,14 @@ func Test_helperRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name: "user mismatch",
+			name: "user mismatch (requested user has no token)",
 			opts: CredentialOptions{
 				Operation: "get",
 				Config: func() (config, error) {
 					return tinyConfig{
-						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
-						"example.com:user":        "monalisa",
-						"example.com:oauth_token": "OTOKEN",
+						"_source":                          "/Users/monalisa/.config/gh/hosts.yml",
+						"example.com:user":                 "monalisa",
+						"example.com:monalisa:oauth_token": "OTOKEN",
 					}, nil
 				},
 			},
@@ -235,6 +247,81 @@ func Test_helperRun(t *testing.T) {
 				Operation: "unknown",
 			},
 			wantErr: true,
+		},
+		{
+			name: "specific user requested, token found",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                          "/Users/monalisa/.config/gh/hosts.yml",
+						"example.com:monalisa:oauth_token": "OTOKEN_MONALISA",
+						"example.com:hubot:oauth_token":    "OTOKEN_HUBOT",
+						"example.com:user":                 "monalisa", // active user is monalisa
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=hubot
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=hubot
+				password=OTOKEN_HUBOT
+			`),
+			wantStderr: "",
+		},
+		{
+			name: "specific user requested, token not found",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                          "/Users/monalisa/.config/gh/hosts.yml",
+						"example.com:monalisa:oauth_token": "OTOKEN_MONALISA",
+						"example.com:user":                 "monalisa", // active user is monalisa
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=nonexistent
+			`),
+			wantErr:    true,
+			wantStdout: "",
+			wantStderr: "",
+		},
+		{
+			name: "specific user for gist host",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                         "/Users/monalisa/.config/gh/hosts.yml",
+						"github.com:monalisa:oauth_token": "OTOKEN_MONALISA",
+						"github.com:hubot:oauth_token":    "OTOKEN_HUBOT",
+						"github.com:user":                 "monalisa", // active user is monalisa
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=gist.github.com
+				username=hubot
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=gist.github.com
+				username=hubot
+				password=OTOKEN_HUBOT
+			`),
+			wantStderr: "",
 		},
 	}
 	for _, tt := range tests {

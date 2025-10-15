@@ -16,6 +16,7 @@ const tokenUser = "x-access-token"
 type config interface {
 	ActiveToken(string) (string, string)
 	ActiveUser(string) (string, error)
+	TokenForUser(hostname, user string) (string, string, error)
 }
 
 type CredentialOptions struct {
@@ -112,26 +113,63 @@ func helperRun(opts *CredentialOptions) error {
 
 	lookupHost := wants["host"]
 	var gotUser string
-	gotToken, source := cfg.ActiveToken(lookupHost)
-	if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
+	var gotToken string
+	var source string
+
+	// Check if environment variables provide a token (highest priority)
+	envToken, envSource := cfg.ActiveToken(lookupHost)
+	if envToken == "" && strings.HasPrefix(lookupHost, "gist.") {
 		lookupHost = strings.TrimPrefix(lookupHost, "gist.")
-		gotToken, source = cfg.ActiveToken(lookupHost)
+		envToken, envSource = cfg.ActiveToken(lookupHost)
 	}
 
-	if strings.HasSuffix(source, "_TOKEN") {
+	// If environment token is found, use it regardless of username
+	if strings.HasSuffix(envSource, "_TOKEN") {
+		gotToken = envToken
+		source = envSource
 		gotUser = tokenUser
+	} else if wants["username"] != "" {
+		// No environment token, look up token for specific user
+		var err error
+		gotToken, source, err = cfg.TokenForUser(lookupHost, wants["username"])
+		if err == nil {
+			gotUser = wants["username"]
+		} else if strings.HasPrefix(wants["host"], "gist.") {
+			// Try without gist. prefix for user lookup
+			lookupHost = strings.TrimPrefix(wants["host"], "gist.")
+			gotToken, source, err = cfg.TokenForUser(lookupHost, wants["username"])
+			if err == nil {
+				gotUser = wants["username"]
+			}
+		}
+
+		// If user-specific token lookup failed, fall back to active token/user
+		if gotToken == "" {
+			gotToken, source = cfg.ActiveToken(lookupHost)
+			if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
+				lookupHost = strings.TrimPrefix(lookupHost, "gist.")
+				gotToken, source = cfg.ActiveToken(lookupHost)
+			}
+		}
 	} else {
-		gotUser, _ = cfg.ActiveUser(lookupHost)
-		if gotUser == "" {
+		// No username provided, use active token
+		gotToken = envToken
+		source = envSource
+	}
+
+	// Determine the username based on token source
+	if gotUser == "" {
+		if strings.HasSuffix(source, "_TOKEN") {
 			gotUser = tokenUser
+		} else {
+			gotUser, _ = cfg.ActiveUser(lookupHost)
+			if gotUser == "" {
+				gotUser = tokenUser
+			}
 		}
 	}
 
 	if gotUser == "" || gotToken == "" {
-		return cmdutil.SilentError
-	}
-
-	if wants["username"] != "" && gotUser != tokenUser && !strings.EqualFold(wants["username"], gotUser) {
 		return cmdutil.SilentError
 	}
 
