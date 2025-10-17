@@ -1,8 +1,6 @@
 package api
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -631,58 +629,17 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	return pr, nil
 }
 
-// AddPullRequestReviews adds the given user and team reviewers to a pull request using the REST API.
-func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, users, teams []string) error {
-	if len(users) == 0 && len(teams) == 0 {
-		return nil
+func UpdatePullRequestReviews(client *Client, repo ghrepo.Interface, params githubv4.RequestReviewsInput) error {
+	var mutation struct {
+		RequestReviews struct {
+			PullRequest struct {
+				ID string
+			}
+		} `graphql:"requestReviews(input: $input)"`
 	}
-
-	path := fmt.Sprintf(
-		"repos/%s/%s/pulls/%d/requested_reviewers",
-		url.PathEscape(repo.RepoOwner()),
-		url.PathEscape(repo.RepoName()),
-		prNumber,
-	)
-	body := struct {
-		Reviewers     []string `json:"reviewers,omitempty"`
-		TeamReviewers []string `json:"team_reviewers,omitempty"`
-	}{
-		Reviewers:     users,
-		TeamReviewers: teams,
-	}
-	buf := &bytes.Buffer{}
-	if err := json.NewEncoder(buf).Encode(body); err != nil {
-		return err
-	}
-	// The endpoint responds with the updated pull request object; we don't need it here.
-	return client.REST(repo.RepoHost(), "POST", path, buf, nil)
-}
-
-// RemovePullRequestReviews removes requested reviewers from a pull request using the REST API.
-func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, users, teams []string) error {
-	if len(users) == 0 && len(teams) == 0 {
-		return nil
-	}
-
-	path := fmt.Sprintf(
-		"repos/%s/%s/pulls/%d/requested_reviewers",
-		url.PathEscape(repo.RepoOwner()),
-		url.PathEscape(repo.RepoName()),
-		prNumber,
-	)
-	body := struct {
-		Reviewers     []string `json:"reviewers,omitempty"`
-		TeamReviewers []string `json:"team_reviewers,omitempty"`
-	}{
-		Reviewers:     users,
-		TeamReviewers: teams,
-	}
-	buf := &bytes.Buffer{}
-	if err := json.NewEncoder(buf).Encode(body); err != nil {
-		return err
-	}
-	// The endpoint responds with the updated pull request object; we don't need it here.
-	return client.REST(repo.RepoHost(), "DELETE", path, buf, nil)
+	variables := map[string]interface{}{"input": params}
+	err := client.Mutate(repo.RepoHost(), "PullRequestUpdateRequestReviews", &mutation, variables)
+	return err
 }
 
 func UpdatePullRequestBranch(client *Client, repo ghrepo.Interface, params githubv4.UpdatePullRequestBranchInput) error {

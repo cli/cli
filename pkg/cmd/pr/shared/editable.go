@@ -2,6 +2,7 @@ package shared
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -75,6 +76,37 @@ func (e Editable) BodyValue() *string {
 		return nil
 	}
 	return &e.Body.Value
+}
+
+func (e Editable) ReviewerIds() (*[]string, *[]string, error) {
+	if !e.Reviewers.Edited {
+		return nil, nil, nil
+	}
+	if len(e.Reviewers.Add) != 0 || len(e.Reviewers.Remove) != 0 {
+		s := set.NewStringSet()
+		s.AddValues(e.Reviewers.Default)
+		s.AddValues(e.Reviewers.Add)
+		s.RemoveValues(e.Reviewers.Remove)
+		e.Reviewers.Value = s.ToSlice()
+	}
+	var userReviewers []string
+	var teamReviewers []string
+	for _, r := range e.Reviewers.Value {
+		if strings.ContainsRune(r, '/') {
+			teamReviewers = append(teamReviewers, r)
+		} else {
+			userReviewers = append(userReviewers, r)
+		}
+	}
+	userIds, err := e.Metadata.MembersToIDs(userReviewers)
+	if err != nil {
+		return nil, nil, err
+	}
+	teamIds, err := e.Metadata.TeamsToIDs(teamReviewers)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &userIds, &teamIds, nil
 }
 
 func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]string, error) {
@@ -396,20 +428,17 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 }
 
 func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable) error {
-	// Determine whether to fetch organization teams.
-	// Interactive reviewer editing (Edited true, but no Add/Remove slices) still needs
-	// team data for selection UI. For non-interactive flows, we never need to fetch teams.
-	teamReviewers := false
-	if editable.Reviewers.Edited {
-		// This is likely an interactive flow since edited is set but no mutations to
-		// Add/Remove slices, so we need to load the teams.
-		if len(editable.Reviewers.Add) == 0 && len(editable.Reviewers.Remove) == 0 {
-			teamReviewers = true
-		}
-	}
 	input := api.RepoMetadataInput{
-		Reviewers:      editable.Reviewers.Edited,
-		TeamReviewers:  teamReviewers,
+		Reviewers: editable.Reviewers.Edited,
+		// TeamReviewers is always true if Reviewers is true because
+		// this is the existing `pr edit` behavior. This means
+		// always fetch teams.
+		// TODO: evaluate whether this can follow the same logic as
+		// `pr create` to conditionally fetch teams if a reviewer contains
+		// a slash.
+		// See https://github.com/cli/cli/blob/449920b40fc8a5015d1578ca10a301aa385a1914/pkg/cmd/pr/shared/params.go#L67-L71
+		// See https://github.com/cli/cli/issues/11360
+		TeamReviewers:  editable.Reviewers.Edited,
 		Assignees:      editable.Assignees.Edited,
 		ActorAssignees: editable.Assignees.ActorAssignees,
 		Labels:         editable.Labels.Edited,

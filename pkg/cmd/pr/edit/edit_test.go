@@ -354,7 +354,7 @@ func Test_editRun(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     *EditOptions
-		httpStubs func(*testing.T, *httpmock.Registry)
+		httpStubs func(*httpmock.Registry)
 		stdout    string
 		stderr    string
 	}{
@@ -411,11 +411,11 @@ func Test_editRun(t *testing.T) {
 				},
 				Fetcher: testFetcher{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: true, teamReviewers: false, assignees: true, labels: true, projects: true, milestones: true})
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, false)
 				mockPullRequestUpdate(reg)
 				mockPullRequestUpdateActorAssignees(reg)
-				mockPullRequestAddReviewers(reg)
+				mockPullRequestReviewersUpdate(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
 			},
@@ -469,8 +469,8 @@ func Test_editRun(t *testing.T) {
 				},
 				Fetcher: testFetcher{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(reg, mockRepoMetadataOptions{assignees: true, labels: true, projects: true, milestones: true})
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, true)
 				mockPullRequestUpdate(reg)
 				mockPullRequestUpdateActorAssignees(reg)
 				mockPullRequestUpdateLabels(reg)
@@ -483,19 +483,8 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
-				Finder: shared.NewMockFinder("123", &api.PullRequest{ // include existing reviewers so removal logic triggers
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
 					URL: "https://github.com/OWNER/REPO/pull/123",
-					ReviewRequests: api.ReviewRequests{Nodes: []struct{ RequestedReviewer api.RequestedReviewer }{
-						{RequestedReviewer: api.RequestedReviewer{TypeName: "Team", Slug: "core", Organization: struct {
-							Login string `json:"login"`
-						}{Login: "OWNER"}}},
-						{RequestedReviewer: api.RequestedReviewer{TypeName: "Team", Slug: "external", Organization: struct {
-							Login string `json:"login"`
-						}{Login: "OWNER"}}},
-						{RequestedReviewer: api.RequestedReviewer{TypeName: "User", Login: "monalisa"}},
-						{RequestedReviewer: api.RequestedReviewer{TypeName: "User", Login: "hubot"}},
-						{RequestedReviewer: api.RequestedReviewer{TypeName: "User", Login: "dependabot"}},
-					}},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
 				Editable: shared.Editable{
@@ -512,9 +501,8 @@ func Test_editRun(t *testing.T) {
 						Edited: true,
 					},
 					Reviewers: shared.EditableSlice{
-						Default: []string{"OWNER/core", "OWNER/external", "monalisa", "hubot", "dependabot"},
-						Remove:  []string{"OWNER/core", "OWNER/external", "monalisa", "hubot", "dependabot"},
-						Edited:  true,
+						Remove: []string{"OWNER/core", "OWNER/external", "monalisa", "hubot", "dependabot"},
+						Edited: true,
 					},
 					Assignees: shared.EditableAssignees{
 						EditableSlice: shared.EditableSlice{
@@ -542,106 +530,13 @@ func Test_editRun(t *testing.T) {
 				},
 				Fetcher: testFetcher{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: true, teamReviewers: false, assignees: true, labels: true, projects: true, milestones: true})
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, false)
 				mockPullRequestUpdate(reg)
-				mockPullRequestRemoveReviewers(reg)
+				mockPullRequestReviewersUpdate(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockPullRequestUpdateActorAssignees(reg)
 				mockProjectV2ItemUpdate(reg)
-			},
-			stdout: "https://github.com/OWNER/REPO/pull/123\n",
-		},
-		// Conditional team fetching cases
-		{
-			name: "non-interactive add only user reviewers skips team fetch",
-			input: &EditOptions{
-				Detector:    &fd.EnabledDetectorMock{},
-				SelectorArg: "123",
-				Finder:      shared.NewMockFinder("123", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO")),
-				Interactive: false,
-				Editable: shared.Editable{
-					Reviewers: shared.EditableSlice{Add: []string{"monalisa", "hubot"}, Edited: true},
-				},
-				Fetcher: testFetcher{},
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				// reviewers only (users), no team reviewers fetched
-				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: true})
-				// explicitly assert that no OrganizationTeamList query occurs
-				reg.Exclude(t, httpmock.GraphQL(`query OrganizationTeamList\b`))
-				mockPullRequestUpdate(reg)
-				mockPullRequestAddReviewers(reg)
-			},
-			stdout: "https://github.com/OWNER/REPO/pull/123\n",
-		},
-		{
-			name: "non-interactive add contains team reviewers skips team fetch",
-			input: &EditOptions{
-				Detector:    &fd.EnabledDetectorMock{},
-				SelectorArg: "123",
-				Finder:      shared.NewMockFinder("123", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO")),
-				Interactive: false,
-				Editable: shared.Editable{
-					Reviewers: shared.EditableSlice{Add: []string{"monalisa", "OWNER/core"}, Edited: true},
-				},
-				Fetcher: testFetcher{},
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				// reviewer add includes team but non-interactive Add/Remove provided -> no team fetch
-				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: true})
-				// explicitly assert that no OrganizationTeamList query occurs
-				reg.Exclude(t, httpmock.GraphQL(`query OrganizationTeamList\b`))
-				mockPullRequestUpdate(reg)
-				mockPullRequestAddReviewers(reg)
-			},
-			stdout: "https://github.com/OWNER/REPO/pull/123\n",
-		},
-		{
-			name: "non-interactive reviewers remove contains team skips team fetch",
-			input: &EditOptions{
-				Detector:    &fd.EnabledDetectorMock{},
-				SelectorArg: "123",
-				Finder: shared.NewMockFinder("123", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123", ReviewRequests: api.ReviewRequests{Nodes: []struct{ RequestedReviewer api.RequestedReviewer }{
-					{RequestedReviewer: api.RequestedReviewer{TypeName: "Team", Slug: "core", Organization: struct {
-						Login string `json:"login"`
-					}{Login: "OWNER"}}},
-					{RequestedReviewer: api.RequestedReviewer{TypeName: "User", Login: "monalisa"}},
-				}}}, ghrepo.New("OWNER", "REPO")),
-				Interactive: false,
-				Editable: shared.Editable{
-					Reviewers: shared.EditableSlice{Remove: []string{"monalisa", "OWNER/core"}, Edited: true},
-				},
-				Fetcher: testFetcher{},
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: true})
-				// explicitly assert that no OrganizationTeamList query occurs
-				reg.Exclude(t, httpmock.GraphQL(`query OrganizationTeamList\b`))
-				mockPullRequestUpdate(reg)
-				mockPullRequestRemoveReviewers(reg)
-			},
-			stdout: "https://github.com/OWNER/REPO/pull/123\n",
-		},
-		{
-			name: "non-interactive mutate reviewers with no change to existing team reviewers skips team fetch",
-			input: &EditOptions{
-				Detector:    &fd.EnabledDetectorMock{},
-				SelectorArg: "123",
-				Finder:      shared.NewMockFinder("123", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO")),
-				Interactive: false,
-				Editable: shared.Editable{
-					Reviewers: shared.EditableSlice{Add: []string{"monalisa"}, Remove: []string{"hubot"}, Default: []string{"OWNER/core"}, Edited: true},
-				},
-				Fetcher: testFetcher{},
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				// reviewers only (users), no team reviewers fetched
-				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: true})
-				// explicitly assert that no OrganizationTeamList query occurs
-				reg.Exclude(t, httpmock.GraphQL(`query OrganizationTeamList\b`))
-				mockPullRequestUpdate(reg)
-				mockPullRequestAddReviewers(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -681,11 +576,11 @@ func Test_editRun(t *testing.T) {
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: true, teamReviewers: true, assignees: true, labels: true, projects: true, milestones: true})
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, false)
 				mockPullRequestUpdate(reg)
 				mockPullRequestUpdateActorAssignees(reg)
-				mockPullRequestAddReviewers(reg)
+				mockPullRequestReviewersUpdate(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
 			},
@@ -725,9 +620,8 @@ func Test_editRun(t *testing.T) {
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				// interactive but reviewers not chosen; need everything except reviewers/teams
-				mockRepoMetadata(reg, mockRepoMetadataOptions{assignees: true, labels: true, projects: true, milestones: true})
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, true)
 				mockPullRequestUpdate(reg)
 				mockPullRequestUpdateActorAssignees(reg)
 				mockPullRequestUpdateLabels(reg)
@@ -740,19 +634,8 @@ func Test_editRun(t *testing.T) {
 			input: &EditOptions{
 				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
-				Finder: shared.NewMockFinder("123", &api.PullRequest{ // include existing reviewers
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
 					URL: "https://github.com/OWNER/REPO/pull/123",
-					ReviewRequests: api.ReviewRequests{Nodes: []struct{ RequestedReviewer api.RequestedReviewer }{
-						{RequestedReviewer: api.RequestedReviewer{TypeName: "Team", Slug: "core", Organization: struct {
-							Login string `json:"login"`
-						}{Login: "OWNER"}}},
-						{RequestedReviewer: api.RequestedReviewer{TypeName: "Team", Slug: "external", Organization: struct {
-							Login string `json:"login"`
-						}{Login: "OWNER"}}},
-						{RequestedReviewer: api.RequestedReviewer{TypeName: "User", Login: "monalisa"}},
-						{RequestedReviewer: api.RequestedReviewer{TypeName: "User", Login: "hubot"}},
-						{RequestedReviewer: api.RequestedReviewer{TypeName: "User", Login: "dependabot"}},
-					}},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: true,
 				Surveyor: testSurveyor{
@@ -782,10 +665,10 @@ func Test_editRun(t *testing.T) {
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: true, teamReviewers: true, assignees: true, labels: true, projects: true, milestones: true})
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, false)
 				mockPullRequestUpdate(reg)
-				mockPullRequestRemoveReviewers(reg)
+				mockPullRequestReviewersUpdate(reg)
 				mockPullRequestUpdateActorAssignees(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
@@ -829,7 +712,7 @@ func Test_editRun(t *testing.T) {
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
 					httpmock.StringResponse(`
@@ -876,7 +759,7 @@ func Test_editRun(t *testing.T) {
 				},
 				Fetcher: testFetcher{},
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+			httpStubs: func(reg *httpmock.Registry) {
 				// Notice there is no call to mockReplaceActorsForAssignable()
 				// and no GraphQL call to RepositoryAssignableActors below.
 				reg.Register(
@@ -904,7 +787,7 @@ func Test_editRun(t *testing.T) {
 
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
-			tt.httpStubs(t, reg)
+			tt.httpStubs(reg)
 
 			httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 			baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
@@ -921,21 +804,10 @@ func Test_editRun(t *testing.T) {
 	}
 }
 
-type mockRepoMetadataOptions struct {
-	reviewers     bool
-	teamReviewers bool // reviewers must also be true for this to have an effect.
-	assignees     bool
-	labels        bool
-	projects      bool // includes both legacy (v1) and v2
-	milestones    bool
-}
-
-func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
-	// Assignable actors (users/bots) are fetched when reviewers OR assignees edited with ActorAssignees enabled.
-	if opt.reviewers || opt.assignees {
-		reg.Register(
-			httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-			httpmock.StringResponse(`
+func mockRepoMetadata(reg *httpmock.Registry, skipReviewers bool) {
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
+		httpmock.StringResponse(`
 			{ "data": { "repository": { "suggestedActors": {
 				"nodes": [
 					{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
@@ -944,11 +816,9 @@ func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
 				"pageInfo": { "hasNextPage": false }
 			} } } }
 			`))
-	}
-	if opt.labels {
-		reg.Register(
-			httpmock.GraphQL(`query RepositoryLabelList\b`),
-			httpmock.StringResponse(`
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryLabelList\b`),
+		httpmock.StringResponse(`
 		{ "data": { "repository": { "labels": {
 			"nodes": [
 				{ "name": "feature", "id": "FEATUREID" },
@@ -959,11 +829,9 @@ func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
-	}
-	if opt.milestones {
-		reg.Register(
-			httpmock.GraphQL(`query RepositoryMilestoneList\b`),
-			httpmock.StringResponse(`
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+		httpmock.StringResponse(`
 		{ "data": { "repository": { "milestones": {
 			"nodes": [
 				{ "title": "GA", "id": "GAID" },
@@ -972,11 +840,9 @@ func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
-	}
-	if opt.projects {
-		reg.Register(
-			httpmock.GraphQL(`query RepositoryProjectList\b`),
-			httpmock.StringResponse(`
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
+		httpmock.StringResponse(`
 		{ "data": { "repository": { "projects": {
 			"nodes": [
 				{ "name": "Cleanup", "id": "CLEANUPID" },
@@ -985,9 +851,9 @@ func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
-		reg.Register(
-			httpmock.GraphQL(`query OrganizationProjectList\b`),
-			httpmock.StringResponse(`
+	reg.Register(
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
+		httpmock.StringResponse(`
 		{ "data": { "organization": { "projects": {
 			"nodes": [
 				{ "name": "Triage", "id": "TRIAGEID" }
@@ -995,9 +861,9 @@ func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
-		reg.Register(
-			httpmock.GraphQL(`query RepositoryProjectV2List\b`),
-			httpmock.StringResponse(`
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
 		{ "data": { "repository": { "projectsV2": {
 			"nodes": [
 				{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
@@ -1006,9 +872,9 @@ func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
-		reg.Register(
-			httpmock.GraphQL(`query OrganizationProjectV2List\b`),
-			httpmock.StringResponse(`
+	reg.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
 		{ "data": { "organization": { "projectsV2": {
 			"nodes": [
 				{ "title": "TriageV2", "id": "TRIAGEV2ID" }
@@ -1016,9 +882,9 @@ func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
-		reg.Register(
-			httpmock.GraphQL(`query UserProjectV2List\b`),
-			httpmock.StringResponse(`
+	reg.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
 		{ "data": { "viewer": { "projectsV2": {
 			"nodes": [
 				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
@@ -1026,8 +892,7 @@ func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
-	}
-	if opt.teamReviewers && opt.reviewers { // teams only relevant if reviewers edited
+	if !skipReviewers {
 		reg.Register(
 			httpmock.GraphQL(`query OrganizationTeamList\b`),
 			httpmock.StringResponse(`
@@ -1039,13 +904,11 @@ func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
         "pageInfo": { "hasNextPage": false }
       } } } }
 		`))
-	}
-	if opt.reviewers { // Current user fetched only when reviewers requested
 		reg.Register(
 			httpmock.GraphQL(`query UserCurrent\b`),
 			httpmock.StringResponse(`
-	  { "data": { "viewer": { "login": "monalisa" } } }
-	`))
+		  { "data": { "viewer": { "login": "monalisa" } } }
+		`))
 	}
 }
 
@@ -1064,15 +927,9 @@ func mockPullRequestUpdateActorAssignees(reg *httpmock.Registry) {
 	)
 }
 
-func mockPullRequestAddReviewers(reg *httpmock.Registry) {
+func mockPullRequestReviewersUpdate(reg *httpmock.Registry) {
 	reg.Register(
-		httpmock.REST("POST", "repos/OWNER/REPO/pulls/0/requested_reviewers"),
-		httpmock.StringResponse(`{}`))
-}
-
-func mockPullRequestRemoveReviewers(reg *httpmock.Registry) {
-	reg.Register(
-		httpmock.REST("DELETE", "repos/OWNER/REPO/pulls/0/requested_reviewers"),
+		httpmock.GraphQL(`mutation PullRequestUpdateRequestReviews\b`),
 		httpmock.StringResponse(`{}`))
 }
 
