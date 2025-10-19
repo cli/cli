@@ -59,6 +59,11 @@ func ParseIssueFromArg(arg string) (int, o.Option[ghrepo.Interface], error) {
 	issueLocator := tryParseIssueFromURL(arg)
 	if issueLocator, present := issueLocator.Value(); present {
 		return issueLocator.issueNumber, o.Some(issueLocator.repo), nil
+
+	}
+	issueLocator = tryParseIssueFromShort(arg)
+	if issueLocator, present := issueLocator.Value(); present {
+		return issueLocator.issueNumber, o.Some(issueLocator.repo), nil
 	}
 
 	issueNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#"))
@@ -91,6 +96,24 @@ func tryParseIssueFromURL(maybeURL string) o.Option[issueLocator] {
 	}
 
 	repo := ghrepo.NewWithHost(m[1], m[2], u.Hostname())
+	issueNumber, _ := strconv.Atoi(m[3])
+	return o.Some(issueLocator{
+		issueNumber: issueNumber,
+		repo:        repo,
+	})
+}
+
+// shorthand issue notation
+var issueRE = regexp.MustCompile(`^/?([^/]+)/([^/]+)#(\d+)`)
+
+// tryParseIssueFromShort tries to parse an issue number and repo from shorthand notation.
+func tryParseIssueFromShort(maybeURL string) o.Option[issueLocator] {
+	m := issueRE.FindStringSubmatch(maybeURL)
+	if m == nil {
+		return o.None[issueLocator]()
+	}
+
+	repo := ghrepo.New(m[1], m[2])
 	issueNumber, _ := strconv.Atoi(m[3])
 	return o.Some(issueLocator{
 		issueNumber: issueNumber,

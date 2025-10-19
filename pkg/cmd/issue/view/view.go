@@ -49,7 +49,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view {<number> | <url>}",
+		Use:   "view {<number> | <shorthand> | <url>}",
 		Short: "View an issue",
 		Long: heredoc.Docf(`
 			Display the title, body, and other information about an issue.

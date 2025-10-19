@@ -32,6 +32,11 @@ func TestParseIssuesFromArgs(t *testing.T) {
 			expectedRepo:         o.None[ghrepo.Interface](),
 		},
 		{
+			behavior:             "when given shorthand issue numbers, returns them with the repo",
+			args:                 []string{"OWNER/REPO#1", "/OWNER/REPO#2"},
+			expectedIssueNumbers: []int{1, 2},
+			expectedRepo:         o.Some(ghrepo.New("OWNER", "REPO")),
+		{
 			behavior: "when given URLs, returns them with the repo",
 			args: []string{
 				"https://github.com/OWNER/REPO/issues/1",
