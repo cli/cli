@@ -232,7 +232,7 @@ func SearchQueryBuild(options FilterOptions, advancedIssueSearchSyntax bool) str
 	}
 
 	if options.Search != "" {
-		return fmt.Sprintf("%s %s", options.Search, q)
+		return fmt.Sprintf("(%s) %s", options.Search, q)
 	}
 	return q
 }
