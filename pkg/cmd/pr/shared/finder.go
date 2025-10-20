@@ -438,8 +438,13 @@ func findForRefs(httpClient *http.Client, prRefs PRFindRefs, stateFilters, field
 		// When the head is the default branch, it doesn't really make sense to show merged or closed PRs.
 		// https://github.com/cli/cli/issues/4263
 		isNotClosedOrMergedWhenHeadIsDefault := pr.State == "OPEN" || resp.Repository.DefaultBranchRef.Name != prRefs.QualifiedHeadRef()
-		if prRefs.Matches(pr.BaseRefName, pr.HeadLabel()) && isNotClosedOrMergedWhenHeadIsDefault {
-			return &pr, nil
+		if isNotClosedOrMergedWhenHeadIsDefault {
+			if prRefs.Matches(pr.BaseRefName, pr.HeadLabel()) {
+				return &pr, nil
+			}
+			if prRefs.Matches(pr.BaseRefName, pr.HeadRefName) {
+				return &pr, nil
+			}
 		}
 	}
 
