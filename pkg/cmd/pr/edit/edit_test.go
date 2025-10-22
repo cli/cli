@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -894,6 +895,67 @@ func Test_editRun(t *testing.T) {
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
+		{
+			name: "non-interactive projects v1 unsupported doesn't fetch v1 metadata",
+			input: &EditOptions{
+				Detector:    &fd.DisabledDetectorMock{},
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+				}, ghrepo.New("OWNER", "REPO")),
+				Interactive: false,
+				Editable: shared.Editable{
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"CleanupV2"},
+							Remove: []string{"RoadmapV2"},
+							Edited: true,
+						},
+					},
+				},
+				Fetcher: testFetcher{},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				// Ensure v1 project queries are NOT made.
+				reg.Exclude(t, httpmock.GraphQL(`query RepositoryProjectList\b`))
+				reg.Exclude(t, httpmock.GraphQL(`query OrganizationProjectList\b`))
+				// Provide only v2 project metadata queries.
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "projectsV2": {
+						"nodes": [
+							{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+							{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "organization": { "projectsV2": {
+						"nodes": [
+							{ "title": "TriageV2", "id": "TRIAGEV2ID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query UserProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "viewer": { "projectsV2": {
+						"nodes": [
+							{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				mockProjectV2ItemUpdate(reg)
+				mockPullRequestUpdate(reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1102,8 +1164,8 @@ func mockProjectV2ItemUpdate(reg *httpmock.Registry) {
 
 type testFetcher struct{}
 
-func (f testFetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable) error {
-	return shared.FetchOptions(client, repo, opts)
+func (f testFetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable, projectsV1Support gh.ProjectsV1Support) error {
+	return shared.FetchOptions(client, repo, opts, projectsV1Support)
 }
 
 type testSurveyor struct {

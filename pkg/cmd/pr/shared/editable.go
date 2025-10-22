@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/set"
 )
@@ -395,7 +396,7 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 	return nil
 }
 
-func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable) error {
+func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable, projectV1Support gh.ProjectsV1Support) error {
 	// Determine whether to fetch organization teams.
 	// Interactive reviewer editing (Edited true, but no Add/Remove slices) still needs
 	// team data for selection UI. For non-interactive flows, we never need to fetch teams.
@@ -413,7 +414,7 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 		Assignees:      editable.Assignees.Edited,
 		ActorAssignees: editable.Assignees.ActorAssignees,
 		Labels:         editable.Labels.Edited,
-		ProjectsV1:     editable.Projects.Edited,
+		ProjectsV1:     editable.Projects.Edited && projectV1Support == gh.ProjectsV1Supported,
 		ProjectsV2:     editable.Projects.Edited,
 		Milestones:     editable.Milestone.Edited,
 	}
