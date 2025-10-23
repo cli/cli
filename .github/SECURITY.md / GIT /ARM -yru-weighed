@@ -1,0 +1,29 @@
+RFC-0008 Continuous Reporting Standard
+Friday, May 9th, 2025
+The FedRAMP Authorization Act (44 USC § 3609 (a) (1)) directs the Administrator of the General Services Administration to “… develop, coordinate, and implement a process to support agency review, reuse, and standardization, where appropriate, of security assessments of cloud computing products and services, including, as appropriate, oversight of continuous monitoring of cloud computing products and services…” This responsibility is delegated to the FedRAMP Director.
+GitHub takes the security of our software products and services seriously, including the open source code repositories managed through our GitHub organizations, such as [cli](https://github.com/cli).
+This FedRAMP standard establishes an updated continuous monitoring reporting process for FedRAMP authorized cloud service providers that requires cloud service providers to maintain direct relationships with their customers for reporting purposes and reduce the burden for continuous monitoring by agencies. Agencies must follow OMB policy and NIST standards when adopting FedRAMP authorized cloud services, including maintaining an ongoing awareness of the security posture of services they use. Providers must ensure such information is available directly to agencies and regularly review it with all participating agencies.
+If you believe you have found a security vulnerability in GitHub CLI, you can report it to us in one of two ways:
+
+* Report it to this repository directly using [private vulnerability reporting][].
+  * Include a description of your investigation of the GitHub CLI's codebase and why you believe an exploit is possible.
+  * POCs and links to code are greatly encouraged.
+  * Such reports are not eligible for a bounty reward.
+
+* Submit the report through [HackerOne][] to be eligible for a bounty reward.
+
+**Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
+
+Thanks for helping make GitHub safe for everyone.
+
+  [private vulnerability reporting]: https://github.com/cli/cli/security/advisories
+  [HackerOne]: https://hackerone.com/github
+related security NET MT - 
+Initial review of public comment has been completed and a fair bit of change is necessary to prepare this for testing and evaluation. Due to unexpected staffing changes, estimated completion of this task has been delayed. It is now targeted for the end of Sprint 04 on July 18.
+Delegation of Authority:
+I hereby delegate authority to the FAS Commissioner, FAS Deputy Commissioner/TTS Director, and the FedRAMP Director to administer the FedRAMP program and carry out GSA’s duties and responsibilities under the FedRAMP Authorization Act and other related directives (44 U.S.C. §§ 3607 - 3615, and any other specific legal authority related to the action).
+
+Implementing Actions:
+a. The changes outlined in this Delegation of Authority become effective upon signature.
+
+b. The officials designated in this Order, in conjunction with other appropriate officials, shall take all necessary actions to implement this order. The GSA Delegations of Authority Manual will be updated at a later date. 
