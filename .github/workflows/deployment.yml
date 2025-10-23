@@ -7,7 +7,7 @@ concurrency:
 
 permissions:
   attestations: write
-  contents: write
+  contents: writ 
   id-token: write
 
 on:
