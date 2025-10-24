@@ -1,3 +1,57 @@
+# 🧠 Carpuncle Cloud
+
+[![Azure Deployment](https://github.com/Carpuncle-Lana/Carpuncle/workflows/Azure%20Carpuncle%20Cloud%20Deployment/badge.svg)](https://github.com/Carpuncle-Lana/Carpuncle/actions)
+[![Security Scan](https://github.com/Carpuncle-Lana/Carpuncle/workflows/CodeQL/badge.svg)](https://github.com/Carpuncle-Lana/Carpuncle/security)
+
+Willkommen bei **Carpuncle**, dem KI-Framework für automatisierte Cloud-Workflows, Webhooks und Datenanalyse.
+
+## 🚀 Projekte
+
+- **Carpuncle-Cloud**: Azure-basierte Infrastruktur mit Dashboard
+- **lana-core**: KI-Module für Lana (selbstlernende KI-Assistenz)
+- **dotnet**: Backend-Services in .NET
+
+## 🔐 Technologien
+
+- Azure CLI & PowerShell 7
+- Node.js 18
+- GitHub Actions & GitHub Copilot
+- Microsoft Graph API
+
+## 📦 Quick Start
+
+### Azure Deployment
+
+```powershell
+# Automatisiertes Azure-Deployment
+.\Deploy-AzureCarpuncle.ps1 -Environment dev -Location westeurope
+```
+
+Siehe [`Deploy-AzureCarpuncle.ps1`](Deploy-AzureCarpuncle.ps1) für detailliertes automatisiertes Deployment.
+
+### Dokumentation
+
+- 📖 [Implementierungsplan](docs/IMPLEMENTATION_PLAN.md) - 6-Phasen-Strategie
+- ⚙️ [GitHub Copilot Instructions](.github/copilot-instructions.md) - Copilot-Konfiguration
+- 🔄 [CI/CD Workflow](.github/workflows/azure-deploy.yml) - Azure Deployment Pipeline
+
+## 🧭 Organisationsstruktur
+
+| Bereich | Inhalt |
+|--------|--------|
+| **Enterprise** | `carpuncle` - Übergeordnete Verwaltungseinheit |
+| **Organisation** | `carpunclede` - Technische Repos (Carpuncle-Cloud, dotnet, lana-core) |
+| **Benutzer** | `Carpuncle-Lana` - Persönliches Profil für kreative & operative Aufgaben |
+| **Teams** | DevOps, KI, Frontend, Security - mit Rollen & Rechten |
+
+## 👥 Kontakt
+
+**Inhaber**: Thomas Heckhoff  
+**Email**: carpuncle-pc@live.de  
+**GitHub**: [@Carpuncle-Lana](https://github.com/Carpuncle-Lana)
+
+---
+
 # GitHub CLI
 
 `gh` is GitHub on the command line. It brings pull requests, issues, and other GitHub concepts to the terminal next to where you are already working with `git` and your code.
