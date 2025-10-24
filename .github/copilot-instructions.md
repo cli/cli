@@ -1,186 +1,121 @@
-# Carpuncle Cloud - GitHub Copilot Instructions
+# GitHub CLI - Copilot Instructions
 
-## Projektübersicht
+This repository contains the GitHub CLI (`gh`), a command-line tool that brings GitHub to your terminal.
 
-**Carpuncle Cloud** ist ein Azure-basiertes KI-Framework für automatisierte Cloud-Workflows, Webhooks und Datenanalyse mit integriertem Dashboard und Backup-Funktionen.
+## Project Overview
 
-### Kernkomponenten
+- **Language**: Go 1.24+
+- **Type**: Command-line interface tool
+- **Purpose**: GitHub CLI for interacting with GitHub from the terminal
+- **License**: Open source (MIT)
 
-- **Carpuncle-Cloud**: Azure-basierte Infrastruktur mit Dashboard
-- **lana-core**: KI-Module für Lana (selbstlernende KI-Assistenz)
-- **dotnet**: Backend-Services in .NET
-- **Automatisierungsketten**: 8 Hauptautomatisierungen (Start, Scan, Manifest, Korrektur, Dashboard, Sicherheit, Dokumentation, SharePoint)
+## Project Structure
 
-## Technologien
+- `cmd/` - Main packages for building the `gh` executable
+- `pkg/` - Command implementations and core packages
+- `internal/` - Internal packages specific to this project
+- `api/` - GitHub API client utilities
+- `git/` - Git repository interaction utilities
+- `docs/` - Documentation for contributors and maintainers
+- `script/` - Build and release automation scripts
 
-### Haupttechnologien
-
-- **Cloud & Infrastructure**: Azure CLI, PowerShell 7
-- **Backend**: Node.js 18, .NET, Go
-- **CI/CD**: GitHub Actions
-- **APIs**: Microsoft Graph API
-- **Sicherheit**: Thetis FIDO, RoboForm, 2FA/SSO
-
-### Entwickler-Tools & Package Manager
-
-**Phase 2 - Developer Engine & Tool Recognition**:
-- **Programmiersprachen**: Python, C#, C++, Java, JavaScript, Go, Rust
-- **Package Manager**: npm, pip, cargo, brew, conda, dotnet, nym, winger
-- **Wichtig**: Tools lokal im Projektordner installieren, keine Systemabhängigkeiten
-
-## Build & Deployment
-
-### Deployment-Skript
-
-```powershell
-# Hauptskript für Azure-Deployment
-.\Deploy-AzureCarpuncle.ps1
+Command implementation follows this pattern:
+```
+pkg/cmd/<command>/<subcommand>/<subcommand>.go
 ```
 
-### Zielumgebung
+See [docs/project-layout.md](../docs/project-layout.md) for detailed information.
 
-- **Azure**: Testversion / Enterprise-Subscription
-- **Branch Strategy**: 
-  - `main`: Geschützt, für Production
-  - `release`: Geschützt, für Releases
-  - Feature-Branches für Entwicklung
+## Building and Testing
 
-### CI/CD Workflow
+### Building
 
-- **Trigger**: Push auf `main` Branch
-- **Schritte**: Azure Login → Ressourcen prüfen → Skript ausführen
-- **Secrets**: `AZURE_CREDENTIALS`, `SUBSCRIPTION_ID`, `APP_ID`
-
-## Projektstruktur
-
-### Verzeichnisstruktur (Phase 5)
-
-```
-T:\Carpuncle\
-├── Enrw/           # Entwicklung & Produktion
-├── Projekte/       # Projektdateien
-├── Logs/           # Log-Dateien
-└── Alliase/        # Alias-Konfigurationen
+**Unix-like systems:**
+```bash
+make                # Build the binary
+bin/gh              # Run the built binary
 ```
 
-### Repository-Organisation
+**Windows:**
+```bash
+go run script/build.go
+bin\gh
+```
 
-| Repository | Zweck |
-|-----------|-------|
-| `Carpuncle-Cloud` | Hauptprojekt mit Azure-Setup |
-| `dotnet` | Backend-Module und APIs |
-| `lana-core` | KI-Logik & Lana-Funktionen |
-| `carpuncle-docs` | Dokumentation & Playbooks |
+### Testing
+
+Run all tests:
+```bash
+go test ./...
+```
+
+Run acceptance tests:
+```bash
+go test -tags acceptance ./acceptance
+```
 
 ## Coding Standards
 
-### Allgemein
+### General Principles
 
-- Minimale Änderungen bevorzugen
-- Bestehende Konventionen respektieren
-- Keine Kommentare hinzufügen, es sei denn notwendig
-- Bestehende Libraries verwenden
+- Follow existing Go conventions and idioms
+- Keep changes minimal and focused
+- Use existing libraries and patterns already in the codebase
+- Write tests for new functionality and bug fixes
+- Ensure code passes `go test ./...` before submitting
 
-### Sicherheit (Phase 4 & 6)
+### Code Style
 
-- **SSL/OAuth**: Immer aktiviert
-- **Zugriffskontrolle**: Identity-basierte Steuerung
-- **Code Scanning**: GitHub Advanced Security aktiv
-- **Branch Protection**: Für `main` und `release` Branches
-- **Audit Logs**: Regelmäßige Überprüfung
+- Follow standard Go formatting (`gofmt`)
+- Use meaningful variable and function names
+- Keep functions focused and concise
+- Add comments only when necessary to explain non-obvious logic
+- Update help text when modifying commands
 
-### Testing & Qualität (Phase 3)
+### Commands
 
-- **Build & Run**: Erfolg-Integration erforderlich
-- **Fehlerbehandlung**: Alternative Lösungen bereitstellen
-- **SDK**: Wechsel und Neuinitialisierung bei Bedarf
-- **Alternative Compiler**: Optional verfügbar
+- Each command should have clear help text
+- Commands use the Cobra framework
+- Help text is embedded in the command's source file
+- Commands should handle errors gracefully and provide helpful error messages
 
-## Organisationsstruktur
+### API Interactions
 
-### GitHub Enterprise Setup
+- Use the utilities in `api/` package for GitHub API calls
+- Handle rate limiting appropriately
+- Use GraphQL when possible for efficiency
+- Include proper error handling for network failures
 
-- **Enterprise**: `carpuncle`
-- **Organisation**: `carpunclede` (Technische Repos)
-- **Benutzer**: `Carpuncle-Lana` (Persönliches Profil)
-- **Teams**: DevOps, KI, Frontend, Security
+## Contributing
 
-### Labels & Projects
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for detailed contribution guidelines.
 
-Verwende folgende Labels für Issues und PRs:
-- `feature`: Neue Funktionalität
-- `bug`: Fehlerbehebungen
-- `infra`: Infrastruktur-Änderungen
-- `ki`: KI/ML-bezogene Änderungen
-- `dashboard`: Dashboard-Funktionalität
+### Pull Request Guidelines
 
-## Phase-Spezifische Hinweise
+- Only work on issues labeled `help wanted`
+- Issues labeled `core` require internal context and are not open for external contributions
+- Keep PR scope limited to the issue's acceptance criteria
+- Add tests for new features and bug fixes
+- Update documentation if adding/modifying commands
+- Mention `@cli/code-reviewers` if acceptance criteria are unclear
 
-### Phase 1: Identität & Infrastruktur
-- OneDrive & Google Drive Integration
-- Geräteunabhängiges Geräte-Syncri
-- Alias-Verwaltung: `carpuncle-pc@live.de`, `thoma@carpuncle.eu`, `carpV@carpuncle.eu`
+### Testing Requirements
 
-### Phase 2: Entwickler-Engine
-- Multi-Language Support
-- Lokale Tool-Installation
-- Keine Systemabhängigkeiten
+- All new code should include tests
+- Tests should pass locally before submitting PR
+- Acceptance tests should be added for user-facing changes
+- Mock external dependencies in unit tests
 
-### Phase 3: Projektinitialisierung
-- Framework-basierte Initialisierung (z.B. `carpuncle init`)
-- Automatisierte Tests
-- Build & Run Integration
+## Release Process
 
-### Phase 4: Webhook & Framework-Integration
-- `.carpuncle.eu` als zentrale API-Schnittstelle
-- AI-Login und Datenanalyse über zentrale Plattform
-- SSL & OAuth durchgehend aktiv
+- Releases follow semantic versioning
+- See [docs/releasing.md](../docs/releasing.md) for the release process
+- Manual pages are auto-generated from help text during releases
+- Binaries are built for macOS, Linux, and Windows
 
-### Phase 5: Speicher & Dokumentation
-- Google Drive für persönliche Daten: `CARPUNCLE/`
-- Strukturierte Verschlüsselung
-- Optional: Geräte-Cloud-Synchronisation
+## Additional Resources
 
-### Phase 6: Erweiterung & KI-Assistenz
-- Fehlererkennung mit automatischer Lösungssuche
-- Toot, Code, Struktur-Sicherheitsvorschläge
-- Identity-basierte Zugriffskontrolle
-
-## Wichtige Kontakte
-
-- **Inhaber**: Thomas Heckhoff
-- **Email**: `carpuncle-pc@live.de`
-- **GitHub**: [@Carpuncle-Lana](https://github.com/Carpuncle-Lana)
-- **Organisation**: [carpunclede](https://github.com/carpunclede)
-
-## Monitoring & Insights
-
-### GitHub Enterprise Insights
-- Commit-Aktivität überwachen
-- Issue-Flow analysieren
-- Deployment-Frequenz tracken
-
-### Status Badges
-README sollte folgende Badges enthalten:
-- Build Status
-- Test Coverage
-- Security Scanning
-- Deployment Status
-
-## Hilfreiche Befehle
-
-```bash
-# Repository klonen
-gh repo clone Carpuncle-Lana/Carpuncle
-
-# Azure Login
-az login
-
-# PowerShell Profil mit Lana laden
-. $PROFILE
-
-# Tests ausführen
-npm test
-dotnet test
-go test ./...
-```
+- [Project Layout Documentation](../docs/project-layout.md)
+- [Command-line Syntax Guidelines](../docs/command-line-syntax.md)
+- [Release Process Details](../docs/releasing.md)
+- [Security Guidelines](../docs/SECURITY_GUIDE.md)
