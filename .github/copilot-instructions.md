@@ -88,7 +88,7 @@ go test -tags acceptance ./acceptance
 
 ## Contributing
 
-See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for detailed contribution guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
 ### Pull Request Guidelines
 
