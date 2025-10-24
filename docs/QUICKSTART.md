@@ -337,8 +337,8 @@ refactor/komponente-name
 - [GitHub Copilot Instructions](../.github/copilot-instructions.md)
 
 ### Externe Ressourcen
-- [Azure CLI Dokumentation](https://docs.microsoft.com/en-us/cli/azure/)
-- [PowerShell Dokumentation](https://docs.microsoft.com/en-us/powershell/)
+- [Azure CLI Dokumentation](https://learn.microsoft.com/en-us/cli/azure/)
+- [PowerShell Dokumentation](https://learn.microsoft.com/en-us/powershell/)
 - [GitHub Actions Dokumentation](https://docs.github.com/en/actions)
 - [GitHub CLI Dokumentation](https://cli.github.com/manual/)
 
@@ -365,5 +365,5 @@ Nach dem Setup kannst du:
 
 ---
 
-*Letzte Aktualisierung: 2025-10-24*  
+*Letzte Aktualisierung: 2024-10-24*  
 *Version: 1.0.0*

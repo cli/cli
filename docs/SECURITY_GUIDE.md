@@ -288,11 +288,11 @@ $secretValue = $secret.SecretValue | ConvertFrom-SecureString -AsPlainText
 ### Weiterführende Dokumentation
 
 - [GitHub Security Best Practices](https://docs.github.com/en/code-security)
-- [Azure Security Documentation](https://docs.microsoft.com/en-us/azure/security/)
+- [Azure Security Documentation](https://learn.microsoft.com/en-us/azure/security/)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 
 ---
 
-*Letzte Aktualisierung: 2025-10-24*  
+*Letzte Aktualisierung: 2024-10-24*  
 *Version: 1.0.0*  
 *Security Team: security@carpuncle.eu*

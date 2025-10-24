@@ -314,6 +314,6 @@ Carpuncle-Cloud/
 
 ---
 
-*Letzte Aktualisierung: 2025-10-24*  
+*Letzte Aktualisierung: 2024-10-24*  
 *Version: 1.0.0*  
 *Maintained by: Carpuncle DevOps Team*
