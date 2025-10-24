@@ -45,9 +45,10 @@ type SetDefaultOptions struct {
 	Prompter   iprompter
 	GitClient  *git.Client
 
-	Repo      ghrepo.Interface
-	ViewMode  bool
-	UnsetMode bool
+	Repo       ghrepo.Interface
+	RemoteName string
+	ViewMode   bool
+	UnsetMode  bool
 }
 
 func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *cobra.Command {
@@ -87,6 +88,11 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 				}
 			}
 
+			// do not allow using a positional repo argument together with --remote
+			if opts.RemoteName != "" && opts.Repo != nil {
+				return cmdutil.FlagErrorf("cannot specify a repository and --remote at the same time")
+			}
+
 			if !opts.ViewMode && !opts.IO.CanPrompt() && opts.Repo == nil {
 				return cmdutil.FlagErrorf("repository required when not running interactively")
 			}
@@ -107,6 +113,7 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 
 	cmd.Flags().BoolVarP(&opts.ViewMode, "view", "v", false, "View the current default repository")
 	cmd.Flags().BoolVarP(&opts.UnsetMode, "unset", "u", false, "Unset the current default repository")
+	cmd.Flags().StringVar(&opts.RemoteName, "remote", "", "Specify a git remote name to set as the default (e.g. origin)")
 
 	return cmd
 }
@@ -173,6 +180,18 @@ func setDefaultRun(opts *SetDefaultOptions) error {
 
 	var selectedRepo ghrepo.Interface
 
+	// If a remote name was provided, find that remote and use it
+	if opts.RemoteName != "" {
+		r, err := remotes.FindByName(opts.RemoteName)
+		if err != nil {
+			return fmt.Errorf("no remote named %s", opts.RemoteName)
+		}
+		if r.Repo == nil {
+			return fmt.Errorf("remote %s does not correspond to a GitHub repository", opts.RemoteName)
+		}
+		selectedRepo = r.Repo
+	}
+
 	if opts.Repo != nil {
 		for _, knownRepo := range knownRepos {
 			if ghrepo.IsSame(opts.Repo, knownRepo) {
@@ -217,8 +236,9 @@ func setDefaultRun(opts *SetDefaultOptions) error {
 		}
 	}
 
+	var selectedRemote *context.Remote
 	resolution := "base"
-	selectedRemote, _ := resolvedRemotes.RemoteForRepo(selectedRepo)
+	selectedRemote, _ = resolvedRemotes.RemoteForRepo(selectedRepo)
 	if selectedRemote == nil {
 		sort.Stable(remotes)
 		selectedRemote = remotes[0]

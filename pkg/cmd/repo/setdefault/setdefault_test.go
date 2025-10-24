@@ -25,7 +25,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		output   SetDefaultOptions
 		wantErr  bool
 		errMsg   string
-	}{
+	{
 		{
 			name: "no argument",
 			gitStubs: func(cs *run.CommandStubber) {
@@ -216,6 +216,31 @@ func TestDefaultRun(t *testing.T) {
 			name: "tty non-interactive mode no current default",
 			tty:  true,
 			opts: SetDefaultOptions{Repo: repo2},
+			remotes: []*context.Remote{
+				{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   repo1,
+				},
+				{
+					Remote: &git.Remote{Name: "upstream"},
+					Repo:   repo2,
+				},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryNetwork\b`),
+					httpmock.StringResponse(`{"data":{"repo_000":{"name":"REPO2","owner":{"login":"OWNER2"}}}}`),
+				)
+			},
+			gitStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --add remote.upstream.gh-resolved base`, 0, "")
+			},
+			wantStdout: "✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
+		},
+		{
+			name: "remote flag non-interactive mode",
+			tty:  true,
+			opts: SetDefaultOptions{RemoteName: "upstream"},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin"},
