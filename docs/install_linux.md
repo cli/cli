@@ -51,7 +51,7 @@ These packages are supported by the GitHub CLI maintainers with updates powered 
 > [!IMPORTANT]
 > **These commands apply to DNF5 only**. If you're using DNF4, please use [the DNF4 instructions](#dnf4).
 
-To install:
+To install:sudo.su
 
 ```bash
 sudo dnf install dnf5-plugins
