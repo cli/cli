@@ -365,6 +365,66 @@ func forkRun(opts *ForkOptions) error {
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
 			upstreamRemote := "upstream"
 
+			// Check if upstream remote already exists (e.g., from cloning a fork)
+			remotes, err := gc.Remotes(ctx)
+			if err != nil {
+				return err
+			}
+
+			// Check if a remote named "upstream" already exists
+			for _, remote := range remotes {
+				if remote.Name == upstreamRemote {
+					// If the existing upstream points to a different URL, rename it
+					existingURL := ""
+					if remote.FetchURL != nil {
+						existingURL = remote.FetchURL.String()
+					} else if remote.PushURL != nil {
+						existingURL = remote.PushURL.String()
+					}
+
+					// Normalize URLs for comparison (remove .git suffix if present)
+					normalizedExisting := strings.TrimSuffix(existingURL, ".git")
+					normalizedNew := strings.TrimSuffix(upstreamURL, ".git")
+
+					if normalizedExisting != normalizedNew {
+						// Rename the existing upstream remote to avoid conflict
+						renameTarget := "upstream-old"
+						renameCmd, err := gc.Command(ctx, "remote", "rename", upstreamRemote, renameTarget)
+						if err != nil {
+							return err
+						}
+						_, err = renameCmd.Output()
+						if err != nil {
+							return err
+						}
+
+						if connectedToTerminal {
+							fmt.Fprintf(stderr, "%s Renamed existing remote %s to %s\n", cs.SuccessIcon(), cs.Bold(upstreamRemote), cs.Bold(renameTarget))
+						}
+					} else {
+						// The upstream already points to the correct repository, skip adding it
+						if connectedToTerminal {
+							fmt.Fprintf(stderr, "%s Using existing remote %s\n", cs.SuccessIcon(), cs.Bold(upstreamRemote))
+						}
+						// Skip adding the remote since it already exists and points to the right place
+						if err := gc.SetRemoteResolution(ctx, upstreamRemote, "base"); err != nil {
+							return err
+						}
+
+						if err := gc.Fetch(ctx, upstreamRemote, ""); err != nil {
+							return err
+						}
+
+						if connectedToTerminal {
+							fmt.Fprintf(stderr, "%s Cloned fork\n", cs.SuccessIcon())
+							fmt.Fprintf(stderr, "%s Repository %s set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n", cs.WarningIcon(), cs.Bold(ghrepo.FullName(repoToFork)))
+						}
+						return nil
+					}
+					break
+				}
+			}
+
 			if _, err := gc.AddRemote(ctx, upstreamRemote, upstreamURL, []string{}); err != nil {
 				return err
 			}

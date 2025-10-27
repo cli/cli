@@ -444,6 +444,8 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone --depth 1 https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote -v`, 0, "origin\thttps://github.com/someone/REPO.git (fetch)\norigin\thttps://github.com/someone/REPO.git (push)\n")
+				cs.Register(`git -C REPO config --get-regexp \^remote\\.\.\*\\.gh-resolved\$`, 1, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
@@ -476,6 +478,8 @@ func TestRepoFork(t *testing.T) {
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/gamehendge/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote -v`, 0, "origin\thttps://github.com/gamehendge/REPO.git (fetch)\norigin\thttps://github.com/gamehendge/REPO.git (push)\n")
+				cs.Register(`git -C REPO config --get-regexp \^remote\\.\.\*\\.gh-resolved\$`, 1, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
@@ -492,6 +496,8 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote -v`, 0, "origin\thttps://github.com/someone/REPO.git (fetch)\norigin\thttps://github.com/someone/REPO.git (push)\n")
+				cs.Register(`git -C REPO config --get-regexp \^remote\\.\.\*\\.gh-resolved\$`, 1, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
@@ -528,6 +534,8 @@ func TestRepoFork(t *testing.T) {
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote -v`, 0, "origin\thttps://github.com/someone/REPO.git (fetch)\norigin\thttps://github.com/someone/REPO.git (push)\n")
+				cs.Register(`git -C REPO config --get-regexp \^remote\\.\.\*\\.gh-resolved\$`, 1, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
@@ -552,6 +560,8 @@ func TestRepoFork(t *testing.T) {
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote -v`, 0, "origin\thttps://github.com/someone/REPO.git (fetch)\norigin\thttps://github.com/someone/REPO.git (push)\n")
+				cs.Register(`git -C REPO config --get-regexp \^remote\\.\.\*\\.gh-resolved\$`, 1, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
@@ -589,6 +599,8 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote -v`, 0, "origin\thttps://github.com/someone/REPO.git (fetch)\norigin\thttps://github.com/someone/REPO.git (push)\n")
+				cs.Register(`git -C REPO config --get-regexp \^remote\\.\.\*\\.gh-resolved\$`, 1, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
@@ -604,6 +616,8 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote -v`, 0, "origin\thttps://github.com/someone/REPO.git (fetch)\norigin\thttps://github.com/someone/REPO.git (push)\n")
+				cs.Register(`git -C REPO config --get-regexp \^remote\\.\.\*\\.gh-resolved\$`, 1, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
@@ -696,6 +710,8 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 128, "")
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 128, "")
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote -v`, 0, "origin\thttps://github.com/someone/REPO.git (fetch)\norigin\thttps://github.com/someone/REPO.git (push)\n")
+				cs.Register(`git -C REPO config --get-regexp \^remote\\.\.\*\\.gh-resolved\$`, 1, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
@@ -716,6 +732,44 @@ func TestRepoFork(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  `failed to clone fork: failed to run git: git -c credential.helper= -c credential.helper=!"[^"]+" auth git-credential clone https://github.com/someone/REPO\.git exited with status 65`,
+		},
+		{
+			name: "clone with existing upstream remote pointing to different repo",
+			tty:  true,
+			opts: &ForkOptions{
+				Repository: "OWNER/REPO",
+				Clone:      true,
+			},
+			httpStubs: forkPost,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
+				// Simulate existing upstream remote pointing to a different repository
+				cs.Register(`git -C REPO remote -v`, 0, "origin\thttps://github.com/someone/REPO.git (fetch)\norigin\thttps://github.com/someone/REPO.git (push)\nupstream\thttps://github.com/original/REPO.git (fetch)\nupstream\thttps://github.com/original/REPO.git (push)\n")
+				cs.Register(`git -C REPO config --get-regexp \^remote\\.\.\*\\.gh-resolved\$`, 1, "")
+				cs.Register(`git -C REPO remote rename upstream upstream-old`, 0, "")
+				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
+			},
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Renamed existing remote upstream to upstream-old\n✓ Cloned fork\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
+		},
+		{
+			name: "clone with existing upstream remote pointing to same repo",
+			tty:  true,
+			opts: &ForkOptions{
+				Repository: "OWNER/REPO",
+				Clone:      true,
+			},
+			httpStubs: forkPost,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
+				// Simulate existing upstream remote already pointing to the correct repository
+				cs.Register(`git -C REPO remote -v`, 0, "origin\thttps://github.com/someone/REPO.git (fetch)\norigin\thttps://github.com/someone/REPO.git (push)\nupstream\thttps://github.com/OWNER/REPO.git (fetch)\nupstream\thttps://github.com/OWNER/REPO.git (push)\n")
+				cs.Register(`git -C REPO config --get-regexp \^remote\\.\.\*\\.gh-resolved\$`, 1, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
+			},
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Using existing remote upstream\n✓ Cloned fork\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 	}
 
