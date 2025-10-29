@@ -64,6 +64,9 @@ var _ gh.Config = &ConfigMock{}
 //			PromptFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Prompt method")
 //			},
+//			RepoDefaultRemoteFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the RepoDefaultRemote method")
+//			},
 //			SetFunc: func(hostname string, key string, value string)  {
 //				panic("mock out the Set method")
 //			},
@@ -127,6 +130,9 @@ type ConfigMock struct {
 
 	// PromptFunc mocks the Prompt method.
 	PromptFunc func(hostname string) gh.ConfigEntry
+
+	// RepoDefaultRemoteFunc mocks the RepoDefaultRemote method.
+	RepoDefaultRemoteFunc func(hostname string) gh.ConfigEntry
 
 	// SetFunc mocks the Set method.
 	SetFunc func(hostname string, key string, value string)
@@ -213,6 +219,11 @@ type ConfigMock struct {
 			// Hostname is the hostname argument value.
 			Hostname string
 		}
+		// RepoDefaultRemote holds details about calls to the RepoDefaultRemote method.
+		RepoDefaultRemote []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
 		// Set holds details about calls to the Set method.
 		Set []struct {
 			// Hostname is the hostname argument value.
@@ -249,6 +260,7 @@ type ConfigMock struct {
 	lockPager              sync.RWMutex
 	lockPreferEditorPrompt sync.RWMutex
 	lockPrompt             sync.RWMutex
+	lockRepoDefaultRemote  sync.RWMutex
 	lockSet                sync.RWMutex
 	lockSpinner            sync.RWMutex
 	lockVersion            sync.RWMutex
@@ -478,6 +490,22 @@ func (mock *ConfigMock) Editor(hostname string) gh.ConfigEntry {
 	mock.calls.Editor = append(mock.calls.Editor, callInfo)
 	mock.lockEditor.Unlock()
 	return mock.EditorFunc(hostname)
+}
+
+// RepoDefaultRemote calls RepoDefaultRemoteFunc.
+func (mock *ConfigMock) RepoDefaultRemote(hostname string) gh.ConfigEntry {
+	if mock.RepoDefaultRemoteFunc == nil {
+		panic("ConfigMock.RepoDefaultRemoteFunc: method is nil but Config.RepoDefaultRemote was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockRepoDefaultRemote.Lock()
+	mock.calls.RepoDefaultRemote = append(mock.calls.RepoDefaultRemote, callInfo)
+	mock.lockRepoDefaultRemote.Unlock()
+	return mock.RepoDefaultRemoteFunc(hostname)
 }
 
 // EditorCalls gets all the calls that were made to Editor.

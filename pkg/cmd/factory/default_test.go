@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -738,6 +739,119 @@ func TestPlainHttpClient(t *testing.T) {
 	assert.Nil(t, receivedHeaders.Values("Content-Type"))
 	assert.Nil(t, receivedHeaders.Values("Accept"))
 	assert.Nil(t, receivedHeaders.Values("Time-Zone"))
+}
+
+func Test_SmartBaseRepo_RepoDefaultRemote(t *testing.T) {
+	pu, _ := url.Parse("https://github.com/newowner/newrepo.git")
+
+	tests := []struct {
+		name      string
+		remotes   git.RemoteSet
+		cfgMock   *ghmock.ConfigMock
+		wantsErr  bool
+		wantsName string
+		wantsOwner string
+		wantsHost string
+	}{
+		{
+			name: "fallback selects named remote",
+			remotes: git.RemoteSet{
+				git.NewRemote("origin", "https://github.com/owner/repo.git"),
+			},
+			cfgMock: func() *ghmock.ConfigMock {
+				m := &ghmock.ConfigMock{}
+				m.AuthenticationFunc = func() gh.AuthConfig {
+					a := &config.AuthConfig{}
+					a.SetHosts([]string{"github.com"})
+					a.SetActiveToken("", "")
+					a.SetDefaultHost("github.com", "hosts")
+					return a
+				}
+				m.GetOrDefaultFunc = func(hostname string, key string) o.Option[gh.ConfigEntry] {
+					if key == "repo_default_remote" {
+						return o.Some(gh.ConfigEntry{Value: "origin", Source: gh.ConfigUserProvided})
+					}
+					return o.None[gh.ConfigEntry]()
+				}
+				return m
+			}(),
+			wantsName: "repo",
+			wantsOwner: "owner",
+			wantsHost: "github.com",
+		},
+		{
+			name: "fallback ignored when remote already resolved",
+			remotes: git.RemoteSet{
+				&git.Remote{Name: "origin", Resolved: "base", FetchURL: pu, PushURL: pu},
+			},
+			cfgMock: func() *ghmock.ConfigMock {
+				m := &ghmock.ConfigMock{}
+				m.AuthenticationFunc = func() gh.AuthConfig {
+					a := &config.AuthConfig{}
+					a.SetHosts([]string{"github.com"})
+					a.SetActiveToken("", "")
+					a.SetDefaultHost("github.com", "hosts")
+					return a
+				}
+				m.GetOrDefaultFunc = func(hostname string, key string) o.Option[gh.ConfigEntry] {
+					if key == "repo_default_remote" {
+						return o.Some(gh.ConfigEntry{Value: "origin", Source: gh.ConfigUserProvided})
+					}
+					return o.None[gh.ConfigEntry]()
+				}
+				return m
+			}(),
+			wantsName: "newrepo",
+			wantsOwner: "newowner",
+			wantsHost: "github.com",
+		},
+		{
+			name: "fallback set but non-GitHub remote",
+			remotes: git.RemoteSet{
+				git.NewRemote("origin", "https://example.com/owner/repo.git"),
+			},
+			cfgMock: func() *ghmock.ConfigMock {
+				m := &ghmock.ConfigMock{}
+				m.AuthenticationFunc = func() gh.AuthConfig {
+					a := &config.AuthConfig{}
+					// Known hosts do not include example.com, so remote will be filtered out
+					a.SetHosts([]string{"github.com"})
+					a.SetActiveToken("", "")
+					a.SetDefaultHost("github.com", "hosts")
+					return a
+				}
+				m.GetOrDefaultFunc = func(hostname string, key string) o.Option[gh.ConfigEntry] {
+					if key == "repo_default_remote" {
+						return o.Some(gh.ConfigEntry{Value: "origin", Source: gh.ConfigUserProvided})
+					}
+					return o.None[gh.ConfigEntry]()
+				}
+				return m
+			}(),
+			wantsErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := New("1")
+			rr := &remoteResolver{
+				readRemotes: func() (git.RemoteSet, error) { return tt.remotes, nil },
+				getConfig:   func() (gh.Config, error) { return tt.cfgMock, nil },
+			}
+			f.Remotes = rr.Resolver()
+			f.BaseRepo = SmartBaseRepoFunc(f)
+			repo, err := f.BaseRepo()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantsName, repo.RepoName())
+			assert.Equal(t, tt.wantsOwner, repo.RepoOwner())
+			assert.Equal(t, tt.wantsHost, repo.RepoHost())
+		})
+	}
 }
 
 func TestNewGitClient(t *testing.T) {

@@ -55,6 +55,8 @@ type Config interface {
 	Prompt(hostname string) ConfigEntry
 	// PreferEditorPrompt returns the configured editor-based prompt, optionally scoped by host.
 	PreferEditorPrompt(hostname string) ConfigEntry
+	// RepoDefaultRemote returns the configured repo default remote name, optionally scoped by host.
+	RepoDefaultRemote(hostname string) ConfigEntry
 	// Spinner returns the configured spinner setting, optionally scoped by host.
 	Spinner(hostname string) ConfigEntry
 

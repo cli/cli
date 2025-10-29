@@ -30,6 +30,7 @@ const (
 	pagerKey              = "pager"
 	promptKey             = "prompt"
 	preferEditorPromptKey = "prefer_editor_prompt"
+	repoDefaultRemote     = "repo_default_remote"
 	spinnerKey            = "spinner"
 	userKey               = "user"
 	usersKey              = "users"
@@ -162,6 +163,11 @@ func (c *cfg) Prompt(hostname string) gh.ConfigEntry {
 func (c *cfg) PreferEditorPrompt(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, preferEditorPromptKey).Unwrap()
+}
+
+func (c *cfg) RepoDefaultRemote(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, repoDefaultRemote).Unwrap()
 }
 
 func (c *cfg) Spinner(hostname string) gh.ConfigEntry {
@@ -680,6 +686,14 @@ var Options = []ConfigOption{
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Spinner(hostname).Value
+		},
+	},
+	{
+		Key:          repoDefaultRemote,
+		Description:  "the default remote name to use for gh repo/pr/issue/workflow/etc.",
+		DefaultValue: "",
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.RepoDefaultRemote(hostname).Value
 		},
 	},
 }

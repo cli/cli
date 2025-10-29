@@ -163,6 +163,27 @@ func SmartBaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// Optional global fallback for default repo selection via repo_default_remote
+		// Apply only when there is no per-repo resolution already present.
+		// This preserves precedence of: --repo, GH_REPO, and `gh repo set-default`.
+		_, err = remotes.ResolvedRemote()
+		if err != nil {
+			if cfg, cerr := f.Config(); cerr == nil {
+				if opt := cfg.GetOrDefault("", "repo_default_remote"); opt.IsSome() {
+					if entry, ok := opt.Value(); ok {
+						key := entry.Value
+						if key != "" {
+							if named, nerr := remotes.FindByName(key); nerr == nil && named != nil {
+								return named.Repo, nil
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Fall back to existing network-aware resolution and interactive prompting behavior
 		resolvedRepos, err := ghContext.ResolveRemotesToRepos(remotes, apiClient, "")
 		if err != nil {
 			return nil, err
