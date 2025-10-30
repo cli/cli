@@ -62,17 +62,17 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 		Use:   "checks [<number> | <url> | <branch>]",
 		Short: "Show CI status for a single pull request",
 		Long: heredoc.Docf(`
-			Show CI status for a single pull request.
+            Show CI status for a single pull request.
 
-			Without an argument, the pull request that belongs to the current branch
-			is selected.
+            Without an argument, the pull request that belongs to the current branch
+            is selected.
 
-			When the %[1]s--json%[1]s flag is used, it includes a %[1]sbucket%[1]s field, which categorizes
-			the %[1]sstate%[1]s field into %[1]spass%[1]s, %[1]sfail%[1]s, %[1]spending%[1]s, %[1]sskipping%[1]s, or %[1]scancel%[1]s.
+            When the %[1]s--json%[1]s flag is used, it includes a %[1]sbucket%[1]s field, which categorizes
+            the %[1]sstate%[1]s field into %[1]spass%[1]s, %[1]sfail%[1]s, %[1]spending%[1]s, %[1]sskipping%[1]s, or %[1]scancel%[1]s.
 
-			Additional exit codes:
-				8: Checks pending
-		`, "`"),
+            Additional exit codes:
+            8: Checks pending
+            `, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
@@ -117,8 +117,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
 	cmd.Flags().BoolVarP(&opts.Watch, "watch", "", false, "Watch checks until they finish")
 	cmd.Flags().BoolVarP(&opts.FailFast, "fail-fast", "", false, "Exit watch mode on first check failure")
-	// cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds when using `--watch` flag")
-    cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds in watch mode")
+	cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds in watch mode")
 	cmd.Flags().BoolVar(&opts.Required, "required", false, "Only show checks that are required")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, prCheckFields)
@@ -263,13 +262,13 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 	}
 
 	query := fmt.Sprintf(`
-	query PullRequestStatusChecks($id: ID!, $endCursor: String) {
-		node(id: $id) {
-			...on PullRequest {
-				%s
-			}
-		}
-	}`, api.RequiredStatusCheckRollupGraphQL("$id", "$endCursor", includeEvent))
+        query PullRequestStatusChecks($id: ID!, $endCursor: String) {
+        node(id: $id) {
+        ...on PullRequest {
+        %s
+        }
+        }
+        }`, api.RequiredStatusCheckRollupGraphQL("$id", "$endCursor", includeEvent))
 
 	variables := map[string]interface{}{
 		"id": pr.ID,
