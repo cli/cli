@@ -31,7 +31,7 @@ prompt_continue() {
 
 # Function to prompt for the artifacts directory and ensure it exists
 prompt_for_artifacts_dir() {
-  read -p "Please provide a directory location for storing all artifacts (leave empty for default: $DEFAULT_ARTIFACTS_DIR): "
+  read -p "Please provide a directory location for storing all artifacts (leave empty for default: $DEFAULT_ARTIFACTS_DIR): " ARTIFACTS_DIR
   # Use default if the user provides no input
   if [ -z "$ARTIFACTS_DIR" ]; then
     ARTIFACTS_DIR="$DEFAULT_ARTIFACTS_DIR"
@@ -41,7 +41,7 @@ prompt_for_artifacts_dir() {
 
 # Function to handle the setup process
 setup() {
-  # Step 1: Install prerequisites (including Go)
+  # Step 0: Install prerequisites (including Go)
   if ! command -v sudo &> /dev/null; then
     # This is to make sure the script runs on both containers and VMs.
     apt-get update
@@ -49,7 +49,7 @@ setup() {
   fi
   echo "Step 1: Installing prerequisites (Go, dpkg-dev, gpg, tree, Python)"
   sudo apt-get update
-  sudo apt-get install -y golang-go dpkg-dev gpg tree python3
+  sudo apt-get install -y golang-go dpkg-dev gpg reprepro tree python3
   prompt_continue "Next, we will ask you to provide a directory location to store all artifacts."
 
   # Prompt for the artifacts directory
@@ -65,6 +65,75 @@ setup() {
   fi
   tree "$ARTIFACTS_DIR"
   prompt_continue "Next, we will create a simple Go program within the specified directory."
+
+  # Step 1: Create a PGP key/cert that expires in 1 minute
+  echo "Step 1: Creating a PGP key/cert that expires in 1 minute"
+  cd "$ARTIFACTS_DIR"
+  echo "%echo Generating an example PGP key
+Key-Type: RSA
+Key-Length: 4096
+Name-Real: example
+Name-Email: example@example.com
+Expire-Date: $(date -u -d '+1 minute' '+%Y%m%dT%H%M%S')
+%no-ask-passphrase
+%no-protection
+%commit" > example-pgp-key.batch
+
+  mkdir -m 700 "temp-gpg-home"
+  GNUPGHOME="$(pwd)/temp-gpg-home" gpg --no-tty --batch --gen-key example-pgp-key.batch
+  GNUPGHOME="$(pwd)/temp-gpg-home" gpg --list-keys
+  GNUPGHOME="$(pwd)/temp-gpg-home" gpg --armor --export-secret-keys example > pgp-key.private # ASCII version
+  GNUPGHOME="$(pwd)/temp-gpg-home" gpg --armor --export example > pgp-key.public # ASCII version
+  GNUPGHOME="$(pwd)/temp-gpg-home" gpg --export example > pgp-key.gpg # Binary version
+
+  KEY1_FINGERPRINT="$(gpg --list-keys --list-options show-only-fpr-mbox | cut -f1 -d' ' | head -n 1)"
+  echo "Generated PGP key with fingerprint: $KEY1_FINGERPRINT"
+
+  tree
+
+  # Step 2: Create directory structure for the archive keyring deb package
+  echo "Step 2: Creating directory structure for the archive keyring deb package"
+  mkdir -p "$ARTIFACTS_DIR/example-archive-keyring"
+  cd "$ARTIFACTS_DIR/example-archive-keyring"
+  mkdir -p usr/share/keyrings
+  gpg --export-options export-minimal --export $KEY1_FINGERPRINT > usr/share/keyrings/example.pgp
+
+  mkdir -p usr/bin
+  cp "$ARTIFACTS_DIR/hello-world-program/hello-world" usr/bin/
+  echo "Binary copied to usr/bin/hello-world."
+  tree "$ARTIFACTS_DIR"
+  prompt_continue "Next, we will create the necessary control file for the deb package."
+
+  # Step 5: Create DEBIAN control file
+  echo "Step 5: Creating DEBIAN control file"
+  mkdir -p DEBIAN
+  echo "Package: hello-world
+Version: 0.0.1
+Maintainer: example <example@example.com>
+Architecture: $ARCH
+Homepage: http://example.com
+Description: A statically compiled Go program that prints hello" > DEBIAN/control
+  echo "Control file created at $ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH/DEBIAN/control."
+  tree "$ARTIFACTS_DIR"
+  prompt_continue "Next, we will build the .deb package from the files we have set up."
+
+  # Step 6: Build the deb package
+  echo "Step 6: Building the .deb package"
+  cd "$ARTIFACTS_DIR"
+  dpkg --build hello-world_0.0.1-1_$ARCH
+  echo "Deb package created: hello-world_0.0.1-1_$ARCH.deb"
+  tree "$ARTIFACTS_DIR"
+  prompt_continue "Next, we will inspect the .deb package to verify its contents."
+
+  # Step 7: Inspect the deb package
+  echo "Step 7: Inspecting the .deb package"
+  dpkg-deb --info hello-world_0.0.1-1_$ARCH.deb
+  dpkg-deb --contents hello-world_0.0.1-1_$ARCH.deb
+  prompt_continue "Next, we will set up a directory structure for hosting this package in an apt repository."
+
+
+
+
 
   # Step 2: Create Go Program
   echo "Step 2: Creating a simple Go program"
