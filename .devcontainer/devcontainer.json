@@ -1,4 +1,5 @@
-{
+{ovfezssh@gmail.com 
+	Osama Atef 
 	"image": "mcr.microsoft.com/devcontainers/go:1.24",
 	"features": {
 		"ghcr.io/devcontainers/features/sshd:1": {}
