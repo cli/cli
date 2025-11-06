@@ -1,13 +1,17 @@
 #!/bin/bash
 
 # Hint: run this at the root of the repo to spin up an Ubuntu container with
-# this script lively mounted:
+# this script lively mounted in `/root`:
 #
-#   docker run -it -d --name gpg-playground -v "$(pwd)/script/debian-devel:/root/debian-devel" python:3
+#   docker run -it -d --name gpg-playground -v "$(pwd)/script/debian-devel:/root/debian-devel" ubuntu:22.04
 #
 # And then use this to exec into the container:
 #
 #   docker exec -it gpg-playground bash
+#
+# To get rid of the container:
+#
+#   docker stop gpg-playground && docker rm gpg-playground
 #
 
 # Enable strict mode
@@ -41,7 +45,7 @@ prompt_for_artifacts_dir() {
 
 # Function to handle the setup process
 setup() {
-  # Step 0: Install prerequisites (including Go)
+  # Step 0: Install prerequisites
   if ! command -v sudo &> /dev/null; then
     # This is to make sure the script runs on both containers and VMs.
     apt-get update
@@ -50,13 +54,11 @@ setup() {
 
   echo "Step 1: Installing prerequisites"
   sudo apt-get update
-  sudo apt-get install --no-upgrade -y dpkg-dev gpg reprepro tree python3
+  sudo apt-get install --no-upgrade -y dpkg-dev busybox gpg reprepro tree
   prompt_continue "Next, we will ask you to provide a directory location to store all artifacts."
 
-  # Prompt for the artifacts directory
   prompt_for_artifacts_dir
 
-  # Check if directory exists, if not, create it
   if [ ! -d "$ARTIFACTS_DIR" ]; then
     echo "Directory does not exist. Creating $ARTIFACTS_DIR..."
     mkdir -p "$ARTIFACTS_DIR"
@@ -64,40 +66,41 @@ setup() {
   else
     echo "Directory $ARTIFACTS_DIR already exists."
   fi
-  tree "$ARTIFACTS_DIR"
-  prompt_continue "Next, we will create a apt repository in the specified directory."
 
-  # Step 1: Create a PGP key/cert that expires in 1 minute
-  echo "Step 1: Creating a PGP key/cert that expires in 1 minute"
+  prompt_continue "Next, we will create our first signing key to use it later."
+  echo "Step 2: Creating a PGP key/cert that expires in 1 minute"
+
   cd "$ARTIFACTS_DIR"
   echo "%echo Generating an example PGP key
 Key-Type: RSA
 Key-Length: 4096
-Name-Real: example
+Name-Real: example-key-1
 Name-Email: example@example.com
-Expire-Date: $(date -u -d '+1 minute' '+%Y%m%dT%H%M%S')
+Expire-Date: seconds=$((1 * 60))
 %no-ask-passphrase
 %no-protection
-%commit" > example-pgp-key.batch
+%commit" > example-pgp-key-1.batch
 
-  mkdir -m 700 "temp-gpg-home"
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --no-tty --batch --gen-key example-pgp-key.batch
+  mkdir -m 700 -p "$ARTIFACTS_DIR/temp-gpg-home"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --no-tty --batch --gen-key example-pgp-key-1.batch
   GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --armor --export-secret-keys example > pgp-key.private # ASCII version
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --armor --export example > pgp-key.public # ASCII version
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export example > pgp-key.gpg # Binary version
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --armor --export-secret-keys > pgp-key.private # ASCII version
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --armor --export > pgp-key.public # ASCII version
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export > pgp-key.gpg # Binary version
 
   KEY1_FINGERPRINT="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --list-options show-only-fpr-mbox | cut -f1 -d' ' | head -n 1)"
+  echo -n "$KEY1_FINGERPRINT" > $ARTIFACTS_DIR/key1-fingerprint
+
   echo "Generated PGP key with fingerprint: $KEY1_FINGERPRINT"
 
-  tree
+  # Step 3: Create the archive keyring deb package
+  prompt_continue "Next, we will create the archive-keyring deb file."
+  echo "Step 3: Creating the archive-keyring deb file"
 
-  # Step 2: Create the archive keyring deb package
-  echo "Step 2: Creating directory structure for the archive keyring deb package"
   mkdir -p "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_$ARCH"
   cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_$ARCH"
   mkdir -p usr/share/keyrings
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export-options export-minimal --export $KEY1_FINGERPRINT > usr/share/keyrings/example-archive-keyring.gpg
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export > usr/share/keyrings/example-archive-keyring.gpg
   mkdir -p etc/apt/sources.list.d
   echo -n "# Created by example-archive-keyring package
 deb [arch=$ARCH allow-insecure=yes signed-by=/usr/share/keyrings/example-archive-keyring.gpg] http://127.0.0.1:8000/apt-repo stable main
@@ -117,10 +120,14 @@ Pin-Priority: 100
 " > etc/apt/preferences.d/example.pref
 
   mkdir -p DEBIAN
+  # The "Section:" and "Priority:" values are to make the deb files similar to what
+  # we build in our CI. Also, omitting them from here will result in reprepro failure.
   echo -n "Package: example-archive-keyring
 Version: 0.0.1
 Maintainer: example <example@example.com>
 Architecture: $ARCH
+Section:
+Priority: optional
 Homepage: http://example.com
 Description: Example archive keyring
 " > DEBIAN/control
@@ -134,202 +141,295 @@ Description: Example archive keyring
   # dpkg-deb --info example-archive-keyring_0.0.1-1_$ARCH.deb
   # dpkg-deb --contents example-archive-keyring_0.0.1-1_$ARCH.deb
 
-  prompt_continue "Next, we will create a simple Go program to be the binary in our repository"
+  # Step 4: Create simple program
+  prompt_continue "Next, we will create the hello-world deb file."
+  echo "Step 4: Creating the hello-world deb file"
 
-  # Step 3: Create simple program
-  echo "Step 3: Creating a simple program"
   mkdir -p "$ARTIFACTS_DIR/hello-world-program"
   echo '#include <stdio.h>
 int main() {
-    printf("hello packaged world\n");
+    printf("hello packaged world (TIMESTAMP)\n");
     return 0;
-}' > $ARTIFACTS_DIR/hello-world-program/hello.c
+}' | sed "s/TIMESTAMP/$(date "+%s")/g" > $ARTIFACTS_DIR/hello-world-program/hello.c
 
-  # Step 4: Compile the program
-  echo "Step 4: Compiling the program"
   cd "$ARTIFACTS_DIR/hello-world-program"
   gcc -o hello-world hello.c
-  tree "$ARTIFACTS_DIR"
-  prompt_continue "Next, we will create the directory structure for the deb package."
 
-  # Step 5: Create directory structure for deb package
-  echo "Step 5: Creating directory structure for the deb package"
+  # Create directory structure for deb package
   mkdir -p "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH"
   cd "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH"
   mkdir -p usr/bin
   cp "$ARTIFACTS_DIR/hello-world-program/hello-world" usr/bin/
   echo "Binary copied to usr/bin/hello-world."
-  tree "$ARTIFACTS_DIR"
-  prompt_continue "Next, we will create the necessary control file for the deb package."
 
-  # Step 6: Create DEBIAN control file
-  echo "Step 6: Creating DEBIAN control file"
+  # Create DEBIAN control file
   mkdir -p DEBIAN
+  # The "Section:" and "Priority:" values are to make the deb files similar to what
+  # we build in our CI. Also, omitting them from here will result in reprepro failure.
   echo "Package: hello-world
 Version: 0.0.1
 Maintainer: example <example@example.com>
 Architecture: $ARCH
+Section:
+Priority: optional
 Homepage: http://example.com
 Description: A statically compiled Go program that prints hello" > DEBIAN/control
-  echo "Control file created at $ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH/DEBIAN/control."
-  tree "$ARTIFACTS_DIR"
-  prompt_continue "Next, we will build the .deb package from the files we have set up."
 
-  # Step 7: Build the deb package
-  echo "Step 7: Building the .deb package"
+  # Build the deb package
   cd "$ARTIFACTS_DIR"
   dpkg --build hello-world_0.0.1-1_$ARCH
   echo "Deb package created: hello-world_0.0.1-1_$ARCH.deb"
-  tree "$ARTIFACTS_DIR"
-  prompt_continue "Next, we will inspect the .deb package to verify its contents."
 
-  # Step 8: Inspect the deb package
-  echo "Step 8: Inspecting the .deb package"
-  dpkg-deb --info hello-world_0.0.1-1_$ARCH.deb
-  dpkg-deb --contents hello-world_0.0.1-1_$ARCH.deb
-  prompt_continue "Next, we will set up a directory structure for hosting this package in an apt repository."
+  # Inspect the deb package
+  # dpkg-deb --info hello-world_0.0.1-1_$ARCH.deb
+  # dpkg-deb --contents hello-world_0.0.1-1_$ARCH.deb
 
-  # Step 9: Create apt repository directory structure
-  echo "Step 9: Creating apt repository directory structure"
-  mkdir -p "$ARTIFACTS_DIR/apt-repo/pool/main/"
-  cp "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_$ARCH.deb" "$ARTIFACTS_DIR/apt-repo/pool/main/"
-  cp "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH.deb" "$ARTIFACTS_DIR/apt-repo/pool/main/"
-  mkdir -p "$ARTIFACTS_DIR/apt-repo/dists/stable/main/binary-$ARCH"
-  tree "$ARTIFACTS_DIR"
-  prompt_continue "Next, we will generate the 'Packages' file, which lists the available deb packages in the repository."
+  # Step 5: Create apt repository using reprepro
+  prompt_continue "Next, we will create an apt repository using reprepro."
+  echo "Step 5: Creating apt repository using reprepro"
 
-  # Step 10: Generate Packages file
-  echo "Step 10: Generating Packages file"
-  cd "$ARTIFACTS_DIR/apt-repo"
-  dpkg-scanpackages --arch $ARCH pool/ > dists/stable/main/binary-$ARCH/Packages
-  cat dists/stable/main/binary-$ARCH/Packages | gzip -9 > dists/stable/main/binary-$ARCH/Packages.gz
+  mkdir -p "$ARTIFACTS_DIR/apt-repo"
 
-  echo "Packages file content:"
-  cat dists/stable/main/binary-$ARCH/Packages
-  echo "There should be two entries above, one for the binary and one for the archive keyring."
-
-  tree "$ARTIFACTS_DIR"
-  prompt_continue "Next, we will create a Release file, which is required by apt repositories."
-
-  # Step 11: Create Release file with a bash script (with debugging logs to stderr)
-  echo "Step 11: Generating Release file using bash script with detailed debugging"
-  cat <<EOF > "$ARTIFACTS_DIR/generate-release.sh"
-#!/bin/bash
-set -e
-
-# Enable debug output if DEBUG is set to true or 1
-DEBUG="\${DEBUG:-false}"
-
-# Debug function to print messages to stderr if DEBUG is enabled
-debug_log() {
-    if [[ "\$DEBUG" == "true" || "\$DEBUG" == "1" ]]; then
-        echo "[DEBUG] \$1" >&2
-    fi
-}
-
-# Function to handle hashing with more detailed debugging
-do_hash() {
-    HASH_NAME=\$1
-    HASH_CMD=\$2
-    echo "\${HASH_NAME}:"
-
-    # Find all files and remove the './' prefix
-    for f in \$(find . -type f); do
-        f=\$(echo "\$f" | cut -c3-)
-
-        # Skip the Release file itself
-        if [ "\$f" = "Release" ]; then
-            debug_log "Skipping the Release file: \$f"
-            continue
-        fi
-
-        # Check file permissions and existence before hashing
-        if [ -r "\$f" ]; then
-            debug_log "Processing file: \$f"
-            debug_log "File permissions: \$(ls -l "\$f")"
-            echo " \$(\${HASH_CMD} "\$f" | cut -d' ' -f1) \$(wc -c < "\$f") \$f"
-        else
-            debug_log "[ERROR] Permission denied or file not readable: \$f"
-            echo "[ERROR] Permission denied or file not readable: \$f" >&2
-            exit 1
-        fi
-    done
-}
-
-# Start logging
-debug_log "Generating Release file with detailed debugging..."
-
-# Output Release file metadata
-cat <<EOF2
+  # make reprepro config template file
+  cat <<EOF > $ARTIFACTS_DIR/distributions.template
 Origin: Example Repository
 Label: Example
-Suite: stable
 Codename: stable
-Version: 1.0
 Architectures: <ARCH-PLACEHOLDER>
 Components: main
 Description: An example software repository
-Date: \$(date -Ru)
-EOF2
-
-# Perform MD5, SHA1, and SHA256 hashes with debugging
-do_hash "MD5Sum" "md5sum"
-do_hash "SHA1" "sha1sum"
-do_hash "SHA256" "sha256sum"
-
-debug_log "Release file generation complete."
+SignWith: <FINGERPRINT-PLACEHOLDER>
 EOF
 
-  sed -i "s/<ARCH-PLACEHOLDER>/$ARCH/g" "$ARTIFACTS_DIR/generate-release.sh"
-  chmod +x "$ARTIFACTS_DIR/generate-release.sh"
+  # Create a temp directory before calling reprepro. This is to mimic the stateless
+  # implementation we have in our CI workflow. Further reprepro calls will have a
+  # separate temp directory.
+  mkdir -p "$ARTIFACTS_DIR/temp-reprepro-1/conf"
+  cd "$ARTIFACTS_DIR/temp-reprepro-1/conf"
+  cp $ARTIFACTS_DIR/distributions.template distributions
+  sed -i "s/<ARCH-PLACEHOLDER>/$ARCH/g" distributions
+  sed -i "s/<FINGERPRINT-PLACEHOLDER>/$KEY1_FINGERPRINT/g" distributions
 
-  cd "$ARTIFACTS_DIR/apt-repo/dists/stable"
-  "$ARTIFACTS_DIR/generate-release.sh" > Release
-  echo "Release file generated."
-  tree "$ARTIFACTS_DIR"
-  prompt_continue "Next, we will sign the release with a PGP key."
+  cd "$ARTIFACTS_DIR/temp-reprepro-1"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH.deb"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_$ARCH.deb"
+  cp -a dists/ pool/ "$ARTIFACTS_DIR/apt-repo/"
 
-  # Step 12: Sign the release with the created PGP key
-  echo "Step 12: Signing the release with the created PGP key"
+  echo "These is the content of the Packages file:"
+  cat dists/stable/main/binary-$ARCH/Packages
+  echo "! Note that there should be two entries above; hello-world and the archive-keyring package."
+
+  # Step 6: Serve the repository using a local HTTP server
+  prompt_continue "Next, we will host the repository using a simple HTTP server."
+  echo "Step 6: Hosting repository with a simple HTTP server"
+
   cd "$ARTIFACTS_DIR"
+  busybox httpd -p 8000 # runs in background by default
+  echo "HTTP server started at http://127.0.0.1:8000"
 
-  # Sign the Release file and also make the InRelease file
-  cat ./apt-repo/dists/stable/Release | GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --local-user $KEY1_FINGERPRINT -abs > apt-repo/dists/stable/Release.gpg
-  cat ./apt-repo/dists/stable/Release | GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --local-user $KEY1_FINGERPRINT -abs --clearsign > apt-repo/dists/stable/InRelease
+  # Step 7: Add the apt repo entry to the host machine
+  prompt_continue "Next, we will add the apt repo entry to the host machine."
+  echo "Step 7: Adding apt repo entry to /etc/apt/sources.list.d"
 
   # Install the trust anchor (public key) on the host system for later verification.
-
+  #
   # Note: This trust anchor installation is the manual step that should be done when the
   # package is installed for the first time. That is we should still include this step
   # in our installation docs as we already have it. Future automatic upgrades of the
   # archive-keyring package will update the installed keyring, so the user would not
   # need to do this step ever again.
+  
   sudo mkdir -p -m 755 /usr/share/keyrings
-  sudo cp pgp-key.gpg /usr/share/keyrings/example-archive-keyring.gpg
+  sudo cp "$ARTIFACTS_DIR/pgp-key.gpg" /usr/share/keyrings/example-archive-keyring.gpg
   sudo chmod go+r /usr/share/keyrings/example-archive-keyring.gpg
 
-  tree
-  prompt_continue "Next, we will host the repository using Python's HTTP server for testing."
-
-  # Step 13: Serve the repository using a local HTTP server
-  echo "Step 13: Hosting repository with Python HTTP server"
-  cd "$ARTIFACTS_DIR"
-  python3 -m http.server 8000 > /dev/null 2>&1 &
-  echo "HTTP server started at http://127.0.0.1:8000"
-  prompt_continue "Next, we will add the local repository to the system's sources list and update apt."
-
-  # Step 14: Add the repository to the system's sources
-  echo "Step 14: Adding repository to /etc/apt/sources.list.d"
   echo "deb [arch=$ARCH allow-insecure=yes signed-by=/usr/share/keyrings/example-archive-keyring.gpg] http://127.0.0.1:8000/apt-repo stable main" | sudo tee /etc/apt/sources.list.d/example.list
   echo "! Note that with this config, apt allows plain HTTP comms but still verifies package signatures."
-  prompt_continue "Next, we will update apt and install the archive keyring and 'hello-world' packages from the repository."
+  echo ""
+  echo "! If you wait here until the generated key expires, you'll see the next step fails due to the expired key."
 
-  # Step 15: Update and install the packages
-  echo "Step 15: Updating apt and installing the packages"
+  # Step 8: Update and install the packages
+  prompt_continue "Next, we will update apt and install the archive keyring and 'hello-world' packages from the repository."
+  echo "Step 8: Updating apt and installing the packages"
+
   sudo apt-get update # We don't need --allow-insecure-repositories
   sudo apt-get install -y example-archive-keyring hello-world
   echo "Hello World and the archive keyring packages installed successfully."
   echo "! Note that there should be no warnings about unverified packages in the logs above."
+}
+
+# Function to handle the signing key rotation process
+newkey() {
+  prompt_continue "Next, we will ask you to provide the directory location you used for the setup step."
+
+  prompt_for_artifacts_dir
+
+  # Verify that the current key is not yet expired
+  prompt_continue "Next, we confirm the current signing key is not yet expired."
+  echo "Step 1: Verifying the current key is not yet expired"
+
+  KEY1_FINGERPRINT="$(cat $ARTIFACTS_DIR/key1-fingerprint)"
+
+  expiry_date="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons --fingerprint $KEY1_FINGERPRINT | grep -E "^pub:" | cut -f7 -d:)"
+  current_date="$(date +%s)"
+  if [ "$expiry_date" -lt "$current_date" ]; then
+    echo "The key is already expired. Please 'teardown' and start over."
+    exit 1
+  else
+    echo "Confirmed that the current signing key is still valid."
+  fi
+
+  # Generate a new key and add it to the keyring
+  prompt_continue "Next, we will generate a new PGP key that expires in 15 mins, and add it to the keyring."
+  echo "Step 2: Generating a new PGP key (expires in 15 mins) and add it to the keyring"
+
+  # Get the list of existing keys
+  existing_keys_list="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons)"
+  KEY1_FINGERPRINT="$(echo "$existing_keys_list" | grep -E "^fpr:" | cut -f10 -d: | head -n1)"
+
+  cd "$ARTIFACTS_DIR"
+  echo "%echo Generating an example PGP key
+Key-Type: RSA
+Key-Length: 4096
+Name-Real: example-key-2
+Name-Email: example@example.com
+Expire-Date: seconds=$((15 * 60))
+%no-ask-passphrase
+%no-protection
+%commit" > example-pgp-key-2.batch
+
+  mkdir -m 700 -p "$ARTIFACTS_DIR/temp-gpg-home"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --no-tty --batch --gen-key example-pgp-key-2.batch
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --armor --export-secret-keys > pgp-key.private # ASCII version
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --armor --export > pgp-key.public # ASCII version
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export > pgp-key.gpg # Binary version
+
+  new_keys_list="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons)"
+  added_key="$(comm -1 -3 <(echo "$existing_keys_list" | sort) <(echo "$new_keys_list" | sort))"
+  KEY2_FINGERPRINT="$(echo "$added_key" | grep -E "^fpr:" | cut -f10 -d: | head -n1)"
+  echo -n "$KEY2_FINGERPRINT" > $ARTIFACTS_DIR/key2-fingerprint
+
+  echo "Generated PGP key with fingerprint: $KEY2_FINGERPRINT"
+
+  # Step 3: Make a new version of the archive keyring package to deliver the updated keyring (including both keys)
+  prompt_continue "Next, we will generate the new archive-keyring package and update the apt repository."
+  echo "Step 3: Generating the new archive-keyring package and updating the apt repository."
+
+  # create a copy of the files of the previous version of the archive keyring package
+  cp -r "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_$ARCH" "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_$ARCH"
+  # update the keyring file with the new keyring (including both keys)
+  cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_$ARCH"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export > usr/share/keyrings/example-archive-keyring.gpg
+  # bump the version in the debian control file
+  sed -i 's/Version: 0\.0\.1/Version: 0.0.2/' DEBIAN/control
+
+  cd "$ARTIFACTS_DIR"
+  dpkg --build example-archive-keyring_0.0.2-1_$ARCH
+  echo "Deb package created: example-archive-keyring_0.0.2-1_$ARCH.deb"
+
+  # To inspect the .deb package:
+  # dpkg-deb --info example-archive-keyring_0.0.2-1_$ARCH.deb
+  # dpkg-deb --contents example-archive-keyring_0.0.2-1_$ARCH.deb
+
+  # Create a new temp directory before calling reprepro.
+  mkdir -p "$ARTIFACTS_DIR/temp-reprepro-2/conf"
+  cd "$ARTIFACTS_DIR/temp-reprepro-2/conf"
+  cp $ARTIFACTS_DIR/distributions.template distributions
+  sed -i "s/<ARCH-PLACEHOLDER>/$ARCH/g" distributions
+  sed -i "s/<FINGERPRINT-PLACEHOLDER>/$KEY1_FINGERPRINT $KEY2_FINGERPRINT/g" distributions
+
+  cd "$ARTIFACTS_DIR/temp-reprepro-2"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH.deb"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_$ARCH.deb"
+  cp -a dists/ pool/ "$ARTIFACTS_DIR/apt-repo/"
+
+  cd "$ARTIFACTS_DIR/apt-repo"
+  echo "New packages:"
+  cat dists/stable/main/binary-$ARCH/Packages
+  echo "! Note that there should be two entries above, with the archive keyring version bumped to 0.0.2."
+  echo "The apt repository has been updated with the new archive keyring package."
+
+  # Step 4: Upgrade the archive keyring package on the host system
+  prompt_continue "Next, we will upgrade the archive keyring package on the host system."
+  echo "Step 4: Upgrading the archive keyring package on the host system."
+
+  sudo apt-get update
+  sudo apt-get install -y --only-upgrade example-archive-keyring
+
+   echo "archive-keyring package upgraded successfully."
+   echo "! Note that in the above logs the archive-keyring is now bumped to 0.0.2."
+}
+
+deprecate() {
+  prompt_continue "Next, we will ask you to provide the directory location you used for the setup step."
+
+  prompt_for_artifacts_dir
+
+  # Step 1: Verify that the old/first current key is expired
+  prompt_continue "Next, we confirm the old/first signing key is expired."
+  echo "Step 1: Verifying the old/first key is expired"
+
+  KEY1_FINGERPRINT="$(cat $ARTIFACTS_DIR/key1-fingerprint)"
+  KEY2_FINGERPRINT="$(cat $ARTIFACTS_DIR/key2-fingerprint)"
+
+  expiry_date="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons --fingerprint $KEY1_FINGERPRINT | grep -E "^pub:" | cut -f7 -d:)"
+  current_date="$(date +%s)"
+  if [ "$expiry_date" -gt "$current_date" ]; then
+    echo "The old/first key is not yet expired. Please wait until it expires and retry."
+    echo "time to expiry (seconds): $(( $expiry_date - $current_date ))"
+    exit 1
+  else
+    echo "Confirmed that the old/first signing key is expired."
+  fi
+
+  # Step 2: Make a new version of the archive keyring package with the old key removed
+  prompt_continue "Next, we will generate the new archive-keyring package with the old key removed, and update the apt repo."
+  echo "Step 2: Generating the new archive-keyring package with the old key removed."
+
+  # create a copy of the files of the previous version of the archive keyring package
+  cp -r "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_$ARCH" "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_$ARCH"
+  # update the keyring file with the new keyring (including both keys)
+  cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_$ARCH"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export $KEY2_FINGERPRINT > usr/share/keyrings/example-archive-keyring.gpg
+  # bump the version in the debian control file
+  sed -i 's/Version: 0\.0\.2/Version: 0.0.3/' DEBIAN/control
+
+  cd "$ARTIFACTS_DIR"
+  dpkg --build example-archive-keyring_0.0.3-1_$ARCH
+  echo "Deb package created: example-archive-keyring_0.0.3-1_$ARCH.deb"
+
+  # To inspect the .deb package:
+  # dpkg-deb --info example-archive-keyring_0.0.3-1_$ARCH.deb
+  # dpkg-deb --contents example-archive-keyring_0.0.3-1_$ARCH.deb
+
+  # Create a new temp directory before calling reprepro.
+  mkdir -p "$ARTIFACTS_DIR/temp-reprepro-3/conf"
+  cd "$ARTIFACTS_DIR/temp-reprepro-3/conf"
+  cp $ARTIFACTS_DIR/distributions.template distributions
+  sed -i "s/<ARCH-PLACEHOLDER>/$ARCH/g" distributions
+  sed -i "s/<FINGERPRINT-PLACEHOLDER>/$KEY2_FINGERPRINT/g" distributions
+
+  cd "$ARTIFACTS_DIR/temp-reprepro-3"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH.deb"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_$ARCH.deb"
+  cp -a dists/ pool/ "$ARTIFACTS_DIR/apt-repo/"
+
+  cd "$ARTIFACTS_DIR/apt-repo"
+  echo "New packages:"
+  cat dists/stable/main/binary-$ARCH/Packages
+  echo "! Note that there should be two entries above, with the archive keyring version bumped to 0.0.3."
+  echo "The apt repository has been updated with the new archive keyring package."
+
+  # Step 4: Upgrade the archive keyring package on the host system
+  prompt_continue "Next, we will upgrade the archive keyring package on the host system."
+  echo "Step 4: Upgrading the archive keyring package on the host system."
+
+  sudo apt-get update
+  sudo apt-get install -y --only-upgrade example-archive-keyring
+
+  echo "archive-keyring package upgraded successfully."
+  echo "! Note that in the above logs the archive-keyring is now bumped to 0.0.3."
 }
 
 # Function to handle the teardown process
@@ -339,10 +439,10 @@ teardown() {
 
   echo "Teardown: Cleaning up everything."
 
-  # Kill the Python HTTP server if it's running
-  if pgrep -f "python3 -m http.server" > /dev/null; then
-    echo "Stopping the Python HTTP server..."
-    pkill -f "python3 -m http.server"
+  # Kill the HTTP server if it's running
+  if pgrep -f "busybox httpd" > /dev/null; then
+    echo "Stopping the HTTP server..."
+    pkill -f "busybox httpd"
     echo "Server stopped."
   fi
 
@@ -406,14 +506,19 @@ teardown() {
   echo "Cleaning apt cache..."
   sudo apt-get clean
   echo "Cleanup complete."
+  sudo apt-get update
 }
 
 # Check for the setup or teardown argument
 if [ "$1" == "setup" ]; then
   setup
+elif [ "$1" == "newkey" ]; then
+  newkey
+elif [ "$1" == "deprecate" ]; then
+  deprecate
 elif [ "$1" == "teardown" ]; then
   teardown
 else
-  echo "Usage: $0 {setup|teardown}"
+  echo "Usage: $0 {setup|newkey|deprecate|teardown}"
   exit 1
 fi
