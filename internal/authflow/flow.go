@@ -6,17 +6,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
-	"strings"
 
 	"github.com/atotto/clipboard"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/cli/oauth"
-	"github.com/henvic/httpretty"
 
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
@@ -26,20 +22,14 @@ var (
 	oauthClientID = "178c6fc778ccc68e1d6a"
 	// This value is safe to be embedded in version control
 	oauthClientSecret = "34ddeff2b558a23d38fba8a6de74f086ede1cc0b"
-
-	jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 )
 
-func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, b browser.Browser, isCopyToClipboard bool) (string, string, error) {
+// AuthFlow initiates an OAuth device or web application flow to acquire a
+// token. The provided HTTP client should be a plain client that does not set
+// auth or other headers.
+func AuthFlow(httpClient *http.Client, oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, b browser.Browser, isCopyToClipboard bool) (string, string, error) {
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
-
-	httpClient := &http.Client{}
-	debugEnabled, debugValue := utils.IsDebugEnabled()
-	if debugEnabled {
-		logTraffic := strings.Contains(debugValue, "api")
-		httpClient.Transport = verboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
-	}
 
 	minimumScopes := []string{"repo", "read:org", "gist"}
 	scopes := append(minimumScopes, additionalScopes...)
@@ -149,29 +139,4 @@ func waitForEnter(r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Scan()
 	return scanner.Err()
-}
-
-func verboseLog(out io.Writer, logTraffic bool, colorize bool) func(http.RoundTripper) http.RoundTripper {
-	logger := &httpretty.Logger{
-		Time:            true,
-		TLS:             false,
-		Colors:          colorize,
-		RequestHeader:   logTraffic,
-		RequestBody:     logTraffic,
-		ResponseHeader:  logTraffic,
-		ResponseBody:    logTraffic,
-		Formatters:      []httpretty.Formatter{&httpretty.JSONFormatter{}},
-		MaxResponseBody: 10000,
-	}
-	logger.SetOutput(out)
-	logger.SetBodyFilter(func(h http.Header) (skip bool, err error) {
-		return !inspectableMIMEType(h.Get("Content-Type")), nil
-	})
-	return logger.RoundTripper
-}
-
-func inspectableMIMEType(t string) bool {
-	return strings.HasPrefix(t, "text/") ||
-		strings.HasPrefix(t, "application/x-www-form-urlencoded") ||
-		jsonTypeRE.MatchString(t)
 }

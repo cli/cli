@@ -347,7 +347,7 @@ func forkRun(opts *ForkOptions) error {
 				forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
 				dir, err := gitClient.Clone(ctx, forkedRepoURL, opts.GitArgs)
 				if err == nil {
-					return dir, err
+					return dir, nil
 				}
 				var execError errWithExitCode
 				if errors.As(err, &execError) && execError.ExitCode() == 128 {

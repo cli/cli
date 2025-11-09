@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -111,23 +112,147 @@ func Test_NewCmdList(t *testing.T) {
 }
 
 func Test_listRun(t *testing.T) {
+	oneDayAgo := time.Now().Add(time.Duration(-24) * time.Hour)
+
 	frozenTime, err := time.Parse(time.RFC3339, "2020-08-31T15:44:24+02:00")
 	require.NoError(t, err)
+
+	httpStubs := func(createdAt time.Time) func(t *testing.T, reg *httpmock.Registry) {
+		return func(t *testing.T, reg *httpmock.Registry) {
+			reg.Register(
+				httpmock.GraphQL(`\bRepositoryReleaseList\(`),
+				httpmock.GraphQLQuery(
+					fmt.Sprintf(`
+						{ "data": { "repository": { "releases": {
+							"nodes": [
+								{
+									"name": "",
+									"tagName": "v1.1.0",
+									"isLatest": false,
+									"isDraft": true,
+									"isPrerelease": false,
+									"immutable": false,
+									"createdAt": "%[1]s",
+									"publishedAt": "%[1]s"
+								},
+								{
+									"name": "The big 1.0",
+									"tagName": "v1.0.0",
+									"isLatest": true,
+									"isDraft": false,
+									"isPrerelease": false,
+									"immutable": false,
+									"createdAt": "%[1]s",
+									"publishedAt": "%[1]s"
+								},
+								{
+									"name": "1.0 release candidate",
+									"tagName": "v1.0.0-pre.2",
+									"isLatest": false,
+									"isDraft": false,
+									"isPrerelease": true,
+									"immutable": true,
+									"createdAt": "%[1]s",
+									"publishedAt": "%[1]s"
+								},
+								{
+									"name": "New features",
+									"tagName": "v0.9.2",
+									"isLatest": false,
+									"isDraft": false,
+									"isPrerelease": false,
+									"immutable": true,
+									"createdAt": "%[1]s",
+									"publishedAt": "%[1]s"
+								}
+							]
+						} } } }`, createdAt.Format(time.RFC3339)),
+					func(s string, m map[string]interface{}) {
+						// Assert "immutable" field is requested
+						assert.Regexp(t, `\bimmutable\b`, s)
+					},
+				),
+			)
+		}
+	}
+
+	// TODO: immutableReleaseFullSupport
+	// Delete this when covered GHES versions support immutable releases.
+	httpStubsWithoutImmutableReleases := func(createdAt time.Time) func(t *testing.T, reg *httpmock.Registry) {
+		return func(t *testing.T, reg *httpmock.Registry) {
+			reg.Register(
+				httpmock.GraphQL(`\bRepositoryReleaseList\(`),
+				httpmock.GraphQLQuery(
+					fmt.Sprintf(`
+						{ "data": { "repository": { "releases": {
+							"nodes": [
+								{
+									"name": "",
+									"tagName": "v1.1.0",
+									"isLatest": false,
+									"isDraft": true,
+									"isPrerelease": false,
+									"createdAt": "%[1]s",
+									"publishedAt": "%[1]s"
+								},
+								{
+									"name": "The big 1.0",
+									"tagName": "v1.0.0",
+									"isLatest": true,
+									"isDraft": false,
+									"isPrerelease": false,
+									"createdAt": "%[1]s",
+									"publishedAt": "%[1]s"
+								},
+								{
+									"name": "1.0 release candidate",
+									"tagName": "v1.0.0-pre.2",
+									"isLatest": false,
+									"isDraft": false,
+									"isPrerelease": true,
+									"createdAt": "%[1]s",
+									"publishedAt": "%[1]s"
+								},
+								{
+									"name": "New features",
+									"tagName": "v0.9.2",
+									"isLatest": false,
+									"isDraft": false,
+									"isPrerelease": false,
+									"createdAt": "%[1]s",
+									"publishedAt": "%[1]s"
+								}
+							]
+						} } } }`, createdAt.Format(time.RFC3339)),
+					func(s string, m map[string]interface{}) {
+						// Assert "immutable" field is NOT requested
+						assert.NotRegexp(t, `\bimmutable\b`, s)
+					},
+				),
+			)
+		}
+	}
 
 	tests := []struct {
 		name       string
 		isTTY      bool
 		opts       ListOptions
+		jsonFields []string
+		httpStubs  func(*testing.T, *httpmock.Registry)
 		wantErr    string
 		wantStdout string
 		wantStderr string
 	}{
 		{
-			name:  "list releases",
+			// TODO: immutableReleaseFullSupport
+			// Delete this when covered GHES versions support immutable releases.
+			name:  "list releases, immutable releases unsupported",
 			isTTY: true,
 			opts: ListOptions{
+				Detector:     &fd.DisabledDetectorMock{},
 				LimitResults: 30,
 			},
+			httpStubs: httpStubsWithoutImmutableReleases(oneDayAgo),
 			wantStdout: heredoc.Doc(`
 				TITLE                  TYPE         TAG NAME      PUBLISHED
 				v1.1.0                 Draft        v1.1.0        about 1 day ago
@@ -138,17 +263,82 @@ func Test_listRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
-			name:  "machine-readable",
-			isTTY: false,
+			name:  "list releases, immutable releases supported",
+			isTTY: true,
 			opts: ListOptions{
+				Detector:     &fd.EnabledDetectorMock{},
 				LimitResults: 30,
 			},
+			httpStubs: httpStubs(oneDayAgo),
+			wantStdout: heredoc.Doc(`
+				TITLE                  TYPE         TAG NAME      PUBLISHED
+				v1.1.0                 Draft        v1.1.0        about 1 day ago
+				The big 1.0            Latest       v1.0.0        about 1 day ago
+				1.0 release candidate  Pre-release  v1.0.0-pre.2  about 1 day ago
+				New features                        v0.9.2        about 1 day ago
+			`),
+			wantStderr: ``,
+		},
+		{
+			// TODO: immutableReleaseFullSupport
+			// Delete this when covered GHES versions support immutable releases.
+			name:  "machine-readable, immutable releases unsupported",
+			isTTY: false,
+			opts: ListOptions{
+				Detector:     &fd.DisabledDetectorMock{},
+				LimitResults: 30,
+			},
+			httpStubs: httpStubsWithoutImmutableReleases(frozenTime),
 			wantStdout: heredoc.Doc(`
 				v1.1.0	Draft	v1.1.0	2020-08-31T15:44:24+02:00
 				The big 1.0	Latest	v1.0.0	2020-08-31T15:44:24+02:00
 				1.0 release candidate	Pre-release	v1.0.0-pre.2	2020-08-31T15:44:24+02:00
 				New features		v0.9.2	2020-08-31T15:44:24+02:00
 			`),
+			wantStderr: ``,
+		},
+		{
+			name:  "machine-readable, immutable releases supported",
+			isTTY: false,
+			opts: ListOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				LimitResults: 30,
+			},
+			httpStubs: httpStubs(frozenTime),
+			wantStdout: heredoc.Doc(`
+				v1.1.0	Draft	v1.1.0	2020-08-31T15:44:24+02:00
+				The big 1.0	Latest	v1.0.0	2020-08-31T15:44:24+02:00
+				1.0 release candidate	Pre-release	v1.0.0-pre.2	2020-08-31T15:44:24+02:00
+				New features		v0.9.2	2020-08-31T15:44:24+02:00
+			`),
+			wantStderr: ``,
+		},
+		{
+			// TODO: immutableReleaseFullSupport
+			// Delete this when covered GHES versions support immutable releases.
+			//
+			// This test ensures on unsupported hosts, "isImmutable" always defaults to false.
+			name:       "JSON, immutable releases unsupported",
+			isTTY:      false,
+			jsonFields: []string{"name", "isImmutable"},
+			opts: ListOptions{
+				Detector:     &fd.DisabledDetectorMock{},
+				LimitResults: 30,
+			},
+			httpStubs:  httpStubsWithoutImmutableReleases(frozenTime),
+			wantStdout: `[{"isImmutable":false,"name":""},{"isImmutable":false,"name":"The big 1.0"},{"isImmutable":false,"name":"1.0 release candidate"},{"isImmutable":false,"name":"New features"}]` + "\n",
+			wantStderr: ``,
+		},
+		{
+			name:       "JSON, immutable releases supported",
+			isTTY:      false,
+			jsonFields: []string{"name", "isImmutable"},
+			opts: ListOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				LimitResults: 30,
+			},
+			httpStubs:  httpStubs(frozenTime),
+			wantStdout: `[{"isImmutable":false,"name":""},{"isImmutable":false,"name":"The big 1.0"},{"isImmutable":true,"name":"1.0 release candidate"},{"isImmutable":true,"name":"New features"}]` + "\n",
 			wantStderr: ``,
 		},
 	}
@@ -159,53 +349,11 @@ func Test_listRun(t *testing.T) {
 			ios.SetStdinTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
 
-			createdAt := frozenTime
-			if tt.isTTY {
-				createdAt = time.Now().Add(time.Duration(-24) * time.Hour)
-			}
-
 			fakeHTTP := &httpmock.Registry{}
-			fakeHTTP.Register(httpmock.GraphQL(`\bRepositoryReleaseList\(`), httpmock.StringResponse(fmt.Sprintf(`
-			{ "data": { "repository": { "releases": {
-				"nodes": [
-					{
-						"name": "",
-						"tagName": "v1.1.0",
-						"isLatest": false,
-						"isDraft": true,
-						"isPrerelease": false,
-						"createdAt": "%[1]s",
-						"publishedAt": "%[1]s"
-					},
-					{
-						"name": "The big 1.0",
-						"tagName": "v1.0.0",
-						"isLatest": true,
-						"isDraft": false,
-						"isPrerelease": false,
-						"createdAt": "%[1]s",
-						"publishedAt": "%[1]s"
-					},
-					{
-						"name": "1.0 release candidate",
-						"tagName": "v1.0.0-pre.2",
-						"isLatest": false,
-						"isDraft": false,
-						"isPrerelease": true,
-						"createdAt": "%[1]s",
-						"publishedAt": "%[1]s"
-					},
-					{
-						"name": "New features",
-						"tagName": "v0.9.2",
-						"isLatest": false,
-						"isDraft": false,
-						"isPrerelease": false,
-						"createdAt": "%[1]s",
-						"publishedAt": "%[1]s"
-					}
-				]
-			} } } }`, createdAt.Format(time.RFC3339))))
+			defer fakeHTTP.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(t, fakeHTTP)
+			}
 
 			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
@@ -213,6 +361,12 @@ func Test_listRun(t *testing.T) {
 			}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
+			}
+
+			if tt.jsonFields != nil {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(tt.jsonFields)
+				tt.opts.Exporter = exporter
 			}
 
 			err := listRun(&tt.opts)
@@ -239,6 +393,7 @@ func TestExportReleases(t *testing.T) {
 		IsDraft:      true,
 		IsLatest:     false,
 		IsPrerelease: true,
+		IsImmutable:  true,
 		CreatedAt:    createdAt,
 		PublishedAt:  publishedAt,
 	}}
@@ -246,6 +401,6 @@ func TestExportReleases(t *testing.T) {
 	exporter.SetFields(releaseFields)
 	require.NoError(t, exporter.Write(ios, rs))
 	require.JSONEq(t,
-		`[{"createdAt":"2024-01-01T00:00:00Z","isDraft":true,"isLatest":false,"isPrerelease":true,"name":"v1","publishedAt":"2024-02-01T00:00:00Z","tagName":"tag"}]`,
+		`[{"createdAt":"2024-01-01T00:00:00Z","isDraft":true,"isLatest":false,"isPrerelease":true,"isImmutable":true,"name":"v1","publishedAt":"2024-02-01T00:00:00Z","tagName":"tag"}]`,
 		stdout.String())
 }

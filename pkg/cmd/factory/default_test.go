@@ -710,6 +710,36 @@ func TestSSOURL(t *testing.T) {
 	}
 }
 
+func TestPlainHttpClient(t *testing.T) {
+	var receivedHeaders *http.Header
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders = &r.Header
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	f := New("1")
+	f.Config = func() (gh.Config, error) {
+		return config.NewBlankConfig(), nil
+	}
+	ios, _, _, _ := iostreams.Test()
+	f.IOStreams = ios
+	client, err := plainHttpClientFunc(f, "v1.2.3")()
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", ts.URL, nil)
+	require.NoError(t, err)
+	res, err := client.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, 204, res.StatusCode)
+	assert.Equal(t, []string{"GitHub CLI v1.2.3"}, receivedHeaders.Values("User-Agent"))
+	assert.Nil(t, receivedHeaders.Values("Authorization"))
+	assert.Nil(t, receivedHeaders.Values("Content-Type"))
+	assert.Nil(t, receivedHeaders.Values("Accept"))
+	assert.Nil(t, receivedHeaders.Values("Time-Zone"))
+}
+
 func TestNewGitClient(t *testing.T) {
 	tests := []struct {
 		name          string

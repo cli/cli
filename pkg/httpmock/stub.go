@@ -249,6 +249,7 @@ func GraphQLQuery(body string, cb func(string, map[string]interface{})) Responde
 
 // ScopesResponder returns a response with a 200 status code and the given OAuth scopes.
 func ScopesResponder(scopes string) func(*http.Request) (*http.Response, error) {
+	//nolint:bodyclose
 	return StatusScopesResponder(http.StatusOK, scopes)
 }
 

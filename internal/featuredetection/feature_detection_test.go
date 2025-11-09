@@ -585,3 +585,114 @@ func TestAdvancedIssueSearchSupport(t *testing.T) {
 		})
 	}
 }
+
+func TestReleaseFeatures(t *testing.T) {
+	withImmutableReleaseSupport := `{"data":{"Release":{"fields":[{"name":"author"},{"name":"name"},{"name":"immutable"}]}}}`
+	withoutImmutableReleaseSupport := `{"data":{"Release":{"fields":[{"name":"author"},{"name":"name"}]}}}`
+
+	tests := []struct {
+		name         string
+		hostname     string
+		httpStubs    func(*httpmock.Registry)
+		wantFeatures ReleaseFeatures
+	}{
+		{
+			// This is not a real case as `github.com` supports immutable releases.
+			name:     "github.com, immutable releases unsupported",
+			hostname: "github.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query Release_fields\b`),
+					httpmock.StringResponse(withoutImmutableReleaseSupport),
+				)
+			},
+			wantFeatures: ReleaseFeatures{
+				ImmutableReleases: false,
+			},
+		},
+		{
+			name:     "github.com, immutable releases supported",
+			hostname: "github.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query Release_fields\b`),
+					httpmock.StringResponse(withImmutableReleaseSupport),
+				)
+			},
+			wantFeatures: ReleaseFeatures{
+				ImmutableReleases: true,
+			},
+		},
+		{
+			// This is not a real case as `github.com` supports immutable releases.
+			name:     "ghec data residency (ghe.com), immutable releases unsupported",
+			hostname: "stampname.ghe.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query Release_fields\b`),
+					httpmock.StringResponse(withoutImmutableReleaseSupport),
+				)
+			},
+			wantFeatures: ReleaseFeatures{
+				ImmutableReleases: false,
+			},
+		},
+		{
+			name:     "ghec data residency (ghe.com), immutable releases supported",
+			hostname: "stampname.ghe.com",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query Release_fields\b`),
+					httpmock.StringResponse(withImmutableReleaseSupport),
+				)
+			},
+			wantFeatures: ReleaseFeatures{
+				ImmutableReleases: true,
+			},
+		},
+		{
+			name:     "GHE, immutable releases unsupported",
+			hostname: "git.my.org",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query Release_fields\b`),
+					httpmock.StringResponse(withoutImmutableReleaseSupport),
+				)
+			},
+			wantFeatures: ReleaseFeatures{
+				ImmutableReleases: false,
+			},
+		},
+		{
+			name:     "GHE, immutable releases supported",
+			hostname: "git.my.org",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query Release_fields\b`),
+					httpmock.StringResponse(withImmutableReleaseSupport),
+				)
+			},
+			wantFeatures: ReleaseFeatures{
+				ImmutableReleases: true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			reg := &httpmock.Registry{}
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+			httpClient := &http.Client{}
+			httpmock.ReplaceTripper(httpClient, reg)
+
+			detector := NewDetector(httpClient, tt.hostname)
+
+			features, err := detector.ReleaseFeatures()
+			require.NoError(t, err)
+			require.Equal(t, tt.wantFeatures, features)
+		})
+	}
+}

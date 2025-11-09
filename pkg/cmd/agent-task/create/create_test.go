@@ -180,7 +180,7 @@ func Test_createRun(t *testing.T) {
 				ProblemStatement: "task description from arg",
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "task description from arg", problemStatement)
@@ -196,7 +196,7 @@ func Test_createRun(t *testing.T) {
 				ProblemStatement: "task description from arg",
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "task description from arg", problemStatement)
@@ -214,7 +214,7 @@ func Test_createRun(t *testing.T) {
 				ProblemStatementFile: taskDescFile,
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "task description from file", problemStatement)
@@ -231,7 +231,7 @@ func Test_createRun(t *testing.T) {
 				ProblemStatementFile: taskDescFile,
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "task description from file", problemStatement)
@@ -255,7 +255,7 @@ func Test_createRun(t *testing.T) {
 				},
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "From editor", problemStatement)
 					return &createdJobSuccessWithPR, nil
 				}
@@ -292,7 +292,7 @@ func Test_createRun(t *testing.T) {
 				ProblemStatement: "task description",
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "task description", problemStatement)
@@ -309,7 +309,7 @@ func Test_createRun(t *testing.T) {
 				BaseBranch:       "feature",
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "Do the thing", problemStatement)
@@ -334,7 +334,7 @@ func Test_createRun(t *testing.T) {
 				ProblemStatement: "Do the thing",
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "Do the thing", problemStatement)
@@ -353,7 +353,7 @@ func Test_createRun(t *testing.T) {
 				ProblemStatement: "Do the thing",
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "Do the thing", problemStatement)
@@ -376,7 +376,7 @@ func Test_createRun(t *testing.T) {
 				ProblemStatement: "Do the thing",
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "Do the thing", problemStatement)
@@ -395,7 +395,7 @@ func Test_createRun(t *testing.T) {
 				ProblemStatement: "Do the thing",
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "Do the thing", problemStatement)
@@ -420,7 +420,7 @@ func Test_createRun(t *testing.T) {
 				ProblemStatement: "Do the thing",
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "Do the thing", problemStatement)
@@ -449,7 +449,7 @@ func Test_createRun(t *testing.T) {
 				Sleep:            func(d time.Duration) {},
 			},
 			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
-				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*capi.Job, error) {
+				m.CreateJobFunc = func(ctx context.Context, owner, repo, problemStatement, baseBranch, customAgent string) (*capi.Job, error) {
 					require.Equal(t, "OWNER", owner)
 					require.Equal(t, "REPO", repo)
 					require.Equal(t, "Do the thing", problemStatement)

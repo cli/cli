@@ -1549,6 +1549,8 @@ func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
 		return false, err
 	}
 
+	defer resp.Body.Close()
+
 	switch resp.StatusCode {
 	case 200:
 		return true, nil

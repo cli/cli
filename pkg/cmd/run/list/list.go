@@ -64,6 +64,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			Also pass the %[1]s-a%[1]s flag to fetch disabled workflow runs using the %[1]sworkflow_name%[1]s and the %[1]s-w%[1]s flag.
 
 			Runs created by organization and enterprise ruleset workflows will not display a workflow name due to GitHub API limitations.
+
+			To see runs associated with a pull request, users should run %[1]sgh pr checks%[1]s.
 		`, "`"),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,

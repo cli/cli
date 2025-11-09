@@ -17,22 +17,24 @@ type tokenGetter interface {
 }
 
 type HTTPClientOptions struct {
-	AppVersion     string
-	CacheTTL       time.Duration
-	Config         tokenGetter
-	EnableCache    bool
-	Log            io.Writer
-	LogColorize    bool
-	LogVerboseHTTP bool
+	AppVersion         string
+	CacheTTL           time.Duration
+	Config             tokenGetter
+	EnableCache        bool
+	Log                io.Writer
+	LogColorize        bool
+	LogVerboseHTTP     bool
+	SkipDefaultHeaders bool
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	// Provide invalid host, and token values so gh.HTTPClient will not automatically resolve them.
 	// The real host and token are inserted at request time.
 	clientOpts := ghAPI.ClientOptions{
-		Host:         "none",
-		AuthToken:    "none",
-		LogIgnoreEnv: true,
+		Host:               "none",
+		AuthToken:          "none",
+		LogIgnoreEnv:       true,
+		SkipDefaultHeaders: opts.SkipDefaultHeaders,
 	}
 
 	debugEnabled, debugValue := utils.IsDebugEnabled()

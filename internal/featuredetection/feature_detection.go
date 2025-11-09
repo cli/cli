@@ -17,6 +17,7 @@ type Detector interface {
 	RepositoryFeatures() (RepositoryFeatures, error)
 	ProjectsV1() gh.ProjectsV1Support
 	SearchFeatures() (SearchFeatures, error)
+	ReleaseFeatures() (ReleaseFeatures, error)
 }
 
 type IssueFeatures struct {
@@ -91,6 +92,10 @@ var advancedIssueSearchSupportedAsOptIn = SearchFeatures{
 var advancedIssueSearchSupportedAsOnlyBackend = SearchFeatures{
 	AdvancedIssueSearchAPI:      true,
 	AdvancedIssueSearchAPIOptIn: false,
+}
+
+type ReleaseFeatures struct {
+	ImmutableReleases bool
 }
 
 type detector struct {
@@ -356,6 +361,36 @@ func (d *detector) SearchFeatures() (SearchFeatures, error) {
 	}
 
 	return feature, nil
+}
+
+func (d *detector) ReleaseFeatures() (ReleaseFeatures, error) {
+	// TODO: immutableReleaseFullSupport
+	// Once all supported GHES versions fully support immutable releases, we can
+	// remove this function, of course, unless there will be other release-related
+	// features that are not available on all GH hosts.
+
+	var releaseFeatureDetection struct {
+		Release struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields"`
+		} `graphql:"Release: __type(name: \"Release\")"`
+	}
+
+	gql := api.NewClientFromHTTP(d.httpClient)
+	if err := gql.Query(d.host, "Release_fields", &releaseFeatureDetection, nil); err != nil {
+		return ReleaseFeatures{}, err
+	}
+
+	for _, field := range releaseFeatureDetection.Release.Fields {
+		if field.Name == "immutable" {
+			return ReleaseFeatures{
+				ImmutableReleases: true,
+			}, nil
+		}
+	}
+
+	return ReleaseFeatures{}, nil
 }
 
 func resolveEnterpriseVersion(httpClient *http.Client, host string) (*version.Version, error) {

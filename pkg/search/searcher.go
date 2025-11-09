@@ -65,9 +65,6 @@ func NewSearcher(client *http.Client, host string, detector fd.Detector) Searche
 func (s searcher) Code(query Query) (CodeResult, error) {
 	result := CodeResult{}
 
-	var resp *http.Response
-	var err error
-
 	// We will request either the query limit if it's less than 1 page, or our max page size.
 	// This number doesn't change to keep a valid offset.
 	//
@@ -77,15 +74,11 @@ func (s searcher) Code(query Query) (CodeResult, error) {
 	// If we were to request page #2 for 50 items, we would instead get items 50 to 99.
 	numItemsToRetrieve := query.Limit
 	query.Limit = min(numItemsToRetrieve, maxPerPage)
+	query.Page = 1
 
 	for numItemsToRetrieve > 0 {
-		query.Page = nextPage(resp)
-		if query.Page == 0 {
-			break
-		}
-
 		page := CodeResult{}
-		resp, err = s.search(query, &page)
+		link, err := s.search(query, &page)
 		if err != nil {
 			return result, err
 		}
@@ -99,6 +92,11 @@ func (s searcher) Code(query Query) (CodeResult, error) {
 		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
 		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
+
+		query.Page = nextPage(link)
+		if query.Page == 0 {
+			break
+		}
 	}
 
 	return result, nil
@@ -107,20 +105,13 @@ func (s searcher) Code(query Query) (CodeResult, error) {
 func (s searcher) Commits(query Query) (CommitsResult, error) {
 	result := CommitsResult{}
 
-	var resp *http.Response
-	var err error
-
 	numItemsToRetrieve := query.Limit
 	query.Limit = min(numItemsToRetrieve, maxPerPage)
+	query.Page = 1
 
 	for numItemsToRetrieve > 0 {
-		query.Page = nextPage(resp)
-		if query.Page == 0 {
-			break
-		}
-
 		page := CommitsResult{}
-		resp, err = s.search(query, &page)
+		link, err := s.search(query, &page)
 		if err != nil {
 			return result, err
 		}
@@ -130,6 +121,11 @@ func (s searcher) Commits(query Query) (CommitsResult, error) {
 		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
 		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
+
+		query.Page = nextPage(link)
+		if query.Page == 0 {
+			break
+		}
 	}
 	return result, nil
 }
@@ -137,20 +133,13 @@ func (s searcher) Commits(query Query) (CommitsResult, error) {
 func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 	result := RepositoriesResult{}
 
-	var resp *http.Response
-	var err error
-
 	numItemsToRetrieve := query.Limit
 	query.Limit = min(numItemsToRetrieve, maxPerPage)
+	query.Page = 1
 
 	for numItemsToRetrieve > 0 {
-		query.Page = nextPage(resp)
-		if query.Page == 0 {
-			break
-		}
-
 		page := RepositoriesResult{}
-		resp, err = s.search(query, &page)
+		link, err := s.search(query, &page)
 		if err != nil {
 			return result, err
 		}
@@ -160,6 +149,11 @@ func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
 		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
+
+		query.Page = nextPage(link)
+		if query.Page == 0 {
+			break
+		}
 	}
 	return result, nil
 }
@@ -167,20 +161,12 @@ func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 func (s searcher) Issues(query Query) (IssuesResult, error) {
 	result := IssuesResult{}
 
-	var resp *http.Response
-	var err error
-
 	numItemsToRetrieve := query.Limit
 	query.Limit = min(numItemsToRetrieve, maxPerPage)
-
+	query.Page = 1
 	for numItemsToRetrieve > 0 {
-		query.Page = nextPage(resp)
-		if query.Page == 0 {
-			break
-		}
-
 		page := IssuesResult{}
-		resp, err = s.search(query, &page)
+		link, err := s.search(query, &page)
 		if err != nil {
 			return result, err
 		}
@@ -190,11 +176,18 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
 		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
+
+		query.Page = nextPage(link)
+		if query.Page == 0 {
+			break
+		}
 	}
 	return result, nil
 }
 
-// search makes a single-page REST search request for code, commits, issues, prs, or repos.
+// search makes a single-page REST search request for code, commits, issues, prs, or repos,
+// and returns the link header from response for further pagination calls. If the link header
+// is not set on the response, empty string is returned.
 //
 // The result argument is populated with the following information:
 //
@@ -203,7 +196,7 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 // - Items: the actual matching search results, up to 100 max items per page
 //
 // For more information, see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28.
-func (s searcher) search(query Query, result interface{}) (*http.Response, error) {
+func (s searcher) search(query Query, result interface{}) (string, error) {
 	path := fmt.Sprintf("%ssearch/%s", ghinstance.RESTPrefix(s.host), query.Kind)
 	qs := url.Values{}
 	qs.Set("page", strconv.Itoa(query.Page))
@@ -216,7 +209,7 @@ func (s searcher) search(query Query, result interface{}) (*http.Response, error
 		// issues.
 		features, err := s.detector.SearchFeatures()
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 
 		if !features.AdvancedIssueSearchAPI {
@@ -242,7 +235,7 @@ func (s searcher) search(query Query, result interface{}) (*http.Response, error
 	url := fmt.Sprintf("%s?%s", path, qs.Encode())
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
@@ -252,19 +245,22 @@ func (s searcher) search(query Query, result interface{}) (*http.Response, error
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer resp.Body.Close()
+
+	link := resp.Header.Get("Link")
+
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if !success {
-		return resp, handleHTTPError(resp)
+		return link, handleHTTPError(resp)
 	}
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(result)
 	if err != nil {
-		return resp, err
+		return link, err
 	}
-	return resp, nil
+	return link, nil
 }
 
 // URL returns URL to the global search in web GUI (i.e. github.com/search).
@@ -317,16 +313,17 @@ func handleHTTPError(resp *http.Response) error {
 	return httpError
 }
 
-// https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api
-func nextPage(resp *http.Response) (page int) {
-	if resp == nil {
-		return 1
-	}
-
+// nextPage extracts the next page number from an API response's link header. if
+// the provided link header is empty or there is no next page, zero is returned.
+//
+// See API [docs] on pagination for more information.
+//
+// [docs]: https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api
+func nextPage(link string) (page int) {
 	// When using pagination, responses get a "Link" field in their header.
 	// When a next page is available, "Link" contains a link to the next page
 	// tagged with rel="next".
-	for _, m := range linkRE.FindAllStringSubmatch(resp.Header.Get("Link"), -1) {
+	for _, m := range linkRE.FindAllStringSubmatch(link, -1) {
 		if !(len(m) > 2 && m[2] == "next") {
 			continue
 		}

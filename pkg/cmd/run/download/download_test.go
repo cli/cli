@@ -527,7 +527,7 @@ func Test_runDownload(t *testing.T) {
 				},
 			},
 			expectedFiles: []string{
-				filepath.Join("non-artifact-2-file"),
+				"non-artifact-2-file",
 			},
 		},
 		{
@@ -681,7 +681,7 @@ func Test_runDownload(t *testing.T) {
 					})
 			},
 			expectedFiles: []string{
-				filepath.Join("artifact-2-file"),
+				"artifact-2-file",
 			},
 		},
 		{

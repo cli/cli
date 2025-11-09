@@ -21,11 +21,11 @@ type token string
 type username string
 
 type RefreshOptions struct {
-	IO         *iostreams.IOStreams
-	Config     func() (gh.Config, error)
-	HttpClient *http.Client
-	GitClient  *git.Client
-	Prompter   shared.Prompt
+	IO              *iostreams.IOStreams
+	Config          func() (gh.Config, error)
+	PlainHttpClient func() (*http.Client, error)
+	GitClient       *git.Client
+	Prompter        shared.Prompt
 
 	MainExecutable string
 
@@ -33,7 +33,7 @@ type RefreshOptions struct {
 	Scopes       []string
 	RemoveScopes []string
 	ResetScopes  bool
-	AuthFlow     func(*iostreams.IOStreams, string, []string, bool, bool) (token, username, error)
+	AuthFlow     func(*http.Client, *iostreams.IOStreams, string, []string, bool, bool) (token, username, error)
 
 	Interactive     bool
 	InsecureStorage bool
@@ -44,13 +44,13 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(io *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool) (token, username, error) {
-			t, u, err := authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser, clipboard)
+		AuthFlow: func(httpClient *http.Client, io *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool) (token, username, error) {
+			t, u, err := authflow.AuthFlow(httpClient, hostname, io, "", scopes, interactive, f.Browser, clipboard)
 			return token(t), username(u), err
 		},
-		HttpClient: &http.Client{},
-		GitClient:  f.GitClient,
-		Prompter:   f.Prompter,
+		PlainHttpClient: f.PlainHttpClient,
+		GitClient:       f.GitClient,
+		Prompter:        f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -125,6 +125,11 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 }
 
 func refreshRun(opts *RefreshOptions) error {
+	plainHTTPClient, err := opts.PlainHttpClient()
+	if err != nil {
+		return err
+	}
+
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -171,7 +176,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	if !opts.ResetScopes {
 		if oldToken, _ := authCfg.ActiveToken(hostname); oldToken != "" {
-			if oldScopes, err := shared.GetScopes(opts.HttpClient, hostname, oldToken); err == nil {
+			if oldScopes, err := shared.GetScopes(plainHTTPClient, hostname, oldToken); err == nil {
 				for _, s := range strings.Split(oldScopes, ",") {
 					s = strings.TrimSpace(s)
 					if s != "" {
@@ -204,7 +209,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	additionalScopes.RemoveValues(opts.RemoveScopes)
 
-	authedToken, authedUser, err := opts.AuthFlow(opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, opts.Clipboard)
+	authedToken, authedUser, err := opts.AuthFlow(plainHTTPClient, opts.IO, hostname, additionalScopes.ToSlice(), opts.Interactive, opts.Clipboard)
 	if err != nil {
 		return err
 	}

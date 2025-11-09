@@ -136,6 +136,16 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	render := func(gf *shared.GistFile) error {
+		if gf.Truncated {
+			fullContent, err := shared.GetRawGistFile(client, gf.RawURL)
+
+			if err != nil {
+				return err
+			}
+
+			gf.Content = fullContent
+		}
+
 		if shared.IsBinaryContents([]byte(gf.Content)) {
 			if len(gist.Files) == 1 || opts.Filename != "" {
 				return fmt.Errorf("error: file is binary")
