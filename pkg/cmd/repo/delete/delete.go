@@ -62,6 +62,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				if !opts.IO.CanPrompt() {
 					return cmdutil.FlagErrorf("cannot non-interactively delete current repository. Please specify a repository or run interactively")
 				}
+				_, _ = fmt.Fprintln(opts.IO.ErrOut, "Warning: `--yes` is ignored since no repository was specified")
 				opts.Confirmed = false
 			}
 

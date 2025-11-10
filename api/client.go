@@ -152,6 +152,8 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 }
 
 // HandleHTTPError parses a http.Response into a HTTPError.
+//
+// The caller is responsible to close the response body stream.
 func HandleHTTPError(resp *http.Response) error {
 	return handleResponse(ghAPI.HandleHTTPError(resp))
 }
@@ -196,12 +198,11 @@ func ScopesSuggestion(resp *http.Response) string {
 // EndpointNeedsScopes adds additional OAuth scopes to an HTTP response as if they were returned from the
 // server endpoint. This improves HTTP 4xx error messaging for endpoints that don't explicitly list the
 // OAuth scopes they need.
-func EndpointNeedsScopes(resp *http.Response, s string) *http.Response {
+func EndpointNeedsScopes(resp *http.Response, s string) {
 	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 		oldScopes := resp.Header.Get("X-Accepted-Oauth-Scopes")
 		resp.Header.Set("X-Accepted-Oauth-Scopes", fmt.Sprintf("%s, %s", oldScopes, s))
 	}
-	return resp
 }
 
 func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScopes, hostname string) string {

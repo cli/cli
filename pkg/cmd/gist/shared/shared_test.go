@@ -219,3 +219,98 @@ func TestPromptGists(t *testing.T) {
 		})
 	}
 }
+
+func TestGetRawGistFile(t *testing.T) {
+	tests := []struct {
+		name        string
+		response    string
+		statusCode  int
+		want        string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:       "successful request",
+			response:   "Hello, World!",
+			statusCode: http.StatusOK,
+			want:       "Hello, World!",
+			wantErr:    false,
+		},
+		{
+			name:       "empty response",
+			response:   "",
+			statusCode: http.StatusOK,
+			want:       "",
+			wantErr:    false,
+		},
+		{
+			name:        "not found error",
+			response:    "Not Found",
+			statusCode:  http.StatusNotFound,
+			want:        "",
+			wantErr:     true,
+			errContains: "HTTP 404",
+		},
+		{
+			name:        "server error",
+			response:    "Internal Server Error",
+			statusCode:  http.StatusInternalServerError,
+			want:        "",
+			wantErr:     true,
+			errContains: "HTTP 500",
+		},
+		{
+			name:       "large content",
+			response:   "This is a very large file content with multiple lines\nLine 2\nLine 3\nAnd more content...",
+			statusCode: http.StatusOK,
+			want:       "This is a very large file content with multiple lines\nLine 2\nLine 3\nAnd more content...",
+			wantErr:    false,
+		},
+		{
+			name:       "special characters",
+			response:   "Special chars: àáâãäåæçèéêë 中文 🎉 \"quotes\" 'single'",
+			statusCode: http.StatusOK,
+			want:       "Special chars: àáâãäåæçèéêë 中文 🎉 \"quotes\" 'single'",
+			wantErr:    false,
+		},
+		{
+			name:       "JSON content",
+			response:   `{"name": "test", "version": "1.0.0", "dependencies": {"lodash": "^4.17.21"}}`,
+			statusCode: http.StatusOK,
+			want:       `{"name": "test", "version": "1.0.0", "dependencies": {"lodash": "^4.17.21"}}`,
+			wantErr:    false,
+		},
+		{
+			name:       "HTML content",
+			response:   "<!DOCTYPE html><html><head><title>Test</title></head><body><h1>Hello</h1></body></html>",
+			statusCode: http.StatusOK,
+			want:       "<!DOCTYPE html><html><head><title>Test</title></head><body><h1>Hello</h1></body></html>",
+			wantErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			reg.Register(
+				httpmock.REST("GET", "raw-url"),
+				httpmock.StatusStringResponse(tt.statusCode, tt.response),
+			)
+
+			client := &http.Client{Transport: reg}
+			result, err := GetRawGistFile(client, "https://gist.githubusercontent.com/raw-url")
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.want, result)
+			}
+
+			reg.Verify(t)
+		})
+	}
+}

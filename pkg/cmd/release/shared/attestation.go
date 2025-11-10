@@ -17,8 +17,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-const ReleasePredicateType = "https://in-toto.io/attestation/release/v0.1"
-
 type Verifier interface {
 	// VerifyAttestation verifies the attestation for a given artifact
 	VerifyAttestation(art *artifact.DigestedArtifact, att *api.Attestation) (*verification.AttestationProcessingResult, error)

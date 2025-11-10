@@ -30,7 +30,7 @@ type EditOptions struct {
 	DetermineEditor    func() (string, error)
 	FieldsToEditSurvey func(prShared.EditPrompter, *prShared.Editable) error
 	EditFieldsSurvey   func(prShared.EditPrompter, *prShared.Editable, string) error
-	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable) error
+	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable, gh.ProjectsV1Support) error
 
 	IssueNumbers []int
 	Interactive  bool
@@ -248,7 +248,7 @@ func editRun(opts *EditOptions) error {
 	// Fetch editable shared fields once for all issues.
 	apiClient := api.NewClientFromHTTP(httpClient)
 	opts.IO.StartProgressIndicatorWithLabel("Fetching repository information")
-	err = opts.FetchOptions(apiClient, baseRepo, &editable)
+	err = opts.FetchOptions(apiClient, baseRepo, &editable, opts.Detector.ProjectsV1())
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err

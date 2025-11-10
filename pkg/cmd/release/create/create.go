@@ -106,6 +106,19 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			This may result in the same or duplicate release which may not be desirable in some cases.
 			Use %[1]s--fail-on-no-commits%[1]s to fail if no new commits are available. This flag has no
 			effect if there are no existing releases or this is the very first release.
+
+			## Immutable Releases
+
+			When release immutability is enabled for a repository, the following protections are enforced:
+			- Git tags associated with a release cannot be modified or deleted.
+			- Release assets cannot be modified or deleted.
+
+			Immutability is enforced only after a release is published. Draft releases can be modified
+			or deleted, and the associated git tags can be modified or deleted as well.
+
+			When using the %[1]screate%[1]s command to attach assets to a release, separate API calls
+			are made to create the release as a draft, upload the assets, and then publish the release.
+			Immutability protections will be enforced ONLY after the release is published.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Interactively create a release

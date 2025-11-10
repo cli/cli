@@ -230,10 +230,33 @@ func Test_editRun(t *testing.T) {
 			wantLastRequestParameters: map[string]interface{}{
 				"description": "catbug",
 				"files": map[string]interface{}{
-					"cicada.txt": map[string]interface{}{
-						"content":  "bwhiizzzbwhuiiizzzz",
-						"filename": "cicada.txt",
+					"unix.md": map[string]interface{}{
+						"content":  "new file content",
+						"filename": "unix.md",
 					},
+				},
+			},
+		},
+		{
+			name: "single file edit flag sends only edited file",
+			opts: &EditOptions{
+				Selector:     "1234",
+				EditFilename: "unix.md",
+			},
+			mockGist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"cicada.txt": {Filename: "cicada.txt", Content: "bwhiizzzbwhuiiizzzz", Type: "text/plain"},
+					"unix.md":    {Filename: "unix.md", Content: "meow", Type: "text/markdown"},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"), httpmock.StatusStringResponse(201, "{}"))
+			},
+			wantLastRequestParameters: map[string]interface{}{
+				"description": "",
+				"files": map[string]interface{}{
 					"unix.md": map[string]interface{}{
 						"content":  "new file content",
 						"filename": "unix.md",
@@ -478,10 +501,6 @@ func Test_editRun(t *testing.T) {
 			wantLastRequestParameters: map[string]interface{}{
 				"description": "",
 				"files": map[string]interface{}{
-					"sample.txt": map[string]interface{}{
-						"filename": "sample.txt",
-						"content":  "bwhiizzzbwhuiiizzzz",
-					},
 					"sample2.txt": nil,
 				},
 			},
@@ -581,6 +600,120 @@ func Test_editRun(t *testing.T) {
 			},
 			wantErr: "no file in the gist",
 		},
+		{
+			name: "edit gist with truncated file",
+			opts: &EditOptions{
+				Selector: "1234",
+			},
+			mockGist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"large.txt": {
+						Filename:  "large.txt",
+						Content:   "This is truncated content...",
+						Type:      "text/plain",
+						Truncated: true,
+						RawURL:    "https://gist.githubusercontent.com/user/1234/raw/large.txt",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			wantLastRequestParameters: map[string]interface{}{
+				"description": "",
+				"files": map[string]interface{}{
+					"large.txt": map[string]interface{}{
+						"content":  "new file content",
+						"filename": "large.txt",
+					},
+				},
+			},
+		},
+		{
+			name: "edit specific truncated file in gist with multiple truncated files",
+			opts: &EditOptions{
+				Selector:     "1234",
+				EditFilename: "large.txt",
+			},
+			mockGist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"large.txt": {
+						Filename:  "large.txt",
+						Content:   "This is truncated content...",
+						Type:      "text/plain",
+						Truncated: true,
+						RawURL:    "https://gist.githubusercontent.com/user/1234/raw/large.txt",
+					},
+					"also-truncated.txt": {
+						Filename:  "also-truncated.txt",
+						Content:   "", // Empty because GitHub truncates subsequent files
+						Type:      "text/plain",
+						Truncated: true, // Subsequent files are also marked as truncated
+						RawURL:    "https://gist.githubusercontent.com/user/1234/raw/also-truncated.txt",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			wantLastRequestParameters: map[string]interface{}{
+				"description": "",
+				"files": map[string]interface{}{
+					"large.txt": map[string]interface{}{
+						"content":  "new file content",
+						"filename": "large.txt",
+					},
+				},
+			},
+		},
+		{
+			name:  "interactive truncated multi-file gist fetches only selected file raw content the first time",
+			isTTY: true,
+			opts:  &EditOptions{Selector: "1234"},
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Edit which file?", []string{"also-truncated.txt", "large.txt"}, func(_, _ string, opts []string) (int, error) {
+					return prompter.IndexFor(opts, "large.txt")
+				})
+				pm.RegisterSelect("What next?", editNextOptions, func(_, _ string, opts []string) (int, error) {
+					return prompter.IndexFor(opts, "Edit another file")
+				})
+				// Editing large.txt twice to ensure that fetch for the raw URL happens only once
+				pm.RegisterSelect("Edit which file?", []string{"also-truncated.txt", "large.txt"}, func(_, _ string, opts []string) (int, error) {
+					return prompter.IndexFor(opts, "large.txt")
+				})
+				pm.RegisterSelect("What next?", editNextOptions, func(_, _ string, opts []string) (int, error) {
+					return prompter.IndexFor(opts, "Submit")
+				})
+			},
+			mockGist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"large.txt":          {Filename: "large.txt", Content: "This is truncated content...", Type: "text/plain", Truncated: true, RawURL: "https://gist.githubusercontent.com/user/1234/raw/large.txt"},
+					"also-truncated.txt": {Filename: "also-truncated.txt", Content: "stuff...", Type: "text/plain", Truncated: true, RawURL: "https://gist.githubusercontent.com/user/1234/raw/also-truncated.txt"},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"), httpmock.StatusStringResponse(201, "{}"))
+				// Explicity exclude also-truncated.txt raw URL to ensure it is not fetched since we did not select it.
+				reg.Exclude(t, httpmock.REST("GET", "user/1234/raw/also-truncated.txt"))
+			},
+			wantLastRequestParameters: map[string]interface{}{
+				"description": "",
+				"files": map[string]interface{}{
+					"large.txt": map[string]interface{}{
+						"content":  "new file content",
+						"filename": "large.txt",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -603,6 +736,17 @@ func Test_editRun(t *testing.T) {
 					httpmock.JSONResponse(tt.mockGist))
 				reg.Register(httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
+
+				// Register raw URL mocks for truncated files
+				for filename, file := range tt.mockGist.Files {
+					if file.Truncated && file.RawURL != "" {
+						// Mock the raw URL response for GetRawGistFile calls
+						if filename == "large.txt" {
+							reg.Register(httpmock.REST("GET", "user/1234/raw/large.txt"),
+								httpmock.StringResponse("This is the full content of the large file retrieved from raw URL"))
+						}
+					}
+				}
 			}
 		}
 

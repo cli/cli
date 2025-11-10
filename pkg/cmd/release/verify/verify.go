@@ -135,7 +135,7 @@ func verifyRun(config *VerifyConfig) error {
 	// Find all the attestations for the release tag SHA
 	attestations, err := config.AttClient.GetByDigest(api.FetchParams{
 		Digest:        releaseRefDigest.DigestWithAlg(),
-		PredicateType: shared.ReleasePredicateType,
+		PredicateType: "release",
 		Owner:         baseRepo.RepoOwner(),
 		Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
 		Initiator:     "github",
