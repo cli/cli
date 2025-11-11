@@ -1027,6 +1027,8 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 				fmt.Fprintln(opts.IO.ErrOut, "Failed to copy pull request URL to clipboard")
 				fmt.Fprintf(opts.IO.ErrOut, "  %s\n", clipErr)
 				fmt.Fprintln(opts.IO.Out, pr.URL)
+			} else {
+				fmt.Fprintf(opts.IO.Out, "Pull request URL copied to clipboard: %s\n", pr.URL)
 			}
 		} else {
 			// Print the pull request URL to stdout
