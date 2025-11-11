@@ -1,6 +1,8 @@
 package comment
 
 import (
+    "io"
+    "fmt"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -64,6 +66,14 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 				}
 				opts.Body = string(b)
 			}
+            if opts.Body == "-" {
+                b, err := io.ReadAll(opts.IO.In)
+                if err != nil {
+                    return fmt.Errorf("failed to read from stdin: %w", err)
+                }
+                opts.Body = string(b)
+
+            }
 
 			if runF != nil {
 				return runF(opts)
