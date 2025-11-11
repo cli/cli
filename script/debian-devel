@@ -285,7 +285,6 @@ newkey() {
 
   # Get the list of existing keys
   existing_keys_list="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons)"
-  KEY1_FINGERPRINT="$(echo "$existing_keys_list" | grep -E "^fpr:" | cut -f10 -d: | head -n1)"
 
   cd "$ARTIFACTS_DIR"
   echo "%echo Generating an example PGP key
