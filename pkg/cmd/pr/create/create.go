@@ -63,11 +63,12 @@ type CreateOptions struct {
 	BaseBranch string
 	HeadBranch string
 
-	Reviewers []string
-	Assignees []string
-	Labels    []string
-	Projects  []string
-	Milestone string
+	Reviewers       []string
+	Assignees       []string
+	Labels          []string
+	Projects        []string
+	Milestone       string
+	PushFirst       bool
 
 	MaintainerCanModify bool
 	Template            string
@@ -343,6 +344,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `title`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
+	fl.BoolVar(&opts.PushFirst, "push", false, "Push the current branch to the first available repository")
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
@@ -939,9 +941,13 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	pushOptions = append(pushOptions, "Skip pushing the branch")
 	pushOptions = append(pushOptions, "Cancel")
 
-	selectedOption, err := opts.Prompter.Select(fmt.Sprintf("Where should we push the '%s' branch?", currentBranch), "", pushOptions)
-	if err != nil {
-		return nil, err
+	selectedOption := 0
+	if !opts.PushFirst {
+		// Prompt the user to select a repo to push to when push flag is not set.
+		selectedOption, err = opts.Prompter.Select(fmt.Sprintf("Where should we push the '%s' branch?", currentBranch), "", pushOptions)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if selectedOption < len(pushableRepos) {
