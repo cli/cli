@@ -147,7 +147,7 @@ func verifyAssetRun(config *VerifyAssetConfig) error {
 	// Find attestations for the release tag SHA
 	attestations, err := config.AttClient.GetByDigest(api.FetchParams{
 		Digest:        releaseRefDigest.DigestWithAlg(),
-		PredicateType: shared.ReleasePredicateType,
+		PredicateType: "release",
 		Owner:         baseRepo.RepoOwner(),
 		Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
 		// TODO: Allow this value to be set via a flag.

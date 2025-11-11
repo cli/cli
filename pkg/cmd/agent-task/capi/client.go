@@ -16,7 +16,7 @@ const capiHost = "api.githubcopilot.com"
 // may be replaced with test doubles in unit tests.
 type CapiClient interface {
 	ListLatestSessionsForViewer(ctx context.Context, limit int) ([]*Session, error)
-	CreateJob(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*Job, error)
+	CreateJob(ctx context.Context, owner, repo, problemStatement, baseBranch string, customAgent string) (*Job, error)
 	GetJob(ctx context.Context, owner, repo, jobID string) (*Job, error)
 	GetSession(ctx context.Context, id string) (*Session, error)
 	GetSessionLogs(ctx context.Context, id string) ([]byte, error)

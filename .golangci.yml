@@ -1,20 +1,57 @@
 version: "2"
 
 linters:
+  default: none
   enable:
+    - bodyclose
+    - copyloopvar
+    - durationcheck
+    - gocritic
+    - govet
+    - ineffassign
+    - nilerr
     - nolintlint
-  disable:
-   # The following linters are disabled purely because this config was migrated to v2 where they are in the default
-   # set, and we should have separate work to enable them if we truly want them.
-   - staticcheck
-   - errcheck
+    # To enable later due to too many issues, and confirm we need them:
+    # - gosec
+    # - staticcheck
+    # - errcheck
   exclusions:
     paths:
       - third-party
+    rules:
+      - path: _test\.go$
+        linters:
+          - bodyclose
+          - gosec
+  settings:
+    gocritic:
+      disabled-checks:
+        - appendAssign
+      disabled-tags:
+        - style
+    gosec:
+      excludes:
+        - G110
+        - G204
+        - G301
+        - G302
+        - G304
+        - G307
+        - G404
+      config:
+        G104:
+          os:
+            - Setenv
+    govet:
+      enable:
+        - httpresponse
 
 formatters:
   enable:
     - gofmt
+  exclusions:
+    paths:
+      - third-party
 
 issues:
   max-issues-per-linter: 0

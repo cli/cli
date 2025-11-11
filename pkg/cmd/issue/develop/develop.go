@@ -61,7 +61,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			# Create a branch for issue 123 based on the my-feature branch
 			$ gh issue develop 123 --base my-feature
 
-			# Create a branch for issue 123 and checkout it out
+			# Create a branch for issue 123 and check it out
 			$ gh issue develop 123 --checkout
 
 			# Create a branch in repo monalisa/cli for issue 123 in repo cli/cli

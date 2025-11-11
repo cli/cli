@@ -637,6 +637,14 @@ func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, 
 		return nil
 	}
 
+	// The API requires empty arrays instead of null values
+	if users == nil {
+		users = []string{}
+	}
+	if teams == nil {
+		teams = []string{}
+	}
+
 	path := fmt.Sprintf(
 		"repos/%s/%s/pulls/%d/requested_reviewers",
 		url.PathEscape(repo.RepoOwner()),
@@ -644,8 +652,8 @@ func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, 
 		prNumber,
 	)
 	body := struct {
-		Reviewers     []string `json:"reviewers,omitempty"`
-		TeamReviewers []string `json:"team_reviewers,omitempty"`
+		Reviewers     []string `json:"reviewers"`
+		TeamReviewers []string `json:"team_reviewers"`
 	}{
 		Reviewers:     users,
 		TeamReviewers: teams,
@@ -664,6 +672,14 @@ func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber in
 		return nil
 	}
 
+	// The API requires empty arrays instead of null values
+	if users == nil {
+		users = []string{}
+	}
+	if teams == nil {
+		teams = []string{}
+	}
+
 	path := fmt.Sprintf(
 		"repos/%s/%s/pulls/%d/requested_reviewers",
 		url.PathEscape(repo.RepoOwner()),
@@ -671,8 +687,8 @@ func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber in
 		prNumber,
 	)
 	body := struct {
-		Reviewers     []string `json:"reviewers,omitempty"`
-		TeamReviewers []string `json:"team_reviewers,omitempty"`
+		Reviewers     []string `json:"reviewers"`
+		TeamReviewers []string `json:"team_reviewers"`
 	}{
 		Reviewers:     users,
 		TeamReviewers: teams,
@@ -762,6 +778,37 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 	}
 
 	return client.Mutate(repo.RepoHost(), "PullRequestReadyForReview", &mutation, variables)
+}
+
+func PullRequestRevert(client *Client, repo ghrepo.Interface, params githubv4.RevertPullRequestInput) (*PullRequest, error) {
+	var mutation struct {
+		RevertPullRequest struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+			RevertPullRequest struct {
+				ID     string
+				Number int
+				URL    string
+			}
+		} `graphql:"revertPullRequest(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": params,
+	}
+	err := client.Mutate(repo.RepoHost(), "PullRequestRevert", &mutation, variables)
+	if err != nil {
+		return nil, err
+	}
+	pr := &mutation.RevertPullRequest.RevertPullRequest
+	revertPR := &PullRequest{
+		ID:     pr.ID,
+		Number: pr.Number,
+		URL:    pr.URL,
+	}
+
+	return revertPR, nil
 }
 
 func ConvertPullRequestToDraft(client *Client, repo ghrepo.Interface, pr *PullRequest) error {

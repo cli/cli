@@ -24,6 +24,10 @@ func (md *DisabledDetectorMock) SearchFeatures() (SearchFeatures, error) {
 	return advancedIssueSearchNotSupported, nil
 }
 
+func (md *DisabledDetectorMock) ReleaseFeatures() (ReleaseFeatures, error) {
+	return ReleaseFeatures{}, nil
+}
+
 type EnabledDetectorMock struct{}
 
 func (md *EnabledDetectorMock) IssueFeatures() (IssueFeatures, error) {
@@ -44,6 +48,12 @@ func (md *EnabledDetectorMock) ProjectsV1() gh.ProjectsV1Support {
 
 func (md *EnabledDetectorMock) SearchFeatures() (SearchFeatures, error) {
 	return advancedIssueSearchNotSupported, nil
+}
+
+func (md *EnabledDetectorMock) ReleaseFeatures() (ReleaseFeatures, error) {
+	return ReleaseFeatures{
+		ImmutableReleases: true,
+	}, nil
 }
 
 type AdvancedIssueSearchDetectorMock struct {

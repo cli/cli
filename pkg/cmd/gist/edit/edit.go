@@ -214,11 +214,12 @@ func editRun(opts *EditOptions) error {
 
 	// Remove a file from the gist
 	if opts.RemoveFilename != "" {
-		err := removeFile(gistToUpdate, opts.RemoveFilename)
+		files, err := getFilesToRemove(gistToUpdate, opts.RemoveFilename)
 		if err != nil {
 			return err
 		}
 
+		gistToUpdate.Files = files
 		return updateGist(apiClient, host, gistToUpdate)
 	}
 
@@ -256,6 +257,20 @@ func editRun(opts *EditOptions) error {
 		}
 		if shared.IsBinaryContents([]byte(gistFile.Content)) {
 			return fmt.Errorf("editing binary files not supported")
+		}
+
+		// If the file is truncated, fetch the full content
+		// but only if it hasn't already been edited in this session
+		file := gist.Files[filename]
+		if file.Truncated {
+			if _, alreadyEdited := filesToUpdate[filename]; !alreadyEdited {
+				fullContent, err := shared.GetRawGistFile(client, file.RawURL)
+				if err != nil {
+					return err
+				}
+
+				gistFile.Content = fullContent
+			}
 		}
 
 		var text string
@@ -328,6 +343,12 @@ func editRun(opts *EditOptions) error {
 		return nil
 	}
 
+	updatedFiles := make(map[string]*gistFileToUpdate, len(filesToUpdate))
+	for filename := range filesToUpdate {
+		updatedFiles[filename] = gistToUpdate.Files[filename]
+	}
+	gistToUpdate.Files = updatedFiles
+
 	return updateGist(apiClient, host, gistToUpdate)
 }
 
@@ -385,11 +406,13 @@ func getFilesToAdd(file string, content []byte) (map[string]*gistFileToUpdate, e
 	}, nil
 }
 
-func removeFile(gist gistToUpdate, filename string) error {
+func getFilesToRemove(gist gistToUpdate, filename string) (map[string]*gistFileToUpdate, error) {
 	if _, found := gist.Files[filename]; !found {
-		return fmt.Errorf("gist has no file %q", filename)
+		return nil, fmt.Errorf("gist has no file %q", filename)
 	}
 
 	gist.Files[filename] = nil
-	return nil
+	return map[string]*gistFileToUpdate{
+		filename: nil,
+	}, nil
 }

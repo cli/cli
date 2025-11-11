@@ -16,12 +16,13 @@ import (
 
 func TestNewCmdDelete(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		tty     bool
-		output  DeleteOptions
-		wantErr bool
-		errMsg  string
+		name       string
+		input      string
+		tty        bool
+		output     DeleteOptions
+		wantErr    bool
+		wantErrMsg string
+		wantStderr string
 	}{
 		{
 			name:   "confirm flag",
@@ -36,11 +37,11 @@ func TestNewCmdDelete(t *testing.T) {
 			output: DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
 		},
 		{
-			name:    "no confirmation notty",
-			input:   "OWNER/REPO",
-			output:  DeleteOptions{RepoArg: "OWNER/REPO"},
-			wantErr: true,
-			errMsg:  "--yes required when not running interactively",
+			name:       "no confirmation notty",
+			input:      "OWNER/REPO",
+			output:     DeleteOptions{RepoArg: "OWNER/REPO"},
+			wantErr:    true,
+			wantErrMsg: "--yes required when not running interactively",
 		},
 		{
 			name:   "base repo resolution",
@@ -49,33 +50,37 @@ func TestNewCmdDelete(t *testing.T) {
 			output: DeleteOptions{},
 		},
 		{
-			name:   "yes flag ignored when no argument tty",
-			tty:    true,
-			input:  "--yes",
-			output: DeleteOptions{Confirmed: false}, // --yes should be ignored
+			name:       "yes flag ignored when no argument tty",
+			tty:        true,
+			input:      "--yes",
+			output:     DeleteOptions{Confirmed: false}, // --yes should be ignored
+			wantErr:    false,
+			wantStderr: "Warning: `--yes` is ignored since no repository was specified\n",
 		},
 		{
-			name:    "yes flag error when no argument notty",
-			input:   "--yes",
-			wantErr: true,
-			errMsg:  "cannot non-interactively delete current repository. Please specify a repository or run interactively",
+			name:       "yes flag error when no argument notty",
+			input:      "--yes",
+			wantErr:    true,
+			wantErrMsg: "cannot non-interactively delete current repository. Please specify a repository or run interactively",
 		},
 		{
-			name:    "confirm flag error when no argument notty",
-			input:   "--confirm",
-			wantErr: true,
-			errMsg:  "cannot non-interactively delete current repository. Please specify a repository or run interactively",
+			name:       "confirm flag error when no argument notty",
+			input:      "--confirm",
+			wantErr:    true,
+			wantErrMsg: "cannot non-interactively delete current repository. Please specify a repository or run interactively",
 		},
 		{
-			name:   "confirm flag also ignored when no argument tty",
-			tty:    true,
-			input:  "--confirm",
-			output: DeleteOptions{Confirmed: false}, // --confirm should also be ignored
+			name:       "confirm flag also ignored when no argument tty",
+			tty:        true,
+			input:      "--confirm",
+			output:     DeleteOptions{Confirmed: false}, // --confirm should also be ignored
+			wantStderr: "Warning: `--yes` is ignored since no repository was specified\n",
+			// Note: This does not confuse the user, as deprecation warnings are shown: "Flag --confirm has been deprecated, use `--yes` instead"
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, _, _ := iostreams.Test()
+			ios, _, _, stdErr := iostreams.Test()
 			ios.SetStdinTTY(tt.tty)
 			ios.SetStdoutTTY(tt.tty)
 			f := &cmdutil.Factory{
@@ -91,15 +96,17 @@ func TestNewCmdDelete(t *testing.T) {
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
 			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetErr(stdErr)
 
 			_, err = cmd.ExecuteC()
+
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
+				assert.Equal(t, tt.wantErrMsg, err.Error())
 				return
 			}
 			assert.NoError(t, err)
+			assert.Equal(t, tt.wantStderr, stdErr.String())
 			assert.Equal(t, tt.output.RepoArg, gotOpts.RepoArg)
 		})
 	}

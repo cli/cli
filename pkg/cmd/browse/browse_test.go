@@ -696,7 +696,7 @@ func Test_parsePathFromFileArg(t *testing.T) {
 		{
 			name:         "go to root of repository",
 			currentDir:   "pkg/cmd/browse/",
-			fileArg:      filepath.Join("../../../"),
+			fileArg:      filepath.FromSlash("../../../"),
 			expectedPath: "",
 		},
 		{

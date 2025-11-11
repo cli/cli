@@ -526,6 +526,8 @@ func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK {
 		return nil, api.HandleHTTPError(res)
 	}
@@ -563,6 +565,7 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 	if err != nil {
 		return err
 	}
+	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
 		return api.HandleHTTPError(res)

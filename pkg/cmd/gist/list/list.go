@@ -293,7 +293,7 @@ func highlightMatch(s string, filter *regexp.Regexp, matched *bool, color, highl
 			text = s[match[1]:matches[i+1][0]]
 		}
 		if _, err := out.WriteString(color(text)); err != nil {
-			return "", nil
+			return "", err
 		}
 	}
 

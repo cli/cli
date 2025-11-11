@@ -2,6 +2,8 @@ name: Go Vulnerability Check
 on:
   schedule:
     - cron: "0 0 * * 1" # Every Monday at midnight UTC
+  workflow_dispatch:
+
 jobs:
   govulncheck:
     runs-on: ubuntu-latest
