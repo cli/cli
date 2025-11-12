@@ -17,7 +17,7 @@
 # Enable strict mode
 set -eo pipefail
 
-ARCH=$(dpkg --print-architecture)
+ARCHITECTURES=("i386" "amd64" "arm64" "armhf")
 
 # Check if DEBUG is set to true or 1, enable debug print statements if so
 if [[ "$DEBUG" == "true" || "$DEBUG" == "1" ]]; then
@@ -54,7 +54,7 @@ setup() {
 
   echo "Step 1: Installing prerequisites"
   sudo apt-get update
-  sudo apt-get install --no-upgrade -y dpkg-dev busybox gpg reprepro tree
+  sudo apt-get install --no-upgrade -y busybox gpg reprepro tree
   prompt_continue "Next, we will ask you to provide a directory location to store all artifacts."
 
   prompt_for_artifacts_dir
@@ -97,13 +97,13 @@ Expire-Date: seconds=$((1 * 60))
   prompt_continue "Next, we will create the archive-keyring deb file."
   echo "Step 3: Creating the archive-keyring deb file"
 
-  mkdir -p "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_$ARCH"
-  cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_$ARCH"
+  mkdir -p "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_all"
+  cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_all"
   mkdir -p usr/share/keyrings
   GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export > usr/share/keyrings/example-archive-keyring.gpg
   mkdir -p etc/apt/sources.list.d
   echo -n "# Created by example-archive-keyring package
-deb [arch=$ARCH allow-insecure=yes signed-by=/usr/share/keyrings/example-archive-keyring.gpg] http://127.0.0.1:8000/apt-repo stable main
+deb [arch=$(echo "${ARCHITECTURES[@]}" | sed 's/ /,/g') allow-insecure=yes signed-by=/usr/share/keyrings/example-archive-keyring.gpg] http://127.0.0.1:8000/apt-repo stable main
 " > etc/apt/sources.list.d/example.list
 
   # Add the preferences file to enable automatic upgrades for the archive keyring package.
@@ -125,64 +125,59 @@ Pin-Priority: 100
   echo -n "Package: example-archive-keyring
 Version: 0.0.1
 Maintainer: example <example@example.com>
-Architecture: $ARCH
+Architecture: all
 Section:
 Priority: optional
 Homepage: http://example.com
 Description: Example archive keyring
 " > DEBIAN/control
-  echo "Control file for example-archive-keyring created at $ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_$ARCH/DEBIAN/control"
+  echo "Control file for example-archive-keyring created at $ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_all/DEBIAN/control"
 
   cd "$ARTIFACTS_DIR"
-  dpkg --build example-archive-keyring_0.0.1-1_$ARCH
-  echo "Deb package created: example-archive-keyring_0.0.1-1_$ARCH.deb"
+  dpkg --build example-archive-keyring_0.0.1-1_all
+  echo "Deb package created: example-archive-keyring_0.0.1-1_all.deb"
 
   # To inspect the .deb package:
-  # dpkg-deb --info example-archive-keyring_0.0.1-1_$ARCH.deb
-  # dpkg-deb --contents example-archive-keyring_0.0.1-1_$ARCH.deb
+  # dpkg-deb --info example-archive-keyring_0.0.1-1_all.deb
+  # dpkg-deb --contents example-archive-keyring_0.0.1-1_all.deb
 
   # Step 4: Create simple program
-  prompt_continue "Next, we will create the hello-world deb file."
-  echo "Step 4: Creating the hello-world deb file"
+  prompt_continue "Next, we will create the hello-world deb files for supported architectures."
+  echo "Step 4: Creating the hello-world deb files for supported architectures"
 
-  mkdir -p "$ARTIFACTS_DIR/hello-world-program"
-  echo '#include <stdio.h>
-int main() {
-    printf("hello packaged world (TIMESTAMP)\n");
-    return 0;
-}' | sed "s/TIMESTAMP/$(date "+%s")/g" > $ARTIFACTS_DIR/hello-world-program/hello.c
+  for arch in "${ARCHITECTURES[@]}"; do
+    mkdir -p "$ARTIFACTS_DIR/hello-world_0.0.1-1_$arch"
+    cd "$ARTIFACTS_DIR/hello-world_0.0.1-1_$arch"
 
-  cd "$ARTIFACTS_DIR/hello-world-program"
-  gcc -o hello-world hello.c
+    mkdir -p usr/bin
+    cat << EOF > usr/bin/hello-world
+#!/bin/bash
+echo "hello world (packaged for $arch)"
+EOF
+    chmod +x usr/bin/hello-world
 
-  # Create directory structure for deb package
-  mkdir -p "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH"
-  cd "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH"
-  mkdir -p usr/bin
-  cp "$ARTIFACTS_DIR/hello-world-program/hello-world" usr/bin/
-  echo "Binary copied to usr/bin/hello-world."
-
-  # Create DEBIAN control file
-  mkdir -p DEBIAN
-  # The "Section:" and "Priority:" values are to make the deb files similar to what
-  # we build in our CI. Also, omitting them from here will result in reprepro failure.
-  echo "Package: hello-world
+    # Create DEBIAN control file
+    mkdir -p DEBIAN
+    # The "Section:" and "Priority:" values are to make the deb files similar to what
+    # we build in our CI. Also, omitting them from here will result in reprepro failure.
+    echo "Package: hello-world
 Version: 0.0.1
 Maintainer: example <example@example.com>
-Architecture: $ARCH
+Architecture: $arch
 Section:
 Priority: optional
 Homepage: http://example.com
 Description: A statically compiled Go program that prints hello" > DEBIAN/control
 
-  # Build the deb package
-  cd "$ARTIFACTS_DIR"
-  dpkg --build hello-world_0.0.1-1_$ARCH
-  echo "Deb package created: hello-world_0.0.1-1_$ARCH.deb"
+    # Build the deb package
+    cd "$ARTIFACTS_DIR"
+    dpkg --build hello-world_0.0.1-1_$arch
+    echo "Deb package created: hello-world_0.0.1-1_$arch.deb"
 
-  # Inspect the deb package
-  # dpkg-deb --info hello-world_0.0.1-1_$ARCH.deb
-  # dpkg-deb --contents hello-world_0.0.1-1_$ARCH.deb
+    # Inspect the deb package
+    # dpkg-deb --info hello-world_0.0.1-1_$arch.deb
+    # dpkg-deb --contents hello-world_0.0.1-1_$arch.deb
+  done
 
   # Step 5: Create apt repository using reprepro
   prompt_continue "Next, we will create an apt repository using reprepro."
@@ -195,7 +190,7 @@ Description: A statically compiled Go program that prints hello" > DEBIAN/contro
 Origin: Example Repository
 Label: Example
 Codename: stable
-Architectures: <ARCH-PLACEHOLDER>
+Architectures: ${ARCHITECTURES[@]}
 Components: main
 Description: An example software repository
 SignWith: <FINGERPRINT-PLACEHOLDER>
@@ -207,16 +202,17 @@ EOF
   mkdir -p "$ARTIFACTS_DIR/temp-reprepro-1/conf"
   cd "$ARTIFACTS_DIR/temp-reprepro-1/conf"
   cp $ARTIFACTS_DIR/distributions.template distributions
-  sed -i "s/<ARCH-PLACEHOLDER>/$ARCH/g" distributions
   sed -i "s/<FINGERPRINT-PLACEHOLDER>/$KEY1_FINGERPRINT/g" distributions
 
   cd "$ARTIFACTS_DIR/temp-reprepro-1"
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH.deb"
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_$ARCH.deb"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_all.deb"
+  for arch in "${ARCHITECTURES[@]}"; do
+    GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/hello-world_0.0.1-1_$arch.deb"
+  done
   cp -a dists/ pool/ "$ARTIFACTS_DIR/apt-repo/"
 
-  echo "These is the content of the Packages file:"
-  cat dists/stable/main/binary-$ARCH/Packages
+  echo "These is the content of the Packages file (for amd64):"
+  cat dists/stable/main/binary-amd64/Packages
   echo "! Note that there should be two entries above; hello-world and the archive-keyring package."
 
   # Step 6: Serve the repository using a local HTTP server
@@ -243,7 +239,7 @@ EOF
   sudo cp "$ARTIFACTS_DIR/pgp-key.gpg" /usr/share/keyrings/example-archive-keyring.gpg
   sudo chmod go+r /usr/share/keyrings/example-archive-keyring.gpg
 
-  echo "deb [arch=$ARCH allow-insecure=yes signed-by=/usr/share/keyrings/example-archive-keyring.gpg] http://127.0.0.1:8000/apt-repo stable main" | sudo tee /etc/apt/sources.list.d/example.list
+  echo "deb [arch=$(echo "${ARCHITECTURES[@]}" | sed 's/ /,/g') allow-insecure=yes signed-by=/usr/share/keyrings/example-archive-keyring.gpg] http://127.0.0.1:8000/apt-repo stable main" | sudo tee /etc/apt/sources.list.d/example.list
   echo "! Note that with this config, apt allows plain HTTP comms but still verifies package signatures."
   echo ""
   echo "! If you wait here until the generated key expires, you'll see the next step fails due to the expired key."
@@ -316,36 +312,37 @@ Expire-Date: seconds=$((15 * 60))
   echo "Step 3: Generating the new archive-keyring package and updating the apt repository."
 
   # create a copy of the files of the previous version of the archive keyring package
-  cp -r "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_$ARCH" "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_$ARCH"
+  cp -r "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_all" "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_all"
   # update the keyring file with the new keyring (including both keys)
-  cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_$ARCH"
+  cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_all"
   GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export > usr/share/keyrings/example-archive-keyring.gpg
   # bump the version in the debian control file
   sed -i 's/Version: 0\.0\.1/Version: 0.0.2/' DEBIAN/control
 
   cd "$ARTIFACTS_DIR"
-  dpkg --build example-archive-keyring_0.0.2-1_$ARCH
-  echo "Deb package created: example-archive-keyring_0.0.2-1_$ARCH.deb"
+  dpkg --build example-archive-keyring_0.0.2-1_all
+  echo "Deb package created: example-archive-keyring_0.0.2-1_all.deb"
 
   # To inspect the .deb package:
-  # dpkg-deb --info example-archive-keyring_0.0.2-1_$ARCH.deb
-  # dpkg-deb --contents example-archive-keyring_0.0.2-1_$ARCH.deb
+  # dpkg-deb --info example-archive-keyring_0.0.2-1_all.deb
+  # dpkg-deb --contents example-archive-keyring_0.0.2-1_all.deb
 
   # Create a new temp directory before calling reprepro.
   mkdir -p "$ARTIFACTS_DIR/temp-reprepro-2/conf"
   cd "$ARTIFACTS_DIR/temp-reprepro-2/conf"
   cp $ARTIFACTS_DIR/distributions.template distributions
-  sed -i "s/<ARCH-PLACEHOLDER>/$ARCH/g" distributions
   sed -i "s/<FINGERPRINT-PLACEHOLDER>/$KEY1_FINGERPRINT $KEY2_FINGERPRINT/g" distributions
 
   cd "$ARTIFACTS_DIR/temp-reprepro-2"
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH.deb"
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_$ARCH.deb"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_all.deb"
+  for arch in "${ARCHITECTURES[@]}"; do
+    GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/hello-world_0.0.1-1_$arch.deb"
+  done
   cp -a dists/ pool/ "$ARTIFACTS_DIR/apt-repo/"
 
   cd "$ARTIFACTS_DIR/apt-repo"
-  echo "New packages:"
-  cat dists/stable/main/binary-$ARCH/Packages
+  echo "New packages (for amd64):"
+  cat dists/stable/main/binary-amd64/Packages
   echo "! Note that there should be two entries above, with the archive keyring version bumped to 0.0.2."
   echo "The apt repository has been updated with the new archive keyring package."
 
@@ -387,36 +384,37 @@ deprecate() {
   echo "Step 2: Generating the new archive-keyring package with the old key removed."
 
   # create a copy of the files of the previous version of the archive keyring package
-  cp -r "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_$ARCH" "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_$ARCH"
+  cp -r "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_all" "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_all"
   # update the keyring file with the new keyring (including both keys)
-  cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_$ARCH"
+  cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_all"
   GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export $KEY2_FINGERPRINT > usr/share/keyrings/example-archive-keyring.gpg
   # bump the version in the debian control file
   sed -i 's/Version: 0\.0\.2/Version: 0.0.3/' DEBIAN/control
 
   cd "$ARTIFACTS_DIR"
-  dpkg --build example-archive-keyring_0.0.3-1_$ARCH
-  echo "Deb package created: example-archive-keyring_0.0.3-1_$ARCH.deb"
+  dpkg --build example-archive-keyring_0.0.3-1_all
+  echo "Deb package created: example-archive-keyring_0.0.3-1_all.deb"
 
   # To inspect the .deb package:
-  # dpkg-deb --info example-archive-keyring_0.0.3-1_$ARCH.deb
-  # dpkg-deb --contents example-archive-keyring_0.0.3-1_$ARCH.deb
+  # dpkg-deb --info example-archive-keyring_0.0.3-1_all.deb
+  # dpkg-deb --contents example-archive-keyring_0.0.3-1_all.deb
 
   # Create a new temp directory before calling reprepro.
   mkdir -p "$ARTIFACTS_DIR/temp-reprepro-3/conf"
   cd "$ARTIFACTS_DIR/temp-reprepro-3/conf"
   cp $ARTIFACTS_DIR/distributions.template distributions
-  sed -i "s/<ARCH-PLACEHOLDER>/$ARCH/g" distributions
   sed -i "s/<FINGERPRINT-PLACEHOLDER>/$KEY2_FINGERPRINT/g" distributions
 
   cd "$ARTIFACTS_DIR/temp-reprepro-3"
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/hello-world_0.0.1-1_$ARCH.deb"
-  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_$ARCH.deb"
+  GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_all.deb"
+  for arch in "${ARCHITECTURES[@]}"; do
+    GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" reprepro includedeb stable "$ARTIFACTS_DIR/hello-world_0.0.1-1_$arch.deb"
+  done
   cp -a dists/ pool/ "$ARTIFACTS_DIR/apt-repo/"
 
   cd "$ARTIFACTS_DIR/apt-repo"
-  echo "New packages:"
-  cat dists/stable/main/binary-$ARCH/Packages
+  echo "New packages (for amd64):"
+  cat dists/stable/main/binary-amd64/Packages
   echo "! Note that there should be two entries above, with the archive keyring version bumped to 0.0.3."
   echo "The apt repository has been updated with the new archive keyring package."
 
