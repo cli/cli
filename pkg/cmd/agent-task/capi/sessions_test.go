@@ -9,8 +9,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1163,8 +1161,7 @@ func TestListLatestSessionsForViewer(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			cfg := config.NewBlankConfig()
-			capiClient := NewCAPIClient(httpClient, cfg.Authentication())
+			capiClient := NewCAPIClient(httpClient, "", "github.com")
 
 			if tt.perPage != 0 {
 				last := defaultSessionsPerPage
@@ -1543,8 +1540,7 @@ func TestListSessionsByResourceID(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			cfg := config.NewBlankConfig()
-			capiClient := NewCAPIClient(httpClient, cfg.Authentication())
+			capiClient := NewCAPIClient(httpClient, "", "github.com")
 
 			if tt.perPage != 0 {
 				last := defaultSessionsPerPage
@@ -1823,8 +1819,7 @@ func TestGetSession(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			cfg := config.NewBlankConfig()
-			capiClient := NewCAPIClient(httpClient, cfg.Authentication())
+			capiClient := NewCAPIClient(httpClient, "", "github.com")
 
 			session, err := capiClient.GetSession(context.Background(), "some-uuid")
 
@@ -1900,8 +1895,7 @@ func TestGetPullRequestDatabaseID(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			cfg := config.NewBlankConfig()
-			capiClient := NewCAPIClient(httpClient, cfg.Authentication())
+			capiClient := NewCAPIClient(httpClient, "", "github.com")
 
 			databaseID, url, err := capiClient.GetPullRequestDatabaseID(context.Background(), "github.com", "OWNER", "REPO", 42)
 

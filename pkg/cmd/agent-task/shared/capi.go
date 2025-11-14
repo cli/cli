@@ -28,7 +28,9 @@ func CapiClientFunc(f *cmdutil.Factory) func() (capi.CapiClient, error) {
 		}
 
 		authCfg := cfg.Authentication()
-		return capi.NewCAPIClient(httpClient, authCfg), nil
+		host, _ := authCfg.DefaultHost()
+		token, _ := authCfg.ActiveToken(host)
+		return capi.NewCAPIClient(httpClient, token, host), nil
 	}
 }
 
