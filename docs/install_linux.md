@@ -1,4 +1,4 @@
-# Installing gh on Linux and BSD
+gh pr checkout 444# Installing gh on Linux and BSD
 
 ## Recommended _(Official)_
 
