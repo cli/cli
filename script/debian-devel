@@ -17,6 +17,7 @@
 # Enable strict mode
 set -eo pipefail
 
+SCRIPT=$(basename $0)
 ARCHITECTURES=("i386" "amd64" "arm64" "armhf")
 
 # Check if DEBUG is set to true or 1, enable debug print statements if so
@@ -25,39 +26,80 @@ if [[ "$DEBUG" == "true" || "$DEBUG" == "1" ]]; then
 fi
 
 # Default artifacts directory
-DEFAULT_ARTIFACTS_DIR="$(pwd)/deb-repo-test"
+ARTIFACTS_DIR="$(pwd)/deb-repo-test"
+
+bold() {
+  echo -e "\033[1m$1\033[0m"
+}
+
+header() {
+  echo
+  echo "================================================================================"
+  bold "$1"
+  echo
+}
 
 # Function to prompt user to continue to the next step with explanations
 prompt_continue() {
   echo
-  read -p "$1 Press Enter to continue..."
+  read -p "Press Enter to continue..."
 }
 
-# Function to prompt for the artifacts directory and ensure it exists
-prompt_for_artifacts_dir() {
-  read -p "Please provide a directory location for storing all artifacts (leave empty for default: $DEFAULT_ARTIFACTS_DIR): " ARTIFACTS_DIR
-  # Use default if the user provides no input
-  if [ -z "$ARTIFACTS_DIR" ]; then
-    ARTIFACTS_DIR="$DEFAULT_ARTIFACTS_DIR"
-    echo "No directory provided. Using default: $ARTIFACTS_DIR"
+# Function to start up Docker container for environment
+docker_setup() {
+  # If the gpg-playground container already exists, prompt the user whether to tear it down
+  if [ "$(docker ps -a -q -f name=gpg-playground)" ]; then
+    read -p "Do you want to teardown the existing container and recreate it? (y/n): " choice
+    if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+      docker_teardown
+    else
+      echo "Skip setup and using existing container."
+      docker exec -it gpg-playground bash
+      exit 0
+    fi
   fi
+
+  echo "Setting up a new container."
+  docker run -it -d --name gpg-playground -v "$(pwd)/script/debian-devel:/root/debian-devel" -w "/root" ubuntu:22.04
+
+  # Set up MOTD to display on shell entry
+  docker exec gpg-playground bash -c "cat >> /root/.bashrc << EOF
+
+# Display MOTD
+cat << "MOTD"
+================================================================================
+  Self-bootstrapping Debian Repository Development Environment
+================================================================================
+
+Welcome to the gpg-playground container!
+
+Available commands:
+  $SCRIPT setup      - Create initial Debian repository and packages
+  $SCRIPT newkey     - Generate new signing key
+  $SCRIPT deprecate  - Deprecate old signing key
+  $SCRIPT teardown   - Clean up repository and configuration
+
+Run $SCRIPT without arguments for full help.
+
+================================================================================
+MOTD
+EOF"
+
+  docker exec -it gpg-playground bash
 }
 
 # Function to handle the setup process
 setup() {
-  # Step 0: Install prerequisites
+  header "Step 1: Installing prerequisites"
+
   if ! command -v sudo &> /dev/null; then
     # This is to make sure the script runs on both containers and VMs.
     apt-get update
     apt-get install -y sudo
   fi
 
-  echo "Step 1: Installing prerequisites"
   sudo apt-get update
   sudo apt-get install --no-upgrade -y busybox gpg reprepro tree
-  prompt_continue "Next, we will ask you to provide a directory location to store all artifacts."
-
-  prompt_for_artifacts_dir
 
   if [ ! -d "$ARTIFACTS_DIR" ]; then
     echo "Directory does not exist. Creating $ARTIFACTS_DIR..."
@@ -67,8 +109,8 @@ setup() {
     echo "Directory $ARTIFACTS_DIR already exists."
   fi
 
-  prompt_continue "Next, we will create our first signing key to use it later."
-  echo "Step 2: Creating a PGP key/cert that expires in 1 minute"
+  prompt_continue
+  header "Step 2: Creating a PGP key/cert that expires in 1 minute"
 
   cd "$ARTIFACTS_DIR"
   echo "%echo Generating an example PGP key
@@ -93,9 +135,8 @@ Expire-Date: seconds=$((1 * 60))
 
   echo "Generated PGP key with fingerprint: $KEY1_FINGERPRINT"
 
-  # Step 3: Create the archive keyring deb package
-  prompt_continue "Next, we will create the archive-keyring deb file."
-  echo "Step 3: Creating the archive-keyring deb file"
+  prompt_continue
+  header "Step 3: Creating the archive-keyring deb file"
 
   mkdir -p "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_all"
   cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_all"
@@ -141,9 +182,8 @@ Description: Example archive keyring
   # dpkg-deb --info example-archive-keyring_0.0.1-1_all.deb
   # dpkg-deb --contents example-archive-keyring_0.0.1-1_all.deb
 
-  # Step 4: Create simple program
-  prompt_continue "Next, we will create the hello-world deb files for supported architectures."
-  echo "Step 4: Creating the hello-world deb files for supported architectures"
+  prompt_continue
+  header "Step 4: Creating the hello-world deb files for supported architectures"
 
   for arch in "${ARCHITECTURES[@]}"; do
     mkdir -p "$ARTIFACTS_DIR/hello-world_0.0.1-1_$arch"
@@ -179,9 +219,8 @@ Description: A statically compiled Go program that prints hello" > DEBIAN/contro
     # dpkg-deb --contents hello-world_0.0.1-1_$arch.deb
   done
 
-  # Step 5: Create apt repository using reprepro
-  prompt_continue "Next, we will create an apt repository using reprepro."
-  echo "Step 5: Creating apt repository using reprepro"
+  prompt_continue
+  header "Step 5: Creating apt repository using reprepro"
 
   mkdir -p "$ARTIFACTS_DIR/apt-repo"
 
@@ -215,17 +254,15 @@ EOF
   cat dists/stable/main/binary-amd64/Packages
   echo "! Note that there should be two entries above; hello-world and the archive-keyring package."
 
-  # Step 6: Serve the repository using a local HTTP server
-  prompt_continue "Next, we will host the repository using a simple HTTP server."
-  echo "Step 6: Hosting repository with a simple HTTP server"
+  prompt_continue
+  header "Step 6: Hosting repository with a simple HTTP server"
 
   cd "$ARTIFACTS_DIR"
   busybox httpd -p 8000 # runs in background by default
   echo "HTTP server started at http://127.0.0.1:8000"
 
-  # Step 7: Add the apt repo entry to the host machine
-  prompt_continue "Next, we will add the apt repo entry to the host machine."
-  echo "Step 7: Adding apt repo entry to /etc/apt/sources.list.d"
+  prompt_continue
+  header "Step 7: Adding apt repo entry to /etc/apt/sources.list.d"
 
   # Install the trust anchor (public key) on the host system for later verification.
   #
@@ -234,50 +271,50 @@ EOF
   # in our installation docs as we already have it. Future automatic upgrades of the
   # archive-keyring package will update the installed keyring, so the user would not
   # need to do this step ever again.
-  
+
   sudo mkdir -p -m 755 /usr/share/keyrings
   sudo cp "$ARTIFACTS_DIR/pgp-key.gpg" /usr/share/keyrings/example-archive-keyring.gpg
   sudo chmod go+r /usr/share/keyrings/example-archive-keyring.gpg
 
   echo "deb [arch=$(echo "${ARCHITECTURES[@]}" | sed 's/ /,/g') allow-insecure=yes signed-by=/usr/share/keyrings/example-archive-keyring.gpg] http://127.0.0.1:8000/apt-repo stable main" | sudo tee /etc/apt/sources.list.d/example.list
+  echo
   echo "! Note that with this config, apt allows plain HTTP comms but still verifies package signatures."
-  echo ""
   echo "! If you wait here until the generated key expires, you'll see the next step fails due to the expired key."
 
-  # Step 8: Update and install the packages
-  prompt_continue "Next, we will update apt and install the archive keyring and 'hello-world' packages from the repository."
-  echo "Step 8: Updating apt and installing the packages"
+  prompt_continue
+  header "Step 8: Updating apt and installing the packages"
 
   sudo apt-get update # We don't need --allow-insecure-repositories
   sudo apt-get install -y example-archive-keyring hello-world
-  echo "Hello World and the archive keyring packages installed successfully."
+
+  echo
+  bold "✅ Hello World and the archive keyring packages installed successfully."
+  echo
+  echo "Run 'newkey' target next to rotate the signing key."
+  echo
   echo "! Note that there should be no warnings about unverified packages in the logs above."
 }
 
 # Function to handle the signing key rotation process
 newkey() {
-  prompt_continue "Next, we will ask you to provide the directory location you used for the setup step."
-
-  prompt_for_artifacts_dir
-
   # Verify that the current key is not yet expired
-  prompt_continue "Next, we confirm the current signing key is not yet expired."
-  echo "Step 1: Verifying the current key is not yet expired"
+  header "Step 1: Verifying the current key is not yet expired"
 
   KEY1_FINGERPRINT="$(cat $ARTIFACTS_DIR/key1-fingerprint)"
 
   expiry_date="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons --fingerprint $KEY1_FINGERPRINT | grep -E "^pub:" | cut -f7 -d:)"
   current_date="$(date +%s)"
   if [ "$expiry_date" -lt "$current_date" ]; then
-    echo "The key is already expired. Please 'teardown' and start over."
+    echo
+    bold "⚠️ The key is already expired. Please 'teardown' and start over."
     exit 1
   else
     echo "Confirmed that the current signing key is still valid."
   fi
 
   # Generate a new key and add it to the keyring
-  prompt_continue "Next, we will generate a new PGP key that expires in 15 mins, and add it to the keyring."
-  echo "Step 2: Generating a new PGP key (expires in 15 mins) and add it to the keyring"
+  prompt_continue
+  header "Step 2: Generating a new PGP key (expires in 15 mins) and add it to the keyring"
 
   # Get the list of existing keys
   existing_keys_list="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons)"
@@ -307,9 +344,8 @@ Expire-Date: seconds=$((15 * 60))
 
   echo "Generated PGP key with fingerprint: $KEY2_FINGERPRINT"
 
-  # Step 3: Make a new version of the archive keyring package to deliver the updated keyring (including both keys)
-  prompt_continue "Next, we will generate the new archive-keyring package and update the apt repository."
-  echo "Step 3: Generating the new archive-keyring package and updating the apt repository."
+  prompt_continue
+  header "Step 3: Generating the new archive-keyring package and updating the apt repository."
 
   # create a copy of the files of the previous version of the archive keyring package
   cp -r "$ARTIFACTS_DIR/example-archive-keyring_0.0.1-1_all" "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_all"
@@ -343,45 +379,43 @@ Expire-Date: seconds=$((15 * 60))
   cd "$ARTIFACTS_DIR/apt-repo"
   echo "New packages (for amd64):"
   cat dists/stable/main/binary-amd64/Packages
-  echo "! Note that there should be two entries above, with the archive keyring version bumped to 0.0.2."
-  echo "The apt repository has been updated with the new archive keyring package."
 
-  # Step 4: Upgrade the archive keyring package on the host system
-  prompt_continue "Next, we will upgrade the archive keyring package on the host system."
-  echo "Step 4: Upgrading the archive keyring package on the host system."
+  echo
+  bold "✅ apt repository has been updated with the new archive keyring package."
+  echo
+  echo "! Note that there should be two entries above, with the archive keyring version bumped to 0.0.2."
+
+  prompt_continue
+  header "Step 4: Upgrading the archive keyring package on the host system."
 
   sudo apt-get update
   sudo apt-get install -y --only-upgrade example-archive-keyring
 
-   echo "archive-keyring package upgraded successfully."
-   echo "! Note that in the above logs the archive-keyring is now bumped to 0.0.2."
+  echo
+  bold "✅ archive-keyring package upgraded successfully."
+  echo
+  echo "Run 'deprecate' target next to deprecate the old key."
+  echo
+  echo "! Note that in the above logs the archive-keyring is now bumped to 0.0.2."
 }
 
 deprecate() {
-  prompt_continue "Next, we will ask you to provide the directory location you used for the setup step."
-
-  prompt_for_artifacts_dir
-
-  # Step 1: Verify that the old/first current key is expired
-  prompt_continue "Next, we confirm the old/first signing key is expired."
-  echo "Step 1: Verifying the old/first key is expired"
+  header "Step 1: Verifying the old/first key is expired"
 
   KEY1_FINGERPRINT="$(cat $ARTIFACTS_DIR/key1-fingerprint)"
   KEY2_FINGERPRINT="$(cat $ARTIFACTS_DIR/key2-fingerprint)"
 
   expiry_date="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons --fingerprint $KEY1_FINGERPRINT | grep -E "^pub:" | cut -f7 -d:)"
   current_date="$(date +%s)"
+
   if [ "$expiry_date" -gt "$current_date" ]; then
-    echo "The old/first key is not yet expired. Please wait until it expires and retry."
-    echo "time to expiry (seconds): $(( $expiry_date - $current_date ))"
-    exit 1
-  else
-    echo "Confirmed that the old/first signing key is expired."
+    SLEEP=$(( $expiry_date - $current_date + 2 ))
+    bold "Sleeping $SLEEP seconds to allow the old/first key to expire."
+    sleep $SLEEP
   fi
 
-  # Step 2: Make a new version of the archive keyring package with the old key removed
-  prompt_continue "Next, we will generate the new archive-keyring package with the old key removed, and update the apt repo."
-  echo "Step 2: Generating the new archive-keyring package with the old key removed."
+  prompt_continue
+  header "Step 2: Generating the new archive-keyring package with the old key removed."
 
   # create a copy of the files of the previous version of the archive keyring package
   cp -r "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_all" "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_all"
@@ -415,37 +449,36 @@ deprecate() {
   cd "$ARTIFACTS_DIR/apt-repo"
   echo "New packages (for amd64):"
   cat dists/stable/main/binary-amd64/Packages
-  echo "! Note that there should be two entries above, with the archive keyring version bumped to 0.0.3."
-  echo "The apt repository has been updated with the new archive keyring package."
 
-  # Step 4: Upgrade the archive keyring package on the host system
-  prompt_continue "Next, we will upgrade the archive keyring package on the host system."
-  echo "Step 4: Upgrading the archive keyring package on the host system."
+  echo
+  bold "✅ apt repository has been updated with the new archive keyring package."
+  echo
+  echo "! Note that there should be two entries above, with the archive keyring version bumped to 0.0.3."
+
+  prompt_continue
+  header "Step 3: Upgrading the archive keyring package on the host system."
 
   sudo apt-get update
   sudo apt-get install -y --only-upgrade example-archive-keyring
 
-  echo "archive-keyring package upgraded successfully."
+  echo
+  bold "✅ archive-keyring package upgraded successfully."
+  echo
   echo "! Note that in the above logs the archive-keyring is now bumped to 0.0.3."
 }
 
 # Function to handle the teardown process
 teardown() {
-  # Prompt for the artifacts directory during teardown
-  prompt_for_artifacts_dir
-
-  echo "Teardown: Cleaning up everything."
-
   # Kill the HTTP server if it's running
   if pgrep -f "busybox httpd" > /dev/null; then
-    echo "Stopping the HTTP server..."
+    header "Stopping the HTTP server..."
     pkill -f "busybox httpd"
     echo "Server stopped."
   fi
 
   # Check if the hello-world package is installed, and remove it safely
   if dpkg -l | grep -q "^ii  hello-world"; then
-    echo "Removing the hello-world package..."
+    header "Removing the hello-world package..."
     sudo apt-get remove --purge -y hello-world
     echo "Package hello-world removed."
   else
@@ -454,28 +487,27 @@ teardown() {
 
   # Remove the PGP keyrings
   if [ -f /etc/apt/keyrings/example-archive-keyring.gpg ]; then
-    echo "Removing the PGP keyring from /etc/apt/keyrings..."
+    header "Removing the PGP keyring from /etc/apt/keyrings..."
     sudo rm /etc/apt/keyrings/example-archive-keyring.gpg
     echo "PGP keyring removed from /etc/apt/keyrings."
   fi
 
   if [ -f /usr/share/keyrings/example-archive-keyring.gpg ]; then
-    echo "Removing the PGP keyring from /usr/share/keyrings..."
+    header "Removing the PGP keyring from /usr/share/keyrings..."
     sudo rm /usr/share/keyrings/example-archive-keyring.gpg
     echo "PGP keyring removed from /usr/share/keyrings."
   fi
 
   # Kill gpg-agent
   if pgrep "^gpg-agent" > /dev/null; then
-    echo "Stopping the GPG agent..."
+    header "Stopping the GPG agent..."
     pkill "^gpg-agent"
     echo "GPG agent stopped."
   fi
 
   # Remove the artifacts directory
   if [ -d "$ARTIFACTS_DIR" ]; then
-    echo "No directory provided. Using default: $ARTIFACTS_DIR"
-    echo "Removing the artifacts directory: $ARTIFACTS_DIR"
+    header "Removing the artifacts directory: $ARTIFACTS_DIR"
     rm -rf "$ARTIFACTS_DIR"
     echo "Artifacts directory removed."
   fi
@@ -487,27 +519,34 @@ teardown() {
 
   # Remove apt source remains (if not removed by the above command)
   if [ -f /etc/apt/sources.list.d/example.list ]; then
-    echo "Removing the repository from /etc/apt/sources.list.d..."
+    header "Removing the repository from /etc/apt/sources.list.d..."
     sudo rm /etc/apt/sources.list.d/example.list
     echo "Repository removed."
   fi
 
   # Remove the preferences from preferences.d
   if [ -f /etc/apt/preferences.d/example ]; then
-    echo "Removing the preferences from /etc/apt/preferences.d..."
+    header "Removing the preferences from /etc/apt/preferences.d..."
     sudo rm /etc/apt/preferences.d/example.pref
     echo "Preferences removed."
   fi
 
   # Clean apt cache
-  echo "Cleaning apt cache..."
+  header "Cleaning apt cache..."
   sudo apt-get clean
-  echo "Cleanup complete."
   sudo apt-get update
+  echo "Cleanup complete."
+}
+
+# Function to start up Docker container for environment
+docker_teardown() {
+  docker stop gpg-playground && docker rm gpg-playground
 }
 
 # Check for the setup or teardown argument
-if [ "$1" == "setup" ]; then
+if [ "$1" == "docker_setup" ]; then
+  docker_setup
+elif [ "$1" == "setup" ]; then
   setup
 elif [ "$1" == "newkey" ]; then
   newkey
@@ -515,7 +554,22 @@ elif [ "$1" == "deprecate" ]; then
   deprecate
 elif [ "$1" == "teardown" ]; then
   teardown
+elif [ "$1" == "docker_teardown" ]; then
+  docker_teardown
 else
-  echo "Usage: $0 {setup|newkey|deprecate|teardown}"
+  echo "
+$(bold "Self-bootstrapping Debian repository development tool")
+
+Usage: $SCRIPT TARGET
+
+The following targets are typical order used to setup and exercise the GitHub CLI Debian packaging process:
+
+- $(bold docker_setup):     create Docker container for testing environment
+- $(bold setup):            create initial Debian repository, create and sign sample application and keyring archive packages
+- $(bold newkey):           generate new signing key, update keyring archive package
+- $(bold deprecate):        deprecate old signing key, update keyring archive package, sign new sample application package
+- $(bold teardown):         clean up Debian repository and local configuration
+- $(bold docker_teardown):  stop and remove Docker container
+"
   exit 1
 fi
