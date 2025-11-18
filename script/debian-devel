@@ -1,19 +1,5 @@
 #!/bin/bash
 
-# Hint: run this at the root of the repo to spin up an Ubuntu container with
-# this script lively mounted in `/root`:
-#
-#   docker run -it -d --name gpg-playground -v "$(pwd)/script/debian-devel:/root/debian-devel" ubuntu:22.04
-#
-# And then use this to exec into the container:
-#
-#   docker exec -it gpg-playground bash
-#
-# To get rid of the container:
-#
-#   docker stop gpg-playground && docker rm gpg-playground
-#
-
 # Enable strict mode
 set -eo pipefail
 
