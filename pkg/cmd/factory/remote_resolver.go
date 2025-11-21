@@ -2,7 +2,6 @@ package factory
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 
 	"github.com/cli/cli/v2/context"
@@ -80,15 +79,11 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 		}
 
 		if len(rr.cachedRemotes) == 0 {
-			if isHostEnv(src) {
-				rr.remotesError = fmt.Errorf("none of the git remotes configured for this repository correspond to the %s environment variable. Try adding a matching remote or unsetting the variable", src)
-				return nil, rr.remotesError
-			} else if cfg.Authentication().HasEnvToken() {
-				rr.remotesError = errors.New("set the GH_HOST environment variable to specify which GitHub host to use")
-				return nil, rr.remotesError
-			}
-			rr.remotesError = errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")
-			return nil, rr.remotesError
+		// Fall back to all remotes for commands that only need owner/repo matching.
+		// Commands performing API operations will still fail with clear errors when
+		// the API host is wrong. This allows git operations through proxies/bastions
+		// where the git remote host differs from the GitHub API host.
+		rr.cachedRemotes = resolvedRemotes
 		}
 
 		return rr.cachedRemotes, nil
