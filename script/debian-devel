@@ -3,7 +3,7 @@
 # Enable strict mode
 set -eo pipefail
 
-SCRIPT=$(basename $0)
+SCRIPT=$(basename "$0")
 ARCHITECTURES=("i386" "amd64" "arm64" "armhf")
 
 # Check if DEBUG is set to true or 1, enable debug print statements if so
@@ -117,7 +117,7 @@ Expire-Date: seconds=$((1 * 60))
   GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export > pgp-key.gpg # Binary version
 
   KEY1_FINGERPRINT="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --list-options show-only-fpr-mbox | cut -f1 -d' ' | head -n 1)"
-  echo -n "$KEY1_FINGERPRINT" > $ARTIFACTS_DIR/key1-fingerprint
+  echo -n "$KEY1_FINGERPRINT" > "$ARTIFACTS_DIR/key1-fingerprint"
 
   echo "Generated PGP key with fingerprint: $KEY1_FINGERPRINT"
 
@@ -211,7 +211,7 @@ Description: A statically compiled Go program that prints hello" > DEBIAN/contro
   mkdir -p "$ARTIFACTS_DIR/apt-repo"
 
   # make reprepro config template file
-  cat <<EOF > $ARTIFACTS_DIR/distributions.template
+  cat <<EOF > "$ARTIFACTS_DIR/distributions.template"
 Origin: Example Repository
 Label: Example
 Codename: stable
@@ -226,7 +226,7 @@ EOF
   # separate temp directory.
   mkdir -p "$ARTIFACTS_DIR/temp-reprepro-1/conf"
   cd "$ARTIFACTS_DIR/temp-reprepro-1/conf"
-  cp $ARTIFACTS_DIR/distributions.template distributions
+  cp "$ARTIFACTS_DIR/distributions.template" distributions
   sed -i "s/<FINGERPRINT-PLACEHOLDER>/$KEY1_FINGERPRINT/g" distributions
 
   cd "$ARTIFACTS_DIR/temp-reprepro-1"
@@ -236,7 +236,7 @@ EOF
   done
   cp -a dists/ pool/ "$ARTIFACTS_DIR/apt-repo/"
 
-  echo "These is the content of the Packages file (for amd64):"
+  echo "This is the content of the Packages file (for amd64):"
   cat dists/stable/main/binary-amd64/Packages
   echo "! Note that there should be two entries above; hello-world and the archive-keyring package."
 
@@ -286,7 +286,7 @@ newkey() {
   # Verify that the current key is not yet expired
   header "Step 1: Verifying the current key is not yet expired"
 
-  KEY1_FINGERPRINT="$(cat $ARTIFACTS_DIR/key1-fingerprint)"
+  KEY1_FINGERPRINT="$(cat "$ARTIFACTS_DIR/key1-fingerprint")"
 
   expiry_date="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons --fingerprint $KEY1_FINGERPRINT | grep -E "^pub:" | cut -f7 -d:)"
   current_date="$(date +%s)"
@@ -326,7 +326,7 @@ Expire-Date: seconds=$((15 * 60))
   new_keys_list="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons)"
   added_key="$(comm -1 -3 <(echo "$existing_keys_list" | sort) <(echo "$new_keys_list" | sort))"
   KEY2_FINGERPRINT="$(echo "$added_key" | grep -E "^fpr:" | cut -f10 -d: | head -n1)"
-  echo -n "$KEY2_FINGERPRINT" > $ARTIFACTS_DIR/key2-fingerprint
+  echo -n "$KEY2_FINGERPRINT" > "$ARTIFACTS_DIR/key2-fingerprint"
 
   echo "Generated PGP key with fingerprint: $KEY2_FINGERPRINT"
 
@@ -352,7 +352,7 @@ Expire-Date: seconds=$((15 * 60))
   # Create a new temp directory before calling reprepro.
   mkdir -p "$ARTIFACTS_DIR/temp-reprepro-2/conf"
   cd "$ARTIFACTS_DIR/temp-reprepro-2/conf"
-  cp $ARTIFACTS_DIR/distributions.template distributions
+  cp "$ARTIFACTS_DIR/distributions.template" distributions
   sed -i "s/<FINGERPRINT-PLACEHOLDER>/$KEY1_FINGERPRINT $KEY2_FINGERPRINT/g" distributions
 
   cd "$ARTIFACTS_DIR/temp-reprepro-2"
@@ -388,8 +388,8 @@ Expire-Date: seconds=$((15 * 60))
 deprecate() {
   header "Step 1: Verifying the old/first key is expired"
 
-  KEY1_FINGERPRINT="$(cat $ARTIFACTS_DIR/key1-fingerprint)"
-  KEY2_FINGERPRINT="$(cat $ARTIFACTS_DIR/key2-fingerprint)"
+  KEY1_FINGERPRINT="$(cat "$ARTIFACTS_DIR/key1-fingerprint")"
+  KEY2_FINGERPRINT="$(cat "$ARTIFACTS_DIR/key2-fingerprint")"
 
   expiry_date="$(GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --list-keys --with-colons --fingerprint $KEY1_FINGERPRINT | grep -E "^pub:" | cut -f7 -d:)"
   current_date="$(date +%s)"
@@ -405,7 +405,7 @@ deprecate() {
 
   # create a copy of the files of the previous version of the archive keyring package
   cp -r "$ARTIFACTS_DIR/example-archive-keyring_0.0.2-1_all" "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_all"
-  # update the keyring file with the new keyring (including both keys)
+  # update the keyring file with the new keyring (now with only the latest key)
   cd "$ARTIFACTS_DIR/example-archive-keyring_0.0.3-1_all"
   GNUPGHOME="$ARTIFACTS_DIR/temp-gpg-home" gpg --export $KEY2_FINGERPRINT > usr/share/keyrings/example-archive-keyring.gpg
   # bump the version in the debian control file
@@ -422,7 +422,7 @@ deprecate() {
   # Create a new temp directory before calling reprepro.
   mkdir -p "$ARTIFACTS_DIR/temp-reprepro-3/conf"
   cd "$ARTIFACTS_DIR/temp-reprepro-3/conf"
-  cp $ARTIFACTS_DIR/distributions.template distributions
+  cp "$ARTIFACTS_DIR/distributions.template" distributions
   sed -i "s/<FINGERPRINT-PLACEHOLDER>/$KEY2_FINGERPRINT/g" distributions
 
   cd "$ARTIFACTS_DIR/temp-reprepro-3"
@@ -511,7 +511,7 @@ teardown() {
   fi
 
   # Remove the preferences from preferences.d
-  if [ -f /etc/apt/preferences.d/example ]; then
+  if [ -f /etc/apt/preferences.d/example.pref ]; then
     header "Removing the preferences from /etc/apt/preferences.d..."
     sudo rm /etc/apt/preferences.d/example.pref
     echo "Preferences removed."
