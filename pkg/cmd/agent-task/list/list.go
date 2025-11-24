@@ -51,7 +51,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, fmt.Sprintf("Maximum number of agent tasks to fetch (default %d)", defaultLimit))
+	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of agent tasks to fetch")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open agent tasks in the browser")
 
 	return cmd

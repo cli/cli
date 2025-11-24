@@ -366,8 +366,7 @@ func (c *CAPIClient) hydrateSessionPullRequestsAndUsers(sessions []session) ([]*
 	ids = append(ids, userNodeIds...)
 
 	// TODO handle pagination
-	host, _ := c.authCfg.DefaultHost()
-	err := apiClient.Query(host, "FetchPRsAndUsersForAgentTaskSessions", &resp, map[string]any{
+	err := apiClient.Query(c.host, "FetchPRsAndUsersForAgentTaskSessions", &resp, map[string]any{
 		"ids": ids,
 	})
 

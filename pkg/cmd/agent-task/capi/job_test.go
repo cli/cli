@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -168,8 +167,7 @@ func TestGetJob(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			cfg := config.NewBlankConfig()
-			capiClient := NewCAPIClient(httpClient, cfg.Authentication())
+			capiClient := NewCAPIClient(httpClient, "", "github.com")
 
 			job, err := capiClient.GetJob(context.Background(), "OWNER", "REPO", "job123")
 
@@ -412,8 +410,7 @@ func TestCreateJob(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			cfg := config.NewBlankConfig()
-			capiClient := NewCAPIClient(httpClient, cfg.Authentication())
+			capiClient := NewCAPIClient(httpClient, "", "github.com")
 
 			job, err := capiClient.CreateJob(context.Background(), "OWNER", "REPO", "Do the thing", tt.baseBranch, tt.customAgent)
 

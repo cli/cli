@@ -15,6 +15,10 @@ func TestStandardSearchString(t *testing.T) {
 		out   string
 	}{
 		{
+			name: "empty query",
+			out:  "",
+		},
+		{
 			name: "converts query to string",
 			query: Query{
 				Keywords: []string{"some", "keywords"},
@@ -70,6 +74,31 @@ func TestStandardSearchString(t *testing.T) {
 			},
 			out: `topic:"quote qualifier"`,
 		},
+		{
+			name: "respects immutable keywords",
+			query: Query{
+				ImmutableKeywords: "immutable keyword that should be left as is",
+			},
+			out: `immutable keyword that should be left as is`,
+		},
+		{
+			name: "respects immutable keywords, with qualifiers",
+			query: Query{
+				ImmutableKeywords: "immutable keyword that should be left as is",
+				Qualifiers: Qualifiers{
+					Topic: []string{"quote qualifier"},
+				},
+			},
+			out: `immutable keyword that should be left as is topic:"quote qualifier"`,
+		},
+		{
+			name: "prioritises immutable keywords over keywords slice",
+			query: Query{
+				Keywords:          []string{"foo", "bar"},
+				ImmutableKeywords: "immutable keyword",
+			},
+			out: `immutable keyword`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -84,6 +113,10 @@ func TestAdvancedIssueSearchString(t *testing.T) {
 		query Query
 		out   string
 	}{
+		{
+			name: "empty query",
+			out:  "",
+		},
 		{
 			name: "quotes keywords",
 			query: Query{
@@ -108,6 +141,31 @@ func TestAdvancedIssueSearchString(t *testing.T) {
 			out: `label:"quote qualifier"`,
 		},
 		{
+			name: "respects immutable keywords",
+			query: Query{
+				ImmutableKeywords: "immutable keyword that should be left as is",
+			},
+			out: `immutable keyword that should be left as is`,
+		},
+		{
+			name: "respects immutable keywords, with qualifiers",
+			query: Query{
+				ImmutableKeywords: "immutable keyword that should be left as is",
+				Qualifiers: Qualifiers{
+					Topic: []string{"quote qualifier"},
+				},
+			},
+			out: `( immutable keyword that should be left as is ) topic:"quote qualifier"`,
+		},
+		{
+			name: "prioritises immutable keywords over keywords slice",
+			query: Query{
+				Keywords:          []string{"foo", "bar"},
+				ImmutableKeywords: "immutable keyword",
+			},
+			out: `immutable keyword`,
+		},
+		{
 			name: "unused qualifiers should not appear in query",
 			query: Query{
 				Keywords: []string{"keyword"},
@@ -115,7 +173,7 @@ func TestAdvancedIssueSearchString(t *testing.T) {
 					Label: []string{"foo", "bar"},
 				},
 			},
-			out: `keyword label:bar label:foo`,
+			out: `( keyword ) label:bar label:foo`,
 		},
 		{
 			name: "special qualifiers when used once",
@@ -128,7 +186,7 @@ func TestAdvancedIssueSearchString(t *testing.T) {
 					In:   []string{"title"},
 				},
 			},
-			out: `keyword in:title is:private repo:foo/bar user:johndoe`,
+			out: `( keyword ) in:title is:private repo:foo/bar user:johndoe`,
 		},
 		{
 			name: "special qualifiers are OR-ed when used multiple times",
@@ -141,7 +199,7 @@ func TestAdvancedIssueSearchString(t *testing.T) {
 					In:   []string{"title", "body", "comments", "foo"}, // "foo" is to ensure only "title", "body", and "comments" are grouped
 				},
 			},
-			out: `keyword (in:body OR in:comments OR in:title) in:foo (is:blocked OR is:blocking) (is:closed OR is:open) (is:issue OR is:pr) (is:locked OR is:unlocked) (is:merged OR is:unmerged) (is:private OR is:public) is:foo (repo:foo/bar OR repo:foo/baz) (user:janedoe OR user:johndoe)`,
+			out: `( keyword ) (in:body OR in:comments OR in:title) in:foo (is:blocked OR is:blocking) (is:closed OR is:open) (is:issue OR is:pr) (is:locked OR is:unlocked) (is:merged OR is:unmerged) (is:private OR is:public) is:foo (repo:foo/bar OR repo:foo/baz) (user:janedoe OR user:johndoe)`,
 		},
 		{
 			// Since this is a general purpose package, we can't assume with know all
@@ -155,7 +213,7 @@ func TestAdvancedIssueSearchString(t *testing.T) {
 					In: []string{"foo", "bar"},
 				},
 			},
-			out: `keyword in:bar in:foo is:bar is:foo`,
+			out: `( keyword ) in:bar in:foo is:bar is:foo`,
 		},
 		{
 			name: "non-special qualifiers used multiple times",
@@ -170,7 +228,7 @@ func TestAdvancedIssueSearchString(t *testing.T) {
 					Topic:   []string{"foo", "bar"},
 				},
 			},
-			out: `keyword in:bar in:foo is:bar is:foo label:bar label:foo license:bar license:foo no:bar no:foo topic:bar topic:foo`,
+			out: `( keyword ) in:bar in:foo is:bar is:foo label:bar label:foo license:bar license:foo no:bar no:foo topic:bar topic:foo`,
 		},
 	}
 	for _, tt := range tests {

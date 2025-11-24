@@ -222,19 +222,13 @@ func SearchQueryBuild(options FilterOptions, advancedIssueSearchSyntax bool) str
 			Is:        []string{is},
 			Type:      options.Entity,
 		},
+		ImmutableKeywords: options.Search,
 	}
 
-	var q string
-	if advancedIssueSearchSyntax {
-		q = query.AdvancedIssueSearchString()
-	} else {
-		q = query.StandardSearchString()
+	if !advancedIssueSearchSyntax {
+		return query.StandardSearchString()
 	}
-
-	if options.Search != "" {
-		return fmt.Sprintf("%s %s", options.Search, q)
-	}
-	return q
+	return query.AdvancedIssueSearchString()
 }
 
 func QueryHasStateClause(searchQuery string) bool {

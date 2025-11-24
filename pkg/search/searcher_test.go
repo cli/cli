@@ -1178,7 +1178,7 @@ func TestSearcherIssuesAdvancedSyntax(t *testing.T) {
 			detector: fd.AdvancedIssueSearchSupportedAsOptIn(),
 			query:    query,
 			wantValues: url.Values{
-				"q":               []string{"keyword author:johndoe (in:body OR in:comments OR in:title) (is:private OR is:public) label:bar label:foo (repo:foo/bar OR repo:foo/baz) (user:janedoe OR user:johndoe)"},
+				"q":               []string{"( keyword ) author:johndoe (in:body OR in:comments OR in:title) (is:private OR is:public) label:bar label:foo (repo:foo/bar OR repo:foo/baz) (user:janedoe OR user:johndoe)"},
 				"advanced_search": []string{"true"}, // opt-in
 			},
 		},
@@ -1189,7 +1189,7 @@ func TestSearcherIssuesAdvancedSyntax(t *testing.T) {
 			detector: fd.AdvancedIssueSearchSupportedAsOnlyBackend(),
 			query:    query,
 			wantValues: url.Values{
-				"q":               []string{"keyword author:johndoe (in:body OR in:comments OR in:title) (is:private OR is:public) label:bar label:foo (repo:foo/bar OR repo:foo/baz) (user:janedoe OR user:johndoe)"},
+				"q":               []string{"( keyword ) author:johndoe (in:body OR in:comments OR in:title) (is:private OR is:public) label:bar label:foo (repo:foo/bar OR repo:foo/baz) (user:janedoe OR user:johndoe)"},
 				"advanced_search": nil, // assert absence
 			},
 		},
