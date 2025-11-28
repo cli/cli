@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ceb">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Komunidad sa Panaghigalaay | Telegram Group</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+            color: #1f2937;
+        }
+        /* Custom Telegram Blue and Gradient */
+        .btn-telegram {
+            background: linear-gradient(135deg, #00A9E0, #0088CC);
+            transition: all 0.3s ease;
+        }
+        .btn-telegram:hover {
+            box-shadow: 0 10px 20px rgba(0, 136, 204, 0.4);
+            transform: translateY(-2px);
+        }
+        .activity-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .activity-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header / Navigation Bar -->
+    <header class="bg-white shadow-lg sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-extrabold text-[#0088CC]">
+                Grupo sa Panaghigalaay
+            </h1>
+            <a href="#join" class="px-4 py-2 bg-[#0088CC] text-white text-sm font-semibold rounded-full shadow-md hover:bg-[#007AB8]">
+                Apil Karon
+            </a>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="text-center py-16 sm:py-24 bg-gray-50">
+        <div class="max-w-4xl mx-auto px-4">
+            <h2 class="text-5xl sm:text-6xl font-extrabold mb-4 text-gray-900 leading-tight">
+                Dili Na Kailangang Mag-inusara.
+            </h2>
+            <p class="text-xl sm:text-2xl text-gray-600 mb-8">
+                Ang imong bag-ong komunidad sa Telegram para sa sinsero nga panaghigalaay, suporta, ug lingaw nga mga kalihokan.
+            </p>
+            <a id="join" href="[IBUTANG ANG IMONG GROUP INVITE LINK DINHI]" target="_blank" class="btn-telegram inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-bold rounded-full text-white shadow-xl focus:outline-none focus:ring-4 focus:ring-[#0088CC] focus:ring-opacity-50">
+                🚀 Apil sa Telegram Group!
+            </a>
+            <p class="mt-4 text-sm text-gray-500">I-download una ang Telegram app: <a href="https://telegram.org/dl" target="_blank" class="text-[#0088CC] hover:underline">https://telegram.org/dl</a></p>
+        </div>
+    </section>
+
+    <!-- Group Mission/Why Join Section -->
+    <section class="py-16 bg-white">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h3 class="text-4xl font-bold text-center mb-12 text-gray-800">
+                Nganong Kinahanglan Kang Moapil?
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                
+                <!-- Card 1: Panaghigalaay -->
+                <div class="p-6 bg-blue-50 rounded-xl shadow-lg text-center">
+                    <svg class="w-10 h-10 mx-auto mb-4 text-[#0088CC]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20h-2m2 0h-2M21 16h-5.356m2.57-2.57C17.072 13.567 18 11.83 18 10c0-3.314-4-6-9-6S0 6.686 0 10c0 1.83.928 3.567 2.356 4.433m0 0v1.5a2.5 2.5 0 002.5 2.5h10.5a2.5 2.5 0 002.5-2.5v-1.5"></path></svg>
+                    <h4 class="text-xl font-semibold mb-2 text-gray-900">Tinuod nga Panaghigalaay</h4>
+                    <p class="text-gray-600">Paghimo og sinsero ug malungtarong mga relasyon. Dinhi, ang tanan nag-suporta ug nagdasig sa usag usa.</p>
+                </div>
+
+                <!-- Card 2: Kalihokan -->
+                <div class="p-6 bg-green-50 rounded-xl shadow-lg text-center">
+                    <svg class="w-10 h-10 mx-auto mb-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <h4 class="text-xl font-semibold mb-2 text-gray-900">Aktibo nga Komunidad</h4>
+                    <p class="text-gray-600">Dili boring! Naa tay tulo ka regular nga kalihokan kada semana aron magpabilin kitang suod ug lingaw.</p>
+                </div>
+
+                <!-- Card 3: Luwas nga Dapit -->
+                <div class="p-6 bg-purple-50 rounded-xl shadow-lg text-center">
+                    <svg class="w-10 h-10 mx-auto mb-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    <h4 class="text-xl font-semibold mb-2 text-gray-900">Luwas ug Mainiton</h4>
+                    <p class="text-gray-600">Usa ka dapit nga walay 'judgment' diin ang imong opinyon ug istorya gipabilhan. Welcome ka sa bisan unsa pa ang imong kahimtang.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recurring Activities Section -->
+    <section class="py-16 bg-gray-50">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h3 class="text-4xl font-bold text-center mb-12 text-gray-800">
+                Atong Regular nga mga Kalihokan (Recurring Activities)
+            </h3>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- Activity 1: Lunes nga Pag-abri -->
+                <div class="activity-card bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-500">
+                    <div class="flex items-center mb-4">
+                        <span class="text-3xl mr-3">🗓️</span>
+                        <h4 class="text-2xl font-bold text-gray-900">Lunes nga Pag-abri ug Pasalamat</h4>
+                    </div>
+                    <p class="text-gray-600 mb-3 font-semibold">Kada Lunes</p>
+                    <p class="text-gray-700">I-share ang imong mga *targets* ug *plano* karong semanaha, uban sa mga butang nga imong gipasalamatan. Usa ka paagi sa pagsugod sa semana nga puno sa kadasig ug positibo nga enerhiya!</p>
+                </div>
+
+                <!-- Activity 2: Miyerkules nga Duha ka Tinuod, Usa ka Bakak -->
+                <div class="activity-card bg-white p-6 rounded-xl shadow-lg border-t-4 border-green-500">
+                    <div class="flex items-center mb-4">
+                        <span class="text-3xl mr-3">🧠</span>
+                        <h4 class="text-2xl font-bold text-gray-900">Miyerkules: Duha ka Tinuod, Usa ka Bakak</h4>
+                    </div>
+                    <p class="text-gray-600 mb-3 font-semibold">Kada Miyerkules</p>
+                    <p class="text-gray-700">Usa ka dula sa pagtag-an. Pag-post og tulo ka pahayag (duha ka tinuod, usa ka bakak) bahin sa imong kaugalingon. Kini makapalambo sa pag-ila sa usag usa ug katawa!</p>
+                </div>
+
+                <!-- Activity 3: Weekend Hobby Spotlight -->
+                <div class="activity-card bg-white p-6 rounded-xl shadow-lg border-t-4 border-purple-500">
+                    <div class="flex items-center mb-4">
+                        <span class="text-3xl mr-3">📸</span>
+                        <h4 class="text-2xl font-bold text-gray-900">Biyernes/Sabado: Hobby Spotlight</h4>
+                    </div>
+                    <p class="text-gray-600 mb-3 font-semibold">Kada Biyernes o Sabado</p>
+                    <p class="text-gray-700">Ang usa ka miyembro mopaambit sa ilang paborito nga hobby o proyekto. Kini usa ka maayo nga paagi aron mas masabtan ang mga interes ug talento sa imong mga higala sa grupo.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Final CTA Section -->
+    <section class="py-16 bg-[#00A9E0] text-white text-center">
+        <div class="max-w-4xl mx-auto px-4">
+            <h3 class="text-4xl font-extrabold mb-4">Andam na Bang Sugdan ang Imong Bag-ong Panaghigalaay?</h3>
+            <p class="text-xl mb-8 opacity-90">Ayaw na paghulat! I-klik ang button sa ubos ug ipaila-ila ang imong kaugalingon sa komunidad.</p>
+            <a href="[IBUTANG ANG IMONG GROUP INVITE LINK DINHI]" target="_blank" class="bg-white text-[#0088CC] inline-flex items-center justify-center px-10 py-4 border border-transparent text-xl font-bold rounded-full shadow-2xl hover:bg-gray-100 transform hover:scale-105 transition duration-300">
+                APIL NA KARON!
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white p-6 text-center text-sm">
+        <div class="max-w-6xl mx-auto">
+            <p>&copy; 2025 Komunidad sa Panaghigalaay. Gihimo para sa mas suod nga online nga relasyon.</p>
+            <p class="mt-2">Telegram App Link: <a href="https://telegram.org/dl" target="_blank" class="text-blue-400 hover:underline">https://telegram.org/dl</a></p>
+        </div>
+    </footer>
+
+</body>
+</html>
+
