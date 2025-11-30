@@ -119,8 +119,6 @@ Some packages may only be included on certain architectures or operating systems
 - [github.com/gorilla/css/scanner](https://pkg.go.dev/github.com/gorilla/css/scanner) ([BSD-3-Clause](https://github.com/gorilla/css/blob/v1.0.1/LICENSE))
 - [github.com/gorilla/websocket](https://pkg.go.dev/github.com/gorilla/websocket) ([BSD-2-Clause](https://github.com/gorilla/websocket/blob/v1.5.3/LICENSE))
 - [github.com/grpc-ecosystem/grpc-gateway/v2](https://pkg.go.dev/github.com/grpc-ecosystem/grpc-gateway/v2) ([BSD-3-Clause](https://github.com/grpc-ecosystem/grpc-gateway/blob/v2.27.2/LICENSE))
-- [github.com/hashicorp/errwrap](https://pkg.go.dev/github.com/hashicorp/errwrap) ([MPL-2.0](https://github.com/hashicorp/errwrap/blob/v1.1.0/LICENSE))
-- [github.com/hashicorp/go-multierror](https://pkg.go.dev/github.com/hashicorp/go-multierror) ([MPL-2.0](https://github.com/hashicorp/go-multierror/blob/v1.1.1/LICENSE))
 - [github.com/hashicorp/go-version](https://pkg.go.dev/github.com/hashicorp/go-version) ([MPL-2.0](https://github.com/hashicorp/go-version/blob/v1.7.0/LICENSE))
 - [github.com/hashicorp/golang-lru/v2](https://pkg.go.dev/github.com/hashicorp/golang-lru/v2) ([MPL-2.0](https://github.com/hashicorp/golang-lru/blob/v2.0.7/LICENSE))
 - [github.com/hashicorp/golang-lru/v2/simplelru](https://pkg.go.dev/github.com/hashicorp/golang-lru/v2/simplelru) ([BSD-3-Clause](https://github.com/hashicorp/golang-lru/blob/v2.0.7/simplelru/LICENSE_list))
