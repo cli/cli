@@ -234,7 +234,7 @@ Some packages may only be included on certain architectures or operating systems
 - [google.golang.org/genproto/googleapis/rpc](https://pkg.go.dev/google.golang.org/genproto/googleapis/rpc) ([Apache-2.0](https://github.com/googleapis/go-genproto/blob/3122310a409c/googleapis/rpc/LICENSE))
 - [google.golang.org/genproto/googleapis/type](https://pkg.go.dev/google.golang.org/genproto/googleapis/type) ([Apache-2.0](https://github.com/googleapis/go-genproto/blob/513f23925822/LICENSE))
 - [google.golang.org/grpc](https://pkg.go.dev/google.golang.org/grpc) ([Apache-2.0](https://github.com/grpc/grpc-go/blob/v1.75.0/LICENSE))
-- [google.golang.org/protobuf](https://pkg.go.dev/google.golang.org/protobuf) ([BSD-3-Clause](https://github.com/protocolbuffers/protobuf-go/blob/v1.36.9/LICENSE))
+- [google.golang.org/protobuf](https://pkg.go.dev/google.golang.org/protobuf) ([BSD-3-Clause](https://github.com/protocolbuffers/protobuf-go/blob/v1.36.10/LICENSE))
 - [gopkg.in/yaml.v3](https://pkg.go.dev/gopkg.in/yaml.v3) ([MIT](https://github.com/go-yaml/yaml/blob/v3.0.1/LICENSE))
 - [k8s.io/klog/v2](https://pkg.go.dev/k8s.io/klog/v2) ([Apache-2.0](https://github.com/kubernetes/klog/blob/v2.130.1/LICENSE))
 
