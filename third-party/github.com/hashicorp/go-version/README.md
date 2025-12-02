@@ -1,6 +1,7 @@
 # Versioning Library for Go
+
 ![Build Status](https://github.com/hashicorp/go-version/actions/workflows/go-tests.yml/badge.svg)
-[![GoDoc](https://godoc.org/github.com/hashicorp/go-version?status.svg)](https://godoc.org/github.com/hashicorp/go-version)
+[![Go Reference](https://pkg.go.dev/badge/github.com/hashicorp/go-version.svg)](https://pkg.go.dev/github.com/hashicorp/go-version)
 
 go-version is a library for parsing versions and version constraints,
 and verifying versions against a set of constraints. go-version
@@ -12,7 +13,7 @@ Versions used with go-version must follow [SemVer](http://semver.org/).
 ## Installation and Usage
 
 Package documentation can be found on
-[GoDoc](http://godoc.org/github.com/hashicorp/go-version).
+[Go Reference](https://pkg.go.dev/github.com/hashicorp/go-version).
 
 Installation can be done with a normal `go get`:
 

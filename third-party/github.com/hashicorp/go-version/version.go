@@ -1,22 +1,38 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2014, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package version
 
 import (
-	"bytes"
 	"database/sql/driver"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // The compiled regular expression used to test the validity of a version.
 var (
-	versionRegexp *regexp.Regexp
-	semverRegexp  *regexp.Regexp
+	versionRegexp     *regexp.Regexp
+	versionRegexpOnce sync.Once
+	semverRegexp      *regexp.Regexp
+	semverRegexpOnce  sync.Once
 )
+
+func getVersionRegexp() *regexp.Regexp {
+	versionRegexpOnce.Do(func() {
+		versionRegexp = regexp.MustCompile("^" + VersionRegexpRaw + "$")
+	})
+	return versionRegexp
+}
+
+func getSemverRegexp() *regexp.Regexp {
+	semverRegexpOnce.Do(func() {
+		semverRegexp = regexp.MustCompile("^" + SemverRegexpRaw + "$")
+	})
+	return semverRegexp
+}
 
 // The raw regular expression string used for testing the validity
 // of a version.
@@ -42,28 +58,23 @@ type Version struct {
 	original string
 }
 
-func init() {
-	versionRegexp = regexp.MustCompile("^" + VersionRegexpRaw + "$")
-	semverRegexp = regexp.MustCompile("^" + SemverRegexpRaw + "$")
-}
-
 // NewVersion parses the given version and returns a new
 // Version.
 func NewVersion(v string) (*Version, error) {
-	return newVersion(v, versionRegexp)
+	return newVersion(v, getVersionRegexp())
 }
 
 // NewSemver parses the given version and returns a new
 // Version that adheres strictly to SemVer specs
 // https://semver.org/
 func NewSemver(v string) (*Version, error) {
-	return newVersion(v, semverRegexp)
+	return newVersion(v, getSemverRegexp())
 }
 
 func newVersion(v string, pattern *regexp.Regexp) (*Version, error) {
 	matches := pattern.FindStringSubmatch(v)
 	if matches == nil {
-		return nil, fmt.Errorf("Malformed version: %s", v)
+		return nil, fmt.Errorf("malformed version: %s", v)
 	}
 	segmentsStr := strings.Split(matches[1], ".")
 	segments := make([]int64, len(segmentsStr))
@@ -71,7 +82,7 @@ func newVersion(v string, pattern *regexp.Regexp) (*Version, error) {
 		val, err := strconv.ParseInt(str, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"Error parsing version: %s", err)
+				"error parsing version: %s", err)
 		}
 
 		segments[i] = val
@@ -174,7 +185,7 @@ func (v *Version) Compare(other *Version) int {
 		} else if lhs < rhs {
 			return -1
 		}
-		// Otherwis, rhs was > lhs, they're not equal
+		// Otherwise, rhs was > lhs, they're not equal
 		return 1
 	}
 
@@ -382,22 +393,29 @@ func (v *Version) Segments64() []int64 {
 // missing parts (1.0 => 1.0.0) will be made into a canonicalized form
 // as shown in the parenthesized examples.
 func (v *Version) String() string {
-	var buf bytes.Buffer
-	fmtParts := make([]string, len(v.segments))
+	return string(v.bytes())
+}
+
+func (v *Version) bytes() []byte {
+	var buf []byte
 	for i, s := range v.segments {
-		// We can ignore err here since we've pre-parsed the values in segments
-		str := strconv.FormatInt(s, 10)
-		fmtParts[i] = str
-	}
-	fmt.Fprintf(&buf, strings.Join(fmtParts, "."))
-	if v.pre != "" {
-		fmt.Fprintf(&buf, "-%s", v.pre)
-	}
-	if v.metadata != "" {
-		fmt.Fprintf(&buf, "+%s", v.metadata)
+		if i > 0 {
+			buf = append(buf, '.')
+		}
+		buf = strconv.AppendInt(buf, s, 10)
 	}
 
-	return buf.String()
+	if v.pre != "" {
+		buf = append(buf, '-')
+		buf = append(buf, v.pre...)
+	}
+
+	if v.metadata != "" {
+		buf = append(buf, '+')
+		buf = append(buf, v.metadata...)
+	}
+
+	return buf
 }
 
 // Original returns the original parsed version as-is, including any
