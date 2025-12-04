@@ -546,9 +546,14 @@ func createRun(opts *CreateOptions) error {
 			uploadURL = uploadURL[:idx]
 		}
 
-		opts.IO.StartProgressIndicator()
-		err = shared.ConcurrentUpload(httpClient, uploadURL, opts.Concurrency, opts.Assets)
-		opts.IO.StopProgressIndicator()
+		progressPrinter := shared.NewUploadProgressPrinter(opts.IO, opts.Assets)
+		var callbacks *shared.UploadCallbacks
+		if progressPrinter != nil {
+			callbacks = progressPrinter.Callbacks()
+			defer progressPrinter.Finish()
+		}
+
+		err = shared.ConcurrentUpload(httpClient, uploadURL, opts.Concurrency, opts.Assets, callbacks)
 		if err != nil {
 			return cleanupDraftRelease(err)
 		}

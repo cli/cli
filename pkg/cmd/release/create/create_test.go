@@ -977,7 +977,7 @@ func Test_createRun(t *testing.T) {
 				reg.Register(httpmock.REST("DELETE", "releases/123"), httpmock.StatusStringResponse(204, ``))
 			},
 			wantStdout: ``,
-			wantStderr: ``,
+			wantStderr: "[1/1] Failed uploading ball.tgz: HTTP 422 (https://api.github.com/assets/upload?label=&name=ball.tgz)\n",
 			wantErr:    `HTTP 422 (https://api.github.com/assets/upload?label=&name=ball.tgz)`,
 		},
 		{

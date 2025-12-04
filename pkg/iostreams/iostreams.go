@@ -283,6 +283,10 @@ func (s *IOStreams) SetSpinnerDisabled(v bool) {
 	s.spinnerDisabled = v
 }
 
+func (s *IOStreams) ProgressIndicatorEnabled() bool {
+	return s.progressIndicatorEnabled
+}
+
 func (s *IOStreams) StartProgressIndicator() {
 	s.StartProgressIndicatorWithLabel("")
 }

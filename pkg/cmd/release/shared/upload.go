@@ -26,14 +26,21 @@ type httpDoer interface {
 type errNetwork struct{ error }
 
 type AssetForUpload struct {
-	Name  string
-	Label string
+	Name    string
+	Label   string
+	Ordinal int
 
 	Size     int64
 	MIMEType string
 	Open     func() (io.ReadCloser, error)
 
 	ExistingURL string
+}
+
+type UploadCallbacks struct {
+	OnUploadStart    func(AssetForUpload)
+	OnUploadProgress func(AssetForUpload, int64)
+	OnUploadComplete func(AssetForUpload, error)
 }
 
 func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
@@ -72,7 +79,19 @@ func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
 			MIMEType: typeForFilename(fi.Name()),
 		})
 	}
+
+	AssignAssetOrdinals(assets)
+
 	return
+}
+
+func AssignAssetOrdinals(assets []*AssetForUpload) {
+	for i, asset := range assets {
+		if asset == nil {
+			continue
+		}
+		asset.Ordinal = i + 1
+	}
 }
 
 func typeForFilename(fn string) string {
@@ -111,7 +130,7 @@ func fileExt(fn string) string {
 	return path.Ext(fn)
 }
 
-func ConcurrentUpload(httpClient httpDoer, uploadURL string, numWorkers int, assets []*AssetForUpload) error {
+func ConcurrentUpload(httpClient httpDoer, uploadURL string, numWorkers int, assets []*AssetForUpload, callbacks *UploadCallbacks) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -123,11 +142,47 @@ func ConcurrentUpload(httpClient httpDoer, uploadURL string, numWorkers int, ass
 	for _, a := range assets {
 		asset := *a
 		g.Go(func() error {
-			return uploadWithDelete(gctx, httpClient, uploadURL, asset)
+			return runUpload(gctx, httpClient, uploadURL, asset, callbacks)
 		})
 	}
 
 	return g.Wait()
+}
+
+func runUpload(ctx context.Context, httpClient httpDoer, uploadURL string, asset AssetForUpload, callbacks *UploadCallbacks) error {
+	if callbacks != nil && callbacks.OnUploadProgress != nil && asset.Open != nil {
+		asset = wrapAssetOpenWithProgress(asset, callbacks.OnUploadProgress)
+	}
+
+	if callbacks != nil && callbacks.OnUploadStart != nil {
+		callbacks.OnUploadStart(asset)
+	}
+
+	err := uploadWithDelete(ctx, httpClient, uploadURL, asset)
+
+	if callbacks != nil && callbacks.OnUploadComplete != nil {
+		callbacks.OnUploadComplete(asset, err)
+	}
+
+	return err
+}
+
+func wrapAssetOpenWithProgress(asset AssetForUpload, progressFn func(AssetForUpload, int64)) AssetForUpload {
+	assetCopy := asset
+	origOpen := asset.Open
+	asset.Open = func() (io.ReadCloser, error) {
+		rc, err := origOpen()
+		if err != nil {
+			return nil, err
+		}
+		return &progressReadCloser{
+			ReadCloser: rc,
+			onProgress: func(uploaded int64) {
+				progressFn(assetCopy, uploaded)
+			},
+		}, nil
+	}
+	return asset
 }
 
 func shouldRetry(err error) bool {
@@ -220,4 +275,21 @@ func deleteAsset(ctx context.Context, httpClient httpDoer, assetURL string) erro
 	}
 
 	return nil
+}
+
+type progressReadCloser struct {
+	io.ReadCloser
+	onProgress func(int64)
+	totalRead  int64
+}
+
+func (p *progressReadCloser) Read(b []byte) (int, error) {
+	n, err := p.ReadCloser.Read(b)
+	if n > 0 {
+		p.totalRead += int64(n)
+		if p.onProgress != nil {
+			p.onProgress(p.totalRead)
+		}
+	}
+	return n, err
 }

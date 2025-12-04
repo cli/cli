@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 )
 
@@ -111,6 +112,75 @@ func Test_uploadWithDelete_retry(t *testing.T) {
 	}
 	if tries != 3 {
 		t.Errorf("tries = %d, expected %d", tries, 3)
+	}
+}
+
+func Test_runUpload_reportsProgress(t *testing.T) {
+	data := []byte("hello world")
+	asset := AssetForUpload{
+		Name:     "hello.txt",
+		Label:    "",
+		Size:     int64(len(data)),
+		MIMEType: "text/plain",
+		Open: func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(data)), nil
+		},
+	}
+
+	var (
+		mu       sync.Mutex
+		progress []int64
+		started  bool
+		finished bool
+	)
+
+	callbacks := &UploadCallbacks{
+		OnUploadStart: func(a AssetForUpload) {
+			started = true
+		},
+		OnUploadProgress: func(a AssetForUpload, uploaded int64) {
+			mu.Lock()
+			defer mu.Unlock()
+			progress = append(progress, uploaded)
+		},
+		OnUploadComplete: func(a AssetForUpload, err error) {
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			finished = true
+		},
+	}
+
+	client := funcClient(func(req *http.Request) (*http.Response, error) {
+		if _, err := io.Copy(io.Discard, req.Body); err != nil {
+			return nil, err
+		}
+		_ = req.Body.Close()
+		return &http.Response{
+			Request:    req,
+			StatusCode: 201,
+			Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
+		}, nil
+	})
+
+	if err := runUpload(context.Background(), client, "https://example.com/upload", asset, callbacks); err != nil {
+		t.Fatalf("runUpload error: %v", err)
+	}
+
+	if !started {
+		t.Fatalf("expected OnUploadStart to be called")
+	}
+	if !finished {
+		t.Fatalf("expected OnUploadComplete to be called")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(progress) == 0 {
+		t.Fatalf("expected progress updates")
+	}
+	if got, want := progress[len(progress)-1], int64(len(data)); got != want {
+		t.Fatalf("got final progress %d, want %d", got, want)
 	}
 }
 
