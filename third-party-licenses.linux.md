@@ -142,7 +142,7 @@ Some packages may only be included on certain architectures or operating systems
 - [github.com/mattn/go-runewidth](https://pkg.go.dev/github.com/mattn/go-runewidth) ([MIT](https://github.com/mattn/go-runewidth/blob/v0.0.16/LICENSE))
 - [github.com/mgutz/ansi](https://pkg.go.dev/github.com/mgutz/ansi) ([MIT](https://github.com/mgutz/ansi/blob/d51e80ef957d/LICENSE))
 - [github.com/microcosm-cc/bluemonday](https://pkg.go.dev/github.com/microcosm-cc/bluemonday) ([BSD-3-Clause](https://github.com/microcosm-cc/bluemonday/blob/v1.0.27/LICENSE.md))
-- [github.com/microsoft/dev-tunnels/go/tunnels](https://pkg.go.dev/github.com/microsoft/dev-tunnels/go/tunnels) ([MIT](https://github.com/microsoft/dev-tunnels/blob/v0.1.13/LICENSE))
+- [github.com/microsoft/dev-tunnels/go/tunnels](https://pkg.go.dev/github.com/microsoft/dev-tunnels/go/tunnels) ([MIT](https://github.com/microsoft/dev-tunnels/blob/v0.1.19/LICENSE))
 - [github.com/mitchellh/copystructure](https://pkg.go.dev/github.com/mitchellh/copystructure) ([MIT](https://github.com/mitchellh/copystructure/blob/v1.2.0/LICENSE))
 - [github.com/mitchellh/go-homedir](https://pkg.go.dev/github.com/mitchellh/go-homedir) ([MIT](https://github.com/mitchellh/go-homedir/blob/v1.1.0/LICENSE))
 - [github.com/mitchellh/hashstructure/v2](https://pkg.go.dev/github.com/mitchellh/hashstructure/v2) ([MIT](https://github.com/mitchellh/hashstructure/blob/v2.0.2/LICENSE))
