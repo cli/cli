@@ -62,6 +62,7 @@ type CreateOptions struct {
 	Body       string
 	BaseBranch string
 	HeadBranch string
+	HeadRepo   string
 
 	Reviewers []string
 	Assignees []string
@@ -176,6 +177,7 @@ type CreateContext struct {
 	// and this is a small price to pay for the convenience of not having to do a lot
 	// more design.
 	BaseTrackingBranch string
+	HeadRepositoryID   string
 	Client             *api.Client
 	GitClient          *git.Client
 }
@@ -211,6 +213,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Using an organization as the %[1]s<user>%[1]s is currently not supported.
 			For more information, see <https://github.com/cli/cli/issues/10093>
 
+			Use %[1]s--head-repo%[1]s to explicitly specify the repository containing the head branch.
+			This is useful when creating pull requests from private forks or when the head repository
+			cannot be automatically determined. When using %[1]s--head-repo%[1]s, you must also specify %[1]s--head%[1]s.
+
 			A prompt will also ask for the title and the body of the pull request. Use %[1]s--title%[1]s and
 			%[1]s--body%[1]s to skip this, or use %[1]s--fill%[1]s to autofill these values from git commits.
 			It's important to notice that if the %[1]s--title%[1]s and/or %[1]s--body%[1]s are also provided
@@ -237,6 +243,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh pr create --reviewer monalisa,hubot  --reviewer myorg/team-name
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
+			$ gh pr create --head-repo owner/repo --head feature-branch
 			$ gh pr create --template "pull_request_template.md"
 		`),
 		Args:    cmdutil.NoArgsQuoteReminder,
@@ -319,6 +326,17 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
 			}
 
+			if opts.HeadRepo != "" {
+				if opts.HeadBranch == "" {
+					return cmdutil.FlagErrorf("`--head-repo` requires `--head` to be specified")
+				}
+				// When --head-repo is provided, --head must be a plain branch name (no colon)
+				// because headRepositoryId and qualified headRefName (user:branch) are mutually exclusive
+				if strings.Contains(opts.HeadBranch, ":") {
+					return cmdutil.FlagErrorf("`--head-repo` cannot be used with `--head` in `user:branch` format. Use a plain branch name with `--head` when specifying `--head-repo`")
+				}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -333,6 +351,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default [current branch])")
+	fl.StringVar(&opts.HeadRepo, "head-repo", "", "The `repository` that contains the head branch (owner/repo format)")
 	fl.BoolVarP(&opts.EditorMode, "editor", "e", false, "Skip prompts and open the text editor to write the title and body in. The first line is the title and the remaining text is the body.")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.FillVerbose, "fill-verbose", "", false, "Use commits msg+body for description")
@@ -691,6 +710,20 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		return nil, err
 	}
 
+	// Resolve head repository ID if --head-repo is provided
+	var headRepositoryID string
+	if opts.HeadRepo != "" {
+		headRepo, err := ghrepo.FromFullName(opts.HeadRepo)
+		if err != nil {
+			return nil, fmt.Errorf("invalid head repository: %w", err)
+		}
+		headRepoFull, err := api.GitHubRepo(client, headRepo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve head repository: %w", err)
+		}
+		headRepositoryID = headRepoFull.ID
+	}
+
 	// This closure provides an easy way to instantiate a CreateContext with everything other than
 	// the refs. This probably indicates that CreateContext could do with some rework, but the refactor
 	// to introduce PRRefs is already large enough.
@@ -714,6 +747,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			GitClient:          opts.GitClient,
 			PRRefs:             refs,
 			BaseTrackingBranch: baseTrackingBranch,
+			HeadRepositoryID:   headRepositoryID,
 		}
 	}
 
@@ -994,6 +1028,9 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		"baseRefName":         ctx.PRRefs.BaseRef(),
 		"headRefName":         ctx.PRRefs.QualifiedHeadRef(),
 		"maintainerCanModify": opts.MaintainerCanModify,
+	}
+	if ctx.HeadRepositoryID != "" {
+		params["headRepositoryId"] = ctx.HeadRepositoryID
 	}
 
 	if params["title"] == "" {
