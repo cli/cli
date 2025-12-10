@@ -270,6 +270,46 @@ func TestNewCmdCreate(t *testing.T) {
 				MaintainerCanModify: true,
 			},
 		},
+		{
+			name:     "head-repo without head",
+			cli:      "--head-repo owner/repo --title mytitle --body ''",
+			wantsErr: true,
+		},
+		{
+			name:     "head-repo with user:branch format",
+			cli:      "--head-repo owner/repo --head user:branch --title mytitle --body ''",
+			wantsErr: true,
+		},
+		{
+			name:     "head-repo with plain branch name",
+			tty:      false,
+			cli:      "--head-repo owner/repo --head feature --title mytitle --body ''",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "",
+				BodyProvided:        true,
+				HeadBranch:          "feature",
+				HeadRepo:            "owner/repo",
+				MaintainerCanModify: true,
+			},
+		},
+		{
+			name:     "head-repo with branch name containing slash",
+			tty:      false,
+			cli:      "--head-repo owner/repo --head brickstore/storage-image-update-2832e6c3d --title mytitle --body ''",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "",
+				BodyProvided:        true,
+				HeadBranch:          "brickstore/storage-image-update-2832e6c3d",
+				HeadRepo:            "owner/repo",
+				MaintainerCanModify: true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1650,6 +1690,38 @@ func Test_createRun(t *testing.T) {
 				opts.Title = "my title"
 				opts.Body = "my body"
 				opts.HeadBranch = "otherowner:feature"
+				return func() {}
+			},
+			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
+		},
+		{
+			name: "--head-repo with plain branch name includes headRepositoryId",
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data": {"repository": {"id": "HEADREPOID", "name": "HEADREPO", "owner": {"login": "HEADOWNER"}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]interface{}) {
+							assert.Equal(t, "REPOID", input["repositoryId"])
+							assert.Equal(t, "my title", input["title"])
+							assert.Equal(t, "my body", input["body"])
+							assert.Equal(t, "master", input["baseRefName"])
+							assert.Equal(t, "feature", input["headRefName"])
+							assert.Equal(t, "HEADREPOID", input["headRepositoryId"])
+						}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.HeadRepo = "HEADOWNER/HEADREPO"
 				return func() {}
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
