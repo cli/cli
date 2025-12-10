@@ -1228,8 +1228,8 @@ github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d h1:5PJl274Y63IEHC+7izoQ
 github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d/go.mod h1:01TrycV0kFyexm33Z7vhZRXopbI8J3TDReVlkTgMUxE=
 github.com/microcosm-cc/bluemonday v1.0.27 h1:MpEUotklkwCSLeH+Qdx1VJgNqLlpY2KXwXFM08ygZfk=
 github.com/microcosm-cc/bluemonday v1.0.27/go.mod h1:jFi9vgW+H7c3V0lb6nR74Ib/DIB5OBs92Dimizgw2cA=
-github.com/microsoft/dev-tunnels v0.1.13 h1:bp1qqCvP/5iLol1Vz0c/lM2sexG7Gd8fRGcGv58vZdE=
-github.com/microsoft/dev-tunnels v0.1.13/go.mod h1:Jvr6RlyjUXomM6KsDmIQbq+hhKd5mWrBcv3MEsa78dc=
+github.com/microsoft/dev-tunnels v0.1.19 h1:uBJ4HEWazgiukfC8sSAUWDnUumu3Dew8pzpNfupZe6k=
+github.com/microsoft/dev-tunnels v0.1.19/go.mod h1:Jvr6RlyjUXomM6KsDmIQbq+hhKd5mWrBcv3MEsa78dc=
 github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8/go.mod h1:mC1jAcsrzbxHt8iiaC+zU4b1ylILSosueou12R++wfY=
 github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3/go.mod h1:RagcQ7I8IeTMnF8JTXieKnO4Z6JCsikNEzj0DwauVzE=
 github.com/mitchellh/copystructure v1.2.0 h1:vpKXTN4ewci03Vljg/q9QvCGUDttBOGBIa15WveJJGw=
