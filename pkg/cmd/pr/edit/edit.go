@@ -12,6 +12,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -335,15 +336,20 @@ func editRun(opts *EditOptions) error {
 	return nil
 }
 
-func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, editable *shared.Editable, assignableID string) func(string) ([]string, []string, int, error) {
-	searchFunc := func(input string) ([]string, []string, int, error) {
+func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, editable *shared.Editable, assignableID string) func(string) prompter.MultiSelectSearchResult {
+	searchFunc := func(input string) prompter.MultiSelectSearchResult {
 		actors, err := api.SuggestedAssignableActors(
 			apiClient,
 			repo,
 			assignableID,
 			input)
 		if err != nil {
-			return nil, nil, 0, err
+			return prompter.MultiSelectSearchResult{
+				Keys:        nil,
+				Labels:      nil,
+				MoreResults: 0,
+				Err:         err,
+			}
 		}
 
 		var logins []string
@@ -366,7 +372,12 @@ func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, editable *
 			// so that updating the PR later can resolve the actor ID.
 			editable.Metadata.AssignableActors = append(editable.Metadata.AssignableActors, a)
 		}
-		return logins, displayNames, 0, nil
+		return prompter.MultiSelectSearchResult{
+			Keys:        logins,
+			Labels:      displayNames,
+			MoreResults: 0,
+			Err:         nil,
+		}
 	}
 	return searchFunc
 }

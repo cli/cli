@@ -38,7 +38,7 @@ var _ Prompter = &PrompterMock{}
 //			MultiSelectFunc: func(prompt string, defaults []string, options []string) ([]int, error) {
 //				panic("mock out the MultiSelect method")
 //			},
-//			MultiSelectWithSearchFunc: func(prompt string, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) ([]string, []string, int, error)) ([]string, error) {
+//			MultiSelectWithSearchFunc: func(prompt string, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
 //				panic("mock out the MultiSelectWithSearch method")
 //			},
 //			PasswordFunc: func(prompt string) (string, error) {
@@ -76,7 +76,7 @@ type PrompterMock struct {
 	MultiSelectFunc func(prompt string, defaults []string, options []string) ([]int, error)
 
 	// MultiSelectWithSearchFunc mocks the MultiSelectWithSearch method.
-	MultiSelectWithSearchFunc func(prompt string, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) ([]string, []string, int, error)) ([]string, error)
+	MultiSelectWithSearchFunc func(prompt string, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error)
 
 	// PasswordFunc mocks the Password method.
 	PasswordFunc func(prompt string) (string, error)
@@ -140,7 +140,7 @@ type PrompterMock struct {
 			// PersistentOptions is the persistentOptions argument value.
 			PersistentOptions []string
 			// SearchFunc is the searchFunc argument value.
-			SearchFunc func(string) ([]string, []string, int, error)
+			SearchFunc func(string) MultiSelectSearchResult
 		}
 		// Password holds details about calls to the Password method.
 		Password []struct {
@@ -408,7 +408,7 @@ func (mock *PrompterMock) MultiSelectCalls() []struct {
 }
 
 // MultiSelectWithSearch calls MultiSelectWithSearchFunc.
-func (mock *PrompterMock) MultiSelectWithSearch(prompt string, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) ([]string, []string, int, error)) ([]string, error) {
+func (mock *PrompterMock) MultiSelectWithSearch(prompt string, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
 	if mock.MultiSelectWithSearchFunc == nil {
 		panic("PrompterMock.MultiSelectWithSearchFunc: method is nil but Prompter.MultiSelectWithSearch was just called")
 	}
@@ -417,7 +417,7 @@ func (mock *PrompterMock) MultiSelectWithSearch(prompt string, searchPrompt stri
 		SearchPrompt      string
 		Defaults          []string
 		PersistentOptions []string
-		SearchFunc        func(string) ([]string, []string, int, error)
+		SearchFunc        func(string) MultiSelectSearchResult
 	}{
 		Prompt:            prompt,
 		SearchPrompt:      searchPrompt,
@@ -440,14 +440,14 @@ func (mock *PrompterMock) MultiSelectWithSearchCalls() []struct {
 	SearchPrompt      string
 	Defaults          []string
 	PersistentOptions []string
-	SearchFunc        func(string) ([]string, []string, int, error)
+	SearchFunc        func(string) MultiSelectSearchResult
 } {
 	var calls []struct {
 		Prompt            string
 		SearchPrompt      string
 		Defaults          []string
 		PersistentOptions []string
-		SearchFunc        func(string) ([]string, []string, int, error)
+		SearchFunc        func(string) MultiSelectSearchResult
 	}
 	mock.lockMultiSelectWithSearch.RLock()
 	calls = mock.calls.MultiSelectWithSearch

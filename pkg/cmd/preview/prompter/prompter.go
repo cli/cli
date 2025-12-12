@@ -157,7 +157,7 @@ func runMultiSelect(p prompter.Prompter, io *iostreams.IOStreams) error {
 func runMultiSelectWithSearch(p prompter.Prompter, io *iostreams.IOStreams) error {
 	fmt.Fprintln(io.Out, "Demonstrating Multi Select With Search")
 	persistentOptions := []string{"persistent-option-1"}
-	searchFunc := func(input string) ([]string, []string, int, error) {
+	searchFunc := func(input string) prompter.MultiSelectSearchResult {
 		var searchResultKeys []string
 		var searchResultLabels []string
 
@@ -165,7 +165,12 @@ func runMultiSelectWithSearch(p prompter.Prompter, io *iostreams.IOStreams) erro
 			moreResults := 2 // Indicate that there are more results available
 			searchResultKeys = []string{"initial-result-1", "initial-result-2"}
 			searchResultLabels = []string{"Initial Result Label 1", "Initial Result Label 2"}
-			return searchResultKeys, searchResultLabels, moreResults, nil
+			return prompter.MultiSelectSearchResult{
+				Keys:        searchResultKeys,
+				Labels:      searchResultLabels,
+				MoreResults: moreResults,
+				Err:         nil,
+			}
 		}
 
 		// In a real implementation, this function would perform a search based on the input.
@@ -173,7 +178,12 @@ func runMultiSelectWithSearch(p prompter.Prompter, io *iostreams.IOStreams) erro
 		moreResults := 0
 		searchResultKeys = []string{"search-result-1", "search-result-2"}
 		searchResultLabels = []string{"Search Result Label 1", "Search Result Label 2"}
-		return searchResultKeys, searchResultLabels, moreResults, nil
+		return prompter.MultiSelectSearchResult{
+			Keys:        searchResultKeys,
+			Labels:      searchResultLabels,
+			MoreResults: moreResults,
+			Err:         nil,
+		}
 	}
 
 	selections, err := p.MultiSelectWithSearch("Select an option", "Search for an option", []string{}, persistentOptions, searchFunc)

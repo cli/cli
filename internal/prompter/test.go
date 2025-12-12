@@ -99,7 +99,7 @@ func (m *MockPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed 
 	return s.fn(prompt, defaultValue, blankAllowed)
 }
 
-func (m *MockPrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) ([]string, []string, int, error)) ([]string, error) {
+func (m *MockPrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
 	var s multiSelectWithSearchStub
 	if len(m.multiSelectWithSearchStubs) == 0 {
 		return nil, NoSuchPromptErr(prompt)

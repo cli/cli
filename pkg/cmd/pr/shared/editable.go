@@ -6,6 +6,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/set"
 )
 
@@ -16,7 +17,7 @@ type Editable struct {
 	Reviewers          EditableSlice
 	ReviewerSearchFunc func(string) ([]string, []string, error)
 	Assignees          EditableAssignees
-	AssigneeSearchFunc func(string) ([]string, []string, int, error)
+	AssigneeSearchFunc func(string) prompter.MultiSelectSearchResult
 	Labels             EditableSlice
 	Projects           EditableProjects
 	Milestone          EditableString
@@ -279,7 +280,7 @@ type EditPrompter interface {
 	Input(string, string) (string, error)
 	MarkdownEditor(string, string, bool) (string, error)
 	MultiSelect(string, []string, []string) ([]int, error)
-	MultiSelectWithSearch(prompt, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) ([]string, []string, int, error)) ([]string, error)
+	MultiSelectWithSearch(prompt, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) prompter.MultiSelectSearchResult) ([]string, error)
 	Confirm(string, bool) (bool, error)
 }
 

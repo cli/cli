@@ -228,26 +228,36 @@ func TestAccessiblePrompter(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
 		persistentOptions := []string{"persistent-option-1"}
-		searchFunc := func(input string) ([]string, []string, int, error) {
-			var searchResultKeys []string
-			var searchResultLabels []string
+	searchFunc := func(input string) prompter.MultiSelectSearchResult {
+		var searchResultKeys []string
+		var searchResultLabels []string
 
-			// Initial search with no input
-			if input == "" {
-				moreResults := 2
-				searchResultKeys = []string{"initial-result-1", "initial-result-2"}
-				searchResultLabels = []string{"Initial Result Label 1", "Initial Result Label 2"}
-				return searchResultKeys, searchResultLabels, moreResults, nil
+		// Initial search with no input
+		if input == "" {
+			moreResults := 2
+			searchResultKeys = []string{"initial-result-1", "initial-result-2"}
+			searchResultLabels = []string{"Initial Result Label 1", "Initial Result Label 2"}
+			return prompter.MultiSelectSearchResult{
+				Keys:        searchResultKeys,
+				Labels:      searchResultLabels,
+				MoreResults: moreResults,
+				Err:         nil,
 			}
-
-			// Subsequent search with input
-			moreResults := 0
-			searchResultKeys = []string{"search-result-1", "search-result-2"}
-			searchResultLabels = []string{"Search Result Label 1", "Search Result Label 2"}
-			return searchResultKeys, searchResultLabels, moreResults, nil
 		}
 
-		go func() {
+		// Subsequent search with input
+		moreResults := 0
+		searchResultKeys = []string{"search-result-1", "search-result-2"}
+		searchResultLabels = []string{"Search Result Label 1", "Search Result Label 2"}
+		return prompter.MultiSelectSearchResult{
+			Keys:        searchResultKeys,
+			Labels:      searchResultLabels,
+			MoreResults: moreResults,
+			Err:         nil,
+		}
+	}
+
+	go func() {
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Select an option \r\n")
 			require.NoError(t, err)
@@ -291,16 +301,26 @@ func TestAccessiblePrompter(t *testing.T) {
 		initialSearchResultKeys := []string{"initial-result-1"}
 		initialSearchResultLabels := []string{"Initial Result Label 1"}
 		defaultOptions := initialSearchResultKeys
-		searchFunc := func(input string) ([]string, []string, int, error) {
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
 			// Initial search with no input
 			if input == "" {
 				moreResults := 2
-				return initialSearchResultKeys, initialSearchResultLabels, moreResults, nil
+				return prompter.MultiSelectSearchResult{
+					Keys:        initialSearchResultKeys,
+					Labels:      initialSearchResultLabels,
+					MoreResults: moreResults,
+					Err:         nil,
+				}
 			}
 
 			// No search selected, so this should fail the test.
 			t.FailNow()
-			return nil, nil, 0, nil
+			return prompter.MultiSelectSearchResult{
+				Keys:        nil,
+				Labels:      nil,
+				MoreResults: 0,
+				Err:         nil,
+			}
 		}
 
 		go func() {
@@ -325,21 +345,36 @@ func TestAccessiblePrompter(t *testing.T) {
 		moreResultKeys := []string{"more-result-1"}
 		moreResultLabels := []string{"More Result Label 1"}
 
-		searchFunc := func(input string) ([]string, []string, int, error) {
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
 			// Initial search with no input
 			if input == "" {
 				moreResults := 2
-				return initialSearchResultKeys, initialSearchResultLabels, moreResults, nil
+				return prompter.MultiSelectSearchResult{
+					Keys:        initialSearchResultKeys,
+					Labels:      initialSearchResultLabels,
+					MoreResults: moreResults,
+					Err:         nil,
+				}
 			}
 
 			// Subsequent search with input "more"
 			if input == "more" {
-				return moreResultKeys, moreResultLabels, 0, nil
+				return prompter.MultiSelectSearchResult{
+					Keys:        moreResultKeys,
+					Labels:      moreResultLabels,
+					MoreResults: 0,
+					Err:         nil,
+				}
 			}
 
 			// No other searches expected
 			t.FailNow()
-			return nil, nil, 0, nil
+			return prompter.MultiSelectSearchResult{
+				Keys:        nil,
+				Labels:      nil,
+				MoreResults: 0,
+				Err:         nil,
+			}
 		}
 
 		go func() {

@@ -29,7 +29,7 @@ type Prompter interface {
 	// not their indices, since the list of options is dynamic.
 	// The searchFunc args and return values are: func(query) (map[keys]labels, moreResultsCount, searchError)
 	// Where the selected keys are eventually returned by MultiSelectWithSearch and the labels are what is shown to the user in the prompt.
-	MultiSelectWithSearch(prompt, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) ([]string, []string, int, error)) ([]string, error)
+	MultiSelectWithSearch(prompt, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error)
 	// Input prompts the user to enter a string value.
 	Input(prompt string, defaultValue string) (string, error)
 	// Password prompts the user to enter a password.
@@ -329,7 +329,7 @@ func (p *accessiblePrompter) MarkdownEditor(prompt, defaultValue string, blankAl
 	return text, nil
 }
 
-func (p *accessiblePrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) ([]string, []string, int, error)) ([]string, error) {
+func (p *accessiblePrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
 	return multiSelectWithSearch(p, prompt, searchPrompt, defaultValues, persistentValues, searchFunc)
 }
 
@@ -349,11 +349,18 @@ func (p *surveyPrompter) MultiSelect(prompt string, defaultValues, options []str
 	return p.prompter.MultiSelect(prompt, defaultValues, options)
 }
 
-func (p *surveyPrompter) MultiSelectWithSearch(prompt string, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) ([]string, []string, int, error)) ([]string, error) {
+func (p *surveyPrompter) MultiSelectWithSearch(prompt string, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
 	return multiSelectWithSearch(p, prompt, searchPrompt, defaultValues, persistentValues, searchFunc)
 }
 
-func multiSelectWithSearch(p Prompter, prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) ([]string, []string, int, error)) ([]string, error) {
+type MultiSelectSearchResult struct {
+	Keys        []string
+	Labels      []string
+	MoreResults int
+	Err         error
+}
+
+func multiSelectWithSearch(p Prompter, prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
 	selectedOptions := defaultValues
 
 	// The optionKeyLabels map is used to uniquely identify optionKeyLabels
@@ -363,10 +370,13 @@ func multiSelectWithSearch(p Prompter, prompt, searchPrompt string, defaultValue
 		optionKeyLabels[k] = k
 	}
 
-	searchResultKeys, searchResultLabels, moreResults, err := searchFunc("")
-	if err != nil {
-		return nil, fmt.Errorf("failed to search: %w", err)
+	searchResult := searchFunc("")
+	if searchResult.Err != nil {
+		return nil, fmt.Errorf("failed to search: %w", searchResult.Err)
 	}
+	searchResultKeys := searchResult.Keys
+	searchResultLabels := searchResult.Labels
+	moreResults := searchResult.MoreResults
 
 	for i, k := range searchResultKeys {
 		optionKeyLabels[k] = searchResultLabels[i]
@@ -474,10 +484,13 @@ func multiSelectWithSearch(p Prompter, prompt, searchPrompt string, defaultValue
 				return nil, err
 			}
 
-			searchResultKeys, searchResultLabels, moreResults, err = searchFunc(query)
-			if err != nil {
-				return nil, err
+			searchResult := searchFunc(query)
+			if searchResult.Err != nil {
+				return nil, searchResult.Err
 			}
+			searchResultKeys = searchResult.Keys
+			searchResultLabels = searchResult.Labels
+			moreResults = searchResult.MoreResults
 
 			for i, k := range searchResultKeys {
 				optionKeyLabels[k] = searchResultLabels[i]
