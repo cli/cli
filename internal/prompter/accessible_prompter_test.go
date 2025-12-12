@@ -803,6 +803,8 @@ func newTestVirtualTerminal(t *testing.T) *expect.Console {
 		failOnExpectError(t),
 		failOnSendError(t),
 		expect.WithDefaultTimeout(time.Second),
+		// Use this logger to debug expect based tests by printing the
+		// characters being read to stdout.
 		// expect.WithLogger(log.New(os.Stdout, "", 0)),
 	}
 
