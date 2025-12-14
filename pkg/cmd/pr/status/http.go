@@ -18,6 +18,7 @@ type requestOptions struct {
 	Username       string
 	Fields         []string
 	ConflictStatus bool
+	LimitResults   int
 
 	CheckRunAndStatusContextCountsSupported bool
 }
@@ -122,7 +123,6 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 	`
 
 	currentUsername, err := getCurrentUsername(options.Username, repo.RepoHost(), apiClient)
-
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +145,10 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		"number":        options.CurrentPR,
 	}
 
+	if options.LimitResults > 0 {
+		variables["per_page"] = options.LimitResults
+	}
+
 	var resp response
 	if err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp); err != nil {
 		return nil, err
@@ -160,7 +164,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		reviewRequested = append(reviewRequested, edge.Node)
 	}
 
-	var currentPR = resp.Repository.PullRequest
+	currentPR := resp.Repository.PullRequest
 	if currentPR == nil {
 		for _, edge := range resp.Repository.PullRequests.Edges {
 			if edge.Node.HeadLabel() == currentPRHeadRef {

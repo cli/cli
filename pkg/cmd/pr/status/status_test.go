@@ -90,6 +90,16 @@ func initFakeHTTP() *httpmock.Registry {
 	return &httpmock.Registry{}
 }
 
+func TestPRStatus_invalidLimit(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	_, err := runCommand(http, "", true, "--limit 0")
+	if err == nil || !strings.Contains(err.Error(), "invalid value for --limit") {
+		t.Fatalf("expected limit validation error, got: %v", err)
+	}
+}
+
 func TestPRStatus(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)

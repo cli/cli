@@ -37,16 +37,19 @@ type StatusOptions struct {
 	ConflictStatus  bool
 
 	Detector fd.Detector
+
+	LimitResults int
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
 	opts := &StatusOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		GitClient:  f.GitClient,
-		Config:     f.Config,
-		Remotes:    f.Remotes,
-		Branch:     f.Branch,
+		IO:           f.IOStreams,
+		HttpClient:   f.HttpClient,
+		GitClient:    f.GitClient,
+		Config:       f.Config,
+		Remotes:      f.Remotes,
+		Branch:       f.Branch,
+		LimitResults: 10,
 	}
 
 	cmd := &cobra.Command{
@@ -66,6 +69,10 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			opts.BaseRepo = f.BaseRepo
 			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
+			if opts.LimitResults < 1 {
+				return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.LimitResults)
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -74,6 +81,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().BoolVarP(&opts.ConflictStatus, "conflict-status", "c", false, "Display the merge conflict status of each pull request")
+	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", opts.LimitResults, "Maximum number of items to fetch")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
@@ -142,6 +150,7 @@ func statusRun(opts *StatusOptions) error {
 	if opts.Exporter != nil {
 		options.Fields = opts.Exporter.Fields()
 	}
+	options.LimitResults = opts.LimitResults
 
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
