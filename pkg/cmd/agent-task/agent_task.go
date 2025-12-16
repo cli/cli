@@ -49,7 +49,9 @@ func NewCmdAgentTask(f *cmdutil.Factory) *cobra.Command {
 			$ gh agent-task view 12345abc-12345-12345-12345-12345abc
 		`),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return requireOAuthToken(f)
+			// NOTE: Temporarily disabled while we work on agent tasks feature flagging.
+			// return requireOAuthToken(f)
+			return nil
 		},
 		// This is required to run this root command. We want to
 		// run it to test PersistentPreRunE behavior.
