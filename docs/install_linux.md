@@ -322,6 +322,20 @@ Or via [mport(1)](http://man.midnightbsd.org/cgi-bin/man.cgi/mport):
 mport install gh
 ```
 
+### Mise
+
+You can install github cli on Linux using [mise](https://github.com/jdx/mise), the polyglot tool versions manager with a command like this:
+
+```bash
+mise use -g gh@latest
+```
+
+OR (alias)
+
+```bash
+mise use -g github-cli@latest
+```
+
 ### NetBSD/pkgsrc
 
 The [GitHub CLI package](https://pkgsrc.se/net/gh) is supported by the NetBSD community with updates powered by [NetBSD/pkgsrc](https://github.com/NetBSD/pkgsrc/tree/trunk/net/gh).

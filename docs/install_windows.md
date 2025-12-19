@@ -66,6 +66,20 @@ To upgrade:
 conda update gh --channel conda-forge
 ```
 
+### Mise
+
+You can install github cli on Windows using [mise](https://github.com/jdx/mise), the polyglot tool versions manager with a command like this:
+
+```bash
+mise use -g gh@latest
+```
+
+OR (alias)
+
+```bash
+mise use -g github-cli@latest
+```
+
 ### Scoop
 
 The [GitHub CLI bucket](https://scoop.sh/#/apps?q=gh) is supported by the Scoop community with updated powered by [ScoopInstaller/Main](https://github.com/ScoopInstaller/Main/blob/master/bucket/gh.json).

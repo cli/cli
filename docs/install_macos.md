@@ -86,6 +86,20 @@ To upgrade:
 sudo port selfupdate && sudo port upgrade gh
 ```
 
+### Mise
+
+You can install github cli on MacOS using [mise](https://github.com/jdx/mise), the polyglot tool versions manager with a command like this:
+
+```bash
+mise use -g gh@latest
+```
+
+OR (alias)
+
+```bash
+mise use -g github-cli@latest
+```
+
 ### Spack
 
 [Spack](https://spack.io/) is a flexible package manager supporting multiple versions, configurations, platforms, and compilers for supercomputers, Linux, and macOS.
