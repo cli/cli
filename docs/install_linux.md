@@ -22,8 +22,8 @@ To install:
 	&& sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
 	&& sudo mkdir -p -m 755 /etc/apt/sources.list.d \
 	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-	&& sudo apt update \
-	&& sudo apt install gh -y
+	&& sudo -E apt update \
+	&& sudo -E apt install gh -y
 ```
 
 To upgrade:
