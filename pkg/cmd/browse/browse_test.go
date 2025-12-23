@@ -64,6 +64,14 @@ func TestNewCmdBrowse(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name: "actions flag",
+			cli:  "--actions",
+			wants: BrowseOptions{
+				ActionsFlag: true,
+			},
+			wantsErr: false,
+		},
+		{
 			name: "no browser flag",
 			cli:  "--no-browser",
 			wants: BrowseOptions{
@@ -103,6 +111,15 @@ func TestNewCmdBrowse(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name: "combination: actions wiki",
+			cli:  "--actions --wiki",
+			wants: BrowseOptions{
+				ActionsFlag: true,
+				WikiFlag:    true,
+			},
+			wantsErr: true,
+		},
+		{
 			name: "passed argument",
 			cli:  "main.go",
 			wants: BrowseOptions{
@@ -133,6 +150,11 @@ func TestNewCmdBrowse(t *testing.T) {
 		{
 			name:     "passed argument and wiki flag",
 			cli:      "main.go --wiki",
+			wantsErr: true,
+		},
+		{
+			name:     "passed argument and actions flag",
+			cli:      "main.go --actions",
 			wantsErr: true,
 		},
 		{
@@ -215,6 +237,7 @@ func TestNewCmdBrowse(t *testing.T) {
 			assert.Equal(t, tt.wants.WikiFlag, opts.WikiFlag)
 			assert.Equal(t, tt.wants.NoBrowserFlag, opts.NoBrowserFlag)
 			assert.Equal(t, tt.wants.SettingsFlag, opts.SettingsFlag)
+			assert.Equal(t, tt.wants.ActionsFlag, opts.ActionsFlag)
 			assert.Equal(t, tt.wants.Commit, opts.Commit)
 		})
 	}
@@ -277,6 +300,14 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("ravocean", "ThreatLevelMidnight"),
 			expectedURL: "https://github.com/ravocean/ThreatLevelMidnight/wiki",
+		},
+		{
+			name: "actions flag",
+			opts: BrowseOptions{
+				ActionsFlag: true,
+			},
+			baseRepo:    ghrepo.New("ravocean", "ThreatLevelMidnight"),
+			expectedURL: "https://github.com/ravocean/ThreatLevelMidnight/actions",
 		},
 		{
 			name:          "file argument",

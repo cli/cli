@@ -209,7 +209,7 @@ conda update gh --channel conda-forge
 
 ### Debian Community
 
-The [GitHub CLI package](https://packages.debian.org/bookworm/gh) is supported by the Debian community with updates powered by [Debian Go Packaging Team](https://salsa.debian.org/go-team/packages/gh).
+The [GitHub CLI package](https://packages.debian.org/stable/gh) is supported by the Debian community with updates powered by [Debian Go Packaging Team](https://salsa.debian.org/go-team/packages/gh).
 
 > [!NOTE]
 > As of November 2025, GitHub CLI maintainers strongly recommend [official Debian packages](#debian) especially as the community-distributed `2.45.x` / `2.46.x` version is broken due to deprecated GitHub APIs.

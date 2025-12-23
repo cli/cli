@@ -106,6 +106,9 @@ func ProjectsV2ItemsForIssue(client *Client, repo ghrepo.Interface, issue *Issue
 			return err
 		}
 		for _, projectItemNode := range query.Repository.Issue.ProjectItems.Nodes {
+			if projectItemNode == nil {
+				continue
+			}
 			items.Nodes = append(items.Nodes, &ProjectV2Item{
 				ID: projectItemNode.ID,
 				Project: ProjectV2ItemProject{
@@ -175,6 +178,9 @@ func ProjectsV2ItemsForPullRequest(client *Client, repo ghrepo.Interface, pr *Pu
 		}
 
 		for _, projectItemNode := range query.Repository.PullRequest.ProjectItems.Nodes {
+			if projectItemNode == nil {
+				continue
+			}
 			items.Nodes = append(items.Nodes, &ProjectV2Item{
 				ID: projectItemNode.ID,
 				Project: ProjectV2ItemProject{

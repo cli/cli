@@ -94,7 +94,7 @@ build_local() {
     ;;
   esac
   [ -z "$tag_name" ] || export GORELEASER_CURRENT_TAG="$tag_name"
-  announce goreleaser release -f "$goreleaser_config" --clean --skip-validate --skip-publish --release-notes="$(mktemp)"
+  announce goreleaser release -f "$goreleaser_config" --clean --skip validate,publish,announce --release-notes="$(mktemp)"
 }
 
 if [ -n "$is_local" ]; then
