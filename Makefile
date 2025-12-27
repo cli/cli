@@ -114,3 +114,7 @@ licenses:
 .PHONY: licenses-check
 licenses-check:
 	./script/licenses-check
+
+.PHONY: eval
+eval:
+	./script/eval

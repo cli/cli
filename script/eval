@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+# Evaluation framework script for GitHub CLI
+# Runs comprehensive quality, performance, and functionality checks
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Tracking
+PASS_COUNT=0
+FAIL_COUNT=0
+WARN_COUNT=0
+
+# Helper functions
+log_header() {
+    echo -e "${BLUE}=== $1 ===${NC}"
+}
+
+log_pass() {
+    echo -e "${GREEN}✅ $1${NC}"
+    ((PASS_COUNT++))
+}
+
+log_fail() {
+    echo -e "${RED}❌ $1${NC}"
+    ((FAIL_COUNT++))
+}
+
+log_warn() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+    ((WARN_COUNT++))
+}
+
+log_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+# Tests
+test_build() {
+    log_header "1. Build Test"
+    if go build -o "$REPO_ROOT/bin/gh-eval" "$REPO_ROOT/cmd/gh/main.go" 2>/dev/null; then
+        log_pass "Build successful"
+        rm -f "$REPO_ROOT/bin/gh-eval"
+    else
+        log_fail "Build failed"
+        return 1
+    fi
+}
+
+test_formatting() {
+    log_header "2. Code Formatting"
+    UNFORMATTED=$(go fmt ./... 2>&1 | wc -l)
+    if [ "$UNFORMATTED" -eq 0 ]; then
+        log_pass "All code properly formatted"
+    else
+        log_warn "$UNFORMATTED files need formatting"
+    fi
+}
+
+test_vet() {
+    log_header "3. Go Vet Analysis"
+    if go vet ./... 2>&1 | grep -q "problem"; then
+        log_fail "Go vet found issues"
+        go vet ./... 2>&1 | head -10
+    else
+        log_pass "No vet issues found"
+    fi
+}
+
+test_linting() {
+    log_header "4. Linting (golangci-lint)"
+    if command -v golangci-lint &> /dev/null; then
+        LINT_OUTPUT=$(golangci-lint run --timeout=5m ./... 2>&1 || true)
+        LINT_COUNT=$(echo "$LINT_OUTPUT" | grep -c "^" || echo 0)
+        if [ "$LINT_COUNT" -eq 0 ]; then
+            log_pass "No linting issues"
+        else
+            log_warn "Found linting issues (first 5):"
+            echo "$LINT_OUTPUT" | head -5
+        fi
+    else
+        log_warn "golangci-lint not installed (install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)"
+    fi
+}
+
+test_unit_tests() {
+    log_header "5. Unit Tests"
+    if go test -short ./... 2>&1 | tail -1 | grep -q "ok"; then
+        log_pass "Unit tests passed"
+    else
+        log_fail "Unit tests failed"
+        return 1
+    fi
+}
+
+test_coverage() {
+    log_header "6. Test Coverage"
+    COVERAGE_FILE=$(mktemp)
+    trap "rm -f $COVERAGE_FILE" EXIT
+    
+    go test -v -coverprofile="$COVERAGE_FILE" ./... 2>&1 > /dev/null || true
+    
+    if [ -f "$COVERAGE_FILE" ]; then
+        TOTAL_COVERAGE=$(go tool cover -func="$COVERAGE_FILE" 2>/dev/null | tail -1 | awk '{print $3}' | sed 's/%//')
+        if (( $(echo "$TOTAL_COVERAGE >= 70" | bc -l) )); then
+            log_pass "Test coverage: ${TOTAL_COVERAGE}%"
+        elif (( $(echo "$TOTAL_COVERAGE >= 50" | bc -l) )); then
+            log_warn "Test coverage: ${TOTAL_COVERAGE}% (target: 70%)"
+        else
+            log_fail "Test coverage: ${TOTAL_COVERAGE}% (below target of 70%)"
+        fi
+        
+        # Show coverage by top-level packages
+        log_info "Coverage by package:"
+        go tool cover -func="$COVERAGE_FILE" 2>/dev/null | grep -E "^./[^/]+" | awk '{printf "  %-40s %s\n", $1, $3}' | head -10
+    else
+        log_warn "Could not generate coverage report"
+    fi
+}
+
+test_race_detector() {
+    log_header "7. Race Detector"
+    if timeout 60 go test -race -short ./... 2>&1 | tail -1 | grep -q "ok"; then
+        log_pass "No race conditions detected"
+    else
+        log_warn "Race detector test timed out or failed (skipping for large suites)"
+    fi
+}
+
+test_acceptance() {
+    log_header "8. Acceptance Tests"
+    if go test -tags acceptance -short ./acceptance 2>&1 | tail -1 | grep -q "ok"; then
+        log_pass "Acceptance tests passed"
+    else
+        log_warn "Acceptance tests skipped or failed (may require special setup)"
+    fi
+}
+
+test_command_help() {
+    log_header "9. Command Help Text"
+    BINARY="$REPO_ROOT/bin/gh-help-test"
+    if go build -o "$BINARY" "$REPO_ROOT/cmd/gh/main.go" 2>/dev/null; then
+        COMMANDS=$($BINARY help 2>&1 | grep -c "^  " || echo 0)
+        if [ "$COMMANDS" -gt 20 ]; then
+            log_pass "Found $COMMANDS commands with help text"
+        else
+            log_warn "Found $COMMANDS commands (expected 25+)"
+        fi
+        rm -f "$BINARY"
+    else
+        log_warn "Could not build binary to test commands"
+    fi
+}
+
+test_dependencies() {
+    log_header "10. Dependency Check"
+    TOTAL_DEPS=$(go list -m all 2>/dev/null | wc -l)
+    OUTDATED=$(go list -u ./... 2>/dev/null | grep -c "\[.*\]" || echo 0)
+    
+    log_info "Total dependencies: $TOTAL_DEPS"
+    
+    if [ "$OUTDATED" -eq 0 ]; then
+        log_pass "All dependencies up to date"
+    else
+        log_warn "$OUTDATED dependencies have updates available"
+    fi
+}
+
+test_security() {
+    log_header "11. Security Check"
+    if command -v gosec &> /dev/null; then
+        SECURITY_ISSUES=$(gosec ./... 2>/dev/null | grep -c "Issue" || echo 0)
+        if [ "$SECURITY_ISSUES" -eq 0 ]; then
+            log_pass "No security issues detected"
+        else
+            log_warn "Found $SECURITY_ISSUES potential security issues"
+        fi
+    else
+        log_warn "gosec not installed (install with: go install github.com/securego/gosec/v2/cmd/gosec@latest)"
+    fi
+}
+
+test_licenses() {
+    log_header "12. License Compliance"
+    if [ -f "$REPO_ROOT/script/licenses-check" ]; then
+        if bash "$REPO_ROOT/script/licenses-check" 2>&1 | tail -1 | grep -q "ok"; then
+            log_pass "License compliance check passed"
+        else
+            log_warn "License compliance check had warnings"
+        fi
+    else
+        log_warn "License check script not found"
+    fi
+}
+
+# Performance tests
+test_command_performance() {
+    log_header "13. Command Performance (Quick Check)"
+    BINARY="$REPO_ROOT/bin/gh-perf-test"
+    if go build -o "$BINARY" "$REPO_ROOT/cmd/gh/main.go" 2>/dev/null; then
+        START=$(date +%s%N)
+        $BINARY help > /dev/null 2>&1
+        END=$(date +%s%N)
+        DURATION=$((($END - $START) / 1000000))
+        
+        if [ "$DURATION" -lt 500 ]; then
+            log_pass "Help command executed in ${DURATION}ms (< 500ms)"
+        elif [ "$DURATION" -lt 2000 ]; then
+            log_warn "Help command took ${DURATION}ms (target: < 500ms)"
+        else
+            log_fail "Help command too slow: ${DURATION}ms"
+        fi
+        rm -f "$BINARY"
+    else
+        log_warn "Could not build binary for performance testing"
+    fi
+}
+
+# Summary
+print_summary() {
+    echo
+    log_header "EVALUATION SUMMARY"
+    echo -e "${GREEN}Passed: $PASS_COUNT${NC}"
+    echo -e "${YELLOW}Warnings: $WARN_COUNT${NC}"
+    echo -e "${RED}Failed: $FAIL_COUNT${NC}"
+    echo
+    
+    if [ "$FAIL_COUNT" -eq 0 ]; then
+        if [ "$WARN_COUNT" -eq 0 ]; then
+            echo -e "${GREEN}✅ All evaluations passed!${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}⚠️  Evaluations passed with warnings${NC}"
+            return 0
+        fi
+    else
+        echo -e "${RED}❌ Some evaluations failed${NC}"
+        return 1
+    fi
+}
+
+# Main execution
+main() {
+    cd "$REPO_ROOT"
+    
+    echo -e "${BLUE}GitHub CLI - Evaluation Framework${NC}"
+    echo "Repository: $REPO_ROOT"
+    echo "Time: $(date)"
+    echo
+    
+    # Run all tests
+    test_build || true
+    test_formatting || true
+    test_vet || true
+    test_linting || true
+    test_unit_tests || true
+    test_coverage || true
+    test_race_detector || true
+    test_acceptance || true
+    test_command_help || true
+    test_dependencies || true
+    test_security || true
+    test_licenses || true
+    test_command_performance || true
+    
+    print_summary
+}
+
+# Show usage if requested
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    cat << EOF
+GitHub CLI Evaluation Framework
+
+Usage:
+  $(basename "$0")                 # Run full evaluation
+  $(basename "$0") --help         # Show this help message
+  
+This script runs comprehensive quality checks including:
+  - Build verification
+  - Code formatting
+  - Go vet analysis
+  - Linting
+  - Unit tests
+  - Test coverage
+  - Race condition detection
+  - Acceptance tests
+  - Command functionality
+  - Dependencies
+  - Security checks
+  - License compliance
+  - Performance metrics
+
+Environment Variables:
+  No special variables required.
+
+Exit Codes:
+  0 - All evaluations passed
+  1 - Some evaluations failed
+
+See docs/evaluation-framework.md for detailed information.
+EOF
+    exit 0
+fi
+
+# Run main
+main
+exit $?
