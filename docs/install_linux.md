@@ -422,7 +422,7 @@ The [GitHub CLI package](https://webinstall.dev/gh/) is supported by the Webi co
 To install:
 
 ```shell
-curl -sS https://webi.sh/gh \| sh
+curl -sS https://webi.sh/gh | sh
 ```
 
 To upgrade:
