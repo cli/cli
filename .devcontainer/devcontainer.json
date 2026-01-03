@@ -1,4 +1,4 @@
-{
+https://codespaces.new/cli/cli{
 	"image": "mcr.microsoft.com/devcontainers/go:1.25",
 	"features": {
 		"ghcr.io/devcontainers/features/sshd:1": {}
