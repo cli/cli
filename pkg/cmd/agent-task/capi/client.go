@@ -3,8 +3,6 @@ package capi
 import (
 	"context"
 	"net/http"
-
-	"github.com/cli/cli/v2/internal/gh"
 )
 
 //go:generate moq -rm -out client_mock.go . CapiClient
@@ -16,7 +14,7 @@ const capiHost = "api.githubcopilot.com"
 // may be replaced with test doubles in unit tests.
 type CapiClient interface {
 	ListLatestSessionsForViewer(ctx context.Context, limit int) ([]*Session, error)
-	CreateJob(ctx context.Context, owner, repo, problemStatement, baseBranch string) (*Job, error)
+	CreateJob(ctx context.Context, owner, repo, problemStatement, baseBranch string, customAgent string) (*Job, error)
 	GetJob(ctx context.Context, owner, repo, jobID string) (*Job, error)
 	GetSession(ctx context.Context, id string) (*Session, error)
 	GetSessionLogs(ctx context.Context, id string) ([]byte, error)
@@ -27,22 +25,19 @@ type CapiClient interface {
 // CAPIClient is a client for interacting with the Copilot API
 type CAPIClient struct {
 	httpClient *http.Client
-	authCfg    gh.AuthConfig
+	host       string
 }
 
-// NewCAPIClient creates a new CAPI client. Provide a token and an HTTP client which
+// NewCAPIClient creates a new CAPI client. Provide a token, host, and an HTTP client which
 // will be used as the base transport for CAPI requests.
 //
 // The provided HTTP client will be mutated for use with CAPI, so it should not
 // be reused elsewhere.
-func NewCAPIClient(httpClient *http.Client, authCfg gh.AuthConfig) *CAPIClient {
-	host, _ := authCfg.DefaultHost()
-	token, _ := authCfg.ActiveToken(host)
-
+func NewCAPIClient(httpClient *http.Client, token string, host string) *CAPIClient {
 	httpClient.Transport = newCAPITransport(token, httpClient.Transport)
 	return &CAPIClient{
 		httpClient: httpClient,
-		authCfg:    authCfg,
+		host:       host,
 	}
 }
 

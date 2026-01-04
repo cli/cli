@@ -347,6 +347,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive",
 			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
 				Interactive:  false,
 				Editable: prShared.Editable{
@@ -403,6 +404,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive multiple issues",
 			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{456, 123},
 				Interactive:  false,
 				Editable: prShared.Editable{
@@ -457,6 +459,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive multiple issues with fetch failures",
 			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123, 9999},
 				Interactive:  false,
 				Editable: prShared.Editable{
@@ -504,6 +507,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive multiple issues with update failures",
 			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123, 456},
 				Interactive:  false,
 				Editable: prShared.Editable{
@@ -584,6 +588,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "interactive",
 			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
 				Interactive:  true,
 				FieldsToEditSurvey: func(p prShared.EditPrompter, eo *prShared.Editable) error {
@@ -623,6 +628,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "interactive prompts with actor assignee display names when actors available",
 			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
 				Interactive:  true,
 				FieldsToEditSurvey: func(p prShared.EditPrompter, eo *prShared.Editable) error {

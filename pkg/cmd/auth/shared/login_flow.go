@@ -30,6 +30,7 @@ type LoginOptions struct {
 	IO               *iostreams.IOStreams
 	Config           iconfig
 	HTTPClient       *http.Client
+	PlainHTTPClient  *http.Client
 	Hostname         string
 	Interactive      bool
 	Web              bool
@@ -149,7 +150,7 @@ func Login(opts *LoginOptions) error {
 
 	if authMode == 0 {
 		var err error
-		authToken, username, err = authflow.AuthFlow(hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard)
+		authToken, username, err = authflow.AuthFlow(opts.PlainHTTPClient, hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser, opts.CopyToClipboard)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}

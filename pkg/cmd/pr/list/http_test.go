@@ -149,7 +149,7 @@ func Test_ListPullRequests(t *testing.T) {
 					httpmock.GraphQL(`query PullRequestSearch\b`),
 					httpmock.GraphQLQuery(`{"data":{}}`, func(query string, vars map[string]interface{}) {
 						want := map[string]interface{}{
-							"q":     "one world in:title repo:OWNER/REPO state:open type:pr",
+							"q":     "( one world in:title ) repo:OWNER/REPO state:open type:pr",
 							"type":  "ISSUE_ADVANCED",
 							"limit": float64(30),
 						}

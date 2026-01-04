@@ -34,6 +34,7 @@ type CreateOptions struct {
 	Sleep       func(d time.Duration)
 
 	ProblemStatement     string
+	CustomAgent          string
 	BackOff              backoff.BackOff
 	BaseBranch           string
 	Prompter             prompter.Prompter
@@ -103,6 +104,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			# Select a different base branch for the PR
 			$ gh agent-task create "fix errors" --base branch
+
+			# Create a task using the custom agent defined in '.github/agents/my-agent.md'
+			$ gh agent-task create "build me a new app" --custom-agent my-agent
 		`),
 	}
 
@@ -111,6 +115,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.ProblemStatementFile, "from-file", "F", "", "Read task description from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "b", "", "Base branch for the pull request (use default branch if not provided)")
 	cmd.Flags().BoolVar(&opts.Follow, "follow", false, "Follow agent session logs")
+	cmd.Flags().StringVarP(&opts.CustomAgent, "custom-agent", "a", "", "Use a custom agent for the task. e.g., use 'my-agent' for the 'my-agent.md' agent")
 
 	return cmd
 }
@@ -160,7 +165,7 @@ func createRun(opts *CreateOptions) error {
 	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Creating agent task in %s/%s...", repo.RepoOwner(), repo.RepoName()))
 	defer opts.IO.StopProgressIndicator()
 
-	job, err := client.CreateJob(ctx, repo.RepoOwner(), repo.RepoName(), opts.ProblemStatement, opts.BaseBranch)
+	job, err := client.CreateJob(ctx, repo.RepoOwner(), repo.RepoName(), opts.ProblemStatement, opts.BaseBranch, opts.CustomAgent)
 	if err != nil {
 		return err
 	}

@@ -33,15 +33,16 @@ func New(appVersion string) *cmdutil.Factory {
 		ExecutableName: "gh",
 	}
 
-	f.IOStreams = ioStreams(f)                   // Depends on Config
-	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
-	f.GitClient = newGitClient(f)                // Depends on IOStreams, and Executable
-	f.Remotes = remotesFunc(f)                   // Depends on Config, and GitClient
-	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
-	f.Prompter = newPrompter(f)                  // Depends on Config and IOStreams
-	f.Browser = newBrowser(f)                    // Depends on Config, and IOStreams
-	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
-	f.Branch = branchFunc(f)                     // Depends on GitClient
+	f.IOStreams = ioStreams(f)                             // Depends on Config
+	f.HttpClient = httpClientFunc(f, appVersion)           // Depends on Config, IOStreams, and appVersion
+	f.PlainHttpClient = plainHttpClientFunc(f, appVersion) // Depends on IOStreams, and appVersion
+	f.GitClient = newGitClient(f)                          // Depends on IOStreams, and Executable
+	f.Remotes = remotesFunc(f)                             // Depends on Config, and GitClient
+	f.BaseRepo = BaseRepoFunc(f)                           // Depends on Remotes
+	f.Prompter = newPrompter(f)                            // Depends on Config and IOStreams
+	f.Browser = newBrowser(f)                              // Depends on Config, and IOStreams
+	f.ExtensionManager = extensionManager(f)               // Depends on Config, HttpClient, and IOStreams
+	f.Branch = branchFunc(f)                               // Depends on GitClient
 
 	return f
 }
@@ -203,6 +204,24 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 			return nil, err
 		}
 		client.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
+		return client, nil
+	}
+}
+
+func plainHttpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client, error) {
+	return func() (*http.Client, error) {
+		io := f.IOStreams
+		opts := api.HTTPClientOptions{
+			Log:         io.ErrOut,
+			LogColorize: io.ColorEnabled(),
+			AppVersion:  appVersion,
+			// This is required to prevent automatic setting of auth and other headers.
+			SkipDefaultHeaders: true,
+		}
+		client, err := api.NewHTTPClient(opts)
+		if err != nil {
+			return nil, err
+		}
 		return client, nil
 	}
 }

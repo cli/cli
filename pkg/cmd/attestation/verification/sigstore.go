@@ -63,27 +63,39 @@ func NewLiveSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, erro
 		Logger:       config.Logger,
 		NoPublicGood: config.NoPublicGood,
 	}
-	// if a custom trusted root is set, configure custom verifiers
+	// if a custom trusted root is set, configure custom verifiers and assume no Public Good or GitHub verifiers
+	// are needed
 	if config.TrustedRoot != "" {
 		customVerifiers, err := createCustomVerifiers(config.TrustedRoot, config.NoPublicGood)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error creating custom verifiers: %s", err)
 		}
 		liveVerifier.Custom = customVerifiers
 		return liveVerifier, nil
 	}
+
+	// No custom trusted root is set, so configure Public Good and GitHub verifiers
 	if !config.NoPublicGood {
 		publicGoodVerifier, err := newPublicGoodVerifier(config.TUFMetadataDir, config.HttpClient)
 		if err != nil {
-			return nil, err
+			// Log warning but continue - PGI unavailability should not block GitHub attestation verification
+			config.Logger.VerbosePrintf("Warning: failed to initialize Sigstore Public Good verifier: %v\n", err)
+			config.Logger.VerbosePrintf("Continuing without Public Good Instance verification\n")
+		} else {
+			liveVerifier.PublicGood = publicGoodVerifier
 		}
-		liveVerifier.PublicGood = publicGoodVerifier
 	}
+
 	github, err := newGitHubVerifier(config.TrustDomain, config.TUFMetadataDir, config.HttpClient)
 	if err != nil {
-		return nil, err
+		config.Logger.VerbosePrintf("Warning: failed to initialize GitHub verifier: %v\n", err)
+	} else {
+		liveVerifier.GitHub = github
 	}
-	liveVerifier.GitHub = github
+
+	if liveVerifier.noVerifierSet() {
+		return nil, fmt.Errorf("no valid Sigstore verifiers could be initialized")
+	}
 
 	return liveVerifier, nil
 }
@@ -205,6 +217,9 @@ func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.Verifier, 
 	case PublicGoodIssuerOrg:
 		if v.NoPublicGood {
 			return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
+		}
+		if v.PublicGood == nil {
+			return nil, fmt.Errorf("public good verifier is not available (initialization may have failed)")
 		}
 		return v.PublicGood, nil
 	case GitHubIssuerOrg:
@@ -371,4 +386,8 @@ func newPublicGoodVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verif
 	}
 
 	return sv, nil
+}
+
+func (v *LiveSigstoreVerifier) noVerifierSet() bool {
+	return v.PublicGood == nil && v.GitHub == nil && len(v.Custom) == 0
 }

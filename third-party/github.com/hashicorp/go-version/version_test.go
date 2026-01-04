@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2014, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package version
@@ -726,5 +726,37 @@ func TestLessThanOrEqual(t *testing.T) {
 				tc.v1, tc.v2,
 				expected, actual)
 		}
+	}
+}
+
+func BenchmarkVersionString(b *testing.B) {
+	v, _ := NewVersion("3.4.5-rc1+meta")
+	_ = v.String()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = v.String()
+	}
+}
+
+func BenchmarkCompareVersionV1(b *testing.B) {
+	v, _ := NewVersion("3.4.5")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		v.Compare(v)
+	}
+}
+
+func BenchmarkVersionCompareV2(b *testing.B) {
+	v, _ := NewVersion("1.2.3")
+	o, _ := NewVersion("v1.2.3.4")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		v.Compare(o)
 	}
 }

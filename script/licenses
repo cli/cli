@@ -5,6 +5,12 @@ if [ "$CI" != "true" ]; then
     go install github.com/google/go-licenses@latest
 fi
 
+# Verify go-licenses is available
+if ! command -v go-licenses &> /dev/null; then
+    echo "Error: go-licenses is not installed or not on PATH"
+    exit 1
+fi
+
 # Setup temporary directory to collect updated third-party source code
 export TEMPDIR="$(mktemp -d)"
 trap "rm -fr ${TEMPDIR}" EXIT

@@ -329,7 +329,6 @@ func (a *App) ForwardPorts(ctx context.Context, selector *CodespaceSelector, por
 	// them at the first failure, including cancellation of the context.
 	group, ctx := errgroup.WithContext(ctx)
 	for _, pair := range portPairs {
-		pair := pair
 		group.Go(func() error {
 			listen, _, err := codespaces.ListenTCP(pair.local, true)
 			if err != nil {

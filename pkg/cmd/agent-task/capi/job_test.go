@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -168,8 +167,7 @@ func TestGetJob(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			cfg := config.NewBlankConfig()
-			capiClient := NewCAPIClient(httpClient, cfg.Authentication())
+			capiClient := NewCAPIClient(httpClient, "", "github.com")
 
 			job, err := capiClient.GetJob(context.Background(), "OWNER", "REPO", "job123")
 
@@ -188,14 +186,14 @@ func TestGetJob(t *testing.T) {
 func TestCreateJobRequiresRepoAndProblemStatement(t *testing.T) {
 	client := &CAPIClient{}
 
-	_, err := client.CreateJob(context.Background(), "", "only-repo", "", "")
+	_, err := client.CreateJob(context.Background(), "", "only-repo", "", "", "")
 	assert.EqualError(t, err, "owner and repo are required")
-	_, err = client.CreateJob(context.Background(), "only-owner", "", "", "")
+	_, err = client.CreateJob(context.Background(), "only-owner", "", "", "", "")
 	assert.EqualError(t, err, "owner and repo are required")
-	_, err = client.CreateJob(context.Background(), "", "", "", "")
+	_, err = client.CreateJob(context.Background(), "", "", "", "", "")
 	assert.EqualError(t, err, "owner and repo are required")
 
-	_, err = client.CreateJob(context.Background(), "owner", "repo", "", "")
+	_, err = client.CreateJob(context.Background(), "owner", "repo", "", "", "")
 	assert.EqualError(t, err, "problem statement is required")
 }
 
@@ -205,11 +203,12 @@ func TestCreateJob(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name       string
-		baseBranch string
-		httpStubs  func(*testing.T, *httpmock.Registry)
-		wantErr    string
-		wantOut    *Job
+		name        string
+		baseBranch  string
+		customAgent string
+		httpStubs   func(*testing.T, *httpmock.Registry)
+		wantErr     string
+		wantOut     *Job
 	}{
 		{
 			name: "success",
@@ -306,6 +305,56 @@ func TestCreateJob(t *testing.T) {
 			},
 		},
 		{
+			name:        "Success with custom agent",
+			customAgent: "my-custom-agent",
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.WithHost(httpmock.REST("POST", "agents/swe/v1/jobs/OWNER/REPO"), "api.githubcopilot.com"),
+					httpmock.RESTPayload(201,
+						heredoc.Docf(`
+							{
+								"job_id": "job123",
+								"session_id": "sess1",
+								"problem_statement": "Do the thing",
+								"custom_agent": "my-custom-agent",
+								"event_type": "foo",
+								"content_filter_mode": "foo",
+								"status": "foo",
+								"result": "foo",
+								"actor": {
+									"id": 1,
+									"login": "octocat"
+								},
+								"created_at": "%[1]s",
+								"updated_at": "%[1]s"
+							}
+						`, sampleDateString),
+						func(payload map[string]interface{}) {
+							assert.Equal(t, "Do the thing", payload["problem_statement"])
+							assert.Equal(t, "gh_cli", payload["event_type"])
+							assert.Equal(t, "my-custom-agent", payload["custom_agent"])
+						},
+					),
+				)
+			},
+			wantOut: &Job{
+				ID:                "job123",
+				SessionID:         "sess1",
+				ProblemStatement:  "Do the thing",
+				CustomAgent:       "my-custom-agent",
+				EventType:         "foo",
+				ContentFilterMode: "foo",
+				Status:            "foo",
+				Result:            "foo",
+				Actor: &JobActor{
+					ID:    1,
+					Login: "octocat",
+				},
+				CreatedAt: sampleDate,
+				UpdatedAt: sampleDate,
+			},
+		},
+		{
 			name: "API error, included in response body",
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -317,7 +366,7 @@ func TestCreateJob(t *testing.T) {
 					}`)),
 				)
 			},
-			wantErr: "failed to create job: some error",
+			wantErr: "failed to create job: 500 Internal Server Error: some error",
 		},
 		{
 			name: "API error",
@@ -327,7 +376,7 @@ func TestCreateJob(t *testing.T) {
 					httpmock.StatusStringResponse(500, `{}`),
 				)
 			},
-			wantErr: "failed to create job: 500 Internal Server Error",
+			wantErr: "failed to create job: 500 Internal Server Error: ",
 		},
 		{
 			name: "invalid JSON response, non-HTTP 200",
@@ -361,10 +410,9 @@ func TestCreateJob(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			cfg := config.NewBlankConfig()
-			capiClient := NewCAPIClient(httpClient, cfg.Authentication())
+			capiClient := NewCAPIClient(httpClient, "", "github.com")
 
-			job, err := capiClient.CreateJob(context.Background(), "OWNER", "REPO", "Do the thing", tt.baseBranch)
+			job, err := capiClient.CreateJob(context.Background(), "OWNER", "REPO", "Do the thing", tt.baseBranch, tt.customAgent)
 
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)

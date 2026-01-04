@@ -30,7 +30,11 @@ type Factory struct {
 	Branch     func() (string, error)
 	Config     func() (gh.Config, error)
 	HttpClient func() (*http.Client, error)
-	Remotes    func() (context.Remotes, error)
+	// PlainHttpClient is a special HTTP client that does not automatically set
+	// auth and other headers. This is meant to be used in situations where the
+	// client needs to specify the headers itself (e.g. during login).
+	PlainHttpClient func() (*http.Client, error)
+	Remotes         func() (context.Remotes, error)
 }
 
 // Executable is the path to the currently invoked binary

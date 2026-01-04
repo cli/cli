@@ -3,6 +3,7 @@ package set
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,7 +19,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/hashicorp/go-multierror"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/nacl/box"
@@ -295,12 +295,12 @@ func setRun(opts *SetOptions) error {
 		}()
 	}
 
-	err = nil
+	var errs []error
 	cs := opts.IO.ColorScheme()
 	for i := 0; i < len(secrets); i++ {
 		result := <-setc
 		if result.err != nil {
-			err = multierror.Append(err, result.err)
+			errs = append(errs, result.err)
 			continue
 		}
 		if result.encrypted != "" {
@@ -318,7 +318,7 @@ func setRun(opts *SetOptions) error {
 		}
 		fmt.Fprintf(opts.IO.Out, "%s Set %s secret %s for %s\n", cs.SuccessIcon(), secretApp.Title(), result.key, target)
 	}
-	return err
+	return errors.Join(errs...)
 }
 
 type setResult struct {

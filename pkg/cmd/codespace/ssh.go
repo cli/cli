@@ -584,9 +584,8 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			continue
 		}
 
-		cs := cs
 		wg.Add(1)
-		go func() {
+		go func(cs *api.Codespace) {
 			result := sshResult{}
 			defer wg.Done()
 
@@ -622,7 +621,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 
 			result.codespace = cs
 			sshUsers <- result
-		}()
+		}(cs)
 	}
 
 	go func() {

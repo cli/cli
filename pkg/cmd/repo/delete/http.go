@@ -32,7 +32,8 @@ func deleteRepo(client *http.Client, repo ghrepo.Interface) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(api.EndpointNeedsScopes(resp, "delete_repo"))
+		api.EndpointNeedsScopes(resp, "delete_repo")
+		return api.HandleHTTPError(resp)
 	}
 
 	return nil

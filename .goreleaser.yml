@@ -1,3 +1,5 @@
+version: 2
+
 project_name: gh
 
 release:
@@ -28,7 +30,7 @@ builds:
 
   - id: linux #build:linux
     goos: [linux]
-    goarch: [386, arm, amd64, arm64]
+    goarch: ["386", arm, amd64, arm64]
     env:
       - CGO_ENABLED=0
     binary: bin/gh
@@ -38,7 +40,7 @@ builds:
 
   - id: windows #build:windows
     goos: [windows]
-    goarch: [386, amd64, arm64]
+    goarch: ["386", amd64, arm64]
     hooks:
       post:
         - cmd: pwsh .\script\sign.ps1 '{{ .Path }}'
@@ -50,34 +52,32 @@ builds:
 
 archives:
   - id: linux-archive
-    builds: [linux]
+    ids: [linux]
     name_template: "gh_{{ .Version }}_linux_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     wrap_in_directory: true
-    format: tar.gz
-    rlcp: true
+    formats: [tar.gz]
     files:
       - LICENSE
       - ./share/man/man1/gh*.1
   - id: macos-archive
-    builds: [macos]
+    ids: [macos]
     name_template: "gh_{{ .Version }}_macOS_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     wrap_in_directory: true
-    format: zip
-    rlcp: true
+    formats: [zip]
     files:
       - LICENSE
       - ./share/man/man1/gh*.1
   - id: windows-archive
-    builds: [windows]
+    ids: [windows]
     name_template: "gh_{{ .Version }}_windows_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     wrap_in_directory: false
-    format: zip
-    rlcp: true
+    formats: [zip]
     files:
       - LICENSE
 
 nfpms: #build:linux
-  - license: MIT
+  - ids: [linux]
+    license: MIT
     maintainer: GitHub
     homepage: https://github.com/cli/cli
     bindir: /usr

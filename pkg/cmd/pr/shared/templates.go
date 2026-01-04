@@ -265,7 +265,8 @@ func (m *templateManager) fetch() error {
 		gitClient := &git.Client{}
 		dir, err = gitClient.ToplevelDir(context.Background())
 		if err != nil {
-			return nil // abort silently
+			//nolint:nilerr // intentional, abort silently
+			return nil
 		}
 	}
 

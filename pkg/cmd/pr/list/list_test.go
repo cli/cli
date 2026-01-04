@@ -441,7 +441,7 @@ func TestPRList_Search_withProjectItems(t *testing.T) {
 		  }`, func(_ string, params map[string]interface{}) {
 			require.Equal(t, map[string]interface{}{
 				"limit": float64(30),
-				"q":     "just used to force the search API branch repo:OWNER/REPO state:open type:pr",
+				"q":     "( just used to force the search API branch ) repo:OWNER/REPO state:open type:pr",
 				"type":  "ISSUE_ADVANCED",
 			}, params)
 		}))

@@ -286,7 +286,8 @@ func createGist(client *http.Client, hostname, description string, public bool, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(api.EndpointNeedsScopes(resp, "gist"))
+		api.EndpointNeedsScopes(resp, "gist")
+		return nil, api.HandleHTTPError(resp)
 	}
 
 	result := &shared.Gist{}

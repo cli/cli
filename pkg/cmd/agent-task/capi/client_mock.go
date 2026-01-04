@@ -18,7 +18,7 @@ var _ CapiClient = &CapiClientMock{}
 //
 //		// make and configure a mocked CapiClient
 //		mockedCapiClient := &CapiClientMock{
-//			CreateJobFunc: func(ctx context.Context, owner string, repo string, problemStatement string, baseBranch string) (*Job, error) {
+//			CreateJobFunc: func(ctx context.Context, owner string, repo string, problemStatement string, baseBranch string, customAgent string) (*Job, error) {
 //				panic("mock out the CreateJob method")
 //			},
 //			GetJobFunc: func(ctx context.Context, owner string, repo string, jobID string) (*Job, error) {
@@ -47,7 +47,7 @@ var _ CapiClient = &CapiClientMock{}
 //	}
 type CapiClientMock struct {
 	// CreateJobFunc mocks the CreateJob method.
-	CreateJobFunc func(ctx context.Context, owner string, repo string, problemStatement string, baseBranch string) (*Job, error)
+	CreateJobFunc func(ctx context.Context, owner string, repo string, problemStatement string, baseBranch string, customAgent string) (*Job, error)
 
 	// GetJobFunc mocks the GetJob method.
 	GetJobFunc func(ctx context.Context, owner string, repo string, jobID string) (*Job, error)
@@ -81,6 +81,8 @@ type CapiClientMock struct {
 			ProblemStatement string
 			// BaseBranch is the baseBranch argument value.
 			BaseBranch string
+			// CustomAgent is the customAgent argument value.
+			CustomAgent string
 		}
 		// GetJob holds details about calls to the GetJob method.
 		GetJob []struct {
@@ -149,7 +151,7 @@ type CapiClientMock struct {
 }
 
 // CreateJob calls CreateJobFunc.
-func (mock *CapiClientMock) CreateJob(ctx context.Context, owner string, repo string, problemStatement string, baseBranch string) (*Job, error) {
+func (mock *CapiClientMock) CreateJob(ctx context.Context, owner string, repo string, problemStatement string, baseBranch string, customAgent string) (*Job, error) {
 	if mock.CreateJobFunc == nil {
 		panic("CapiClientMock.CreateJobFunc: method is nil but CapiClient.CreateJob was just called")
 	}
@@ -159,17 +161,19 @@ func (mock *CapiClientMock) CreateJob(ctx context.Context, owner string, repo st
 		Repo             string
 		ProblemStatement string
 		BaseBranch       string
+		CustomAgent      string
 	}{
 		Ctx:              ctx,
 		Owner:            owner,
 		Repo:             repo,
 		ProblemStatement: problemStatement,
 		BaseBranch:       baseBranch,
+		CustomAgent:      customAgent,
 	}
 	mock.lockCreateJob.Lock()
 	mock.calls.CreateJob = append(mock.calls.CreateJob, callInfo)
 	mock.lockCreateJob.Unlock()
-	return mock.CreateJobFunc(ctx, owner, repo, problemStatement, baseBranch)
+	return mock.CreateJobFunc(ctx, owner, repo, problemStatement, baseBranch, customAgent)
 }
 
 // CreateJobCalls gets all the calls that were made to CreateJob.
@@ -182,6 +186,7 @@ func (mock *CapiClientMock) CreateJobCalls() []struct {
 	Repo             string
 	ProblemStatement string
 	BaseBranch       string
+	CustomAgent      string
 } {
 	var calls []struct {
 		Ctx              context.Context
@@ -189,6 +194,7 @@ func (mock *CapiClientMock) CreateJobCalls() []struct {
 		Repo             string
 		ProblemStatement string
 		BaseBranch       string
+		CustomAgent      string
 	}
 	mock.lockCreateJob.RLock()
 	calls = mock.calls.CreateJob

@@ -20,12 +20,13 @@ import (
 )
 
 type LoginOptions struct {
-	IO         *iostreams.IOStreams
-	Config     func() (gh.Config, error)
-	HttpClient func() (*http.Client, error)
-	GitClient  *git.Client
-	Prompter   shared.Prompt
-	Browser    browser.Browser
+	IO              *iostreams.IOStreams
+	Config          func() (gh.Config, error)
+	HttpClient      func() (*http.Client, error)
+	PlainHttpClient func() (*http.Client, error)
+	GitClient       *git.Client
+	Prompter        shared.Prompt
+	Browser         browser.Browser
 
 	MainExecutable string
 
@@ -43,12 +44,13 @@ type LoginOptions struct {
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
 	opts := &LoginOptions{
-		IO:         f.IOStreams,
-		Config:     f.Config,
-		HttpClient: f.HttpClient,
-		GitClient:  f.GitClient,
-		Prompter:   f.Prompter,
-		Browser:    f.Browser,
+		IO:              f.IOStreams,
+		Config:          f.Config,
+		HttpClient:      f.HttpClient,
+		PlainHttpClient: f.PlainHttpClient,
+		GitClient:       f.GitClient,
+		Prompter:        f.Prompter,
+		Browser:         f.Browser,
 	}
 
 	var tokenStdin bool
@@ -190,6 +192,11 @@ func loginRun(opts *LoginOptions) error {
 		return cmdutil.SilentError
 	}
 
+	plainHTTPClient, err := opts.PlainHttpClient()
+	if err != nil {
+		return err
+	}
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -210,16 +217,17 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	return shared.Login(&shared.LoginOptions{
-		IO:          opts.IO,
-		Config:      authCfg,
-		HTTPClient:  httpClient,
-		Hostname:    hostname,
-		Interactive: opts.Interactive,
-		Web:         opts.Web,
-		Scopes:      opts.Scopes,
-		GitProtocol: opts.GitProtocol,
-		Prompter:    opts.Prompter,
-		Browser:     opts.Browser,
+		IO:              opts.IO,
+		Config:          authCfg,
+		HTTPClient:      httpClient,
+		PlainHTTPClient: plainHTTPClient,
+		Hostname:        hostname,
+		Interactive:     opts.Interactive,
+		Web:             opts.Web,
+		Scopes:          opts.Scopes,
+		GitProtocol:     opts.GitProtocol,
+		Prompter:        opts.Prompter,
+		Browser:         opts.Browser,
 		CredentialFlow: &shared.GitCredentialFlow{
 			Prompter: opts.Prompter,
 			HelperConfig: &gitcredentials.HelperConfig{

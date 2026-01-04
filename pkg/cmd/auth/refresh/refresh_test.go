@@ -471,7 +471,7 @@ func Test_refreshRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			tt.opts.AuthFlow = func(_ *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool) (token, username, error) {
+			tt.opts.AuthFlow = func(_ *http.Client, _ *iostreams.IOStreams, hostname string, scopes []string, interactive bool, clipboard bool) (token, username, error) {
 				aa.hostname = hostname
 				aa.scopes = scopes
 				aa.interactive = interactive
@@ -514,7 +514,9 @@ func Test_refreshRun(t *testing.T) {
 					}, nil
 				},
 			)
-			tt.opts.HttpClient = &http.Client{Transport: httpReg}
+			tt.opts.PlainHttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: httpReg}, nil
+			}
 
 			pm := &prompter.PrompterMock{}
 			if tt.prompterStubs != nil {

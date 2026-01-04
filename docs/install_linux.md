@@ -207,6 +207,13 @@ To upgrade:
 conda update gh --channel conda-forge
 ```
 
+### Debian Community
+
+The [GitHub CLI package](https://packages.debian.org/stable/gh) is supported by the Debian community with updates powered by [Debian Go Packaging Team](https://salsa.debian.org/go-team/packages/gh).
+
+> [!NOTE]
+> As of November 2025, GitHub CLI maintainers strongly recommend [official Debian packages](#debian) especially as the community-distributed `2.45.x` / `2.46.x` version is broken due to deprecated GitHub APIs.
+
 ### Fedora Community
 
 The [GitHub CLI package](https://packages.fedoraproject.org/pkgs/gh/gh/) is supported by the Fedora community with updates powered by [Fedora Project](https://src.fedoraproject.org/rpms/gh).
@@ -388,6 +395,13 @@ To upgrade:
 ```shell
 spack uninstall gh && spack install gh
 ```
+
+### Ubuntu Community
+
+The [GitHub CLI package](https://packages.ubuntu.com/noble/gh) is synced from [upstream Debian Community package](#debian-community).
+
+> [!NOTE]
+> As of November 2025, GitHub CLI maintainers strongly recommend [official Debian packages](#debian) especially as the community-distributed `2.45.x` / `2.46.x` version is broken due to deprecated GitHub APIs.
 
 ### Void Linux
 

@@ -443,7 +443,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "auth bug assignee:@me author:@me mentions:@me repo:OWNER/REPO state:open type:issue",
+							"query": "( auth bug ) assignee:@me author:@me mentions:@me repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE_ADVANCED",
 						}, params)
 					}))
@@ -618,7 +618,7 @@ func TestIssueList_Search_withProjectItems(t *testing.T) {
 				"repo":  "REPO",
 				"type":  "ISSUE_ADVANCED",
 				"limit": float64(30),
-				"query": "just used to force the search API branch repo:OWNER/REPO type:issue",
+				"query": "( just used to force the search API branch ) repo:OWNER/REPO type:issue",
 			}, params)
 		}))
 
