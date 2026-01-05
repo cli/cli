@@ -1773,7 +1773,7 @@ func TestClientPush(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
-			err := client.Push(context.Background(), "origin", "trunk", tt.mods...)
+			err := client.Push(context.Background(), "origin", "trunk", false, tt.mods...)
 			if tt.wantErrorMsg == "" {
 				require.NoError(t, err)
 			} else {
@@ -2140,7 +2140,7 @@ func TestClientPushPreserveUpstream(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
-			err := client.PushPreserveUpstream(context.Background(), "origin", "trunk", tt.mods...)
+			err := client.Push(context.Background(), "origin", "trunk", true, tt.mods...)
 			if tt.wantErrorMsg == "" {
 				require.NoError(t, err)
 			} else {

@@ -804,20 +804,13 @@ func (c *Client) Pull(ctx context.Context, remote, branch string, mods ...Comman
 	return cmd.Run()
 }
 
-func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
-	args := []string{"push", "--set-upstream", remote, ref}
-	cmd, err := c.AuthenticatedCommand(ctx, AllMatchingCredentialsPattern, args...)
-	if err != nil {
-		return err
+func (c *Client) Push(ctx context.Context, remote string, ref string, preserveUpstream bool, mods ...CommandModifier) error {
+	args := []string{}
+	if preserveUpstream {
+		args = []string{"push", remote, ref}
+	} else {
+		args = []string{"push", "--set-upstream", remote, ref}
 	}
-	for _, mod := range mods {
-		mod(cmd)
-	}
-	return cmd.Run()
-}
-
-func (c *Client) PushPreserveUpstream(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
-	args := []string{"push", remote, ref}
 	cmd, err := c.AuthenticatedCommand(ctx, AllMatchingCredentialsPattern, args...)
 	if err != nil {
 		return err

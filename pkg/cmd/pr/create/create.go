@@ -50,13 +50,12 @@ type CreateOptions struct {
 	RootDirOverride string
 	RepoOverride    string
 
-	Autofill    bool
-	FillVerbose bool
-	FillFirst   bool
-	EditorMode  bool
-	WebMode     bool
-	RecoverFile string
-
+	Autofill         bool
+	FillVerbose      bool
+	FillFirst        bool
+	EditorMode       bool
+	WebMode          bool
+	RecoverFile      string
 	PreserveUpstream bool
 
 	IsDraft    bool
@@ -1218,13 +1217,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		bo := backoff.NewConstantBackOff(2 * time.Second)
 		root := context.Background()
 		return backoff.Retry(func() error {
-			var err error
-			if opts.PreserveUpstream {
-				err = ctx.GitClient.PushPreserveUpstream(root, headRemote.Name, ref, git.WithStderr(w))
-			} else {
-				err = ctx.GitClient.Push(root, headRemote.Name, ref, git.WithStderr(w))
-			}
-			if err != nil {
+			if err := ctx.GitClient.Push(root, headRemote.Name, ref, opts.PreserveUpstream, git.WithStderr(w)); err != nil {
 				// Only retry if we have forked the repo else the push should succeed the first time.
 				if requiresFork {
 					fmt.Fprintf(opts.IO.ErrOut, "waiting 2 seconds before retrying...\n")
