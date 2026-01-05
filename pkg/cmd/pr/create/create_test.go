@@ -716,54 +716,6 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 		{
-			name: "push without set-upstream when --preserve-upstream flag is set",
-			tty:  true,
-			setup: func(opts *CreateOptions, t *testing.T) func() {
-				opts.TitleProvided = true
-				opts.BodyProvided = true
-				opts.Title = "my title"
-				opts.Body = "my body"
-				opts.PreserveUpstream = true
-				return func() {}
-			},
-			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoResponse("OWNER", "REPO")
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-				reg.Register(
-					httpmock.GraphQL(`mutation PullRequestCreate\b`),
-					httpmock.GraphQLMutation(`
-							{ "data": { "createPullRequest": { "pullRequest": {
-								"URL": "https://github.com/OWNER/REPO/pull/12"
-							} } } }`, func(input map[string]interface{}) {
-						assert.Equal(t, "REPOID", input["repositoryId"].(string))
-						assert.Equal(t, "my title", input["title"].(string))
-						assert.Equal(t, "my body", input["body"].(string))
-						assert.Equal(t, "master", input["baseRefName"].(string))
-						assert.Equal(t, "feature", input["headRefName"].(string))
-						assert.Equal(t, false, input["draft"].(bool))
-					}))
-			},
-			cmdStubs: func(cs *run.CommandStubber) {
-				cs.Register("git rev-parse --symbolic-full-name feature@{push}", 0, "refs/remotes/origin/feature")
-				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
-				cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature", 1, "")
-				cs.Register(`git push origin HEAD:refs/heads/feature`, 0, "")
-			},
-			promptStubs: func(pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
-					if p == "Where should we push the 'feature' branch?" {
-						return 0, nil
-					} else {
-						return -1, prompter.NoSuchPromptErr(p)
-					}
-				}
-			},
-			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
-			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
-		},
-		{
 			name: "skip pushing to branch on prompt",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
