@@ -50,12 +50,13 @@ type CreateOptions struct {
 	RootDirOverride string
 	RepoOverride    string
 
-	Autofill    bool
-	FillVerbose bool
-	FillFirst   bool
-	EditorMode  bool
-	WebMode     bool
-	RecoverFile string
+	Autofill         bool
+	FillVerbose      bool
+	FillFirst        bool
+	EditorMode       bool
+	WebMode          bool
+	RecoverFile      string
+	PreserveUpstream bool
 
 	IsDraft    bool
 	Title      string
@@ -347,6 +348,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
+	fl.BoolVar(&opts.PreserveUpstream, "preserve-upstream", false, "Do not set upstream when pushing the branch")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -1215,7 +1217,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		bo := backoff.NewConstantBackOff(2 * time.Second)
 		root := context.Background()
 		return backoff.Retry(func() error {
-			if err := ctx.GitClient.Push(root, headRemote.Name, ref, git.WithStderr(w)); err != nil {
+			if err := ctx.GitClient.Push(root, headRemote.Name, ref, opts.PreserveUpstream, git.WithStderr(w)); err != nil {
 				// Only retry if we have forked the repo else the push should succeed the first time.
 				if requiresFork {
 					fmt.Fprintf(opts.IO.ErrOut, "waiting 2 seconds before retrying...\n")
