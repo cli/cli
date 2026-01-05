@@ -72,7 +72,8 @@ type CreateOptions struct {
 	MaintainerCanModify bool
 	Template            string
 
-	DryRun bool
+	DryRun        bool
+	NoSetUpstream bool
 }
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
@@ -347,6 +348,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
+	fl.BoolVar(&opts.NoSetUpstream, "no-set-upstream", false, "Do not set upstream when pushing the branch")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -1215,7 +1217,13 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		bo := backoff.NewConstantBackOff(2 * time.Second)
 		root := context.Background()
 		return backoff.Retry(func() error {
-			if err := ctx.GitClient.Push(root, headRemote.Name, ref, git.WithStderr(w)); err != nil {
+			var err error
+			if opts.NoSetUpstream {
+				err = ctx.GitClient.PushWithoutUpstream(root, headRemote.Name, ref, git.WithStderr(w))
+			} else {
+				err = ctx.GitClient.Push(root, headRemote.Name, ref, git.WithStderr(w))
+			}
+			if err != nil {
 				// Only retry if we have forked the repo else the push should succeed the first time.
 				if requiresFork {
 					fmt.Fprintf(opts.IO.ErrOut, "waiting 2 seconds before retrying...\n")

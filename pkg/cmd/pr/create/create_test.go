@@ -1,6 +1,7 @@
 package create
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,7 +12,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
@@ -270,6 +271,26 @@ func TestNewCmdCreate(t *testing.T) {
 				MaintainerCanModify: true,
 			},
 		},
+		{
+			name:     "no-set-upstream flag",
+			tty:      false,
+			cli:      "--title mytitle --body '' --no-set-upstream",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "",
+				BodyProvided:        true,
+				Autofill:            false,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+				NoSetUpstream:       true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -326,6 +347,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.BaseBranch, opts.BaseBranch)
 			assert.Equal(t, tt.wantsOpts.HeadBranch, opts.HeadBranch)
 			assert.Equal(t, tt.wantsOpts.Template, opts.Template)
+			assert.Equal(t, tt.wantsOpts.NoSetUpstream, opts.NoSetUpstream)
 		})
 	}
 }
@@ -694,6 +716,54 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 		{
+			name: "push without set-upstream when --no-set-upstream flag is set",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.NoSetUpstream = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+							{ "data": { "createPullRequest": { "pullRequest": {
+								"URL": "https://github.com/OWNER/REPO/pull/12"
+							} } } }`, func(input map[string]interface{}) {
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "my title", input["title"].(string))
+						assert.Equal(t, "my body", input["body"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "feature", input["headRefName"].(string))
+						assert.Equal(t, false, input["draft"].(bool))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register("git rev-parse --symbolic-full-name feature@{push}", 0, "refs/remotes/origin/feature")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
+				cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature", 1, "")
+				cs.Register(`git push origin HEAD:refs/heads/feature`, 0, "")
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "Where should we push the 'feature' branch?" {
+						return 0, nil
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
 			name: "skip pushing to branch on prompt",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
@@ -915,8 +985,8 @@ func Test_createRun(t *testing.T) {
 				opts.BodyProvided = true
 				opts.Title = "title"
 				opts.Body = "body"
-				opts.Remotes = func() (context.Remotes, error) {
-					return context.Remotes{
+				opts.Remotes = func() (ghContext.Remotes, error) {
+					return ghContext.Remotes{
 						{
 							Remote: &git.Remote{
 								Name:     "upstream",
@@ -1579,8 +1649,8 @@ func Test_createRun(t *testing.T) {
 				opts.Branch = func() (string, error) {
 					return "task1", nil
 				}
-				opts.Remotes = func() (context.Remotes, error) {
-					return context.Remotes{
+				opts.Remotes = func() (ghContext.Remotes, error) {
+					return ghContext.Remotes{
 						{
 							Remote: &git.Remote{
 								Name:     "upstream",
@@ -1943,8 +2013,8 @@ func Test_createRun(t *testing.T) {
 			opts.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
-			opts.Remotes = func() (context.Remotes, error) {
-				return context.Remotes{
+			opts.Remotes = func() (ghContext.Remotes, error) {
+				return ghContext.Remotes{
 					{
 						Remote: &git.Remote{
 							Name:     "origin",
@@ -1993,6 +2063,105 @@ func Test_createRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateNoSetUpstreamPreservesUpstream(t *testing.T) {
+	t.Run("upstream configuration remains unchanged after push with --no-set-upstream", func(t *testing.T) {
+		branch := "feature"
+		reg := &httpmock.Registry{}
+		reg.StubRepoInfoResponse("OWNER", "REPO", "master")
+		defer reg.Verify(t)
+
+		reg.StubRepoResponse("OWNER", "REPO")
+		reg.Register(
+			httpmock.GraphQL(`query UserCurrent\b`),
+			httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+		reg.Register(
+			httpmock.GraphQL(`mutation PullRequestCreate\b`),
+			httpmock.GraphQLMutation(`
+					{ "data": { "createPullRequest": { "pullRequest": {
+						"URL": "https://github.com/OWNER/REPO/pull/12"
+					} } } }`, func(input map[string]interface{}) {
+				assert.Equal(t, "REPOID", input["repositoryId"].(string))
+				assert.Equal(t, "my title", input["title"].(string))
+				assert.Equal(t, "my body", input["body"].(string))
+				assert.Equal(t, "master", input["baseRefName"].(string))
+				assert.Equal(t, "feature", input["headRefName"].(string))
+			}))
+
+		pm := &prompter.PrompterMock{}
+		pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+			if p == "Where should we push the 'feature' branch?" {
+				return 0, nil
+			} else {
+				return -1, prompter.NoSuchPromptErr(p)
+			}
+		}
+
+		cs, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		cs.Register(`git status --porcelain`, 0, "")
+		cs.Register(`git config --get-regexp \^branch\\\.feature\\\.\(remote\|merge\|pushremote\|gh-merge-base\)\$`, 0, "branch.feature.remote upstream\nbranch.feature.merge refs/heads/master")
+		cs.Register("git rev-parse --symbolic-full-name feature@{push}", 0, "refs/remotes/origin/feature")
+		cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 1, "")
+		cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature", 1, "")
+		cs.Register(`git( .+)? push origin HEAD:refs/heads/feature`, 0, "")
+
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdoutTTY(true)
+		ios.SetStdinTTY(true)
+		ios.SetStderrTTY(true)
+
+		opts := CreateOptions{
+			Detector: &fd.EnabledDetectorMock{},
+			Prompter: pm,
+			IO:       ios,
+			Browser:  &browser.Stub{},
+			GitClient: &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			},
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			Config: func() (gh.Config, error) {
+				return config.NewBlankConfig(), nil
+			},
+			Remotes: func() (ghContext.Remotes, error) {
+				return ghContext.Remotes{
+					{
+						Remote: &git.Remote{
+							Name:     "origin",
+							Resolved: "base",
+						},
+						Repo: ghrepo.New("OWNER", "REPO"),
+					},
+				}, nil
+			},
+			Branch: func() (string, error) {
+				return branch, nil
+			},
+			Finder:        shared.NewMockFinder(branch, nil, nil),
+			TitleProvided: true,
+			BodyProvided:  true,
+			Title:         "my title",
+			Body:          "my body",
+			NoSetUpstream: true,
+		}
+
+		err := createRun(&opts)
+		require.NoError(t, err)
+
+		assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", stdout.String())
+		assert.Contains(t, stderr.String(), "Creating pull request for feature into master in OWNER/REPO")
+
+		cs.Register(`git config --get-regexp \^branch\\\.feature\\\.\(remote\|merge\|pushremote\|gh-merge-base\)\$`, 0, "branch.feature.remote upstream\nbranch.feature.merge refs/heads/master")
+		branchConfig, verifyErr := opts.GitClient.ReadBranchConfig(context.Background(), "feature")
+		require.NoError(t, verifyErr)
+		assert.Equal(t, "upstream", branchConfig.RemoteName, "upstream remote should remain unchanged after push without --set-upstream")
+		assert.Equal(t, "refs/heads/master", branchConfig.MergeRef, "upstream merge ref should remain unchanged after push without --set-upstream")
+	})
 }
 
 func TestRemoteGuessing(t *testing.T) {
@@ -2045,8 +2214,8 @@ func TestRemoteGuessing(t *testing.T) {
 			GitPath: "some/path/git",
 		},
 		Finder: shared.NewMockFinder("feature", nil, nil),
-		Remotes: func() (context.Remotes, error) {
-			return context.Remotes{
+		Remotes: func() (ghContext.Remotes, error) {
+			return ghContext.Remotes{
 				{
 					Remote: &git.Remote{
 						Name:     "upstream",
@@ -2120,8 +2289,8 @@ func TestNoRepoCanBeDetermined(t *testing.T) {
 			GitPath: "some/path/git",
 		},
 		Finder: shared.NewMockFinder("feature", nil, nil),
-		Remotes: func() (context.Remotes, error) {
-			return context.Remotes{
+		Remotes: func() (ghContext.Remotes, error) {
+			return ghContext.Remotes{
 				{
 					Remote: &git.Remote{
 						Name:     "origin",
@@ -2478,8 +2647,8 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					GhPath:  "some/path/gh",
 					GitPath: "some/path/git",
 				},
-				Remotes: func() (context.Remotes, error) {
-					return context.Remotes{
+				Remotes: func() (ghContext.Remotes, error) {
+					return ghContext.Remotes{
 						{
 							Remote: &git.Remote{
 								Name:     "upstream",
@@ -2530,8 +2699,8 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					GhPath:  "some/path/gh",
 					GitPath: "some/path/git",
 				},
-				Remotes: func() (context.Remotes, error) {
-					return context.Remotes{
+				Remotes: func() (ghContext.Remotes, error) {
+					return ghContext.Remotes{
 						{
 							Remote: &git.Remote{
 								Name:     "upstream",
@@ -2643,8 +2812,8 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				},
 				Finder:   shared.NewMockFinder("feature", nil, nil),
 				Detector: &fd.EnabledDetectorMock{},
-				Remotes: func() (context.Remotes, error) {
-					return context.Remotes{
+				Remotes: func() (ghContext.Remotes, error) {
+					return ghContext.Remotes{
 						{
 							Remote: &git.Remote{
 								Name: "origin",
@@ -2738,8 +2907,8 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				},
 				Finder:   shared.NewMockFinder("feature", nil, nil),
 				Detector: &fd.DisabledDetectorMock{},
-				Remotes: func() (context.Remotes, error) {
-					return context.Remotes{
+				Remotes: func() (ghContext.Remotes, error) {
+					return ghContext.Remotes{
 						{
 							Remote: &git.Remote{
 								Name: "origin",
@@ -2794,8 +2963,8 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					GhPath:  "some/path/gh",
 					GitPath: "some/path/git",
 				},
-				Remotes: func() (context.Remotes, error) {
-					return context.Remotes{
+				Remotes: func() (ghContext.Remotes, error) {
+					return ghContext.Remotes{
 						{
 							Remote: &git.Remote{
 								Name:     "upstream",
@@ -2848,8 +3017,8 @@ func TestProjectsV1Deprecation(t *testing.T) {
 					GhPath:  "some/path/gh",
 					GitPath: "some/path/git",
 				},
-				Remotes: func() (context.Remotes, error) {
-					return context.Remotes{
+				Remotes: func() (ghContext.Remotes, error) {
+					return ghContext.Remotes{
 						{
 							Remote: &git.Remote{
 								Name:     "upstream",

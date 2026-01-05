@@ -816,6 +816,18 @@ func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...Co
 	return cmd.Run()
 }
 
+func (c *Client) PushWithoutUpstream(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
+	args := []string{"push", remote, ref}
+	cmd, err := c.AuthenticatedCommand(ctx, AllMatchingCredentialsPattern, args...)
+	if err != nil {
+		return err
+	}
+	for _, mod := range mods {
+		mod(cmd)
+	}
+	return cmd.Run()
+}
+
 func (c *Client) Clone(ctx context.Context, cloneURL string, args []string, mods ...CommandModifier) (string, error) {
 	// Note that even if this is an SSH clone URL, we are setting the pattern anyway.
 	// We could write some code to prevent this, but it also doesn't seem harmful.
