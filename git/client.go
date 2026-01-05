@@ -816,7 +816,7 @@ func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...Co
 	return cmd.Run()
 }
 
-func (c *Client) PushWithoutUpstream(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
+func (c *Client) PushPreserveUpstream(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
 	args := []string{"push", remote, ref}
 	cmd, err := c.AuthenticatedCommand(ctx, AllMatchingCredentialsPattern, args...)
 	if err != nil {

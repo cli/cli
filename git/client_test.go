@@ -2097,7 +2097,7 @@ func TestCredentialPatternFromHost(t *testing.T) {
 	}
 }
 
-func TestClientPushWithoutUpstream(t *testing.T) {
+func TestClientPushPreserveUpstream(t *testing.T) {
 	tests := []struct {
 		name         string
 		mods         []CommandModifier
@@ -2140,7 +2140,7 @@ func TestClientPushWithoutUpstream(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
-			err := client.PushWithoutUpstream(context.Background(), "origin", "trunk", tt.mods...)
+			err := client.PushPreserveUpstream(context.Background(), "origin", "trunk", tt.mods...)
 			if tt.wantErrorMsg == "" {
 				require.NoError(t, err)
 			} else {

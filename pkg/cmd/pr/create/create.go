@@ -57,6 +57,8 @@ type CreateOptions struct {
 	WebMode     bool
 	RecoverFile string
 
+	PreserveUpstream bool
+
 	IsDraft    bool
 	Title      string
 	Body       string
@@ -72,8 +74,7 @@ type CreateOptions struct {
 	MaintainerCanModify bool
 	Template            string
 
-	DryRun        bool
-	NoSetUpstream bool
+	DryRun bool
 }
 
 // creationRefs is an interface that provides the necessary information for creating a pull request in the API.
@@ -348,7 +349,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 	fl.BoolVar(&opts.DryRun, "dry-run", false, "Print details instead of creating the PR. May still push git changes.")
-	fl.BoolVar(&opts.NoSetUpstream, "no-set-upstream", false, "Do not set upstream when pushing the branch")
+	fl.BoolVar(&opts.PreserveUpstream, "preserve-upstream", false, "Do not set upstream when pushing the branch")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
@@ -1218,8 +1219,8 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		root := context.Background()
 		return backoff.Retry(func() error {
 			var err error
-			if opts.NoSetUpstream {
-				err = ctx.GitClient.PushWithoutUpstream(root, headRemote.Name, ref, git.WithStderr(w))
+			if opts.PreserveUpstream {
+				err = ctx.GitClient.PushPreserveUpstream(root, headRemote.Name, ref, git.WithStderr(w))
 			} else {
 				err = ctx.GitClient.Push(root, headRemote.Name, ref, git.WithStderr(w))
 			}

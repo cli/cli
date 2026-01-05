@@ -272,9 +272,9 @@ func TestNewCmdCreate(t *testing.T) {
 			},
 		},
 		{
-			name:     "no-set-upstream flag",
+			name:     "preserve-upstream flag",
 			tty:      false,
-			cli:      "--title mytitle --body '' --no-set-upstream",
+			cli:      "--title mytitle --body '' --preserve-upstream",
 			wantsErr: false,
 			wantsOpts: CreateOptions{
 				Title:               "mytitle",
@@ -288,7 +288,7 @@ func TestNewCmdCreate(t *testing.T) {
 				BaseBranch:          "",
 				HeadBranch:          "",
 				MaintainerCanModify: true,
-				NoSetUpstream:       true,
+				PreserveUpstream:    true,
 			},
 		},
 	}
@@ -347,7 +347,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.BaseBranch, opts.BaseBranch)
 			assert.Equal(t, tt.wantsOpts.HeadBranch, opts.HeadBranch)
 			assert.Equal(t, tt.wantsOpts.Template, opts.Template)
-			assert.Equal(t, tt.wantsOpts.NoSetUpstream, opts.NoSetUpstream)
+			assert.Equal(t, tt.wantsOpts.PreserveUpstream, opts.PreserveUpstream)
 		})
 	}
 }
@@ -716,14 +716,14 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 		{
-			name: "push without set-upstream when --no-set-upstream flag is set",
+			name: "push without set-upstream when --preserve-upstream flag is set",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				opts.TitleProvided = true
 				opts.BodyProvided = true
 				opts.Title = "my title"
 				opts.Body = "my body"
-				opts.NoSetUpstream = true
+				opts.PreserveUpstream = true
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
@@ -2065,8 +2065,8 @@ func Test_createRun(t *testing.T) {
 	}
 }
 
-func TestCreateNoSetUpstreamPreservesUpstream(t *testing.T) {
-	t.Run("upstream configuration remains unchanged after push with --no-set-upstream", func(t *testing.T) {
+func TestCreatePreserveUpstreamPreservesUpstream(t *testing.T) {
+	t.Run("upstream configuration remains unchanged after push with --preserve-upstream", func(t *testing.T) {
 		branch := "feature"
 		reg := &httpmock.Registry{}
 		reg.StubRepoInfoResponse("OWNER", "REPO", "master")
@@ -2142,12 +2142,12 @@ func TestCreateNoSetUpstreamPreservesUpstream(t *testing.T) {
 			Branch: func() (string, error) {
 				return branch, nil
 			},
-			Finder:        shared.NewMockFinder(branch, nil, nil),
-			TitleProvided: true,
-			BodyProvided:  true,
-			Title:         "my title",
-			Body:          "my body",
-			NoSetUpstream: true,
+			Finder:           shared.NewMockFinder(branch, nil, nil),
+			TitleProvided:    true,
+			BodyProvided:     true,
+			Title:            "my title",
+			Body:             "my body",
+			PreserveUpstream: true,
 		}
 
 		err := createRun(&opts)
