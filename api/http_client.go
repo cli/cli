@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -48,8 +50,9 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		clientOpts.LogVerboseHTTP = opts.LogVerboseHTTP
 	}
 
+	userAgentValue := fmt.Sprintf("GitHub CLI %s", opts.AppVersion)
 	headers := map[string]string{
-		userAgent: fmt.Sprintf("GitHub CLI %s", opts.AppVersion),
+		userAgent: getUserAgentForActions(userAgentValue),
 	}
 	clientOpts.Headers = headers
 
@@ -139,4 +142,21 @@ func getHost(r *http.Request) string {
 		return r.Host
 	}
 	return r.URL.Host
+}
+
+// getUserAgentForActions appends the ACTIONS_ORCHESTRATION_ID to the user agent
+// if the environment variable is set. The orchestration ID is sanitized to only allow
+// alphanumeric characters, underscores, hyphens, and dots.
+func getUserAgentForActions(baseUserAgent string) string {
+	orchID := os.Getenv("ACTIONS_ORCHESTRATION_ID")
+	if orchID == "" {
+		return baseUserAgent
+	}
+
+	// Sanitize the orchestration ID to ensure it contains only valid characters
+	// Valid characters: 0-9, a-z, A-Z, _, -, .
+	re := regexp.MustCompile(`[^a-zA-Z0-9_.-]`)
+	sanitizedID := re.ReplaceAllString(orchID, "_")
+
+	return fmt.Sprintf("%s (actions_orchestration_id/%s)", baseUserAgent, sanitizedID)
 }

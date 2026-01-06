@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -312,4 +313,109 @@ func normalizeVerboseLog(t string) string {
 	t = durationRE.ReplaceAllString(t, "* Request took <duration>")
 	t = timezoneRE.ReplaceAllString(t, "> Time-Zone: <timezone>")
 	return t
+}
+
+func TestGetUserAgentForActions(t *testing.T) {
+	tests := []struct {
+		name           string
+		baseUserAgent  string
+		orchID         string
+		expectedResult string
+	}{
+		{
+			name:           "with orchestration ID",
+			baseUserAgent:  "GitHub CLI v1.2.3",
+			orchID:         "workflow-12345-job-67890",
+			expectedResult: "GitHub CLI v1.2.3 (actions_orchestration_id/workflow-12345-job-67890)",
+		},
+		{
+			name:           "without orchestration ID",
+			baseUserAgent:  "GitHub CLI v1.2.3",
+			orchID:         "",
+			expectedResult: "GitHub CLI v1.2.3",
+		},
+		{
+			name:           "with special characters",
+			baseUserAgent:  "GitHub CLI v1.2.3",
+			orchID:         "test (with) special/chars",
+			expectedResult: "GitHub CLI v1.2.3 (actions_orchestration_id/test__with__special_chars)",
+		},
+		{
+			name:           "with various special characters",
+			baseUserAgent:  "GitHub CLI v1.2.3",
+			orchID:         "test!@#$%^&*()+=[]{}|\\:;\"'<>?,/",
+			expectedResult: "GitHub CLI v1.2.3 (actions_orchestration_id/test___________________________)",
+		},
+		{
+			name:           "with allowed characters only",
+			baseUserAgent:  "GitHub CLI v1.2.3",
+			orchID:         "test_with-allowed.chars123",
+			expectedResult: "GitHub CLI v1.2.3 (actions_orchestration_id/test_with-allowed.chars123)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set environment variable
+			if tt.orchID != "" {
+				t.Setenv("ACTIONS_ORCHESTRATION_ID", tt.orchID)
+			} else {
+				os.Unsetenv("ACTIONS_ORCHESTRATION_ID")
+			}
+
+			result := getUserAgentForActions(tt.baseUserAgent)
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+
+func TestNewHTTPClientWithActionsOrchestrationID(t *testing.T) {
+	// Set the orchestration ID
+	orchID := "test-orch-id-12345"
+	t.Setenv("ACTIONS_ORCHESTRATION_ID", orchID)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgent := r.Header.Get("User-Agent")
+		assert.Contains(t, userAgent, "GitHub CLI v1.2.3")
+		assert.Contains(t, userAgent, "actions_orchestration_id/test-orch-id-12345")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	client, err := NewHTTPClient(HTTPClientOptions{
+		AppVersion: "v1.2.3",
+	})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", ts.URL, nil)
+	require.NoError(t, err)
+	res, err := client.Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+}
+
+func TestNewHTTPClientWithoutActionsOrchestrationID(t *testing.T) {
+	// Ensure the environment variable is not set
+	os.Unsetenv("ACTIONS_ORCHESTRATION_ID")
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgent := r.Header.Get("User-Agent")
+		assert.Equal(t, "GitHub CLI v1.2.3", userAgent)
+		assert.NotContains(t, userAgent, "actions_orchestration_id")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	client, err := NewHTTPClient(HTTPClientOptions{
+		AppVersion: "v1.2.3",
+	})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", ts.URL, nil)
+	require.NoError(t, err)
+	res, err := client.Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
