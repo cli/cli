@@ -30,8 +30,8 @@ type DownloadOptions struct {
 type platform interface {
 	List(runID string) ([]shared.Artifact, error)
 	// Downloads an artifact from the given URL to the given location.
-	// if skipUnpack is false, the artifact will be unpacked in the *directory path* destPath
-	// if skipUnpack is true, the artifact be saved as a zip at the *file path* destPath
+	// If skipUnpack is false, the artifact will be unpacked in the *directory path* destPath
+	// If skipUnpack is true, the artifact will be saved as a zip at the *file path* destPath
 	Download(url string, destPath safepaths.Absolute, skipUnpack bool) error
 }
 
