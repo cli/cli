@@ -43,7 +43,7 @@ For additional Windows packages and installers, see [community-supported docs](d
 
 ### Build from source
 
-See here on how to [build GitHub CLI from source](docs/install_source.md).
+Here is some information on how to build GitHub CLI from source: [build GitHub CLI from source](docs/install_source.md).
 
 ### GitHub Codespaces
 
