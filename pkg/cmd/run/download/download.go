@@ -24,11 +24,15 @@ type DownloadOptions struct {
 	DestinationDir string
 	Names          []string
 	FilePatterns   []string
+	SkipUnpack     bool
 }
 
 type platform interface {
 	List(runID string) ([]shared.Artifact, error)
-	Download(url string, dir safepaths.Absolute) error
+	// Downloads an artifact from the given URL to the given location.
+	// if skipUnpack is false, the artifact will be unpacked in the *directory path* destPath
+	// if skipUnpack is true, the artifact be saved as a zip at the *file path* destPath
+	Download(url string, destPath safepaths.Absolute, skipUnpack bool) error
 }
 
 type iprompter interface {
@@ -101,6 +105,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.DestinationDir, "dir", "D", ".", "The directory to download artifacts into")
 	cmd.Flags().StringArrayVarP(&opts.Names, "name", "n", nil, "Download artifacts that match any of the given names")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download artifacts that match a glob pattern")
+	cmd.Flags().BoolVarP(&opts.SkipUnpack, "skip-unpack", "", false, "Save artifacts as zip files without unpacking them")
 
 	return cmd
 }
@@ -155,7 +160,7 @@ func runDownload(opts *DownloadOptions) error {
 
 	// track downloaded artifacts and avoid re-downloading any of the same name, isolate if multiple artifacts
 	downloaded := set.NewStringSet()
-	isolateArtifacts := isolateArtifacts(wantNames, wantPatterns)
+	maybeMultipleArtifacts := maybeMultipleArtifacts(wantNames, wantPatterns)
 
 	absoluteDestinationDir, err := safepaths.ParseAbsolute(opts.DestinationDir)
 	if err != nil {
@@ -176,7 +181,9 @@ func runDownload(opts *DownloadOptions) error {
 		}
 
 		destDir := absoluteDestinationDir
-		if isolateArtifacts {
+		if opts.SkipUnpack {
+			destDir, err = absoluteDestinationDir.Join(a.Name + ".zip")
+		} else if maybeMultipleArtifacts {
 			destDir, err = absoluteDestinationDir.Join(a.Name)
 			if err != nil {
 				var pathTraversalError safepaths.PathTraversalError
@@ -187,7 +194,7 @@ func runDownload(opts *DownloadOptions) error {
 			}
 		}
 
-		err := opts.Platform.Download(a.DownloadURL, destDir)
+		err := opts.Platform.Download(a.DownloadURL, destDir, opts.SkipUnpack)
 		if err != nil {
 			return fmt.Errorf("error downloading %s: %w", a.Name, err)
 		}
@@ -201,7 +208,7 @@ func runDownload(opts *DownloadOptions) error {
 	return nil
 }
 
-func isolateArtifacts(wantNames []string, wantPatterns []string) bool {
+func maybeMultipleArtifacts(wantNames []string, wantPatterns []string) bool {
 	if len(wantPatterns) > 0 {
 		// Patterns can match multiple artifacts
 		return true

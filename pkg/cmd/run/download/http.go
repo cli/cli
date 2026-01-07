@@ -22,11 +22,11 @@ func (p *apiPlatform) List(runID string) ([]shared.Artifact, error) {
 	return shared.ListArtifacts(p.client, p.repo, runID)
 }
 
-func (p *apiPlatform) Download(url string, dir safepaths.Absolute) error {
-	return downloadArtifact(p.client, url, dir)
+func (p *apiPlatform) Download(url string, destPath safepaths.Absolute, skipUnpack bool) error {
+	return downloadArtifact(p.client, url, destPath, skipUnpack)
 }
 
-func downloadArtifact(httpClient *http.Client, url string, destDir safepaths.Absolute) error {
+func downloadArtifact(httpClient *http.Client, url string, destPath safepaths.Absolute, skipUnpack bool) error {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -42,6 +42,20 @@ func downloadArtifact(httpClient *http.Client, url string, destDir safepaths.Abs
 
 	if resp.StatusCode > 299 {
 		return api.HandleHTTPError(resp)
+	}
+
+	if skipUnpack {
+		outFile, err := os.Create(destPath.String())
+		if err != nil {
+			return fmt.Errorf("error creating file: %w", err)
+		}
+		defer outFile.Close()
+
+		_, err = io.Copy(outFile, resp.Body)
+		if err != nil {
+			return fmt.Errorf("error writing file: %w", err)
+		}
+		return nil
 	}
 
 	tmpfile, err := os.CreateTemp("", "gh-artifact.*.zip")
@@ -62,7 +76,7 @@ func downloadArtifact(httpClient *http.Client, url string, destDir safepaths.Abs
 	if err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}
-	if err := extractZip(zipfile, destDir); err != nil {
+	if err := extractZip(zipfile, destPath); err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}
 
