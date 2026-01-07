@@ -183,6 +183,13 @@ func runDownload(opts *DownloadOptions) error {
 		destDir := absoluteDestinationDir
 		if opts.SkipUnpack {
 			destDir, err = absoluteDestinationDir.Join(a.Name + ".zip")
+			if err != nil {
+				var pathTraversalError safepaths.PathTraversalError
+				if errors.As(err, &pathTraversalError) {
+					return fmt.Errorf("error downloading %s: would result in path traversal", a.Name)
+				}
+				return err
+			}
 		} else if maybeMultipleArtifacts { // isolate artifacts into separate dirs
 			destDir, err = absoluteDestinationDir.Join(a.Name)
 			if err != nil {
