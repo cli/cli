@@ -186,8 +186,12 @@ func (f *fakePlatform) List(runID string) ([]shared.Artifact, error) {
 	return artifacts, nil
 }
 
-func (f *fakePlatform) Download(url string, dir safepaths.Absolute) error {
-	if err := os.MkdirAll(dir.String(), 0755); err != nil {
+func (f *fakePlatform) Download(url string, destPath safepaths.Absolute, skipUnpack bool) error {
+	if skipUnpack {
+		return os.WriteFile(destPath.String(), []byte{}, 0600)
+	}
+
+	if err := os.MkdirAll(destPath.String(), 0755); err != nil {
 		return err
 	}
 	// Now to be consistent, we find the artifact with the provided URL.
@@ -199,7 +203,7 @@ func (f *fakePlatform) Download(url string, dir safepaths.Absolute) error {
 		for _, testArtifact := range run.testArtifacts {
 			if testArtifact.artifact.DownloadURL == url {
 				for _, file := range testArtifact.files {
-					path := filepath.Join(dir.String(), file)
+					path := filepath.Join(destPath.String(), file)
 					return os.WriteFile(path, []byte{}, 0600)
 				}
 			}
@@ -688,6 +692,74 @@ func Test_runDownload(t *testing.T) {
 			name: "handling artifact name with path traversal exploit",
 			opts: DownloadOptions{
 				RunID: "2345",
+			},
+			platform: &fakePlatform{
+				runs: []run{
+					{
+						id: "2345",
+						testArtifacts: []testArtifact{
+							{
+								artifact: shared.Artifact{
+									Name:        "..",
+									DownloadURL: "http://download.com/artifact1.zip",
+									Expired:     false,
+								},
+								files: []string{
+									"etc/passwd",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFiles: []string{},
+			wantErr:       "error downloading ..: would result in path traversal",
+		},
+		{
+			name: "skip unpack",
+			opts: DownloadOptions{
+				RunID:      "2345",
+				SkipUnpack: true,
+			},
+			platform: &fakePlatform{
+				runs: []run{
+					{
+						id: "2345",
+						testArtifacts: []testArtifact{
+							{
+								artifact: shared.Artifact{
+									Name:        "artifact-1",
+									DownloadURL: "http://download.com/artifact1.zip",
+									Expired:     false,
+								},
+								files: []string{
+									"artifact-1-file",
+								},
+							},
+							{
+								artifact: shared.Artifact{
+									Name:        "artifact-2",
+									DownloadURL: "http://download.com/artifact2.zip",
+									Expired:     false,
+								},
+								files: []string{
+									"artifact-2-file",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFiles: []string{
+				"artifact-1.zip",
+				"artifact-2.zip",
+			},
+		},
+		{
+			name: "skip unpack with path traversal exploit",
+			opts: DownloadOptions{
+				RunID:      "2345",
+				SkipUnpack: true,
 			},
 			platform: &fakePlatform{
 				runs: []run{

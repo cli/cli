@@ -72,7 +72,7 @@ func Test_Download(t *testing.T) {
 	api := &apiPlatform{
 		client: &http.Client{Transport: reg},
 	}
-	require.NoError(t, api.Download("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip", destDir))
+	require.NoError(t, api.Download("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip", destDir, false))
 
 	var paths []string
 	parentPrefix := tmpDir + string(filepath.Separator)
@@ -104,4 +104,25 @@ func Test_Download(t *testing.T) {
 		filepath.Join("artifact", "src", "main.go"),
 		filepath.Join("artifact", "src", "util.go"),
 	}, paths)
+}
+
+func Test_Download_SkipUnpack(t *testing.T) {
+	tmpDir := t.TempDir()
+	destFilePath, err := safepaths.ParseAbsolute(filepath.Join(tmpDir, "artifact.zip"))
+	require.NoError(t, err)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/actions/artifacts/12345/zip"),
+		httpmock.FileResponse("./fixtures/myproject.zip"))
+
+	api := &apiPlatform{
+		client: &http.Client{Transport: reg},
+	}
+	require.NoError(t, api.Download("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip", destFilePath, true))
+
+	_, err = os.Stat(destFilePath.String())
+	require.NoError(t, err)
 }
