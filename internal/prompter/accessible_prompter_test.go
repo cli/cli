@@ -228,15 +228,27 @@ func TestAccessiblePrompter(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
 		persistentOptions := []string{"persistent-option-1"}
-	searchFunc := func(input string) prompter.MultiSelectSearchResult {
-		var searchResultKeys []string
-		var searchResultLabels []string
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
+			var searchResultKeys []string
+			var searchResultLabels []string
 
-		// Initial search with no input
-		if input == "" {
-			moreResults := 2
-			searchResultKeys = []string{"initial-result-1", "initial-result-2"}
-			searchResultLabels = []string{"Initial Result Label 1", "Initial Result Label 2"}
+			// Initial search with no input
+			if input == "" {
+				moreResults := 2
+				searchResultKeys = []string{"initial-result-1", "initial-result-2"}
+				searchResultLabels = []string{"Initial Result Label 1", "Initial Result Label 2"}
+				return prompter.MultiSelectSearchResult{
+					Keys:        searchResultKeys,
+					Labels:      searchResultLabels,
+					MoreResults: moreResults,
+					Err:         nil,
+				}
+			}
+
+			// Subsequent search with input
+			moreResults := 0
+			searchResultKeys = []string{"search-result-1", "search-result-2"}
+			searchResultLabels = []string{"Search Result Label 1", "Search Result Label 2"}
 			return prompter.MultiSelectSearchResult{
 				Keys:        searchResultKeys,
 				Labels:      searchResultLabels,
@@ -245,19 +257,7 @@ func TestAccessiblePrompter(t *testing.T) {
 			}
 		}
 
-		// Subsequent search with input
-		moreResults := 0
-		searchResultKeys = []string{"search-result-1", "search-result-2"}
-		searchResultLabels = []string{"Search Result Label 1", "Search Result Label 2"}
-		return prompter.MultiSelectSearchResult{
-			Keys:        searchResultKeys,
-			Labels:      searchResultLabels,
-			MoreResults: moreResults,
-			Err:         nil,
-		}
-	}
-
-	go func() {
+		go func() {
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Select an option \r\n")
 			require.NoError(t, err)

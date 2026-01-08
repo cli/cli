@@ -714,7 +714,13 @@ func Test_editRun(t *testing.T) {
 					editFields: func(e *shared.Editable, _ string) error {
 						e.Title.Value = "new title"
 						e.Body.Value = "new body"
-						e.Assignees.Value = []string{"monalisa", "hubot"}
+						// When ActorAssignees is enabled, the interactive flow returns display names (or logins for non-users)
+						e.Assignees.Value = []string{"monalisa (Mona Display Name)", "hubot"}
+						// Populate metadata to simulate what searchFunc would do during prompting
+						e.Metadata.AssignableActors = []api.AssignableActor{
+							api.NewAssignableBot("HUBOTID", "hubot"),
+							api.NewAssignableUser("MONAID", "monalisa", "Mona Display Name"),
+						}
 						e.Labels.Value = []string{"feature", "TODO", "bug"}
 						e.Labels.Add = []string{"feature", "TODO", "bug"}
 						e.Labels.Remove = []string{"docs"}
@@ -728,7 +734,8 @@ func Test_editRun(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// interactive but reviewers not chosen; need everything except reviewers/teams
-				mockRepoMetadata(reg, mockRepoMetadataOptions{assignees: true, labels: true, projects: true, milestones: true})
+				// assignees: false because searchFunc handles dynamic fetching (metadata populated in test mock)
+				mockRepoMetadata(reg, mockRepoMetadataOptions{assignees: false, labels: true, projects: true, milestones: true})
 				mockPullRequestUpdate(reg)
 				mockPullRequestUpdateActorAssignees(reg)
 				mockPullRequestUpdateLabels(reg)
@@ -822,8 +829,13 @@ func Test_editRun(t *testing.T) {
 						require.Equal(t, []string{"hubot"}, e.Assignees.Default)
 						require.Equal(t, []string{"hubot"}, e.Assignees.DefaultLogins)
 
-						// Adding MonaLisa as PR assignee, should preserve hubot.
-						e.Assignees.Value = []string{"hubot", "MonaLisa (Mona Display Name)"}
+						// Adding monalisa as PR assignee, should preserve hubot.
+						e.Assignees.Value = []string{"hubot", "monalisa (Mona Display Name)"}
+						// Populate metadata to simulate what searchFunc would do during prompting
+						e.Metadata.AssignableActors = []api.AssignableActor{
+							api.NewAssignableBot("HUBOTID", "hubot"),
+							api.NewAssignableUser("MONAID", "monalisa", "Mona Display Name"),
+						}
 						return nil
 					},
 				},
@@ -831,17 +843,8 @@ func Test_editRun(t *testing.T) {
 				EditorRetriever: testEditorRetriever{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "suggestedActors": {
-						"nodes": [
-							{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
-							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
+				// No RepositoryAssignableActors query needed - searchFunc handles dynamic fetching
+				// (metadata populated in test mock)
 				mockPullRequestUpdate(reg)
 				reg.Register(
 					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
@@ -886,7 +889,7 @@ func Test_editRun(t *testing.T) {
 					{ "data": { "repository": { "assignableUsers": {
 						"nodes": [
 							{ "login": "hubot", "id": "HUBOTID" },
-							{ "login": "MonaLisa", "id": "MONAID" }
+							{ "login": "monalisa", "id": "MONAID" }
 						],
 						"pageInfo": { "hasNextPage": false }
 					} } } }
@@ -1001,7 +1004,7 @@ func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
 			{ "data": { "repository": { "suggestedActors": {
 				"nodes": [
 					{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
-					{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
+					{ "login": "monalisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
 				],
 				"pageInfo": { "hasNextPage": false }
 			} } } }

@@ -845,7 +845,7 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 		{ "data": { "repository": { "suggestedActors": {
 			"nodes": [
 				{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
-				{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
+				{ "login": "monalisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
