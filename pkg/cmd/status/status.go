@@ -36,6 +36,7 @@ type StatusOptions struct {
 	IO           *iostreams.IOStreams
 	Org          string
 	Exclude      []string
+	ScreenReader bool
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -80,6 +81,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 
 	cmd.Flags().StringVarP(&opts.Org, "org", "o", "", "Report status within an organization")
 	cmd.Flags().StringSliceVarP(&opts.Exclude, "exclude", "e", []string{}, "Comma separated list of repos to exclude in owner/name format")
+	cmd.Flags().BoolVar(&opts.ScreenReader, "screen-reader", false, "Render output optimized for screen readers")
 
 	return cmd
 }
@@ -665,6 +667,10 @@ func statusRun(opts *StatusOptions) error {
 		return err
 	}
 
+	if opts.ScreenReader {
+		renderScreenReaderStatus(opts, sg)
+		return nil
+	}
 	cs := opts.IO.ColorScheme()
 	out := opts.IO.Out
 	fullWidth := opts.IO.TerminalWidth()
@@ -745,4 +751,43 @@ func statusRun(opts *StatusOptions) error {
 	}
 
 	return nil
+}
+
+func renderScreenReaderStatus(opts *StatusOptions, sg *StatusGetter) {
+	out := opts.IO.Out
+	cs := opts.IO.ColorScheme()
+	section := func(header string, items []StatusItem, rowLimit int) {
+		fmt.Fprintln(out, cs.Bold(header))
+		if len(items) == 0 {
+			fmt.Fprintln(out, "Nothing here")
+			fmt.Fprintln(out)
+			return
+		}
+		for i, si := range items {
+			if i == rowLimit {
+				break
+			}
+			fmt.Fprintf(out, "- %s\n", si.Identifier)
+			if si.Reason != "" {
+				fmt.Fprintf(out, "\t%s\n", si.Reason)
+			}
+			preview := si.Preview()
+			if preview != "" {
+				fmt.Fprintf(out, "\t%s\n", preview)
+			}
+		}
+		fmt.Fprintln(out)
+	}
+	section("Assigned Issues", sg.AssignedIssues, 5)
+	section("Assigned Pull Requests", sg.AssignedPRs, 5)
+	section("Review Requests", sg.ReviewRequests, 5)
+	section("Mentions", sg.Mentions, 5)
+	section("Repository Activity", sg.RepoActivity, 10)
+	if sg.HasAuthErrors() {
+		errs := sg.authErrors.ToSlice()
+		sort.Strings(errs)
+		for _, msg := range errs {
+			fmt.Fprintln(out, cs.Mutedf("warning: %s", msg))
+		}
+	}
 }
