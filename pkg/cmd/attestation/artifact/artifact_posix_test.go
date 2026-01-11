@@ -132,16 +132,16 @@ func TestParseDigestReference(t *testing.T) {
 	}{
 		{
 			name:          "valid sha256 digest",
-			reference:     "sha256:abcdef1234567890",
+			reference:     "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1111111111111111111111111111111",
 			expectedAlg:   "sha256",
-			expectedValue: "abcdef1234567890",
+			expectedValue: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1111111111111111111111111111111",
 			expectedError: false,
 		},
 		{
 			name:          "valid sha512 digest",
-			reference:     "sha512:abcdef1234567890abcdef",
+			reference:     "sha512:ABCDEF1234567890ABCDEFABCDEF1234567890abcdefabcdef1234567890abcdefabcdef1234567890abcdefabcdef1234567890abcdefabcdef1234567890ab",
 			expectedAlg:   "sha512",
-			expectedValue: "abcdef1234567890abcdef",
+			expectedValue: "abcdef1234567890abcdefabcdef1234567890abcdefabcdef1234567890abcdefabcdef1234567890abcdefabcdef1234567890abcdefabcdef1234567890ab",
 			expectedError: false,
 		},
 		{
@@ -151,9 +151,9 @@ func TestParseDigestReference(t *testing.T) {
 		},
 		{
 			name:          "uppercase algorithm normalized",
-			reference:     "SHA256:abcdef1234567890",
+			reference:     "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1111111111111111111111111111111",
 			expectedAlg:   "sha256",
-			expectedValue: "abcdef1234567890",
+			expectedValue: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1111111111111111111111111111111",
 			expectedError: false,
 		},
 		{
