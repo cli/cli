@@ -169,6 +169,26 @@ func TestParseDigestReference(t *testing.T) {
 			reference:     "sha256abcdef",
 			expectedError: true,
 		},
+		{
+			name:          "invalid digest (sha256)",
+			reference:     "sha256:abcdef1234567890abcdefabcdef1234567890abcdefabcdef1234567890abcdefabcdef1234567890abcdefabcdef1234567890abcdefabcdef1234567890ab",
+			expectedError: true,
+		},
+		{
+			name:          "invalid digest (sha512)",
+			reference:     "sha512:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1111111111111111111111111111111",
+			expectedError: true,
+		},
+		{
+			name:          "empty digest (sha256)",
+			reference:     "sha256:",
+			expectedError: true,
+		},
+		{
+			name:          "empty digest (sha512)",
+			reference:     "sha512:",
+			expectedError: true,
+		},
 	}
 
 	for _, tc := range testCases {
