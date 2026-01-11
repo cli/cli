@@ -175,6 +175,11 @@ func TestParseDigestReference(t *testing.T) {
 			expectedError: true,
 		},
 		{
+			name:          "invalid digest",
+			reference:     "sha256:invalidAAAAAAAAAAAAAAAAAAAAAAAAAA1111111111111111111111111111111",
+			expectedError: true,
+		},
+		{
 			name:          "invalid digest (sha512)",
 			reference:     "sha512:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1111111111111111111111111111111",
 			expectedError: true,
