@@ -35,7 +35,8 @@ func normalizeReference(reference string, pathSeparator rune) (normalized string
 	case strings.HasPrefix(reference, "oci://"):
 		return reference[6:], ociArtifactType, nil
 	case strings.HasPrefix(lowerRef, "sha256:"), strings.HasPrefix(lowerRef, "sha512:"):
-		return reference, digestArtifactType, nil
+		// digest is normalized to lowercase.
+		return lowerRef, digestArtifactType, nil
 	case strings.HasPrefix(reference, "file://"):
 		uri, err := url.ParseRequestURI(reference)
 		if err != nil {
@@ -69,12 +70,13 @@ func NewDigestedArtifactForRelease(d string, digestAlg string) (artifact *Digest
 // parseDigestReference parses a digest reference like "sha256:abc123" and returns
 // the algorithm and digest value. Returns an error if the format is invalid.
 func parseDigestReference(reference string) (alg, digestValue string, err error) {
+	reference = strings.ToLower(reference)
 	parts := strings.SplitN(reference, ":", 2)
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid digest format, expected 'algorithm:digest'")
 	}
 
-	alg = strings.ToLower(parts[0])
+	alg = parts[0]
 	digestValue = parts[1]
 
 	if !digest.IsValidDigestAlgorithm(alg) {
@@ -98,7 +100,7 @@ func parseDigestReference(reference string) (alg, digestValue string, err error)
 
 	for i := 0; i < len(digestValue); i++ {
 		c := digestValue[i]
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
 			return "", "", fmt.Errorf("invalid %s digest: digest must be a hexadecimal string", alg)
 		}
 	}
