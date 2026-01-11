@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/digest"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 )
 
@@ -17,6 +18,7 @@ type artifactType int
 const (
 	ociArtifactType artifactType = iota
 	fileArtifactType
+	digestArtifactType
 )
 
 // DigestedArtifact abstracts the software artifact being verified
@@ -31,6 +33,8 @@ func normalizeReference(reference string, pathSeparator rune) (normalized string
 	switch {
 	case strings.HasPrefix(reference, "oci://"):
 		return reference[6:], ociArtifactType, nil
+	case strings.HasPrefix(reference, "sha256:"), strings.HasPrefix(reference, "sha512:"):
+		return reference, digestArtifactType, nil
 	case strings.HasPrefix(reference, "file://"):
 		uri, err := url.ParseRequestURI(reference)
 		if err != nil {
@@ -54,23 +58,53 @@ func normalizeReference(reference string, pathSeparator rune) (normalized string
 	return filepath.Clean(reference), fileArtifactType, nil
 }
 
-func NewDigestedArtifactForRelease(digest string, digestAlg string) (artifact *DigestedArtifact) {
+func NewDigestedArtifactForRelease(d string, digestAlg string) (artifact *DigestedArtifact) {
 	return &DigestedArtifact{
-		digest:    digest,
+		digest:    d,
 		digestAlg: digestAlg,
 	}
 }
 
+// parseDigestReference parses a digest reference like "sha256:abc123" and returns
+// the algorithm and digest value. Returns an error if the format is invalid.
+func parseDigestReference(reference string) (alg, digestValue string, err error) {
+	parts := strings.SplitN(reference, ":", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid digest format, expected 'algorithm:digest'")
+	}
+
+	alg = strings.ToLower(parts[0])
+	digestValue = parts[1]
+
+	if !digest.IsValidDigestAlgorithm(alg) {
+		return "", "", fmt.Errorf("unsupported digest algorithm: %s", alg)
+	}
+
+	return alg, digestValue, nil
+}
+
 func NewDigestedArtifact(client oci.Client, reference, digestAlg string) (artifact *DigestedArtifact, err error) {
-	normalized, artifactType, err := normalizeReference(reference, os.PathSeparator)
+	normalized, artType, err := normalizeReference(reference, os.PathSeparator)
 	if err != nil {
 		return nil, err
 	}
-	if artifactType == ociArtifactType {
+
+	switch artType {
+	case ociArtifactType:
 		// TODO: should we allow custom digestAlg for OCI artifacts?
 		return digestContainerImageArtifact(normalized, client)
+	case digestArtifactType:
+		alg, digestValue, err := parseDigestReference(normalized)
+		if err != nil {
+			return nil, err
+		}
+		return &DigestedArtifact{
+			digest:    digestValue,
+			digestAlg: alg,
+		}, nil
+	default:
+		return digestLocalFileArtifact(normalized, digestAlg)
 	}
-	return digestLocalFileArtifact(normalized, digestAlg)
 }
 
 // Digest returns the artifact's digest

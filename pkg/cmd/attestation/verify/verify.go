@@ -23,8 +23,8 @@ import (
 func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	verifyCmd := &cobra.Command{
-		Use:   "verify [<file-path> | oci://<image-uri>] [--owner | --repo]",
-		Args:  cmdutil.ExactArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
+		Use:   "verify [<file-path> | oci://<image-uri> | sha256:<digest> | sha512:<digest>] [--owner | --repo]",
+		Args:  cmdutil.ExactArgs(1, "must specify file path, container image URI, or digest, as well as one of --owner or --repo"),
 		Short: "Verify an artifact's integrity using attestations",
 		Long: heredoc.Docf(`
 			Verify the integrity and provenance of an artifact using its associated
@@ -274,7 +274,11 @@ func runVerify(opts *Options) error {
 		return err
 	}
 
-	opts.Logger.Printf("Loaded digest %s for %s\n", artifact.DigestWithAlg(), artifact.URL)
+	if artifact.URL != "" {
+		opts.Logger.Printf("Loaded digest %s for %s\n", artifact.DigestWithAlg(), artifact.URL)
+	} else {
+		opts.Logger.Printf("Using provided digest %s\n", artifact.DigestWithAlg())
+	}
 
 	attestations, logMsg, err := getAttestations(opts, *artifact)
 	if err != nil {
