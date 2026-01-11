@@ -19,8 +19,8 @@ import (
 func NewDownloadCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	downloadCmd := &cobra.Command{
-		Use:   "download [<file-path> | oci://<image-uri>] [--owner | --repo]",
-		Args:  cmdutil.ExactArgs(1, "must specify file path or container image URI, as well as one of --owner or --repo"),
+		Use:   "download [<file-path> | oci://<image-uri> | sha256:<digest> | sha512:<digest>] [--owner | --repo]",
+		Args:  cmdutil.ExactArgs(1, "must specify file path, container image URI, or digest, as well as one of --owner or --repo"),
 		Short: "Download an artifact's attestations for offline use",
 		Long: heredoc.Docf(`
 			### NOTE: This feature is currently in public preview, and subject to change.
@@ -124,7 +124,11 @@ func runDownload(opts *Options) error {
 		return fmt.Errorf("failed to digest artifact: %v", err)
 	}
 
-	opts.Logger.VerbosePrintf("Downloading trusted metadata for artifact %s\n\n", opts.ArtifactPath)
+	if artifact.URL != "" {
+		opts.Logger.VerbosePrintf("Downloading trusted metadata for artifact %s\n\n", artifact.URL)
+	} else {
+		opts.Logger.VerbosePrintf("Downloading trusted metadata for digest %s\n\n", artifact.DigestWithAlg())
+	}
 
 	if opts.APIClient == nil {
 		return fmt.Errorf("no APIClient provided")
@@ -138,7 +142,11 @@ func runDownload(opts *Options) error {
 	attestations, err := opts.APIClient.GetByDigest(params)
 	if err != nil {
 		if errors.Is(err, api.ErrNoAttestationsFound) {
-			fmt.Fprintf(opts.Logger.IO.Out, "No attestations found for %s\n", opts.ArtifactPath)
+			if artifact.URL != "" {
+				fmt.Fprintf(opts.Logger.IO.Out, "No attestations found for %s\n", artifact.URL)
+			} else {
+				fmt.Fprintf(opts.Logger.IO.Out, "No attestations found for digest %s\n", artifact.DigestWithAlg())
+			}
 			return nil
 		}
 		return fmt.Errorf("failed to fetch attestations: %v", err)
