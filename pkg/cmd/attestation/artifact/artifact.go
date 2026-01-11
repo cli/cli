@@ -30,10 +30,11 @@ type DigestedArtifact struct {
 }
 
 func normalizeReference(reference string, pathSeparator rune) (normalized string, artifactType artifactType, err error) {
+	lowerRef := strings.ToLower(reference)
 	switch {
 	case strings.HasPrefix(reference, "oci://"):
 		return reference[6:], ociArtifactType, nil
-	case strings.HasPrefix(reference, "sha256:"), strings.HasPrefix(reference, "sha512:"):
+	case strings.HasPrefix(lowerRef, "sha256:"), strings.HasPrefix(lowerRef, "sha512:"):
 		return reference, digestArtifactType, nil
 	case strings.HasPrefix(reference, "file://"):
 		uri, err := url.ParseRequestURI(reference)
@@ -80,6 +81,27 @@ func parseDigestReference(reference string) (alg, digestValue string, err error)
 		return "", "", fmt.Errorf("unsupported digest algorithm: %s", alg)
 	}
 
+	var expectedLen int
+	switch alg {
+	case "sha256":
+		expectedLen = 64
+	case "sha512":
+		expectedLen = 128
+	default:
+		// For any other supported algorithms, we currently don't enforce a length,
+		// but we still validate that the digest is hexadecimal.
+	}
+
+	if expectedLen > 0 && len(digestValue) != expectedLen {
+		return "", "", fmt.Errorf("invalid %s digest: expected %d hexadecimal characters, got %d", alg, expectedLen, len(digestValue))
+	}
+
+	for i := 0; i < len(digestValue); i++ {
+		c := digestValue[i]
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return "", "", fmt.Errorf("invalid %s digest: digest must be a hexadecimal string", alg)
+		}
+	}
 	return alg, digestValue, nil
 }
 
