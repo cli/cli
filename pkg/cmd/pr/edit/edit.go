@@ -295,7 +295,9 @@ func editRun(opts *EditOptions) error {
 
 	// Wire up search functions for assignees and reviewers.
 	// TODO: Wire up reviewer search func.
-	editable.AssigneeSearchFunc = assigneeSearchFunc(apiClient, repo, &editable, pr.ID)
+	if issueFeatures.ActorIsAssignable {
+		editable.AssigneeSearchFunc = assigneeSearchFunc(apiClient, repo, &editable, pr.ID)
+	}
 
 	opts.IO.StartProgressIndicator()
 	err = opts.Fetcher.EditableOptionsFetch(apiClient, repo, &editable, opts.Detector.ProjectsV1())
