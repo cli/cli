@@ -294,7 +294,7 @@ func editRun(opts *EditOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	// Wire up search functions for assignees and reviewers.
-	// TODO: Wire up reviewer search func.
+	// TODO KW: Wire up reviewer search func if/when it exists.
 	if issueFeatures.ActorIsAssignable {
 		editable.AssigneeSearchFunc = assigneeSearchFunc(apiClient, repo, &editable, pr.ID)
 	}
