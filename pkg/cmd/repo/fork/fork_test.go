@@ -373,6 +373,22 @@ func TestRepoFork(t *testing.T) {
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Renamed remote origin to upstream\n✓ Added remote origin\n",
 		},
 		{
+			name: "repo arg matches remote --remote",
+			tty:  true,
+			opts: &ForkOptions{
+				Repository: "https://github.com/OWNER/REPO.git",
+				Remote:     true,
+				RemoteName: defaultRemoteName,
+				Rename:     true,
+			},
+			httpStubs: forkPost,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register("git remote rename origin upstream", 0, "")
+				cs.Register(`git remote add origin https://github.com/someone/REPO.git`, 0, "")
+			},
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Renamed remote origin to upstream\n✓ Added remote origin\n",
+		},
+		{
 			name: "implicit nontty reuse existing remote",
 			opts: &ForkOptions{
 				Remote:     true,

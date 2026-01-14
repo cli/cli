@@ -182,6 +182,14 @@ func forkRun(opts *ForkOptions) error {
 				return fmt.Errorf("argument error: %w", err)
 			}
 		}
+
+		if opts.Remote {
+			if remotes, err := opts.Remotes(); err == nil {
+				if _, err := remotes.FindByRepo(repoToFork.RepoOwner(), repoToFork.RepoName()); err == nil {
+					inParent = true
+				}
+			}
+		}
 	}
 
 	connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY() && opts.IO.IsStdinTTY()
