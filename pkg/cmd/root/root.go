@@ -19,6 +19,7 @@ import (
 	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
+	envCmd "github.com/cli/cli/v2/pkg/cmd/env"
 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/v2/pkg/cmd/gist"
@@ -162,6 +163,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
 	cmd.AddCommand(cacheCmd.NewCmdCache(&repoResolvingCmdFactory))
 	cmd.AddCommand(apiCmd.NewCmdApi(&repoResolvingCmdFactory, nil))
+	cmd.AddCommand(envCmd.NewCmdEnv(&repoResolvingCmdFactory, nil))
 
 	// Help topics
 	var referenceCmd *cobra.Command
