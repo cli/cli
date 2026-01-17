@@ -59,7 +59,7 @@ jobs:
         run: |
           export GOROOT=$(go env GOROOT)
           export PATH=${GOROOT}/bin:$PATH
-          go install github.com/google/go-licenses@5348b744d0983d85713295ea08a20cca1654a45e # v2.0.1
+          go install github.com/google/go-licenses/v2@3e084b0caf710f7bfead967567539214f598c0a2 # v2.0.1
           make licenses-check
 
   # Discover vulnerabilities within Go standard libraries used to build GitHub CLI using govulncheck.

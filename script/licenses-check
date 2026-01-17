@@ -2,7 +2,7 @@
 
 # Manage go-licenses version externally for CI
 if [ "$CI" != "true" ]; then
-    go install github.com/google/go-licenses@latest
+    go install github.com/google/go-licenses/v2@latest
 fi
 
 # Setup temporary directory for generated license reports
