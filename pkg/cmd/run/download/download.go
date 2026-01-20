@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/safepaths"
@@ -112,6 +113,22 @@ func runDownload(opts *DownloadOptions) error {
 	if err != nil {
 		return fmt.Errorf("error fetching artifacts: %w", err)
 	}
+
+	// Prefer newer artifacts when there are multiple artifacts with the same
+	// name (e.g. rerun attempts of the same workflow run can produce duplicates).
+	sort.SliceStable(artifacts, func(i, j int) bool {
+		ai, aj := artifacts[i].CreatedAt, artifacts[j].CreatedAt
+		if ai.IsZero() && aj.IsZero() {
+			return false
+		}
+		if ai.IsZero() {
+			return false
+		}
+		if aj.IsZero() {
+			return true
+		}
+		return ai.After(aj)
+	})
 
 	numValidArtifacts := 0
 	for _, a := range artifacts {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -12,10 +13,12 @@ import (
 )
 
 type Artifact struct {
-	Name        string `json:"name"`
-	Size        uint64 `json:"size_in_bytes"`
-	DownloadURL string `json:"archive_download_url"`
-	Expired     bool   `json:"expired"`
+	Name        string    `json:"name"`
+	Size        uint64    `json:"size_in_bytes"`
+	DownloadURL string    `json:"archive_download_url"`
+	Expired     bool      `json:"expired"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type artifactsPayload struct {

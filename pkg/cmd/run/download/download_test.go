@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -581,7 +582,7 @@ func Test_runDownload(t *testing.T) {
 			},
 		},
 		{
-			name: "avoid redownloading files of the same name",
+			name: "when multiple artifacts have the same name, download the newest one",
 			opts: DownloadOptions{
 				RunID: "2345",
 			},
@@ -595,6 +596,7 @@ func Test_runDownload(t *testing.T) {
 									Name:        "artifact-1",
 									DownloadURL: "http://download.com/artifact1.zip",
 									Expired:     false,
+									CreatedAt:   time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
 								files: []string{
 									"artifact-1-file",
@@ -605,9 +607,10 @@ func Test_runDownload(t *testing.T) {
 									Name:        "artifact-1",
 									DownloadURL: "http://download.com/artifact2.zip",
 									Expired:     false,
+									CreatedAt:   time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC),
 								},
 								files: []string{
-									"artifact-2-file",
+									"artifact-1-newer-file",
 								},
 							},
 						},
@@ -615,7 +618,7 @@ func Test_runDownload(t *testing.T) {
 				},
 			},
 			expectedFiles: []string{
-				filepath.Join("artifact-1", "artifact-1-file"),
+				filepath.Join("artifact-1", "artifact-1-newer-file"),
 			},
 		},
 		{
