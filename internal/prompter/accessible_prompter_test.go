@@ -147,6 +147,29 @@ func TestAccessiblePrompter(t *testing.T) {
 		assert.Equal(t, []int{0, 1}, multiSelectValue)
 	})
 
+	t.Run("MultiSelect - blank Enter after selection confirms", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Input a number between 0 and 3:")
+			require.NoError(t, err)
+
+			// Select option 1
+			_, err = console.SendLine("1")
+			require.NoError(t, err)
+
+			// Press Enter (blank) to confirm selection
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		multiSelectValue, err := p.MultiSelect("Select a number", []string{}, []string{"1", "2", "3"})
+		require.NoError(t, err)
+		assert.Equal(t, []int{0}, multiSelectValue)
+	})
+
 	t.Run("MultiSelect - default values are respected by being pre-selected", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)

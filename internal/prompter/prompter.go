@@ -1,7 +1,10 @@
 package prompter
 
 import (
+	"bufio"
 	"fmt"
+	"sort"
+	"strconv"
 	"slices"
 	"strings"
 
@@ -128,41 +131,85 @@ func (p *accessiblePrompter) Select(prompt, defaultValue string, options []strin
 }
 
 func (p *accessiblePrompter) MultiSelect(prompt string, defaults []string, options []string) ([]int, error) {
-	var result []int
-
 	// Remove invalid default values from the defaults slice.
 	defaults = slices.DeleteFunc(defaults, func(s string) bool {
 		return !slices.Contains(options, s)
 	})
 
 	prompt = p.addDefaultsToPrompt(prompt, defaults)
-	formOptions := make([]huh.Option[int], len(options))
-	for i, o := range options {
-		// If this option is in the defaults slice,
-		// let's add its index to the result slice and huh
-		// will treat it as a default selection.
-		if slices.Contains(defaults, o) {
-			result = append(result, i)
+
+	// Build a selection map initialized with defaults
+	selected := map[int]struct{}{}
+	for _, d := range defaults {
+		for i, o := range options {
+			if o == d {
+				selected[i] = struct{}{}
+				break
+			}
+		}
+	}
+
+	reader := bufio.NewReader(p.stdin)
+	for {
+		// Print prompt and options
+		fmt.Fprintf(p.stdout, "%s\n", prompt)
+		for i, o := range options {
+			if _, ok := selected[i]; ok {
+				fmt.Fprintf(p.stdout, "%d. ✓ %s\n", i+1, o)
+			} else {
+				fmt.Fprintf(p.stdout, "%d.   %s\n", i+1, o)
+			}
+		}
+		fmt.Fprintf(p.stdout, "0.   Confirm selection\n")
+		fmt.Fprintf(p.stdout, "Input a number between 0 and %d: ", len(options))
+
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		line = strings.TrimSpace(line)
+
+		if line == "" {
+			// Blank Enter: if we have selections, confirm; otherwise show validation
+			if len(selected) > 0 {
+				// Convert to slice of indices sorted ascending
+				keys := make([]int, 0, len(selected))
+				for k := range selected {
+					keys = append(keys, k)
+				}
+				sort.Ints(keys)
+				return keys, nil
+			}
+			fmt.Fprintf(p.stdout, "Invalid: must be between 0 and %d\n", len(options))
+			continue
 		}
 
-		formOptions[i] = huh.NewOption(o, i)
+		num, err := strconv.Atoi(line)
+		if err != nil || num < 0 || num > len(options) {
+			fmt.Fprintf(p.stdout, "Invalid: must be between 0 and %d\n", len(options))
+			continue
+		}
+
+		if num == 0 {
+			if len(selected) == 0 {
+				fmt.Fprintf(p.stdout, "Invalid: must be between 0 and %d\n", len(options))
+				continue
+			}
+			keys := make([]int, 0, len(selected))
+			for k := range selected {
+				keys = append(keys, k)
+			}
+			sort.Ints(keys)
+			return keys, nil
+		}
+
+		idx := num - 1
+		if _, ok := selected[idx]; ok {
+			delete(selected, idx)
+		} else {
+			selected[idx] = struct{}{}
+		}
 	}
-
-	form := p.newForm(
-		huh.NewGroup(
-			huh.NewMultiSelect[int]().
-				Title(prompt).
-				Value(&result).
-				Limit(len(options)).
-				Options(formOptions...),
-		),
-	)
-
-	if err := form.Run(); err != nil {
-		return nil, err
-	}
-
-	return result, nil
 }
 
 func (p *accessiblePrompter) Input(prompt, defaultValue string) (string, error) {
