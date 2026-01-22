@@ -715,16 +715,15 @@ func SuggestedAssignableActors(client *Client, repo ghrepo.Interface, assignable
 			Issue struct {
 				SuggestedActors struct {
 					Nodes []struct {
+					    TypeName string `graphql:"__typename"`
 						User struct {
 							ID       string
 							Login    string
 							Name     string
-							TypeName string `graphql:"__typename"`
 						} `graphql:"... on User"`
 						Bot struct {
 							ID       string
 							Login    string
-							TypeName string `graphql:"__typename"`
 						} `graphql:"... on Bot"`
 					}
 				} `graphql:"suggestedActors(first: 10, query: $query)"`
@@ -732,16 +731,15 @@ func SuggestedAssignableActors(client *Client, repo ghrepo.Interface, assignable
 			PullRequest struct {
 				SuggestedActors struct {
 					Nodes []struct {
+					    TypeName string `graphql:"__typename"`
 						User struct {
 							ID       string
 							Login    string
-							Name     string
-							TypeName string `graphql:"__typename"`
+							Name     string							
 						} `graphql:"... on User"`
 						Bot struct {
 							ID       string
 							Login    string
-							TypeName string `graphql:"__typename"`
 						} `graphql:"... on Bot"`
 					}
 				} `graphql:"suggestedActors(first: 10, query: $query)"`
@@ -764,16 +762,15 @@ func SuggestedAssignableActors(client *Client, repo ghrepo.Interface, assignable
 	}
 
 	var nodes []struct {
+		TypeName string `graphql:"__typename"`
 		User struct {
 			ID       string
 			Login    string
 			Name     string
-			TypeName string `graphql:"__typename"`
 		} `graphql:"... on User"`
 		Bot struct {
 			ID       string
 			Login    string
-			TypeName string `graphql:"__typename"`
 		} `graphql:"... on Bot"`
 	}
 
@@ -789,12 +786,12 @@ func SuggestedAssignableActors(client *Client, repo ghrepo.Interface, assignable
 	viewerIncluded := false
 
 	for _, n := range nodes {
-		if n.User.TypeName == "User" && n.User.Login != "" {
+		if n.TypeName == "User" && n.User.Login != "" {
 			actors = append(actors, AssignableUser{id: n.User.ID, login: n.User.Login, name: n.User.Name})
 			if query == "" && viewerLogin != "" && n.User.Login == viewerLogin {
 				viewerIncluded = true
 			}
-		} else if n.Bot.TypeName == "Bot" && n.Bot.Login != "" {
+		} else if n.TypeName == "Bot" && n.Bot.Login != "" {
 			actors = append(actors, AssignableBot{id: n.Bot.ID, login: n.Bot.Login})
 			if query == "" && viewerLogin != "" && n.Bot.Login == viewerLogin {
 				viewerIncluded = true
