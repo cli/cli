@@ -354,8 +354,8 @@ func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, editable *
 			}
 		}
 
-		var logins []string
-		var displayNames []string
+		logins := make([]string, 0, len(actors))
+		displayNames := make([]string, 0, len(actors))
 
 		for _, a := range actors {
 			if a.Login() != "" {
