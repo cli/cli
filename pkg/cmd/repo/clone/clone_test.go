@@ -54,9 +54,17 @@ func TestNewCmdClone(t *testing.T) {
 				GitArgs:    []string{"--depth", "1", "--recurse-submodules"},
 			},
 		},
-		{
-			name:    "unknown argument",
-			args:    "OWNER/REPO --depth 1",
+		                {
+		                        name: "no-upstream flag",
+		                        args: "OWNER/REPO --no-upstream",
+		                        wantOpts: CloneOptions{
+		                                Repository: "OWNER/REPO",
+		                                GitArgs:    []string{},
+		                                NoUpstream: true,
+		                        },
+		                },
+		                {
+		                        name:    "unknown argument",			args:    "OWNER/REPO --depth 1",
 			wantErr: "unknown flag: --depth\nSeparate git clone flags with '--'.",
 		},
 	}
@@ -387,12 +395,50 @@ func TestSimplifyURL(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			u, err := url.Parse(tt.raw)
-			require.NoError(t, err)
-			result := simplifyURL(u)
-			assert.Equal(t, tt.expectedRaw, result.String())
-		})
+	        for _, tt := range tests {
+	                t.Run(tt.name, func(t *testing.T) {
+	                        u, err := url.Parse(tt.raw)
+	                        require.NoError(t, err)
+	                        result := simplifyURL(u)
+	                        assert.Equal(t, tt.expectedRaw, result.String())
+	                })
+	        }
 	}
-}
+	
+	func Test_RepoClone_hasParent_noUpstream(t *testing.T) {
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+		reg.Register(
+			httpmock.GraphQL(`query RepositoryInfo\b`),
+			httpmock.StringResponse(`
+	                                { "data": { "repository": {
+	                                        "name": "REPO",
+	                                        "owner": {
+	                                                "login": "OWNER"
+	                                        },
+	                                        "parent": {
+	                                                "name": "ORIG",
+	                                                "owner": {
+	                                                        "login": "hubot"
+	                                                },
+	                                                "defaultBranchRef": {
+	                                                        "name": "trunk"
+	                                                }
+	                                        }
+	                                } } }
+	                                `))
+	
+		httpClient := &http.Client{Transport: reg}
+	
+		cs, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+	
+		// We only expect git clone, but NO upstream-related git commands
+		cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+	
+		_, err := runCloneCommand(httpClient, "OWNER/REPO --no-upstream")
+		if err != nil {
+			t.Fatalf("error running command `repo clone`: %v", err)
+		}
+	}
+	

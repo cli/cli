@@ -19,80 +19,86 @@ import (
 )
 
 type CloneOptions struct {
-	HttpClient func() (*http.Client, error)
-	GitClient  *git.Client
-	Config     func() (gh.Config, error)
-	IO         *iostreams.IOStreams
+        HttpClient func() (*http.Client, error)
+        GitClient  *git.Client
+        Config     func() (gh.Config, error)
+        IO         *iostreams.IOStreams
 
-	GitArgs      []string
-	Repository   string
-	UpstreamName string
+        GitArgs      []string
+        Repository   string
+        UpstreamName string
+        NoUpstream   bool
 }
 
 func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Command {
-	opts := &CloneOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		GitClient:  f.GitClient,
-		Config:     f.Config,
-	}
+        opts := &CloneOptions{
+                IO:         f.IOStreams,
+                HttpClient: f.HttpClient,
+                GitClient:  f.GitClient,
+                Config:     f.Config,
+        }
 
-	cmd := &cobra.Command{
-		DisableFlagsInUseLine: true,
+        cmd := &cobra.Command{
+                DisableFlagsInUseLine: true,
 
-		Use:   "clone <repository> [<directory>] [-- <gitflags>...]",
-		Args:  cmdutil.MinimumArgs(1, "cannot clone: repository argument required"),
-		Short: "Clone a repository locally",
-		Long: heredoc.Docf(`
-			Clone a GitHub repository locally. Pass additional %[1]sgit clone%[1]s flags by listing
-			them after %[1]s--%[1]s.
+                Use:   "clone <repository> [<directory>] [-- <gitflags>...]",
+                Args:  cmdutil.MinimumArgs(1, "cannot clone: repository argument required"),
+                Short: "Clone a repository locally",
+                Long: heredoc.Docf(`
+                        Clone a GitHub repository locally. Pass additional %[1]sgit clone%[1]s flags by listing
+                        them after %[1]s--%[1]s.
 
-			If the %[1]sOWNER/%[1]s portion of the %[1]sOWNER/REPO%[1]s repository argument is omitted, it
-			defaults to the name of the authenticating user.
+                        If the %[1]sOWNER/%[1]s portion of the %[1]sOWNER/REPO%[1]s repository argument is omitted, it
+                        defaults to the name of the authenticating user.
 
-			When a protocol scheme is not provided in the repository argument, the %[1]sgit_protocol%[1]s will be
-			chosen from your configuration, which can be checked via %[1]sgh config get git_protocol%[1]s. If the protocol
-			scheme is provided, the repository will be cloned using the specified protocol.
+                        When a protocol scheme is not provided in the repository argument, the %[1]sgit_protocol%[1]s will be
+                        chosen from your configuration, which can be checked via %[1]sgh config get git_protocol%[1]s. If the protocol
+                        scheme is provided, the repository will be cloned using the specified protocol.
 
-			If the repository is a fork, its parent repository will be added as an additional
-			git remote called %[1]supstream%[1]s. The remote name can be configured using %[1]s--upstream-remote-name%[1]s.
-			The %[1]s--upstream-remote-name%[1]s option supports an %[1]s@owner%[1]s value which will name
-			the remote after the owner of the parent repository.
+                        If the repository is a fork, its parent repository will be added as an additional
+                        git remote called %[1]supstream%[1]s. The remote name can be configured using %[1]s--upstream-remote-name%[1]s.
+                        The %[1]s--upstream-remote-name%[1]s option supports an %[1]s@owner%[1]s value which will name
+                        the remote after the owner of the parent repository.
 
-			If the repository is a fork, its parent repository will be set as the default remote repository.
-		`, "`"),
-		Example: heredoc.Doc(`
-			# Clone a repository from a specific org
-			$ gh repo clone cli/cli
+                        To skip adding an upstream remote, use the %[1]s--no-upstream%[1]s flag.
 
-			# Clone a repository from your own account
-			$ gh repo clone myrepo
+                        If the repository is a fork, its parent repository will be set as the default remote repository.
+                `, "`"),
+                Example: heredoc.Doc(`
+                        # Clone a repository from a specific org
+                        $ gh repo clone cli/cli
 
-			# Clone a repo, overriding git protocol configuration
-			$ gh repo clone https://github.com/cli/cli
-			$ gh repo clone git@github.com:cli/cli.git
+                        # Clone a repository from your own account
+                        $ gh repo clone myrepo
 
-			# Clone a repository to a custom directory
-			$ gh repo clone cli/cli workspace/cli
+                        # Clone a repo, overriding git protocol configuration
+                        $ gh repo clone https://github.com/cli/cli
+                        $ gh repo clone git@github.com:cli/cli.git
 
-			# Clone a repository with additional git clone flags
-			$ gh repo clone cli/cli -- --depth=1
-		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Repository = args[0]
-			opts.GitArgs = args[1:]
+                        # Clone a repository to a custom directory
+                        $ gh repo clone cli/cli workspace/cli
 
-			if runF != nil {
-				return runF(opts)
-			}
+                        # Clone a repository without adding an upstream remote
+                        $ gh repo clone myfork --no-upstream
 
-			return cloneRun(opts)
-		},
-	}
+                        # Clone a repository with additional git clone flags
+                        $ gh repo clone cli/cli -- --depth=1
+                `),
+                RunE: func(cmd *cobra.Command, args []string) error {
+                        opts.Repository = args[0]
+                        opts.GitArgs = args[1:]
 
-	cmd.Flags().StringVarP(&opts.UpstreamName, "upstream-remote-name", "u", "upstream", "Upstream remote name when cloning a fork")
-	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		if err == pflag.ErrHelp {
+                        if runF != nil {
+                                return runF(opts)
+                        }
+
+                        return cloneRun(opts)
+                },
+        }
+
+        cmd.Flags().StringVarP(&opts.UpstreamName, "upstream-remote-name", "u", "upstream", "Upstream remote name when cloning a fork")
+        cmd.Flags().BoolVar(&opts.NoUpstream, "no-upstream", false, "Do not add an upstream remote if the repository is a fork")
+        cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {		if err == pflag.ErrHelp {
 			return err
 		}
 		return cmdutil.FlagErrorf("%w\nSeparate git clone flags with '--'.", err)
@@ -185,10 +191,13 @@ func cloneRun(opts *CloneOptions) error {
 		return err
 	}
 
-	// If the repo is a fork, add the parent as an upstream remote and set the parent as the default repo.
-	if canonicalRepo.Parent != nil {
-		protocol := cfg.GitProtocol(canonicalRepo.Parent.RepoHost()).Value
-		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
+	                // If the repo is a fork, add the parent as an upstream remote and set the parent as the default repo.
+
+	                if canonicalRepo.Parent != nil && !opts.NoUpstream {
+
+	                        protocol := cfg.GitProtocol(canonicalRepo.Parent.RepoHost()).Value
+
+	                        upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
 		upstreamName := opts.UpstreamName
 		if opts.UpstreamName == "@owner" {
