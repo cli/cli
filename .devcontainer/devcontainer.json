@@ -1,7 +1,7 @@
 {
 	"image": "mcr.microsoft.com/devcontainers/go:1.25",
 	"features": {
-		"ghcr.io/devcontainers/features/sshd:1": {}
+		"ghcr.io/devcontainers/features/sshd:1": "ghcr.io/wxw-matt/devcontainer-features/script_runner:0": {}{}
 	},
 	"remoteUser": "vscode",
 	"customizations": {
