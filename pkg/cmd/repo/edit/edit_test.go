@@ -300,7 +300,8 @@ func Test_editRun_interactive(t *testing.T) {
 		"Template Repository",
 		"Topics",
 		"Visibility",
-		"Wikis"}
+		"Wikis",
+		"Collaborators"}
 
 	tests := []struct {
 		name        string
@@ -320,7 +321,7 @@ func Test_editRun_interactive(t *testing.T) {
 				el := append(editList, optionAllowForking)
 				pm.RegisterMultiSelect("What do you want to edit?", nil, el,
 					func(_ string, _, opts []string) ([]int, error) {
-						return []int{10}, nil
+						return []int{11}, nil
 					})
 				pm.RegisterConfirm("Allow forking (of an organization repository)?", func(_ string, _ bool) (bool, error) {
 					return true, nil
@@ -814,6 +815,233 @@ func Test_transformSecurityAndAnalysisOpts(t *testing.T) {
 			opts := &tt.opts
 			transformed := transformSecurityAndAnalysisOpts(opts)
 			assert.Equal(t, tt.want, transformed)
+		})
+	}
+}
+
+func Test_editRun_collaborators(t *testing.T) {
+	tests := []struct {
+		name      string
+		opts      EditOptions
+		httpStubs func(*testing.T, *httpmock.Registry)
+		wantsErr  string
+	}{
+		{
+			name: "add collaborator",
+			opts: EditOptions{
+				Repository:       ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				AddCollaborators: []string{"octocat:push"},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/collaborators/octocat"),
+					httpmock.RESTPayload(204, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "push", payload["permission"])
+					}))
+			},
+		},
+		{
+			name: "remove collaborator",
+			opts: EditOptions{
+				Repository:         ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				RemoveCollaborators: []string{"octocat"},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("DELETE", "repos/OWNER/REPO/collaborators/octocat"),
+					httpmock.StatusStringResponse(204, ""))
+			},
+		},
+		{
+			name: "add team",
+			opts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				AddTeams:   []string{"org/team:admin"},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("PUT", "orgs/org/teams/team/repos/OWNER/REPO"),
+					httpmock.RESTPayload(204, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "admin", payload["permission"])
+					}))
+			},
+		},
+		{
+			name: "remove team",
+			opts: EditOptions{
+				Repository:  ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				RemoveTeams: []string{"org/team"},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("DELETE", "orgs/org/teams/team/repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(204, ""))
+			},
+		},
+		{
+			name: "add multiple collaborators",
+			opts: EditOptions{
+				Repository:       ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				AddCollaborators: []string{"user1:push", "user2:admin"},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/collaborators/user1"),
+					httpmock.RESTPayload(204, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "push", payload["permission"])
+					}))
+				r.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/collaborators/user2"),
+					httpmock.RESTPayload(204, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "admin", payload["permission"])
+					}))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+
+			httpReg := &httpmock.Registry{}
+			defer httpReg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(t, httpReg)
+			}
+
+			opts := &tt.opts
+			opts.HTTPClient = &http.Client{Transport: httpReg}
+			opts.IO = ios
+
+			err := editRun(context.Background(), opts)
+			if tt.wantsErr == "" {
+				require.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantsErr)
+			}
+		})
+	}
+}
+
+func Test_isValidPermission(t *testing.T) {
+	tests := []struct {
+		name       string
+		permission string
+		want       bool
+	}{
+		{"valid pull", "pull", true},
+		{"valid push", "push", true},
+		{"valid admin", "admin", true},
+		{"valid maintain", "maintain", true},
+		{"valid triage", "triage", true},
+		{"invalid permission", "invalid", false},
+		{"empty permission", "", false},
+		{"case sensitive", "PUSH", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isValidPermission(tt.permission)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestNewCmdEdit_collaboratorFlags(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     string
+		wantErr  string
+		validate func(*testing.T, *EditOptions)
+	}{
+		{
+			name: "add collaborator with valid permission",
+			args: "--add-collaborator octocat:push",
+			validate: func(t *testing.T, opts *EditOptions) {
+				require.Len(t, opts.AddCollaborators, 1)
+				assert.Equal(t, "octocat:push", opts.AddCollaborators[0])
+			},
+		},
+		{
+			name: "add collaborator with invalid format",
+			args: "--add-collaborator invalid",
+			wantErr: "invalid collaborator format: invalid (expected 'username:permission')",
+		},
+		{
+			name: "add collaborator with invalid permission",
+			args: "--add-collaborator user:invalid",
+			wantErr: "invalid permission: invalid (must be one of: pull, push, admin, maintain, triage)",
+		},
+		{
+			name: "remove collaborator",
+			args: "--remove-collaborator octocat",
+			validate: func(t *testing.T, opts *EditOptions) {
+				require.Len(t, opts.RemoveCollaborators, 1)
+				assert.Equal(t, "octocat", opts.RemoveCollaborators[0])
+			},
+		},
+		{
+			name: "add team with valid permission",
+			args: "--add-team org/team:admin",
+			validate: func(t *testing.T, opts *EditOptions) {
+				require.Len(t, opts.AddTeams, 1)
+				assert.Equal(t, "org/team:admin", opts.AddTeams[0])
+			},
+		},
+		{
+			name: "add team with invalid format",
+			args: "--add-team invalid",
+			wantErr: "invalid team format: invalid (expected 'org/team:permission')",
+		},
+		{
+			name: "remove team",
+			args: "--remove-team org/team",
+			validate: func(t *testing.T, opts *EditOptions) {
+				require.Len(t, opts.RemoveTeams, 1)
+				assert.Equal(t, "org/team", opts.RemoveTeams[0])
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.New("OWNER", "REPO"), nil
+				},
+				HttpClient: func() (*http.Client, error) {
+					return nil, nil
+				},
+			}
+
+			argv, err := shlex.Split(tt.args)
+			assert.NoError(t, err)
+
+			var gotOpts *EditOptions
+			cmd := NewCmdEdit(f, func(opts *EditOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			cmd.Flags().BoolP("help", "x", false, "")
+
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+
+			_, err = cmd.ExecuteC()
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+
+			if tt.validate != nil {
+				tt.validate(t, gotOpts)
+			}
 		})
 	}
 }

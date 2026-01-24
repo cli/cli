@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -36,17 +37,18 @@ const (
 	allowRebaseMerge  = "Allow Rebase Merging"
 
 	optionAllowForking      = "Allow Forking"
-	optionDefaultBranchName = "Default Branch Name"
-	optionDescription       = "Description"
-	optionHomePageURL       = "Home Page URL"
-	optionIssues            = "Issues"
-	optionMergeOptions      = "Merge Options"
-	optionProjects          = "Projects"
-	optionDiscussions       = "Discussions"
-	optionTemplateRepo      = "Template Repository"
-	optionTopics            = "Topics"
-	optionVisibility        = "Visibility"
-	optionWikis             = "Wikis"
+	optionCollaborators      = "Collaborators"
+	optionDefaultBranchName  = "Default Branch Name"
+	optionDescription        = "Description"
+	optionHomePageURL        = "Home Page URL"
+	optionIssues             = "Issues"
+	optionMergeOptions       = "Merge Options"
+	optionProjects           = "Projects"
+	optionDiscussions        = "Discussions"
+	optionTemplateRepo       = "Template Repository"
+	optionTopics             = "Topics"
+	optionVisibility         = "Visibility"
+	optionWikis              = "Wikis"
 )
 
 type EditOptions struct {
@@ -56,6 +58,10 @@ type EditOptions struct {
 	Edits                              EditRepositoryInput
 	AddTopics                          []string
 	RemoveTopics                       []string
+	AddCollaborators                   []string
+	RemoveCollaborators                []string
+	AddTeams                           []string
+	RemoveTeams                        []string
 	AcceptVisibilityChangeConsequences bool
 	InteractiveMode                    bool
 	Detector                           fd.Detector
@@ -166,6 +172,30 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				opts.Edits.SecurityAndAnalysis = transformSecurityAndAnalysisOpts(opts)
 			}
 
+			// Validate collaborator inputs
+			for _, input := range opts.AddCollaborators {
+				parts := strings.SplitN(input, ":", 2)
+				if len(parts) != 2 {
+					return cmdutil.FlagErrorf("invalid collaborator format: %s (expected 'username:permission')", input)
+				}
+				permission := strings.ToLower(strings.TrimSpace(parts[1]))
+				if !isValidPermission(permission) {
+					return cmdutil.FlagErrorf("invalid permission: %s (must be one of: pull, push, admin, maintain, triage)", parts[1])
+				}
+			}
+
+			// Validate team inputs
+			for _, input := range opts.AddTeams {
+				parts := strings.SplitN(input, ":", 2)
+				if len(parts) != 2 {
+					return cmdutil.FlagErrorf("invalid team format: %s (expected 'org/team:permission')", input)
+				}
+				permission := strings.ToLower(strings.TrimSpace(parts[1]))
+				if !isValidPermission(permission) {
+					return cmdutil.FlagErrorf("invalid permission: %s (must be one of: pull, push, admin, maintain, triage)", parts[1])
+				}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -195,6 +225,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmd.Flags().StringSliceVar(&opts.AddTopics, "add-topic", nil, "Add repository topic")
 	cmd.Flags().StringSliceVar(&opts.RemoveTopics, "remove-topic", nil, "Remove repository topic")
 	cmd.Flags().BoolVar(&opts.AcceptVisibilityChangeConsequences, "accept-visibility-change-consequences", false, "Accept the consequences of changing the repository visibility")
+	
+	// Collaborator management flags
+	cmd.Flags().StringSliceVarP(&opts.AddCollaborators, "add-collaborator", "c", nil, "Add a collaborator with format 'username:permission' (permission: pull, push, admin, maintain, triage)")
+	cmd.Flags().StringSliceVar(&opts.RemoveCollaborators, "remove-collaborator", nil, "Remove a collaborator by username")
+	cmd.Flags().StringSliceVar(&opts.AddTeams, "add-team", nil, "Add a team with format 'org/team:permission' (permission: pull, push, admin, maintain, triage)")
+	cmd.Flags().StringSliceVar(&opts.RemoveTeams, "remove-team", nil, "Remove a team by slug (format: org/team)")
 
 	return cmd
 }
@@ -246,7 +282,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		if err != nil {
 			return err
 		}
-		err = interactiveRepoEdit(opts, fetchedRepo)
+		err = interactiveRepoEdit(ctx, opts, fetchedRepo)
 		if err != nil {
 			return err
 		}
@@ -306,6 +342,42 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		})
 	}
 
+	// Handle collaborator management
+	apiClient := api.NewClientFromHTTP(opts.HTTPClient)
+	for _, collabInput := range opts.AddCollaborators {
+		collabInput := collabInput // capture loop variable
+		g.Go(func() error {
+			parts := strings.SplitN(collabInput, ":", 2)
+			username := strings.TrimSpace(parts[0])
+			permission := strings.ToLower(strings.TrimSpace(parts[1]))
+			return addCollaborator(ctx, apiClient, repo, username, permission)
+		})
+	}
+
+	for _, username := range opts.RemoveCollaborators {
+		username := username // capture loop variable
+		g.Go(func() error {
+			return removeCollaborator(ctx, apiClient, repo, username)
+		})
+	}
+
+	for _, teamInput := range opts.AddTeams {
+		teamInput := teamInput // capture loop variable
+		g.Go(func() error {
+			parts := strings.SplitN(teamInput, ":", 2)
+			teamSlug := strings.TrimSpace(parts[0])
+			permission := strings.ToLower(strings.TrimSpace(parts[1]))
+			return addTeam(ctx, apiClient, repo, teamSlug, permission)
+		})
+	}
+
+	for _, teamSlug := range opts.RemoveTeams {
+		teamSlug := teamSlug // capture loop variable
+		g.Go(func() error {
+			return removeTeam(ctx, apiClient, repo, teamSlug)
+		})
+	}
+
 	err := g.Wait()
 	if err != nil {
 		return err
@@ -336,6 +408,7 @@ func interactiveChoice(p iprompter, r *api.Repository) ([]string, error) {
 		optionTopics,
 		optionVisibility,
 		optionWikis,
+		optionCollaborators,
 	}
 	if r.IsInOrganization {
 		options = append(options, optionAllowForking)
@@ -352,7 +425,7 @@ func interactiveChoice(p iprompter, r *api.Repository) ([]string, error) {
 	return answers, err
 }
 
-func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
+func interactiveRepoEdit(ctx context.Context, opts *EditOptions, r *api.Repository) error {
 	for _, v := range r.RepositoryTopics.Nodes {
 		opts.topicsCache = append(opts.topicsCache, v.Topic.Name)
 	}
@@ -500,6 +573,11 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				return err
 			}
 			opts.Edits.AllowForking = &c
+		case optionCollaborators:
+			err := interactiveCollaboratorManagement(ctx, opts, r)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -599,6 +677,252 @@ func boolToStatus(status bool) *string {
 
 func hasSecurityEdits(edits EditRepositoryInput) bool {
 	return edits.enableAdvancedSecurity != nil || edits.enableSecretScanning != nil || edits.enableSecretScanningPushProtection != nil
+}
+
+func isValidPermission(permission string) bool {
+	validPermissions := []string{"pull", "push", "admin", "maintain", "triage"}
+	for _, p := range validPermissions {
+		if permission == p {
+			return true
+		}
+	}
+	return false
+}
+
+func interactiveCollaboratorManagement(ctx context.Context, opts *EditOptions, r *api.Repository) error {
+	p := opts.Prompter
+	apiClient := api.NewClientFromHTTP(opts.HTTPClient)
+
+	collabOptions := []string{"Add Collaborator", "Remove Collaborator"}
+	if r.IsInOrganization {
+		collabOptions = append(collabOptions, "Add Team", "Remove Team")
+	}
+
+	selected, err := p.Select("What would you like to do?", "", collabOptions)
+	if err != nil {
+		return err
+	}
+
+	switch collabOptions[selected] {
+	case "Add Collaborator":
+		username, err := p.Input("Username of collaborator to add", "")
+		if err != nil {
+			return err
+		}
+		if username == "" {
+			return fmt.Errorf("username cannot be empty")
+		}
+
+		permissionOptions := []string{"pull", "push", "admin", "maintain", "triage"}
+		permissionIndex, err := p.Select("Permission level", "push", permissionOptions)
+		if err != nil {
+			return err
+		}
+		permission := permissionOptions[permissionIndex]
+
+		opts.AddCollaborators = append(opts.AddCollaborators, fmt.Sprintf("%s:%s", username, permission))
+
+	case "Remove Collaborator":
+		collaborators, err := getCollaborators(ctx, apiClient, opts.Repository)
+		if err != nil {
+			return fmt.Errorf("failed to fetch collaborators: %w", err)
+		}
+
+		if len(collaborators) == 0 {
+			fmt.Fprintf(opts.IO.ErrOut, "No collaborators found.\n")
+			return nil
+		}
+
+		collabNames := make([]string, len(collaborators))
+		for i, c := range collaborators {
+			collabNames[i] = c.Login
+		}
+
+		selected, err := p.MultiSelect("Select collaborators to remove", nil, collabNames)
+		if err != nil {
+			return err
+		}
+
+		for _, i := range selected {
+			opts.RemoveCollaborators = append(opts.RemoveCollaborators, collabNames[i])
+		}
+
+	case "Add Team":
+		if !r.IsInOrganization {
+			return fmt.Errorf("teams can only be added to organization repositories")
+		}
+
+		teamSlug, err := p.Input("Team slug (format: org/team)", "")
+		if err != nil {
+			return err
+		}
+		if teamSlug == "" {
+			return fmt.Errorf("team slug cannot be empty")
+		}
+
+		permissionOptions := []string{"pull", "push", "admin", "maintain", "triage"}
+		permissionIndex, err := p.Select("Permission level", "push", permissionOptions)
+		if err != nil {
+			return err
+		}
+		permission := permissionOptions[permissionIndex]
+
+		opts.AddTeams = append(opts.AddTeams, fmt.Sprintf("%s:%s", teamSlug, permission))
+
+	case "Remove Team":
+		if !r.IsInOrganization {
+			return fmt.Errorf("teams can only be removed from organization repositories")
+		}
+
+		teams, err := getTeams(ctx, apiClient, opts.Repository)
+		if err != nil {
+			return fmt.Errorf("failed to fetch teams: %w", err)
+		}
+
+		if len(teams) == 0 {
+			fmt.Fprintf(opts.IO.ErrOut, "No teams found.\n")
+			return nil
+		}
+
+		teamNames := make([]string, len(teams))
+		for i, t := range teams {
+			teamNames[i] = fmt.Sprintf("%s/%s", t.Organization.Login, t.Slug)
+		}
+
+		selected, err := p.MultiSelect("Select teams to remove", nil, teamNames)
+		if err != nil {
+			return err
+		}
+
+		for _, i := range selected {
+			opts.RemoveTeams = append(opts.RemoveTeams, teamNames[i])
+		}
+	}
+
+	return nil
+}
+
+type Collaborator struct {
+	Login       string `json:"login"`
+	Permissions struct {
+		Admin   bool `json:"admin"`
+		Push    bool `json:"push"`
+		Pull    bool `json:"pull"`
+		Maintain bool `json:"maintain"`
+		Triage  bool `json:"triage"`
+	} `json:"permissions"`
+}
+
+func getCollaborators(ctx context.Context, client *api.Client, repo ghrepo.Interface) ([]Collaborator, error) {
+	path := fmt.Sprintf("repos/%s/%s/collaborators",
+		url.PathEscape(repo.RepoOwner()),
+		url.PathEscape(repo.RepoName()))
+
+	var collaborators []Collaborator
+	err := client.REST(repo.RepoHost(), "GET", path, nil, &collaborators)
+	if err != nil {
+		return nil, err
+	}
+
+	return collaborators, nil
+}
+
+type Team struct {
+	Slug         string `json:"slug"`
+	Organization struct {
+		Login string `json:"login"`
+	} `json:"organization"`
+	Permission string `json:"permission"`
+}
+
+func getTeams(ctx context.Context, client *api.Client, repo ghrepo.Interface) ([]Team, error) {
+	path := fmt.Sprintf("repos/%s/%s/teams",
+		url.PathEscape(repo.RepoOwner()),
+		url.PathEscape(repo.RepoName()))
+
+	var teams []Team
+	err := client.REST(repo.RepoHost(), "GET", path, nil, &teams)
+	if err != nil {
+		return nil, err
+	}
+
+	return teams, nil
+}
+
+func addCollaborator(ctx context.Context, client *api.Client, repo ghrepo.Interface, username, permission string) error {
+	path := fmt.Sprintf("repos/%s/%s/collaborators/%s",
+		url.PathEscape(repo.RepoOwner()),
+		url.PathEscape(repo.RepoName()),
+		url.PathEscape(username))
+
+	payload := struct {
+		Permission string `json:"permission"`
+	}{
+		Permission: permission,
+	}
+
+	body := &bytes.Buffer{}
+	if err := json.NewEncoder(body).Encode(payload); err != nil {
+		return err
+	}
+
+	return client.REST(repo.RepoHost(), "PUT", path, body, nil)
+}
+
+func removeCollaborator(ctx context.Context, client *api.Client, repo ghrepo.Interface, username string) error {
+	path := fmt.Sprintf("repos/%s/%s/collaborators/%s",
+		url.PathEscape(repo.RepoOwner()),
+		url.PathEscape(repo.RepoName()),
+		url.PathEscape(username))
+
+	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
+}
+
+func addTeam(ctx context.Context, client *api.Client, repo ghrepo.Interface, teamSlug, permission string) error {
+	// Parse teamSlug which should be in format "org/team"
+	parts := strings.SplitN(teamSlug, "/", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid team format: %s (expected 'org/team')", teamSlug)
+	}
+	orgSlug := parts[0]
+	teamName := parts[1]
+
+	path := fmt.Sprintf("orgs/%s/teams/%s/repos/%s/%s",
+		url.PathEscape(orgSlug),
+		url.PathEscape(teamName),
+		url.PathEscape(repo.RepoOwner()),
+		url.PathEscape(repo.RepoName()))
+
+	payload := struct {
+		Permission string `json:"permission"`
+	}{
+		Permission: permission,
+	}
+
+	body := &bytes.Buffer{}
+	if err := json.NewEncoder(body).Encode(payload); err != nil {
+		return err
+	}
+
+	return client.REST(repo.RepoHost(), "PUT", path, body, nil)
+}
+
+func removeTeam(ctx context.Context, client *api.Client, repo ghrepo.Interface, teamSlug string) error {
+	// Parse teamSlug which should be in format "org/team"
+	parts := strings.SplitN(teamSlug, "/", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid team format: %s (expected 'org/team')", teamSlug)
+	}
+	orgSlug := parts[0]
+	teamName := parts[1]
+
+	path := fmt.Sprintf("orgs/%s/teams/%s/repos/%s/%s",
+		url.PathEscape(orgSlug),
+		url.PathEscape(teamName),
+		url.PathEscape(repo.RepoOwner()),
+		url.PathEscape(repo.RepoName()))
+
+	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
 }
 
 type SecurityAndAnalysisInput struct {
