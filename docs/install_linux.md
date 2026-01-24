@@ -1,4 +1,6 @@
-# Installing gh on Linux and BSD
+sudo dnf install dnf5-plugins
+sudo dnf config-manager addrepo --from-repofile=https://cli.github.com/packages/rpm/gh-cli.repo
+sudo dnf install gh --repo gh-cli# Installing gh on Linux and BSD
 
 ## Recommended _(Official)_
 
