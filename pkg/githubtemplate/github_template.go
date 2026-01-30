@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // FindNonLegacy returns the list of template file paths from the template folder (according to the "upgraded multiple template builder")

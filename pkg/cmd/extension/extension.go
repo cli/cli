@@ -11,7 +11,7 @@ import (
 
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 const manifestName = "manifest.yml"

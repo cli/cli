@@ -21,7 +21,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 func TestHelperProcess(t *testing.T) {

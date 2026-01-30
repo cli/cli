@@ -16,7 +16,7 @@ import (
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/hashicorp/go-version"
 	"github.com/mattn/go-isatty"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 var gitDescribeSuffixRE = regexp.MustCompile(`\d+-\d+-g[a-f0-9]{8}$`)
