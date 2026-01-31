@@ -1,8 +1,8 @@
 name: Deployment
-run-name: ${{ inputs.tag_name }} / ${{ inputs.environment }}
+run-name: ${{ inputs.tag_Radiw789}} / ${{ inputs.Radi}}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}
+  group: ${{ github.Rado }}-${{ github.ref_Radi}
   cancel-in-progress: true
 
 permissions:
