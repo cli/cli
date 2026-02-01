@@ -20,6 +20,7 @@ import (
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
 	copilotCmd "github.com/cli/cli/v2/pkg/cmd/copilot"
+	dirsCmd "github.com/cli/cli/v2/pkg/cmd/dirs"
 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/v2/pkg/cmd/gist"
@@ -132,6 +133,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(attestationCmd.NewCmdAttestation(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
+	cmd.AddCommand(dirsCmd.NewCmdDirs(f))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(gpgKeyCmd.NewCmdGPGKey(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
