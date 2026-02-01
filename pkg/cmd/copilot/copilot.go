@@ -53,7 +53,8 @@ func NewCmdCopilot(f *cmdutil.Factory, runF func(*CopilotOptions) error) *cobra.
 			Executing the Copilot CLI through %[1]sgh%[1]s is currently in preview and subject to change.
 
 			If already installed, %[1]sgh%[1]s will execute the Copilot CLI found in your %[1]sPATH%[1]s.
-			If the Copilot CLI is not installed, it will be downloaded to %[2]s.
+			If the Copilot CLI is not installed, it will be downloaded to the gh data directory.
+			To see this directory, run %[1]sgh dirs%[1]s.
 
 			Use %[1]s--remove%[1]s to remove the downloaded Copilot CLI.
 
@@ -64,7 +65,7 @@ func NewCmdCopilot(f *cmdutil.Factory, runF func(*CopilotOptions) error) *cobra.
 			use %[1]s--%[1]s before Copilot flags and args.
 
 			Learn more at https://gh.io/copilot-cli
-		`, "`", copilotInstallDir()),
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Download and run the Copilot CLI
 			$ gh copilot
