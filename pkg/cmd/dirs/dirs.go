@@ -23,22 +23,22 @@ func NewCmdDirs(f *cmdutil.Factory) *cobra.Command {
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			tp := tableprinter.New(f.IOStreams, tableprinter.WithHeader("NAME", "PATH", "DESCRIPTION"))
-			
+
 			tp.AddField("CONFIG DIR", tableprinter.WithColor(f.IOStreams.ColorScheme().Bold))
 			tp.AddField(config.ConfigDir())
 			tp.AddField("Directory for storing configuration files")
 			tp.EndRow()
-			
+
 			tp.AddField("DATA DIR", tableprinter.WithColor(f.IOStreams.ColorScheme().Bold))
 			tp.AddField(config.DataDir())
 			tp.AddField("Directory for storing downloaded data like extensions and copilot")
 			tp.EndRow()
-			
+
 			tp.AddField("STATE DIR", tableprinter.WithColor(f.IOStreams.ColorScheme().Bold))
 			tp.AddField(config.StateDir())
 			tp.AddField("Directory for storing state files")
 			tp.EndRow()
-			
+
 			return tp.Render()
 		},
 	}

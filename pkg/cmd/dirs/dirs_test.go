@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdDirs(t *testing.T) {
@@ -16,20 +19,13 @@ func TestNewCmdDirs(t *testing.T) {
 
 	cmd := NewCmdDirs(f)
 
-	if cmd.Use != "dirs" {
-		t.Errorf("expected use to be 'dirs', got %s", cmd.Use)
-	}
+	assert.Equal(t, "dirs", cmd.Use)
 
-	if cmd.Short != "Print the directories gh uses for configuration, data, and state" {
-		t.Errorf("unexpected short description: %s", cmd.Short)
-	}
+	assert.Equal(t, "Print the directories gh uses for configuration, data, and state", cmd.Short)
 
 	// Test that the command runs without error
 	cmd.SetArgs([]string{})
-	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, cmd.Execute())
 
 	// Check that output contains expected directories
 	output := stdout.String()
@@ -41,5 +37,16 @@ func TestNewCmdDirs(t *testing.T) {
 	}
 	if !bytes.Contains([]byte(output), []byte("STATE DIR")) {
 		t.Errorf("output does not contain STATE DIR: %s", output)
+	}
+
+	// Check that output contains the actual directory paths
+	if !bytes.Contains([]byte(output), []byte(config.ConfigDir())) {
+		t.Errorf("output does not contain config dir path: %s", output)
+	}
+	if !bytes.Contains([]byte(output), []byte(config.DataDir())) {
+		t.Errorf("output does not contain data dir path: %s", output)
+	}
+	if !bytes.Contains([]byte(output), []byte(config.StateDir())) {
+		t.Errorf("output does not contain state dir path: %s", output)
 	}
 }
