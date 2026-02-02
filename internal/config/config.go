@@ -705,3 +705,7 @@ func DataDir() string {
 func ConfigDir() string {
 	return ghConfig.ConfigDir()
 }
+
+func CacheDir() string {
+	return ghConfig.CacheDir()
+}

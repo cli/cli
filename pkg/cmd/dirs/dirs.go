@@ -14,11 +14,12 @@ func NewCmdDirs(f *cmdutil.Factory) *cobra.Command {
 		Short: "Print the directories gh uses for configuration, data, and state",
 		Long: heredoc.Doc(`
 			Print the directories that gh uses for storing configuration files,
-			downloaded data, and state information.
+			downloaded data, state information, and cached data.
 
 			CONFIG DIR    Directory for storing configuration files
 			DATA DIR      Directory for storing downloaded data like extensions and copilot
 			STATE DIR     Directory for storing state files
+			CACHE DIR     Directory for storing cached data like run logs
 		`),
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -37,6 +38,11 @@ func NewCmdDirs(f *cmdutil.Factory) *cobra.Command {
 			tp.AddField("STATE DIR", tableprinter.WithColor(f.IOStreams.ColorScheme().Bold))
 			tp.AddField(config.StateDir())
 			tp.AddField("Directory for storing state files")
+			tp.EndRow()
+
+			tp.AddField("CACHE DIR", tableprinter.WithColor(f.IOStreams.ColorScheme().Bold))
+			tp.AddField(config.CacheDir())
+			tp.AddField("Directory for storing cached data like run logs")
 			tp.EndRow()
 
 			return tp.Render()

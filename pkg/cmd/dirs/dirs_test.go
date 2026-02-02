@@ -38,6 +38,9 @@ func TestNewCmdDirs(t *testing.T) {
 	if !bytes.Contains([]byte(output), []byte("STATE DIR")) {
 		t.Errorf("output does not contain STATE DIR: %s", output)
 	}
+	if !bytes.Contains([]byte(output), []byte("CACHE DIR")) {
+		t.Errorf("output does not contain CACHE DIR: %s", output)
+	}
 
 	// Check that output contains the actual directory paths
 	if !bytes.Contains([]byte(output), []byte(config.ConfigDir())) {
@@ -48,5 +51,8 @@ func TestNewCmdDirs(t *testing.T) {
 	}
 	if !bytes.Contains([]byte(output), []byte(config.StateDir())) {
 		t.Errorf("output does not contain state dir path: %s", output)
+	}
+	if !bytes.Contains([]byte(output), []byte(config.CacheDir())) {
+		t.Errorf("output does not contain cache dir path: %s", output)
 	}
 }
