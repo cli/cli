@@ -144,8 +144,6 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	if lookupFields.Contains("comments") {
-		// FIXME: this re-fetches the comments connection even though the initial set of 100 were
-		// fetched in the previous request.
 		err := preloadIssueComments(httpClient, baseRepo, issue)
 		if err != nil {
 			return err

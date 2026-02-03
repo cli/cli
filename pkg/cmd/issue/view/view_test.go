@@ -424,6 +424,20 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
 			},
 		},
+		"with comments flag single page": {
+			cli: "123 --comments",
+			httpStubs: func(r *httpmock.Registry) {
+				r.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse("./fixtures/issueView_previewSingleCommentNoNextPage.json"))
+				mockEmptyV2ProjectItems(t, r)
+			},
+			expectedOutputs: []string{
+				`some title OWNER/REPO#123`,
+				`some body`,
+				`marseilles \(Collaborator\) • Jan  1, 2020`,
+				`Comment 1`,
+				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
+			},
+		},
 		"with invalid comments flag": {
 			cli:      "123 --comments 3",
 			wantsErr: true,
@@ -499,6 +513,19 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 				`association:\tcollaborator`,
 				`edited:\tfalse`,
 				`Comment 5`,
+			},
+		},
+		"with comments flag single page": {
+			cli: "123 --comments",
+			httpStubs: func(r *httpmock.Registry) {
+				r.Register(httpmock.GraphQL(`query IssueByNumber\b`), httpmock.FileResponse("./fixtures/issueView_previewSingleCommentNoNextPage.json"))
+				mockEmptyV2ProjectItems(t, r)
+			},
+			expectedOutputs: []string{
+				`author:\tmarseilles`,
+				`association:\tcollaborator`,
+				`edited:\tfalse`,
+				`Comment 1`,
 			},
 		},
 		"with invalid comments flag": {
