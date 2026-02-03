@@ -93,12 +93,22 @@ func CheckForUpdate(ctx context.Context, client *http.Client, stateFilePath, rep
 		return nil, nil
 	}
 
-	releaseInfo, err := getLatestReleaseInfo(ctx, client, repo)
+	// Write timestamp before HTTP request to prevent repeated checks if request is canceled
+	now := time.Now()
+	err := setStateEntry(stateFilePath, now, ReleaseInfo{})
 	if err != nil {
 		return nil, err
 	}
 
-	err = setStateEntry(stateFilePath, time.Now(), *releaseInfo)
+	releaseInfo, err := getLatestReleaseInfo(ctx, client, repo)
+	if err != nil {
+		// Returning error preserves existing behavior; timestamp already written
+		// to avoid repeated update checks on subsequent runs.
+		return nil, err
+	}
+
+	// Update state with actual release info
+	err = setStateEntry(stateFilePath, now, *releaseInfo)
 	if err != nil {
 		return nil, err
 	}
