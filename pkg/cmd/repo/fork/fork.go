@@ -182,6 +182,14 @@ func forkRun(opts *ForkOptions) error {
 				return fmt.Errorf("argument error: %w", err)
 			}
 		}
+
+		if err == nil {
+			if baseRepo, baseRepoErr := opts.BaseRepo(); baseRepoErr == nil {
+				if ghrepo.IsSame(baseRepo, repoToFork) {
+					inParent = true
+				}
+			}
+		}
 	}
 
 	connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY() && opts.IO.IsStdinTTY()

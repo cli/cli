@@ -717,6 +717,20 @@ func TestRepoFork(t *testing.T) {
 			wantErr: true,
 			errMsg:  `failed to clone fork: failed to run git: git -c credential.helper= -c credential.helper=!"[^"]+" auth git-credential clone https://github.com/someone/REPO\.git exited with status 65`,
 		},
+		{
+			name: "repo arg matches current repo",
+			tty:  true,
+			opts: &ForkOptions{
+				Repository: "OWNER/REPO",
+				Remote:     true,
+				RemoteName: "fork",
+			},
+			httpStubs: forkPost,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git remote add fork https://github\.com/someone/REPO\.git`, 0, "")
+			},
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote fork\n",
+		},
 	}
 
 	for _, tt := range tests {
