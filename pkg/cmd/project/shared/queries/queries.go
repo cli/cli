@@ -1450,6 +1450,11 @@ func handleError(err error) error {
 		}
 		if missing.Len() > 0 {
 			s := missing.ToSlice()
+			for i, scope := range s {
+				if scope == "read:project" {
+					s[i] = "project"
+				}
+			}
 			// TODO: this duplicates parts of generateScopesSuggestion
 			return fmt.Errorf(
 				"error: your authentication token is missing required scopes %v\n"+
