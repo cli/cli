@@ -20,6 +20,9 @@ builds:
     goos: [darwin]
     goarch: [amd64, arm64]
     hooks:
+      pre:
+        - cmd: bash ./script/licenses {{ .Os }} {{ .Arch }}
+          output: true
       post:
         - cmd: ./script/sign '{{ .Path }}'
           output: true
@@ -33,6 +36,10 @@ builds:
     goarch: ["386", arm, amd64, arm64]
     env:
       - CGO_ENABLED=0
+    hooks:
+      pre:
+        - cmd: bash ./script/licenses {{ .Os }} {{ .Arch }}
+          output: true
     binary: bin/gh
     main: ./cmd/gh
     ldflags:
@@ -42,6 +49,9 @@ builds:
     goos: [windows]
     goarch: ["386", amd64, arm64]
     hooks:
+      pre:
+        - cmd: bash ./script/licenses {{ .Os }} {{ .Arch }}
+          output: true
       post:
         - cmd: pwsh .\script\sign.ps1 '{{ .Path }}'
           output: true

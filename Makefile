@@ -109,8 +109,8 @@ endif
 
 .PHONY: licenses
 licenses:
-	./script/licenses
+	./script/licenses $$(go env GOOS) $$(go env GOARCH)
 
 .PHONY: licenses-check
 licenses-check:
-	./script/licenses-check
+	./script/licenses --check
