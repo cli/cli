@@ -26,6 +26,7 @@ import (
 	gpgKeyCmd "github.com/cli/cli/v2/pkg/cmd/gpg-key"
 	issueCmd "github.com/cli/cli/v2/pkg/cmd/issue"
 	labelCmd "github.com/cli/cli/v2/pkg/cmd/label"
+	licensesCmd "github.com/cli/cli/v2/pkg/cmd/licenses"
 	orgCmd "github.com/cli/cli/v2/pkg/cmd/org"
 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
 	previewCmd "github.com/cli/cli/v2/pkg/cmd/preview"
@@ -148,6 +149,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(copilotCmd.NewCmdCopilot(f, nil))
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
+	cmd.AddCommand(licensesCmd.NewCmdLicenses(f))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f

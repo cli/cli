@@ -8,14 +8,14 @@ on:
       - go.mod
       - go.sum
       - ".github/licenses.tmpl"
-      - "script/licenses*"
+      - "script/licenses"
   pull_request:
     paths:
       - "**.go"
       - go.mod
       - go.sum
       - ".github/licenses.tmpl"
-      - "script/licenses*"
+      - "script/licenses"
 permissions:
   contents: read
 jobs:
@@ -50,16 +50,18 @@ jobs:
         with:
           version: v2.6.0
 
+      # Verify that license generation succeeds for all release platforms (GOOS/GOARCH).
+      # This catches issues like new dependencies with unrecognized licenses before release time.
+      #
       # actions/setup-go does not setup the installed toolchain to be preferred over the system install,
       # which causes go-licenses to raise "Package ... does not have module info" errors.
       # For more information, https://github.com/google/go-licenses/issues/244#issuecomment-1885098633
       #
       # go-licenses has been pinned for automation use.
-      - name: Check licenses
+      - name: Verify license generation
         run: |
           export GOROOT=$(go env GOROOT)
           export PATH=${GOROOT}/bin:$PATH
-          go install github.com/google/go-licenses/v2@3e084b0caf710f7bfead967567539214f598c0a2 # v2.0.1
           make licenses-check
 
   # Discover vulnerabilities within Go standard libraries used to build GitHub CLI using govulncheck.

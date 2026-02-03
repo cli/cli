@@ -1,9 +1,20 @@
 #!/bin/bash
+#
+# Generate third-party license information for embedding in the binary.
+#
+# Usage:
+#   ./script/licenses <GOOS> <GOARCH>     Generate licenses for a single platform
+#   ./script/licenses --check              Verify generation works for all release platforms
+#
+# The single-platform mode is called by goreleaser pre-build hooks to generate
+# platform-specific license information that gets embedded via go:embed.
+#
+# The --check mode is used in CI to catch license generation issues before release.
 
-# Manage go-licenses version externally for CI
-if [ "$CI" != "true" ]; then
-    go install github.com/google/go-licenses/v2@latest
-fi
+set -e
+
+# Install pinned version of go-licenses
+go install github.com/google/go-licenses/v2@3e084b0caf710f7bfead967567539214f598c0a2 # v2.0.1
 
 # Verify go-licenses is available
 if ! command -v go-licenses &> /dev/null; then
@@ -11,24 +22,63 @@ if ! command -v go-licenses &> /dev/null; then
     exit 1
 fi
 
-# Setup temporary directory to collect updated third-party source code
-export TEMPDIR="$(mktemp -d)"
-trap "rm -fr ${TEMPDIR}" EXIT
+generate_licenses() {
+    local goos="$1"
+    local goarch="$2"
+    local output_dir="$3"
 
-# Clear third-party source code to avoid stale content
-rm -rf third-party
-mkdir -p third-party
+    echo "Generating licenses for ${goos}/${goarch}..."
+    mkdir -p "${output_dir}"
 
-for goos in linux darwin windows ; do
-    # Note: we ignore warnings because we want the command to succeed, however the output should be checked
-    #       for any new warnings, and potentially we may need to add license information.
-    #
-    #       Normally these warnings are packages containing non go code, which may or may not require explicit attribution,
-    #       depending on the license.
-    echo "Generating licenses for ${goos}..."
-    GOOS="${goos}" go-licenses save ./... --save_path="${TEMPDIR}/${goos}" --force || echo "Ignore warnings"
-    GOOS="${goos}" go-licenses report ./... --template .github/licenses.tmpl --ignore github.com/cli/cli > third-party-licenses.${goos}.md || echo "Ignore warnings"
-    cp -fR "${TEMPDIR}/${goos}"/* third-party/
-done
+    # Generate the report listing (name, license type, URL)
+    GOOS="${goos}" GOARCH="${goarch}" go-licenses report ./... \
+        --template .github/licenses.tmpl \
+        --ignore github.com/cli/cli \
+        > "${output_dir}/report.txt"
 
-echo "Licenses generated for all platforms."
+    # Save license and notice files for all dependencies
+    rm -rf "${output_dir}/third-party"
+    GOOS="${goos}" GOARCH="${goarch}" go-licenses save ./... \
+        --save_path="${output_dir}/third-party" \
+        --ignore github.com/cli/cli \
+        --force 2>/dev/null || true
+
+    # Remove everything except LICENSE and NOTICE files. go-licenses save copies
+    # full source code for some licenses (e.g., MPL-2.0), but go:embed cannot
+    # include directories containing go.mod or .go files.
+    if [ -d "${output_dir}/third-party" ]; then
+        find "${output_dir}/third-party" -type f \
+            ! -iname "LICENSE*" \
+            ! -iname "LICENCE*" \
+            ! -iname "NOTICE*" \
+            ! -iname "COPYING*" \
+            ! -iname "PATENTS*" \
+            -delete
+        find "${output_dir}/third-party" -type d -empty -delete
+    fi
+}
+
+if [ "$1" = "--check" ]; then
+    # Verify license generation works for all release platforms.
+    # This runs the same go-licenses report command that goreleaser pre-build hooks
+    # will run at release time, for all 9 GOOS/GOARCH combinations. Running this in
+    # CI on every PR ensures we catch issues (e.g., template errors, go-licenses
+    # incompatibilities, dependency resolution failures) before they block a release.
+    TEMPDIR="$(mktemp -d)"
+    trap "rm -fr ${TEMPDIR}" EXIT
+
+    for platform in linux/386 linux/arm linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/386 windows/amd64 windows/arm64; do
+        goos="${platform%/*}"
+        goarch="${platform#*/}"
+        generate_licenses "${goos}" "${goarch}" "${TEMPDIR}/${goos}-${goarch}"
+    done
+
+    echo "License generation verified for all platforms."
+elif [ $# -eq 2 ]; then
+    generate_licenses "$1" "$2" "internal/licenses/embed"
+    echo "Licenses written to internal/licenses/embed/"
+else
+    echo "Usage: $0 <GOOS> <GOARCH>"
+    echo "       $0 --check"
+    exit 1
+fi
