@@ -396,3 +396,68 @@ func TestRenderJobs(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderRunHeader(t *testing.T) {
+	tests := []struct {
+		name     string
+		run      Run
+		ago      string
+		prNumber string
+		attempt  uint64
+		want     string
+	}{
+		{
+			name: "basic run",
+			run: Run{
+				HeadBranch:   "main",
+				workflowName: "CI",
+				ID:           123,
+				Status:       InProgress,
+				Event:        "push",
+				HeadSha:      "abc123456789",
+			},
+			ago:      "10 minutes ago",
+			prNumber: "",
+			attempt:  0,
+			want:     "* main (abc1234) CI · 123\nTriggered via push 10 minutes ago",
+		},
+		{
+			name: "run with PR and attempt",
+			run: Run{
+				HeadBranch:   "feature",
+				workflowName: "Deploy",
+				ID:           456,
+				Status:       Completed,
+				Conclusion:   Success,
+				Event:        "pull_request",
+				HeadSha:      "def456789012",
+			},
+			ago:      "1 hour ago",
+			prNumber: " #12",
+			attempt:  2,
+			want:     "✓ feature (def4567) Deploy #12 · 456 (Attempt #2)\nTriggered via pull_request 1 hour ago",
+		},
+		{
+			name: "run without HeadSha",
+			run: Run{
+				HeadBranch:   "main",
+				workflowName: "CI",
+				ID:           123,
+				Status:       InProgress,
+				Event:        "push",
+				HeadSha:      "",
+			},
+			ago:      "10 minutes ago",
+			prNumber: "",
+			attempt:  0,
+			want:     "* main CI · 123\nTriggered via push 10 minutes ago",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := RenderRunHeader(&iostreams.ColorScheme{}, tt.run, tt.ago, tt.prNumber, tt.attempt)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

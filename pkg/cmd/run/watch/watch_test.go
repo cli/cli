@@ -286,7 +286,7 @@ func TestWatchRun(t *testing.T) {
 						return prompter.IndexFor(opts, "* commit2, CI [trunk] Feb 23, 2021")
 					})
 			},
-			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[?1049l✓ trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run CI (2) completed with 'success'\n",
+			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk (1234567) CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[?1049l✓ trunk (1234567) CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run CI (2) completed with 'success'\n",
 		},
 		{
 			name: "exit status respected",
@@ -304,7 +304,7 @@ func TestWatchRun(t *testing.T) {
 						return prompter.IndexFor(opts, "* commit2, CI [trunk] Feb 23, 2021")
 					})
 			},
-			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk CI · 2\nTriggered via push about 59 minutes ago\n\n\x1b[?1049lX trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run CI (2) completed with 'failure'\n",
+			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk (1234567) CI · 2\nTriggered via push about 59 minutes ago\n\n\x1b[?1049lX trunk (1234567) CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run CI (2) completed with 'failure'\n",
 			wantErr: true,
 			errMsg:  "SilentError",
 		},
@@ -371,7 +371,7 @@ func TestWatchRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
-			wantOut: "\x1b[?1049h\x1b[?1049l✓ trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nrequesting annotations returned 403 Forbidden as the token does not have sufficient permissions. Note that it is not currently possible to create a fine-grained PAT with the `checks:read` permission.\n✓ Run CI (2) completed with 'success'\n",
+			wantOut: "\x1b[?1049h\x1b[?1049l✓ trunk (1234567) CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nrequesting annotations returned 403 Forbidden as the token does not have sufficient permissions. Note that it is not currently possible to create a fine-grained PAT with the `checks:read` permission.\n✓ Run CI (2) completed with 'success'\n",
 		},
 	}
 

@@ -8,8 +8,12 @@ import (
 )
 
 func RenderRunHeader(cs *iostreams.ColorScheme, run Run, ago, prNumber string, attempt uint64) string {
-	title := fmt.Sprintf("%s %s%s",
-		cs.Bold(run.HeadBranch), run.WorkflowName(), prNumber)
+	shortSha := ""
+	if len(run.HeadSha) >= 7 {
+		shortSha = fmt.Sprintf(" (%s)", run.HeadSha[0:7])
+	}
+	title := fmt.Sprintf("%s%s %s%s",
+		cs.Bold(run.HeadBranch), shortSha, run.WorkflowName(), prNumber)
 	symbol, symbolColor := Symbol(cs, run.Status, run.Conclusion)
 	id := cs.Cyanf("%d", run.ID)
 
