@@ -140,7 +140,7 @@
           ],
           "totalCount": 6,
           "pageInfo": {
-            "hasNextPage": true,
+            "hasNextPage": false,
             "endCursor": "CURSOR"
           }
         },

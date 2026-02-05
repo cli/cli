@@ -83,7 +83,7 @@
                                 "login": "marseilles"
                             },
                             "authorAssociation": "COLLABORATOR",
-                            "body": "Comment 1",
+                            "body": "Comment 5",
                             "createdAt": "2020-01-01T12:00:00Z",
                             "includesCreatedEdit": false,
                             "reactionGroups": [
@@ -138,10 +138,10 @@
                             ]
                         }
                     ],
-                    "totalCount": 1,
+                    "totalCount": 6,
                     "pageInfo": {
-                        "hasNextPage": false,
-                        "endCursor": ""
+                        "hasNextPage": true,
+                        "endCursor": "CURSOR"
                     }
                 },
                 "url": "https://github.com/OWNER/REPO/issues/123"
