@@ -103,6 +103,10 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 				opts.GitArgs = args[1:]
 			}
 
+			if opts.Repository != "" && opts.Remote {
+				return cmdutil.FlagErrorf("cannot use `--remote` when forking a repository specified via argument; run `gh repo fork --remote` from within the local repository instead")
+			}
+
 			if cmd.Flags().Changed("org") && opts.Organization == "" {
 				return cmdutil.FlagErrorf("--org cannot be blank")
 			}

@@ -60,6 +60,12 @@ func TestNewCmdFork(t *testing.T) {
 			},
 		},
 		{
+			name:    "repo with --remote",
+			cli:     "foo/bar --remote",
+			wantErr: true,
+			errMsg:  "cannot use `--remote` when forking a repository specified via argument; run `gh repo fork --remote` from within the local repository instead",
+		},
+		{
 			name:    "blank remote name",
 			cli:     "--remote --remote-name=''",
 			wantErr: true,
