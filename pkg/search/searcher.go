@@ -267,7 +267,16 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 func (s searcher) URL(query Query) string {
 	path := fmt.Sprintf("https://%s/search", s.host)
 	qs := url.Values{}
-	qs.Set("type", query.Kind)
+	var urlType string
+	switch query.Qualifiers.Type {
+	case "pr":
+		urlType = "pullrequests"
+	case "issue":
+		urlType = "issues"
+	default:
+		urlType = query.Kind
+	}
+	qs.Set("type", urlType)
 
 	// TODO advancedSearchFuture
 	// Currently, the global search GUI does not support the advanced issue
