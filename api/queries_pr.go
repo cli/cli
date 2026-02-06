@@ -557,13 +557,14 @@ func (pr *PullRequest) DisplayableReviews() PullRequestReviews {
 func CreatePullRequest(client *Client, repo *Repository, params map[string]interface{}) (*PullRequest, error) {
 	query := `
 		mutation PullRequestCreate($input: CreatePullRequestInput!) {
-			createPullRequest(input: $input) {
-				pullRequest {
-					id
-					url
+				createPullRequest(input: $input) {
+					pullRequest {
+						id
+						number
+						url
+					}
 				}
-			}
-	}`
+		}`
 
 	inputParams := map[string]interface{}{
 		"repositoryId": repo.ID,
