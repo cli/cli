@@ -182,3 +182,72 @@ func TestSetUserSpecificKeyNoUserPresent(t *testing.T) {
 	requireKeyWithValue(t, c.cfg, []string{hostsKey, host, key}, val)
 	requireNoKey(t, c.cfg, []string{hostsKey, host, usersKey})
 }
+
+func TestActiveUserGitConfigOverride(t *testing.T) {
+	tests := []struct {
+		name           string
+		gitAccount     string
+		storedUser     string
+		knownUsers     []string
+		expectedUser   string
+		expectError    bool
+	}{
+		{
+			name:         "git config account matches authenticated user",
+			gitAccount:   "work-user",
+			storedUser:   "personal-user",
+			knownUsers:   []string{"personal-user", "work-user"},
+			expectedUser: "work-user",
+		},
+		{
+			name:         "git config account not authenticated falls back to stored",
+			gitAccount:   "unknown-user",
+			storedUser:   "personal-user",
+			knownUsers:   []string{"personal-user"},
+			expectedUser: "personal-user",
+		},
+		{
+			name:         "no git config falls back to stored",
+			gitAccount:   "",
+			storedUser:   "personal-user",
+			knownUsers:   []string{"personal-user"},
+			expectedUser: "personal-user",
+		},
+		{
+			name:        "no git config and no stored user returns error",
+			gitAccount:  "",
+			storedUser:  "",
+			knownUsers:  []string{},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Override gitConfigAccountFunc for testing
+			originalFunc := gitConfigAccountFunc
+			gitConfigAccountFunc = func() string { return tt.gitAccount }
+			t.Cleanup(func() { gitConfigAccountFunc = originalFunc })
+
+			c := newTestConfig()
+			host := "github.com"
+
+			if tt.storedUser != "" {
+				c.cfg.Set([]string{hostsKey, host, userKey}, tt.storedUser)
+			}
+			for _, user := range tt.knownUsers {
+				c.cfg.Set([]string{hostsKey, host, usersKey, user, oauthTokenKey}, "test-token")
+			}
+
+			authCfg := c.Authentication().(*AuthConfig)
+			user, err := authCfg.ActiveUser(host)
+
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedUser, user)
+			}
+		})
+	}
+}

@@ -310,13 +310,17 @@ func (c *AuthConfig) TokenFromKeyringForUser(hostname, username string) (string,
 	return keyring.Get(keyringServiceName(hostname), username)
 }
 
+// gitConfigAccountFunc is the function used to read git config github.account.
+// It can be overridden in tests.
+var gitConfigAccountFunc = gitConfigAccount
+
 // ActiveUser will retrieve the username for the active user at the given hostname.
 // This will not be accurate if the oauth token is set from an environment variable.
 //
 // If git config "github.account" is set (e.g. via includeIf), and the account
 // is authenticated, it takes precedence over the stored active user.
 func (c *AuthConfig) ActiveUser(hostname string) (string, error) {
-	if account := gitConfigAccount(); account != "" {
+	if account := gitConfigAccountFunc(); account != "" {
 		users := c.UsersForHost(hostname)
 		if slices.Contains(users, account) {
 			return account, nil
