@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
@@ -310,8 +312,28 @@ func (c *AuthConfig) TokenFromKeyringForUser(hostname, username string) (string,
 
 // ActiveUser will retrieve the username for the active user at the given hostname.
 // This will not be accurate if the oauth token is set from an environment variable.
+//
+// If git config "github.account" is set (e.g. via includeIf), and the account
+// is authenticated, it takes precedence over the stored active user.
 func (c *AuthConfig) ActiveUser(hostname string) (string, error) {
+	if account := gitConfigAccount(); account != "" {
+		users := c.UsersForHost(hostname)
+		if slices.Contains(users, account) {
+			return account, nil
+		}
+	}
 	return c.cfg.Get([]string{hostsKey, hostname, userKey})
+}
+
+// gitConfigAccount reads the "github.account" value from git config.
+// Returns empty string if not set or git is unavailable.
+func gitConfigAccount() string {
+	cmd := exec.Command("git", "config", "github.account")
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func (c *AuthConfig) Hosts() []string {
