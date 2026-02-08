@@ -1,4 +1,4 @@
-## Contributing
+❤️ POP ❤️ ## Contributing
 
 Hi! Thanks for your interest in contributing to the GitHub CLI!
 
