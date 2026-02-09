@@ -186,6 +186,26 @@ func handleResponse(err error) error {
 	return err
 }
 
+func IsGraphQLErrorResourceNotAccessible(err error) bool {
+	var gqlErr GraphQLError
+	if errors.As(err, &gqlErr) {
+		for _, e := range gqlErr.Errors {
+			if strings.Contains(e.Message, "Resource not accessible by personal access token") {
+				return true
+			}
+		}
+	}
+	var ghGqlErr *ghAPI.GraphQLError
+	if errors.As(err, &ghGqlErr) {
+		for _, e := range ghGqlErr.Errors {
+			if strings.Contains(e.Message, "Resource not accessible by personal access token") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // ScopesSuggestion is an error messaging utility that prints the suggestion to request additional OAuth
 // scopes in case a server response indicates that there are missing scopes.
 func ScopesSuggestion(resp *http.Response) string {

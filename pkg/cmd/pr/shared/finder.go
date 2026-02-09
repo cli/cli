@@ -225,10 +225,16 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		}
 	}
 
-	var getProjectItems bool
+	getProjectItems := false
 	if fields.Contains("projectItems") {
 		getProjectItems = true
 		fields.Remove("projectItems")
+	}
+
+	getStatusChecks := false
+	if fields.Contains("statusCheckRollup") {
+		getStatusChecks = true
+		fields.Remove("statusCheckRollup")
 	}
 
 	// TODO projectsV1Deprecation
@@ -284,9 +290,9 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 			return preloadPrClosingIssuesReferences(httpClient, f.baseRefRepo, pr)
 		})
 	}
-	if fields.Contains("statusCheckRollup") {
+	if getStatusChecks {
 		g.Go(func() error {
-			return preloadPrChecks(httpClient, f.baseRefRepo, pr)
+			return fetchStatusChecks(httpClient, f.baseRefRepo, pr)
 		})
 	}
 	if getProjectItems {
@@ -563,6 +569,41 @@ func preloadPrClosingIssuesReferences(client *http.Client, repo ghrepo.Interface
 
 	pr.ClosingIssuesReferences.PageInfo.HasNextPage = false
 	return nil
+}
+
+func fetchStatusChecks(httpClient *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+	type response struct {
+		Node struct {
+			PullRequest api.PullRequest `graphql:"...on PullRequest"`
+		} `graphql:"node(id: $id)"`
+	}
+
+	query := fmt.Sprintf(`
+	query PullRequestStatusChecks($id: ID!) {
+		node(id: $id) {
+			...on PullRequest {
+				%s
+			}
+		}
+	}`, api.StatusCheckRollupGraphQLWithoutCountByState(""))
+
+	variables := map[string]interface{}{
+		"id": githubv4.ID(pr.ID),
+	}
+
+	gql := api.NewClientFromHTTP(httpClient)
+	var resp response
+	err := gql.GraphQL(repo.RepoHost(), query, variables, &resp)
+	if err != nil {
+		if api.IsGraphQLErrorResourceNotAccessible(err) {
+			return nil
+		}
+		return err
+	}
+
+	pr.StatusCheckRollup = resp.Node.PullRequest.StatusCheckRollup
+
+	return preloadPrChecks(httpClient, repo, pr)
 }
 
 func preloadPrChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
