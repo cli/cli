@@ -2,6 +2,7 @@ name: Bump Go
 on:
   schedule:
     - cron: "0 3 * * *" # 3 AM UTC
+  workflow_dispatch:
 permissions:
   contents: write
   pull-requests: write
