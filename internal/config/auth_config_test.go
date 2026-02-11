@@ -195,6 +195,31 @@ func TestHostsIncludesEnvVar(t *testing.T) {
 	// Then the host in the env var is included
 	require.Contains(t, hosts, "ghe.io")
 }
+func TestHostsIncludesGitHubServerURL(t *testing.T) {
+	// Given the GITHUB_SERVER_URL env var is set
+	authCfg := newTestAuthConfig(t)
+	t.Setenv("GITHUB_SERVER_URL", "https://corp.ghe.com")
+	t.Setenv("GITHUB_TOKEN", "test-token")
+
+	// When we get the hosts
+	hosts := authCfg.Hosts()
+
+	// Then the host in the env var is included
+	require.Contains(t, hosts, "corp.ghe.com")
+}
+
+func TestHostsIncludesGitHubAPIURL(t *testing.T) {
+	// Given the GITHUB_API_URL env var is set
+	authCfg := newTestAuthConfig(t)
+	t.Setenv("GITHUB_API_URL", "https://api.corp.ghe.com")
+	t.Setenv("GITHUB_TOKEN", "test-token")
+
+	// When we get the hosts
+	hosts := authCfg.Hosts()
+
+	// Then the host in the env var is included
+	require.Contains(t, hosts, "corp.ghe.com")
+}
 
 func TestDefaultHostFromEnvVar(t *testing.T) {
 	// Given the GH_HOST env var is set
@@ -207,6 +232,31 @@ func TestDefaultHostFromEnvVar(t *testing.T) {
 	// Then the returned host and source are using the env var
 	require.Equal(t, "ghe.io", defaultHost)
 	require.Equal(t, "GH_HOST", source)
+}
+func TestDefaultHostFromGitHubServerURL(t *testing.T) {
+	// Given the GITHUB_SERVER_URL env var is set
+	authCfg := newTestAuthConfig(t)
+	t.Setenv("GITHUB_SERVER_URL", "https://corp.ghe.com")
+
+	// When we get the DefaultHost
+	defaultHost, source := authCfg.DefaultHost()
+
+	// Then the returned host and source are using the env var
+	require.Equal(t, "corp.ghe.com", defaultHost)
+	require.Equal(t, "GITHUB_SERVER_URL", source)
+}
+
+func TestDefaultHostFromGitHubAPIURL(t *testing.T) {
+	// Given the GITHUB_API_URL env var is set
+	authCfg := newTestAuthConfig(t)
+	t.Setenv("GITHUB_API_URL", "https://api.corp.ghe.com")
+
+	// When we get the DefaultHost
+	defaultHost, source := authCfg.DefaultHost()
+
+	// Then the returned host and source are using the env var
+	require.Equal(t, "corp.ghe.com", defaultHost)
+	require.Equal(t, "GITHUB_API_URL", source)
 }
 
 func TestDefaultHostNotLoggedIn(t *testing.T) {

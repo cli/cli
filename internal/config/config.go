@@ -3,9 +3,11 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
@@ -314,11 +316,93 @@ func (c *AuthConfig) ActiveUser(hostname string) (string, error) {
 	return c.cfg.Get([]string{hostsKey, hostname, userKey})
 }
 
+// githubHostFromEnv resolves a GitHub host from GITHUB_SERVER_URL or GITHUB_API_URL.
+func githubHostFromEnv() (string, string) {
+	if host, source := hostnameFromGitHubServerURL(); host != "" {
+		return host, source
+	}
+	if host, source := hostnameFromGitHubAPIURL(); host != "" {
+		return host, source
+	}
+	return "", ""
+}
+
+// hostnameFromGitHubServerURL returns the normalized host derived from GITHUB_SERVER_URL.
+func hostnameFromGitHubServerURL() (string, string) {
+	if raw := os.Getenv("GITHUB_SERVER_URL"); raw != "" {
+		if host := hostnameFromURL(raw); host != "" {
+			return ghauth.NormalizeHostname(host), "GITHUB_SERVER_URL"
+		}
+	}
+	return "", ""
+}
+
+// hostnameFromGitHubAPIURL returns the normalized host derived from GITHUB_API_URL.
+func hostnameFromGitHubAPIURL() (string, string) {
+	if raw := os.Getenv("GITHUB_API_URL"); raw != "" {
+		if host := hostnameFromURL(raw); host != "" {
+			host = strings.ToLower(host)
+			if strings.HasPrefix(host, "api.") && (host == "api.github.com" || strings.HasSuffix(host, ".ghe.com")) {
+				host = strings.TrimPrefix(host, "api.")
+			}
+			return ghauth.NormalizeHostname(host), "GITHUB_API_URL"
+		}
+	}
+	return "", ""
+}
+
+// hostnameFromURL extracts a lowercase hostname from a URL or host string.
+func hostnameFromURL(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	parsed, err := url.Parse(trimmed)
+	if err == nil {
+		if parsed.Host != "" {
+			return strings.ToLower(parsed.Hostname())
+		}
+		if parsed.Path != "" {
+			parts := strings.Split(parsed.Path, "/")
+			if len(parts) > 0 && parts[0] != "" {
+				return strings.ToLower(parts[0])
+			}
+		}
+	}
+	return ""
+}
+
 func (c *AuthConfig) Hosts() []string {
 	if c.hostsOverride != nil {
 		return c.hostsOverride()
 	}
-	return ghauth.KnownHosts()
+	hosts := ghauth.KnownHosts()
+	envHost, _ := githubHostFromEnv()
+	if envHost != "" {
+		if token, _ := ghauth.TokenFromEnvOrConfig(envHost); token != "" && !slices.Contains(hosts, envHost) {
+			hosts = append(hosts, envHost)
+		}
+		if envHost != ghauth.NormalizeHostname("github.com") && os.Getenv("GH_HOST") == "" && !c.hasHostConfig("github.com") {
+			hosts = slices.DeleteFunc(hosts, func(host string) bool {
+				return host == "github.com"
+			})
+		}
+	}
+	return hosts
+}
+
+// hasHostConfig reports whether the config contains the given host.
+func (c *AuthConfig) hasHostConfig(hostname string) bool {
+	keys, err := c.cfg.Keys([]string{hostsKey})
+	if err != nil {
+		return false
+	}
+	for _, key := range keys {
+		if key == hostname {
+			return true
+		}
+	}
+	return false
 }
 
 // SetHosts will override any hosts resolution and return the given
@@ -332,6 +416,12 @@ func (c *AuthConfig) SetHosts(hosts []string) {
 func (c *AuthConfig) DefaultHost() (string, string) {
 	if c.defaultHostOverride != nil {
 		return c.defaultHostOverride()
+	}
+	if host := os.Getenv("GH_HOST"); host != "" {
+		return host, "GH_HOST"
+	}
+	if host, source := githubHostFromEnv(); host != "" {
+		return host, source
 	}
 	return ghauth.DefaultHost()
 }

@@ -289,6 +289,34 @@ func Test_statusRun(t *testing.T) {
 			`),
 		},
 		{
+			name: "token from env with server url",
+			opts: StatusOptions{},
+			env: map[string]string{
+				"GITHUB_TOKEN":      "gho_abc123",
+				"GITHUB_SERVER_URL": "https://corp.ghe.com",
+				"GITHUB_API_URL":    "https://api.corp.ghe.com",
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.WithHost(httpmock.REST("GET", ""), "api.corp.ghe.com"),
+					httpmock.ScopesResponder("repo,read:org"),
+				)
+				reg.Register(
+					httpmock.WithHost(httpmock.GraphQL(`query UserCurrent\b`), "api.corp.ghe.com"),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`),
+				)
+			},
+			wantOut: heredoc.Doc(`
+				corp.ghe.com
+				  ✓ Logged in to corp.ghe.com account monalisa (GITHUB_TOKEN)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: 'repo', 'read:org'
+			`),
+		},
+		{
 			name: "server-to-server token",
 			opts: StatusOptions{},
 			cfgStubs: func(t *testing.T, c gh.Config) {
