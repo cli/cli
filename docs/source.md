@@ -8,20 +8,21 @@
 
    If `go` is not installed, follow instructions on [the Go website](https://golang.org/doc/install).
 
-2. Clone this repository
+3. Clone this repository
 
    ```sh
    $ git clone https://github.com/cli/cli.git gh-cli
    $ cd gh-cli
    ```
 
-3. Build and install
+4. Build and install
 
    #### Unix-like systems
 
    ```sh
    # installs to '/usr/local' by default; sudo may be required, or sudo -E for configured go environments
    $ make install
+   # for go version mismatch, try GOTOOLCHAIN=auto make install
 
    # or, install to a different location
    $ make install prefix=/path/to/gh
@@ -36,7 +37,7 @@
 
    There is no install step available on Windows.
 
-4. Run `gh version` to check if it worked.
+5. Run `gh version` to check if it worked.
 
    #### Windows
 
