@@ -177,7 +177,7 @@ func displayResults(io *iostreams.IOStreams, now time.Time, results search.Repos
 		if repo.IsPrivate {
 			infoColor = cs.Yellow
 		}
-		tp.AddField(repo.FullName, tableprinter.WithColor(cs.Bold))
+		tp.AddField(repo.FullName, tableprinter.WithColor(cs.WithHyperlink(repo.URL, cs.Bold)))
 		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description))
 		tp.AddField(info, tableprinter.WithColor(infoColor))
 		tp.AddTimeField(now, repo.UpdatedAt, cs.Muted)

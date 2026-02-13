@@ -109,6 +109,7 @@ func ListGists(client *http.Client, hostname string, limit int, filter *regexp.R
 					IsPublic  bool
 					Name      string
 					UpdatedAt time.Time
+					URL       string
 				}
 				PageInfo struct {
 					HasNextPage bool
@@ -174,6 +175,7 @@ pagination:
 				Files:       files,
 				UpdatedAt:   gist.UpdatedAt,
 				Public:      gist.IsPublic,
+				HTMLURL:     gist.URL,
 			}
 
 			if filter == nil || filterFunc(&gist) {

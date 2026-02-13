@@ -199,7 +199,7 @@ func printTable(io *iostreams.IOStreams, gists []shared.Gist, filter *regexp.Reg
 		tp.AddField(gist.ID)
 		tp.AddField(
 			text.RemoveExcessiveWhitespace(description),
-			tableprinter.WithColor(highlightDescription),
+			tableprinter.WithColor(cs.WithHyperlink(gist.HTMLURL, highlightDescription)),
 		)
 		tp.AddField(
 			text.Pluralize(fileCount, "file"),
