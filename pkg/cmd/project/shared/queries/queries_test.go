@@ -24,6 +24,7 @@ func TestProjectItems_DefaultLimit(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
+				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -56,7 +57,7 @@ func TestProjectItems_DefaultLimit(t *testing.T) {
 		Login: "monalisa",
 		ID:    "user ID",
 	}
-	project, err := client.ProjectItems(owner, 1, LimitMax)
+	project, err := client.ProjectItems(owner, 1, LimitMax, "")
 	assert.NoError(t, err)
 	assert.Len(t, project.Items.Nodes, 3)
 }
@@ -77,6 +78,7 @@ func TestProjectItems_LowerLimit(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
+				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -106,7 +108,7 @@ func TestProjectItems_LowerLimit(t *testing.T) {
 		Login: "monalisa",
 		ID:    "user ID",
 	}
-	project, err := client.ProjectItems(owner, 1, 2)
+	project, err := client.ProjectItems(owner, 1, 2, "")
 	assert.NoError(t, err)
 	assert.Len(t, project.Items.Nodes, 2)
 }
@@ -127,6 +129,7 @@ func TestProjectItems_NoLimit(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
+				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -159,7 +162,7 @@ func TestProjectItems_NoLimit(t *testing.T) {
 		Login: "monalisa",
 		ID:    "user ID",
 	}
-	project, err := client.ProjectItems(owner, 1, 0)
+	project, err := client.ProjectItems(owner, 1, 0, "")
 	assert.NoError(t, err)
 	assert.Len(t, project.Items.Nodes, 3)
 }
@@ -381,6 +384,7 @@ func TestProjectItems_FieldTitle(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
+				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -422,7 +426,7 @@ func TestProjectItems_FieldTitle(t *testing.T) {
 		Login: "monalisa",
 		ID:    "user ID",
 	}
-	project, err := client.ProjectItems(owner, 1, LimitMax)
+	project, err := client.ProjectItems(owner, 1, LimitMax, "")
 	assert.NoError(t, err)
 	assert.Len(t, project.Items.Nodes, 1)
 	assert.Len(t, project.Items.Nodes[0].FieldValues.Nodes, 2)

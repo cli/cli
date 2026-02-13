@@ -16,6 +16,7 @@ type Detector interface {
 	PullRequestFeatures() (PullRequestFeatures, error)
 	RepositoryFeatures() (RepositoryFeatures, error)
 	ProjectsV1() gh.ProjectsV1Support
+	ProjectFeatures() (ProjectFeatures, error)
 	SearchFeatures() (SearchFeatures, error)
 	ReleaseFeatures() (ReleaseFeatures, error)
 	ActionsFeatures() (ActionsFeatures, error)
@@ -56,6 +57,16 @@ var allRepositoryFeatures = RepositoryFeatures{
 	PullRequestTemplateQuery: true,
 	VisibilityField:          true,
 	AutoMerge:                true,
+}
+
+type ProjectFeatures struct {
+	// ProjectItemQuery indicates support for the `query` argument on
+	// ProjectV2.items.
+	ProjectItemQuery bool
+}
+
+var allProjectFeatures = ProjectFeatures{
+	ProjectItemQuery: true,
 }
 
 type SearchFeatures struct {
@@ -277,6 +288,43 @@ func (d *detector) ProjectsV1() gh.ProjectsV1Support {
 	}
 
 	return gh.ProjectsV1Unsupported
+}
+
+func (d *detector) ProjectFeatures() (ProjectFeatures, error) {
+	if !ghauth.IsEnterprise(d.host) {
+		return allProjectFeatures, nil
+	}
+
+	features := ProjectFeatures{}
+
+	var featureDetection struct {
+		ProjectV2 struct {
+			Fields []struct {
+				Name string
+				Args []struct {
+					Name string
+				}
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"ProjectV2: __type(name: \"ProjectV2\")"`
+	}
+
+	gql := api.NewClientFromHTTP(d.httpClient)
+	err := gql.Query(d.host, "ProjectV2_fields", &featureDetection, nil)
+	if err != nil {
+		return features, err
+	}
+
+	for _, field := range featureDetection.ProjectV2.Fields {
+		if field.Name == "items" {
+			for _, arg := range field.Args {
+				if arg.Name == "query" {
+					features.ProjectItemQuery = true
+				}
+			}
+		}
+	}
+
+	return features, nil
 }
 
 const (

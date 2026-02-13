@@ -134,7 +134,7 @@ type Project struct {
 		PageInfo   PageInfo
 		TotalCount int
 		Nodes      []ProjectItem
-	} `graphql:"items(first: $firstItems, after: $afterItems)"`
+	} `graphql:"items(first: $firstItems, after: $afterItems, query: $queryItems)"`
 	Fields ProjectFields `graphql:"fields(first: $firstFields, after: $afterFields)"`
 	Owner  struct {
 		TypeName string `graphql:"__typename"`
@@ -508,8 +508,10 @@ func (p ProjectItem) ExportData(_ []string) map[string]interface{} {
 }
 
 // ProjectItems returns the items of a project. If the OwnerType is VIEWER, no login is required.
-// If limit is 0, the default limit is used.
-func (c *Client) ProjectItems(o *Owner, number int32, limit int) (*Project, error) {
+// If limit is 0, the default limit is used. The queryStr parameter is passed as a server-side
+// filter to the items connection, using the same syntax as the GitHub Projects filter bar
+// (e.g. "assignee:octocat", "status:done").
+func (c *Client) ProjectItems(o *Owner, number int32, limit int, queryStr string) (*Project, error) {
 	project := &Project{}
 	if limit == 0 {
 		limit = LimitDefault
@@ -527,6 +529,7 @@ func (c *Client) ProjectItems(o *Owner, number int32, limit int) (*Project, erro
 		"firstFields": githubv4.Int(LimitMax),
 		"afterFields": (*githubv4.String)(nil),
 		"number":      githubv4.Int(number),
+		"queryItems":  githubv4.String(queryStr),
 	}
 
 	var query pager[ProjectItem]

@@ -2,9 +2,14 @@ package itemlist
 
 import (
 	"fmt"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -17,13 +22,15 @@ type listOpts struct {
 	limit    int
 	owner    string
 	number   int32
+	query    string
 	exporter cmdutil.Exporter
 }
 
 type listConfig struct {
-	io     *iostreams.IOStreams
-	client *queries.Client
-	opts   listOpts
+	io       *iostreams.IOStreams
+	client   *queries.Client
+	opts     listOpts
+	detector fd.Detector
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.Command {
@@ -34,6 +41,15 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 		Example: heredoc.Doc(`
 			# List the items in the current users's project "1"
 			$ gh project item-list 1 --owner "@me"
+
+			# List items assigned to a specific user
+			$ gh project item-list 1 --owner "@me" --query "assignee:monalisa"
+
+			# List open issues assigned to yourself
+			$ gh project item-list 1 --owner "@me" --query "assignee:@me is:issue is:open"
+
+			# List items with the "bug" label that are not done
+			$ gh project item-list 1 --owner "@me" --query "label:bug -status:Done"
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -60,11 +76,24 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 			if runF != nil {
 				return runF(config)
 			}
+
+			httpClient, err := f.HttpClient()
+			if err != nil {
+				return err
+			}
+			host := os.Getenv("GH_HOST")
+			if host == "" {
+				host = ghinstance.Default()
+			}
+			config.detector = fd.NewDetector(api.NewCachedHTTPClient(httpClient, time.Hour*24), host)
+
 			return runList(config)
 		},
 	}
 
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
+	listCmd.Flags().StringVar(&opts.query, "query", "", `Filter items using the Projects filter syntax, e.g. "assignee:octocat -status:Done".
+For the full syntax, see <https://docs.github.com/en/issues/planning-and-tracking-with-projects/customizing-views-in-your-project/filtering-projects>`)
 	cmdutil.AddFormatFlags(listCmd, &opts.exporter)
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of items to fetch")
 
@@ -72,6 +101,16 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 }
 
 func runList(config listConfig) error {
+	if config.opts.query != "" {
+		features, err := config.detector.ProjectFeatures()
+		if err != nil {
+			return err
+		}
+		if !features.ProjectItemQuery {
+			return fmt.Errorf("the `--query` flag is not supported on this GitHub host")
+		}
+	}
+
 	canPrompt := config.io.CanPrompt()
 	owner, err := config.client.NewOwner(canPrompt, config.opts.owner)
 	if err != nil {
@@ -87,7 +126,7 @@ func runList(config listConfig) error {
 		config.opts.number = project.Number
 	}
 
-	project, err := config.client.ProjectItems(owner, config.opts.number, config.opts.limit)
+	project, err := config.client.ProjectItems(owner, config.opts.number, config.opts.limit, config.opts.query)
 	if err != nil {
 		return err
 	}

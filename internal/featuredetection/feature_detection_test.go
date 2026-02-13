@@ -586,6 +586,91 @@ func TestAdvancedIssueSearchSupport(t *testing.T) {
 	}
 }
 
+func TestProjectFeatures(t *testing.T) {
+	tests := []struct {
+		name          string
+		hostname      string
+		queryResponse map[string]string
+		wantFeatures  ProjectFeatures
+		wantErr       bool
+	}{
+		{
+			name:     "github.com",
+			hostname: "github.com",
+			wantFeatures: ProjectFeatures{
+				ProjectItemQuery: true,
+			},
+		},
+		{
+			name:     "ghec data residency (ghe.com)",
+			hostname: "stampname.ghe.com",
+			wantFeatures: ProjectFeatures{
+				ProjectItemQuery: true,
+			},
+		},
+		{
+			name:     "GHE empty response",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query ProjectV2_fields\b`: `{"data": {}}`,
+			},
+			wantFeatures: ProjectFeatures{},
+		},
+		{
+			name:     "GHE items field without query arg",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query ProjectV2_fields\b`: heredoc.Doc(`
+					{ "data": { "ProjectV2": { "fields": [
+						{"name": "items", "args": [
+							{"name": "after"},
+							{"name": "first"}
+						]}
+					] } } }
+				`),
+			},
+			wantFeatures: ProjectFeatures{},
+		},
+		{
+			name:     "GHE items field with query arg",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query ProjectV2_fields\b`: heredoc.Doc(`
+					{ "data": { "ProjectV2": { "fields": [
+						{"name": "items", "args": [
+							{"name": "after"},
+							{"name": "first"},
+							{"name": "query"}
+						]}
+					] } } }
+				`),
+			},
+			wantFeatures: ProjectFeatures{
+				ProjectItemQuery: true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			httpClient := &http.Client{}
+			httpmock.ReplaceTripper(httpClient, reg)
+			for query, resp := range tt.queryResponse {
+				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
+			}
+			detector := detector{host: tt.hostname, httpClient: httpClient}
+			gotFeatures, err := detector.ProjectFeatures()
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantFeatures, gotFeatures)
+		})
+	}
+}
+
 func TestReleaseFeatures(t *testing.T) {
 	withImmutableReleaseSupport := `{"data":{"Release":{"fields":[{"name":"author"},{"name":"name"},{"name":"immutable"}]}}}`
 	withoutImmutableReleaseSupport := `{"data":{"Release":{"fields":[{"name":"author"},{"name":"name"}]}}}`
