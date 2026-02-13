@@ -8,14 +8,10 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-type repositoryUserResolver interface {
-	UserForRepository(hostname, owner, repo string) (string, bool)
-}
-
 type dynamicRepoTokenGetter struct {
 	authCfg gh.AuthConfig
 	repo    ghrepo.Interface
-	mapper  repositoryUserResolver
+	mapper  gh.RepositoryUserResolver
 }
 
 func withRepositoryTokenMapping(authCfg gh.AuthConfig, repo ghrepo.Interface) interface{ ActiveToken(string) (string, string) } {
@@ -23,7 +19,7 @@ func withRepositoryTokenMapping(authCfg gh.AuthConfig, repo ghrepo.Interface) in
 		return authCfg
 	}
 
-	mapper, ok := authCfg.(repositoryUserResolver)
+	mapper, ok := authCfg.(gh.RepositoryUserResolver)
 	if !ok {
 		return authCfg
 	}
@@ -58,27 +54,6 @@ func (t dynamicRepoTokenGetter) ActiveToken(hostname string) (string, string) {
 
 	return mappedToken, mappedSource
 }
-
 func repoContextFromRemotes(remotes ghContext.Remotes) (ghrepo.Interface, bool) {
-	if len(remotes) == 0 {
-		return nil, false
-	}
-
-	for _, remote := range remotes {
-		if remote.Resolved == "base" {
-			return remote, true
-		}
-		if remote.Resolved == "" {
-			continue
-		}
-
-		repo, err := ghrepo.FromFullName(remote.Resolved)
-		if err != nil {
-			continue
-		}
-
-		return ghrepo.NewWithHost(repo.RepoOwner(), repo.RepoName(), remote.RepoHost()), true
-	}
-
-	return remotes[0], true
+	return remotes.RepoContext()
 }

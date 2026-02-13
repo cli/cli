@@ -57,6 +57,34 @@ func (r Remotes) ResolvedRemote() (*Remote, error) {
 	return nil, fmt.Errorf("no resolved remote found")
 }
 
+// RepoContext returns the most specific repository context from remotes,
+// preferring remotes resolved as "base", then explicitly resolved values,
+// and finally the first remote.
+func (r Remotes) RepoContext() (ghrepo.Interface, bool) {
+	if len(r) == 0 {
+		return nil, false
+	}
+
+	for _, remote := range r {
+		if remote.Resolved == "base" {
+			return remote, true
+		}
+
+		if remote.Resolved == "" {
+			continue
+		}
+
+		repo, err := ghrepo.FromFullName(remote.Resolved)
+		if err != nil {
+			continue
+		}
+
+		return ghrepo.NewWithHost(repo.RepoOwner(), repo.RepoName(), remote.RepoHost()), true
+	}
+
+	return r[0], true
+}
+
 func remoteNameSortScore(name string) int {
 	switch strings.ToLower(name) {
 	case "upstream":

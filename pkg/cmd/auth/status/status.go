@@ -336,10 +336,6 @@ func statusRun(opts *StatusOptions) error {
 	return finalErr
 }
 
-type repositoryUserResolver interface {
-	UserForRepository(hostname, owner, repo string) (string, bool)
-}
-
 type currentRepositoryStatus struct {
 	repoDisplay      string
 	effectiveAccount string
@@ -373,7 +369,7 @@ func currentRepositoryStatusForAuth(remotesFn func() (ghContext.Remotes, error),
 	hostname := repo.RepoHost()
 	repoDisplay := fmt.Sprintf("%s/%s/%s", hostname, repo.RepoOwner(), repo.RepoName())
 
-	if mapper, ok := authCfg.(repositoryUserResolver); ok {
+	if mapper, ok := authCfg.(gh.RepositoryUserResolver); ok {
 		if mappedUser, found := mapper.UserForRepository(hostname, repo.RepoOwner(), repo.RepoName()); found {
 			if _, _, tokenErr := authCfg.TokenForUser(hostname, mappedUser); tokenErr == nil {
 				return &currentRepositoryStatus{
@@ -407,28 +403,7 @@ func currentRepositoryStatusForAuth(remotesFn func() (ghContext.Remotes, error),
 }
 
 func repoContextFromRemotes(remotes ghContext.Remotes) (ghrepo.Interface, bool) {
-	if len(remotes) == 0 {
-		return nil, false
-	}
-
-	for _, remote := range remotes {
-		if remote.Resolved == "base" {
-			return remote, true
-		}
-
-		if remote.Resolved == "" {
-			continue
-		}
-
-		repo, err := ghrepo.FromFullName(remote.Resolved)
-		if err != nil {
-			continue
-		}
-
-		return ghrepo.NewWithHost(repo.RepoOwner(), repo.RepoName(), remote.RepoHost()), true
-	}
-
-	return remotes[0], true
+	return remotes.RepoContext()
 }
 
 func maskToken(token string) string {

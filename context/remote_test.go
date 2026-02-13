@@ -137,3 +137,47 @@ func Test_FilterByHosts(t *testing.T) {
 	assert.Equal(t, r1, f[0])
 	assert.Equal(t, r2, f[1])
 }
+
+func Test_Remotes_RepoContext(t *testing.T) {
+	t.Run("returns false for empty", func(t *testing.T) {
+		repo, ok := Remotes{}.RepoContext()
+		assert.False(t, ok)
+		assert.Nil(t, repo)
+	})
+
+	t.Run("prefers resolved base remote", func(t *testing.T) {
+		list := Remotes{
+			&Remote{Remote: &git.Remote{Name: "origin", Resolved: ""}, Repo: ghrepo.NewWithHost("owner", "repo", "github.com")},
+			&Remote{Remote: &git.Remote{Name: "upstream", Resolved: "base"}, Repo: ghrepo.NewWithHost("base-owner", "base-repo", "github.com")},
+		}
+
+		repo, ok := list.RepoContext()
+		assert.True(t, ok)
+		assert.Equal(t, "base-owner", repo.RepoOwner())
+		assert.Equal(t, "base-repo", repo.RepoName())
+	})
+
+	t.Run("uses explicit resolved repo", func(t *testing.T) {
+		list := Remotes{
+			&Remote{Remote: &git.Remote{Name: "origin", Resolved: "other-owner/other-repo"}, Repo: ghrepo.NewWithHost("owner", "repo", "github.com")},
+		}
+
+		repo, ok := list.RepoContext()
+		assert.True(t, ok)
+		assert.Equal(t, "other-owner", repo.RepoOwner())
+		assert.Equal(t, "other-repo", repo.RepoName())
+		assert.Equal(t, "github.com", repo.RepoHost())
+	})
+
+	t.Run("falls back to first remote", func(t *testing.T) {
+		list := Remotes{
+			&Remote{Remote: &git.Remote{Name: "origin", Resolved: ""}, Repo: ghrepo.NewWithHost("owner", "repo", "github.com")},
+			&Remote{Remote: &git.Remote{Name: "fork", Resolved: ""}, Repo: ghrepo.NewWithHost("other", "repo", "github.com")},
+		}
+
+		repo, ok := list.RepoContext()
+		assert.True(t, ok)
+		assert.Equal(t, "owner", repo.RepoOwner())
+		assert.Equal(t, "repo", repo.RepoName())
+	})
+}

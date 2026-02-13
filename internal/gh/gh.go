@@ -168,6 +168,12 @@ type AuthConfig interface {
 	SetDefaultHost(host, source string)
 }
 
+// RepositoryUserResolver provides repository-scoped account lookup behavior for
+// authentication implementations that support dynamic account selection.
+type RepositoryUserResolver interface {
+	UserForRepository(hostname, owner, repo string) (string, bool)
+}
+
 // AliasConfig defines an interface for managing command aliases.
 type AliasConfig interface {
 	// Get retrieves the expansion for a specified alias.
