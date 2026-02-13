@@ -75,6 +75,7 @@ type IOStreams struct {
 	colorEnabled            bool
 	colorLabels             bool
 	accessibleColorsEnabled bool
+	linkEnabled             bool
 
 	pagerCommand string
 	pagerProcess *os.Process
@@ -108,6 +109,10 @@ func (s *IOStreams) HasTrueColor() bool {
 
 func (s *IOStreams) ColorLabels() bool {
 	return s.colorLabels
+}
+
+func (s *IOStreams) IsLinkEnabled() bool {
+	return s.linkEnabled
 }
 
 // DetectTerminalTheme is a utility to call before starting the output pager so that the terminal background
@@ -424,6 +429,7 @@ func (s *IOStreams) ColorScheme() *ColorScheme {
 		TrueColor:     s.HasTrueColor(),
 		Accessible:    s.AccessibleColorsEnabled(),
 		ColorLabels:   s.ColorLabels(),
+		linkEnabled:   s.IsLinkEnabled(),
 		Theme:         s.TerminalTheme(),
 	}
 }
@@ -495,6 +501,7 @@ func System() *IOStreams {
 		In:           os.Stdin,
 		Out:          stdout,
 		ErrOut:       stderr,
+		linkEnabled:  os.Getenv("GH_HYPERLINK") != "",
 		pagerCommand: os.Getenv("PAGER"),
 		term:         &terminal,
 	}

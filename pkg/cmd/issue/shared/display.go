@@ -32,7 +32,11 @@ func PrintIssues(io *iostreams.IOStreams, now time.Time, prefix string, totalCou
 			issueNum = "#" + issueNum
 		}
 		issueNum = prefix + issueNum
-		table.AddField(issueNum, tableprinter.WithColor(cs.ColorFromString(prShared.ColorForIssueState(issue))))
+		colorFunc := cs.ColorFromString(prShared.ColorForIssueState(issue))
+		issueURL := issue.URL
+		table.AddField(issueNum, tableprinter.WithColor(func(t string) string {
+			return colorFunc(cs.Hyperlink(t, issueURL))
+		}))
 		if !isTTY {
 			table.AddField(issue.State)
 		}

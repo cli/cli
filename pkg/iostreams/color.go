@@ -53,6 +53,8 @@ type ColorScheme struct {
 	Accessible bool
 	// ColorLabels is whether labels are colored based on their truecolor RGB hex color.
 	ColorLabels bool
+	// linkEnabled is whether terminal hyperlinks should be rendered.
+	linkEnabled bool
 	// Theme is the terminal background color theme used to contextually color text for light, dark, or none at all.
 	Theme string
 }
@@ -260,6 +262,14 @@ func (c *ColorScheme) ColorFromString(s string) func(string) string {
 	}
 
 	return fn
+}
+
+func (c *ColorScheme) Hyperlink(text, url string) string {
+	if !c.linkEnabled {
+		return text
+	}
+	// https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda
+	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", url, text)
 }
 
 // Label stylizes text based on label's RGB hex color.
