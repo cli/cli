@@ -11,8 +11,10 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -116,6 +118,7 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 
 type StatusOptions struct {
 	HttpClient func() (*http.Client, error)
+	Remotes    func() (ghContext.Remotes, error)
 	IO         *iostreams.IOStreams
 	Config     func() (gh.Config, error)
 	Exporter   cmdutil.Exporter
@@ -128,6 +131,7 @@ type StatusOptions struct {
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
 	opts := &StatusOptions{
 		HttpClient: f.HttpClient,
+		Remotes:    f.Remotes,
 		IO:         f.IOStreams,
 		Config:     f.Config,
 	}
@@ -298,6 +302,8 @@ func statusRun(opts *StatusOptions) error {
 		return nil
 	}
 
+	currentRepo := currentRepositoryStatusForAuth(opts.Remotes, authCfg)
+
 	prevEntry := false
 	for _, hostname := range hostnames {
 		entries, ok := statuses.Hosts[hostname]
@@ -308,6 +314,10 @@ func statusRun(opts *StatusOptions) error {
 		stream := stdout
 		if finalErr != nil {
 			stream = stderr
+		}
+
+		if !prevEntry && currentRepo != nil {
+			fmt.Fprintf(stream, "%s\n\n", currentRepo.display(cs))
 		}
 
 		if prevEntry {
@@ -324,6 +334,101 @@ func statusRun(opts *StatusOptions) error {
 	}
 
 	return finalErr
+}
+
+type repositoryUserResolver interface {
+	UserForRepository(hostname, owner, repo string) (string, bool)
+}
+
+type currentRepositoryStatus struct {
+	repoDisplay      string
+	effectiveAccount string
+	reason           string
+}
+
+func (c currentRepositoryStatus) display(cs *iostreams.ColorScheme) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("%s %s\n", cs.SuccessIcon(), cs.Bold("Current repository auth")))
+	sb.WriteString(fmt.Sprintf("  - Repository: %s\n", cs.Bold(c.repoDisplay)))
+	sb.WriteString(fmt.Sprintf("  - Effective account: %s\n", cs.Bold(c.effectiveAccount)))
+	sb.WriteString(fmt.Sprintf("  - Source: %s", c.reason))
+	return sb.String()
+}
+
+func currentRepositoryStatusForAuth(remotesFn func() (ghContext.Remotes, error), authCfg gh.AuthConfig) *currentRepositoryStatus {
+	if remotesFn == nil {
+		return nil
+	}
+
+	remotes, err := remotesFn()
+	if err != nil || len(remotes) == 0 {
+		return nil
+	}
+
+	repo, ok := repoContextFromRemotes(remotes)
+	if !ok {
+		return nil
+	}
+
+	hostname := repo.RepoHost()
+	repoDisplay := fmt.Sprintf("%s/%s/%s", hostname, repo.RepoOwner(), repo.RepoName())
+
+	if mapper, ok := authCfg.(repositoryUserResolver); ok {
+		if mappedUser, found := mapper.UserForRepository(hostname, repo.RepoOwner(), repo.RepoName()); found {
+			if _, _, tokenErr := authCfg.TokenForUser(hostname, mappedUser); tokenErr == nil {
+				return &currentRepositoryStatus{
+					repoDisplay:      repoDisplay,
+					effectiveAccount: mappedUser,
+					reason:           "repository mapping",
+				}
+			}
+		}
+	}
+
+	_, tokenSource := authCfg.ActiveToken(hostname)
+	if !authTokenWriteable(tokenSource) {
+		return &currentRepositoryStatus{
+			repoDisplay:      repoDisplay,
+			effectiveAccount: tokenSource,
+			reason:           "environment token",
+		}
+	}
+
+	activeUser, err := authCfg.ActiveUser(hostname)
+	if err != nil || activeUser == "" {
+		return nil
+	}
+
+	return &currentRepositoryStatus{
+		repoDisplay:      repoDisplay,
+		effectiveAccount: activeUser,
+		reason:           "active host account",
+	}
+}
+
+func repoContextFromRemotes(remotes ghContext.Remotes) (ghrepo.Interface, bool) {
+	if len(remotes) == 0 {
+		return nil, false
+	}
+
+	for _, remote := range remotes {
+		if remote.Resolved == "base" {
+			return remote, true
+		}
+
+		if remote.Resolved == "" {
+			continue
+		}
+
+		repo, err := ghrepo.FromFullName(remote.Resolved)
+		if err != nil {
+			continue
+		}
+
+		return ghrepo.NewWithHost(repo.RepoOwner(), repo.RepoName(), remote.RepoHost()), true
+	}
+
+	return remotes[0], true
 }
 
 func maskToken(token string) string {

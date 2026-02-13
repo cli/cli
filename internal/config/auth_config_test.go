@@ -825,6 +825,42 @@ func TestTokenWithActiveUserNotInKeyringFallsBackToBlank(t *testing.T) {
 	require.Equal(t, "test-token", token)
 }
 
+func TestUserForRepositoryPrioritizesExactMatchOverOwnerMatch(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+
+	require.NoError(t, authCfg.SetUserForOwner("github.com", "devolutions", "work-user"))
+	require.NoError(t, authCfg.SetUserForRepository("github.com", "devolutions", "github-cli", "repo-user"))
+
+	user, ok := authCfg.UserForRepository("github.com", "Devolutions", "github-cli")
+	require.True(t, ok)
+	require.Equal(t, "repo-user", user)
+
+	user, ok = authCfg.UserForRepository("github.com", "devolutions", "other-repo")
+	require.True(t, ok)
+	require.Equal(t, "work-user", user)
+
+	_, ok = authCfg.UserForRepository("github.com", "unknown-owner", "repo")
+	require.False(t, ok)
+}
+
+func TestRepositoryUserMappingsCRUD(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+
+	require.NoError(t, authCfg.SetUserForOwner("github.com", "awakecoding", "personal-user"))
+	require.NoError(t, authCfg.SetUserForRepository("github.com", "devolutions", "github-cli", "work-user"))
+
+	mappings := authCfg.RepositoryUserMappings("github.com")
+	require.Equal(t, "personal-user", mappings.Owners["awakecoding"])
+	require.Equal(t, "work-user", mappings.Repos["devolutions"]["github-cli"])
+
+	require.NoError(t, authCfg.DeleteUserForOwner("github.com", "awakecoding"))
+	require.NoError(t, authCfg.DeleteUserForRepository("github.com", "devolutions", "github-cli"))
+
+	mappings = authCfg.RepositoryUserMappings("github.com")
+	require.Empty(t, mappings.Owners)
+	require.Empty(t, mappings.Repos)
+}
+
 func TestLogoutRightAfterMigrationRemovesHost(t *testing.T) {
 	// Given we have logged in before migration
 	authCfg := newTestAuthConfig(t)

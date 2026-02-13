@@ -193,8 +193,19 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 		if err != nil {
 			return nil, err
 		}
+
+		authCfg := cfg.Authentication()
+		tokenGetter := interface{ ActiveToken(string) (string, string) }(authCfg)
+		if f.Remotes != nil {
+			if remotes, remotesErr := f.Remotes(); remotesErr == nil {
+				if repoContext, ok := repoContextFromRemotes(remotes); ok {
+					tokenGetter = withRepositoryTokenMapping(authCfg, repoContext)
+				}
+			}
+		}
+
 		opts := api.HTTPClientOptions{
-			Config:      cfg.Authentication(),
+			Config:      tokenGetter,
 			Log:         io.ErrOut,
 			LogColorize: io.ColorEnabled(),
 			AppVersion:  appVersion,

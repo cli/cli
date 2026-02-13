@@ -10,8 +10,11 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	ghContext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -264,6 +267,76 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: ssh
 				  - Token: gho_******
 				  - Token scopes: none
+			`),
+		},
+		{
+			name: "shows mapped account for current repository",
+			opts: StatusOptions{
+				Active: true,
+				Remotes: func() (ghContext.Remotes, error) {
+					return ghContext.Remotes{
+						&ghContext.Remote{
+							Remote: &git.Remote{Name: "origin"},
+							Repo:   ghrepo.NewWithHost("awakecoding", "MsRdpEx", "github.com"),
+						},
+					}, nil
+				},
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "awakecoding", "gho_awake123", "https")
+				login(t, c, "github.com", "work-user", "gho_work123", "https")
+				authCfg, ok := c.Authentication().(*config.AuthConfig)
+				require.True(t, ok)
+				require.NoError(t, authCfg.SetUserForOwner("github.com", "awakecoding", "awakecoding"))
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				✓ Current repository auth
+				  - Repository: github.com/awakecoding/MsRdpEx
+				  - Effective account: awakecoding
+				  - Source: repository mapping
+
+				github.com
+				  ✓ Logged in to github.com account work-user (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_*******
+				  - Token scopes: 'repo', 'read:org'
+			`),
+		},
+		{
+			name: "shows active host account for current repository when unmapped",
+			opts: StatusOptions{
+				Active: true,
+				Remotes: func() (ghContext.Remotes, error) {
+					return ghContext.Remotes{
+						&ghContext.Remote{
+							Remote: &git.Remote{Name: "origin"},
+							Repo:   ghrepo.NewWithHost("Devolutions", "github-cli", "github.com"),
+						},
+					}, nil
+				},
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "work-user", "gho_work123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+			},
+			wantOut: heredoc.Doc(`
+				✓ Current repository auth
+				  - Repository: github.com/Devolutions/github-cli
+				  - Effective account: work-user
+				  - Source: active host account
+
+				github.com
+				  ✓ Logged in to github.com account work-user (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_*******
+				  - Token scopes: 'repo', 'read:org'
 			`),
 		},
 		{

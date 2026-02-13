@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
@@ -34,6 +35,9 @@ const (
 	userKey               = "user"
 	usersKey              = "users"
 	versionKey            = "version"
+	accountMapKey         = "account_map"
+	ownersMapKey          = "owners"
+	reposMapKey           = "repos"
 )
 
 func NewConfig() (gh.Config, error) {
@@ -223,6 +227,11 @@ type AuthConfig struct {
 	defaultHostOverride func() (string, string)
 	hostsOverride       func() []string
 	tokenOverride       func(string) (string, string)
+}
+
+type RepositoryUserMappings struct {
+	Owners map[string]string
+	Repos  map[string]map[string]string
 }
 
 // ActiveToken will retrieve the active auth token for the given hostname,
@@ -503,6 +512,121 @@ func (c *AuthConfig) TokenForUser(hostname, user string) (string, string, error)
 	}
 
 	return "", "default", fmt.Errorf("no token found for '%s'", user)
+}
+
+func (c *AuthConfig) UserForRepository(hostname, owner, repo string) (string, bool) {
+	hostname = ghauth.NormalizeHostname(hostname)
+	owner = normalizeMappingPart(owner)
+	repo = normalizeMappingPart(repo)
+
+	if hostname == "" || owner == "" || repo == "" {
+		return "", false
+	}
+
+	if username, err := c.cfg.Get([]string{hostsKey, hostname, accountMapKey, reposMapKey, owner, repo}); err == nil && username != "" {
+		return username, true
+	}
+
+	if username, err := c.cfg.Get([]string{hostsKey, hostname, accountMapKey, ownersMapKey, owner}); err == nil && username != "" {
+		return username, true
+	}
+
+	return "", false
+}
+
+func (c *AuthConfig) SetUserForOwner(hostname, owner, user string) error {
+	hostname = ghauth.NormalizeHostname(hostname)
+	owner = normalizeMappingPart(owner)
+	user = strings.TrimSpace(user)
+
+	if hostname == "" || owner == "" || user == "" {
+		return errors.New("hostname, owner, and user are required")
+	}
+
+	c.cfg.Set([]string{hostsKey, hostname, accountMapKey, ownersMapKey, owner}, user)
+	return nil
+}
+
+func (c *AuthConfig) SetUserForRepository(hostname, owner, repo, user string) error {
+	hostname = ghauth.NormalizeHostname(hostname)
+	owner = normalizeMappingPart(owner)
+	repo = normalizeMappingPart(repo)
+	user = strings.TrimSpace(user)
+
+	if hostname == "" || owner == "" || repo == "" || user == "" {
+		return errors.New("hostname, owner, repo, and user are required")
+	}
+
+	c.cfg.Set([]string{hostsKey, hostname, accountMapKey, reposMapKey, owner, repo}, user)
+	return nil
+}
+
+func (c *AuthConfig) DeleteUserForOwner(hostname, owner string) error {
+	hostname = ghauth.NormalizeHostname(hostname)
+	owner = normalizeMappingPart(owner)
+
+	if hostname == "" || owner == "" {
+		return errors.New("hostname and owner are required")
+	}
+
+	return c.cfg.Remove([]string{hostsKey, hostname, accountMapKey, ownersMapKey, owner})
+}
+
+func (c *AuthConfig) DeleteUserForRepository(hostname, owner, repo string) error {
+	hostname = ghauth.NormalizeHostname(hostname)
+	owner = normalizeMappingPart(owner)
+	repo = normalizeMappingPart(repo)
+
+	if hostname == "" || owner == "" || repo == "" {
+		return errors.New("hostname, owner, and repo are required")
+	}
+
+	return c.cfg.Remove([]string{hostsKey, hostname, accountMapKey, reposMapKey, owner, repo})
+}
+
+func (c *AuthConfig) RepositoryUserMappings(hostname string) RepositoryUserMappings {
+	hostname = ghauth.NormalizeHostname(hostname)
+	out := RepositoryUserMappings{
+		Owners: map[string]string{},
+		Repos:  map[string]map[string]string{},
+	}
+
+	owners, err := c.cfg.Keys([]string{hostsKey, hostname, accountMapKey, ownersMapKey})
+	if err == nil {
+		for _, owner := range owners {
+			if username, getErr := c.cfg.Get([]string{hostsKey, hostname, accountMapKey, ownersMapKey, owner}); getErr == nil && username != "" {
+				out.Owners[owner] = username
+			}
+		}
+	}
+
+	repoOwners, err := c.cfg.Keys([]string{hostsKey, hostname, accountMapKey, reposMapKey})
+	if err == nil {
+		for _, owner := range repoOwners {
+			repos, repoErr := c.cfg.Keys([]string{hostsKey, hostname, accountMapKey, reposMapKey, owner})
+			if repoErr != nil {
+				continue
+			}
+
+			for _, repo := range repos {
+				username, getErr := c.cfg.Get([]string{hostsKey, hostname, accountMapKey, reposMapKey, owner, repo})
+				if getErr != nil || username == "" {
+					continue
+				}
+
+				if _, ok := out.Repos[owner]; !ok {
+					out.Repos[owner] = map[string]string{}
+				}
+				out.Repos[owner][repo] = username
+			}
+		}
+	}
+
+	return out
+}
+
+func normalizeMappingPart(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
 }
 
 func keyringServiceName(hostname string) string {
