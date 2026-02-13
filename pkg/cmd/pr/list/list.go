@@ -238,11 +238,9 @@ func listRun(opts *ListOptions) error {
 		if isTTY {
 			prNum = "#" + prNum
 		}
-		prURL := pr.URL
-		colorFunc := cs.ColorFromString(shared.ColorForPRState(pr))
-		table.AddField(prNum, tableprinter.WithColor(func(t string) string {
-			return colorFunc(cs.Hyperlink(t, prURL))
-		}))
+
+		table.AddField(prNum, tableprinter.WithColor(cs.WithHyperlink(pr.URL,
+			cs.ColorFromString(shared.ColorForPRState(pr)))))
 		table.AddField(text.RemoveExcessiveWhitespace(pr.Title))
 		table.AddField(pr.HeadLabel(), tableprinter.WithColor(cs.Cyan))
 		if !isTTY {

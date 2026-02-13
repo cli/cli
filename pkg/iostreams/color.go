@@ -268,8 +268,32 @@ func (c *ColorScheme) Hyperlink(text, url string) string {
 	if !c.linkEnabled {
 		return text
 	}
+
+	// Make trailing spaces not to be part of the link as it looks ugly, ...
+	link_text := strings.TrimRight(text, " ")
+	trailing_spaces := text[len(link_text):]
+	if link_text == "" {
+		// ... but still allow spaces-only text to be clickable.
+		link_text = text
+		trailing_spaces = ""
+	}
+
 	// https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda
-	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", url, text)
+	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\%s", url, link_text, trailing_spaces)
+}
+
+func (c *ColorScheme) WithHyperlink(url string, colorize func(string) string) func(string) string {
+	if colorize == nil {
+		colorize = func(s string) string { return s }
+	}
+	if !c.linkEnabled {
+		return colorize
+	}
+	return func(text string) string {
+		// Call c.Hyperlink first, then colorize.
+		// Otherwise space-trimming logic in c.Hyperlink wouldn't work.
+		return colorize(c.Hyperlink(text, url))
+	}
 }
 
 // Label stylizes text based on label's RGB hex color.

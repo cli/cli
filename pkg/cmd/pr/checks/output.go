@@ -44,10 +44,7 @@ func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 			name += fmt.Sprintf(" (%s)", o.Event)
 		}
 		tp.AddField(mark, tableprinter.WithColor(markColor))
-		link := o.Link
-		tp.AddField(name, tableprinter.WithColor(func(t string) string {
-			return cs.Hyperlink(t, link)
-		}))
+		tp.AddField(name, tableprinter.WithColor(cs.WithHyperlink(o.Link, nil)))
 		tp.AddField(o.Description)
 		tp.AddField(elapsed)
 		if !isLinkEnabled {
