@@ -325,6 +325,34 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/kevin/MinTy/issues/217",
 		},
 		{
+			name: "number-only short hash in selector arg resolves to commit when commit exists",
+			opts: BrowseOptions{
+				SelectorArg: "309628980",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/kevin/MinTy/commits/309628980"),
+					httpmock.StringResponse(`{"sha":"309628980"}`),
+				)
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/commit/309628980",
+		},
+		{
+			name: "number-only short hash in selector arg resolves to issue when commit is not found",
+			opts: BrowseOptions{
+				SelectorArg: "309628980",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/kevin/MinTy/commits/309628980"),
+					httpmock.StatusStringResponse(422, "{}"),
+				)
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/309628980",
+		},
+		{
 			name: "issue with hashtag argument",
 			opts: BrowseOptions{
 				SelectorArg: "#217",
