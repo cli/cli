@@ -330,6 +330,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--dry-run` is not supported when using `--web`")
 			}
 
+			baseRepo, err := f.BaseRepo()
+			if err != nil {
+				return err
+			}
+			if err := cmdutil.RequireWriteConfirmation(f, baseRepo.RepoHost(), "create a pull request"); err != nil {
+				return err
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}

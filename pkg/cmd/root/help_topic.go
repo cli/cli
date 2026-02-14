@@ -119,6 +119,10 @@ var HelpTopics = []helpTopic{
 
 			%[1]sGH_SPINNER_DISABLED%[1]s: set to a truthy value to replace the spinner animation with
 			a textual progress indicator.
+
+			%[1]sGH_CONFIRM_WRITE_COMMANDS%[1]s: when set to %[1]senabled%[1]s, requires confirmation before running
+			write commands (e.g. %[1]spr create%[1]s, %[1]sissue create%[1]s, %[1]srepo delete%[1]s). When set to %[1]sdisabled%[1]s,
+			overrides the %[1]sconfirm_write_commands%[1]s config and skips confirmation. Useful for non-interactive scripts.
 		`, "`"),
 	},
 	{

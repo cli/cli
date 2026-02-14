@@ -122,6 +122,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
 			}
 
+			baseRepo, err := opts.BaseRepo()
+			if err != nil {
+				return err
+			}
+			if err := cmdutil.RequireWriteConfirmation(f, baseRepo.RepoHost(), "create an issue"); err != nil {
+				return err
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}

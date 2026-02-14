@@ -70,6 +70,16 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("--yes required when not running interactively")
 			}
 
+			hostname, _ := ghauth.DefaultHost()
+			if opts.RepoArg == "" {
+				if baseRepo, err := opts.BaseRepo(); err == nil {
+					hostname = baseRepo.RepoHost()
+				}
+			}
+			if err := cmdutil.RequireWriteConfirmation(f, hostname, "delete the repository"); err != nil {
+				return err
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}

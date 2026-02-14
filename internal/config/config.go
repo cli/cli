@@ -17,9 +17,10 @@ import (
 // Important: some of the following configuration settings are used outside of `cli/cli`,
 // they are defined here to avoid `cli/cli` being changed unexpectedly.
 const (
-	accessibleColorsKey   = "accessible_colors" // used by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
-	accessiblePrompterKey = "accessible_prompter"
-	aliasesKey            = "aliases"
+	accessibleColorsKey    = "accessible_colors" // used by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
+	accessiblePrompterKey  = "accessible_prompter"
+	aliasesKey             = "aliases"
+	confirmWriteCommandsKey = "confirm_write_commands"
 	browserKey            = "browser" // used by cli/go-gh to open URLs in web browsers
 	colorLabelsKey        = "color_labels"
 	editorKey             = "editor" // used by cli/go-gh to open interactive text editor
@@ -680,6 +681,19 @@ var Options = []ConfigOption{
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Spinner(hostname).Value
+		},
+	},
+	{
+		Key:           confirmWriteCommandsKey,
+		Description:   "require confirmation before running write commands (e.g. pr create, issue create)",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			e := c.GetOrDefault(hostname, confirmWriteCommandsKey)
+			if e.IsNone() {
+				return "disabled"
+			}
+			return e.Unwrap().Value
 		},
 	},
 }
