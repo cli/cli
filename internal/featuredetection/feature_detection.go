@@ -314,18 +314,14 @@ func (d *detector) ProjectFeatures() (ProjectFeatures, error) {
 		return features, err
 	}
 
-	found := false
 	for _, field := range featureDetection.ProjectV2.Fields {
 		if field.Name == "items" {
 			for _, arg := range field.Args {
 				if arg.Name == "query" {
 					features.ProjectItemQuery = true
-					found = true
 					break
 				}
 			}
-		}
-		if found {
 			break
 		}
 	}
