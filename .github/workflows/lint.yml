@@ -56,8 +56,6 @@ jobs:
       # actions/setup-go does not setup the installed toolchain to be preferred over the system install,
       # which causes go-licenses to raise "Package ... does not have module info" errors.
       # For more information, https://github.com/google/go-licenses/issues/244#issuecomment-1885098633
-      #
-      # go-licenses has been pinned for automation use.
       - name: Verify license generation
         run: |
           export GOROOT=$(go env GOROOT)
