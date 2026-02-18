@@ -1,12 +1,22 @@
 package queries
 
 import (
+	"io"
+	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 func TestProjectItems_DefaultLimit(t *testing.T) {
 	defer gock.Off()
@@ -263,6 +273,91 @@ func TestProjectItems_WithQuery(t *testing.T) {
 			assert.Len(t, project.Items.Nodes, 1)
 		})
 	}
+}
+
+func TestProjectItems_NoQueryDoesNotUseQueryItems(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	httpClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			assert.NoError(t, err)
+			assert.NotContains(t, string(body), "$queryItems")
+
+			return &http.Response{
+				StatusCode: 200,
+				Header: http.Header{
+					"Content-Type": []string{"application/json"},
+				},
+				Body: io.NopCloser(strings.NewReader(`{
+					"data": {
+						"user": {
+							"projectV2": {
+								"items": {
+									"nodes": [
+										{"id": "issue ID"}
+									]
+								}
+							}
+						}
+					}
+				}`)),
+			}, nil
+		}),
+	}
+
+	client := NewClient(httpClient, "github.com", ios)
+	owner := &Owner{
+		Type:  UserOwner,
+		Login: "monalisa",
+		ID:    "user ID",
+	}
+	project, err := client.ProjectItems(owner, 1, LimitMax, "")
+	assert.NoError(t, err)
+	assert.Len(t, project.Items.Nodes, 1)
+}
+
+func TestProjects_ViewerQueryDoesNotUseQueryItems(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	httpClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			assert.NoError(t, err)
+			assert.NotContains(t, string(body), "$queryItems")
+
+			return &http.Response{
+				StatusCode: 200,
+				Header: http.Header{
+					"Content-Type": []string{"application/json"},
+				},
+				Body: io.NopCloser(strings.NewReader(`{
+					"data": {
+						"viewer": {
+							"projectsV2": {
+								"totalCount": 1,
+								"pageInfo": {
+									"hasNextPage": false,
+									"endCursor": ""
+								},
+								"nodes": [
+									{
+										"number": 1,
+										"title": "Roadmap"
+									}
+								]
+							}
+						}
+					}
+				}`)),
+			}, nil
+		}),
+	}
+
+	client := NewClient(httpClient, "github.com", ios)
+	projects, err := client.Projects("", ViewerOwner, 1, false)
+	assert.NoError(t, err)
+	assert.Len(t, projects.Nodes, 1)
+	assert.Equal(t, int32(1), projects.Nodes[0].Number)
+	assert.Equal(t, "Roadmap", projects.Nodes[0].Title)
 }
 
 func TestProjectFields_LowerLimit(t *testing.T) {
