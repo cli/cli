@@ -1008,91 +1008,77 @@ type viewerLoginOrgs struct {
 	}
 }
 
+type ownerWithLogin struct {
+	Project Project `graphql:"projectV2(number: $number)"`
+	Login   string
+}
+
+type ownerWithProject struct {
+	Project Project `graphql:"projectV2(number: $number)"`
+}
+
+type ownerWithProjectWithoutItemQuery struct {
+	Project projectWithoutItemQuery `graphql:"projectV2(number: $number)"`
+}
+
 // userOwner is used to query the project of a user.
 type userOwner struct {
-	Owner struct {
-		Project Project `graphql:"projectV2(number: $number)"`
-		Login   string
-	} `graphql:"user(login: $login)"`
+	Owner ownerWithLogin `graphql:"user(login: $login)"`
 }
 
 // userOwnerWithItems is used to query the project of a user with its items.
 type userOwnerWithItems struct {
-	Owner struct {
-		Project Project `graphql:"projectV2(number: $number)"`
-	} `graphql:"user(login: $login)"`
+	Owner ownerWithProject `graphql:"user(login: $login)"`
 }
 
 // userOwnerWithItemsNoQuery is used to query the project of a user with its items, without query support.
 type userOwnerWithItemsNoQuery struct {
-	Owner struct {
-		Project projectWithoutItemQuery `graphql:"projectV2(number: $number)"`
-	} `graphql:"user(login: $login)"`
+	Owner ownerWithProjectWithoutItemQuery `graphql:"user(login: $login)"`
 }
 
 // userOwnerWithFields is used to query the project of a user with its fields.
 type userOwnerWithFields struct {
-	Owner struct {
-		Project Project `graphql:"projectV2(number: $number)"`
-	} `graphql:"user(login: $login)"`
+	Owner ownerWithProject `graphql:"user(login: $login)"`
 }
 
 // orgOwner is used to query the project of an organization.
 type orgOwner struct {
-	Owner struct {
-		Project Project `graphql:"projectV2(number: $number)"`
-		Login   string
-	} `graphql:"organization(login: $login)"`
+	Owner ownerWithLogin `graphql:"organization(login: $login)"`
 }
 
 // orgOwnerWithItems is used to query the project of an organization with its items.
 type orgOwnerWithItems struct {
-	Owner struct {
-		Project Project `graphql:"projectV2(number: $number)"`
-	} `graphql:"organization(login: $login)"`
+	Owner ownerWithProject `graphql:"organization(login: $login)"`
 }
 
 // orgOwnerWithItemsNoQuery is used to query the project of an organization with its items, without query support.
 type orgOwnerWithItemsNoQuery struct {
-	Owner struct {
-		Project projectWithoutItemQuery `graphql:"projectV2(number: $number)"`
-	} `graphql:"organization(login: $login)"`
+	Owner ownerWithProjectWithoutItemQuery `graphql:"organization(login: $login)"`
 }
 
 // orgOwnerWithFields is used to query the project of an organization with its fields.
 type orgOwnerWithFields struct {
-	Owner struct {
-		Project Project `graphql:"projectV2(number: $number)"`
-	} `graphql:"organization(login: $login)"`
+	Owner ownerWithProject `graphql:"organization(login: $login)"`
 }
 
 // viewerOwner is used to query the project of the viewer.
 type viewerOwner struct {
-	Owner struct {
-		Project Project `graphql:"projectV2(number: $number)"`
-		Login   string
-	} `graphql:"viewer"`
+	Owner ownerWithLogin `graphql:"viewer"`
 }
 
 // viewerOwnerWithItems is used to query the project of the viewer with its items.
 type viewerOwnerWithItems struct {
-	Owner struct {
-		Project Project `graphql:"projectV2(number: $number)"`
-	} `graphql:"viewer"`
+	Owner ownerWithProject `graphql:"viewer"`
 }
 
 // viewerOwnerWithItemsNoQuery is used to query the project of the viewer with its items, without query support.
 type viewerOwnerWithItemsNoQuery struct {
-	Owner struct {
-		Project projectWithoutItemQuery `graphql:"projectV2(number: $number)"`
-	} `graphql:"viewer"`
+	Owner ownerWithProjectWithoutItemQuery `graphql:"viewer"`
 }
 
 // viewerOwnerWithFields is used to query the project of the viewer with its fields.
 type viewerOwnerWithFields struct {
-	Owner struct {
-		Project Project `graphql:"projectV2(number: $number)"`
-	} `graphql:"viewer"`
+	Owner ownerWithProject `graphql:"viewer"`
 }
 
 // OwnerType is the type of the owner of a project, which can be either a user or an organization. Viewer is the current user.
