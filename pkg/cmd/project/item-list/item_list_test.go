@@ -732,5 +732,5 @@ func TestRunList_QueryUnsupported(t *testing.T) {
 	}
 
 	err := runList(config)
-	assert.EqualError(t, err, "the `--query` flag is not supported on this GitHub host")
+	assert.EqualError(t, err, "the `--query` flag is not supported on this GitHub host; most likely you are targeting a version of GHES that does not yet have the query field available")
 }
