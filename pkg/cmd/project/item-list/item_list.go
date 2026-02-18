@@ -109,9 +109,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 
 func runList(config listConfig) error {
 	if config.opts.query != "" {
-		if config.detector == nil {
-			return fmt.Errorf("the `--query` flag is not supported on this GitHub host")
-		}
 		features, err := config.detector.ProjectFeatures()
 		if err != nil {
 			return err

@@ -164,6 +164,107 @@ func TestProjectItems_NoLimit(t *testing.T) {
 	assert.Len(t, project.Items.Nodes, 3)
 }
 
+func TestProjectItems_WithQuery(t *testing.T) {
+	tests := []struct {
+		name      string
+		owner     *Owner
+		queryName string
+		dataKey   string
+		vars      map[string]interface{}
+	}{
+		{
+			name: "user owner",
+			owner: &Owner{
+				Type:  UserOwner,
+				Login: "monalisa",
+				ID:    "user ID",
+			},
+			queryName: "UserProjectWithItems",
+			dataKey:   "user",
+			vars: map[string]interface{}{
+				"firstItems":  LimitMax,
+				"afterItems":  nil,
+				"firstFields": LimitMax,
+				"afterFields": nil,
+				"login":       "monalisa",
+				"number":      1,
+				"queryItems":  "assignee:octocat",
+			},
+		},
+		{
+			name: "org owner",
+			owner: &Owner{
+				Type:  OrgOwner,
+				Login: "github",
+				ID:    "org ID",
+			},
+			queryName: "OrgProjectWithItems",
+			dataKey:   "organization",
+			vars: map[string]interface{}{
+				"firstItems":  LimitMax,
+				"afterItems":  nil,
+				"firstFields": LimitMax,
+				"afterFields": nil,
+				"login":       "github",
+				"number":      1,
+				"queryItems":  "assignee:octocat",
+			},
+		},
+		{
+			name: "viewer owner",
+			owner: &Owner{
+				Type: ViewerOwner,
+				ID:   "viewer ID",
+			},
+			queryName: "ViewerProjectWithItems",
+			dataKey:   "viewer",
+			vars: map[string]interface{}{
+				"firstItems":  LimitMax,
+				"afterItems":  nil,
+				"firstFields": LimitMax,
+				"afterFields": nil,
+				"number":      1,
+				"queryItems":  "assignee:octocat",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			gock.Observe(gock.DumpRequest)
+
+			gock.New("https://api.github.com").
+				Post("/graphql").
+				JSON(map[string]interface{}{
+					"query":     "query " + tt.queryName + ".*",
+					"variables": tt.vars,
+				}).
+				Reply(200).
+				JSON(map[string]interface{}{
+					"data": map[string]interface{}{
+						tt.dataKey: map[string]interface{}{
+							"projectV2": map[string]interface{}{
+								"items": map[string]interface{}{
+									"nodes": []map[string]interface{}{
+										{
+											"id": "issue ID",
+										},
+									},
+								},
+							},
+						},
+					},
+				})
+
+			client := NewTestClient()
+			project, err := client.ProjectItems(tt.owner, 1, LimitMax, "assignee:octocat")
+			assert.NoError(t, err)
+			assert.Len(t, project.Items.Nodes, 1)
+		})
+	}
+}
+
 func TestProjectFields_LowerLimit(t *testing.T) {
 
 	defer gock.Off()
