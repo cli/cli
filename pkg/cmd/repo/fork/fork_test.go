@@ -483,6 +483,22 @@ func TestRepoFork(t *testing.T) {
 			wantErrOut: "✓ Created fork gamehendge/REPO\n✓ Cloned fork\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 		{
+			name: "repo arg with --remote for current repo",
+			tty:  true,
+			opts: &ForkOptions{
+				Repository: "OWNER/REPO",
+				Remote:     true,
+				RemoteName: defaultRemoteName,
+				Rename:     true,
+			},
+			httpStubs: forkPost,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register("git remote rename origin upstream", 0, "")
+				cs.Register(`git remote add origin https://github.com/someone/REPO.git`, 0, "")
+			},
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Renamed remote origin to upstream\n✓ Added remote origin\n",
+		},
+		{
 			name: "repo arg url arg",
 			tty:  true,
 			opts: &ForkOptions{

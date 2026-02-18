@@ -144,10 +144,11 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 
 func forkRun(opts *ForkOptions) error {
 	var repoToFork ghrepo.Interface
+	var baseRepo ghrepo.Interface
 	var err error
 	inParent := false // whether or not we're forking the repo we're currently "in"
 	if opts.Repository == "" {
-		baseRepo, err := opts.BaseRepo()
+		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return fmt.Errorf("unable to determine base repository: %w", err)
 		}
@@ -180,6 +181,17 @@ func forkRun(opts *ForkOptions) error {
 			repoToFork, err = ghrepo.FromFullName(repoArg)
 			if err != nil {
 				return fmt.Errorf("argument error: %w", err)
+			}
+		}
+	}
+
+	if opts.Repository != "" && opts.Remote {
+		if currentRepo, currentRepoErr := opts.BaseRepo(); currentRepoErr == nil {
+			baseRepo = currentRepo
+			if strings.EqualFold(baseRepo.RepoHost(), repoToFork.RepoHost()) &&
+				strings.EqualFold(baseRepo.RepoOwner(), repoToFork.RepoOwner()) &&
+				strings.EqualFold(baseRepo.RepoName(), repoToFork.RepoName()) {
+				inParent = true
 			}
 		}
 	}
