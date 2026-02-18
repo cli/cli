@@ -114,7 +114,7 @@ func runList(config listConfig) error {
 			return err
 		}
 		if !features.ProjectItemQuery {
-			return fmt.Errorf("the `--query` flag is not supported on this GitHub host")
+			return errors.New("the `--query` flag is not supported on this GitHub host")
 		}
 	}
 
