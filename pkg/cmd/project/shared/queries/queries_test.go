@@ -198,7 +198,7 @@ func TestProjectItems_WithQuery(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
-				"queryItems":  "assignee:octocat",
+				"query":       "assignee:octocat",
 			},
 		},
 		{
@@ -217,7 +217,7 @@ func TestProjectItems_WithQuery(t *testing.T) {
 				"afterFields": nil,
 				"login":       "github",
 				"number":      1,
-				"queryItems":  "assignee:octocat",
+				"query":       "assignee:octocat",
 			},
 		},
 		{
@@ -234,7 +234,7 @@ func TestProjectItems_WithQuery(t *testing.T) {
 				"firstFields": LimitMax,
 				"afterFields": nil,
 				"number":      1,
-				"queryItems":  "assignee:octocat",
+				"query":       "assignee:octocat",
 			},
 		},
 	}
@@ -281,7 +281,7 @@ func TestProjectItems_NoQueryDoesNotUseQueryItems(t *testing.T) {
 		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 			body, err := io.ReadAll(req.Body)
 			assert.NoError(t, err)
-			assert.NotContains(t, string(body), "$queryItems")
+			assert.NotContains(t, string(body), "$query")
 
 			return &http.Response{
 				StatusCode: 200,
@@ -322,7 +322,7 @@ func TestProjects_ViewerQueryDoesNotUseQueryItems(t *testing.T) {
 		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 			body, err := io.ReadAll(req.Body)
 			assert.NoError(t, err)
-			assert.NotContains(t, string(body), "$queryItems")
+			assert.NotContains(t, string(body), "$query")
 
 			return &http.Response{
 				StatusCode: 200,

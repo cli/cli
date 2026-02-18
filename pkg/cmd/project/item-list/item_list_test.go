@@ -669,7 +669,7 @@ func TestRunList_WithQuery(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
-				"queryItems":  "assignee:octocat -status:Done",
+				"query":       "assignee:octocat -status:Done",
 			},
 		}).
 		Reply(200).

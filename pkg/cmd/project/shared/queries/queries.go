@@ -134,7 +134,7 @@ type Project struct {
 		PageInfo   PageInfo
 		TotalCount int
 		Nodes      []ProjectItem
-	} `graphql:"items(first: $firstItems, after: $afterItems, query: $queryItems)"`
+	} `graphql:"items(first: $firstItems, after: $afterItems, query: $query)"`
 	Fields ProjectFields `graphql:"fields(first: $firstFields, after: $afterFields)"`
 	Owner  struct {
 		TypeName string `graphql:"__typename"`
@@ -173,7 +173,7 @@ type projectDTOWithItemQuery struct {
 		PageInfo   PageInfo
 		TotalCount int
 		Nodes      []ProjectItem
-	} `graphql:"items(first: $firstItems, after: $afterItems, query: $queryItems)"`
+	} `graphql:"items(first: $firstItems, after: $afterItems, query: $query)"`
 	Fields ProjectFields `graphql:"fields(first: $firstFields, after: $afterFields)"`
 }
 
@@ -606,7 +606,7 @@ func (c *Client) ProjectItems(o *Owner, number int32, limit int, queryStr string
 		"number":      githubv4.Int(number),
 	}
 	if queryStr != "" {
-		variables["queryItems"] = githubv4.String(queryStr)
+		variables["query"] = githubv4.String(queryStr)
 	}
 
 	var query pager[ProjectItem]
