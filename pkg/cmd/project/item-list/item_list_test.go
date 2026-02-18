@@ -140,7 +140,6 @@ func TestRunList_User_tty(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
-				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -251,7 +250,6 @@ func TestRunList_User(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
-				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -359,7 +357,6 @@ func TestRunList_Org(t *testing.T) {
 				"afterFields": nil,
 				"login":       "github",
 				"number":      1,
-				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -457,7 +454,6 @@ func TestRunList_Me(t *testing.T) {
 				"firstFields": queries.LimitMax,
 				"afterFields": nil,
 				"number":      1,
-				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -565,7 +561,6 @@ func TestRunList_JSON(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
-				"queryItems":  "",
 			},
 		}).
 		Reply(200).

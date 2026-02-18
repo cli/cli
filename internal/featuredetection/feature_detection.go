@@ -61,7 +61,7 @@ var allRepositoryFeatures = RepositoryFeatures{
 
 type ProjectFeatures struct {
 	// ProjectItemQuery indicates support for the `query` argument on
-	// ProjectV2.items.
+	// ProjectV2.items (supported on github.com and GHES 3.20+).
 	ProjectItemQuery bool
 }
 
@@ -295,7 +295,7 @@ func (d *detector) ProjectFeatures() (ProjectFeatures, error) {
 		return allProjectFeatures, nil
 	}
 
-	features := ProjectFeatures{}
+	var features ProjectFeatures
 
 	var featureDetection struct {
 		ProjectV2 struct {
@@ -314,13 +314,19 @@ func (d *detector) ProjectFeatures() (ProjectFeatures, error) {
 		return features, err
 	}
 
+	found := false
 	for _, field := range featureDetection.ProjectV2.Fields {
 		if field.Name == "items" {
 			for _, arg := range field.Args {
 				if arg.Name == "query" {
 					features.ProjectItemQuery = true
+					found = true
+					break
 				}
 			}
+		}
+		if found {
+			break
 		}
 	}
 

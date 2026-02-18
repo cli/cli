@@ -2,14 +2,12 @@ package itemlist
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/client"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -38,6 +36,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 	listCmd := &cobra.Command{
 		Short: "List the items in a project",
 		Use:   "item-list [<number>]",
+		Long: heredoc.Doc(`
+			List the items in a project.
+
+			If supported by the API host, the --query option can be used to perform advanced
+			search. For the full syntax, see:
+			https://docs.github.com/en/issues/planning-and-tracking-with-projects/customizing-views-in-your-project/filtering-projects
+		`),
 		Example: heredoc.Doc(`
 			# List the items in the current users's project "1"
 			$ gh project item-list 1 --owner "@me"
@@ -77,23 +82,25 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 				return runF(config)
 			}
 
-			httpClient, err := f.HttpClient()
-			if err != nil {
-				return err
+			if opts.query != "" {
+				httpClient, err := f.HttpClient()
+				if err != nil {
+					return err
+				}
+				cfg, err := f.Config()
+				if err != nil {
+					return err
+				}
+				host, _ := cfg.Authentication().DefaultHost()
+				config.detector = fd.NewDetector(api.NewCachedHTTPClient(httpClient, time.Hour*24), host)
 			}
-			host := os.Getenv("GH_HOST")
-			if host == "" {
-				host = ghinstance.Default()
-			}
-			config.detector = fd.NewDetector(api.NewCachedHTTPClient(httpClient, time.Hour*24), host)
 
 			return runList(config)
 		},
 	}
 
 	listCmd.Flags().StringVar(&opts.owner, "owner", "", "Login of the owner. Use \"@me\" for the current user.")
-	listCmd.Flags().StringVar(&opts.query, "query", "", `Filter items using the Projects filter syntax, e.g. "assignee:octocat -status:Done".
-For the full syntax, see <https://docs.github.com/en/issues/planning-and-tracking-with-projects/customizing-views-in-your-project/filtering-projects>`)
+	listCmd.Flags().StringVar(&opts.query, "query", "", `Filter items using the Projects filter syntax, e.g. "assignee:octocat -status:Done".`)
 	cmdutil.AddFormatFlags(listCmd, &opts.exporter)
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", queries.LimitDefault, "Maximum number of items to fetch")
 
@@ -102,6 +109,9 @@ For the full syntax, see <https://docs.github.com/en/issues/planning-and-trackin
 
 func runList(config listConfig) error {
 	if config.opts.query != "" {
+		if config.detector == nil {
+			return fmt.Errorf("the `--query` flag is not supported on this GitHub host")
+		}
 		features, err := config.detector.ProjectFeatures()
 		if err != nil {
 			return err

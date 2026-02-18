@@ -24,7 +24,6 @@ func TestProjectItems_DefaultLimit(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
-				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -78,7 +77,6 @@ func TestProjectItems_LowerLimit(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
-				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -129,7 +127,6 @@ func TestProjectItems_NoLimit(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
-				"queryItems":  "",
 			},
 		}).
 		Reply(200).
@@ -384,7 +381,6 @@ func TestProjectItems_FieldTitle(t *testing.T) {
 				"afterFields": nil,
 				"login":       "monalisa",
 				"number":      1,
-				"queryItems":  "",
 			},
 		}).
 		Reply(200).
