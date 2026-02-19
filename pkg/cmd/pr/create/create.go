@@ -691,12 +691,14 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 
 	var baseRepo *api.Repository
+	var baseRepoOriginal ghrepo.Interface
 	if br, err := resolvedRemotes.BaseRepo(opts.IO); err == nil {
 		if r, ok := br.(*api.Repository); ok {
 			baseRepo = r
 		} else {
 			// TODO: if RepoNetwork is going to be requested anyway in `repoContext.HeadRepos()`,
 			// consider piggybacking on that result instead of performing a separate lookup
+			baseRepoOriginal = br
 			baseRepo, err = api.GitHubRepo(client, br)
 			if err != nil {
 				return nil, err
@@ -719,6 +721,9 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		// In that case, we might just have a mess? In any case, this is what the old code did, so I don't want to change
 		// it as part of an already large refactor.
 		baseRemote, _ := resolvedRemotes.RemoteForRepo(baseRepo)
+		if baseRemote == nil && baseRepoOriginal != nil {
+			baseRemote, _ = resolvedRemotes.RemoteForRepo(baseRepoOriginal)
+		}
 		if baseRemote != nil {
 			baseTrackingBranch = fmt.Sprintf("%s/%s", baseRemote.Name, baseTrackingBranch)
 		}
@@ -817,10 +822,15 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	// If we were able to determine a head repo, then let's check that the remote tracking ref matches the SHA of
 	// HEAD. If it does, then we don't need to push, otherwise we'll need to ask the user to tell us where to push.
 	if headRepo, present := defaultPRHead.Repo.Value(); present {
+		headRepoOriginal := headRepo
+		headRepo = normalizeHeadRepoForBase(client, headRepo, baseRepo)
 		// We may not find a remote because the git branch config may have a URL rather than a remote name.
 		// Ideally, we would return a sentinel error from RemoteForRepo that we could compare to, but the
 		// refactor that introduced this code was already large enough.
 		headRemote, _ := resolvedRemotes.RemoteForRepo(headRepo)
+		if headRemote == nil && headRepoOriginal != nil {
+			headRemote, _ = resolvedRemotes.RemoteForRepo(headRepoOriginal)
+		}
 		if headRemote != nil {
 			resolvedRefs, _ := opts.GitClient.ShowRefs(
 				context.Background(),
@@ -900,9 +910,11 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 				return nil, err
 			}
 
+			headRepoForRef := normalizeHeadRepoForBase(client, remote, baseRepo)
+
 			qualifiedHeadRef := shared.NewQualifiedHeadRefWithoutOwner(ref.Branch)
-			if baseRepo.RepoOwner() != remote.RepoOwner() {
-				qualifiedHeadRef = shared.NewQualifiedHeadRef(remote.RepoOwner(), ref.Branch)
+			if baseRepo.RepoOwner() != headRepoForRef.RepoOwner() {
+				qualifiedHeadRef = shared.NewQualifiedHeadRef(headRepoForRef.RepoOwner(), ref.Branch)
 			}
 
 			return newCreateContext(skipPushRefs{
@@ -997,6 +1009,29 @@ func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
 		}
 	}
 	return remotes, nil
+}
+
+func normalizeHeadRepoForBase(client *api.Client, headRepo ghrepo.Interface, baseRepo *api.Repository) ghrepo.Interface {
+	if headRepo == nil || baseRepo == nil {
+		return headRepo
+	}
+	if ghrepo.IsSame(headRepo, baseRepo) {
+		return baseRepo
+	}
+	if !strings.EqualFold(headRepo.RepoHost(), baseRepo.RepoHost()) ||
+		!strings.EqualFold(headRepo.RepoName(), baseRepo.RepoName()) ||
+		strings.EqualFold(headRepo.RepoOwner(), baseRepo.RepoOwner()) {
+		return headRepo
+	}
+
+	if resolved, err := api.GitHubRepo(client, headRepo); err == nil {
+		if ghrepo.IsSame(resolved, baseRepo) {
+			return baseRepo
+		}
+		return resolved
+	}
+
+	return headRepo
 }
 
 func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState, projectV1Support gh.ProjectsV1Support) error {

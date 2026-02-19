@@ -24,6 +24,11 @@ func TestGitHubRepo_notFound(t *testing.T) {
 		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`{ "data": { "repository": null } }`))
 
+	httpReg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO"),
+		httpmock.StatusJSONResponse(404, map[string]string{"message": "Not Found"}),
+	)
+
 	client := newTestClient(httpReg)
 	repo, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
 	if err == nil {
@@ -35,6 +40,49 @@ func TestGitHubRepo_notFound(t *testing.T) {
 	if repo != nil {
 		t.Errorf("GitHubRepo: expected nil repo, got %v", repo)
 	}
+}
+
+func TestGitHubRepo_redirected(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`{ "data": { "repository": null } }`))
+
+	httpReg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO"),
+		httpmock.JSONResponse(map[string]interface{}{
+			"name": "REPO",
+			"owner": map[string]interface{}{
+				"login": "NEWOWNER",
+			},
+		}),
+	)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`{
+			"data": {
+				"repository": {
+					"name": "REPO",
+					"owner": { "login": "NEWOWNER" },
+					"defaultBranchRef": { "name": "main" },
+					"mergeCommitAllowed": true,
+					"rebaseMergeAllowed": true,
+					"squashMergeAllowed": true
+				}
+			}
+		}`),
+	)
+
+	client := newTestClient(httpReg)
+	repo, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
+	require.NoError(t, err)
+	require.NotNil(t, repo)
+	assert.Equal(t, "NEWOWNER", repo.Owner.Login)
+	assert.Equal(t, "REPO", repo.Name)
+	assert.Equal(t, "main", repo.DefaultBranchRef.Name)
 }
 
 func Test_RepoMetadata(t *testing.T) {

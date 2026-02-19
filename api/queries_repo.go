@@ -310,6 +310,24 @@ func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*R
 }
 
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
+	result, err := gitHubRepoGraphQL(client, repo)
+	if err == nil {
+		return result, nil
+	}
+
+	if !isGraphQLNotFound(err) {
+		return nil, err
+	}
+
+	redirected, redirectErr := resolveRepoRedirect(client, repo)
+	if redirectErr != nil || redirected == nil || ghrepo.IsSame(redirected, repo) {
+		return nil, err
+	}
+
+	return gitHubRepoGraphQL(client, redirected)
+}
+
+func gitHubRepoGraphQL(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	fragment repo on Repository {
 		id
@@ -360,6 +378,42 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	}
 
 	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
+}
+
+func isGraphQLNotFound(err error) bool {
+	var gqlErr GraphQLError
+	if !errors.As(err, &gqlErr) {
+		return false
+	}
+	if len(gqlErr.Errors) == 0 {
+		return false
+	}
+	for _, ge := range gqlErr.Errors {
+		if ge.Type != "NOT_FOUND" {
+			return false
+		}
+	}
+	return true
+}
+
+func resolveRepoRedirect(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error) {
+	var response struct {
+		Name  string `json:"name"`
+		Owner struct {
+			Login string `json:"login"`
+		} `json:"owner"`
+	}
+
+	path := fmt.Sprintf("repos/%s/%s", repo.RepoOwner(), repo.RepoName())
+	if err := client.REST(repo.RepoHost(), "GET", path, nil, &response); err != nil {
+		return nil, err
+	}
+
+	if response.Name == "" || response.Owner.Login == "" {
+		return nil, fmt.Errorf("unexpected repository response for %s/%s", repo.RepoOwner(), repo.RepoName())
+	}
+
+	return ghrepo.NewWithHost(response.Owner.Login, response.Name, repo.RepoHost()), nil
 }
 
 func RepoDefaultBranch(client *Client, repo ghrepo.Interface) (string, error) {
