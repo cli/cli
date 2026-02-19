@@ -1562,6 +1562,26 @@ func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
 	}
 }
 
+// CommitExists reports whether a commit SHA exists in the given repository.
+func CommitExists(client *Client, repo ghrepo.Interface, sha string) (bool, error) {
+	path := fmt.Sprintf("%srepos/%s/%s/commits/%s",
+		ghinstance.RESTPrefix(repo.RepoHost()),
+		repo.RepoOwner(), repo.RepoName(), sha)
+	resp, err := client.HTTP().Head(path)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case 200:
+		return true, nil
+	case 404, 422:
+		return false, nil
+	default:
+		return false, ghAPI.HandleHTTPError(resp)
+	}
+}
+
 // RepoLicenses fetches available repository licenses.
 // It uses API v3 because licenses are not supported by GraphQL.
 func RepoLicenses(httpClient *http.Client, hostname string) ([]License, error) {

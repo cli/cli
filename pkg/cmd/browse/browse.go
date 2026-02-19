@@ -241,6 +241,22 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 			return "", nil
 		}
 		if isNumber(opts.SelectorArg) {
+			if isCommit(opts.SelectorArg) {
+				// The argument is both a valid issue/PR number and a valid commit SHA
+				// (all decimal digits, 7+ chars). Query the API to disambiguate.
+				httpClient, err := opts.HttpClient()
+				if err != nil {
+					return "", err
+				}
+				apiClient := api.NewClientFromHTTP(httpClient)
+				exists, err := api.CommitExists(apiClient, baseRepo, opts.SelectorArg)
+				if err != nil {
+					return "", err
+				}
+				if exists {
+					return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+				}
+			}
 			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 		}
 		if isCommit(opts.SelectorArg) {

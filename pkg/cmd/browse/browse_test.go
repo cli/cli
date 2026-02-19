@@ -584,6 +584,36 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/bchadwic/test/commit/6e3689d5",
 			wantsErr:    false,
 		},
+		{
+			name: "decimal-only selector arg that is an existing commit",
+			opts: BrowseOptions{
+				SelectorArg: "1234567",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("HEAD", "repos/bchadwic/test/commits/1234567"),
+					httpmock.StatusStringResponse(200, ""),
+				)
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/commit/1234567",
+			wantsErr:    false,
+		},
+		{
+			name: "decimal-only selector arg that is not an existing commit",
+			opts: BrowseOptions{
+				SelectorArg: "1234567",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("HEAD", "repos/bchadwic/test/commits/1234567"),
+					httpmock.StatusStringResponse(404, ""),
+				)
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/issues/1234567",
+			wantsErr:    false,
+		},
 
 		{
 			name: "commit hash with extension",
