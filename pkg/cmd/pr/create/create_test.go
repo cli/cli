@@ -204,6 +204,12 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name:     "dry-run and json",
+			tty:      false,
+			cli:      "--title mytitle --body '' --dry-run --json id",
+			wantsErr: true,
+		},
+		{
 			name:     "editor by cli",
 			tty:      true,
 			cli:      "--editor",
@@ -383,6 +389,84 @@ func Test_createRun(t *testing.T) {
 				return func() {}
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
+		},
+		{
+			name: "nontty-json",
+			tty:  false,
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"ID": "PR_kwDOA",
+							"Number": 12,
+							"URL": "https://github.com/OWNER/REPO/pull/12",
+							"HeadRefName": "feature",
+							"BaseRefName": "master",
+							"IsDraft": false,
+							"Title": "my title",
+							"Body": "my body",
+							"State": "OPEN",
+							"CreatedAt": "2025-01-01T00:00:00Z"
+						} } } }`,
+						func(input map[string]interface{}) {
+							assert.Equal(t, "REPOID", input["repositoryId"])
+							assert.Equal(t, "my title", input["title"])
+							assert.Equal(t, "my body", input["body"])
+							assert.Equal(t, "master", input["baseRefName"])
+							assert.Equal(t, "feature", input["headRefName"])
+						}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields([]string{"id", "url", "number"})
+				opts.Exporter = exporter
+				return func() {}
+			},
+			expectedOut: "{\"id\":\"PR_kwDOA\",\"number\":12,\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
+		},
+		{
+			name: "nontty-json-all-fields",
+			tty:  false,
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"ID": "PR_kwDOA",
+							"Number": 12,
+							"URL": "https://github.com/OWNER/REPO/pull/12",
+							"HeadRefName": "feature",
+							"BaseRefName": "master",
+							"IsDraft": true,
+							"Title": "my title",
+							"Body": "my body",
+							"State": "OPEN",
+							"CreatedAt": "2025-01-01T00:00:00Z"
+						} } } }`,
+						func(input map[string]interface{}) {
+							assert.Equal(t, "REPOID", input["repositoryId"])
+							assert.Equal(t, true, input["draft"])
+						}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.IsDraft = true
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields([]string{"id", "url", "number", "headRefName", "baseRefName", "isDraft", "title", "state"})
+				opts.Exporter = exporter
+				return func() {}
+			},
+			expectedOut: "{\"baseRefName\":\"master\",\"headRefName\":\"feature\",\"id\":\"PR_kwDOA\",\"isDraft\":true,\"number\":12,\"state\":\"OPEN\",\"title\":\"my title\",\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
 		},
 		{
 			name: "same head and base branch should error",

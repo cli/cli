@@ -560,7 +560,15 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 			createPullRequest(input: $input) {
 				pullRequest {
 					id
+					number
 					url
+					headRefName
+					baseRefName
+					isDraft
+					title
+					body
+					state
+					createdAt
 				}
 			}
 	}`

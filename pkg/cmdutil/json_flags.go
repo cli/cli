@@ -41,6 +41,103 @@ func AddJSONFlagsWithoutShorthand(cmd *cobra.Command, exportTarget *Exporter, fi
 	setupJsonFlags(cmd, exportTarget, fields)
 }
 
+// AddJSONFlagsWithoutTemplate registers --json and --jq without --template,
+// for use by commands that already define their own --template flag.
+func AddJSONFlagsWithoutTemplate(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
+	f := cmd.Flags()
+	addJsonFlag(f)
+	addJqFlag(f, "")
+
+	setupJSONFlagsWithoutTemplate(cmd, exportTarget, fields)
+}
+
+func setupJSONFlagsWithoutTemplate(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
+	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var results []string
+		var prefix string
+		if idx := strings.LastIndexByte(toComplete, ','); idx >= 0 {
+			prefix = toComplete[:idx+1]
+			toComplete = toComplete[idx+1:]
+		}
+		toComplete = strings.ToLower(toComplete)
+		for _, f := range fields {
+			if strings.HasPrefix(strings.ToLower(f), toComplete) {
+				results = append(results, prefix+f)
+			}
+		}
+		sort.Strings(results)
+		return results, cobra.ShellCompDirectiveNoSpace
+	})
+
+	oldPreRun := cmd.PreRunE
+	cmd.PreRunE = func(c *cobra.Command, args []string) error {
+		if oldPreRun != nil {
+			if err := oldPreRun(c, args); err != nil {
+				return err
+			}
+		}
+		if export, err := checkJSONFlagsWithoutTemplate(c); err == nil {
+			if export == nil {
+				*exportTarget = nil
+			} else {
+				allowedFields := set.NewStringSet()
+				allowedFields.AddValues(fields)
+				for _, f := range export.fields {
+					if !allowedFields.Contains(f) {
+						sort.Strings(fields)
+						return JSONFlagError{fmt.Errorf("Unknown JSON field: %q\nAvailable fields:\n  %s", f, strings.Join(fields, "\n  "))}
+					}
+				}
+				*exportTarget = export
+			}
+		} else {
+			return err
+		}
+		return nil
+	}
+
+	cmd.SetFlagErrorFunc(func(c *cobra.Command, e error) error {
+		if c == cmd && e.Error() == "flag needs an argument: --json" {
+			sort.Strings(fields)
+			return JSONFlagError{fmt.Errorf("Specify one or more comma-separated fields for `--json`:\n  %s", strings.Join(fields, "\n  "))}
+		}
+		if cmd.HasParent() {
+			return cmd.Parent().FlagErrorFunc()(c, e)
+		}
+		return e
+	})
+
+	if len(fields) == 0 {
+		return
+	}
+
+	if cmd.Annotations == nil {
+		cmd.Annotations = map[string]string{}
+	}
+	cmd.Annotations["help:json-fields"] = strings.Join(fields, ",")
+}
+
+func checkJSONFlagsWithoutTemplate(cmd *cobra.Command) (*jsonExporter, error) {
+	f := cmd.Flags()
+	jsonFlag := f.Lookup("json")
+	jqFlag := f.Lookup("jq")
+	webFlag := f.Lookup("web")
+
+	if jsonFlag.Changed {
+		if webFlag != nil && webFlag.Changed {
+			return nil, errors.New("cannot use `--web` with `--json`")
+		}
+		jv := jsonFlag.Value.(pflag.SliceValue)
+		return &jsonExporter{
+			fields: jv.GetSlice(),
+			filter: jqFlag.Value.String(),
+		}, nil
+	} else if jqFlag.Changed {
+		return nil, errors.New("cannot use `--jq` without specifying `--json`")
+	}
+	return nil, nil
+}
+
 func addJsonFlag(f *pflag.FlagSet) {
 	f.StringSlice("json", nil, "Output JSON with the specified `fields`")
 }
