@@ -2030,6 +2030,61 @@ func TestPrAddToMergeQueueAdminWithMergeStrategy(t *testing.T) {
 	assert.Equal(t, "✓ Merged pull request OWNER/REPO#1 (The title of the PR)\n", output.Stderr())
 }
 
+func TestPrMerge_retryOnBaseBranchModified(t *testing.T) {
+	orig := mergeRetryInterval
+	mergeRetryInterval = 0
+	t.Cleanup(func() { mergeRetryInterval = orig })
+
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.StringResponse(`
+		{ "data": {},
+			"errors": [
+				{
+					"message": "Base branch was modified. Review and try the merge again."
+				}
+			]
+		}`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+		}),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, nil, "main", true, "pr merge 1 --merge")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Merged pull request OWNER/REPO#1 \(The title of the PR\)`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
 type testEditor struct{}
 
 func (e testEditor) Edit(filename, text string) (string, error) {

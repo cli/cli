@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
@@ -56,6 +59,9 @@ type MergeOptions struct {
 
 // ErrAlreadyInMergeQueue indicates that the pull request is already in a merge queue
 var ErrAlreadyInMergeQueue = errors.New("already in merge queue")
+
+// Allow injecting backoff interval in tests.
+var mergeRetryInterval = 2 * time.Second
 
 func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Command {
 	opts := &MergeOptions{
@@ -345,8 +351,14 @@ func (m *mergeContext) merge() error {
 		}
 	}
 
-	err := mergePullRequest(m.httpClient, payload)
-	if err != nil {
+	bo := backoff.NewConstantBackOff(mergeRetryInterval)
+	if err := backoff.Retry(func() error {
+		err := mergePullRequest(m.httpClient, payload)
+		if err == nil || shouldRetry(err) {
+			return err
+		}
+		return backoff.Permanent(err)
+	}, backoff.WithMaxRetries(bo, 3)); err != nil {
 		return err
 	}
 
@@ -758,6 +770,21 @@ func remoteForMergeConflictResolution(baseRepo ghrepo.Interface, pr *api.PullReq
 
 func mergeConflictStatus(status string) bool {
 	return status == MergeStateStatusDirty
+}
+
+// The "Base branch was modified" error occurs when the base
+// branch is updated by another merge and the mergeability
+// computation hasn't completed yet.
+func shouldRetry(err error) bool {
+	var graphErr api.GraphQLError
+	if errors.As(err, &graphErr) {
+		for _, e := range graphErr.Errors {
+			if strings.Contains(e.Message, "Base branch was modified.") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func isImmediatelyMergeable(status string) bool {
