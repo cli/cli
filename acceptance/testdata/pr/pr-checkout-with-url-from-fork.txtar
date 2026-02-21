@@ -35,4 +35,4 @@ stdout2env PR_URL
 # Checkout the PR by full URL in the upstream repo
 cd ${WORK}/${REPO}
 exec gh pr checkout ${PR_URL}
-stderr 'Switched to branch ''feature-branch'''
+stderr 'Switched to a new branch ''${ORG}/feature-branch'''

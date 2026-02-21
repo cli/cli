@@ -181,6 +181,8 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 	localBranch := pr.HeadRefName
 	if opts.BranchName != "" {
 		localBranch = opts.BranchName
+	} else if pr.IsCrossRepository {
+		localBranch = fmt.Sprintf("%s/%s", remote.Name, pr.HeadRefName)
 	}
 
 	switch {
@@ -214,6 +216,8 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 	localBranch := pr.HeadRefName
 	if opts.BranchName != "" {
 		localBranch = opts.BranchName
+	} else if pr.IsCrossRepository && pr.HeadRepositoryOwner.Login != "" {
+		localBranch = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, pr.HeadRefName)
 	} else if pr.HeadRefName == defaultBranch {
 		// avoid naming the new branch the same as the default branch
 		localBranch = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, localBranch)
