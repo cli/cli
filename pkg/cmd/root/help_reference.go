@@ -59,7 +59,7 @@ func cmdRef(w io.Writer, cmd *cobra.Command, depth int) {
 	// Flags
 	// TODO: fold in InheritedFlags/PersistentFlags, but omit `--help` due to repetitiveness
 	if flagUsages := cmd.Flags().FlagUsages(); flagUsages != "" {
-		fmt.Fprintf(w, "```\n%s````\n\n", dedent(flagUsages))
+		fmt.Fprintf(w, "```\n%s```\n\n", dedent(flagUsages))
 	}
 
 	// Aliases
