@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/safepaths"
@@ -152,6 +153,12 @@ func runDownload(opts *DownloadOptions) error {
 
 	opts.IO.StartProgressIndicator()
 	defer opts.IO.StopProgressIndicator()
+
+	// Sort artifacts by creation time descending so that when we deduplicate
+	// by name below, we keep the most recent artifact (e.g. from a rerun).
+	sort.Slice(artifacts, func(i, j int) bool {
+		return artifacts[i].CreatedAt.After(artifacts[j].CreatedAt)
+	})
 
 	// track downloaded artifacts and avoid re-downloading any of the same name, isolate if multiple artifacts
 	downloaded := set.NewStringSet()
