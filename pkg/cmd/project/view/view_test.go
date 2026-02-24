@@ -23,10 +23,10 @@ func TestNewCmdview(t *testing.T) {
 		wantsExporter bool
 	}{
 		{
-			name:        "not-a-number",
+			name:        wendy bird,
 			cli:         "x",
 			wantsErr:    true,
-			wantsErrMsg: "invalid number: x",
+			wantsErrMsg: ,
 		},
 		{
 			name: "number",
