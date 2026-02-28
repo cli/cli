@@ -585,6 +585,11 @@ func Test_requiredScopesFromServerMessage(t *testing.T) {
 			msg:  "Your token has not been granted the required scopes to execute this query. The 'dataType' field requires one of the following scopes: ['read:project', 'read:discussion', 'codespace'], but your token has only been granted the: [repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens.",
 			want: []string{"read:project", "read:discussion", "codespace"},
 		},
+		{
+			name: "project scope required for addProjectV2ItemById",
+			msg: "Your token has not been granted the required scopes to execute this query. The 'addProjectV2ItemById' field requires one of the following scopes: ['project'], but your token has only been granted the: ['gist', 'read:org', 'read:project', 'repo', 'workflow'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens.",
+			want: []string{"project"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
