@@ -2,6 +2,8 @@ package api
 
 import (
 	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -466,8 +468,18 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	if resp.StatusCode == 204 {
 		return
 	}
-	var responseBody io.Reader = resp.Body
 	defer resp.Body.Close()
+
+	// Automatically decompress the body if necessary.
+	// TODO: Probably best to do this universally in github.com/cli/go-gh/pkg/api/NewHTTPClient.
+	var responseBody io.Reader
+	responseBody, err = getReader(resp)
+	if err != nil {
+		return
+	}
+	if c, ok := responseBody.(io.Closer); ok {
+		defer c.Close()
+	}
 
 	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
 
@@ -700,4 +712,32 @@ func previewNamesToMIMETypes(names []string) string {
 		types = append(types, fmt.Sprintf("application/vnd.github.%s-preview", p))
 	}
 	return strings.Join(types, ", ")
+}
+
+func getReader(resp *http.Response) (io.ReadCloser, error) {
+	encoding := strings.ToLower(resp.Header.Get("Content-Encoding"))
+
+	switch {
+	case strings.Contains(encoding, "gzip"):
+		// Remove encoding headers since body is now decoded.
+		resp.Header.Del("Content-Encoding")
+		resp.Header.Del("Content-Length")
+		resp.ContentLength = -1
+
+		return gzip.NewReader(resp.Body)
+
+	case strings.Contains(encoding, "deflate"):
+		// Remove encoding headers since body is now decoded.
+		resp.Header.Del("Content-Encoding")
+		resp.Header.Del("Content-Length")
+		resp.ContentLength = -1
+
+		return flate.NewReader(resp.Body), nil
+
+	case encoding == "":
+		return resp.Body, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported encoding: %s", encoding)
+	}
 }
