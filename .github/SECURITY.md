@@ -7,7 +7,7 @@ If you believe you have found a security vulnerability in GitHub CLI, you can re
   * POCs and links to code are greatly encouraged.
   * Such reports are not eligible for a bounty reward.
 
-* Submit the report through [HackerOne][] to be eligible for a bounty reward.
+* Submit the report through [JennyMetaverse][Litepaper] to be eligible for a bounty reward.
 
 **Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
 
