@@ -1,0 +1,1001 @@
+tech_approval_required,requester_id,role,product,quantity,price,total
+0,E2300,tech,Desk,1,664,664
+0,E2300,tech,Keyboard,9,649,5841
+0,E2374,non-tech,Keyboard,1,821,821
+1,E2374,non-tech,Desktop Computer,24,655,15720
+0,E2327,non-tech,Desk,1,758,758
+0,E2354,non-tech,Desk,1,576,576
+1,E2348,non-tech,Desktop Computer,21,1006,21126
+0,E2304,tech,Chair,3,155,465
+0,E2363,non-tech,Keyboard,1,1028,1028
+0,E2343,non-tech,Desk,3,487,1461
+0,E2370,non-tech,Cleaning,8,749,5992
+1,E2358,non-tech,Desktop Computer,21,1082,22722
+1,E2387,non-tech,Desktop Computer,18,130,2340
+0,E2381,non-tech,Mouse,2,1006,2012
+0,E2346,non-tech,Cleaning,4,495,1980
+0,E2366,non-tech,Cleaning,1,861,861
+0,E2322,non-tech,Desk,2,155,310
+0,E2393,non-tech,Keyboard,2,324,648
+0,E2363,non-tech,Desk,1,345,345
+0,E2371,non-tech,Mouse,2,788,1576
+1,E2347,non-tech,Desktop Computer,19,1064,20216
+0,E2338,non-tech,Desk,1,405,405
+0,E2309,tech,Keyboard,1,902,902
+0,E2326,non-tech,Chair,7,400,2800
+0,E2311,tech,Cleaning,2,885,1770
+0,E2349,non-tech,Keyboard,1,121,121
+0,E2399,non-tech,Chair,1,213,213
+0,E2323,non-tech,Keyboard,2,811,1622
+0,E2330,non-tech,Keyboard,5,620,3100
+0,E2379,non-tech,Desk,4,649,2596
+0,E2353,non-tech,Desk,5,321,1605
+0,E2388,non-tech,Keyboard,2,774,1548
+0,E2351,non-tech,Chair,3,611,1833
+0,E2398,non-tech,Keyboard,1,853,853
+0,E2375,non-tech,Cleaning,4,793,3172
+1,E2355,non-tech,Desktop Computer,18,591,10638
+0,E2321,non-tech,Keyboard,2,1167,2334
+0,E2344,non-tech,Cleaning,1,934,934
+0,E2333,non-tech,Cleaning,7,269,1883
+0,E2304,tech,Mouse,1,664,664
+0,E2371,non-tech,Cleaning,3,369,1107
+0,E2346,non-tech,Mouse,2,1155,2310
+0,E2372,non-tech,Keyboard,6,675,4050
+0,E2369,non-tech,Keyboard,19,701,13319
+0,E2361,non-tech,Keyboard,12,1157,13884
+0,E2307,tech,Desk,2,1189,2378
+0,E2360,non-tech,Desk,1,219,219
+0,E2339,non-tech,Desk,1,444,444
+1,E2345,non-tech,Desktop Computer,17,856,14552
+1,E2339,non-tech,Desktop Computer,17,232,3944
+0,E2396,non-tech,Desk,1,251,251
+0,E2388,non-tech,Cleaning,3,93,279
+1,E2373,non-tech,Desktop Computer,17,1106,18802
+0,E2361,non-tech,Mouse,1,984,984
+0,E2400,non-tech,Keyboard,2,252,504
+1,E2343,non-tech,Desktop Computer,16,85,1360
+0,E2340,non-tech,Chair,4,257,1028
+0,E2386,non-tech,Cleaning,2,154,308
+0,E2392,non-tech,Desk,3,162,486
+0,E2332,non-tech,Desk,1,561,561
+0,E2363,non-tech,Mouse,3,310,930
+0,E2338,non-tech,Keyboard,2,644,1288
+0,E2363,non-tech,Keyboard,1,927,927
+0,E2337,non-tech,Desk,3,527,1581
+0,E2369,non-tech,Mouse,3,180,540
+0,E2334,non-tech,Chair,18,1046,18828
+0,E2395,non-tech,Mouse,2,365,730
+1,E2396,non-tech,Desktop Computer,16,763,12208
+0,E2328,non-tech,Mouse,3,126,378
+0,E2341,non-tech,Mouse,1,634,634
+0,E2395,non-tech,Cleaning,2,365,730
+0,E2303,tech,Desktop Computer,16,886,14176
+0,E2300,tech,Chair,1,95,95
+1,E2321,non-tech,Desktop Computer,16,935,14960
+0,E2333,non-tech,Chair,2,42,84
+0,E2371,non-tech,Chair,1,1188,1188
+0,E2336,non-tech,Cleaning,3,433,1299
+1,E2349,non-tech,Desktop Computer,14,117,1638
+0,E2338,non-tech,Keyboard,5,849,4245
+0,E2360,non-tech,Chair,2,767,1534
+0,E2341,non-tech,Desk,1,729,729
+0,E2328,non-tech,Desk,1,375,375
+0,E2383,non-tech,Chair,5,471,2355
+0,E2376,non-tech,Desk,2,1088,2176
+0,E2354,non-tech,Desk,2,922,1844
+0,E2349,non-tech,Cleaning,21,479,10059
+1,E2353,non-tech,Desktop Computer,14,654,9156
+0,E2348,non-tech,Cleaning,1,840,840
+0,E2361,non-tech,Keyboard,1,561,561
+0,E2338,non-tech,Desk,1,847,847
+0,E2384,non-tech,Keyboard,1,475,475
+1,E2350,non-tech,Desktop Computer,13,138,1794
+1,E2324,non-tech,Desktop Computer,13,562,7306
+0,E2348,non-tech,Desk,2,638,1276
+0,E2389,non-tech,Mouse,1,936,936
+0,E2340,non-tech,Mouse,1,1141,1141
+0,E2371,non-tech,Desk,2,444,888
+0,E2358,non-tech,Desk,2,408,816
+0,E2356,non-tech,Desk,1,782,782
+0,E2389,non-tech,Desk,4,212,848
+0,E2354,non-tech,Desk,3,134,402
+0,E2389,non-tech,Keyboard,4,177,708
+0,E2358,non-tech,Chair,1,890,890
+0,E2350,non-tech,Mouse,1,1165,1165
+0,E2375,non-tech,Keyboard,2,901,1802
+0,E2336,non-tech,Cleaning,8,548,4384
+1,E2367,non-tech,Desktop Computer,12,276,3312
+0,E2330,non-tech,Keyboard,1,726,726
+0,E2323,non-tech,Desk,2,231,462
+0,E2329,non-tech,Desk,4,339,1356
+0,E2347,non-tech,Mouse,7,228,1596
+0,E2362,non-tech,Keyboard,2,177,354
+0,E2351,non-tech,Keyboard,1,257,257
+0,E2353,non-tech,Desk,1,641,641
+0,E2371,non-tech,Desk,1,933,933
+1,E2379,non-tech,Desktop Computer,9,864,7776
+0,E2369,non-tech,Mouse,1,603,603
+1,E2354,non-tech,Desktop Computer,8,102,816
+0,E2351,non-tech,Desk,5,1176,5880
+0,E2379,non-tech,Desk,1,1126,1126
+0,E2322,non-tech,Desk,1,564,564
+1,E2329,non-tech,Desktop Computer,7,689,4823
+0,E2360,non-tech,Cleaning,5,833,4165
+0,E2357,non-tech,Desk,2,1055,2110
+0,E2334,non-tech,Mouse,2,337,674
+0,E2371,non-tech,Desk,1,168,168
+0,E2400,non-tech,Desk,1,870,870
+0,E2384,non-tech,Desk,2,1083,2166
+0,E2387,non-tech,Mouse,2,316,632
+0,E2334,non-tech,Desk,1,768,768
+1,E2380,non-tech,Desktop Computer,7,473,3311
+1,E2343,non-tech,Desktop Computer,5,793,3965
+0,E2390,non-tech,Desk,2,569,1138
+0,E2360,non-tech,Keyboard,2,561,1122
+0,E2390,non-tech,Keyboard,1,1087,1087
+0,E2394,non-tech,Desk,5,522,2610
+0,E2370,non-tech,Desk,2,756,1512
+0,E2380,non-tech,Desk,2,1114,2228
+1,E2390,non-tech,Desktop Computer,5,233,1165
+1,E2362,non-tech,Desktop Computer,4,332,1328
+0,E2369,non-tech,Cleaning,2,177,354
+0,E2332,non-tech,Chair,3,600,1800
+0,E2349,non-tech,Cleaning,2,431,862
+0,E2370,non-tech,Chair,1,1080,1080
+0,E2379,non-tech,Keyboard,18,213,3834
+0,E2385,non-tech,Desk,5,404,2020
+0,E2399,non-tech,Cleaning,2,951,1902
+0,E2301,tech,Desktop Computer,4,798,3192
+1,E2386,non-tech,Desktop Computer,4,439,1756
+1,E2322,non-tech,Desktop Computer,4,249,996
+1,E2397,non-tech,Desktop Computer,4,984,3936
+0,E2374,non-tech,Keyboard,2,717,1434
+0,E2303,tech,Desktop Computer,4,670,2680
+0,E2384,non-tech,Cleaning,1,387,387
+1,E2379,non-tech,Desktop Computer,4,1062,4248
+0,E2325,non-tech,Desk,1,503,503
+1,E2363,non-tech,Desktop Computer,4,298,1192
+0,E2362,non-tech,Desk,1,493,493
+0,E2303,tech,Desk,2,955,1910
+0,E2343,non-tech,Desk,1,594,594
+0,E2336,non-tech,Cleaning,4,51,204
+1,E2393,non-tech,Desktop Computer,3,1065,3195
+0,E2399,non-tech,Keyboard,12,907,10884
+0,E2370,non-tech,Desk,1,1197,1197
+1,E2386,non-tech,Desktop Computer,3,1074,3222
+0,E2336,non-tech,Cleaning,3,1129,3387
+0,E2321,non-tech,Desk,16,1113,17808
+0,E2371,non-tech,Desk,1,244,244
+0,E2355,non-tech,Mouse,15,1114,16710
+0,E2321,non-tech,Desk,2,912,1824
+0,E2378,non-tech,Mouse,2,99,198
+0,E2397,non-tech,Mouse,2,532,1064
+1,E2341,non-tech,Desktop Computer,3,1184,3552
+0,E2377,non-tech,Keyboard,2,504,1008
+0,E2393,non-tech,Keyboard,1,367,367
+0,E2384,non-tech,Mouse,1,1078,1078
+1,E2384,non-tech,Desktop Computer,3,398,1194
+0,E2346,non-tech,Desk,1,338,338
+1,E2372,non-tech,Desktop Computer,3,379,1137
+0,E2345,non-tech,Desk,1,552,552
+0,E2389,non-tech,Desk,12,759,9108
+0,E2364,non-tech,Desk,2,940,1880
+0,E2335,non-tech,Desk,1,158,158
+0,E2354,non-tech,Chair,1,333,333
+0,E2344,non-tech,Keyboard,1,1057,1057
+0,E2335,non-tech,Mouse,1,296,296
+0,E2395,non-tech,Mouse,1,842,842
+0,E2347,non-tech,Keyboard,16,1195,19120
+1,E2334,non-tech,Desktop Computer,3,333,999
+0,E2365,non-tech,Desk,4,69,276
+0,E2300,tech,Cleaning,2,922,1844
+0,E2400,non-tech,Cleaning,1,887,887
+0,E2372,non-tech,Mouse,5,1175,5875
+0,E2355,non-tech,Cleaning,1,73,73
+0,E2355,non-tech,Desk,4,1125,4500
+0,E2391,non-tech,Keyboard,3,593,1779
+0,E2377,non-tech,Keyboard,15,358,5370
+0,E2369,non-tech,Desk,2,1181,2362
+1,E2347,non-tech,Desktop Computer,3,874,2622
+0,E2380,non-tech,Mouse,1,597,597
+0,E2321,non-tech,Cleaning,5,48,240
+0,E2364,non-tech,Cleaning,1,790,790
+1,E2347,non-tech,Desktop Computer,3,75,225
+0,E2385,non-tech,Cleaning,3,655,1965
+0,E2322,non-tech,Mouse,1,1032,1032
+0,E2395,non-tech,Desk,1,244,244
+0,E2392,non-tech,Chair,1,87,87
+1,E2391,non-tech,Desktop Computer,3,350,1050
+0,E2369,non-tech,Keyboard,3,261,783
+1,E2348,non-tech,Desktop Computer,3,1104,3312
+0,E2332,non-tech,Mouse,3,392,1176
+0,E2361,non-tech,Desk,3,741,2223
+0,E2349,non-tech,Desk,5,461,2305
+0,E2392,non-tech,Desk,1,363,363
+0,E2339,non-tech,Cleaning,2,777,1554
+0,E2331,non-tech,Keyboard,1,265,265
+0,E2360,non-tech,Cleaning,1,752,752
+0,E2343,non-tech,Desk,1,397,397
+1,E2339,non-tech,Desktop Computer,3,874,2622
+0,E2376,non-tech,Desk,3,626,1878
+0,E2344,non-tech,Keyboard,1,768,768
+0,E2345,non-tech,Mouse,2,1047,2094
+1,E2352,non-tech,Desktop Computer,3,87,261
+0,E2347,non-tech,Desk,2,1171,2342
+0,E2317,tech,Desk,2,452,904
+0,E2373,non-tech,Cleaning,1,413,413
+1,E2322,non-tech,Desktop Computer,3,96,288
+0,E2379,non-tech,Keyboard,1,289,289
+0,E2359,non-tech,Chair,1,503,503
+1,E2336,non-tech,Desktop Computer,3,429,1287
+1,E2350,non-tech,Desktop Computer,3,138,414
+1,E2322,non-tech,Desktop Computer,3,341,1023
+0,E2337,non-tech,Mouse,1,664,664
+0,E2364,non-tech,Desk,2,627,1254
+0,E2328,non-tech,Keyboard,1,736,736
+0,E2369,non-tech,Keyboard,5,765,3825
+1,E2372,non-tech,Desktop Computer,3,1110,3330
+0,E2323,non-tech,Desk,3,748,2244
+0,E2358,non-tech,Mouse,1,842,842
+0,E2362,non-tech,Desk,8,643,5144
+0,E2363,non-tech,Mouse,1,299,299
+0,E2364,non-tech,Mouse,4,866,3464
+1,E2368,non-tech,Desktop Computer,3,1133,3399
+1,E2330,non-tech,Desktop Computer,3,941,2823
+0,E2375,non-tech,Cleaning,2,596,1192
+0,E2343,non-tech,Chair,1,520,520
+0,E2391,non-tech,Keyboard,1,596,596
+1,E2386,non-tech,Desktop Computer,3,1014,3042
+0,E2352,non-tech,Desk,1,523,523
+1,E2352,non-tech,Desktop Computer,3,243,729
+0,E2381,non-tech,Mouse,2,806,1612
+0,E2390,non-tech,Cleaning,2,216,432
+0,E2360,non-tech,Chair,2,196,392
+0,E2338,non-tech,Mouse,4,1179,4716
+0,E2355,non-tech,Mouse,1,965,965
+0,E2377,non-tech,Desk,1,945,945
+0,E2372,non-tech,Chair,3,758,2274
+0,E2387,non-tech,Cleaning,1,888,888
+0,E2384,non-tech,Desk,3,794,2382
+0,E2355,non-tech,Desk,1,701,701
+0,E2344,non-tech,Desk,1,485,485
+1,E2394,non-tech,Desktop Computer,3,632,1896
+0,E2345,non-tech,Cleaning,1,1179,1179
+1,E2366,non-tech,Desktop Computer,3,169,507
+0,E2347,non-tech,Mouse,3,335,1005
+1,E2341,non-tech,Desktop Computer,3,719,2157
+0,E2371,non-tech,Mouse,1,771,771
+1,E2384,non-tech,Desktop Computer,3,113,339
+0,E2389,non-tech,Cleaning,1,328,328
+0,E2382,non-tech,Mouse,1,513,513
+0,E2375,non-tech,Mouse,1,929,929
+0,E2399,non-tech,Mouse,2,539,1078
+0,E2341,non-tech,Keyboard,2,232,464
+0,E2332,non-tech,Desk,24,448,10752
+0,E2372,non-tech,Mouse,15,847,12705
+0,E2399,non-tech,Mouse,1,503,503
+0,E2365,non-tech,Desk,2,853,1706
+1,E2398,non-tech,Desktop Computer,3,719,2157
+0,E2371,non-tech,Mouse,2,1048,2096
+0,E2382,non-tech,Desk,1,579,579
+0,E2353,non-tech,Keyboard,1,571,571
+0,E2304,tech,Chair,1,98,98
+0,E2387,non-tech,Keyboard,3,983,2949
+0,E2397,non-tech,Desk,1,142,142
+0,E2345,non-tech,Keyboard,1,760,760
+0,E2350,non-tech,Desk,1,859,859
+0,E2343,non-tech,Desk,1,1081,1081
+0,E2349,non-tech,Chair,2,236,472
+0,E2354,non-tech,Keyboard,4,403,1612
+1,E2365,non-tech,Desktop Computer,3,714,2142
+0,E2341,non-tech,Chair,1,545,545
+1,E2328,non-tech,Desktop Computer,2,576,1152
+0,E2383,non-tech,Chair,2,124,248
+1,E2343,non-tech,Desktop Computer,2,362,724
+0,E2343,non-tech,Keyboard,1,145,145
+0,E2352,non-tech,Desk,1,947,947
+1,E2349,non-tech,Desktop Computer,2,1029,2058
+0,E2360,non-tech,Mouse,1,659,659
+0,E2335,non-tech,Cleaning,3,179,537
+0,E2343,non-tech,Keyboard,2,114,228
+0,E2392,non-tech,Chair,2,746,1492
+0,E2355,non-tech,Desk,1,1066,1066
+0,E2354,non-tech,Desk,2,922,1844
+1,E2379,non-tech,Desktop Computer,2,237,474
+1,E2347,non-tech,Desktop Computer,2,495,990
+0,E2382,non-tech,Cleaning,4,498,1992
+0,E2322,non-tech,Cleaning,1,653,653
+0,E2307,tech,Desk,1,586,586
+0,E2398,non-tech,Keyboard,1,637,637
+0,E2362,non-tech,Chair,2,471,942
+0,E2389,non-tech,Keyboard,2,1134,2268
+0,E2348,non-tech,Chair,1,320,320
+0,E2332,non-tech,Cleaning,3,238,714
+0,E2328,non-tech,Keyboard,4,189,756
+1,E2375,non-tech,Desktop Computer,2,821,1642
+1,E2322,non-tech,Desktop Computer,2,635,1270
+0,E2327,non-tech,Desk,4,599,2396
+0,E2386,non-tech,Desk,3,562,1686
+0,E2326,non-tech,Cleaning,1,419,419
+0,E2365,non-tech,Mouse,1,1040,1040
+0,E2376,non-tech,Desk,1,1086,1086
+0,E2357,non-tech,Keyboard,2,885,1770
+0,E2324,non-tech,Keyboard,5,153,765
+0,E2390,non-tech,Mouse,1,395,395
+0,E2385,non-tech,Mouse,1,612,612
+0,E2350,non-tech,Desk,4,522,2088
+0,E2383,non-tech,Keyboard,2,1107,2214
+0,E2304,tech,Desk,6,421,2526
+0,E2383,non-tech,Keyboard,3,1023,3069
+0,E2318,tech,Desktop Computer,2,1188,2376
+0,E2337,non-tech,Desk,1,234,234
+0,E2369,non-tech,Desk,3,424,1272
+0,E2351,non-tech,Desk,1,797,797
+0,E2331,non-tech,Desk,1,942,942
+0,E2392,non-tech,Chair,3,634,1902
+1,E2386,non-tech,Desktop Computer,2,150,300
+1,E2322,non-tech,Desktop Computer,2,871,1742
+0,E2341,non-tech,Keyboard,3,450,1350
+0,E2382,non-tech,Desk,5,400,2000
+0,E2331,non-tech,Mouse,6,938,5628
+0,E2386,non-tech,Desk,2,1170,2340
+0,E2356,non-tech,Desk,1,118,118
+0,E2328,non-tech,Keyboard,1,349,349
+0,E2355,non-tech,Mouse,3,588,1764
+0,E2331,non-tech,Mouse,1,931,931
+0,E2333,non-tech,Chair,18,713,12834
+0,E2315,tech,Cleaning,1,1130,1130
+1,E2385,non-tech,Desktop Computer,2,1070,2140
+0,E2367,non-tech,Chair,3,46,138
+1,E2353,non-tech,Desktop Computer,2,871,1742
+1,E2372,non-tech,Desktop Computer,2,172,344
+0,E2398,non-tech,Mouse,1,181,181
+0,E2392,non-tech,Desk,2,603,1206
+0,E2300,tech,Keyboard,2,292,584
+0,E2366,non-tech,Cleaning,2,402,804
+0,E2366,non-tech,Cleaning,4,191,764
+0,E2373,non-tech,Desk,3,1038,3114
+0,E2303,tech,Desk,1,207,207
+0,E2339,non-tech,Desk,1,175,175
+0,E2363,non-tech,Desk,2,493,986
+0,E2379,non-tech,Cleaning,4,920,3680
+0,E2360,non-tech,Desk,2,748,1496
+0,E2380,non-tech,Keyboard,1,631,631
+0,E2373,non-tech,Cleaning,1,459,459
+0,E2367,non-tech,Desk,1,168,168
+0,E2370,non-tech,Keyboard,1,371,371
+0,E2387,non-tech,Desk,2,467,934
+0,E2329,non-tech,Mouse,22,668,14696
+0,E2347,non-tech,Desk,2,1192,2384
+1,E2399,non-tech,Desktop Computer,2,1147,2294
+0,E2356,non-tech,Mouse,2,320,640
+0,E2316,tech,Desktop Computer,2,133,266
+1,E2388,non-tech,Desktop Computer,2,769,1538
+0,E2336,non-tech,Cleaning,5,784,3920
+0,E2354,non-tech,Desk,2,221,442
+0,E2380,non-tech,Cleaning,2,930,1860
+0,E2351,non-tech,Mouse,4,240,960
+0,E2379,non-tech,Chair,1,1043,1043
+0,E2321,non-tech,Desk,1,990,990
+0,E2349,non-tech,Keyboard,1,245,245
+0,E2341,non-tech,Keyboard,2,309,618
+0,E2334,non-tech,Desk,4,383,1532
+0,E2339,non-tech,Desk,2,254,508
+0,E2388,non-tech,Desk,1,722,722
+0,E2333,non-tech,Keyboard,5,551,2755
+0,E2338,non-tech,Desk,15,692,10380
+1,E2362,non-tech,Desktop Computer,2,867,1734
+0,E2361,non-tech,Desk,22,664,14608
+0,E2371,non-tech,Cleaning,1,220,220
+1,E2352,non-tech,Desktop Computer,2,473,946
+0,E2315,tech,Keyboard,1,500,500
+0,E2399,non-tech,Mouse,1,1033,1033
+0,E2386,non-tech,Desk,1,158,158
+0,E2374,non-tech,Desk,1,220,220
+0,E2376,non-tech,Chair,1,484,484
+1,E2375,non-tech,Desktop Computer,2,979,1958
+0,E2365,non-tech,Keyboard,6,252,1512
+1,E2362,non-tech,Desktop Computer,2,264,528
+0,E2325,non-tech,Keyboard,2,277,554
+0,E2337,non-tech,Keyboard,1,665,665
+0,E2343,non-tech,Desk,1,364,364
+0,E2390,non-tech,Cleaning,1,370,370
+0,E2348,non-tech,Mouse,1,1196,1196
+0,E2381,non-tech,Desk,1,118,118
+0,E2372,non-tech,Cleaning,4,977,3908
+0,E2369,non-tech,Keyboard,1,1092,1092
+0,E2300,tech,Mouse,3,93,279
+1,E2338,non-tech,Desktop Computer,2,800,1600
+0,E2386,non-tech,Keyboard,3,304,912
+0,E2308,tech,Chair,1,132,132
+0,E2380,non-tech,Keyboard,1,711,711
+1,E2330,non-tech,Desktop Computer,2,834,1668
+0,E2390,non-tech,Chair,1,532,532
+0,E2332,non-tech,Keyboard,1,1114,1114
+1,E2394,non-tech,Desktop Computer,2,468,936
+0,E2327,non-tech,Desk,3,795,2385
+1,E2396,non-tech,Desktop Computer,2,656,1312
+0,E2344,non-tech,Cleaning,2,701,1402
+0,E2373,non-tech,Cleaning,1,341,341
+0,E2339,non-tech,Keyboard,1,688,688
+0,E2370,non-tech,Keyboard,2,1096,2192
+1,E2351,non-tech,Desktop Computer,2,244,488
+0,E2337,non-tech,Keyboard,3,1010,3030
+0,E2378,non-tech,Cleaning,1,926,926
+0,E2349,non-tech,Keyboard,3,79,237
+0,E2350,non-tech,Desk,1,839,839
+0,E2341,non-tech,Cleaning,2,362,724
+0,E2358,non-tech,Mouse,1,256,256
+0,E2351,non-tech,Keyboard,1,75,75
+0,E2393,non-tech,Cleaning,3,595,1785
+1,E2337,non-tech,Desktop Computer,2,517,1034
+0,E2396,non-tech,Desk,2,845,1690
+0,E2391,non-tech,Cleaning,1,1035,1035
+0,E2321,non-tech,Mouse,1,682,682
+1,E2367,non-tech,Desktop Computer,2,882,1764
+0,E2340,non-tech,Cleaning,1,136,136
+0,E2350,non-tech,Keyboard,2,201,402
+0,E2326,non-tech,Cleaning,1,161,161
+0,E2337,non-tech,Mouse,1,743,743
+0,E2374,non-tech,Keyboard,3,255,765
+0,E2330,non-tech,Desk,18,505,9090
+0,E2338,non-tech,Keyboard,2,408,816
+0,E2352,non-tech,Mouse,3,136,408
+0,E2364,non-tech,Mouse,3,193,579
+0,E2330,non-tech,Chair,5,236,1180
+1,E2331,non-tech,Desktop Computer,2,1051,2102
+0,E2368,non-tech,Desk,1,119,119
+0,E2368,non-tech,Desk,19,963,18297
+0,E2386,non-tech,Desk,2,183,366
+0,E2301,tech,Keyboard,4,373,1492
+1,E2369,non-tech,Desktop Computer,2,741,1482
+0,E2391,non-tech,Keyboard,2,577,1154
+0,E2321,non-tech,Keyboard,1,879,879
+0,E2317,tech,Cleaning,3,715,2145
+1,E2335,non-tech,Desktop Computer,2,63,126
+0,E2372,non-tech,Cleaning,3,556,1668
+0,E2365,non-tech,Chair,1,1016,1016
+1,E2334,non-tech,Desktop Computer,2,157,314
+0,E2357,non-tech,Cleaning,3,339,1017
+1,E2327,non-tech,Desktop Computer,2,333,666
+1,E2338,non-tech,Desktop Computer,2,319,638
+0,E2383,non-tech,Desk,1,1105,1105
+0,E2369,non-tech,Mouse,2,941,1882
+1,E2394,non-tech,Desktop Computer,2,1147,2294
+0,E2302,tech,Desktop Computer,2,1126,2252
+0,E2338,non-tech,Keyboard,1,220,220
+0,E2361,non-tech,Desk,1,903,903
+0,E2342,non-tech,Desk,1,319,319
+0,E2345,non-tech,Cleaning,2,1074,2148
+0,E2338,non-tech,Keyboard,1,1186,1186
+1,E2329,non-tech,Desktop Computer,2,870,1740
+0,E2322,non-tech,Desk,2,1081,2162
+0,E2326,non-tech,Desk,1,884,884
+1,E2399,non-tech,Desktop Computer,2,252,504
+0,E2325,non-tech,Keyboard,1,495,495
+0,E2399,non-tech,Chair,1,450,450
+0,E2324,non-tech,Chair,3,80,240
+0,E2399,non-tech,Keyboard,4,1118,4472
+0,E2343,non-tech,Keyboard,16,973,15568
+0,E2321,non-tech,Desk,1,590,590
+0,E2363,non-tech,Keyboard,2,219,438
+0,E2378,non-tech,Chair,22,1031,22682
+0,E2370,non-tech,Desk,1,264,264
+0,E2390,non-tech,Desk,1,413,413
+0,E2395,non-tech,Desk,1,756,756
+0,E2397,non-tech,Desk,1,212,212
+0,E2360,non-tech,Keyboard,1,214,214
+0,E2329,non-tech,Desk,2,1194,2388
+0,E2379,non-tech,Keyboard,2,635,1270
+0,E2359,non-tech,Cleaning,1,1147,1147
+0,E2359,non-tech,Keyboard,6,1011,6066
+0,E2355,non-tech,Keyboard,1,1073,1073
+0,E2357,non-tech,Keyboard,1,604,604
+0,E2325,non-tech,Mouse,3,131,393
+0,E2393,non-tech,Desk,10,676,6760
+0,E2339,non-tech,Keyboard,1,530,530
+0,E2354,non-tech,Keyboard,3,884,2652
+0,E2390,non-tech,Keyboard,1,75,75
+0,E2345,non-tech,Desk,1,563,563
+0,E2393,non-tech,Chair,5,941,4705
+0,E2396,non-tech,Cleaning,1,1036,1036
+0,E2323,non-tech,Keyboard,1,176,176
+0,E2360,non-tech,Mouse,1,914,914
+0,E2396,non-tech,Mouse,4,1026,4104
+0,E2359,non-tech,Mouse,1,420,420
+0,E2381,non-tech,Desk,1,896,896
+0,E2388,non-tech,Desk,1,422,422
+1,E2385,non-tech,Desktop Computer,2,505,1010
+0,E2366,non-tech,Keyboard,2,243,486
+0,E2365,non-tech,Cleaning,2,435,870
+0,E2400,non-tech,Desk,1,1080,1080
+0,E2396,non-tech,Mouse,3,1045,3135
+0,E2384,non-tech,Cleaning,1,1111,1111
+0,E2340,non-tech,Keyboard,2,290,580
+0,E2352,non-tech,Mouse,1,520,520
+0,E2371,non-tech,Desk,1,1040,1040
+0,E2328,non-tech,Keyboard,1,407,407
+0,E2329,non-tech,Keyboard,1,1092,1092
+0,E2391,non-tech,Desk,1,537,537
+0,E2364,non-tech,Keyboard,1,305,305
+0,E2378,non-tech,Desk,19,515,9785
+0,E2337,non-tech,Mouse,3,96,288
+0,E2367,non-tech,Desk,1,91,91
+0,E2391,non-tech,Cleaning,3,808,2424
+0,E2356,non-tech,Desk,1,107,107
+0,E2361,non-tech,Desk,1,785,785
+0,E2341,non-tech,Cleaning,1,787,787
+0,E2363,non-tech,Desk,12,863,10356
+1,E2335,non-tech,Desktop Computer,2,739,1478
+1,E2369,non-tech,Desktop Computer,2,580,1160
+0,E2379,non-tech,Desk,1,220,220
+0,E2371,non-tech,Chair,3,393,1179
+0,E2367,non-tech,Mouse,4,751,3004
+0,E2390,non-tech,Desk,2,874,1748
+0,E2304,tech,Keyboard,1,975,975
+0,E2363,non-tech,Chair,2,543,1086
+0,E2394,non-tech,Mouse,1,170,170
+1,E2380,non-tech,Desktop Computer,2,913,1826
+1,E2376,non-tech,Desktop Computer,2,78,156
+0,E2386,non-tech,Keyboard,1,447,447
+0,E2323,non-tech,Mouse,2,782,1564
+0,E2378,non-tech,Keyboard,4,977,3908
+0,E2371,non-tech,Desk,5,460,2300
+0,E2384,non-tech,Chair,2,696,1392
+0,E2322,non-tech,Keyboard,1,173,173
+1,E2323,non-tech,Desktop Computer,2,668,1336
+0,E2397,non-tech,Cleaning,1,989,989
+0,E2356,non-tech,Chair,1,639,639
+0,E2322,non-tech,Desk,1,353,353
+1,E2368,non-tech,Desktop Computer,2,501,1002
+1,E2392,non-tech,Desktop Computer,2,1038,2076
+0,E2332,non-tech,Keyboard,1,690,690
+0,E2391,non-tech,Cleaning,2,213,426
+0,E2398,non-tech,Desk,3,952,2856
+0,E2374,non-tech,Cleaning,1,1075,1075
+0,E2374,non-tech,Keyboard,3,304,912
+0,E2349,non-tech,Desk,3,97,291
+0,E2325,non-tech,Keyboard,2,833,1666
+0,E2319,tech,Desk,2,626,1252
+0,E2324,non-tech,Keyboard,2,937,1874
+0,E2300,tech,Desk,3,527,1581
+0,E2357,non-tech,Desk,1,58,58
+0,E2326,non-tech,Keyboard,2,311,622
+1,E2335,non-tech,Desktop Computer,2,235,470
+0,E2390,non-tech,Mouse,1,521,521
+0,E2302,tech,Cleaning,2,325,650
+0,E2395,non-tech,Desk,2,782,1564
+0,E2389,non-tech,Keyboard,1,378,378
+0,E2370,non-tech,Chair,2,330,660
+0,E2355,non-tech,Cleaning,18,789,14202
+1,E2343,non-tech,Desktop Computer,2,1100,2200
+1,E2380,non-tech,Desktop Computer,2,376,752
+0,E2360,non-tech,Desk,1,993,993
+0,E2340,non-tech,Keyboard,2,816,1632
+0,E2360,non-tech,Cleaning,1,1027,1027
+0,E2346,non-tech,Desk,7,488,3416
+0,E2325,non-tech,Keyboard,2,988,1976
+1,E2344,non-tech,Desktop Computer,2,656,1312
+0,E2337,non-tech,Mouse,1,47,47
+0,E2328,non-tech,Cleaning,1,328,328
+0,E2399,non-tech,Cleaning,1,173,173
+0,E2396,non-tech,Cleaning,2,137,274
+0,E2345,non-tech,Keyboard,1,465,465
+0,E2369,non-tech,Desk,4,546,2184
+0,E2327,non-tech,Keyboard,1,437,437
+0,E2302,tech,Mouse,1,528,528
+0,E2340,non-tech,Mouse,1,1004,1004
+0,E2395,non-tech,Keyboard,1,253,253
+0,E2376,non-tech,Desk,1,713,713
+0,E2387,non-tech,Desk,1,272,272
+0,E2350,non-tech,Desk,1,315,315
+0,E2400,non-tech,Mouse,1,496,496
+0,E2388,non-tech,Desk,5,772,3860
+0,E2370,non-tech,Keyboard,1,899,899
+1,E2355,non-tech,Desktop Computer,1,852,852
+0,E2303,tech,Keyboard,2,550,1100
+0,E2385,non-tech,Keyboard,1,759,759
+0,E2312,tech,Desk,8,1013,8104
+0,E2316,tech,Desk,1,878,878
+1,E2390,non-tech,Desktop Computer,1,155,155
+0,E2334,non-tech,Desk,3,222,666
+1,E2386,non-tech,Desktop Computer,1,400,400
+0,E2367,non-tech,Chair,1,523,523
+0,E2350,non-tech,Keyboard,5,224,1120
+0,E2322,non-tech,Cleaning,1,206,206
+1,E2321,non-tech,Desktop Computer,1,617,617
+0,E2398,non-tech,Mouse,1,375,375
+0,E2347,non-tech,Mouse,4,618,2472
+0,E2399,non-tech,Keyboard,2,1024,2048
+1,E2399,non-tech,Desktop Computer,1,57,57
+0,E2337,non-tech,Cleaning,1,1151,1151
+0,E2369,non-tech,Cleaning,4,1126,4504
+0,E2382,non-tech,Mouse,2,871,1742
+0,E2333,non-tech,Chair,3,957,2871
+1,E2381,non-tech,Desktop Computer,1,428,428
+0,E2321,non-tech,Keyboard,1,962,962
+0,E2353,non-tech,Cleaning,1,1072,1072
+0,E2329,non-tech,Desk,27,45,1215
+0,E2347,non-tech,Desk,3,1182,3546
+0,E2355,non-tech,Mouse,1,855,855
+0,E2335,non-tech,Cleaning,4,592,2368
+0,E2369,non-tech,Cleaning,1,79,79
+0,E2383,non-tech,Cleaning,1,758,758
+0,E2361,non-tech,Cleaning,1,213,213
+0,E2342,non-tech,Mouse,1,672,672
+1,E2378,non-tech,Desktop Computer,1,719,719
+0,E2390,non-tech,Keyboard,1,755,755
+0,E2327,non-tech,Desk,1,1122,1122
+0,E2307,tech,Desktop Computer,1,986,986
+0,E2380,non-tech,Cleaning,1,214,214
+1,E2361,non-tech,Desktop Computer,1,986,986
+1,E2375,non-tech,Desktop Computer,1,269,269
+0,E2400,non-tech,Mouse,2,1050,2100
+0,E2389,non-tech,Keyboard,2,363,726
+0,E2390,non-tech,Keyboard,1,468,468
+0,E2347,non-tech,Cleaning,2,68,136
+1,E2366,non-tech,Desktop Computer,1,1062,1062
+0,E2372,non-tech,Cleaning,2,611,1222
+0,E2386,non-tech,Desk,1,179,179
+1,E2384,non-tech,Desktop Computer,1,258,258
+0,E2396,non-tech,Mouse,1,988,988
+0,E2382,non-tech,Keyboard,1,938,938
+0,E2346,non-tech,Cleaning,2,445,890
+0,E2369,non-tech,Desk,5,964,4820
+1,E2336,non-tech,Desktop Computer,1,363,363
+0,E2345,non-tech,Cleaning,1,117,117
+1,E2377,non-tech,Desktop Computer,1,417,417
+0,E2367,non-tech,Desk,1,1178,1178
+0,E2329,non-tech,Desk,3,614,1842
+0,E2360,non-tech,Cleaning,3,329,987
+1,E2346,non-tech,Desktop Computer,1,409,409
+1,E2398,non-tech,Desktop Computer,1,743,743
+0,E2390,non-tech,Mouse,4,977,3908
+0,E2392,non-tech,Chair,1,300,300
+1,E2350,non-tech,Desktop Computer,1,782,782
+1,E2386,non-tech,Desktop Computer,1,173,173
+0,E2381,non-tech,Cleaning,1,379,379
+1,E2396,non-tech,Desktop Computer,1,129,129
+0,E2382,non-tech,Desk,1,479,479
+0,E2342,non-tech,Chair,2,1196,2392
+0,E2340,non-tech,Keyboard,2,750,1500
+0,E2400,non-tech,Keyboard,1,349,349
+0,E2373,non-tech,Keyboard,1,1028,1028
+0,E2386,non-tech,Keyboard,1,206,206
+0,E2355,non-tech,Chair,1,101,101
+0,E2376,non-tech,Cleaning,1,255,255
+0,E2363,non-tech,Desk,1,144,144
+0,E2356,non-tech,Desk,12,403,4836
+0,E2378,non-tech,Keyboard,2,64,128
+0,E2342,non-tech,Keyboard,1,626,626
+0,E2347,non-tech,Cleaning,1,392,392
+1,E2343,non-tech,Desktop Computer,1,346,346
+0,E2357,non-tech,Keyboard,6,531,3186
+0,E2362,non-tech,Keyboard,1,526,526
+1,E2379,non-tech,Desktop Computer,1,247,247
+0,E2353,non-tech,Mouse,3,818,2454
+0,E2324,non-tech,Chair,2,351,702
+1,E2397,non-tech,Desktop Computer,1,1008,1008
+0,E2366,non-tech,Desk,2,779,1558
+0,E2317,tech,Chair,1,419,419
+0,E2344,non-tech,Desk,1,251,251
+0,E2386,non-tech,Keyboard,3,783,2349
+0,E2393,non-tech,Keyboard,1,420,420
+0,E2354,non-tech,Keyboard,1,1044,1044
+0,E2384,non-tech,Desk,1,977,977
+0,E2318,tech,Desktop Computer,1,50,50
+1,E2323,non-tech,Desktop Computer,1,392,392
+0,E2343,non-tech,Cleaning,1,967,967
+0,E2390,non-tech,Desk,2,455,910
+0,E2387,non-tech,Desk,4,952,3808
+0,E2365,non-tech,Desk,2,935,1870
+0,E2384,non-tech,Keyboard,1,67,67
+0,E2392,non-tech,Mouse,1,568,568
+0,E2375,non-tech,Desk,4,584,2336
+0,E2313,tech,Mouse,3,664,1992
+1,E2365,non-tech,Desktop Computer,1,761,761
+1,E2338,non-tech,Desktop Computer,1,729,729
+1,E2369,non-tech,Desktop Computer,1,449,449
+0,E2359,non-tech,Mouse,1,252,252
+0,E2328,non-tech,Mouse,4,655,2620
+0,E2374,non-tech,Keyboard,2,138,276
+0,E2370,non-tech,Desk,3,433,1299
+0,E2303,tech,Desk,1,45,45
+0,E2326,non-tech,Keyboard,9,380,3420
+0,E2331,non-tech,Keyboard,3,1001,3003
+0,E2355,non-tech,Cleaning,1,238,238
+0,E2356,non-tech,Keyboard,2,331,662
+0,E2330,non-tech,Keyboard,3,562,1686
+0,E2342,non-tech,Desk,4,1140,4560
+0,E2397,non-tech,Desk,1,184,184
+0,E2384,non-tech,Keyboard,2,503,1006
+0,E2370,non-tech,Desk,3,273,819
+0,E2341,non-tech,Keyboard,4,1069,4276
+0,E2391,non-tech,Keyboard,1,1036,1036
+0,E2355,non-tech,Keyboard,1,398,398
+0,E2363,non-tech,Desk,4,1081,4324
+0,E2327,non-tech,Keyboard,2,805,1610
+0,E2330,non-tech,Keyboard,3,188,564
+1,E2322,non-tech,Desktop Computer,1,149,149
+0,E2348,non-tech,Cleaning,1,1001,1001
+0,E2329,non-tech,Cleaning,1,383,383
+0,E2399,non-tech,Desk,1,1180,1180
+0,E2347,non-tech,Desk,1,710,710
+0,E2351,non-tech,Desk,4,258,1032
+0,E2365,non-tech,Mouse,2,155,310
+1,E2325,non-tech,Laptop Computer,1,659,659
+1,E2364,non-tech,Laptop Computer,1,1069,1069
+0,E2321,non-tech,Mouse,4,1160,4640
+0,E2325,non-tech,Mouse,1,66,66
+0,E2328,non-tech,Mouse,1,1184,1184
+0,E2339,non-tech,Cleaning,1,1146,1146
+0,E2323,non-tech,Cleaning,2,699,1398
+0,E2346,non-tech,Desk,1,999,999
+0,E2318,tech,Cleaning,2,461,922
+0,E2330,non-tech,Desk,1,492,492
+0,E2323,non-tech,Desk,1,367,367
+0,E2304,tech,Cleaning,2,786,1572
+0,E2398,non-tech,Cleaning,2,1162,2324
+0,E2330,non-tech,Desk,2,292,584
+0,E2341,non-tech,Chair,5,120,600
+0,E2350,non-tech,Desk,5,542,2710
+0,E2335,non-tech,Keyboard,1,280,280
+1,E2338,non-tech,Laptop Computer,1,433,433
+0,E2331,non-tech,Chair,2,648,1296
+0,E2380,non-tech,Mouse,1,720,720
+1,E2367,non-tech,Laptop Computer,1,673,673
+0,E2310,tech,Cleaning,1,391,391
+0,E2377,non-tech,Chair,1,319,319
+0,E2381,non-tech,Keyboard,2,83,166
+0,E2392,non-tech,Mouse,1,960,960
+1,E2399,non-tech,Laptop Computer,1,505,505
+0,E2358,non-tech,Chair,1,798,798
+0,E2332,non-tech,Cleaning,1,148,148
+0,E2398,non-tech,Mouse,1,185,185
+1,E2381,non-tech,Laptop Computer,1,852,852
+0,E2388,non-tech,Desk,15,1167,17505
+0,E2307,tech,Keyboard,1,810,810
+0,E2381,non-tech,Cleaning,5,532,2660
+0,E2381,non-tech,Desk,1,969,969
+0,E2378,non-tech,Keyboard,3,628,1884
+0,E2399,non-tech,Desk,2,372,744
+0,E2358,non-tech,Desk,1,1082,1082
+0,E2365,non-tech,Mouse,4,646,2584
+0,E2348,non-tech,Desk,2,329,658
+0,E2390,non-tech,Keyboard,3,463,1389
+1,E2335,non-tech,Laptop Computer,1,117,117
+0,E2359,non-tech,Desk,1,634,634
+0,E2379,non-tech,Desk,4,278,1112
+0,E2338,non-tech,Cleaning,3,674,2022
+1,E2397,non-tech,Laptop Computer,1,1149,1149
+0,E2366,non-tech,Mouse,1,520,520
+0,E2300,tech,Laptop Computer,1,474,474
+0,E2362,non-tech,Desk,1,796,796
+0,E2329,non-tech,Mouse,1,412,412
+0,E2344,non-tech,Desk,1,161,161
+0,E2345,non-tech,Keyboard,2,326,652
+0,E2368,non-tech,Desk,1,492,492
+0,E2390,non-tech,Keyboard,1,746,746
+0,E2324,non-tech,Keyboard,1,196,196
+0,E2380,non-tech,Mouse,1,1043,1043
+1,E2333,non-tech,Laptop Computer,1,1006,1006
+1,E2326,non-tech,Laptop Computer,1,355,355
+1,E2324,non-tech,Laptop Computer,1,339,339
+0,E2366,non-tech,Keyboard,1,928,928
+0,E2317,tech,Desk,1,281,281
+0,E2375,non-tech,Desk,1,210,210
+1,E2345,non-tech,Laptop Computer,1,1182,1182
+0,E2368,non-tech,Chair,2,1140,2280
+0,E2312,tech,Laptop Computer,1,220,220
+1,E2395,non-tech,Laptop Computer,1,853,853
+0,E2378,non-tech,Desk,1,621,621
+0,E2391,non-tech,Keyboard,21,1052,22092
+0,E2301,tech,Mouse,3,651,1953
+0,E2353,non-tech,Keyboard,1,349,349
+0,E2331,non-tech,Mouse,1,1176,1176
+0,E2379,non-tech,Mouse,1,362,362
+0,E2336,non-tech,Keyboard,2,1111,2222
+0,E2398,non-tech,Keyboard,3,384,1152
+1,E2326,non-tech,Laptop Computer,1,687,687
+1,E2382,non-tech,Laptop Computer,1,75,75
+0,E2344,non-tech,Desk,1,49,49
+1,E2373,non-tech,Laptop Computer,1,131,131
+0,E2338,non-tech,Keyboard,12,717,8604
+0,E2321,non-tech,Mouse,2,108,216
+0,E2345,non-tech,Keyboard,4,606,2424
+0,E2362,non-tech,Cleaning,6,967,5802
+0,E2333,non-tech,Mouse,1,936,936
+0,E2360,non-tech,Desk,4,1065,4260
+0,E2397,non-tech,Desk,1,512,512
+1,E2373,non-tech,Laptop Computer,1,450,450
+0,E2327,non-tech,Keyboard,2,259,518
+0,E2396,non-tech,Cleaning,1,824,824
+0,E2306,tech,Cleaning,5,742,3710
+1,E2392,non-tech,Laptop Computer,1,379,379
+0,E2353,non-tech,Desk,1,426,426
+0,E2344,non-tech,Cleaning,2,709,1418
+0,E2358,non-tech,Keyboard,2,524,1048
+0,E2333,non-tech,Mouse,1,1101,1101
+0,E2341,non-tech,Keyboard,22,63,1386
+0,E2328,non-tech,Desk,2,335,670
+0,E2375,non-tech,Desk,1,838,838
+1,E2339,non-tech,Laptop Computer,1,222,222
+1,E2378,non-tech,Laptop Computer,1,403,403
+0,E2356,non-tech,Desk,1,526,526
+1,E2383,non-tech,Laptop Computer,1,66,66
+0,E2378,non-tech,Desk,1,881,881
+0,E2348,non-tech,Keyboard,6,1117,6702
+1,E2382,non-tech,Laptop Computer,1,92,92
+0,E2335,non-tech,Cleaning,3,799,2397
+0,E2346,non-tech,Cleaning,2,853,1706
+0,E2336,non-tech,Chair,1,1053,1053
+1,E2354,non-tech,Laptop Computer,1,309,309
+1,E2328,non-tech,Laptop Computer,1,765,765
+0,E2389,non-tech,Desk,4,290,1160
+0,E2315,tech,Laptop Computer,1,615,615
+0,E2386,non-tech,Keyboard,2,827,1654
+1,E2355,non-tech,Laptop Computer,1,959,959
+0,E2379,non-tech,Mouse,1,1006,1006
+1,E2333,non-tech,Laptop Computer,1,861,861
+0,E2398,non-tech,Chair,1,91,91
+1,E2388,non-tech,Laptop Computer,1,829,829
+0,E2392,non-tech,Desk,2,678,1356
+1,E2388,non-tech,Laptop Computer,1,384,384
+0,E2328,non-tech,Desk,5,794,3970
+0,E2345,non-tech,Desk,1,781,781
+0,E2349,non-tech,Desk,4,1134,4536
+0,E2392,non-tech,Desk,3,410,1230
+0,E2384,non-tech,Desk,3,70,210
+0,E2376,non-tech,Desk,2,126,252
+0,E2364,non-tech,Mouse,1,670,670
+0,E2368,non-tech,Desk,1,769,769
+1,E2357,non-tech,Laptop Computer,1,51,51
+0,E2329,non-tech,Keyboard,2,988,1976
+1,E2332,non-tech,Laptop Computer,1,602,602
+0,E2353,non-tech,Keyboard,1,393,393
+0,E2398,non-tech,Desk,1,1094,1094
+0,E2326,non-tech,Chair,4,879,3516
+0,E2361,non-tech,Desk,1,1188,1188
+0,E2385,non-tech,Mouse,1,619,619
+0,E2390,non-tech,Desk,4,1170,4680
+0,E2369,non-tech,Keyboard,1,194,194
+1,E2386,non-tech,Laptop Computer,1,574,574
+0,E2357,non-tech,Cleaning,2,826,1652
+0,E2377,non-tech,Cleaning,2,289,578
+0,E2310,tech,Laptop Computer,1,195,195
+0,E2388,non-tech,Mouse,3,898,2694
+0,E2362,non-tech,Keyboard,1,713,713
+0,E2380,non-tech,Keyboard,3,1193,3579
+0,E2348,non-tech,Cleaning,7,371,2597
+0,E2328,non-tech,Mouse,1,345,345
+0,E2331,non-tech,Cleaning,1,601,601
+0,E2371,non-tech,Mouse,4,422,1688
+0,E2393,non-tech,Desk,1,869,869
+0,E2366,non-tech,Chair,1,816,816
+0,E2356,non-tech,Mouse,5,217,1085
+1,E2321,non-tech,Laptop Computer,1,738,738
+0,E2346,non-tech,Keyboard,2,131,262
+0,E2370,non-tech,Chair,1,70,70
+0,E2331,non-tech,Desk,2,1117,2234
+0,E2380,non-tech,Chair,1,714,714
+0,E2350,non-tech,Desk,1,1008,1008
+0,E2392,non-tech,Mouse,1,301,301
+0,E2306,tech,Chair,2,631,1262
+0,E2348,non-tech,Desk,1,497,497
+0,E2373,non-tech,Desk,4,763,3052
+0,E2310,tech,Keyboard,1,1102,1102
+0,E2391,non-tech,Chair,2,586,1172
+0,E2393,non-tech,Desk,2,977,1954
+0,E2347,non-tech,Cleaning,2,788,1576
+0,E2376,non-tech,Mouse,1,439,439
+0,E2364,non-tech,Mouse,1,1085,1085
+0,E2350,non-tech,Mouse,1,1047,1047
+0,E2382,non-tech,Keyboard,2,609,1218
+0,E2335,non-tech,Chair,5,828,4140
+0,E2363,non-tech,Cleaning,1,403,403
+0,E2311,tech,Mouse,2,494,988
+1,E2350,non-tech,Laptop Computer,1,767,767
+0,E2357,non-tech,Cleaning,4,67,268
+0,E2397,non-tech,Desk,2,892,1784
+0,E2361,non-tech,Cleaning,4,468,1872
+0,E2355,non-tech,Desk,7,348,2436
+0,E2379,non-tech,Cleaning,3,256,768
+0,E2384,non-tech,Mouse,3,397,1191
+0,E2362,non-tech,Desk,4,459,1836
+0,E2381,non-tech,Desk,1,1111,1111
+0,E2343,non-tech,Keyboard,1,582,582
+1,E2346,non-tech,Laptop Computer,1,147,147
+0,E2351,non-tech,Mouse,4,846,3384
+0,E2342,non-tech,Desk,1,630,630
+0,E2333,non-tech,Cleaning,4,48,192
+1,E2364,non-tech,Laptop Computer,1,121,121
+1,E2353,non-tech,Laptop Computer,1,496,496
+0,E2357,non-tech,Desk,2,915,1830
+0,E2386,non-tech,Keyboard,1,852,852
+1,E2371,non-tech,Laptop Computer,1,878,878
+0,E2398,non-tech,Mouse,2,726,1452
+1,E2331,non-tech,Laptop Computer,1,635,635
+0,E2315,tech,Desk,3,420,1260
+1,E2333,non-tech,Laptop Computer,1,185,185
+0,E2348,non-tech,Mouse,1,1165,1165
+0,E2352,non-tech,Keyboard,1,1077,1077
+0,E2327,non-tech,Mouse,1,1097,1097
+0,E2301,tech,Desk,4,195,780
+1,E2365,non-tech,Laptop Computer,1,69,69
+0,E2395,non-tech,Keyboard,5,447,2235
+0,E2345,non-tech,Keyboard,2,1125,2250
+0,E2325,non-tech,Mouse,2,236,472
+0,E2357,non-tech,Cleaning,17,786,13362
+0,E2370,non-tech,Mouse,4,1178,4712
+0,E2387,non-tech,Desk,2,198,396
+0,E2385,non-tech,Cleaning,2,595,1190
+1,E2348,non-tech,Laptop Computer,1,1098,1098
+0,E2340,non-tech,Desk,1,961,961
+0,E2380,non-tech,Desk,2,1172,2344
+1,E2383,non-tech,Laptop Computer,1,241,241
+1,E2338,non-tech,Laptop Computer,1,806,806
+0,E2388,non-tech,Keyboard,1,894,894
+1,E2377,non-tech,Laptop Computer,1,568,568
+0,E2376,non-tech,Keyboard,1,1191,1191
+1,E2361,non-tech,Laptop Computer,1,180,180
+1,E2330,non-tech,Laptop Computer,1,870,870
+0,E2387,non-tech,Desk,1,323,323
+0,E2353,non-tech,Chair,6,1009,6054
+0,E2395,non-tech,Cleaning,2,600,1200
+0,E2395,non-tech,Keyboard,1,1008,1008
+0,E2344,non-tech,Mouse,5,413,2065
+1,E2328,non-tech,Laptop Computer,1,766,766
+0,E2378,non-tech,Cleaning,1,624,624
+0,E2368,non-tech,Chair,1,417,417
+0,E2356,non-tech,Desk,3,886,2658
+0,E2398,non-tech,Desk,1,768,768
+1,E2332,non-tech,Laptop Computer,1,713,713
+0,E2371,non-tech,Desk,1,340,340
+1,E2376,non-tech,Laptop Computer,1,722,722
+0,E2399,non-tech,Keyboard,3,1180,3540
+0,E2345,non-tech,Keyboard,1,307,307
+1,E2367,non-tech,Laptop Computer,1,560,560
+0,E2307,tech,Mouse,2,580,1160
+0,E2327,non-tech,Mouse,4,899,3596
+0,E2390,non-tech,Keyboard,5,989,4945
+1,E2376,non-tech,Laptop Computer,1,888,888
+1,E2369,non-tech,Laptop Computer,1,157,157
+0,E2400,non-tech,Desk,2,966,1932
+1,E2338,non-tech,Laptop Computer,1,134,134
+1,E2371,non-tech,Laptop Computer,1,209,209
+0,E2393,non-tech,Cleaning,2,962,1924
+0,E2373,non-tech,Keyboard,5,66,330
+1,E2366,non-tech,Laptop Computer,1,134,134
+1,E2358,non-tech,Laptop Computer,1,520,520
+0,E2397,non-tech,Cleaning,1,622,622
+0,E2308,tech,Desk,3,885,2655
+0,E2352,non-tech,Chair,3,946,2838
+0,E2367,non-tech,Desk,2,209,418
+0,E2346,non-tech,Desk,1,745,745
+1,E2393,non-tech,Laptop Computer,1,705,705
+0,E2330,non-tech,Keyboard,1,984,984
+0,E2357,non-tech,Desk,2,1088,2176
+1,E2351,non-tech,Laptop Computer,1,1132,1132
+0,E2369,non-tech,Mouse,4,867,3468
+1,E2390,non-tech,Laptop Computer,1,605,605
+0,E2345,non-tech,Desk,3,225,675
+1,E2366,non-tech,Laptop Computer,1,762,762
+1,E2370,non-tech,Laptop Computer,1,697,697
+0,E2395,non-tech,Desk,1,956,956
+0,E2370,non-tech,Cleaning,2,825,1650
+0,E2386,non-tech,Chair,1,1020,1020
+0,E2361,non-tech,Desk,1,676,676
+0,E2322,non-tech,Keyboard,4,805,3220
+1,E2360,non-tech,Laptop Computer,1,335,335
+0,E2325,non-tech,Keyboard,1,962,962
+0,E2345,non-tech,Cleaning,3,712,2136
+1,E2395,non-tech,Laptop Computer,1,478,478
+0,E2398,non-tech,Keyboard,1,160,160
+0,E2343,non-tech,Cleaning,2,778,1556
+0,E2361,non-tech,Desk,1,167,167
+1,E2364,non-tech,Laptop Computer,1,116,116
+1,E2357,non-tech,Laptop Computer,1,1132,1132
+0,E2330,non-tech,Keyboard,2,804,1608
+0,E2384,non-tech,Desk,3,270,810
+0,E2343,non-tech,Mouse,1,236,236
