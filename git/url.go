@@ -14,7 +14,6 @@ func isSupportedProtocol(u string) bool {
 		strings.HasPrefix(u, "git+ssh:") ||
 		strings.HasPrefix(u, "git:") ||
 		strings.HasPrefix(u, "http:") ||
-		strings.HasPrefix(u, "git+https:") ||
 		strings.HasPrefix(u, "https:")
 }
 
