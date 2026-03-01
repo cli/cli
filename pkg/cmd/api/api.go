@@ -221,7 +221,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		},
 		Args: cobra.ExactArgs(1),
 		PreRun: func(c *cobra.Command, args []string) {
-			opts.BaseRepo = cmdutil.OverrideBaseRepoFunc(f, "")
+			opts.BaseRepo = cmdutil.PrioritiseEnvBaseRepoFunc(f.BaseRepo)
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]

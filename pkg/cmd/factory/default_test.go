@@ -254,7 +254,7 @@ func Test_SmartBaseRepo(t *testing.T) {
 }
 
 // Defined in pkg/cmdutil/repo_override.go but test it along with other BaseRepo functions
-func Test_OverrideBaseRepo(t *testing.T) {
+func Test_PrioritiseEnvBaseRepoFunc(t *testing.T) {
 	tests := []struct {
 		name        string
 		remotes     git.RemoteSet
@@ -267,14 +267,7 @@ func Test_OverrideBaseRepo(t *testing.T) {
 		wantsHost   string
 	}{
 		{
-			name:        "override from argument",
-			argOverride: "override/test",
-			wantsHost:   "github.com",
-			wantsOwner:  "override",
-			wantsName:   "test",
-		},
-		{
-			name:        "override from environment",
+			name:        "from environment",
 			envOverride: "somehost.com/override/test",
 			wantsHost:   "somehost.com",
 			wantsOwner:  "override",
@@ -307,7 +300,7 @@ func Test_OverrideBaseRepo(t *testing.T) {
 				},
 			}
 			f.Remotes = rr.Resolver()
-			f.BaseRepo = cmdutil.OverrideBaseRepoFunc(f, tt.argOverride)
+			f.BaseRepo = cmdutil.PrioritiseEnvBaseRepoFunc(f.BaseRepo)
 			repo, err := f.BaseRepo()
 			if tt.wantsErr {
 				assert.Error(t, err)
