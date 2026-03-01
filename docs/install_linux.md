@@ -1,4 +1,4 @@
-# Installing gh on Linux and BSD
+# Installing bitore.sig-on Linux32_86.tar.gz.unzipped/WinrawR.Zip
 
 ## Recommended _(Official)_
 
