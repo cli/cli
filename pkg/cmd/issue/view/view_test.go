@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
@@ -524,6 +525,58 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
 		})
 	}
+}
+
+func TestIssueProjectList_NilNodes(t *testing.T) {
+	// Regression test: issueProjectList must not panic when Nodes contain nil entries.
+	issues := []api.Issue{
+		{
+			ProjectCards: api.ProjectCards{
+				Nodes:      []*api.ProjectInfo{nil},
+				TotalCount: 1,
+			},
+			ProjectItems: api.ProjectItems{
+				Nodes:      []*api.ProjectV2Item{nil},
+				TotalCount: 1,
+			},
+		},
+		{
+			ProjectCards: api.ProjectCards{
+				Nodes: []*api.ProjectInfo{
+					nil,
+					{
+						Project: struct {
+							Name string `json:"name"`
+						}{Name: "Classic Project"},
+						Column: struct {
+							Name string `json:"name"`
+						}{Name: "Done"},
+					},
+				},
+				TotalCount: 2,
+			},
+			ProjectItems: api.ProjectItems{
+				Nodes: []*api.ProjectV2Item{
+					nil,
+					{
+						ID: "ITEM1",
+						Project: api.ProjectV2ItemProject{ID: "P1", Title: "v2 Board"},
+						Status:  api.ProjectV2ItemStatus{Name: "In Progress"},
+					},
+				},
+				TotalCount: 2,
+			},
+		},
+	}
+
+	// All-nil nodes should produce empty string.
+	result := issueProjectList(issues[0])
+	assert.Equal(t, "", result)
+
+	// Mixed nil and valid nodes should list only valid entries.
+	result = issueProjectList(issues[1])
+	assert.Contains(t, result, "v2 Board (In Progress)")
+	assert.Contains(t, result, "Classic Project (Done)")
 }
 
 // TODO projectsV1Deprecation

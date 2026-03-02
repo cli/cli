@@ -449,6 +449,9 @@ func prProjectList(pr api.PullRequest) string {
 	projectNames := make([]string, 0, len(pr.ProjectCards.Nodes))
 
 	for _, project := range pr.ProjectItems.Nodes {
+		if project == nil {
+			continue
+		}
 		colName := project.Status.Name
 		if colName == "" {
 			colName = "No Status"

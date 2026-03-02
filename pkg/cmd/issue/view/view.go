@@ -321,6 +321,9 @@ func issueProjectList(issue api.Issue) string {
 	projectNames := make([]string, 0, count)
 
 	for _, project := range issue.ProjectItems.Nodes {
+		if project == nil {
+			continue
+		}
 		colName := project.Status.Name
 		if colName == "" {
 			colName = "No Status"
@@ -330,6 +333,9 @@ func issueProjectList(issue api.Issue) string {
 
 	// TODO: Remove v1 classic project logic when completely deprecated
 	for _, project := range issue.ProjectCards.Nodes {
+		if project == nil {
+			continue
+		}
 		colName := project.Column.Name
 		if colName == "" {
 			colName = "Awaiting triage"

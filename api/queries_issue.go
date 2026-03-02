@@ -196,17 +196,23 @@ type ProjectV2ItemStatus struct {
 }
 
 func (p ProjectCards) ProjectNames() []string {
-	names := make([]string, len(p.Nodes))
-	for i, c := range p.Nodes {
-		names[i] = c.Project.Name
+	var names []string
+	for _, c := range p.Nodes {
+		if c == nil {
+			continue
+		}
+		names = append(names, c.Project.Name)
 	}
 	return names
 }
 
 func (p ProjectItems) ProjectTitles() []string {
-	titles := make([]string, len(p.Nodes))
-	for i, c := range p.Nodes {
-		titles[i] = c.Project.Title
+	var titles []string
+	for _, c := range p.Nodes {
+		if c == nil {
+			continue
+		}
+		titles = append(titles, c.Project.Title)
 	}
 	return titles
 }

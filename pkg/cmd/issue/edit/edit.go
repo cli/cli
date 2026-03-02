@@ -281,8 +281,11 @@ func editRun(opts *EditOptions) error {
 		}
 		editable.Labels.Default = issue.Labels.Names()
 		editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
-		projectItems := map[string]string{}
+	projectItems := map[string]string{}
 		for _, n := range issue.ProjectItems.Nodes {
+			if n == nil {
+				continue
+			}
 			projectItems[n.Project.ID] = n.ID
 		}
 		editable.Projects.ProjectItems = projectItems
