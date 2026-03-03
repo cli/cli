@@ -7,7 +7,8 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"golang.go"
+				"golang.go",
+				"ms-vscode-remote.remote-wsl"
 			],
 			"settings": {
 				"go.toolsManagement.checkForUpdates": "local",
