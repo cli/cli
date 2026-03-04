@@ -49,7 +49,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 			# Close issue as a duplicate of issue #456
 			$ gh issue close 123 --duplicate-of 456
 
-			# Close issue with a reason
+			# Close issue as not planned
 			$ gh issue close 123 --reason "not planned"
 		`),
 		Args: cobra.ExactArgs(1),
