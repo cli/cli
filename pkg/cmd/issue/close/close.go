@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -38,7 +39,20 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "close {<number> | <url>}",
 		Short: "Close issue",
-		Args:  cobra.ExactArgs(1),
+		Example: heredoc.Doc(`
+			# Close issue
+			$ gh issue close 123
+
+			# Close issue and add a closing comment
+			$ gh issue close 123 --comment "Closing this issue"
+
+			# Close issue as a duplicate of issue #456
+			$ gh issue close 123 --duplicate-of 456
+
+			# Close issue with a reason
+			$ gh issue close 123 --reason "not planned"
+		`),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			issueNumber, baseRepo, err := shared.ParseIssueFromArg(args[0])
 			if err != nil {
