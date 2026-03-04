@@ -113,6 +113,15 @@ func TestNewCmdFork(t *testing.T) {
 			},
 		},
 		{
+			name: "skip confirmation",
+			cli:  "--yes",
+			wants: ForkOptions{
+				RemoteName: "origin",
+				Rename:     true,
+				Confirmed:  true,
+			},
+		},
+		{
 			name: "to org",
 			cli:  "--org batmanshome",
 			wants: ForkOptions{
@@ -184,6 +193,7 @@ func TestNewCmdFork(t *testing.T) {
 			assert.Equal(t, tt.wants.PromptClone, gotOpts.PromptClone)
 			assert.Equal(t, tt.wants.Organization, gotOpts.Organization)
 			assert.Equal(t, tt.wants.GitArgs, gotOpts.GitArgs)
+			assert.Equal(t, tt.wants.Confirmed, gotOpts.Confirmed)
 		})
 	}
 }
@@ -242,6 +252,11 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git remote add fork https://github\.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git config --add remote\.origin\.gh-resolved base`, 0, "")
 			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Would you like to set OWNER/REPO as the default repository for this directory?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote fork\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 		{
@@ -263,6 +278,11 @@ func TestRepoFork(t *testing.T) {
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote add fork git@github\.com:someone/REPO\.git`, 0, "")
 				cs.Register(`git config --add remote\.origin\.gh-resolved base`, 0, "")
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Would you like to set OWNER/REPO as the default repository for this directory?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote fork\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
@@ -298,6 +318,9 @@ func TestRepoFork(t *testing.T) {
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterConfirm("Would you like to add a remote for the fork?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+				pm.RegisterConfirm("Would you like to set OWNER/REPO as the default repository for this directory?", func(_ string, _ bool) (bool, error) {
 					return true, nil
 				})
 			},
@@ -374,6 +397,11 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git remote add origin https://github.com/someone/REPO.git`, 0, "")
 				cs.Register(`git config --add remote\.upstream\.gh-resolved base`, 0, "")
 			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Would you like to set OWNER/REPO as the default repository for this directory?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
+			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Renamed remote origin to upstream\n✓ Added remote origin\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 		{
@@ -423,6 +451,21 @@ func TestRepoFork(t *testing.T) {
 				Remote:     true,
 				RemoteName: defaultRemoteName,
 				Rename:     true,
+			},
+			httpStubs: forkPost,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register("git remote rename origin upstream", 0, "")
+				cs.Register(`git remote add origin https://github.com/someone/REPO.git`, 0, "")
+			},
+			wantOut: "https://github.com/someone/REPO\n",
+		},
+		{
+			name: "implicit nontty --remote --yes",
+			opts: &ForkOptions{
+				Remote:     true,
+				RemoteName: defaultRemoteName,
+				Rename:     true,
+				Confirmed:  true,
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {

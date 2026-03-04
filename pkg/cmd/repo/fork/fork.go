@@ -46,6 +46,7 @@ type ForkOptions struct {
 	Remote            bool
 	PromptClone       bool
 	PromptRemote      bool
+	Confirmed         bool
 	RemoteName        string
 	Organization      string
 	ForkName          string
@@ -92,7 +93,8 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 			origin remote is renamed to %[1]supstream%[1]s. To alter this behavior, you can set
 			a name for the new fork's remote with %[1]s--remote-name%[1]s.
 
-			The %[1]supstream%[1]s remote will be set as the default remote repository.
+			After adding a fork remote in an existing local clone, gh can set the parent
+			repository as the default repository for this directory.
 
 			Additional %[1]sgit clone%[1]s flags can be passed after %[1]s--%[1]s.
 		`, "`"),
@@ -134,6 +136,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork")
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add a git remote for the fork")
+	cmd.Flags().BoolVar(&opts.Confirmed, "yes", false, "Skip the default-repository confirmation prompt")
 	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", defaultRemoteName, "Specify the name for the new remote")
 	cmd.Flags().StringVar(&opts.Organization, "org", "", "Create the fork in an organization")
 	cmd.Flags().StringVar(&opts.ForkName, "fork-name", "", "Rename the forked repository")
@@ -338,12 +341,23 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			if parentRepoRemoteName != "" {
-				if err := gitClient.SetRemoteResolution(ctx, parentRepoRemoteName, "base"); err != nil {
-					return fmt.Errorf("failed to set %s as the default/base repository: %w", parentRepoRemoteName, err)
+				setDefaultRepo := opts.Confirmed
+				if !setDefaultRepo && connectedToTerminal {
+					setDefaultPrompt := fmt.Sprintf("Would you like to set %s as the default repository for this directory?", ghrepo.FullName(repoToFork))
+					setDefaultRepo, err = opts.Prompter.Confirm(setDefaultPrompt, false)
+					if err != nil {
+						return err
+					}
 				}
 
-				if connectedToTerminal {
-					fmt.Fprintf(stderr, "%s Repository %s set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n", cs.WarningIcon(), cs.Bold(ghrepo.FullName(repoToFork)))
+				if setDefaultRepo {
+					if err := gitClient.SetRemoteResolution(ctx, parentRepoRemoteName, "base"); err != nil {
+						return fmt.Errorf("failed to set %s as the default/base repository: %w", parentRepoRemoteName, err)
+					}
+
+					if connectedToTerminal {
+						fmt.Fprintf(stderr, "%s Repository %s set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n", cs.WarningIcon(), cs.Bold(ghrepo.FullName(repoToFork)))
+					}
 				}
 			}
 		}
