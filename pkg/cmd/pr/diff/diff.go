@@ -190,7 +190,7 @@ func fetchDiff(httpClient *http.Client, baseRepo ghrepo.Interface, prNumber int,
 const lineBufferSize = 4096
 
 var (
-	colorHeader   = []byte("\x1b[1;38m")
+	colorHeader   = []byte("\x1b[1;37m")
 	colorAddition = []byte("\x1b[32m")
 	colorRemoval  = []byte("\x1b[31m")
 	colorReset    = []byte("\x1b[m")

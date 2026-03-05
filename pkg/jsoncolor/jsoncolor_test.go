@@ -34,7 +34,7 @@ func TestWrite(t *testing.T) {
 				r:      bytes.NewBufferString(`{}`),
 				indent: "",
 			},
-			wantW:   "\x1b[1;38m{\x1b[m\x1b[1;38m}\x1b[m\n",
+			wantW:   "\x1b[1;37m{\x1b[m\x1b[1;37m}\x1b[m\n",
 			wantErr: false,
 		},
 		{
@@ -43,9 +43,9 @@ func TestWrite(t *testing.T) {
 				r:      bytes.NewBufferString(`{"hash":{"a":1,"b":2},"array":[3,4]}`),
 				indent: "\t",
 			},
-			wantW: "\x1b[1;38m{\x1b[m\n\t\x1b[1;34m\"hash\"\x1b[m\x1b[1;38m:\x1b[m " +
-				"\x1b[1;38m{\x1b[m\n\t\t\x1b[1;34m\"a\"\x1b[m\x1b[1;38m:\x1b[m 1\x1b[1;38m,\x1b[m\n\t\t\x1b[1;34m\"b\"\x1b[m\x1b[1;38m:\x1b[m 2\n\t\x1b[1;38m}\x1b[m\x1b[1;38m,\x1b[m" +
-				"\n\t\x1b[1;34m\"array\"\x1b[m\x1b[1;38m:\x1b[m \x1b[1;38m[\x1b[m\n\t\t3\x1b[1;38m,\x1b[m\n\t\t4\n\t\x1b[1;38m]\x1b[m\n\x1b[1;38m}\x1b[m\n",
+			wantW: "\x1b[1;37m{\x1b[m\n\t\x1b[1;34m\"hash\"\x1b[m\x1b[1;37m:\x1b[m " +
+				"\x1b[1;37m{\x1b[m\n\t\t\x1b[1;34m\"a\"\x1b[m\x1b[1;37m:\x1b[m 1\x1b[1;37m,\x1b[m\n\t\t\x1b[1;34m\"b\"\x1b[m\x1b[1;37m:\x1b[m 2\n\t\x1b[1;37m}\x1b[m\x1b[1;37m,\x1b[m" +
+				"\n\t\x1b[1;34m\"array\"\x1b[m\x1b[1;37m:\x1b[m \x1b[1;37m[\x1b[m\n\t\t3\x1b[1;37m,\x1b[m\n\t\t4\n\t\x1b[1;37m]\x1b[m\n\x1b[1;37m}\x1b[m\n",
 			wantErr: false,
 		},
 		{
@@ -63,7 +63,7 @@ func TestWrite(t *testing.T) {
 				r:      bytes.NewBufferString(`{{`),
 				indent: "",
 			},
-			wantW:   "\x1b[1;38m{\x1b[m\n",
+			wantW:   "\x1b[1;37m{\x1b[m\n",
 			wantErr: true,
 		},
 	}

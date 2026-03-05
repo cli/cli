@@ -43,6 +43,9 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 
 			To define a display label for an asset, append text starting with %[1]s#%[1]s after the
 			file name.
+
+			When using %[1]s--clobber%[1]s, existing assets are deleted before new assets are uploaded.
+			If the upload fails, the original assets will be lost.
 		`, "`"),
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -66,7 +69,7 @@ func NewCmdUpload(f *cmdutil.Factory, runF func(*UploadOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing assets of the same name")
+	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Delete and re-upload existing assets of the same name")
 
 	return cmd
 }

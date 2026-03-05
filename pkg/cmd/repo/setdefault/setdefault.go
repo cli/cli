@@ -70,6 +70,9 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 			# Set a repository explicitly
 			$ gh repo set-default owner/repo
 
+			# Set a repository using a git remote name
+			$ gh repo set-default origin
+
 			# View the current default repository
 			$ gh repo set-default --view
 
@@ -79,22 +82,31 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if isLocal, err := opts.GitClient.IsLocalGitRepo(cmd.Context()); err != nil {
+				return err
+			} else if !isLocal {
+				return errors.New("must be run from inside a git repository")
+			}
+
 			if len(args) > 0 {
 				var err error
 				opts.Repo, err = ghrepo.FromFullName(args[0])
 				if err != nil {
-					return err
+					remotes, remoteErr := opts.Remotes()
+					if remoteErr != nil {
+						return remoteErr
+					}
+
+					remote, findErr := remotes.FindByName(args[0])
+					if findErr != nil {
+						return fmt.Errorf("given arg is not a valid repo or git remote: %w", err)
+					}
+					opts.Repo = remote.Repo
 				}
 			}
 
 			if !opts.ViewMode && !opts.IO.CanPrompt() && opts.Repo == nil {
 				return cmdutil.FlagErrorf("repository required when not running interactively")
-			}
-
-			if isLocal, err := opts.GitClient.IsLocalGitRepo(cmd.Context()); err != nil {
-				return err
-			} else if !isLocal {
-				return errors.New("must be run from inside a git repository")
 			}
 
 			if runF != nil {

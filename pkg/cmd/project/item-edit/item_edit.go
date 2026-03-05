@@ -16,9 +16,11 @@ import (
 
 type editItemOpts struct {
 	// updateDraftIssue
-	title  string
-	body   string
-	itemID string
+	title        string
+	titleChanged bool
+	body         string
+	bodyChanged  bool
+	itemID       string
 	// updateItem
 	fieldID              string
 	projectID            string
@@ -43,6 +45,12 @@ type EditProjectDraftIssue struct {
 	UpdateProjectV2DraftIssue struct {
 		DraftIssue queries.DraftIssue `graphql:"draftIssue"`
 	} `graphql:"updateProjectV2DraftIssue(input:$input)"`
+}
+
+type DraftIssueQuery struct {
+	DraftIssueNode struct {
+		DraftIssue queries.DraftIssue `graphql:"... on DraftIssue"`
+	} `graphql:"node(id: $id)"`
 }
 
 type UpdateProjectV2FieldValue struct {
@@ -78,6 +86,8 @@ func NewCmdEditItem(f *cmdutil.Factory, runF func(config editItemConfig) error) 
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.numberChanged = cmd.Flags().Changed("number")
+			opts.titleChanged = cmd.Flags().Changed("title")
+			opts.bodyChanged = cmd.Flags().Changed("body")
 			if err := cmdutil.MutuallyExclusive(
 				"only one of `--text`, `--number`, `--date`, `--single-select-option-id` or `--iteration-id` may be used",
 				opts.text != "",
@@ -143,7 +153,7 @@ func runEditItem(config editItemConfig) error {
 	}
 
 	// update draft issue
-	if config.opts.title != "" || config.opts.body != "" {
+	if config.opts.titleChanged || config.opts.bodyChanged {
 		return updateDraftIssue(config)
 	}
 
@@ -158,13 +168,41 @@ func runEditItem(config editItemConfig) error {
 	return cmdutil.SilentError
 }
 
-func buildEditDraftIssue(config editItemConfig) (*EditProjectDraftIssue, map[string]interface{}) {
+func fetchDraftIssueByID(config editItemConfig, draftIssueID string) (*queries.DraftIssue, error) {
+	var query DraftIssueQuery
+	variables := map[string]interface{}{
+		"id": githubv4.ID(draftIssueID),
+	}
+
+	err := config.client.Query("DraftIssueByID", &query, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	return &query.DraftIssueNode.DraftIssue, nil
+}
+
+func buildEditDraftIssue(config editItemConfig, currentDraftIssue *queries.DraftIssue) (*EditProjectDraftIssue, map[string]interface{}) {
+	input := githubv4.UpdateProjectV2DraftIssueInput{
+		DraftIssueID: githubv4.ID(config.opts.itemID),
+	}
+
+	if config.opts.titleChanged {
+		input.Title = githubv4.NewString(githubv4.String(config.opts.title))
+	} else if currentDraftIssue != nil {
+		// Preserve existing if title is not provided
+		input.Title = githubv4.NewString(githubv4.String(currentDraftIssue.Title))
+	}
+
+	if config.opts.bodyChanged {
+		input.Body = githubv4.NewString(githubv4.String(config.opts.body))
+	} else if currentDraftIssue != nil {
+		// Preserve existing if body is not provided
+		input.Body = githubv4.NewString(githubv4.String(currentDraftIssue.Body))
+	}
+
 	return &EditProjectDraftIssue{}, map[string]interface{}{
-		"input": githubv4.UpdateProjectV2DraftIssueInput{
-			Body:         githubv4.NewString(githubv4.String(config.opts.body)),
-			DraftIssueID: githubv4.ID(config.opts.itemID),
-			Title:        githubv4.NewString(githubv4.String(config.opts.title)),
-		},
+		"input": input,
 	}
 }
 
@@ -250,9 +288,19 @@ func updateDraftIssue(config editItemConfig) error {
 		return cmdutil.FlagErrorf("ID must be the ID of the draft issue content which is prefixed with `DI_`")
 	}
 
-	query, variables := buildEditDraftIssue(config)
+	// Fetch current draft issue to preserve fields that aren't being updated
+	var currentDraftIssue *queries.DraftIssue
+	var err error
+	if !config.opts.titleChanged || !config.opts.bodyChanged {
+		currentDraftIssue, err = fetchDraftIssueByID(config, config.opts.itemID)
+		if err != nil {
+			return err
+		}
+	}
 
-	err := config.client.Mutate("EditDraftIssueItem", query, variables)
+	query, variables := buildEditDraftIssue(config, currentDraftIssue)
+
+	err = config.client.Mutate("EditDraftIssueItem", query, variables)
 	if err != nil {
 		return err
 	}

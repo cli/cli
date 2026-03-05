@@ -144,6 +144,12 @@ func TestNewCmdFork(t *testing.T) {
 				Rename:     false,
 			},
 		},
+		{
+			name:    "remote with repo argument",
+			cli:     "foo/bar --remote",
+			wantErr: true,
+			errMsg:  "the `--remote` flag is unsupported when a repository argument is provided",
+		},
 	}
 
 	for _, tt := range tests {

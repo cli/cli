@@ -217,6 +217,7 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 		} else {
 			qs.Set("q", query.AdvancedIssueSearchString())
 
+			// TODO advancedIssueSearchCleanup
 			if features.AdvancedIssueSearchAPIOptIn {
 				// Advanced syntax should be explicitly enabled
 				qs.Set("advanced_search", "true")

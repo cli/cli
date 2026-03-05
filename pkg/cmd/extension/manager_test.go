@@ -867,6 +867,39 @@ func TestManager_Install_git(t *testing.T) {
 	assert.NoDirExistsf(t, extensionUpdatePath, "update directory should be removed")
 }
 
+func TestManager_Install_not_installable(t *testing.T) {
+	dataDir := t.TempDir()
+	updateDir := t.TempDir()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	ios, _, _, _ := iostreams.Test()
+
+	m := newTestManager(dataDir, updateDir, &client, nil, ios)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-some-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "not-a-binary",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-some-ext/contents/gh-some-ext"),
+		httpmock.StatusStringResponse(404, "not found"))
+
+	repo := ghrepo.New("owner", "gh-some-ext")
+
+	err := m.Install(repo, "")
+	assert.EqualError(t, err, "extension is not installable: no usable release artifact or script found in owner/gh-some-ext")
+}
+
 func TestManager_Install_git_pinned(t *testing.T) {
 	dataDir := t.TempDir()
 	updateDir := t.TempDir()

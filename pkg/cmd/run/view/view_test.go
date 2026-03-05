@@ -1049,6 +1049,64 @@ func TestViewRun(t *testing.T) {
 			wantOut: quuxTheBarfLogOutput,
 		},
 		{
+			name: "exit status respected with log-failed, failed run",
+			opts: &ViewOptions{
+				RunID:      "1234",
+				LogFailed:  true,
+				ExitStatus: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJob,
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.BinaryResponse(zipArchive))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: quuxTheBarfLogOutput,
+			wantErr: true,
+		},
+		{
+			name: "exit status respected with log, failed run",
+			opts: &ViewOptions{
+				RunID:      "1234",
+				Log:        true,
+				ExitStatus: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "runs/1234/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							shared.SuccessfulJob,
+							shared.FailedJob,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234/logs"),
+					httpmock.BinaryResponse(zipArchive))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+			},
+			wantOut: expectedRunLogOutput,
+			wantErr: true,
+		},
+		{
 			name: "interactive with log, with no step logs available (#10551)",
 			tty:  true,
 			opts: &ViewOptions{

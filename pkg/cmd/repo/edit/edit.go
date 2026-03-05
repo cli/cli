@@ -233,9 +233,11 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			"squashMergeAllowed",
 			"watchers",
 		}
+		// TODO repoFeaturesCleanup
 		if repoFeatures.VisibilityField {
 			fieldsToRetrieve = append(fieldsToRetrieve, "visibility")
 		}
+		// TODO repoFeaturesCleanup
 		if repoFeatures.AutoMerge {
 			fieldsToRetrieve = append(fieldsToRetrieve, "autoMergeAllowed")
 		}

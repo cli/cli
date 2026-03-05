@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/safepaths"
+	ghzip "github.com/cli/cli/v2/internal/zip"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 )
 
@@ -62,7 +63,7 @@ func downloadArtifact(httpClient *http.Client, url string, destDir safepaths.Abs
 	if err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}
-	if err := extractZip(zipfile, destDir); err != nil {
+	if err := ghzip.ExtractZip(zipfile, destDir); err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}
 

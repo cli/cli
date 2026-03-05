@@ -49,7 +49,8 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	}
 
 	headers := map[string]string{
-		userAgent: fmt.Sprintf("GitHub CLI %s", opts.AppVersion),
+		userAgent:  fmt.Sprintf("GitHub CLI %s", opts.AppVersion),
+		apiVersion: apiVersionValue,
 	}
 	clientOpts.Headers = headers
 

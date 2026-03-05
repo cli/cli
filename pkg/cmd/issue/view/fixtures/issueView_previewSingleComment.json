@@ -138,7 +138,11 @@
               ]
             }
           ],
-          "totalCount": 6
+          "totalCount": 6,
+          "pageInfo": {
+            "hasNextPage": true,
+            "endCursor": "Y3Vyc29yOnYyOjg5"
+          }
         },
         "url": "https://github.com/OWNER/REPO/issues/123"
       }

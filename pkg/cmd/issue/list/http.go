@@ -2,12 +2,15 @@ package list
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 )
+
+var pullRequestSearchQualifierRE = regexp.MustCompile(`(?i)\b(?:is|type):(?:pr|pull-?request)\b`)
 
 func listIssues(client *api.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.IssuesAndTotalCount, error) {
 	var states []string
@@ -114,6 +117,10 @@ loop:
 }
 
 func searchIssues(client *api.Client, detector fd.Detector, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.IssuesAndTotalCount, error) {
+	if pullRequestSearchQualifierRE.MatchString(filters.Search) {
+		return nil, fmt.Errorf("cannot use pull request search qualifiers with `gh issue list`; use `gh pr list` instead")
+	}
+
 	// TODO advancedIssueSearchCleanup
 	// We won't need feature detection when GHES 3.17 support ends, since
 	// the advanced issue search is the only available search backend for
@@ -164,8 +171,10 @@ func searchIssues(client *api.Client, detector fd.Detector, repo ghrepo.Interfac
 	filters.Repo = ghrepo.FullName(repo)
 	filters.Entity = "issue"
 
+	// TODO advancedIssueSearchCleanup
 	if features.AdvancedIssueSearchAPI {
 		variables["query"] = prShared.SearchQueryBuild(filters, true)
+		// TODO advancedIssueSearchCleanup
 		if features.AdvancedIssueSearchAPIOptIn {
 			variables["type"] = "ISSUE_ADVANCED"
 		} else {

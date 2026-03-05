@@ -224,6 +224,217 @@ func TestAccessiblePrompter(t *testing.T) {
 		assert.Equal(t, []int{1}, multiSelectValues)
 	})
 
+	t.Run("MultiSelectWithSearch - basic flow", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		persistentOptions := []string{"persistent-option-1"}
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
+			var searchResultKeys []string
+			var searchResultLabels []string
+
+			// Initial search with no input
+			if input == "" {
+				moreResults := 2
+				searchResultKeys = []string{"initial-result-1", "initial-result-2"}
+				searchResultLabels = []string{"Initial Result Label 1", "Initial Result Label 2"}
+				return prompter.MultiSelectSearchResult{
+					Keys:        searchResultKeys,
+					Labels:      searchResultLabels,
+					MoreResults: moreResults,
+					Err:         nil,
+				}
+			}
+
+			// Subsequent search with input
+			moreResults := 0
+			searchResultKeys = []string{"search-result-1", "search-result-2"}
+			searchResultLabels = []string{"Search Result Label 1", "Search Result Label 2"}
+			return prompter.MultiSelectSearchResult{
+				Keys:        searchResultKeys,
+				Labels:      searchResultLabels,
+				MoreResults: moreResults,
+				Err:         nil,
+			}
+		}
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select an option \r\n")
+			require.NoError(t, err)
+
+			// Select the search option, which will always be the first option
+			_, err = console.SendLine("1")
+			require.NoError(t, err)
+
+			// Submit search
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+
+			// Wait for the search prompt to appear
+			_, err = console.ExpectString("Search for an option")
+			require.NoError(t, err)
+
+			// Enter some search text to trigger the search
+			_, err = console.SendLine("search text")
+			require.NoError(t, err)
+
+			// Wait for the multiselect prompt to re-appear after search
+			_, err = console.ExpectString("Select an option \r\n")
+			require.NoError(t, err)
+
+			// Select the first search result
+			_, err = console.SendLine("2")
+			require.NoError(t, err)
+
+			// This confirms selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+		multiSelectValues, err := p.MultiSelectWithSearch("Select an option", "Search for an option", []string{}, persistentOptions, searchFunc)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"search-result-1"}, multiSelectValues)
+	})
+
+	t.Run("MultiSelectWithSearch - defaults are pre-selected", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		initialSearchResultKeys := []string{"initial-result-1"}
+		initialSearchResultLabels := []string{"Initial Result Label 1"}
+		defaultOptions := initialSearchResultKeys
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
+			// Initial search with no input
+			if input == "" {
+				moreResults := 2
+				return prompter.MultiSelectSearchResult{
+					Keys:        initialSearchResultKeys,
+					Labels:      initialSearchResultLabels,
+					MoreResults: moreResults,
+					Err:         nil,
+				}
+			}
+
+			// No search selected, so this should fail the test.
+			t.FailNow()
+			return prompter.MultiSelectSearchResult{
+				Keys:        nil,
+				Labels:      nil,
+				MoreResults: 0,
+				Err:         nil,
+			}
+		}
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select an option (default: Initial Result Label 1) \r\n")
+			require.NoError(t, err)
+
+			// This confirms default selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+		multiSelectValues, err := p.MultiSelectWithSearch("Select an option", "Search for an option", defaultOptions, initialSearchResultKeys, searchFunc)
+		require.NoError(t, err)
+		assert.Equal(t, defaultOptions, multiSelectValues)
+	})
+
+	t.Run("MultiSelectWithSearch - selected options persist between searches", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		initialSearchResultKeys := []string{"initial-result-1"}
+		initialSearchResultLabels := []string{"Initial Result Label 1"}
+		moreResultKeys := []string{"more-result-1"}
+		moreResultLabels := []string{"More Result Label 1"}
+
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
+			// Initial search with no input
+			if input == "" {
+				moreResults := 2
+				return prompter.MultiSelectSearchResult{
+					Keys:        initialSearchResultKeys,
+					Labels:      initialSearchResultLabels,
+					MoreResults: moreResults,
+					Err:         nil,
+				}
+			}
+
+			// Subsequent search with input "more"
+			if input == "more" {
+				return prompter.MultiSelectSearchResult{
+					Keys:        moreResultKeys,
+					Labels:      moreResultLabels,
+					MoreResults: 0,
+					Err:         nil,
+				}
+			}
+
+			// No other searches expected
+			t.FailNow()
+			return prompter.MultiSelectSearchResult{
+				Keys:        nil,
+				Labels:      nil,
+				MoreResults: 0,
+				Err:         nil,
+			}
+		}
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select an option \r\n")
+			require.NoError(t, err)
+
+			// Select one of our initial search results
+			_, err = console.SendLine("2")
+			require.NoError(t, err)
+
+			// Select to search
+			_, err = console.SendLine("1")
+			require.NoError(t, err)
+
+			// Submit the search selection
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+
+			// Wait for the search prompt to appear
+			_, err = console.ExpectString("Search for an option")
+			require.NoError(t, err)
+
+			// Enter some search text to trigger the search
+			_, err = console.SendLine("more")
+			require.NoError(t, err)
+
+			// Wait for the multiselect prompt to re-appear after search
+			_, err = console.ExpectString("Select up to")
+			require.NoError(t, err)
+
+			// Select the new option from the new search results
+			_, err = console.SendLine("3")
+			require.NoError(t, err)
+
+			// Submit selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+		multiSelectValues, err := p.MultiSelectWithSearch("Select an option", "Search for an option", []string{}, []string{}, searchFunc)
+		require.NoError(t, err)
+		expectedValues := append(initialSearchResultKeys, moreResultKeys...)
+		assert.Equal(t, expectedValues, multiSelectValues)
+	})
+
+	t.Run("MultiSelectWithSearch - search error propagates", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+
+		searchFunc := func(input string) prompter.MultiSelectSearchResult {
+			return prompter.MultiSelectSearchResult{
+				Err: fmt.Errorf("search error"),
+			}
+		}
+
+		_, err := p.MultiSelectWithSearch("Select", "Search", []string{}, []string{}, searchFunc)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "search error")
+	})
+
 	t.Run("Input", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
@@ -642,6 +853,9 @@ func newTestVirtualTerminal(t *testing.T) *expect.Console {
 		failOnExpectError(t),
 		failOnSendError(t),
 		expect.WithDefaultTimeout(time.Second),
+		// Use this logger to debug expect based tests by printing the
+		// characters being read to stdout.
+		// expect.WithLogger(log.New(os.Stdout, "", 0)),
 	}
 
 	console, err := expect.NewConsole(consoleOpts...)

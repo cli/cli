@@ -14,16 +14,16 @@ For bugs, the FR should engage with the issue and community with the goal to rem
 
 To be considered triaged, `bug` issues require the following:
 
-- A severity label `p1`, `p2`, and `p3`
+- A severity label `priority-1`, `priority-2`, and `priority-3`
 - Clearly defined Acceptance Criteria, added to the Issue as a standalone comment (see [example](https://github.com/cli/cli/issues/9469#issuecomment-2292315743))
 
 #### Bug severities
 
 | Severity | Description |
 | - | - |
-| `p1` | Affects a large population and inhibits work |
-| `p2` | Affects more than a few users but doesn't prevent core functions |
-| `p3` | Affects a small number of users or is largely cosmetic |
+| `priority-1` | Affects a large population and inhibits work |
+| `priority-2` | Affects more than a few users but doesn't prevent core functions |
+| `priority-3` | Affects a small number of users or is largely cosmetic |
 
 ### Enhancements and Docs
 
@@ -36,10 +36,10 @@ When a new issue is opened, the FR **should**:
 - Ensure there is enough information to understand the enhancement's scope and value
 - Ask the user for more information about value and use-case, if necessary
 - Leave the `needs-triage` label on the issue
-- Add the `needs-user-input` and `needs-investigation` labels as needed
+- Add the `more-info-needed` and `needs-investigation` labels as needed
 
 When the FR has enough information to be triaged, they should:
-- Remove the `needs-user-input` and `needs-investigation` labels
+- Remove the `more-info-needed` and `needs-investigation` labels
 - Remove their assignment from the issue
 
 The FR should **avoid**:
@@ -57,7 +57,7 @@ The FR can consider adding any of the following labels below.
 | - | - |
 | `discuss` | Some issues require discussion with the internal team. Adding this label will automatically open up an internal discussion with the team to facilitate this discussion. |
 | `core` |  Defines what we would like to do internally. We tend to lean towards `help wanted` by default, and adding `core` should be reserved for trickier issues or implementations we have strong opinions/preferences about. |
-| `needs-user-input` | After asking any contributors for more information, add this label so it is clear that the issue has been responded to and we are waiting on the user. |
+| `more-info-needed` | After asking any contributors for more information, add this label so it is clear that the issue has been responded to and we are waiting on the user. |
 | `needs-investigation` | Used when the issue requires further investigation before it can be reviewed and triaged. This is often used for issues that are not clearly bugs or enhancements, or when the FR needs to gather more information before proceeding. |
 | `invalid` | Added to spam and abusive issues. |
 

@@ -1,0 +1,61 @@
+name: Issue Triaging
+on:
+  issues:
+    types: [opened, reopened, labeled, unlabeled, closed]
+
+jobs:
+  label-incoming:
+    if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'unlabeled'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-label-incoming.yml@main
+    permissions:
+      issues: write
+
+  close-invalid:
+    if: github.event.action == 'labeled'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-invalid.yml@main
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+  close-suspected-spam:
+    if: github.event.action == 'labeled'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-suspected-spam.yml@main
+    permissions:
+      issues: write
+
+  close-single-word:
+    if: github.event.action == 'opened'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-single-word-issues.yml@main
+    permissions:
+      issues: write
+
+  close-off-topic:
+    if: github.event.action == 'labeled'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-close-off-topic.yml@main
+    permissions:
+      issues: write
+
+  enhancement-comment:
+    if: github.event.action == 'labeled'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-enhancement-comment.yml@main
+    permissions:
+      issues: write
+
+  unable-to-reproduce:
+    if: github.event.action == 'labeled'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-unable-to-reproduce-comment.yml@main
+    permissions:
+      issues: write
+
+  remove-needs-triage:
+    if: github.event.action == 'labeled'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-remove-needs-triage.yml@main
+    permissions:
+      issues: write
+
+  on-issue-close:
+    if: github.event.action == 'closed'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-on-issue-close.yml@main
+    permissions:
+      issues: write

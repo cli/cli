@@ -20,12 +20,20 @@ func (md *DisabledDetectorMock) ProjectsV1() gh.ProjectsV1Support {
 	return gh.ProjectsV1Unsupported
 }
 
+func (md *DisabledDetectorMock) ProjectFeatures() (ProjectFeatures, error) {
+	return ProjectFeatures{}, nil
+}
+
 func (md *DisabledDetectorMock) SearchFeatures() (SearchFeatures, error) {
 	return advancedIssueSearchNotSupported, nil
 }
 
 func (md *DisabledDetectorMock) ReleaseFeatures() (ReleaseFeatures, error) {
 	return ReleaseFeatures{}, nil
+}
+
+func (md *DisabledDetectorMock) ActionsFeatures() (ActionsFeatures, error) {
+	return ActionsFeatures{}, nil
 }
 
 type EnabledDetectorMock struct{}
@@ -46,6 +54,10 @@ func (md *EnabledDetectorMock) ProjectsV1() gh.ProjectsV1Support {
 	return gh.ProjectsV1Supported
 }
 
+func (md *EnabledDetectorMock) ProjectFeatures() (ProjectFeatures, error) {
+	return allProjectFeatures, nil
+}
+
 func (md *EnabledDetectorMock) SearchFeatures() (SearchFeatures, error) {
 	return advancedIssueSearchNotSupported, nil
 }
@@ -53,6 +65,12 @@ func (md *EnabledDetectorMock) SearchFeatures() (SearchFeatures, error) {
 func (md *EnabledDetectorMock) ReleaseFeatures() (ReleaseFeatures, error) {
 	return ReleaseFeatures{
 		ImmutableReleases: true,
+	}, nil
+}
+
+func (md *EnabledDetectorMock) ActionsFeatures() (ActionsFeatures, error) {
+	return ActionsFeatures{
+		DispatchRunDetails: true,
 	}, nil
 }
 

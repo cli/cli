@@ -219,6 +219,7 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		if err != nil {
 			return nil, nil, err
 		}
+		// TODO mergeQueueCleanup
 		if !prFeatures.MergeQueue {
 			fields.Remove("isInMergeQueue")
 			fields.Remove("isMergeQueueEnabled")
@@ -349,7 +350,7 @@ func ParseFullReference(s string) (ghrepo.Interface, int, error) {
 
 	number, err := strconv.Atoi(m[3])
 	if err != nil {
-		return nil, 0, fmt.Errorf("invalid reference: %q", number)
+		return nil, 0, fmt.Errorf("invalid reference: %q; %w", s, err)
 	}
 
 	owner := m[1]

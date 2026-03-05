@@ -10,12 +10,15 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cli/cli/v2/pkg/set"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 const (
 	accept          = "Accept"
+	apiVersion      = "X-GitHub-Api-Version"
+	apiVersionValue = "2022-11-28"
 	authorization   = "Authorization"
 	cacheTTL        = "X-GH-CACHE-TTL"
 	graphqlFeatures = "GraphQL-Features"
@@ -178,12 +181,49 @@ func handleResponse(err error) error {
 
 	var gqlErr *ghAPI.GraphQLError
 	if errors.As(err, &gqlErr) {
+		scopeErr := GenerateScopeErrorForGQL(gqlErr)
+		if scopeErr != nil {
+			return scopeErr
+		}
 		return GraphQLError{
 			GraphQLError: gqlErr,
 		}
 	}
 
 	return err
+}
+
+func GenerateScopeErrorForGQL(gqlErr *ghAPI.GraphQLError) error {
+	missing := set.NewStringSet()
+	for _, e := range gqlErr.Errors {
+		if e.Type != "INSUFFICIENT_SCOPES" {
+			continue
+		}
+		missing.AddValues(requiredScopesFromServerMessage(e.Message))
+	}
+	if missing.Len() > 0 {
+		s := missing.ToSlice()
+		return fmt.Errorf(
+			"error: your authentication token is missing required scopes %v\n"+
+				"To request it, run:  gh auth refresh -s %s",
+			s,
+			strings.Join(s, ","))
+	}
+	return nil
+}
+
+var scopesRE = regexp.MustCompile(`one of the following scopes: \[(.+?)]`)
+
+func requiredScopesFromServerMessage(msg string) []string {
+	m := scopesRE.FindStringSubmatch(msg)
+	if m == nil {
+		return nil
+	}
+	var scopes []string
+	for _, mm := range strings.Split(m[1], ",") {
+		scopes = append(scopes, strings.Trim(mm, "' "))
+	}
+	return scopes
 }
 
 // ScopesSuggestion is an error messaging utility that prints the suggestion to request additional OAuth
@@ -264,6 +304,7 @@ func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOpt
 		AuthToken: "none",
 		Headers: map[string]string{
 			authorization: "",
+			apiVersion:    apiVersionValue,
 		},
 		Host:               hostname,
 		SkipDefaultHeaders: true,

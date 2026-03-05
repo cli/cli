@@ -215,6 +215,7 @@ func editRun(opts *EditOptions) error {
 
 	lookupFields := []string{"id", "number", "title", "body", "url"}
 	if editable.Assignees.Edited {
+		// TODO actorIsAssignableCleanup
 		if issueFeatures.ActorIsAssignable {
 			editable.Assignees.ActorAssignees = true
 			lookupFields = append(lookupFields, "assignedActors")

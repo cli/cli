@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	colorDelim  = "1;38" // bright white
+	colorDelim  = "1;37" // bold white
 	colorKey    = "1;34" // bright blue
 	colorNull   = "36"   // cyan
 	colorString = "32"   // green

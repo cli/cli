@@ -168,6 +168,7 @@ func Test_viewRun(t *testing.T) {
 		promptStubs      func(*testing.T, *prompter.MockPrompter)
 		capiStubs        func(*testing.T, *capi.CapiClientMock)
 		logRendererStubs func(*testing.T, *shared.LogRendererMock)
+		jsonFields       []string
 		wantOut          string
 		wantErr          error
 		wantStderr       string
@@ -1209,6 +1210,63 @@ func Test_viewRun(t *testing.T) {
 				(rendered:) <raw-logs-two>
 			`),
 		},
+		{
+			name: "json output (tty)",
+			tty:  true,
+			opts: ViewOptions{
+				SelectorArg: "some-session-id",
+				SessionID:   "some-session-id",
+			},
+			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
+				m.GetSessionFunc = func(_ context.Context, id string) (*capi.Session, error) {
+					return &capi.Session{
+						ID:            "some-session-id",
+						Name:          "Fix login bug",
+						State:         "completed",
+						CreatedAt:     sampleDate,
+						LastUpdatedAt: sampleDate,
+						CompletedAt:   sampleCompletedAt,
+						ResourceType:  "pull",
+						PullRequest: &api.PullRequest{
+							Number: 42,
+							URL:    "https://github.com/OWNER/REPO/pull/42",
+							Title:  "Fix login bug",
+							State:  "MERGED",
+							Repository: &api.PRRepository{
+								NameWithOwner: "OWNER/REPO",
+							},
+						},
+						User: &api.GitHubUser{
+							Login: "testuser",
+						},
+					}, nil
+				}
+			},
+			wantOut:    "{\"id\":\"some-session-id\",\"name\":\"Fix login bug\",\"pullRequestNumber\":42,\"pullRequestState\":\"MERGED\",\"pullRequestTitle\":\"Fix login bug\",\"pullRequestUrl\":\"https://github.com/OWNER/REPO/pull/42\",\"repository\":\"OWNER/REPO\",\"state\":\"completed\",\"user\":\"testuser\"}\n",
+			jsonFields: []string{"id", "name", "state", "repository", "user", "pullRequestNumber", "pullRequestUrl", "pullRequestTitle", "pullRequestState"},
+		},
+		{
+			name: "json output with nil pull request",
+			tty:  false,
+			opts: ViewOptions{
+				SelectorArg: "some-session-id",
+				SessionID:   "some-session-id",
+			},
+			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
+				m.GetSessionFunc = func(_ context.Context, id string) (*capi.Session, error) {
+					return &capi.Session{
+						ID:            "some-session-id",
+						Name:          "New task",
+						State:         "in_progress",
+						CreatedAt:     sampleDate,
+						LastUpdatedAt: sampleDate,
+						ResourceType:  "pull",
+					}, nil
+				}
+			},
+			wantOut:    "{\"id\":\"some-session-id\",\"name\":\"New task\",\"pullRequestNumber\":null,\"pullRequestUrl\":null,\"repository\":null,\"state\":\"in_progress\",\"user\":null}\n",
+			jsonFields: []string{"id", "name", "state", "repository", "user", "pullRequestNumber", "pullRequestUrl"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1242,6 +1300,12 @@ func Test_viewRun(t *testing.T) {
 			}
 			opts.LogRenderer = func() shared.LogRenderer {
 				return logRenderer
+			}
+
+			if tt.jsonFields != nil {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(tt.jsonFields)
+				opts.Exporter = exporter
 			}
 
 			err := viewRun(&opts)

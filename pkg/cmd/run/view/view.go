@@ -331,7 +331,14 @@ func runView(opts *ViewOptions) error {
 			return err
 		}
 
-		return displayLogSegments(opts.IO.Out, segments)
+		if err := displayLogSegments(opts.IO.Out, segments); err != nil {
+			return err
+		}
+
+		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
+			return cmdutil.SilentError
+		}
+		return nil
 	}
 
 	prNumber := ""

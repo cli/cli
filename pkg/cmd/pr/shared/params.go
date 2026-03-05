@@ -295,11 +295,24 @@ func (r *MeReplacer) ReplaceSlice(handles []string) ([]string, error) {
 // Login is generally needed for API calls; name is used when launching web browser.
 type CopilotReplacer struct {
 	returnLogin bool
+	// copilotLogin is the login to use when replacing @copilot.
+	// Different Copilot features use different bot logins.
+	copilotLogin string
 }
 
+// NewCopilotReplacer creates a replacer for assignee @copilot references.
 func NewCopilotReplacer(returnLogin bool) *CopilotReplacer {
 	return &CopilotReplacer{
-		returnLogin: returnLogin,
+		returnLogin:  returnLogin,
+		copilotLogin: api.CopilotAssigneeLogin,
+	}
+}
+
+// NewCopilotReviewerReplacer creates a replacer for reviewer @copilot references.
+func NewCopilotReviewerReplacer() *CopilotReplacer {
+	return &CopilotReplacer{
+		returnLogin:  true,
+		copilotLogin: api.CopilotReviewerLogin,
 	}
 }
 
@@ -308,7 +321,7 @@ func (r *CopilotReplacer) replace(handle string) string {
 		return handle
 	}
 	if r.returnLogin {
-		return api.CopilotActorLogin
+		return r.copilotLogin
 	}
 	return api.CopilotActorName
 }

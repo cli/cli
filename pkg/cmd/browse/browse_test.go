@@ -64,6 +64,14 @@ func TestNewCmdBrowse(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name: "actions flag",
+			cli:  "--actions",
+			wants: BrowseOptions{
+				ActionsFlag: true,
+			},
+			wantsErr: false,
+		},
+		{
 			name: "no browser flag",
 			cli:  "--no-browser",
 			wants: BrowseOptions{
@@ -103,6 +111,15 @@ func TestNewCmdBrowse(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name: "combination: actions wiki",
+			cli:  "--actions --wiki",
+			wants: BrowseOptions{
+				ActionsFlag: true,
+				WikiFlag:    true,
+			},
+			wantsErr: true,
+		},
+		{
 			name: "passed argument",
 			cli:  "main.go",
 			wants: BrowseOptions{
@@ -133,6 +150,11 @@ func TestNewCmdBrowse(t *testing.T) {
 		{
 			name:     "passed argument and wiki flag",
 			cli:      "main.go --wiki",
+			wantsErr: true,
+		},
+		{
+			name:     "passed argument and actions flag",
+			cli:      "main.go --actions",
 			wantsErr: true,
 		},
 		{
@@ -185,6 +207,29 @@ func TestNewCmdBrowse(t *testing.T) {
 			cli:      "de07febc26e19000f8c9e821207f3bc34a3c8038 --commit=12a4",
 			wantsErr: true,
 		},
+		{
+			name: "blame flag",
+			cli:  "main.go --blame",
+			wants: BrowseOptions{
+				BlameFlag:   true,
+				SelectorArg: "main.go",
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "blame flag without file argument",
+			cli:      "--blame",
+			wantsErr: true,
+		},
+		{
+			name: "blame flag with line number",
+			cli:  "main.go:312 --blame",
+			wants: BrowseOptions{
+				BlameFlag:   true,
+				SelectorArg: "main.go:312",
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -215,7 +260,9 @@ func TestNewCmdBrowse(t *testing.T) {
 			assert.Equal(t, tt.wants.WikiFlag, opts.WikiFlag)
 			assert.Equal(t, tt.wants.NoBrowserFlag, opts.NoBrowserFlag)
 			assert.Equal(t, tt.wants.SettingsFlag, opts.SettingsFlag)
+			assert.Equal(t, tt.wants.ActionsFlag, opts.ActionsFlag)
 			assert.Equal(t, tt.wants.Commit, opts.Commit)
+			assert.Equal(t, tt.wants.BlameFlag, opts.BlameFlag)
 		})
 	}
 }
@@ -277,6 +324,14 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("ravocean", "ThreatLevelMidnight"),
 			expectedURL: "https://github.com/ravocean/ThreatLevelMidnight/wiki",
+		},
+		{
+			name: "actions flag",
+			opts: BrowseOptions{
+				ActionsFlag: true,
+			},
+			baseRepo:    ghrepo.New("ravocean", "ThreatLevelMidnight"),
+			expectedURL: "https://github.com/ravocean/ThreatLevelMidnight/actions",
 		},
 		{
 			name:          "file argument",
@@ -562,6 +617,61 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("bchadwic", "test"),
 			expectedURL: "https://github.com/bchadwic/test/tree/trunk/77507cd94ccafcf568f8560cfecde965fcfa63e7.txt",
+			wantsErr:    false,
+		},
+		{
+			name: "file with blame flag",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt",
+				BlameFlag:   true,
+			},
+			baseRepo:      ghrepo.New("owner", "repo"),
+			defaultBranch: "main",
+			expectedURL:   "https://github.com/owner/repo/blame/main/path/to/file.txt",
+			wantsErr:      false,
+		},
+		{
+			name: "file with blame flag and line number",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:42",
+				BlameFlag:   true,
+			},
+			baseRepo:      ghrepo.New("owner", "repo"),
+			defaultBranch: "main",
+			expectedURL:   "https://github.com/owner/repo/blame/main/path/to/file.txt#L42",
+			wantsErr:      false,
+		},
+		{
+			name: "file with blame flag and line range",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:10-20",
+				BlameFlag:   true,
+			},
+			baseRepo:      ghrepo.New("owner", "repo"),
+			defaultBranch: "main",
+			expectedURL:   "https://github.com/owner/repo/blame/main/path/to/file.txt#L10-L20",
+			wantsErr:      false,
+		},
+		{
+			name: "file with blame flag and branch",
+			opts: BrowseOptions{
+				SelectorArg: "main.go:100",
+				BlameFlag:   true,
+				Branch:      "feature-branch",
+			},
+			baseRepo:    ghrepo.New("owner", "repo"),
+			expectedURL: "https://github.com/owner/repo/blame/feature-branch/main.go#L100",
+			wantsErr:    false,
+		},
+		{
+			name: "file with blame flag and commit",
+			opts: BrowseOptions{
+				SelectorArg: "src/app.js:50",
+				BlameFlag:   true,
+				Commit:      "abc123",
+			},
+			baseRepo:    ghrepo.New("owner", "repo"),
+			expectedURL: "https://github.com/owner/repo/blame/abc123/src/app.js#L50",
 			wantsErr:    false,
 		},
 	}

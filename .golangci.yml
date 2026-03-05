@@ -3,14 +3,27 @@ version: "2"
 linters:
   default: none
   enable:
-    - bodyclose
-    - copyloopvar
-    - durationcheck
-    - gocritic
-    - govet
-    - ineffassign
-    - nilerr
-    - nolintlint
+    - asasalint # checks for pass []any as any in variadic func(...any)
+    - asciicheck # checks that your code does not contain non-ASCII identifiers
+    - bidichk # checks for dangerous unicode character sequences
+    - bodyclose # checks whether HTTP response body is closed successfully
+    - copyloopvar # detects places where loop variables are copied (Go 1.22+)
+    - durationcheck # checks for two durations multiplied together
+    - exptostd # detects functions from golang.org/x/exp/ that can be replaced by std functions
+    - fatcontext # detects nested contexts in loops
+    - gocheckcompilerdirectives # validates go compiler directive comments (//go:)
+    - gochecksumtype # checks exhaustiveness on Go "sum types"
+    - gocritic # provides diagnostics that check for bugs, performance and style issues
+    - gomoddirectives # manages the use of 'replace', 'retract', and 'excludes' directives in go.mod
+    - goprintffuncname # checks that printf-like functions are named with f at the end
+    - govet # reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
+    - ineffassign # detects when assignments to existing variables are not used
+    - nilerr # finds the code that returns nil even if it checks that the error is not nil
+    - nolintlint # reports ill-formed or insufficient nolint directives
+    - nosprintfhostport # checks for misuse of Sprintf to construct a host with port in a URL
+    - reassign # checks that package variables are not reassigned
+    - unused # checks for unused constants, variables, functions and types
+
     # To enable later due to too many issues, and confirm we need them:
     # - gosec
     # - staticcheck

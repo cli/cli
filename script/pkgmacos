@@ -58,7 +58,7 @@ fi
 
 # gh-binary paths
 bin_path="/bin/gh"
-arm64_bin="./dist/macos_darwin_arm64$bin_path"
+arm64_bin="./dist/macos_darwin_arm64_v8.0$bin_path"
 amd64_bin="./dist/macos_darwin_amd64_v1$bin_path"
 # payload paths
 payload_root="pkg_payload"

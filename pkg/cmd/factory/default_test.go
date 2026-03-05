@@ -734,6 +734,7 @@ func TestPlainHttpClient(t *testing.T) {
 
 	assert.Equal(t, 204, res.StatusCode)
 	assert.Equal(t, []string{"GitHub CLI v1.2.3"}, receivedHeaders.Values("User-Agent"))
+	assert.Equal(t, []string{"2022-11-28"}, receivedHeaders.Values("X-GitHub-Api-Version"))
 	assert.Nil(t, receivedHeaders.Values("Authorization"))
 	assert.Nil(t, receivedHeaders.Values("Content-Type"))
 	assert.Nil(t, receivedHeaders.Values("Accept"))

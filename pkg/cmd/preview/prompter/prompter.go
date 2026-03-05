@@ -2,6 +2,7 @@ package prompter
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/gh"
@@ -25,32 +26,35 @@ func NewCmdPrompter(f *cmdutil.Factory, runF func(*prompterOptions) error) *cobr
 	}
 
 	const (
-		selectPrompt          = "select"
-		multiSelectPrompt     = "multi-select"
-		inputPrompt           = "input"
-		passwordPrompt        = "password"
-		confirmPrompt         = "confirm"
-		authTokenPrompt       = "auth-token"
-		confirmDeletionPrompt = "confirm-deletion"
-		inputHostnamePrompt   = "input-hostname"
-		markdownEditorPrompt  = "markdown-editor"
+		selectPrompt                = "select"
+		multiSelectPrompt           = "multi-select"
+		multiSelectWithSearchPrompt = "multi-select-with-search"
+		inputPrompt                 = "input"
+		passwordPrompt              = "password"
+		confirmPrompt               = "confirm"
+		authTokenPrompt             = "auth-token"
+		confirmDeletionPrompt       = "confirm-deletion"
+		inputHostnamePrompt         = "input-hostname"
+		markdownEditorPrompt        = "markdown-editor"
 	)
 
 	prompterTypeFuncMap := map[string]func(prompter.Prompter, *iostreams.IOStreams) error{
-		selectPrompt:          runSelect,
-		multiSelectPrompt:     runMultiSelect,
-		inputPrompt:           runInput,
-		passwordPrompt:        runPassword,
-		confirmPrompt:         runConfirm,
-		authTokenPrompt:       runAuthToken,
-		confirmDeletionPrompt: runConfirmDeletion,
-		inputHostnamePrompt:   runInputHostname,
-		markdownEditorPrompt:  runMarkdownEditor,
+		selectPrompt:                runSelect,
+		multiSelectPrompt:           runMultiSelect,
+		multiSelectWithSearchPrompt: runMultiSelectWithSearch,
+		inputPrompt:                 runInput,
+		passwordPrompt:              runPassword,
+		confirmPrompt:               runConfirm,
+		authTokenPrompt:             runAuthToken,
+		confirmDeletionPrompt:       runConfirmDeletion,
+		inputHostnamePrompt:         runInputHostname,
+		markdownEditorPrompt:        runMarkdownEditor,
 	}
 
 	allPromptsOrder := []string{
 		selectPrompt,
 		multiSelectPrompt,
+		multiSelectWithSearchPrompt,
 		inputPrompt,
 		passwordPrompt,
 		confirmPrompt,
@@ -70,6 +74,7 @@ func NewCmdPrompter(f *cmdutil.Factory, runF func(*prompterOptions) error) *cobr
 			Available prompt types:
 			- select
 			- multi-select
+			- multi-select-with-search
 			- input
 			- password
 			- confirm
@@ -146,6 +151,52 @@ func runMultiSelect(p prompter.Prompter, io *iostreams.IOStreams) error {
 	for _, f := range favorites {
 		fmt.Fprintf(io.Out, "Favorite cuisine: %s\n", cuisines[f])
 	}
+	return nil
+}
+
+func runMultiSelectWithSearch(p prompter.Prompter, io *iostreams.IOStreams) error {
+	fmt.Fprintln(io.Out, "Demonstrating Multi Select With Search")
+	persistentOptions := []string{"persistent-option-1"}
+	searchFunc := func(input string) prompter.MultiSelectSearchResult {
+		var searchResultKeys []string
+		var searchResultLabels []string
+
+		if input == "" {
+			moreResults := 2 // Indicate that there are more results available
+			searchResultKeys = []string{"initial-result-1", "initial-result-2"}
+			searchResultLabels = []string{"Initial Result Label 1", "Initial Result Label 2"}
+			return prompter.MultiSelectSearchResult{
+				Keys:        searchResultKeys,
+				Labels:      searchResultLabels,
+				MoreResults: moreResults,
+				Err:         nil,
+			}
+		}
+
+		// In a real implementation, this function would perform a search based on the input.
+		// Here, we return a static set of options for demonstration purposes.
+		moreResults := 0
+		searchResultKeys = []string{"search-result-1", "search-result-2"}
+		searchResultLabels = []string{"Search Result Label 1", "Search Result Label 2"}
+		return prompter.MultiSelectSearchResult{
+			Keys:        searchResultKeys,
+			Labels:      searchResultLabels,
+			MoreResults: moreResults,
+			Err:         nil,
+		}
+	}
+
+	selections, err := p.MultiSelectWithSearch("Select an option", "Search for an option", []string{}, persistentOptions, searchFunc)
+	if err != nil {
+		return err
+	}
+
+	if len(selections) == 0 {
+		fmt.Fprintln(io.Out, "No options selected.")
+		return nil
+	}
+
+	fmt.Fprintf(io.Out, "Selected options: %s\n", strings.Join(selections, ", "))
 	return nil
 }
 

@@ -179,7 +179,7 @@ func Test_diffRun(t *testing.T) {
 				Patch:       false,
 			},
 			wantFields: []string{"number"},
-			wantStdout: fmt.Sprintf(testDiff, "\x1b[m", "\x1b[1;38m", "\x1b[32m", "\x1b[31m"),
+			wantStdout: fmt.Sprintf(testDiff, "\x1b[m", "\x1b[1;37m", "\x1b[32m", "\x1b[31m"),
 			httpStubs: func(reg *httpmock.Registry) {
 				stubDiffRequest(reg, "application/vnd.github.v3.diff", fmt.Sprintf(testDiff, "", "", "", ""))
 			},
@@ -313,7 +313,7 @@ func Test_colorDiffLines(t *testing.T) {
 				"%[4]s+foo%[2]s\n%[5]s-b%[1]sr%[2]s\n%[3]s+++ baz%[2]s\n",
 				strings.Repeat("a", 2*lineBufferSize),
 				"\x1b[m",
-				"\x1b[1;38m",
+				"\x1b[1;37m",
 				"\x1b[32m",
 				"\x1b[31m",
 			),

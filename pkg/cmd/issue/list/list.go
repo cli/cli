@@ -147,14 +147,7 @@ func listRun(opts *ListOptions) error {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
 		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
 	}
-	features, err := opts.Detector.IssueFeatures()
-	if err != nil {
-		return err
-	}
-	fields := defaultFields
-	if features.StateReason {
-		fields = append(defaultFields, "stateReason")
-	}
+	fields := append(defaultFields, "stateReason")
 
 	filterOptions := prShared.FilterOptions{
 		Entity:    "issue",

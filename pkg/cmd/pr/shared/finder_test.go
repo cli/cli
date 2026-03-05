@@ -160,6 +160,11 @@ func TestParseFullReference(t *testing.T) {
 			arg:     "OWNER/#123",
 			wantErr: `invalid reference: "OWNER/#123"`,
 		},
+		{
+			name:    "invalid full form, too large number",
+			arg:     "OWNER/REPO#9999999999999999999",
+			wantErr: `invalid reference: "OWNER/REPO#9999999999999999999"; strconv.Atoi: parsing "9999999999999999999": value out of range`,
+		},
 	}
 
 	for _, tt := range tests {

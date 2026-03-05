@@ -113,6 +113,10 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 				opts.Rename = true // Any existing 'origin' will be renamed to upstream
 			}
 
+			if opts.Repository != "" && cmd.Flags().Changed("remote") {
+				return cmdutil.FlagErrorf("the `--remote` flag is unsupported when a repository argument is provided")
+			}
+
 			if promptOk {
 				// We can prompt for these if they were not specified.
 				opts.PromptClone = !cmd.Flags().Changed("clone")

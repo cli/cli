@@ -32,7 +32,7 @@ type editConfig struct {
 
 type updateProjectMutation struct {
 	UpdateProjectV2 struct {
-		ProjectV2 queries.Project `graphql:"projectV2"`
+		ProjectV2 queries.ProjectMutationQuery `graphql:"projectV2"`
 	} `graphql:"updateProjectV2(input:$input)"`
 }
 
@@ -144,7 +144,7 @@ func editArgs(config editConfig) (*updateProjectMutation, map[string]interface{}
 	}
 }
 
-func printResults(config editConfig, project queries.Project) error {
+func printResults(config editConfig, project queries.ProjectMutationQuery) error {
 	if !config.io.IsStdoutTTY() {
 		return nil
 	}

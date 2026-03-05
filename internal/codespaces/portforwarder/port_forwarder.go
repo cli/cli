@@ -264,7 +264,11 @@ func (fwd *CodespacesPortForwarder) UpdatePortVisibility(ctx context.Context, re
 	}
 
 	// Delete the existing tunnel port to update
-	err = fwd.connection.TunnelManager.DeleteTunnelPort(ctx, fwd.connection.Tunnel, uint16(remotePort), fwd.connection.Options)
+	port, err := convertIntToUint16(remotePort)
+	if err != nil {
+		return fmt.Errorf("error converting port: %w", err)
+	}
+	err = fwd.connection.TunnelManager.DeleteTunnelPort(ctx, fwd.connection.Tunnel, port, fwd.connection.Options)
 	if err != nil {
 		return fmt.Errorf("error deleting tunnel port: %w", err)
 	}

@@ -10,7 +10,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
@@ -394,6 +396,7 @@ jobs:
     run: echo "${{ github.event.inputs.message }} ${{ fromJSON('["", "🥳"]')[github.event.inputs.use-emoji == 'true'] }} ${{ github.event.inputs.name }}"`)
 	encodedYAMLContentMissingChoiceIp := base64.StdEncoding.EncodeToString(yamlContentMissingChoiceIp)
 
+	// Old GitHub API servers return 204 No Content for successful workflow dispatches.
 	stubs := func(reg *httpmock.Registry) {
 		reg.Register(
 			httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/workflow.yml"),
@@ -404,6 +407,24 @@ jobs:
 		reg.Register(
 			httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
 			httpmock.StatusStringResponse(204, "cool"))
+	}
+
+	// Current GitHub API servers return 200 OK with run info for successful workflow dispatches,
+	// if `return_run_details` is enabled in the request body.
+	stubsWithRunInfo := func(reg *httpmock.Registry) {
+		reg.Register(
+			httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/workflow.yml"),
+			httpmock.JSONResponse(shared.Workflow{
+				Path: ".github/workflows/workflow.yml",
+				ID:   12345,
+			}))
+		reg.Register(
+			httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
+			httpmock.StatusJSONResponse(200, map[string]interface{}{
+				"workflow_run_id": int64(6789),
+				"run_url":         "https://api.github.com/repos/OWNER/REPO/actions/runs/6789",
+				"html_url":        "https://github.com/OWNER/REPO/actions/runs/6789",
+			}))
 	}
 
 	tests := []struct {
@@ -434,11 +455,14 @@ jobs:
 			errOut:  "could not parse provided JSON: unexpected end of JSON input",
 		},
 		{
-			name: "good JSON",
+			// TODO workflowDispatchRunDetailsCleanup
+			// To be deleted
+			name: "good JSON without run info (204)",
 			tty:  true,
 			opts: &RunOptions{
 				Selector:  "workflow.yml",
 				JSONInput: `{"name":"scully"}`,
+				Detector:  &fd.DisabledDetectorMock{},
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -447,13 +471,44 @@ jobs:
 				"ref": "trunk",
 			},
 			httpStubs: stubs,
-			wantOut:   "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=\"workflow.yml\"\n",
+			wantOut: heredoc.Doc(`
+				✓ Created workflow_dispatch event for workflow.yml at trunk
+
+				To see runs for this workflow, try: gh run list --workflow="workflow.yml"
+			`),
 		},
 		{
-			name: "nontty good JSON",
+			name: "good JSON with run info",
+			tty:  true,
 			opts: &RunOptions{
 				Selector:  "workflow.yml",
 				JSONInput: `{"name":"scully"}`,
+				Detector:  &fd.EnabledDetectorMock{},
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"name": "scully",
+				},
+				"ref":                "trunk",
+				"return_run_details": true,
+			},
+			httpStubs: stubsWithRunInfo,
+			wantOut: heredoc.Doc(`
+				✓ Created workflow_dispatch event for workflow.yml at trunk
+				https://github.com/OWNER/REPO/actions/runs/6789
+
+				To see the created workflow run, try: gh run view 6789
+				To see runs for this workflow, try: gh run list --workflow="workflow.yml"
+			`),
+		},
+		{
+			// TODO workflowDispatchRunDetailsCleanup
+			// To be deleted
+			name: "nontty good JSON without run info (204)",
+			opts: &RunOptions{
+				Selector:  "workflow.yml",
+				JSONInput: `{"name":"scully"}`,
+				Detector:  &fd.DisabledDetectorMock{},
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -464,11 +519,31 @@ jobs:
 			httpStubs: stubs,
 		},
 		{
-			name: "nontty good input fields",
+			name: "nontty good JSON with run info",
+			opts: &RunOptions{
+				Selector:  "workflow.yml",
+				JSONInput: `{"name":"scully"}`,
+				Detector:  &fd.EnabledDetectorMock{},
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"name": "scully",
+				},
+				"ref":                "trunk",
+				"return_run_details": true,
+			},
+			httpStubs: stubsWithRunInfo,
+			wantOut:   "https://github.com/OWNER/REPO/actions/runs/6789\n",
+		},
+		{
+			// TODO workflowDispatchRunDetailsCleanup
+			// To be deleted
+			name: "nontty good input fields without run info (204)",
 			opts: &RunOptions{
 				Selector:    "workflow.yml",
 				RawFields:   []string{`name=scully`},
 				MagicFields: []string{`greeting=hey`},
+				Detector:    &fd.DisabledDetectorMock{},
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -480,12 +555,34 @@ jobs:
 			httpStubs: stubs,
 		},
 		{
-			name: "respects ref",
+			name: "nontty good input fields with run info",
+			opts: &RunOptions{
+				Selector:    "workflow.yml",
+				RawFields:   []string{`name=scully`},
+				MagicFields: []string{`greeting=hey`},
+				Detector:    &fd.EnabledDetectorMock{},
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"name":     "scully",
+					"greeting": "hey",
+				},
+				"ref":                "trunk",
+				"return_run_details": true,
+			},
+			httpStubs: stubsWithRunInfo,
+			wantOut:   "https://github.com/OWNER/REPO/actions/runs/6789\n",
+		},
+		{
+			// TODO workflowDispatchRunDetailsCleanup
+			// To be deleted
+			name: "respects ref, without run info (204)",
 			tty:  true,
 			opts: &RunOptions{
 				Selector:  "workflow.yml",
 				JSONInput: `{"name":"scully"}`,
 				Ref:       "good-branch",
+				Detector:  &fd.DisabledDetectorMock{},
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -494,7 +591,36 @@ jobs:
 				"ref": "good-branch",
 			},
 			httpStubs: stubs,
-			wantOut:   "✓ Created workflow_dispatch event for workflow.yml at good-branch\n\nTo see runs for this workflow, try: gh run list --workflow=\"workflow.yml\"\n",
+			wantOut: heredoc.Doc(`
+				✓ Created workflow_dispatch event for workflow.yml at good-branch
+
+				To see runs for this workflow, try: gh run list --workflow="workflow.yml"
+			`),
+		},
+		{
+			name: "respects ref, with run info",
+			tty:  true,
+			opts: &RunOptions{
+				Selector:  "workflow.yml",
+				JSONInput: `{"name":"scully"}`,
+				Ref:       "good-branch",
+				Detector:  &fd.EnabledDetectorMock{},
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"name": "scully",
+				},
+				"ref":                "good-branch",
+				"return_run_details": true,
+			},
+			httpStubs: stubsWithRunInfo,
+			wantOut: heredoc.Doc(`
+				✓ Created workflow_dispatch event for workflow.yml at good-branch
+				https://github.com/OWNER/REPO/actions/runs/6789
+
+				To see the created workflow run, try: gh run view 6789
+				To see runs for this workflow, try: gh run list --workflow="workflow.yml"
+			`),
 		},
 		{
 			// TODO this test is somewhat silly; it's more of a placeholder in case I decide to handle the API error more elegantly
@@ -503,6 +629,7 @@ jobs:
 			opts: &RunOptions{
 				Selector:  "workflow.yml",
 				JSONInput: `{"greeting":"hello there"}`,
+				Detector:  &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -515,6 +642,13 @@ jobs:
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
 					httpmock.StatusStringResponse(422, "missing something"))
 			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"greeting": "hello there",
+				},
+				"ref":                "trunk",
+				"return_run_details": true,
+			},
 			wantErr: true,
 			errOut:  "could not create workflow dispatch event: HTTP 422 (https://api.github.com/repos/OWNER/REPO/actions/workflows/12345/dispatches)",
 		},
@@ -523,6 +657,7 @@ jobs:
 			tty:  false,
 			opts: &RunOptions{
 				Selector: "workflow.yaml",
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -530,13 +665,19 @@ jobs:
 					httpmock.StatusStringResponse(200, `{"id": 12345}`))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
-					httpmock.StatusStringResponse(204, ""))
+					httpmock.StatusJSONResponse(200, map[string]interface{}{
+						"workflow_run_id": int64(6789),
+						"run_url":         "https://api.github.com/repos/OWNER/REPO/actions/runs/6789",
+						"html_url":        "https://github.com/OWNER/REPO/actions/runs/6789",
+					}))
 			},
 			wantBody: map[string]interface{}{
-				"inputs": map[string]interface{}{},
-				"ref":    "trunk",
+				"inputs":             map[string]interface{}{},
+				"ref":                "trunk",
+				"return_run_details": true,
 			},
 			wantErr: false,
+			wantOut: "https://github.com/OWNER/REPO/actions/runs/6789\n",
 		},
 		{
 			// TODO this test is somewhat silly; it's more of a placeholder in case I decide to handle the API error more elegantly
@@ -544,6 +685,7 @@ jobs:
 			opts: &RunOptions{
 				Selector:  "workflow.yml",
 				RawFields: []string{`greeting="hello there"`},
+				Detector:  &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -563,7 +705,8 @@ jobs:
 			name: "prompt, no workflows enabled",
 			tty:  true,
 			opts: &RunOptions{
-				Prompt: true,
+				Prompt:   true,
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -585,7 +728,8 @@ jobs:
 			name: "prompt, no workflows",
 			tty:  true,
 			opts: &RunOptions{
-				Prompt: true,
+				Prompt:   true,
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -598,10 +742,13 @@ jobs:
 			errOut:  "could not fetch workflows for OWNER/REPO: no workflows are enabled",
 		},
 		{
-			name: "prompt, minimal yaml",
+			// TODO workflowDispatchRunDetailsCleanup
+			// To be deleted
+			name: "prompt, minimal yaml, without run info (204)",
 			tty:  true,
 			opts: &RunOptions{
-				Prompt: true,
+				Prompt:   true,
+				Detector: &fd.DisabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -634,13 +781,71 @@ jobs:
 				"inputs": map[string]interface{}{},
 				"ref":    "trunk",
 			},
-			wantOut: "✓ Created workflow_dispatch event for minimal.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=\"minimal.yml\"\n",
+			wantOut: heredoc.Doc(`
+				✓ Created workflow_dispatch event for minimal.yml at trunk
+
+				To see runs for this workflow, try: gh run list --workflow="minimal.yml"
+			`),
 		},
 		{
-			name: "prompt",
+			name: "prompt, minimal yaml, with run info",
 			tty:  true,
 			opts: &RunOptions{
-				Prompt: true,
+				Prompt:   true,
+				Detector: &fd.EnabledDetectorMock{},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{
+						Workflows: []shared.Workflow{
+							{
+								Name:  "minimal workflow",
+								ID:    1,
+								State: shared.Active,
+								Path:  ".github/workflows/minimal.yml",
+							},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/minimal.yml"),
+					httpmock.JSONResponse(struct{ Content string }{
+						Content: encodedNoInputsYAMLContent,
+					}))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/1/dispatches"),
+					httpmock.StatusJSONResponse(200, map[string]interface{}{
+						"workflow_run_id": int64(6789),
+						"run_url":         "https://api.github.com/repos/OWNER/REPO/actions/runs/6789",
+						"html_url":        "https://github.com/OWNER/REPO/actions/runs/6789",
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow", []string{"minimal workflow (minimal.yml)"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+			},
+			wantBody: map[string]interface{}{
+				"inputs":             map[string]interface{}{},
+				"ref":                "trunk",
+				"return_run_details": true,
+			},
+			wantOut: heredoc.Doc(`
+				✓ Created workflow_dispatch event for minimal.yml at trunk
+				https://github.com/OWNER/REPO/actions/runs/6789
+
+				To see the created workflow run, try: gh run view 6789
+				To see runs for this workflow, try: gh run list --workflow="minimal.yml"
+			`),
+		},
+		{
+			// TODO workflowDispatchRunDetailsCleanup
+			// To be deleted
+			name: "prompt without run info (204)",
+			tty:  true,
+			opts: &RunOptions{
+				Prompt:   true,
+				Detector: &fd.DisabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -682,13 +887,80 @@ jobs:
 				},
 				"ref": "trunk",
 			},
-			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=\"workflow.yml\"\n",
+			wantOut: heredoc.Doc(`
+				✓ Created workflow_dispatch event for workflow.yml at trunk
+
+				To see runs for this workflow, try: gh run list --workflow="workflow.yml"
+			`),
 		},
 		{
-			name: "prompt, workflow choice input",
+			name: "prompt with run info",
 			tty:  true,
 			opts: &RunOptions{
-				Prompt: true,
+				Prompt:   true,
+				Detector: &fd.EnabledDetectorMock{},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{
+						Workflows: []shared.Workflow{
+							{
+								Name:  "a workflow",
+								ID:    12345,
+								State: shared.Active,
+								Path:  ".github/workflows/workflow.yml",
+							},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.JSONResponse(struct{ Content string }{
+						Content: encodedYAMLContent,
+					}))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
+					httpmock.StatusJSONResponse(200, map[string]interface{}{
+						"workflow_run_id": int64(6789),
+						"run_url":         "https://api.github.com/repos/OWNER/REPO/actions/runs/6789",
+						"html_url":        "https://github.com/OWNER/REPO/actions/runs/6789",
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow", []string{"a workflow (workflow.yml)"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+				pm.RegisterInput("greeting", func(_, _ string) (string, error) {
+					return "hi", nil
+				})
+				pm.RegisterInput("name (required)", func(_, _ string) (string, error) {
+					return "scully", nil
+				})
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"name":     "scully",
+					"greeting": "hi",
+				},
+				"ref":                "trunk",
+				"return_run_details": true,
+			},
+			wantOut: heredoc.Doc(`
+				✓ Created workflow_dispatch event for workflow.yml at trunk
+				https://github.com/OWNER/REPO/actions/runs/6789
+
+				To see the created workflow run, try: gh run view 6789
+				To see runs for this workflow, try: gh run list --workflow="workflow.yml"
+			`),
+		},
+		{
+			// TODO workflowDispatchRunDetailsCleanup
+			// To be deleted
+			name: "prompt, workflow choice input without run info (204)",
+			tty:  true,
+			opts: &RunOptions{
+				Prompt:   true,
+				Detector: &fd.DisabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -731,13 +1003,79 @@ jobs:
 				},
 				"ref": "trunk",
 			},
-			wantOut: "✓ Created workflow_dispatch event for workflow.yml at trunk\n\nTo see runs for this workflow, try: gh run list --workflow=\"workflow.yml\"\n",
+			wantOut: heredoc.Doc(`
+				✓ Created workflow_dispatch event for workflow.yml at trunk
+
+				To see runs for this workflow, try: gh run list --workflow="workflow.yml"
+			`),
+		},
+		{
+			name: "prompt, workflow choice input with run info",
+			tty:  true,
+			opts: &RunOptions{
+				Prompt:   true,
+				Detector: &fd.EnabledDetectorMock{},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{
+						Workflows: []shared.Workflow{
+							{
+								Name:  "choice inputs",
+								ID:    12345,
+								State: shared.Active,
+								Path:  ".github/workflows/workflow.yml",
+							},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/contents/.github/workflows/workflow.yml"),
+					httpmock.JSONResponse(struct{ Content string }{
+						Content: encodedYAMLContentChoiceIp,
+					}))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
+					httpmock.StatusJSONResponse(200, map[string]interface{}{
+						"workflow_run_id": int64(6789),
+						"run_url":         "https://api.github.com/repos/OWNER/REPO/actions/runs/6789",
+						"html_url":        "https://github.com/OWNER/REPO/actions/runs/6789",
+					}))
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow", []string{"choice inputs (workflow.yml)"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+				pm.RegisterSelect("favourite-animal (required)", []string{"dog", "cat"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+				pm.RegisterSelect("name", []string{"monalisa", "cschleiden"}, func(_, _ string, opts []string) (int, error) {
+					return 0, nil
+				})
+
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{
+					"name":             "monalisa",
+					"favourite-animal": "dog",
+				},
+				"ref":                "trunk",
+				"return_run_details": true,
+			},
+			wantOut: heredoc.Doc(`
+				✓ Created workflow_dispatch event for workflow.yml at trunk
+				https://github.com/OWNER/REPO/actions/runs/6789
+
+				To see the created workflow run, try: gh run view 6789
+				To see runs for this workflow, try: gh run list --workflow="workflow.yml"
+			`),
 		},
 		{
 			name: "prompt, workflow choice missing input",
 			tty:  true,
 			opts: &RunOptions{
-				Prompt: true,
+				Prompt:   true,
+				Detector: &fd.EnabledDetectorMock{},
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -757,9 +1095,6 @@ jobs:
 					httpmock.JSONResponse(struct{ Content string }{
 						Content: encodedYAMLContentMissingChoiceIp,
 					}))
-				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
-					httpmock.StatusStringResponse(204, "cool"))
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
 				pm.RegisterSelect("Select a workflow", []string{"choice missing inputs (workflow.yml)"}, func(_, _ string, opts []string) (int, error) {
@@ -775,27 +1110,28 @@ jobs:
 	}
 
 	for _, tt := range tests {
-		reg := &httpmock.Registry{}
-		if tt.httpStubs != nil {
-			tt.httpStubs(reg)
-		}
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-
-		ios, _, stdout, _ := iostreams.Test()
-		ios.SetStdinTTY(tt.tty)
-		ios.SetStdoutTTY(tt.tty)
-		tt.opts.IO = ios
-		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-			return api.InitRepoHostname(&api.Repository{
-				Name:             "REPO",
-				Owner:            api.RepositoryOwner{Login: "OWNER"},
-				DefaultBranchRef: api.BranchRef{Name: "trunk"},
-			}, "github.com"), nil
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			tt.opts.IO = ios
+			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return api.InitRepoHostname(&api.Repository{
+					Name:             "REPO",
+					Owner:            api.RepositoryOwner{Login: "OWNER"},
+					DefaultBranchRef: api.BranchRef{Name: "trunk"},
+				}, "github.com"), nil
+			}
+
 			pm := prompter.NewMockPrompter(t)
 			tt.opts.Prompter = pm
 			if tt.promptStubs != nil {
@@ -810,7 +1146,6 @@ jobs:
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, stdout.String())
-			reg.Verify(t)
 
 			if len(reg.Requests) > 0 {
 				lastRequest := reg.Requests[len(reg.Requests)-1]

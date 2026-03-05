@@ -99,6 +99,7 @@ func Test_listRun(t *testing.T) {
 		capiStubs      func(*testing.T, *capi.CapiClientMock)
 		limit          int
 		web            bool
+		jsonFields     []string
 		wantOut        string
 		wantErr        error
 		wantStderr     string
@@ -286,6 +287,68 @@ func Test_listRun(t *testing.T) {
 			wantStderr:     "Opening https://github.com/copilot/agents in your browser.\n",
 			wantBrowserURL: "https://github.com/copilot/agents",
 		},
+		{
+			name: "json output",
+			tty:  false,
+			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
+				m.ListLatestSessionsForViewerFunc = func(ctx context.Context, limit int) ([]*capi.Session, error) {
+					return []*capi.Session{
+						{
+							ID:            "abc-123",
+							Name:          "s1",
+							State:         "completed",
+							CreatedAt:     sampleDate,
+							LastUpdatedAt: sampleDate,
+							CompletedAt:   sampleDate,
+							ResourceType:  "pull",
+							User:          &api.GitHubUser{Login: "monalisa"},
+							PullRequest: &api.PullRequest{
+								Number: 101,
+								Title:  "Fix login bug",
+								State:  "MERGED",
+								URL:    "https://github.com/OWNER/REPO/pull/101",
+								Repository: &api.PRRepository{
+									NameWithOwner: "OWNER/REPO",
+								},
+							},
+						},
+					}, nil
+				}
+			},
+			jsonFields: []string{"id", "name", "state", "repository", "user", "pullRequestNumber", "pullRequestUrl", "pullRequestTitle", "pullRequestState"},
+			wantOut:    "[{\"id\":\"abc-123\",\"name\":\"s1\",\"pullRequestNumber\":101,\"pullRequestState\":\"MERGED\",\"pullRequestTitle\":\"Fix login bug\",\"pullRequestUrl\":\"https://github.com/OWNER/REPO/pull/101\",\"repository\":\"OWNER/REPO\",\"state\":\"completed\",\"user\":\"monalisa\"}]\n",
+		},
+		{
+			name: "json output with no sessions returns empty array",
+			tty:  false,
+			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
+				m.ListLatestSessionsForViewerFunc = func(ctx context.Context, limit int) ([]*capi.Session, error) {
+					return nil, nil
+				}
+			},
+			jsonFields: []string{"id", "name", "state"},
+			wantOut:    "[]\n",
+		},
+		{
+			name: "json output with nil pull request",
+			tty:  false,
+			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
+				m.ListLatestSessionsForViewerFunc = func(ctx context.Context, limit int) ([]*capi.Session, error) {
+					return []*capi.Session{
+						{
+							ID:            "abc-456",
+							Name:          "s2",
+							State:         "in_progress",
+							CreatedAt:     sampleDate,
+							LastUpdatedAt: sampleDate,
+							ResourceType:  "pull",
+						},
+					}, nil
+				}
+			},
+			jsonFields: []string{"id", "name", "state", "repository", "user", "pullRequestNumber", "pullRequestUrl", "pullRequestTitle", "pullRequestState"},
+			wantOut:    "[{\"id\":\"abc-456\",\"name\":\"s2\",\"pullRequestNumber\":null,\"pullRequestState\":null,\"pullRequestTitle\":null,\"pullRequestUrl\":null,\"repository\":null,\"state\":\"in_progress\",\"user\":null}]\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -314,6 +377,12 @@ func Test_listRun(t *testing.T) {
 					}
 					return capiClientMock, nil
 				},
+			}
+
+			if tt.jsonFields != nil {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(tt.jsonFields)
+				opts.Exporter = exporter
 			}
 
 			err := listRun(opts)

@@ -1080,10 +1080,11 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 	return projects, nil
 }
 
-// Expected login for Copilot when retrieved as an Actor
-// This is returned from assignable actors and issue/pr assigned actors.
-// We use this to check if the actor is Copilot.
-const CopilotActorLogin = "copilot-swe-agent"
+// Expected login for Copilot when retrieved as an assignee
+const CopilotAssigneeLogin = "copilot-swe-agent"
+
+// Expected login for Copilot when retrieved as a Pull Request Reviewer.
+const CopilotReviewerLogin = "copilot-pull-request-reviewer"
 const CopilotActorName = "Copilot"
 
 type AssignableActor interface {
@@ -1144,7 +1145,7 @@ func NewAssignableBot(id, login string) AssignableBot {
 }
 
 func (b AssignableBot) DisplayName() string {
-	if b.login == CopilotActorLogin {
+	if b.login == CopilotAssigneeLogin {
 		return fmt.Sprintf("%s (AI)", CopilotActorName)
 	}
 	return b.Login()

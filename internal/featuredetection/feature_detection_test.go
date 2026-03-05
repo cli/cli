@@ -23,7 +23,6 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "github.com",
 			hostname: "github.com",
 			wantFeatures: IssueFeatures{
-				StateReason:       true,
 				ActorIsAssignable: true,
 			},
 			wantErr: false,
@@ -32,35 +31,15 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "ghec data residency (ghe.com)",
 			hostname: "stampname.ghe.com",
 			wantFeatures: IssueFeatures{
-				StateReason:       true,
 				ActorIsAssignable: true,
 			},
 			wantErr: false,
 		},
 		{
-			name:     "GHE empty response",
+			name:     "GHE",
 			hostname: "git.my.org",
-			queryResponse: map[string]string{
-				`query Issue_fields\b`: `{"data": {}}`,
-			},
 			wantFeatures: IssueFeatures{
-				StateReason:       false,
 				ActorIsAssignable: false,
-			},
-			wantErr: false,
-		},
-		{
-			name:     "GHE has state reason field",
-			hostname: "git.my.org",
-			queryResponse: map[string]string{
-				`query Issue_fields\b`: heredoc.Doc(`
-					{ "data": { "Issue": { "fields": [
-						{"name": "stateReason"}
-					] } } }
-				`),
-			},
-			wantFeatures: IssueFeatures{
-				StateReason: true,
 			},
 			wantErr: false,
 		},
@@ -69,6 +48,7 @@ func TestIssueFeatures(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 			httpClient := &http.Client{}
 			httpmock.ReplaceTripper(httpClient, reg)
 			for query, resp := range tt.queryResponse {
@@ -586,6 +566,92 @@ func TestAdvancedIssueSearchSupport(t *testing.T) {
 	}
 }
 
+func TestProjectFeatures(t *testing.T) {
+	tests := []struct {
+		name          string
+		hostname      string
+		queryResponse map[string]string
+		wantFeatures  ProjectFeatures
+		wantErr       bool
+	}{
+		{
+			name:     "github.com",
+			hostname: "github.com",
+			wantFeatures: ProjectFeatures{
+				ProjectItemQuery: true,
+			},
+		},
+		{
+			name:     "ghec data residency (ghe.com)",
+			hostname: "stampname.ghe.com",
+			wantFeatures: ProjectFeatures{
+				ProjectItemQuery: true,
+			},
+		},
+		{
+			name:     "GHE empty response",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query ProjectV2_fields\b`: `{"data": {}}`,
+			},
+			wantFeatures: ProjectFeatures{},
+		},
+		{
+			name:     "GHE items field without query arg",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query ProjectV2_fields\b`: heredoc.Doc(`
+					{ "data": { "ProjectV2": { "fields": [
+						{"name": "items", "args": [
+							{"name": "after"},
+							{"name": "first"}
+						]}
+					] } } }
+				`),
+			},
+			wantFeatures: ProjectFeatures{},
+		},
+		{
+			name:     "GHE items field with query arg",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query ProjectV2_fields\b`: heredoc.Doc(`
+					{ "data": { "ProjectV2": { "fields": [
+						{"name": "items", "args": [
+							{"name": "after"},
+							{"name": "first"},
+							{"name": "query"}
+						]}
+					] } } }
+				`),
+			},
+			wantFeatures: ProjectFeatures{
+				ProjectItemQuery: true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			httpClient := &http.Client{}
+			httpmock.ReplaceTripper(httpClient, reg)
+			for query, resp := range tt.queryResponse {
+				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
+			}
+			detector := detector{host: tt.hostname, httpClient: httpClient}
+			gotFeatures, err := detector.ProjectFeatures()
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantFeatures, gotFeatures)
+		})
+	}
+}
+
 func TestReleaseFeatures(t *testing.T) {
 	withImmutableReleaseSupport := `{"data":{"Release":{"fields":[{"name":"author"},{"name":"name"},{"name":"immutable"}]}}}`
 	withoutImmutableReleaseSupport := `{"data":{"Release":{"fields":[{"name":"author"},{"name":"name"}]}}}`
@@ -691,6 +757,74 @@ func TestReleaseFeatures(t *testing.T) {
 			detector := NewDetector(httpClient, tt.hostname)
 
 			features, err := detector.ReleaseFeatures()
+			require.NoError(t, err)
+			require.Equal(t, tt.wantFeatures, features)
+		})
+	}
+}
+
+func TestActionsFeatures(t *testing.T) {
+	tests := []struct {
+		name         string
+		hostname     string
+		httpStubs    func(*httpmock.Registry)
+		wantFeatures ActionsFeatures
+	}{
+		{
+			name:     "github.com, workflow dispatch run details supported",
+			hostname: "github.com",
+			wantFeatures: ActionsFeatures{
+				DispatchRunDetails: true,
+			},
+		},
+		{
+			name:     "ghec data residency (ghe.com), workflow dispatch run details supported",
+			hostname: "stampname.ghe.com",
+			wantFeatures: ActionsFeatures{
+				DispatchRunDetails: true,
+			},
+		},
+		{
+			name:     "GHE 3.20, workflow dispatch run details not supported",
+			hostname: "git.my.org",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "api/v3/meta"),
+					httpmock.StringResponse(`{"installed_version":"3.20.999"}`),
+				)
+			},
+			wantFeatures: ActionsFeatures{
+				DispatchRunDetails: false,
+			},
+		},
+		{
+			name:     "GHE 3.21, workflow dispatch run details supported",
+			hostname: "git.my.org",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "api/v3/meta"),
+					httpmock.StringResponse(`{"installed_version":"3.21.0"}`),
+				)
+			},
+			wantFeatures: ActionsFeatures{
+				DispatchRunDetails: true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			reg := &httpmock.Registry{}
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+			httpClient := &http.Client{}
+			httpmock.ReplaceTripper(httpClient, reg)
+
+			detector := NewDetector(httpClient, tt.hostname)
+
+			features, err := detector.ActionsFeatures()
 			require.NoError(t, err)
 			require.Equal(t, tt.wantFeatures, features)
 		})

@@ -139,6 +139,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	fields := defaultFields
+	// TODO repoFeaturesCleanup
 	if features.VisibilityField {
 		fields = append(defaultFields, "visibility")
 	}

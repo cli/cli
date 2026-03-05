@@ -102,6 +102,94 @@ type SessionError struct {
 	Message string
 }
 
+// SessionFields defines the available fields for JSON export of a Session.
+var SessionFields = []string{
+	"id",
+	"name",
+	"state",
+	"repository",
+	"user",
+	"createdAt",
+	"updatedAt",
+	"completedAt",
+	"pullRequestNumber",
+	"pullRequestUrl",
+	"pullRequestTitle",
+	"pullRequestState",
+}
+
+// ExportData implements the exportable interface for JSON output.
+func (s *Session) ExportData(fields []string) map[string]interface{} {
+	data := make(map[string]interface{}, len(fields))
+	for _, f := range fields {
+		switch f {
+		case "id":
+			data[f] = s.ID
+		case "name":
+			data[f] = s.Name
+		case "state":
+			data[f] = s.State
+		case "repository":
+			if s.PullRequest != nil && s.PullRequest.Repository != nil {
+				data[f] = s.PullRequest.Repository.NameWithOwner
+			} else {
+				data[f] = nil
+			}
+		case "user":
+			if s.User != nil {
+				data[f] = s.User.Login
+			} else {
+				data[f] = nil
+			}
+		case "createdAt":
+			if s.CreatedAt.IsZero() {
+				data[f] = nil
+			} else {
+				data[f] = s.CreatedAt
+			}
+		case "updatedAt":
+			if s.LastUpdatedAt.IsZero() {
+				data[f] = nil
+			} else {
+				data[f] = s.LastUpdatedAt
+			}
+		case "completedAt":
+			if s.CompletedAt.IsZero() {
+				data[f] = nil
+			} else {
+				data[f] = s.CompletedAt
+			}
+		case "pullRequestNumber":
+			if s.PullRequest != nil {
+				data[f] = s.PullRequest.Number
+			} else {
+				data[f] = nil
+			}
+		case "pullRequestUrl":
+			if s.PullRequest != nil {
+				data[f] = s.PullRequest.URL
+			} else {
+				data[f] = nil
+			}
+		case "pullRequestTitle":
+			if s.PullRequest != nil {
+				data[f] = s.PullRequest.Title
+			} else {
+				data[f] = nil
+			}
+		case "pullRequestState":
+			if s.PullRequest != nil {
+				data[f] = s.PullRequest.State
+			} else {
+				data[f] = nil
+			}
+		default:
+			data[f] = nil
+		}
+	}
+	return data
+}
+
 type resource struct {
 	ID                   string            `json:"id"`
 	UserID               uint64            `json:"user_id"`

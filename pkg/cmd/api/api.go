@@ -456,6 +456,8 @@ func apiRun(opts *ApiOptions) error {
 	return tmpl.Flush()
 }
 
+var jsonContentTypeRE = regexp.MustCompile(`[/+]json(;|$)`)
+
 func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template, isFirstPage, isLastPage bool) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
@@ -469,7 +471,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	var responseBody io.Reader = resp.Body
 	defer resp.Body.Close()
 
-	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
+	isJSON := jsonContentTypeRE.MatchString(resp.Header.Get("Content-Type"))
 
 	var serverError string
 	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {

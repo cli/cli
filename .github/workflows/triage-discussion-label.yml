@@ -1,0 +1,23 @@
+name: Process Discuss Label
+run-name: ${{ github.event_name == 'issues' && github.event.issue.title || github.event.pull_request.title }}
+permissions: {}
+on:
+  issues:
+    types:
+      - labeled
+  # pull_request_target (not pull_request) to access secrets for fork PRs.
+  # Safe: no PR code is checked out or executed.
+  pull_request_target:
+    types:
+      - labeled
+
+jobs:
+  discuss:
+    if: github.event.action == 'labeled' && github.event.label.name == 'discuss'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-discuss.yml@main
+    with:
+      target_repo: 'github/cli'
+      cc_team: '@github/cli'
+      environment: cli-discuss-automation
+    secrets:
+      discussion_token: ${{ secrets.CLI_DISCUSSION_TRIAGE_TOKEN }}

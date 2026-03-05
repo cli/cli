@@ -167,6 +167,16 @@ func (r forkableRefs) UnqualifiedHeadRef() string {
 	return r.qualifiedHeadRef.BranchName()
 }
 
+// isSameRef checks if the head and base refs point to the same ref in the same repository.
+// For cross-repository PRs (e.g., from a fork), the qualified head ref will contain
+// an owner prefix (owner:branch), so even if branch names match, they refer to different repos.
+func isSameRef(refs creationRefs) bool {
+	if strings.Contains(refs.QualifiedHeadRef(), ":") {
+		return false
+	}
+	return refs.UnqualifiedHeadRef() == refs.BaseRef()
+}
+
 // CreateContext stores contextual data about the creation process and is for building up enough
 // data to create a pull request.
 type CreateContext struct {
@@ -206,7 +216,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Upon success, the URL of the created pull request will be printed.
 
 			When the current branch isn't fully pushed to a git remote, a prompt will ask where
-			to push the branch and offer an option to fork the base repository. Use %[1]s--head%[1]s to
+			to push the branch and offer an option to fork the base repository. Any fork created this
+			way will only have the default branch of the upstream repository. Use %[1]s--head%[1]s to
 			explicitly skip any forking or pushing behavior.
 
 			%[1]s--head%[1]s supports %[1]s<user>:<branch>%[1]s syntax to select a head repo owned by %[1]s<user>%[1]s.
@@ -384,6 +395,10 @@ func createRun(opts *CreateOptions) error {
 	ctx, err := NewCreateContext(opts)
 	if err != nil {
 		return err
+	}
+
+	if isSameRef(ctx.PRRefs) {
+		return fmt.Errorf("head branch %q is the same as base branch %q, cannot create a pull request", ctx.PRRefs.UnqualifiedHeadRef(), ctx.PRRefs.BaseRef())
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -1151,7 +1166,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	forkableRefs, requiresFork := refs.(forkableRefs)
 	if requiresFork {
 		opts.IO.StartProgressIndicator()
-		forkedRepo, err := api.ForkRepo(ctx.Client, forkableRefs.BaseRepo(), "", "", false)
+		forkedRepo, err := api.ForkRepo(ctx.Client, forkableRefs.BaseRepo(), "", "", true)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)

@@ -61,6 +61,9 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			# Delete all caches (exit code 1 on no caches)
 			$ gh cache delete --all
 
+			# Delete all caches for a specific ref
+			$ gh cache delete --all --ref refs/pull/<PR-number>/merge
+
 			# Delete all caches (exit code 0 on no caches)
 			$ gh cache delete --all --succeed-on-no-caches
 		`),
@@ -76,18 +79,11 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 				return err
 			}
 
-			if err := cmdutil.MutuallyExclusive(
-				"--ref cannot be used with --all",
-				opts.DeleteAll, opts.Ref != "",
-			); err != nil {
-				return err
-			}
-
 			if !opts.DeleteAll && opts.SucceedOnNoCaches {
 				return cmdutil.FlagErrorf("--succeed-on-no-caches must be used in conjunction with --all")
 			}
 
-			if opts.Ref != "" && len(args) == 0 {
+			if opts.Ref != "" && len(args) == 0 && !opts.DeleteAll {
 				return cmdutil.FlagErrorf("must provide a cache key")
 			}
 
@@ -113,7 +109,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.DeleteAll, "all", "a", false, "Delete all caches")
+	cmd.Flags().BoolVarP(&opts.DeleteAll, "all", "a", false, "Delete all caches, can be used with --ref to delete all caches for a specific ref")
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "Delete by cache key and ref, formatted as refs/heads/<branch name> or refs/pull/<number>/merge")
 	cmd.Flags().BoolVar(&opts.SucceedOnNoCaches, "succeed-on-no-caches", false, "Return exit code 0 if no caches found. Must be used in conjunction with `--all`")
 
@@ -135,7 +131,7 @@ func deleteRun(opts *DeleteOptions) error {
 	var toDelete []string
 	if opts.DeleteAll {
 		opts.IO.StartProgressIndicator()
-		caches, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: -1})
+		caches, err := shared.GetCaches(client, repo, shared.GetCachesOptions{Limit: -1, Ref: opts.Ref})
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err

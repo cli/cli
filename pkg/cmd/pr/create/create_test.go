@@ -425,6 +425,31 @@ func Test_createRun(t *testing.T) {
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
 		{
+			name: "same head and base branch should error",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "master"
+				return func() {}
+			},
+			wantErr: `head branch "master" is the same as base branch "master", cannot create a pull request`,
+		},
+		{
+			name: "same head and base branch with explicit base should error",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.BaseBranch = "feature"
+				return func() {}
+			},
+			wantErr: `head branch "feature" is the same as base branch "feature", cannot create a pull request`,
+		},
+		{
 			name: "dry-run-nontty-with-default-base",
 			tty:  false,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
@@ -909,11 +934,13 @@ func Test_createRun(t *testing.T) {
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "monalisa"} } }`))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-					httpmock.StatusStringResponse(201, `
+					httpmock.RESTPayload(201, `
 							{ "node_id": "NODEID",
 							  "name": "REPO",
 							  "owner": {"login": "monalisa"}
-							}`))
+							}`, func(payload map[string]interface{}) {
+						assert.Equal(t, true, payload["default_branch_only"])
+					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
@@ -2950,4 +2977,74 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			reg.Verify(t)
 		})
 	})
+}
+
+func Test_isSameRef(t *testing.T) {
+	tests := []struct {
+		name     string
+		refs     creationRefs
+		expected bool
+	}{
+		{
+			name: "same branch in same repo",
+			refs: skipPushRefs{
+				qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("main"),
+				baseRefs: baseRefs{
+					baseBranchName: "main",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "different branches in same repo",
+			refs: skipPushRefs{
+				qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
+				baseRefs: baseRefs{
+					baseBranchName: "main",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "same branch name in different repos (cross-repo PR)",
+			refs: skipPushRefs{
+				qualifiedHeadRef: shared.NewQualifiedHeadRef("other-owner", "main"),
+				baseRefs: baseRefs{
+					baseBranchName: "main",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "pushableRefs same branch same repo",
+			refs: pushableRefs{
+				headRepo:       ghrepo.New("OWNER", "REPO"),
+				headBranchName: "main",
+				baseRefs: baseRefs{
+					baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName: "main",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "pushableRefs same branch different repos (fork)",
+			refs: pushableRefs{
+				headRepo:       ghrepo.New("FORK-OWNER", "REPO"),
+				headBranchName: "main",
+				baseRefs: baseRefs{
+					baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+					baseBranchName: "main",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isSameRef(tt.refs)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

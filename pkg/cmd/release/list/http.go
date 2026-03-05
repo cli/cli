@@ -55,6 +55,7 @@ func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, ex
 	// `@skip(condition)` here because if the field doesn't exist on the schema
 	// then the whole query would still fail regardless of the condition being
 	// met or not.
+	// TODO immutableReleaseFullSupport
 	if !releaseFeatures.ImmutableReleases {
 		return fetchReleasesWithoutImmutableReleases(httpClient, repo, limit, excludeDrafts, excludePreReleases, order)
 	}

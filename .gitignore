@@ -18,6 +18,10 @@
 # Windows resource files
 /cmd/gh/*.syso
 
+# Third-party licenses
+/internal/licenses/embed/*/*
+!/internal/licenses/embed/*/PLACEHOLDER
+
 # VS Code
 .vscode
 

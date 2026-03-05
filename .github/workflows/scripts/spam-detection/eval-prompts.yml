@@ -918,7 +918,7 @@ testData:
 
       We have an automation to nudge on issues waiting for user info (like after one week), and close the issue if there's no further activity (like after one more week).
 
-      - Automatically add the stale label to issues labelled needs-user-input after 30 days of inactivity. When the stale label is added, also post a comment to the issue explaining what this means: the issue will close after 30 days of inactivity; contributors can comment on the issue to remove the stale label and keep it open. Maintainers can also add the keep label to make the stale automation ignore that issue.
+      - Automatically add the stale label to issues labelled more-info-needed after 30 days of inactivity. When the stale label is added, also post a comment to the issue explaining what this means: the issue will close after 30 days of inactivity; contributors can comment on the issue to remove the stale label and keep it open. Maintainers can also add the keep label to make the stale automation ignore that issue.
       - Automatically close issues labelled stale after they have been stale for 30 days. When the issue is closed, add a comment explaining why this happened. Encourage them to leave a comment if the close was done in error.
       - The above automation should only act on new issues after the date of the automation's implementation.
       </BODY>

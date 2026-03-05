@@ -108,6 +108,32 @@ func TestIssue_ExportData(t *testing.T) {
 			`),
 		},
 		{
+			name:   "assignees",
+			fields: []string{"assignees"},
+			inputJSON: heredoc.Doc(`
+				{ "assignees": { "nodes": [
+					{
+						"id": "MDQ6VXNlcjE=",
+						"login": "monalisa",
+						"name": "Mona Lisa",
+						"databaseId": 1234
+					}
+				] } }
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"assignees": [
+						{
+							"id": "MDQ6VXNlcjE=",
+							"login": "monalisa",
+							"name": "Mona Lisa",
+							"databaseId": 1234
+						}
+					]
+				}
+			`),
+		},
+		{
 			name:   "linked pull requests",
 			fields: []string{"closedByPullRequestsReferences"},
 			inputJSON: heredoc.Doc(`
@@ -311,6 +337,32 @@ func TestPullRequest_ExportData(t *testing.T) {
 								"name": "Todo"
 							},
 							"title": "Some Project"
+						}
+					]
+				}
+			`),
+		},
+		{
+			name:   "assignees",
+			fields: []string{"assignees"},
+			inputJSON: heredoc.Doc(`
+				{ "assignees": { "nodes": [
+					{
+						"id": "MDQ6VXNlcjE=",
+						"login": "monalisa",
+						"name": "Mona Lisa",
+						"databaseId": 1234
+					}
+				] } }
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"assignees": [
+						{
+							"id": "MDQ6VXNlcjE=",
+							"login": "monalisa",
+							"name": "Mona Lisa",
+							"databaseId": 1234
 						}
 					]
 				}

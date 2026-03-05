@@ -6,19 +6,22 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/set"
 )
 
 type Editable struct {
-	Title     EditableString
-	Body      EditableString
-	Base      EditableString
-	Reviewers EditableSlice
-	Assignees EditableAssignees
-	Labels    EditableSlice
-	Projects  EditableProjects
-	Milestone EditableString
-	Metadata  api.RepoMetadataResult
+	Title              EditableString
+	Body               EditableString
+	Base               EditableString
+	Reviewers          EditableReviewers
+	ReviewerSearchFunc func(string) prompter.MultiSelectSearchResult
+	Assignees          EditableAssignees
+	AssigneeSearchFunc func(string) prompter.MultiSelectSearchResult
+	Labels             EditableSlice
+	Projects           EditableProjects
+	Milestone          EditableString
+	Metadata           api.RepoMetadataResult
 }
 
 type EditableString struct {
@@ -44,6 +47,12 @@ type EditableAssignees struct {
 	EditableSlice
 	ActorAssignees bool
 	DefaultLogins  []string // For disambiguating actors from display names
+}
+
+// EditableReviewers is a special case of EditableSlice.
+type EditableReviewers struct {
+	EditableSlice
+	DefaultLogins []string // For disambiguating actors from display names
 }
 
 // ProjectsV2 mutations require a mapping of an item ID to a project ID.
@@ -265,6 +274,13 @@ func (ea *EditableAssignees) clone() EditableAssignees {
 	}
 }
 
+func (er *EditableReviewers) clone() EditableReviewers {
+	return EditableReviewers{
+		EditableSlice: er.EditableSlice.clone(),
+		DefaultLogins: er.DefaultLogins,
+	}
+}
+
 func (ep *EditableProjects) clone() EditableProjects {
 	return EditableProjects{
 		EditableSlice: ep.EditableSlice.clone(),
@@ -277,6 +293,7 @@ type EditPrompter interface {
 	Input(string, string) (string, error)
 	MarkdownEditor(string, string, bool) (string, error)
 	MultiSelect(string, []string, []string) ([]int, error)
+	MultiSelectWithSearch(prompt, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) prompter.MultiSelectSearchResult) ([]string, error)
 	Confirm(string, bool) (bool, error)
 }
 
@@ -295,17 +312,45 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 		}
 	}
 	if editable.Reviewers.Edited {
-		editable.Reviewers.Value, err = multiSelectSurvey(
-			p, "Reviewers", editable.Reviewers.Default, editable.Reviewers.Options)
-		if err != nil {
-			return err
+		if editable.ReviewerSearchFunc != nil {
+			editable.Reviewers.Options = []string{}
+			editable.Reviewers.Value, err = p.MultiSelectWithSearch(
+				"Reviewers",
+				"Search reviewers",
+				editable.Reviewers.Default,
+				// No persistent options - teams are included in search results
+				[]string{},
+				editable.ReviewerSearchFunc)
+			if err != nil {
+				return err
+			}
+		} else {
+			editable.Reviewers.Value, err = multiSelectSurvey(
+				p, "Reviewers", editable.Reviewers.Default, editable.Reviewers.Options)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if editable.Assignees.Edited {
-		editable.Assignees.Value, err = multiSelectSurvey(
-			p, "Assignees", editable.Assignees.Default, editable.Assignees.Options)
-		if err != nil {
-			return err
+		if editable.AssigneeSearchFunc != nil {
+			editable.Assignees.Options = []string{}
+			editable.Assignees.Value, err = p.MultiSelectWithSearch(
+				"Assignees",
+				"Search assignees",
+				editable.Assignees.DefaultLogins,
+				// No persistent options required here as teams cannot be assignees.
+				[]string{},
+				editable.AssigneeSearchFunc)
+			if err != nil {
+				return err
+			}
+		} else {
+			editable.Assignees.Value, err = multiSelectSurvey(
+				p, "Assignees", editable.Assignees.Default, editable.Assignees.Options)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	if editable.Labels.Edited {
@@ -397,21 +442,47 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 }
 
 func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable, projectV1Support gh.ProjectsV1Support) error {
-	// Determine whether to fetch organization teams.
+	// Determine whether to fetch organization teams and reviewers.
 	// Interactive reviewer editing (Edited true, but no Add/Remove slices) still needs
-	// team data for selection UI. For non-interactive flows, we never need to fetch teams.
+	// team data for selection UI. For non-interactive flows, we never need to fetch teams
+	// as the REST API accepts team slugs directly.
+	// If we have a search func, we don't need to fetch teams/reviewers since we
+	// assume that will be done dynamically in the prompting flow.
 	teamReviewers := false
+	fetchReviewers := false
 	if editable.Reviewers.Edited {
 		// This is likely an interactive flow since edited is set but no mutations to
-		// Add/Remove slices, so we need to load the teams.
-		if len(editable.Reviewers.Add) == 0 && len(editable.Reviewers.Remove) == 0 {
+		// Add/Remove slices, so we need to load the teams and reviewers.
+		// However, if we have a search func, skip fetching as it will be done dynamically.
+		if len(editable.Reviewers.Add) == 0 && len(editable.Reviewers.Remove) == 0 && editable.ReviewerSearchFunc == nil {
 			teamReviewers = true
+			fetchReviewers = true
+		}
+		// Note: Non-interactive flows (with Add/Remove) don't need to fetch reviewers/teams
+		// because the APIs in use for both GHES and GitHub.com accept user logins and team slugs directly.
+	}
+
+	fetchAssignees := false
+	if editable.Assignees.Edited {
+		// Similar as above, this is likely an interactive flow if no Add/Remove slices are set.
+		// If we have a search func, we don't need to fetch assignees since we
+		// assume that will be done dynamically in the prompting flow.
+		if len(editable.Assignees.Add) == 0 && len(editable.Assignees.Remove) == 0 && editable.AssigneeSearchFunc == nil {
+			fetchAssignees = true
+		}
+		// However, if we have Add/Remove operations (non-interactive flow),
+		// we do need to fetch the assignees.
+		// TODO: KW noninteractive assignees need to migrate to directly use
+		// new logins input with ReplaceActorsForAssignable to prevent fetching.
+		if len(editable.Assignees.Add) > 0 || len(editable.Assignees.Remove) > 0 {
+			fetchAssignees = true
 		}
 	}
+
 	input := api.RepoMetadataInput{
-		Reviewers:      editable.Reviewers.Edited,
+		Reviewers:      fetchReviewers,
 		TeamReviewers:  teamReviewers,
-		Assignees:      editable.Assignees.Edited,
+		Assignees:      fetchAssignees,
 		ActorAssignees: editable.Assignees.ActorAssignees,
 		Labels:         editable.Labels.Edited,
 		ProjectsV1:     editable.Projects.Edited && projectV1Support == gh.ProjectsV1Supported,

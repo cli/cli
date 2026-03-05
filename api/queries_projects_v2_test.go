@@ -129,6 +129,17 @@ func TestProjectsV2ItemsForIssue(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "skips null project items for issue",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueProjectItems\b`),
+					httpmock.GraphQLQuery(`{"data":{"repository":{"issue":{"projectItems":{"totalCount":1,"nodes":[null]}}}}}`,
+						func(query string, inputs map[string]interface{}) {}),
+				)
+			},
+			expectItems: ProjectItems{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -185,6 +196,17 @@ func TestProjectsV2ItemsForPullRequest(t *testing.T) {
 				)
 			},
 			expectError: true,
+		},
+		{
+			name: "skips null project items for pull request",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestProjectItems\b`),
+					httpmock.GraphQLQuery(`{"data":{"repository":{"pullRequest":{"projectItems":{"totalCount":1,"nodes":[null]}}}}}`,
+						func(query string, inputs map[string]interface{}) {}),
+				)
+			},
+			expectItems: ProjectItems{},
 		},
 		{
 			name: "retrieves project items that have status columns",

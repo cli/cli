@@ -186,6 +186,7 @@ func createRun(opts *CreateOptions) (err error) {
 		return err
 	}
 
+	// TODO actorIsAssignableCleanup
 	if issueFeatures.ActorIsAssignable {
 		assignees = copilotReplacer.ReplaceSlice(assignees)
 	}

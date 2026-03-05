@@ -1,0 +1,26 @@
+name: Triage Scheduled Tasks
+on:
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: '5 * * * *'   # Hourly — no-response close
+    - cron: '0 3 * * *'   # Daily at 3 AM UTC — stale issues
+
+jobs:
+  no-response:
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-no-response-close.yml@main
+    permissions:
+      issues: write
+
+  stale:
+    if: github.event.schedule == '0 3 * * *'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-stale-issues.yml@main
+    with:
+      days_before_stale: 30
+      days_before_close: -1
+      start_date: '2025-07-10T00:00:00Z'
+      stale_issue_label: 'stale'
+      exempt_issue_labels: 'keep'
+    permissions:
+      issues: write

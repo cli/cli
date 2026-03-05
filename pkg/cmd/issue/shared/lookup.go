@@ -8,10 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cli/cli/v2/api"
-	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/cli/cli/v2/pkg/set"
@@ -138,17 +136,6 @@ func FindIssuesOrPRs(httpClient *http.Client, repo ghrepo.Interface, issueNumber
 func FindIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.Issue, error) {
 	fieldSet := set.NewStringSet()
 	fieldSet.AddValues(fields)
-	if fieldSet.Contains("stateReason") {
-		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		detector := fd.NewDetector(cachedClient, repo.RepoHost())
-		features, err := detector.IssueFeatures()
-		if err != nil {
-			return nil, err
-		}
-		if !features.StateReason {
-			fieldSet.Remove("stateReason")
-		}
-	}
 
 	var getProjectItems bool
 	if fieldSet.Contains("projectItems") {

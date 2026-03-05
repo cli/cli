@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -52,6 +53,14 @@ func TestNewCmdList(t *testing.T) {
 			},
 			wantsExporter: true,
 		},
+		{
+			name: "query",
+			cli:  `--query "assignee:octocat"`,
+			wants: listOpts{
+				limit: 30,
+				query: "assignee:octocat",
+			},
+		},
 	}
 
 	t.Setenv("GH_TOKEN", "auth-token")
@@ -83,6 +92,7 @@ func TestNewCmdList(t *testing.T) {
 
 			assert.Equal(t, tt.wants.number, gotOpts.number)
 			assert.Equal(t, tt.wants.owner, gotOpts.owner)
+			assert.Equal(t, tt.wants.query, gotOpts.query)
 			assert.Equal(t, tt.wantsExporter, gotOpts.exporter != nil)
 			assert.Equal(t, tt.wants.limit, gotOpts.limit)
 		})
@@ -617,4 +627,110 @@ func TestRunList_JSON(t *testing.T) {
 		t,
 		`{"items":[{"content":{"type":"Issue","body":"","title":"an issue","number":1,"repository":"cli/go-gh","url":""},"id":"issue ID"},{"content":{"type":"PullRequest","body":"","title":"a pull request","number":2,"repository":"cli/go-gh","url":""},"id":"pull request ID"},{"content":{"type":"DraftIssue","body":"","title":"draft issue","id":"draft issue ID"},"id":"draft issue ID"}],"totalCount":3}`,
 		stdout.String())
+}
+
+func TestRunList_WithQuery(t *testing.T) {
+	defer gock.Off()
+
+	// get user ID
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query UserOrgOwner.*",
+			"variables": map[string]interface{}{
+				"login": "monalisa",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id": "an ID",
+				},
+			},
+			"errors": []interface{}{
+				map[string]interface{}{
+					"type": "NOT_FOUND",
+					"path": []string{"organization"},
+				},
+			},
+		})
+
+	// list project items with query
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		JSON(map[string]interface{}{
+			"query": "query UserProjectWithItems.*",
+			"variables": map[string]interface{}{
+				"firstItems":  queries.LimitDefault,
+				"afterItems":  nil,
+				"firstFields": queries.LimitMax,
+				"afterFields": nil,
+				"login":       "monalisa",
+				"number":      1,
+				"query":       "assignee:octocat -status:Done",
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"items": map[string]interface{}{
+							"nodes": []map[string]interface{}{
+								{
+									"id": "issue ID",
+									"content": map[string]interface{}{
+										"__typename": "Issue",
+										"title":      "an issue",
+										"number":     1,
+										"repository": map[string]string{
+											"nameWithOwner": "cli/go-gh",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+	client := queries.NewTestClient()
+
+	ios, _, stdout, _ := iostreams.Test()
+	config := listConfig{
+		opts: listOpts{
+			number: 1,
+			owner:  "monalisa",
+			query:  "assignee:octocat -status:Done",
+		},
+		client:   client,
+		detector: &fd.EnabledDetectorMock{},
+		io:       ios,
+	}
+
+	err := runList(config)
+	assert.NoError(t, err)
+	assert.Equal(
+		t,
+		"Issue\tan issue\t1\tcli/go-gh\tissue ID\n",
+		stdout.String())
+}
+
+func TestRunList_QueryUnsupported(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	config := listConfig{
+		opts: listOpts{
+			number: 1,
+			owner:  "monalisa",
+			query:  "assignee:octocat",
+		},
+		detector: &fd.DisabledDetectorMock{},
+		io:       ios,
+	}
+
+	err := runList(config)
+	assert.EqualError(t, err, "the `--query` flag is not supported on this GitHub host")
 }
