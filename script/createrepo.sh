@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
-mkdir createrepo
+mkdir -p createrepo
 cat > createrepo/Dockerfile << EOF
-FROM fedora:32
-RUN yum install -y createrepo_c
+FROM fedora:40
+RUN dnf install -y createrepo_c && dnf clean all
 ENTRYPOINT ["createrepo", "/packages"]
 EOF
 
