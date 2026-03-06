@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gh"
 	accessibilityCmd "github.com/cli/cli/v2/pkg/cmd/accessibility"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	agentTaskCmd "github.com/cli/cli/v2/pkg/cmd/agent-task"
@@ -76,6 +78,11 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 			"versionInfo": versionCmd.Format(version, buildDate),
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve --account flag or GH_ACCOUNT env var
+			if err := applyAccountOverride(cmd, cfg); err != nil {
+				return err
+			}
+
 			// require that the user is authenticated before running most commands
 			if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
 				parent := cmd.Parent()
@@ -94,6 +101,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	// cmd.SetErr(f.IOStreams.ErrOut) // just let it default to os.Stderr instead
 
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
+	cmd.PersistentFlags().String("account", "", `Use the specified account for this command (format: "user@host")`)
 
 	// override Cobra's default behaviors unless an opt-out has been set
 	if os.Getenv("GH_COBRA") == "" {
@@ -239,4 +247,65 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	referenceCmd.Long = stringifyReference(cmd)
 	referenceCmd.SetHelpFunc(longPager(f.IOStreams))
 	return cmd, nil
+}
+
+// applyAccountOverride checks for --account flag or GH_ACCOUNT env var and
+// configures the auth system to use the specified account for this command.
+func applyAccountOverride(cmd *cobra.Command, cfg gh.Config) error {
+	account, _ := cmd.Flags().GetString("account")
+	if account == "" {
+		account = os.Getenv("GH_ACCOUNT")
+	}
+	if account == "" {
+		return nil
+	}
+
+	authCfg := cfg.Authentication()
+
+	// If GH_TOKEN is set, the explicit token takes priority
+	if authCfg.HasEnvToken() {
+		fmt.Fprintf(os.Stderr, "warning: --account ignored because GH_TOKEN is set\n")
+		return nil
+	}
+
+	// Validate the account format
+	user, host, err := config.ParseAccount(account)
+	if err != nil {
+		return err
+	}
+
+	// Validate the account exists in config
+	users := authCfg.UsersForHost(host)
+	found := false
+	for _, u := range users {
+		if u == user {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return accountNotFoundError(account, authCfg)
+	}
+
+	authCfg.SetAccountOverride(account)
+	return nil
+}
+
+func accountNotFoundError(account string, authCfg gh.AuthConfig) error {
+	var available []string
+	for _, host := range authCfg.Hosts() {
+		for _, user := range authCfg.UsersForHost(host) {
+			available = append(available, user+"@"+host)
+		}
+	}
+
+	msg := fmt.Sprintf("account %q not found", account)
+	if len(available) > 0 {
+		msg += "\nAvailable accounts:\n"
+		for _, a := range available {
+			msg += fmt.Sprintf("  %s\n", a)
+		}
+	}
+	msg += `Run "gh auth login" to add a new account.`
+	return fmt.Errorf("%s", msg)
 }
