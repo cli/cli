@@ -223,6 +223,7 @@ type AuthConfig struct {
 	defaultHostOverride func() (string, string)
 	hostsOverride       func() []string
 	tokenOverride       func(string) (string, string)
+	accountOverride     string // "user@host", set from --account flag or GH_ACCOUNT env var
 }
 
 // ActiveToken will retrieve the active auth token for the given hostname,
@@ -342,6 +343,13 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 	c.defaultHostOverride = func() (string, string) {
 		return host, source
 	}
+}
+
+// SetAccountOverride sets a "user@host" account override. When set,
+// ActiveToken and ActiveUser will resolve to this account instead of
+// the configured active user.
+func (c *AuthConfig) SetAccountOverride(account string) {
+	c.accountOverride = account
 }
 
 // Login will set user, git protocol, and auth token for the given hostname.

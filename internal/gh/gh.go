@@ -166,6 +166,11 @@ type AuthConfig interface {
 	// DefaultHost.
 	// Use for testing purposes only.
 	SetDefaultHost(host, source string)
+
+	// SetAccountOverride sets a "user@host" override for account selection.
+	// When set, ActiveToken and ActiveUser will resolve to this account
+	// instead of the configured active user. The override is in-memory only.
+	SetAccountOverride(account string)
 }
 
 // AliasConfig defines an interface for managing command aliases.
