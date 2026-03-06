@@ -947,3 +947,53 @@ func preMigrationLogin(c *AuthConfig, hostname, username, token, gitProtocol str
 	}
 	return insecureStorageUsed, ghConfig.Write(c.cfg)
 }
+
+func TestActiveTokenWithAccountOverride(t *testing.T) {
+	// Given two users logged into the same host
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "active-user", "active-token", "", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "other-user", "other-token", "", false)
+	require.NoError(t, err)
+	// other-user is now active (Login activates the logged-in user)
+
+	// When we set the account override to active-user@github.com
+	authCfg.SetAccountOverride("active-user@github.com")
+
+	// Then ActiveToken returns active-user's token
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "active-token", token)
+	require.NotEmpty(t, source)
+}
+
+func TestActiveTokenWithAccountOverrideWrongHost(t *testing.T) {
+	// Given a user logged into github.com
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "monalisa", "gh-token", "", false)
+	require.NoError(t, err)
+
+	// When we set the account override to a different host
+	authCfg.SetAccountOverride("monalisa@enterprise.com")
+
+	// Then ActiveToken for github.com falls through to normal resolution
+	token, _ := authCfg.ActiveToken("github.com")
+	require.Equal(t, "gh-token", token)
+}
+
+func TestActiveUserWithAccountOverride(t *testing.T) {
+	// Given two users on the same host
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "user-one", "token-one", "", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "user-two", "token-two", "", false)
+	require.NoError(t, err)
+	// user-two is now active
+
+	// When we override to user-one
+	authCfg.SetAccountOverride("user-one@github.com")
+
+	// Then ActiveUser returns user-one
+	user, err := authCfg.ActiveUser("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "user-one", user)
+}

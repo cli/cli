@@ -233,6 +233,17 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	if c.tokenOverride != nil {
 		return c.tokenOverride(hostname)
 	}
+	// When an account override is set for this host, skip the global
+	// oauth_token lookup (which would return the wrong user's token) and go
+	// directly to the per-user token store.
+	if c.accountOverride != "" {
+		if user, host, err := ParseAccount(c.accountOverride); err == nil && host == hostname {
+			token, source, err := c.TokenForUser(hostname, user)
+			if err == nil {
+				return token, source
+			}
+		}
+	}
 	token, source := ghauth.TokenFromEnvOrConfig(hostname)
 	if token == "" {
 		var user string
@@ -312,6 +323,15 @@ func (c *AuthConfig) TokenFromKeyringForUser(hostname, username string) (string,
 // ActiveUser will retrieve the username for the active user at the given hostname.
 // This will not be accurate if the oauth token is set from an environment variable.
 func (c *AuthConfig) ActiveUser(hostname string) (string, error) {
+	if c.accountOverride != "" {
+		user, host, err := ParseAccount(c.accountOverride)
+		if err != nil {
+			return "", err
+		}
+		if host == hostname {
+			return user, nil
+		}
+	}
 	return c.cfg.Get([]string{hostsKey, hostname, userKey})
 }
 
