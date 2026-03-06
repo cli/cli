@@ -351,6 +351,11 @@ func (c *AuthConfig) SetHosts(hosts []string) {
 }
 
 func (c *AuthConfig) DefaultHost() (string, string) {
+	if c.accountOverride != "" {
+		if _, host, err := ParseAccount(c.accountOverride); err == nil {
+			return host, "--account"
+		}
+	}
 	if c.defaultHostOverride != nil {
 		return c.defaultHostOverride()
 	}

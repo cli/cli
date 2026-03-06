@@ -997,3 +997,15 @@ func TestActiveUserWithAccountOverride(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "user-one", user)
 }
+
+func TestDefaultHostWithAccountOverride(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("enterprise.example.com", "admin", "ent-token", "", false)
+	require.NoError(t, err)
+
+	authCfg.SetAccountOverride("admin@enterprise.example.com")
+
+	host, source := authCfg.DefaultHost()
+	require.Equal(t, "enterprise.example.com", host)
+	require.Equal(t, "--account", source)
+}
