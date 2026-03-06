@@ -366,14 +366,10 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 	}
 }
 
-// SetAccountOverride sets a "user@host" account override. When set,
-// ActiveToken and ActiveUser will resolve to this account instead of
-// the configured active user.
-func (c *AuthConfig) SetAccountOverride(account string) {
-	user, host, err := ParseAccount(account)
-	if err != nil {
-		return
-	}
+// SetAccountOverride sets an account override by user and host. When set,
+// ActiveToken, ActiveUser, and DefaultHost will resolve to this account
+// instead of the configured active user.
+func (c *AuthConfig) SetAccountOverride(user, host string) {
 	c.accountOverrideUser = user
 	c.accountOverrideHost = host
 }

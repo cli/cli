@@ -1,6 +1,7 @@
 package root
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -287,35 +288,33 @@ func applyAccountOverride(cmd *cobra.Command, cfg gh.Config) error {
 		return nil
 	}
 
-	authCfg.SetAccountOverride(account)
+	authCfg.SetAccountOverride(user, host)
 	return nil
 }
 
 func isAuthMutationCommand(cmd *cobra.Command) bool {
-	mutationCmds := map[string]bool{"login": true, "logout": true, "switch": true}
-	if !mutationCmds[cmd.Name()] {
+	if !slices.Contains([]string{"login", "logout", "switch"}, cmd.Name()) {
 		return false
 	}
-	// Check that the parent is the "auth" command
 	parent := cmd.Parent()
 	return parent != nil && parent.Name() == "auth"
 }
 
 func accountNotFoundError(account string, authCfg gh.AuthConfig) error {
-	var available []string
+	var b strings.Builder
+	fmt.Fprintf(&b, "account %q not found", account)
+
+	var hasAccounts bool
 	for _, host := range authCfg.Hosts() {
 		for _, user := range authCfg.UsersForHost(host) {
-			available = append(available, user+"@"+host)
+			if !hasAccounts {
+				b.WriteString("\nAvailable accounts:\n")
+				hasAccounts = true
+			}
+			fmt.Fprintf(&b, "  %s@%s\n", user, host)
 		}
 	}
 
-	msg := fmt.Sprintf("account %q not found", account)
-	if len(available) > 0 {
-		msg += "\nAvailable accounts:\n"
-		for _, a := range available {
-			msg += fmt.Sprintf("  %s\n", a)
-		}
-	}
-	msg += `Run "gh auth login" to add a new account.`
-	return fmt.Errorf("%s", msg)
+	b.WriteString(`Run "gh auth login" to add a new account.`)
+	return errors.New(b.String())
 }

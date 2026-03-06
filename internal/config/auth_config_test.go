@@ -957,8 +957,8 @@ func TestActiveTokenWithAccountOverride(t *testing.T) {
 	require.NoError(t, err)
 	// other-user is now active (Login activates the logged-in user)
 
-	// When we set the account override to active-user@github.com
-	authCfg.SetAccountOverride("active-user@github.com")
+	// When we set the account override to active-user on github.com
+	authCfg.SetAccountOverride("active-user", "github.com")
 
 	// Then ActiveToken returns active-user's token
 	token, source := authCfg.ActiveToken("github.com")
@@ -973,7 +973,7 @@ func TestActiveTokenWithAccountOverrideWrongHost(t *testing.T) {
 	require.NoError(t, err)
 
 	// When we set the account override to a different host
-	authCfg.SetAccountOverride("monalisa@enterprise.com")
+	authCfg.SetAccountOverride("monalisa", "enterprise.com")
 
 	// Then ActiveToken for github.com falls through to normal resolution
 	token, _ := authCfg.ActiveToken("github.com")
@@ -990,7 +990,7 @@ func TestActiveUserWithAccountOverride(t *testing.T) {
 	// user-two is now active
 
 	// When we override to user-one
-	authCfg.SetAccountOverride("user-one@github.com")
+	authCfg.SetAccountOverride("user-one", "github.com")
 
 	// Then ActiveUser returns user-one
 	user, err := authCfg.ActiveUser("github.com")
@@ -1003,7 +1003,7 @@ func TestDefaultHostWithAccountOverride(t *testing.T) {
 	_, err := authCfg.Login("enterprise.example.com", "admin", "ent-token", "", false)
 	require.NoError(t, err)
 
-	authCfg.SetAccountOverride("admin@enterprise.example.com")
+	authCfg.SetAccountOverride("admin", "enterprise.example.com")
 
 	host, source := authCfg.DefaultHost()
 	require.Equal(t, "enterprise.example.com", host)
