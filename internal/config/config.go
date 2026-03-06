@@ -227,7 +227,8 @@ type AuthConfig struct {
 	defaultHostOverride func() (string, string)
 	hostsOverride       func() []string
 	tokenOverride       func(string) (string, string)
-	accountOverride     string // "user@host", set from --account flag or GH_ACCOUNT env var
+	accountOverrideUser string // username from --account flag or GH_ACCOUNT
+	accountOverrideHost string // hostname from --account flag or GH_ACCOUNT
 }
 
 // ActiveToken will retrieve the active auth token for the given hostname,
@@ -240,13 +241,12 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	// When an account override is set for this host, skip the global
 	// oauth_token lookup (which would return the wrong user's token) and go
 	// directly to the per-user token store.
-	if c.accountOverride != "" {
-		if user, host, err := ParseAccount(c.accountOverride); err == nil && host == hostname {
-			token, source, err := c.TokenForUser(hostname, user)
-			if err == nil {
-				return token, source
-			}
+	if c.accountOverrideHost == hostname {
+		token, source, err := c.TokenForUser(hostname, c.accountOverrideUser)
+		if err != nil {
+			return "", ""
 		}
+		return token, source
 	}
 	token, source := ghauth.TokenFromEnvOrConfig(hostname)
 	if token == "" {
@@ -327,14 +327,8 @@ func (c *AuthConfig) TokenFromKeyringForUser(hostname, username string) (string,
 // ActiveUser will retrieve the username for the active user at the given hostname.
 // This will not be accurate if the oauth token is set from an environment variable.
 func (c *AuthConfig) ActiveUser(hostname string) (string, error) {
-	if c.accountOverride != "" {
-		user, host, err := ParseAccount(c.accountOverride)
-		if err != nil {
-			return "", err
-		}
-		if host == hostname {
-			return user, nil
-		}
+	if c.accountOverrideHost == hostname {
+		return c.accountOverrideUser, nil
 	}
 	return c.cfg.Get([]string{hostsKey, hostname, userKey})
 }
@@ -355,10 +349,8 @@ func (c *AuthConfig) SetHosts(hosts []string) {
 }
 
 func (c *AuthConfig) DefaultHost() (string, string) {
-	if c.accountOverride != "" {
-		if _, host, err := ParseAccount(c.accountOverride); err == nil {
-			return host, "--account"
-		}
+	if c.accountOverrideHost != "" {
+		return c.accountOverrideHost, "--account"
 	}
 	if c.defaultHostOverride != nil {
 		return c.defaultHostOverride()
@@ -378,7 +370,12 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 // ActiveToken and ActiveUser will resolve to this account instead of
 // the configured active user.
 func (c *AuthConfig) SetAccountOverride(account string) {
-	c.accountOverride = account
+	user, host, err := ParseAccount(account)
+	if err != nil {
+		return
+	}
+	c.accountOverrideUser = user
+	c.accountOverrideHost = host
 }
 
 // Login will set user, git protocol, and auth token for the given hostname.

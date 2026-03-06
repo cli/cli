@@ -43,6 +43,10 @@ func TestApplyAccountOverride_ValidAccountSetsOverride(t *testing.T) {
 
 	// Then it should succeed with no error
 	require.NoError(t, err)
+
+	// Then the override should change which token is returned
+	token, _ := cfg.Authentication().ActiveToken("github.com")
+	require.Equal(t, "test-token", token)
 }
 
 func TestApplyAccountOverride_GHAccountEnvVar(t *testing.T) {
@@ -76,6 +80,10 @@ func TestApplyAccountOverride_FlagTakesPrecedenceOverEnvVar(t *testing.T) {
 	// Then the call succeeds (flag value "monalisa@github.com" is valid and takes precedence)
 	err = applyAccountOverride(cmd, cfg)
 	require.NoError(t, err)
+
+	// Then the override should resolve to monalisa's token (from the flag), not hubot's (from env)
+	token, _ := cfg.Authentication().ActiveToken("github.com")
+	require.Equal(t, "test-token", token) // monalisa's token from setupTestConfig
 }
 
 func TestApplyAccountOverride_InvalidFormatProducesError(t *testing.T) {

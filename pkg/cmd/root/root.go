@@ -3,6 +3,7 @@ package root
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -276,14 +277,7 @@ func applyAccountOverride(cmd *cobra.Command, cfg gh.Config) error {
 
 	// Validate the account exists in config
 	users := authCfg.UsersForHost(host)
-	found := false
-	for _, u := range users {
-		if u == user {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(users, user) {
 		return accountNotFoundError(account, authCfg)
 	}
 
