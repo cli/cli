@@ -30,7 +30,7 @@ func TestMigrationAppliedSuccessfully(t *testing.T) {
 	})
 
 	// When we run the migration
-	conf := cfg{c}
+	conf := cfg{cfg: c}
 	require.NoError(t, conf.Migrate(migration))
 
 	// Then our original config is updated with the migration applied
@@ -75,7 +75,7 @@ func TestMigrationAppliedBumpsVersion(t *testing.T) {
 	}
 
 	// When we migrate
-	conf := cfg{c}
+	conf := cfg{cfg: c}
 	require.NoError(t, conf.Migrate(migration))
 
 	// Then our original config is updated with the migration applied
@@ -110,7 +110,7 @@ func TestMigrationIsNoopWhenAlreadyApplied(t *testing.T) {
 	}
 
 	// When we run Migrate
-	conf := cfg{c}
+	conf := cfg{cfg: c}
 	err := conf.Migrate(migration)
 
 	// Then there is nothing done and the config is not modified
@@ -141,7 +141,7 @@ func TestMigrationErrorsWhenPreVersionMismatch(t *testing.T) {
 	}
 
 	// When we run Migrate
-	conf := cfg{c}
+	conf := cfg{cfg: c}
 	err := conf.Migrate(migration)
 
 	// Then there is an error the migration is not applied and the version is not modified
@@ -161,7 +161,7 @@ func TestMigrationErrorWritesNoFiles(t *testing.T) {
 	})
 
 	// When we run the migration
-	conf := cfg{c}
+	conf := cfg{cfg: c}
 	err := conf.Migrate(migration)
 
 	// Then the error is wrapped and bubbled
@@ -210,7 +210,7 @@ func TestMigrationWriteErrors(t *testing.T) {
 			})
 
 			// When we run the migration
-			conf := cfg{c}
+			conf := cfg{cfg: c}
 			err := conf.Migrate(migration)
 
 			// Then the error is wrapped and bubbled

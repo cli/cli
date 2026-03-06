@@ -693,7 +693,7 @@ func TestUserWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccount
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the user correctly
@@ -710,7 +710,7 @@ func TestGitProtocolWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccount
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the git protocol correctly
@@ -727,7 +727,7 @@ func TestHostsWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccount
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the hosts correctly
@@ -743,7 +743,7 @@ func TestDefaultHostWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccount
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	// Then the default host is still the enterprise host
@@ -760,7 +760,7 @@ func TestTokenWorksRightAfterMigration(t *testing.T) {
 
 	// When we migrate
 	var m migration.MultiAccount
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	// Then we can still get the token correctly
@@ -837,7 +837,7 @@ func TestLogoutRightAfterMigrationRemovesHost(t *testing.T) {
 
 	// When we migrate and logout
 	var m migration.MultiAccount
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	require.NoError(t, authCfg.Logout(host, user))
@@ -852,7 +852,7 @@ func TestLoginInsecurePostMigrationUsesConfigForToken(t *testing.T) {
 
 	// When we migrate and login with insecure storage
 	var m migration.MultiAccount
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	insecureStorageUsed, err := authCfg.Login("github.com", "test-user", "test-token", "", false)
@@ -871,7 +871,7 @@ func TestLoginPostMigrationSetsGitProtocol(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	var m migration.MultiAccount
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
@@ -890,7 +890,7 @@ func TestLoginPostMigrationSetsUser(t *testing.T) {
 	authCfg := newTestAuthConfig(t)
 
 	var m migration.MultiAccount
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	_, err := authCfg.Login("github.com", "test-user", "test-token", "ssh", false)
@@ -912,7 +912,7 @@ func TestLoginSecurePostMigrationRemovesTokenFromConfig(t *testing.T) {
 
 	// When we migrate and login again with secure storage
 	var m migration.MultiAccount
-	c := cfg{authCfg.cfg}
+	c := cfg{cfg: authCfg.cfg}
 	require.NoError(t, c.Migrate(m))
 
 	_, err = authCfg.Login("github.com", "test-user", "test-token", "", true)

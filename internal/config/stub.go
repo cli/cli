@@ -19,7 +19,7 @@ func NewBlankConfig() *ghmock.ConfigMock {
 
 func NewFromString(cfgStr string) *ghmock.ConfigMock {
 	c := ghConfig.ReadFromString(cfgStr)
-	cfg := cfg{c}
+	cfg := cfg{cfg: c}
 	mock := &ghmock.ConfigMock{}
 	mock.GetOrDefaultFunc = func(host, key string) o.Option[gh.ConfigEntry] {
 		return cfg.GetOrDefault(host, key)
@@ -103,7 +103,7 @@ func NewIsolatedTestConfig(t *testing.T) (*cfg, func(io.Writer, io.Writer)) {
 	keyring.MockInit()
 
 	c := ghConfig.ReadFromString("")
-	cfg := cfg{c}
+	cfg := cfg{cfg: c}
 
 	// The real implementation of config.Read uses a sync.Once
 	// to read config files and initialise package level variables

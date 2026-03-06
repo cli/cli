@@ -41,12 +41,13 @@ func NewConfig() (gh.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &cfg{c}, nil
+	return &cfg{cfg: c}, nil
 }
 
 // Implements Config interface
 type cfg struct {
-	cfg *ghConfig.Config
+	cfg     *ghConfig.Config
+	authCfg *AuthConfig
 }
 
 func (c *cfg) get(hostname, key string) o.Option[string] {
@@ -111,7 +112,10 @@ func (c *cfg) Aliases() gh.AliasConfig {
 }
 
 func (c *cfg) Authentication() gh.AuthConfig {
-	return &AuthConfig{cfg: c.cfg}
+	if c.authCfg == nil {
+		c.authCfg = &AuthConfig{cfg: c.cfg}
+	}
+	return c.authCfg
 }
 
 func (c *cfg) AccessibleColors(hostname string) gh.ConfigEntry {
