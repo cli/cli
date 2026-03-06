@@ -287,8 +287,24 @@ func applyAccountOverride(cmd *cobra.Command, cfg gh.Config) error {
 		return accountNotFoundError(account, authCfg)
 	}
 
+	// Warn and skip for auth mutation commands (login, logout, switch)
+	if isAuthMutationCommand(cmd) {
+		fmt.Fprintf(os.Stderr, "warning: --account is ignored for %q\n", cmd.Name())
+		return nil
+	}
+
 	authCfg.SetAccountOverride(account)
 	return nil
+}
+
+func isAuthMutationCommand(cmd *cobra.Command) bool {
+	mutationCmds := map[string]bool{"login": true, "logout": true, "switch": true}
+	if !mutationCmds[cmd.Name()] {
+		return false
+	}
+	// Check that the parent is the "auth" command
+	parent := cmd.Parent()
+	return parent != nil && parent.Name() == "auth"
 }
 
 func accountNotFoundError(account string, authCfg gh.AuthConfig) error {
