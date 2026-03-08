@@ -2,10 +2,12 @@ package diff
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
@@ -36,6 +38,7 @@ type DiffOptions struct {
 	Patch       bool
 	NameOnly    bool
 	BrowserMode bool
+	Exclude     []string
 }
 
 func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Command {
@@ -81,6 +84,8 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 				return fmt.Errorf("unsupported color %q", colorFlag)
 			}
 
+			opts.Exclude = normalizeExcludePatterns(opts.Exclude)
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -92,6 +97,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
 	cmd.Flags().BoolVar(&opts.NameOnly, "name-only", false, "Display only names of changed files")
 	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open the pull request diff in the browser")
+	cmd.Flags().StringArrayVarP(&opts.Exclude, "exclude", "e", nil, "Exclude files/directories from diff output (glob patterns; can be repeated or comma-separated)")
 
 	return cmd
 }
@@ -137,6 +143,13 @@ func diffRun(opts *DiffOptions) error {
 	var diff io.Reader = diffReadCloser
 	if opts.IO.IsStdoutTTY() {
 		diff = sanitizedReader(diff)
+	}
+
+	if len(opts.Exclude) > 0 {
+		diff, err = excludeDiffPaths(diff, opts.Exclude)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := opts.IO.StartPager(); err == nil {
@@ -185,6 +198,76 @@ func fetchDiff(httpClient *http.Client, baseRepo ghrepo.Interface, prNumber int,
 	}
 
 	return resp.Body, nil
+}
+
+func normalizeExcludePatterns(patterns []string) []string {
+	result := make([]string, 0, len(patterns))
+	for _, pattern := range patterns {
+		for _, item := range strings.Split(pattern, ",") {
+			trimmed := strings.TrimSpace(item)
+			if trimmed != "" {
+				result = append(result, trimmed)
+			}
+		}
+	}
+
+	return result
+}
+
+func excludeDiffPaths(r io.Reader, patterns []string) (io.Reader, error) {
+	diff, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var out bytes.Buffer
+	sections := bytes.SplitAfter(diff, []byte("\ndiff --git "))
+	for i, section := range sections {
+		if i > 0 {
+			section = append([]byte("diff --git "), section...)
+		}
+
+		path := diffSectionPath(section)
+		if path != "" && isPathExcluded(path, patterns) {
+			continue
+		}
+
+		_, _ = out.Write(section)
+	}
+
+	return bytes.NewReader(out.Bytes()), nil
+}
+
+func isPathExcluded(path string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if ok, err := filepath.Match(pattern, path); err == nil && ok {
+			return true
+		}
+
+		dirPattern := strings.TrimSuffix(pattern, "/") + "/*"
+		if ok, err := filepath.Match(dirPattern, path); err == nil && ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+var diffHeaderPathPattern = regexp.MustCompile(`^diff\s--git.*\s(["]?)b/(.*)$`)
+
+func diffSectionPath(section []byte) string {
+	line, _, _ := bytes.Cut(section, []byte("\n"))
+	match := diffHeaderPathPattern.FindSubmatch(line)
+	if len(match) < 3 {
+		return ""
+	}
+
+	path := string(match[2])
+	if len(match[1]) > 0 {
+		path = strings.TrimSuffix(path, string(match[1]))
+	}
+
+	return path
 }
 
 const lineBufferSize = 4096

@@ -37,6 +37,13 @@ func Test_NewCmdDiff(t *testing.T) {
 			},
 		},
 		{
+			name: "exclude patterns",
+			args: "--exclude generated/* --exclude docs/*,fixtures/*",
+			want: DiffOptions{
+				Exclude: []string{"generated/*", "docs/*", "fixtures/*"},
+			},
+		},
+		{
 			name:  "number argument",
 			args:  "123",
 			isTTY: true,
@@ -142,6 +149,11 @@ func Test_NewCmdDiff(t *testing.T) {
 			assert.Equal(t, tt.want.SelectorArg, opts.SelectorArg)
 			assert.Equal(t, tt.want.UseColor, opts.UseColor)
 			assert.Equal(t, tt.want.BrowserMode, opts.BrowserMode)
+			if tt.want.Exclude == nil {
+				assert.Empty(t, opts.Exclude)
+			} else {
+				assert.Equal(t, tt.want.Exclude, opts.Exclude)
+			}
 		})
 	}
 }
@@ -207,6 +219,20 @@ func Test_diffRun(t *testing.T) {
 			},
 			wantFields: []string{"number"},
 			wantStdout: ".github/workflows/releases.yml\nMakefile\n",
+			httpStubs: func(reg *httpmock.Registry) {
+				stubDiffRequest(reg, "application/vnd.github.v3.diff", fmt.Sprintf(testDiff, "", "", "", ""))
+			},
+		},
+		{
+			name: "exclude pattern",
+			opts: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    false,
+				Patch:       false,
+				Exclude:     []string{".github/*"},
+			},
+			wantFields: []string{"number"},
+			wantStdout: "diff --git a/Makefile b/Makefile\nindex f2b4805c..3d7bd0f9 100644\n--- a/Makefile\n+++ b/Makefile\n@@ -22,8 +22,8 @@ test:\n \tgo test ./...\n .PHONY: test\n\n-site:\n-\tgit clone https://github.com/github/cli.github.com.git \"$@\"\n+site: bin/gh\n+\tbin/gh repo clone github/cli.github.com \"$@\"\n\n site-docs: site\n \tgit -C site pull\n",
 			httpStubs: func(reg *httpmock.Registry) {
 				stubDiffRequest(reg, "application/vnd.github.v3.diff", fmt.Sprintf(testDiff, "", "", "", ""))
 			},
