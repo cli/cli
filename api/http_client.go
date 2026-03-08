@@ -85,7 +85,21 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 		if req.Header.Get(cacheTTL) == "" {
 			req.Header.Set(cacheTTL, ttl.String())
 		}
-		return rt.RoundTrip(req)
+
+		resp, err := rt.RoundTrip(req)
+		if err != nil {
+			return nil, err
+		}
+
+		// Cached responses may contain stale rate-limit headers from the original
+		// request time; never propagate those back to callers on cache-enabled
+		// requests.
+		resp.Header.Del("X-Ratelimit-Limit")
+		resp.Header.Del("X-Ratelimit-Remaining")
+		resp.Header.Del("X-Ratelimit-Reset")
+		resp.Header.Del("X-Ratelimit-Used")
+
+		return resp, nil
 	}}
 }
 

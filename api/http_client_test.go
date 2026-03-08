@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -264,6 +265,34 @@ func TestHTTPClientSanitizeJSONControlCharactersC0(t *testing.T) {
 	assert.Equal(t, "10^P 11^Q 12^R 13^S 14^T 15^U 16^V 17^W 18^X 19^Y 1A^Z 1B^[ 1C^\\ 1D^] 1E^^ 1F^_", issue.Author.Name)
 	assert.Equal(t, "monalisa \\u00^[", issue.Author.Login)
 	assert.Equal(t, "Escaped ^[ \\^[ \\^[ \\\\^[", issue.ActiveLockReason)
+}
+
+func TestAddCacheTTLHeader_StripsRateLimitHeaders(t *testing.T) {
+	rt := AddCacheTTLHeader(funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		assert.Equal(t, "1h0m0s", req.Header.Get(cacheTTL))
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header: http.Header{
+				"X-Ratelimit-Limit":     []string{"5000"},
+				"X-Ratelimit-Remaining": []string{"0"},
+				"X-Ratelimit-Reset":     []string{"1234567890"},
+				"X-Ratelimit-Used":      []string{"5001"},
+			},
+			Body: io.NopCloser(strings.NewReader("{}")),
+		}, nil
+	}}, time.Hour)
+
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/graphql", nil)
+	require.NoError(t, err)
+
+	resp, err := rt.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Empty(t, resp.Header.Get("X-Ratelimit-Limit"))
+	assert.Empty(t, resp.Header.Get("X-Ratelimit-Remaining"))
+	assert.Empty(t, resp.Header.Get("X-Ratelimit-Reset"))
+	assert.Empty(t, resp.Header.Get("X-Ratelimit-Used"))
 }
 
 func TestHTTPClientSanitizeControlCharactersC1(t *testing.T) {
