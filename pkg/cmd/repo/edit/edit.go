@@ -70,23 +70,25 @@ type EditRepositoryInput struct {
 	enableSecretScanning               *bool
 	enableSecretScanningPushProtection *bool
 
-	AllowForking        *bool                     `json:"allow_forking,omitempty"`
-	AllowUpdateBranch   *bool                     `json:"allow_update_branch,omitempty"`
-	DefaultBranch       *string                   `json:"default_branch,omitempty"`
-	DeleteBranchOnMerge *bool                     `json:"delete_branch_on_merge,omitempty"`
-	Description         *string                   `json:"description,omitempty"`
-	EnableAutoMerge     *bool                     `json:"allow_auto_merge,omitempty"`
-	EnableIssues        *bool                     `json:"has_issues,omitempty"`
-	EnableMergeCommit   *bool                     `json:"allow_merge_commit,omitempty"`
-	EnableProjects      *bool                     `json:"has_projects,omitempty"`
-	EnableDiscussions   *bool                     `json:"has_discussions,omitempty"`
-	EnableRebaseMerge   *bool                     `json:"allow_rebase_merge,omitempty"`
-	EnableSquashMerge   *bool                     `json:"allow_squash_merge,omitempty"`
-	EnableWiki          *bool                     `json:"has_wiki,omitempty"`
-	Homepage            *string                   `json:"homepage,omitempty"`
-	IsTemplate          *bool                     `json:"is_template,omitempty"`
-	SecurityAndAnalysis *SecurityAndAnalysisInput `json:"security_and_analysis,omitempty"`
-	Visibility          *string                   `json:"visibility,omitempty"`
+	AllowForking             *bool                     `json:"allow_forking,omitempty"`
+	AllowUpdateBranch        *bool                     `json:"allow_update_branch,omitempty"`
+	DefaultBranch            *string                   `json:"default_branch,omitempty"`
+	DeleteBranchOnMerge      *bool                     `json:"delete_branch_on_merge,omitempty"`
+	Description              *string                   `json:"description,omitempty"`
+	EnableAutoMerge          *bool                     `json:"allow_auto_merge,omitempty"`
+	EnableIssues             *bool                     `json:"has_issues,omitempty"`
+	EnableMergeCommit        *bool                     `json:"allow_merge_commit,omitempty"`
+	EnableProjects           *bool                     `json:"has_projects,omitempty"`
+	EnableDiscussions        *bool                     `json:"has_discussions,omitempty"`
+	EnableRebaseMerge        *bool                     `json:"allow_rebase_merge,omitempty"`
+	EnableSquashMerge        *bool                     `json:"allow_squash_merge,omitempty"`
+	SquashMergeCommitMessage *string                   `json:"squash_merge_commit_message,omitempty"`
+	SquashMergeCommitTitle   *string                   `json:"squash_merge_commit_title,omitempty"`
+	EnableWiki               *bool                     `json:"has_wiki,omitempty"`
+	Homepage                 *string                   `json:"homepage,omitempty"`
+	IsTemplate               *bool                     `json:"is_template,omitempty"`
+	SecurityAndAnalysis      *SecurityAndAnalysisInput `json:"security_and_analysis,omitempty"`
+	Visibility               *string                   `json:"visibility,omitempty"`
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobra.Command {
@@ -184,6 +186,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableDiscussions, "enable-discussions", "", "Enable discussions in the repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableMergeCommit, "enable-merge-commit", "", "Enable merging pull requests via merge commit")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableSquashMerge, "enable-squash-merge", "", "Enable merging pull requests via squashed commit")
+	cmdutil.NilStringFlag(cmd, &opts.Edits.SquashMergeCommitMessage, "squash-merge-commit-message", "", "Set squash merge commit message style {PR_BODY,COMMIT_MESSAGES,BLANK}")
+	cmdutil.NilStringFlag(cmd, &opts.Edits.SquashMergeCommitTitle, "squash-merge-commit-title", "", "Set squash merge commit title style {PR_TITLE,COMMIT_OR_PR_TITLE}")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableRebaseMerge, "enable-rebase-merge", "", "Enable merging pull requests via rebase")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableAutoMerge, "enable-auto-merge", "", "Enable auto-merge functionality")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.enableAdvancedSecurity, "enable-advanced-security", "", "Enable advanced security in the repository")

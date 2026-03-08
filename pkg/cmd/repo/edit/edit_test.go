@@ -35,6 +35,17 @@ func TestNewCmdEdit(t *testing.T) {
 			},
 		},
 		{
+			name: "set squash merge commit defaults",
+			args: "--squash-merge-commit-message PR_BODY --squash-merge-commit-title PR_TITLE",
+			wantOpts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					SquashMergeCommitMessage: sp("PR_BODY"),
+					SquashMergeCommitTitle:   sp("PR_TITLE"),
+				},
+			},
+		},
+		{
 			name: "deny public visibility change without accepting consequences",
 			args: "--visibility public",
 			wantOpts: EditOptions{
