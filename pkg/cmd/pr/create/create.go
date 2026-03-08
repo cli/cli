@@ -437,9 +437,13 @@ func createRun(opts *CreateOptions) error {
 		if !(opts.Autofill || opts.FillFirst) {
 			state.Title = opts.Title
 			state.Body = opts.Body
+			if opts.Title != "" || opts.Body != "" {
+				state.MarkDirty()
+			}
 		}
 		if opts.Template != "" {
 			state.Template = opts.Template
+			state.MarkDirty()
 		}
 		err = handlePush(*opts, *ctx)
 		if err != nil {
@@ -458,10 +462,12 @@ func createRun(opts *CreateOptions) error {
 
 	if opts.TitleProvided {
 		state.Title = opts.Title
+		state.MarkDirty()
 	}
 
 	if opts.BodyProvided {
 		state.Body = opts.Body
+		state.MarkDirty()
 	}
 
 	existingPR, _, err := opts.Finder.Find(shared.FindOptions{
