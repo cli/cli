@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -126,6 +128,52 @@ func Test_statusRun(t *testing.T) {
 			`),
 		},
 		{
+			name: "network error",
+			opts: StatusOptions{
+				Hostname: "github.com",
+			},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), func(req *http.Request) (*http.Response, error) {
+					return nil, &url.Error{
+						Op:  "Get",
+						URL: "https://api.github.com/",
+						Err: &net.DNSError{Err: "no such host", Name: "api.github.com"},
+					}
+				})
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Failed to verify authentication for github.com account monalisa (GH_CONFIG_DIR/hosts.yml)
+				  - Active account: true
+				  - Authentication status could not be determined due to a network error: Get "https://api.github.com/": Get "https://api.github.com/": lookup api.github.com: no such host
+			`),
+		},
+		{
+			name: "network error from env token",
+			opts: StatusOptions{},
+			env:  map[string]string{"GH_TOKEN": "gho_abc123"},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL(`query UserCurrent\b`), func(req *http.Request) (*http.Response, error) {
+					return nil, &url.Error{
+						Op:  "Post",
+						URL: "https://api.github.com/graphql",
+						Err: &net.DNSError{Err: "no such host", Name: "api.github.com"},
+					}
+				})
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Failed to verify authentication for github.com using token (GH_TOKEN)
+				  - Active account: true
+				  - Authentication status could not be determined due to a network error: Post "https://api.github.com/graphql": Post "https://api.github.com/graphql": lookup api.github.com: no such host
+			`),
+		},
+		{
 			name: "hostname set",
 			opts: StatusOptions{
 				Hostname: "ghe.io",
@@ -176,7 +224,7 @@ func Test_statusRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(401, `{"message":"Bad credentials"}`))
 			},
 			wantErr: cmdutil.SilentError,
 			wantErrOut: heredoc.Doc(`
@@ -221,7 +269,7 @@ func Test_statusRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mocks for HeaderHasMinimumScopes api requests to a non-github.com host
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(401, `{"message":"Bad credentials"}`))
 			},
 			wantErr: cmdutil.SilentError,
 			wantErrOut: heredoc.Doc(`
@@ -286,6 +334,23 @@ func Test_statusRun(t *testing.T) {
 				  - Git operations protocol: https
 				  - Token: gho_******
 				  - Token scopes: none
+			`),
+		},
+		{
+			name: "bad token from env",
+			opts: StatusOptions{},
+			env:  map[string]string{"GH_TOKEN": "gho_abc123"},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StatusStringResponse(401, `{"message":"Bad credentials"}`))
+			},
+			wantErr: cmdutil.SilentError,
+			wantErrOut: heredoc.Doc(`
+				github.com
+				  X Failed to log in to github.com using token (GH_TOKEN)
+				  - Active account: true
+				  - The token in GH_TOKEN is invalid.
 			`),
 		},
 		{
@@ -414,7 +479,7 @@ func Test_statusRun(t *testing.T) {
 				// Get scopes for monalisa-ghe-2
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
 				// Error getting scopes for monalisa-ghe
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(404, "{}"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(401, `{"message":"Bad credentials"}`))
 				// Get username for monalisa-ghe-2
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
@@ -520,7 +585,7 @@ func Test_statusRun(t *testing.T) {
 				// Get scopes for monalisa-2
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 				// Error getting scopes for monalisa-ghe-2
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(404, "{}"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(401, `{"message":"Bad credentials"}`))
 			},
 			wantErr: cmdutil.SilentError,
 			wantErrOut: heredoc.Doc(`
@@ -653,9 +718,9 @@ func Test_statusRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(401, `{"message":"Bad credentials"}`))
 			},
-			wantOut: `{"hosts":{"ghe.io":[{"state":"error","error":"HTTP 400 (https://ghe.io/api/v3/)","active":true,"host":"ghe.io","login":"monalisa-ghe","tokenSource":"GH_CONFIG_DIR/hosts.yml","gitProtocol":"https"}]}}` + "\n",
+			wantOut: `{"hosts":{"ghe.io":[{"state":"error","error":"HTTP 401 (https://ghe.io/api/v3/)","active":true,"host":"ghe.io","login":"monalisa-ghe","tokenSource":"GH_CONFIG_DIR/hosts.yml","gitProtocol":"https"}]}}` + "\n",
 			wantErr: nil, // should not return error in machine-readable mode
 		},
 		{
@@ -667,9 +732,30 @@ func Test_statusRun(t *testing.T) {
 				// mock for HeaderHasMinimumScopes api requests to a non-github.com host
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StatusStringResponse(400, `no bueno`))
+					httpmock.StatusStringResponse(401, `{"message":"Bad credentials"}`))
 			},
-			wantOut: `{"hosts":{"github.com":[{"state":"error","error":"non-200 OK status code:  body: \"no bueno\"","active":true,"host":"github.com","login":"","tokenSource":"GH_TOKEN","gitProtocol":"https"}]}}` + "\n",
+			wantOut: `{"hosts":{"github.com":[{"state":"error","error":"non-200 OK status code:  body: \"{\\\"message\\\":\\\"Bad credentials\\\"}\"","active":true,"host":"github.com","login":"","tokenSource":"GH_TOKEN","gitProtocol":"https"}]}}` + "\n",
+			wantErr: nil, // should not return error in machine-readable mode
+		},
+		{
+			name: "json, network error",
+			opts: StatusOptions{
+				Hostname: "github.com",
+			},
+			jsonFields: []string{"hosts"},
+			cfgStubs: func(t *testing.T, c gh.Config) {
+				login(t, c, "github.com", "monalisa", "abc123", "https")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), func(req *http.Request) (*http.Response, error) {
+					return nil, &url.Error{
+						Op:  "Get",
+						URL: "https://api.github.com/",
+						Err: &net.DNSError{Err: "no such host", Name: "api.github.com"},
+					}
+				})
+			},
+			wantOut: `{"hosts":{"github.com":[{"state":"error","error":"Get \"https://api.github.com/\": Get \"https://api.github.com/\": lookup api.github.com: no such host","active":true,"host":"github.com","login":"monalisa","tokenSource":"GH_CONFIG_DIR/hosts.yml","gitProtocol":"https"}]}}` + "\n",
 			wantErr: nil, // should not return error in machine-readable mode
 		},
 		{

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -20,11 +21,17 @@ import (
 )
 
 type authEntryState string
+type authFailureKind string
 
 const (
 	authEntryStateSuccess = "success"
 	authEntryStateTimeout = "timeout"
 	authEntryStateError   = "error"
+
+	authFailureKindNone        authFailureKind = ""
+	authFailureKindInvalidAuth authFailureKind = "invalid_auth"
+	authFailureKindNetwork     authFailureKind = "network"
+	authFailureKindUnknown     authFailureKind = "unknown"
 )
 
 type authEntry struct {
@@ -37,6 +44,8 @@ type authEntry struct {
 	Token       string         `json:"token,omitempty"`
 	Scopes      string         `json:"scopes,omitempty"`
 	GitProtocol string         `json:"gitProtocol"`
+
+	failureKind authFailureKind
 }
 
 type authStatus struct {
@@ -86,19 +95,22 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 		}
 
 	case authEntryStateError:
-		if e.Login != "" {
-			sb.WriteString(fmt.Sprintf("  %s Failed to log in to %s account %s (%s)\n", cs.Red("X"), e.Host, cs.Bold(e.Login), e.TokenSource))
-		} else {
-			sb.WriteString(fmt.Sprintf("  %s Failed to log in to %s using token (%s)\n", cs.Red("X"), e.Host, e.TokenSource))
-		}
+		sb.WriteString(errorHeader(cs, e))
 		activeStr := fmt.Sprintf("%v", e.Active)
 		sb.WriteString(fmt.Sprintf("  - Active account: %s\n", cs.Bold(activeStr)))
-		sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.TokenSource))
-		if authTokenWriteable(e.TokenSource) {
-			loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
-			logoutInstructions := fmt.Sprintf("gh auth logout -h %s -u %s", e.Host, e.Login)
-			sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
-			sb.WriteString(fmt.Sprintf("  - To forget about this account, run: %s\n", cs.Bold(logoutInstructions)))
+		switch e.failureKind {
+		case authFailureKindInvalidAuth:
+			sb.WriteString(fmt.Sprintf("  - The token in %s is invalid.\n", e.TokenSource))
+			if authTokenWriteable(e.TokenSource) {
+				loginInstructions := fmt.Sprintf("gh auth login -h %s", e.Host)
+				logoutInstructions := fmt.Sprintf("gh auth logout -h %s -u %s", e.Host, e.Login)
+				sb.WriteString(fmt.Sprintf("  - To re-authenticate, run: %s\n", cs.Bold(loginInstructions)))
+				sb.WriteString(fmt.Sprintf("  - To forget about this account, run: %s\n", cs.Bold(logoutInstructions)))
+			}
+		case authFailureKindNetwork:
+			sb.WriteString(fmt.Sprintf("  - Authentication status could not be determined due to a network error: %s\n", e.Error))
+		default:
+			sb.WriteString(fmt.Sprintf("  - Authentication status could not be determined: %s\n", e.Error))
 		}
 
 	case authEntryStateTimeout:
@@ -112,6 +124,21 @@ func (e authEntry) String(cs *iostreams.ColorScheme) string {
 	}
 
 	return sb.String()
+}
+
+func errorHeader(cs *iostreams.ColorScheme, e authEntry) string {
+	switch e.failureKind {
+	case authFailureKindNetwork, authFailureKindUnknown:
+		if e.Login != "" {
+			return fmt.Sprintf("  %s Failed to verify authentication for %s account %s (%s)\n", cs.Red("X"), e.Host, cs.Bold(e.Login), e.TokenSource)
+		}
+		return fmt.Sprintf("  %s Failed to verify authentication for %s using token (%s)\n", cs.Red("X"), e.Host, e.TokenSource)
+	default:
+		if e.Login != "" {
+			return fmt.Sprintf("  %s Failed to log in to %s account %s (%s)\n", cs.Red("X"), e.Host, cs.Bold(e.Login), e.TokenSource)
+		}
+		return fmt.Sprintf("  %s Failed to log in to %s using token (%s)\n", cs.Red("X"), e.Host, e.TokenSource)
+	}
 }
 
 type StatusOptions struct {
@@ -383,7 +410,7 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 		var err error
 		entry.Login, err = api.CurrentLoginName(apiClient, opts.hostname)
 		if err != nil {
-			entry.State = authEntryStateError
+			entry.State, entry.failureKind = classifyAuthError(err)
 			entry.Error = err.Error()
 			return entry
 		}
@@ -392,21 +419,48 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 	// Get scopes for token.
 	scopesHeader, err := shared.GetScopes(httpClient, opts.hostname, opts.token)
 	if err != nil {
-		var networkError net.Error
-		if errors.As(err, &networkError) && networkError.Timeout() {
-			entry.State = authEntryStateTimeout
-			entry.Error = err.Error()
-			return entry
-		}
-
-		entry.State = authEntryStateError
+		entry.State, entry.failureKind = classifyAuthError(err)
 		entry.Error = err.Error()
 		return entry
 	}
 	entry.Scopes = scopesHeader
 
 	entry.State = authEntryStateSuccess
+	entry.failureKind = authFailureKindNone
 	return entry
+}
+
+func classifyAuthError(err error) (authEntryState, authFailureKind) {
+	var urlError *url.Error
+	if errors.As(err, &urlError) {
+		if urlError.Timeout() {
+			return authEntryStateTimeout, authFailureKindNetwork
+		}
+		return authEntryStateError, authFailureKindNetwork
+	}
+
+	var networkError net.Error
+	if errors.As(err, &networkError) {
+		if networkError.Timeout() {
+			return authEntryStateTimeout, authFailureKindNetwork
+		}
+		return authEntryStateError, authFailureKindNetwork
+	}
+
+	var httpErr api.HTTPError
+	if errors.As(err, &httpErr) {
+		if httpErr.StatusCode == http.StatusUnauthorized {
+			return authEntryStateError, authFailureKindInvalidAuth
+		}
+		return authEntryStateError, authFailureKindUnknown
+	}
+
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "401 Unauthorized") || strings.Contains(errMsg, "Bad credentials") {
+		return authEntryStateError, authFailureKindInvalidAuth
+	}
+
+	return authEntryStateError, authFailureKindUnknown
 }
 
 func authTokenWriteable(src string) bool {
