@@ -640,7 +640,15 @@ func createRun(opts *CreateOptions) error {
 var regexPattern = regexp.MustCompile(`(?m)^`)
 
 func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool, addBody bool) error {
-	commits, err := ctx.GitClient.Commits(context.Background(), ctx.BaseTrackingBranch, ctx.PRRefs.UnqualifiedHeadRef())
+	commitHeadRef := ctx.PRRefs.UnqualifiedHeadRef()
+	if !ctx.GitClient.HasLocalBranch(context.Background(), commitHeadRef) {
+		currentBranch, err := ctx.GitClient.CurrentBranch(context.Background())
+		if err == nil && currentBranch != "" {
+			commitHeadRef = currentBranch
+		}
+	}
+
+	commits, err := ctx.GitClient.Commits(context.Background(), ctx.BaseTrackingBranch, commitHeadRef)
 	if err != nil {
 		return err
 	}
