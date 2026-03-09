@@ -1,6 +1,7 @@
 {
 	"image": "mcr.microsoft.com/devcontainers/go:1.25",
-	"features": {
+	"featu"ghcr.io/dotnet/aspire-devcontainer-feature/dotnetaspire:1": {}
+	res": {
 		"ghcr.io/devcontainers/features/sshd:1": {}
 	},
 	"remoteUser": "vscode",
