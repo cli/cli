@@ -640,16 +640,30 @@ func createRun(opts *CreateOptions) error {
 var regexPattern = regexp.MustCompile(`(?m)^`)
 
 func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool, addBody bool) error {
-	commits, err := ctx.GitClient.Commits(context.Background(), ctx.BaseTrackingBranch, ctx.PRRefs.UnqualifiedHeadRef())
+	headRef := ctx.PRRefs.UnqualifiedHeadRef()
+	commits, err := ctx.GitClient.Commits(context.Background(), ctx.BaseTrackingBranch, headRef)
 	if err != nil {
-		return err
+		if !strings.Contains(err.Error(), "ambiguous argument") {
+			return err
+		}
+
+		currentBranch, branchErr := ctx.GitClient.CurrentBranch(context.Background())
+		if branchErr != nil || currentBranch == "" || currentBranch == headRef {
+			return err
+		}
+
+		commits, err = ctx.GitClient.Commits(context.Background(), ctx.BaseTrackingBranch, currentBranch)
+		if err != nil {
+			return err
+		}
+		headRef = currentBranch
 	}
 
 	if len(commits) == 1 || useFirstCommit {
 		state.Title = commits[len(commits)-1].Title
 		state.Body = commits[len(commits)-1].Body
 	} else {
-		state.Title = humanize(ctx.PRRefs.UnqualifiedHeadRef())
+		state.Title = humanize(headRef)
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
 			fmt.Fprintf(&body, "- **%s**\n", commits[i].Title)
