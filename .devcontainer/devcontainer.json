@@ -7,7 +7,8 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"golang.go"
+				"golang.go",
+				"googlecloudtools.cloudcode"
 			],
 			"settings": {
 				"go.toolsManagement.checkForUpdates": "local",
