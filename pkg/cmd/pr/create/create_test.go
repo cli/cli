@@ -1485,6 +1485,19 @@ func Test_createRun(t *testing.T) {
 				opts.Title = "my title"
 				opts.Body = "my body"
 				opts.HeadBranch = "otherowner:feature"
+				opts.BaseBranch = "upstream/master"
+				opts.Remotes = func() (context.Remotes, error) {
+					return context.Remotes{
+						{
+							Remote: &git.Remote{Name: "upstream", Resolved: "base"},
+							Repo:   ghrepo.New("OWNER", "REPO"),
+						},
+						{
+							Remote: &git.Remote{Name: "origin"},
+							Repo:   ghrepo.New("monalisa", "REPO"),
+						},
+					}, nil
+				}
 				return func() {}
 			},
 			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",

@@ -783,7 +783,10 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			return nil, err
 		}
 
-		baseBranch := opts.BaseBranch
+		baseBranch, err := normalizeBaseBranch(remotes, opts.BaseBranch)
+		if err != nil {
+			return nil, err
+		}
 		if baseBranch == "" {
 			baseBranch = branchConfig.MergeBase
 		}
@@ -816,7 +819,10 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		return nil, err
 	}
 
-	baseBranch := opts.BaseBranch
+	baseBranch, err := normalizeBaseBranch(remotes, opts.BaseBranch)
+	if err != nil {
+		return nil, err
+	}
 	if baseBranch == "" {
 		baseBranch = branchConfig.MergeBase
 	}
@@ -1015,6 +1021,23 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			baseRefs:         baseRefs,
 		}), nil
 	}
+}
+
+func normalizeBaseBranch(remotes ghContext.Remotes, baseBranch string) (string, error) {
+	if baseBranch == "" {
+		return "", nil
+	}
+
+	parts := strings.SplitN(baseBranch, "/", 2)
+	if len(parts) != 2 {
+		return baseBranch, nil
+	}
+
+	if _, err := remotes.FindByName(parts[0]); err != nil {
+		return baseBranch, nil
+	}
+
+	return parts[1], nil
 }
 
 func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
