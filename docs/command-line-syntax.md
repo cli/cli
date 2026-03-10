@@ -58,3 +58,18 @@ _required argument with mutually exclusive options:_
 
 _optional argument with mutually exclusive options:_
 `command sub-command [<path> | <string>]`
+
+## Prompting behavior
+
+GitHub CLI follows an "all or nothing" approach to prompting:
+
+- If you provide **any flags** when running a command, the CLI assumes you want to specify all values explicitly and will **not prompt** for missing required fields
+- If you provide **no flags**, the CLI will interactively prompt you for any missing required fields
+
+This design ensures predictable behavior and prevents unexpected prompts when scripting or automating commands.
+
+For example:
+- `gh pr create --title "My PR"` → Won't prompt for other fields (may fail if required fields missing)
+- `gh pr create` → Will interactively prompt for title, body, etc.
+
+When writing scripts or automation, always provide all required values as flags to avoid unexpected prompts.
