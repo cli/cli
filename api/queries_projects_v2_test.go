@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -330,6 +331,25 @@ func TestProjectsV2IgnorableError(t *testing.T) {
 			assert.Equal(t, tt.expectOut, out)
 		})
 	}
+}
+
+func TestProjectsV2IgnorableError_AfterHandleResponse(t *testing.T) {
+	// Regression test for https://github.com/cli/cli/issues/12904
+	// Scope errors from GraphQL responses must remain ignorable after
+	// handleResponse wraps them, so that gh pr view and similar commands
+	// don't fatally error when the token lacks read:project scope.
+	gqlErr := &ghAPI.GraphQLError{
+		Errors: []ghAPI.GraphQLErrorItem{
+			{
+				Type:    "INSUFFICIENT_SCOPES",
+				Message: "field requires one of the following scopes: ['read:project']",
+			},
+		},
+	}
+	wrapped := handleResponse(gqlErr)
+	require.NotNil(t, wrapped)
+	assert.True(t, ProjectsV2IgnorableError(wrapped),
+		"scope error after handleResponse should be ignorable, got: %v", wrapped)
 }
 
 func stripSpace(str string) string {

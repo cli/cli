@@ -181,10 +181,6 @@ func handleResponse(err error) error {
 
 	var gqlErr *ghAPI.GraphQLError
 	if errors.As(err, &gqlErr) {
-		scopeErr := GenerateScopeErrorForGQL(gqlErr)
-		if scopeErr != nil {
-			return scopeErr
-		}
 		return GraphQLError{
 			GraphQLError: gqlErr,
 		}
