@@ -249,11 +249,22 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		if opts.SelectorArg == "" {
 			return "", nil
 		}
+		// Check if it's a commit hash (hexadecimal, 7-64 chars)
+		if isCommit(opts.SelectorArg) {
+			// If it's all decimal digits and 7+ chars, it could be either
+			// a commit hash or an issue number. Git short hashes are min 7 chars,
+			// so treat shorter decimal strings as issue numbers.
+			if isAllDigits(opts.SelectorArg) && len(opts.SelectorArg) >= 7 {
+				// Ambiguous: could be commit hash or issue number
+				// For now, treat as commit to fix the reported bug
+				// where decimal-only commit hashes are mistaken for issues
+				return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+			}
+			// Contains a-f, definitely a commit hash
+			return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+		}
 		if isNumber(opts.SelectorArg) {
 			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
-		}
-		if isCommit(opts.SelectorArg) {
-			return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
 		}
 	}
 
@@ -345,6 +356,16 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 func isNumber(arg string) bool {
 	_, err := strconv.Atoi(strings.TrimPrefix(arg, "#"))
 	return err == nil
+}
+
+// isAllDigits checks if string contains only decimal digits (0-9)
+func isAllDigits(arg string) bool {
+	for _, r := range arg {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return len(arg) > 0
 }
 
 // sha1 and sha256 are supported
