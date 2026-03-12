@@ -187,6 +187,20 @@ func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	}
 
 	remotes := parseRemotes(outputLines(remoteOut))
+
+	// Overwrite fetch/push URLs with the raw values from git config, which are
+	// not subject to url.<base>.insteadOf rewriting. This is important because
+	// gh needs to match remote hostnames against known GitHub hosts, and
+	// insteadOf rules can rewrite github.com URLs to something unrecognizable.
+	rawURLArgs := []string{"config", "--get-regexp", `^remote\..*\.(url|pushurl)$`}
+	rawURLCmd, err := c.Command(ctx, rawURLArgs...)
+	if err == nil {
+		rawURLOut, rawURLErr := rawURLCmd.Output()
+		if rawURLErr == nil {
+			populateRawRemoteURLs(remotes, outputLines(rawURLOut))
+		}
+	}
+
 	populateResolvedRemotes(remotes, outputLines(configOut))
 	sort.Sort(remotes)
 	return remotes, nil
@@ -959,6 +973,53 @@ func populateResolvedRemotes(remotes RemoteSet, resolved []string) {
 		for _, r := range remotes {
 			if r.Name == name {
 				r.Resolved = parts[1]
+				break
+			}
+		}
+	}
+}
+
+// populateRawRemoteURLs overwrites the FetchURL and PushURL on each remote with
+// the raw (non-rewritten) values read from git config. git remote -v applies
+// url.<base>.insteadOf rules which can obscure the original hostname, making it
+// impossible for gh to match remotes against known GitHub hosts.
+func populateRawRemoteURLs(remotes RemoteSet, configLines []string) {
+	for _, l := range configLines {
+		// Lines look like:
+		//   remote.origin.url https://github.com/owner/repo.git
+		//   remote.origin.pushurl https://github.com/owner/repo.git
+		parts := strings.SplitN(l, " ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		key := parts[0] // e.g. remote.origin.url
+		rawURL := parts[1]
+
+		// Split key into ["remote", "<name>", "url"|"pushurl"]
+		kp := strings.SplitN(key, ".", 3)
+		if len(kp) < 3 {
+			continue
+		}
+		name := kp[1]
+		urlType := kp[2]
+
+		parsedURL, err := ParseURL(rawURL)
+		if err != nil {
+			continue
+		}
+
+		for _, r := range remotes {
+			if r.Name == name {
+				switch urlType {
+				case "url":
+					r.FetchURL = parsedURL
+					// Also update PushURL to the raw value. If the remote has
+					// a separate pushurl config entry it will be processed
+					// after this and override PushURL again.
+					r.PushURL = parsedURL
+				case "pushurl":
+					r.PushURL = parsedURL
+				}
 				break
 			}
 		}

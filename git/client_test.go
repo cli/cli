@@ -182,6 +182,165 @@ func TestClientRemotes_no_resolved_remote(t *testing.T) {
 	assert.Equal(t, "test", rs[3].Name)
 }
 
+func TestClientRemotes_insteadOf(t *testing.T) {
+	tempDir := t.TempDir()
+	initRepo(t, tempDir)
+	gitDir := filepath.Join(tempDir, ".git")
+	remoteFile := filepath.Join(gitDir, "config")
+
+	// Simulate a setup where insteadOf rewrites github.com URLs to localhost.
+	// The raw config stores github.com URLs, but git remote -v would show
+	// localhost URLs due to url.<base>.insteadOf.
+	remotes := `
+[url "http://localhost:9989/"]
+	insteadOf = https://github.com/
+[remote "origin"]
+	url = https://github.com/owner/repo.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[remote "upstream"]
+	url = https://github.com/upstream-owner/repo.git
+	fetch = +refs/heads/*:refs/remotes/upstream/*
+	gh-resolved = base
+`
+	f, err := os.OpenFile(remoteFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
+	assert.NoError(t, err)
+	_, err = f.Write([]byte(remotes))
+	assert.NoError(t, err)
+	err = f.Close()
+	assert.NoError(t, err)
+
+	client := Client{
+		RepoDir: tempDir,
+	}
+	rs, err := client.Remotes(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(rs))
+
+	// Remotes should use the raw github.com URLs, not the rewritten localhost ones.
+	assert.Equal(t, "upstream", rs[0].Name)
+	assert.Equal(t, "github.com", rs[0].FetchURL.Host)
+	assert.Equal(t, "/upstream-owner/repo.git", rs[0].FetchURL.Path)
+	assert.Equal(t, "base", rs[0].Resolved)
+
+	assert.Equal(t, "origin", rs[1].Name)
+	assert.Equal(t, "github.com", rs[1].FetchURL.Host)
+	assert.Equal(t, "/owner/repo.git", rs[1].FetchURL.Path)
+}
+
+func TestPopulateRawRemoteURLs(t *testing.T) {
+	tests := []struct {
+		name        string
+		remotes     RemoteSet
+		configLines []string
+		wantFetch   map[string]string // remote name -> expected FetchURL host
+		wantPush    map[string]string // remote name -> expected PushURL host
+	}{
+		{
+			name: "overwrites fetch and push URLs with raw values",
+			remotes: RemoteSet{
+				{Name: "origin",
+					FetchURL: &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+					PushURL:  &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+				},
+			},
+			configLines: []string{
+				"remote.origin.url https://github.com/owner/repo.git",
+			},
+			wantFetch: map[string]string{"origin": "github.com"},
+			wantPush:  map[string]string{"origin": "github.com"},
+		},
+		{
+			name: "separate pushurl overrides push URL",
+			remotes: RemoteSet{
+				{Name: "origin",
+					FetchURL: &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+					PushURL:  &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+				},
+			},
+			configLines: []string{
+				"remote.origin.url https://github.com/owner/repo.git",
+				"remote.origin.pushurl https://push.example.com/owner/repo.git",
+			},
+			wantFetch: map[string]string{"origin": "github.com"},
+			wantPush:  map[string]string{"origin": "push.example.com"},
+		},
+		{
+			name: "multiple remotes",
+			remotes: RemoteSet{
+				{Name: "origin",
+					FetchURL: &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+					PushURL:  &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+				},
+				{Name: "upstream",
+					FetchURL: &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/up/repo.git"},
+					PushURL:  &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/up/repo.git"},
+				},
+			},
+			configLines: []string{
+				"remote.origin.url https://github.com/owner/repo.git",
+				"remote.upstream.url https://github.com/up/repo.git",
+			},
+			wantFetch: map[string]string{"origin": "github.com", "upstream": "github.com"},
+			wantPush:  map[string]string{"origin": "github.com", "upstream": "github.com"},
+		},
+		{
+			name: "unmatched remote in config is ignored",
+			remotes: RemoteSet{
+				{Name: "origin",
+					FetchURL: &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+					PushURL:  &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+				},
+			},
+			configLines: []string{
+				"remote.origin.url https://github.com/owner/repo.git",
+				"remote.nonexistent.url https://github.com/other/repo.git",
+			},
+			wantFetch: map[string]string{"origin": "github.com"},
+			wantPush:  map[string]string{"origin": "github.com"},
+		},
+		{
+			name: "malformed config lines are skipped",
+			remotes: RemoteSet{
+				{Name: "origin",
+					FetchURL: &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+					PushURL:  &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+				},
+			},
+			configLines: []string{
+				"not-a-valid-line",
+				"remote.origin.url https://github.com/owner/repo.git",
+			},
+			wantFetch: map[string]string{"origin": "github.com"},
+			wantPush:  map[string]string{"origin": "github.com"},
+		},
+		{
+			name: "empty config lines",
+			remotes: RemoteSet{
+				{Name: "origin",
+					FetchURL: &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+					PushURL:  &url.URL{Scheme: "http", Host: "localhost:9989", Path: "/owner/repo.git"},
+				},
+			},
+			configLines: []string{""},
+			wantFetch:   map[string]string{"origin": "localhost:9989"},
+			wantPush:    map[string]string{"origin": "localhost:9989"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			populateRawRemoteURLs(tt.remotes, tt.configLines)
+			for _, r := range tt.remotes {
+				if wantHost, ok := tt.wantFetch[r.Name]; ok {
+					assert.Equal(t, wantHost, r.FetchURL.Host, "FetchURL host for %s", r.Name)
+				}
+				if wantHost, ok := tt.wantPush[r.Name]; ok {
+					assert.Equal(t, wantHost, r.PushURL.Host, "PushURL host for %s", r.Name)
+				}
+			}
+		})
+	}
+}
+
 func TestParseRemotes(t *testing.T) {
 	remoteList := []string{
 		"mona\tgit@github.com:monalisa/myfork.git (fetch)",
