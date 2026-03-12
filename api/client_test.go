@@ -10,7 +10,6 @@ import (
 
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -256,80 +255,4 @@ func TestHTTPHeaders(t *testing.T) {
 		assert.Equal(t, value, gotReq.Header.Get(name), name)
 	}
 	assert.Equal(t, "", stderr.String())
-}
-
-func TestGenerateScopeErrorForGQL(t *testing.T) {
-	tests := []struct {
-		name     string
-		gqlError *api.GraphQLError
-		wantErr  bool
-		expected string
-	}{
-		{
-			name: "missing scope",
-			gqlError: &api.GraphQLError{
-				Errors: []api.GraphQLErrorItem{
-					{
-						Type:    "INSUFFICIENT_SCOPES",
-						Message: "The 'addProjectV2ItemById' field requires one of the following scopes: ['project']",
-					},
-				},
-			},
-			wantErr: true,
-			expected: "error: your authentication token is missing required scopes [project]\n" +
-				"To request it, run:  gh auth refresh -s project",
-		},
-
-		{
-			name: "ignore non-scope errors",
-			gqlError: &api.GraphQLError{
-				Errors: []api.GraphQLErrorItem{
-					{
-						Type:    "NOT_FOUND",
-						Message: "Could not resolve to a Repository",
-					},
-				},
-			},
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := GenerateScopeErrorForGQL(tt.gqlError)
-			if tt.wantErr {
-				assert.NotNil(t, err)
-				assert.Equal(t, tt.expected, err.Error())
-			} else {
-				assert.Nil(t, err)
-			}
-		})
-	}
-}
-
-func TestRequiredScopesFromServerMessage(t *testing.T) {
-	tests := []struct {
-		msg      string
-		expected []string
-	}{
-		{
-			msg:      "requires one of the following scopes: ['project']",
-			expected: []string{"project"},
-		},
-		{
-			msg:      "requires one of the following scopes: ['repo', 'read:org']",
-			expected: []string{"repo", "read:org"},
-		},
-		{
-			msg:      "no match here",
-			expected: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.msg, func(t *testing.T) {
-			output := requiredScopesFromServerMessage(tt.msg)
-			assert.Equal(t, tt.expected, output)
-		})
-	}
 }

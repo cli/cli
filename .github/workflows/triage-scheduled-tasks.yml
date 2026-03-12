@@ -6,9 +6,11 @@ on:
   schedule:
     - cron: '5 * * * *'   # Hourly — no-response close
     - cron: '0 3 * * *'   # Daily at 3 AM UTC — stale issues
+    - cron: '0 14 1 * *'  # Monthly on the 1st at 2 PM UTC — pitch surfacing
 
 jobs:
   no-response:
+    if: github.event_name == 'issue_comment' || github.event.schedule == '5 * * * *'
     uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-no-response-close.yml@main
     permissions:
       issues: write
@@ -22,5 +24,11 @@ jobs:
       start_date: '2025-07-10T00:00:00Z'
       stale_issue_label: 'stale'
       exempt_issue_labels: 'keep'
+    permissions:
+      issues: write
+
+  pitch-surface:
+    if: github.event.schedule == '0 14 1 * *' || github.event_name == 'workflow_dispatch'
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/pitch-surface-top-issues.yml@main
     permissions:
       issues: write

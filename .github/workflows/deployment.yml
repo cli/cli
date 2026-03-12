@@ -206,14 +206,19 @@ jobs:
         env:
           TAG_NAME: ${{ inputs.tag_name }}
         run: git tag "$TAG_NAME"
-      # Azure Code Signing leverages the environment variables for secrets that complement the metadata.json
-      # file generated above (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
-      # For more information, see https://learn.microsoft.com/en-us/dotnet/api/azure.identity.defaultazurecredential?view=azure-dotnet
+      - name: Authenticate to Azure for code signing
+        if: inputs.environment == 'production'
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
+          tenant-id: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
+          allow-no-subscriptions: true
+      # Azure Code Signing authenticates via OIDC (azure/login above). AZURE_CLIENT_ID and AZURE_TENANT_ID
+      # are still passed so DefaultAzureCredential can identify the service principal.
       - name: Build release binaries
         shell: bash
         env:
           AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
           AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
           DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
@@ -255,7 +260,6 @@ jobs:
         shell: pwsh
         env:
           AZURE_CLIENT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.SPN_GITHUB_CLI_SIGNING }}
           AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
           DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
