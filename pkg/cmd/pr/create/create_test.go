@@ -844,6 +844,42 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "\nCreating pull request for my-feat2 into master in OWNER/REPO\n\n",
 		},
 		{
+			name: "fill when pushed to different branch name",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.Autofill = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+			{ "data": { "createPullRequest": { "pullRequest": {
+				"URL": "https://github.com/OWNER/REPO/pull/12"
+			} } } }
+			`, func(input map[string]interface{}) {
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "my-feat2", input["headRefName"].(string))
+					}))
+			},
+			customBranchConfig: true,
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp \^branch\\\.feature\\\.`, 0, heredoc.Doc(`
+			branch.feature.remote origin
+			branch.feature.merge refs/heads/my-feat2
+		`))
+				cs.Register("git rev-parse --symbolic-full-name feature@{push}", 0, "refs/remotes/origin/my-feat2")
+				cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/my-feat2", 0, heredoc.Doc(`
+			deadbeef HEAD
+			deadbeef refs/remotes/origin/my-feat2
+		`))
+				cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry origin/master\.\.\.origin/my-feat2`, 0, "d3476a1\x00first commit\x00\x00")
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for my-feat2 into master in OWNER/REPO\n\n",
+		},
+		{
 			name: "non legacy template",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {

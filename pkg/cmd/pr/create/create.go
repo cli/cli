@@ -187,6 +187,7 @@ type CreateContext struct {
 	// and this is a small price to pay for the convenience of not having to do a lot
 	// more design.
 	BaseTrackingBranch string
+	HeadTrackingBranch string
 	Client             *api.Client
 	GitClient          *git.Client
 }
@@ -640,7 +641,7 @@ func createRun(opts *CreateOptions) error {
 var regexPattern = regexp.MustCompile(`(?m)^`)
 
 func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, useFirstCommit bool, addBody bool) error {
-	commits, err := ctx.GitClient.Commits(context.Background(), ctx.BaseTrackingBranch, ctx.PRRefs.UnqualifiedHeadRef())
+	commits, err := ctx.GitClient.Commits(context.Background(), ctx.BaseTrackingBranch, ctx.HeadTrackingBranch)
 	if err != nil {
 		return err
 	}
@@ -760,6 +761,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			GitClient:          opts.GitClient,
 			PRRefs:             refs,
 			BaseTrackingBranch: baseTrackingBranch,
+			HeadTrackingBranch: refs.UnqualifiedHeadRef(),
 		}
 	}
 
@@ -870,10 +872,12 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 					qualifiedHeadRef = shared.NewQualifiedHeadRef(headRepo.RepoOwner(), defaultPRHead.BranchName)
 				}
 
-				return newCreateContext(skipPushRefs{
+				ctx := newCreateContext(skipPushRefs{
 					qualifiedHeadRef: qualifiedHeadRef,
 					baseRefs:         baseRefs,
-				}), nil
+				})
+				ctx.HeadTrackingBranch = fmt.Sprintf("%s/%s", headRemote.Name, defaultPRHead.BranchName)
+				return ctx, nil
 			}
 		}
 	}
@@ -936,10 +940,12 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 				qualifiedHeadRef = shared.NewQualifiedHeadRef(remote.RepoOwner(), ref.Branch)
 			}
 
-			return newCreateContext(skipPushRefs{
+			ctx := newCreateContext(skipPushRefs{
 				qualifiedHeadRef: qualifiedHeadRef,
 				baseRefs:         baseRefs,
-			}), nil
+			})
+			ctx.HeadTrackingBranch = fmt.Sprintf("%s/%s", ref.Remote, ref.Branch)
+			return ctx, nil
 		}
 	}
 
