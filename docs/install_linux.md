@@ -1,4 +1,4 @@
-# Installing gh on Linux and BSD
+# menu
 
 ## Recommended _(Official)_
 
