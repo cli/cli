@@ -42,6 +42,11 @@ func (c *Client) HTTP() *http.Client {
 
 type GraphQLError struct {
 	*ghAPI.GraphQLError
+	scopesSuggestion string
+}
+
+func (err GraphQLError) ScopesSuggestion() string {
+	return err.scopesSuggestion
 }
 
 type HTTPError struct {
@@ -180,12 +185,49 @@ func handleResponse(err error) error {
 
 	var gqlErr *ghAPI.GraphQLError
 	if errors.As(err, &gqlErr) {
+		// Check if GraphQL error is about missing scopes and improve the message
+		improvedErr := improveGraphQLScopeError(gqlErr)
+		if improvedErr != "" {
+			return GraphQLError{
+				GraphQLError:     gqlErr,
+				scopesSuggestion: improvedErr,
+			}
+		}
 		return GraphQLError{
 			GraphQLError: gqlErr,
 		}
 	}
 
 	return err
+}
+
+// improveGraphQLScopeError checks if a GraphQL error message is about missing scopes
+// and returns an improved message with instructions to refresh authentication
+func improveGraphQLScopeError(gqlErr *ghAPI.GraphQLError) string {
+	if gqlErr == nil || len(gqlErr.Errors) == 0 {
+		return ""
+	}
+
+	// Check all error messages
+	for _, err := range gqlErr.Errors {
+		if !strings.Contains(err.Message, "has not been granted the required scopes") {
+			continue
+		}
+
+		// Extract the missing scope from the message
+		re := regexp.MustCompile(`requires one of the following scopes: \[([^\]]+)\]`)
+		matches := re.FindStringSubmatch(err.Message)
+		if len(matches) < 2 {
+			continue
+		}
+
+		missingScope := strings.TrimSpace(strings.Split(matches[1], ",")[0])
+		missingScope = strings.Trim(missingScope, "'")
+
+		return fmt.Sprintf("To request it, run: gh auth refresh -s %s", missingScope)
+	}
+
+	return ""
 }
 
 // ScopesSuggestion is an error messaging utility that prints the suggestion to request additional OAuth
