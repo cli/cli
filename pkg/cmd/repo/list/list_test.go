@@ -471,9 +471,9 @@ func TestRepoList_filtering(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryList\b`),
+		httpmock.GraphQL(`query RepositoryListSearch\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
-			assert.Equal(t, "PRIVATE", params["privacy"])
+			assert.Equal(t, "sort:updated-desc fork:true is:private user:@me", params["query"])
 			assert.Equal(t, float64(2), params["perPage"])
 		}),
 	)
