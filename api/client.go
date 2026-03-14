@@ -42,6 +42,11 @@ func (c *Client) HTTP() *http.Client {
 
 type GraphQLError struct {
 	*ghAPI.GraphQLError
+	scopesSuggestion string
+}
+
+func (err GraphQLError) ScopesSuggestion() string {
+	return err.scopesSuggestion
 }
 
 type HTTPError struct {
@@ -181,7 +186,8 @@ func handleResponse(err error) error {
 	var gqlErr *ghAPI.GraphQLError
 	if errors.As(err, &gqlErr) {
 		return GraphQLError{
-			GraphQLError: gqlErr,
+			GraphQLError:     gqlErr,
+			scopesSuggestion: generateGQLScopesSuggestion(gqlErr),
 		}
 	}
 
@@ -257,6 +263,38 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 	}
 
 	return ""
+}
+
+var gqlScopesRE = regexp.MustCompile(`one of the following scopes: \[(.+?)\]`)
+
+// generateGQLScopesSuggestion inspects a GraphQL error for INSUFFICIENT_SCOPES
+// items and returns a suggestion string. The original error is left unmodified so
+// that callers like ProjectsV2IgnorableError can still match against it.
+func generateGQLScopesSuggestion(gqlErr *ghAPI.GraphQLError) string {
+	var missing []string
+	seen := map[string]bool{}
+	for _, e := range gqlErr.Errors {
+		if e.Type != "INSUFFICIENT_SCOPES" {
+			continue
+		}
+		m := gqlScopesRE.FindStringSubmatch(e.Message)
+		if m == nil {
+			continue
+		}
+		for _, s := range strings.Split(m[1], ",") {
+			s = strings.Trim(s, "' ")
+			if s != "" && !seen[s] {
+				seen[s] = true
+				missing = append(missing, s)
+			}
+		}
+	}
+	if len(missing) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(
+		"To request missing scopes, run:  gh auth refresh -s %s",
+		strings.Join(missing, ","))
 }
 
 func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOptions {

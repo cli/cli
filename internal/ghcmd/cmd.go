@@ -157,6 +157,13 @@ func Main() exitCode {
 			fmt.Fprintln(stderr, msg)
 		}
 
+		var gqlErr api.GraphQLError
+		if errors.As(err, &gqlErr) {
+			if msg := gqlErr.ScopesSuggestion(); msg != "" {
+				fmt.Fprintln(stderr, msg)
+			}
+		}
+
 		return exitError
 	}
 	if root.HasFailed() {

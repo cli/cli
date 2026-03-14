@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -222,6 +223,88 @@ func TestHTTPError_ScopesSuggestion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGraphQLError_ScopesSuggestion(t *testing.T) {
+	tests := []struct {
+		name string
+		errs []ghAPI.GraphQLErrorItem
+		want string
+	}{
+		{
+			name: "no scope errors",
+			errs: []ghAPI.GraphQLErrorItem{
+				{Message: "something went wrong", Type: "SOME_ERROR"},
+			},
+			want: "",
+		},
+		{
+			name: "single missing scope",
+			errs: []ghAPI.GraphQLErrorItem{
+				{
+					Message: "Your token has not been granted the required scopes to execute this query. The 'addProjectV2ItemById' field requires one of the following scopes: ['project'], but your token has only been granted the: ['gist', 'read:org', 'read:project', 'repo', 'workflow'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens.",
+					Type:    "INSUFFICIENT_SCOPES",
+				},
+			},
+			want: "To request missing scopes, run:  gh auth refresh -s project",
+		},
+		{
+			name: "multiple missing scopes",
+			errs: []ghAPI.GraphQLErrorItem{
+				{
+					Message: "The 'foo' field requires one of the following scopes: ['read:project', 'read:discussion', 'codespace'], but your token has only been granted the: ['repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens.",
+					Type:    "INSUFFICIENT_SCOPES",
+				},
+			},
+			want: "To request missing scopes, run:  gh auth refresh -s read:project,read:discussion,codespace",
+		},
+		{
+			name: "mixed error types",
+			errs: []ghAPI.GraphQLErrorItem{
+				{Message: "not found", Type: "NOT_FOUND"},
+				{
+					Message: "The 'x' field requires one of the following scopes: ['project'], but your token has only been granted the: ['repo'] scopes.",
+					Type:    "INSUFFICIENT_SCOPES",
+				},
+			},
+			want: "To request missing scopes, run:  gh auth refresh -s project",
+		},
+		{
+			name: "insufficient scopes without parseable message",
+			errs: []ghAPI.GraphQLErrorItem{
+				{Message: "some other insufficient scope message", Type: "INSUFFICIENT_SCOPES"},
+			},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gqlErr := GraphQLError{
+				GraphQLError:     &ghAPI.GraphQLError{Errors: tt.errs},
+				scopesSuggestion: generateGQLScopesSuggestion(&ghAPI.GraphQLError{Errors: tt.errs}),
+			}
+			if got := gqlErr.ScopesSuggestion(); got != tt.want {
+				t.Errorf("GraphQLError.ScopesSuggestion() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGraphQLError_PreservesOriginalMessage(t *testing.T) {
+	// Verify that the original error message is preserved for ProjectsV2IgnorableError matching
+	originalMsg := "Your token has not been granted the required scopes to execute this query. The 'projectItems' field requires one of the following scopes: ['read:project'], but your token has only been granted the: ['repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens."
+	gqlErr := &ghAPI.GraphQLError{
+		Errors: []ghAPI.GraphQLErrorItem{
+			{Message: originalMsg, Type: "INSUFFICIENT_SCOPES"},
+		},
+	}
+	wrapped := handleResponse(gqlErr)
+	// The original message must still be present in Error() output
+	assert.Contains(t, wrapped.Error(), "field requires one of the following scopes: ['read:project']")
+	// And the scopes suggestion must be set
+	graphqlErr, ok := wrapped.(GraphQLError)
+	assert.True(t, ok)
+	assert.Equal(t, "To request missing scopes, run:  gh auth refresh -s read:project", graphqlErr.ScopesSuggestion())
 }
 
 func TestHTTPHeaders(t *testing.T) {
