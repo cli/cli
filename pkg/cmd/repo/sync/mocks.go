@@ -43,6 +43,11 @@ func (g *mockGitClient) IsDirty() (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
+func (g *mockGitClient) IsBranchCheckedOutInAnyWorktree(b string) (bool, error) {
+	args := g.Called(b)
+	return args.Bool(0), args.Error(1)
+}
+
 func (g *mockGitClient) MergeFastForward(a string) error {
 	args := g.Called(a)
 	return args.Error(0)
