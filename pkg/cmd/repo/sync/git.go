@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cli/cli/v2/git"
 )
@@ -15,6 +16,7 @@ type gitClient interface {
 	HasLocalBranch(string) bool
 	IsAncestor(string, string) (bool, error)
 	IsDirty() (bool, error)
+	IsBranchCheckedOutInAnyWorktree(string) (bool, error)
 	MergeFastForward(string) error
 	ResetHard(string) error
 }
@@ -82,6 +84,36 @@ func (g *gitExecuter) IsDirty() (bool, error) {
 		return false, err
 	}
 	return changeCount != 0, nil
+}
+
+// IsBranchCheckedOutInAnyWorktree checks if the given branch is checked out
+// in any git worktree (not just the current one). This prevents silent corruption
+// when using git update-ref on a branch that's checked out elsewhere.
+func (g *gitExecuter) IsBranchCheckedOutInAnyWorktree(branch string) (bool, error) {
+	args := []string{"worktree", "list", "--porcelain"}
+	cmd, err := g.client.Command(context.Background(), args...)
+	if err != nil {
+		return false, err
+	}
+	output, err := cmd.Output()
+	if err != nil {
+		// If worktree command fails (e.g., older git), fall back to false
+		// which means we can't detect it, but won't block the operation
+		return false, nil
+	}
+
+	// Parse porcelain output: each worktree entry has "branch refs/heads/xxx" lines
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "branch ") {
+			ref := strings.TrimPrefix(line, "branch ")
+			// Match refs/heads/<branch>
+			if ref == fmt.Sprintf("refs/heads/%s", branch) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func (g *gitExecuter) MergeFastForward(ref string) error {
