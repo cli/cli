@@ -250,6 +250,23 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 			return "", nil
 		}
 		if isNumber(opts.SelectorArg) {
+			// When the arg is both a valid issue number and a valid commit hash
+			// candidate (all-decimal, 7+ chars, no '#' prefix), disambiguate by
+			// checking whether the commit actually exists on the remote.
+			if !strings.HasPrefix(opts.SelectorArg, "#") && isCommit(opts.SelectorArg) {
+				httpClient, err := opts.HttpClient()
+				if err != nil {
+					return "", err
+				}
+				apiClient := api.NewClientFromHTTP(httpClient)
+				exists, err := api.CommitExists(apiClient, baseRepo, opts.SelectorArg)
+				if err != nil {
+					return "", err
+				}
+				if exists {
+					return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+				}
+			}
 			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 		}
 		if isCommit(opts.SelectorArg) {

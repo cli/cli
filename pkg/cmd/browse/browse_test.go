@@ -608,6 +608,45 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/bchadwic/test/commit/6e3689d5",
 			wantsErr:    false,
 		},
+		{
+			name: "decimal-only hash that is a valid commit",
+			opts: BrowseOptions{
+				SelectorArg: "309628980",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("HEAD", "repos/owner/repo/commits/309628980"),
+					httpmock.StatusStringResponse(200, "{}"),
+				)
+			},
+			baseRepo:    ghrepo.New("owner", "repo"),
+			expectedURL: "https://github.com/owner/repo/commit/309628980",
+			wantsErr:    false,
+		},
+		{
+			name: "decimal-only string that is not a valid commit",
+			opts: BrowseOptions{
+				SelectorArg: "309628980",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("HEAD", "repos/owner/repo/commits/309628980"),
+					httpmock.StatusStringResponse(422, ""),
+				)
+			},
+			baseRepo:    ghrepo.New("owner", "repo"),
+			expectedURL: "https://github.com/owner/repo/issues/309628980",
+			wantsErr:    false,
+		},
+		{
+			name: "decimal-only hash with # prefix forces issue",
+			opts: BrowseOptions{
+				SelectorArg: "#309628980",
+			},
+			baseRepo:    ghrepo.New("owner", "repo"),
+			expectedURL: "https://github.com/owner/repo/issues/309628980",
+			wantsErr:    false,
+		},
 
 		{
 			name: "commit hash with extension",
