@@ -250,8 +250,9 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 			return "", nil
 		}
 		if isNumber(opts.SelectorArg) {
-			// When the arg is both a valid issue number and a valid commit hash
-			// candidate (all-decimal, 7+ chars, no '#' prefix), disambiguate by
+			// isCommit requires hex-only chars and a length of 7–64. An all-decimal
+			// string with no '#' prefix can satisfy both isNumber and isCommit (since
+			// decimal digits 0–9 are valid hex). When that happens, disambiguate by
 			// checking whether the commit actually exists on the remote.
 			if !strings.HasPrefix(opts.SelectorArg, "#") && isCommit(opts.SelectorArg) {
 				httpClient, err := opts.HttpClient()
