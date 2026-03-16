@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -33,6 +34,7 @@ func TestNewCmdEdit(t *testing.T) {
 		output           EditOptions
 		expectedBaseRepo ghrepo.Interface
 		wantsErr         bool
+		config           func() (gh.Config, error)
 	}{
 		{
 			name:  "no argument",
@@ -297,6 +299,43 @@ func TestNewCmdEdit(t *testing.T) {
 			input:    "23 --milestone foo --remove-milestone",
 			wantsErr: true,
 		},
+		{
+			name:  "editor flag",
+			input: "23 --editor",
+			output: EditOptions{
+				SelectorArg: "23",
+				EditorMode:  true,
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "editor flag with body flag",
+			input:    "23 --editor --body test",
+			wantsErr: true,
+		},
+		{
+			name:     "editor flag with body-file flag",
+			input:    fmt.Sprintf("23 --editor --body-file '%s'", tmpFile),
+			wantsErr: true,
+		},
+		{
+			name:  "prefer_editor_prompt config with body flag",
+			input: "23 --body test",
+			config: func() (gh.Config, error) {
+				return config.NewFromString("prefer_editor_prompt: enabled"), nil
+			},
+			output: EditOptions{
+				SelectorArg: "23",
+				EditorMode:  false,
+				Editable: shared.Editable{
+					Body: shared.EditableString{
+						Value:  "test",
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -309,8 +348,16 @@ func TestNewCmdEdit(t *testing.T) {
 				_, _ = stdin.WriteString(tt.stdin)
 			}
 
+			cfgFunc := tt.config
+			if cfgFunc == nil {
+				cfgFunc = func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				}
+			}
+
 			f := &cmdutil.Factory{
 				IOStreams: ios,
+				Config:    cfgFunc,
 			}
 
 			argv, err := shlex.Split(tt.input)
@@ -337,6 +384,7 @@ func TestNewCmdEdit(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.output.SelectorArg, gotOpts.SelectorArg)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
+			assert.Equal(t, tt.output.EditorMode, gotOpts.EditorMode)
 			assert.Equal(t, tt.output.Editable, gotOpts.Editable)
 			if tt.expectedBaseRepo != nil {
 				baseRepo, err := gotOpts.BaseRepo()
@@ -1149,6 +1197,39 @@ func Test_editRun(t *testing.T) {
 					} } } }
 					`))
 				mockProjectV2ItemUpdate(reg)
+				mockPullRequestUpdate(reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
+			name: "editor mode",
+			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL:   "https://github.com/OWNER/REPO/pull/123",
+					Title: "pr title",
+					Body:  "pr body",
+				}, ghrepo.New("OWNER", "REPO")),
+				EditorMode: true,
+				TitledEditSurvey: func(title, body string) (string, string, error) {
+					assert.Equal(t, "pr title", title)
+					assert.Equal(t, "pr body", body)
+					return "edited title", "edited body", nil
+				},
+				Surveyor: testSurveyor{
+					fieldsToEdit: func(e *shared.Editable) error {
+						t.Fatal("FieldsToEdit should not be called in editor mode")
+						return nil
+					},
+					editFields: func(e *shared.Editable, _ string) error {
+						t.Fatal("EditFields should not be called in editor mode")
+						return nil
+					},
+				},
+				Fetcher: testFetcher{},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockPullRequestUpdate(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",

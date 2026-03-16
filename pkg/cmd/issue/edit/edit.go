@@ -32,9 +32,11 @@ type EditOptions struct {
 	FieldsToEditSurvey func(prShared.EditPrompter, *prShared.Editable) error
 	EditFieldsSurvey   func(prShared.EditPrompter, *prShared.Editable, string) error
 	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable, gh.ProjectsV1Support) error
+	TitledEditSurvey   func(string, string) (string, string, error)
 
 	IssueNumbers []int
 	Interactive  bool
+	EditorMode   bool
 
 	RemoveIssueType bool
 
@@ -59,6 +61,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		EditFieldsSurvey:   prShared.EditFieldsSurvey,
 		FetchOptions:       prShared.FetchOptions,
 		Prompter:           f.Prompter,
+		TitledEditSurvey:   prShared.TitledEditSurvey(&prShared.UserEditor{Config: f.Config, IO: f.IOStreams}),
 	}
 
 	var bodyFile string
@@ -94,6 +97,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh issue edit 23 --remove-parent
 			$ gh issue edit 100 --add-sub-issue 123,124
 			$ gh issue edit 123 --add-blocked-by 200 --add-blocking 300,301
+			$ gh issue edit 23 --editor
 		`),
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -197,8 +201,25 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				len(opts.AddBlockedBy) > 0 || len(opts.RemoveBlockedBy) > 0 ||
 				len(opts.AddBlocking) > 0 || len(opts.RemoveBlocking) > 0
 
+			opts.EditorMode, err = prShared.InitEditorMode(f, opts.EditorMode, false, opts.IO.CanPrompt())
+			if err != nil {
+				return err
+			}
+
+			// When editor mode was enabled via config (prefer_editor_prompt)
+			// rather than the --editor flag, silently disable it if the user
+			// provided flags that conflict, so scripted usage isn't broken.
+			editorFlagExplicit := flags.Changed("editor")
+			if opts.EditorMode && !editorFlagExplicit && (opts.Editable.Dirty() || hasDeferredFlags || len(opts.IssueNumbers) > 1) {
+				opts.EditorMode = false
+			}
+
+			if opts.EditorMode && (bodyProvided || bodyFileProvided) {
+				return cmdutil.FlagErrorf("specify only one of `--body`, `--body-file`, or `--editor`")
+			}
+
 			// Drop into interactive mode only if the user passed no edit flags at all.
-			if !opts.Editable.Dirty() && !hasDeferredFlags {
+			if !opts.Editable.Dirty() && !hasDeferredFlags && !opts.EditorMode {
 				opts.Interactive = true
 			}
 
@@ -212,6 +233,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			if len(opts.IssueNumbers) > 1 && len(opts.AddSubIssues) > 0 {
 				return cmdutil.FlagErrorf("`--add-sub-issue` cannot be used when editing multiple issues")
+			}
+
+			if opts.EditorMode && len(opts.IssueNumbers) > 1 {
+				return cmdutil.FlagErrorf("multiple issues cannot be edited with --editor")
 			}
 
 			if runF != nil {
@@ -243,6 +268,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.RemoveBlockedBy, "remove-blocked-by", nil, "Remove 'blocked by' relationships by issue `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.AddBlocking, "add-blocking", nil, "Add 'blocking' relationships by issue `number` or URL")
 	cmd.Flags().StringSliceVar(&opts.RemoveBlocking, "remove-blocking", nil, "Remove 'blocking' relationships by issue `number` or URL")
+	cmd.Flags().BoolVarP(&opts.EditorMode, "editor", "e", false, "Skip prompts and open the text editor to write the title and body in. The first line is the title and the remaining text is the body.")
 
 	return cmd
 }
@@ -266,6 +292,10 @@ func editRun(opts *EditOptions) error {
 		if err != nil {
 			return err
 		}
+	}
+	if opts.EditorMode {
+		editable.Title.Edited = true
+		editable.Body.Edited = true
 	}
 
 	if opts.Detector == nil {
@@ -320,17 +350,20 @@ func editRun(opts *EditOptions) error {
 	// Fetch editable shared fields once for all issues.
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	// Wire up search function for assignees when ApiActorsSupported is available.
-	// Interactive mode only supports a single issue, so we use its ID for the search query.
-	if issueFeatures.ApiActorsSupported && opts.Interactive && len(issues) == 1 {
-		editable.AssigneeSearchFunc = prShared.AssigneeSearchFunc(apiClient, baseRepo, issues[0].ID)
-	}
+	// Skip the metadata fetch when in editor mode since we only need title and body.
+	if !opts.EditorMode {
+		// Wire up search function for assignees when ApiActorsSupported is available.
+		// Interactive mode only supports a single issue, so we use its ID for the search query.
+		if issueFeatures.ApiActorsSupported && opts.Interactive && len(issues) == 1 {
+			editable.AssigneeSearchFunc = prShared.AssigneeSearchFunc(apiClient, baseRepo, issues[0].ID)
+		}
 
-	opts.IO.StartProgressIndicatorWithLabel("Fetching repository information")
-	err = opts.FetchOptions(apiClient, baseRepo, &editable, opts.Detector.ProjectsV1())
-	opts.IO.StopProgressIndicator()
-	if err != nil {
-		return err
+		opts.IO.StartProgressIndicatorWithLabel("Fetching repository information")
+		err = opts.FetchOptions(apiClient, baseRepo, &editable, opts.Detector.ProjectsV1())
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Update all issues in parallel.
@@ -339,7 +372,7 @@ func editRun(opts *EditOptions) error {
 	g := sync.WaitGroup{}
 
 	// Only show progress if we will not prompt below or the survey will break up the progress indicator.
-	if !opts.Interactive {
+	if !opts.Interactive && !opts.EditorMode {
 		opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating %d issues", len(issues)))
 	}
 
@@ -383,7 +416,12 @@ func editRun(opts *EditOptions) error {
 		}
 
 		// Allow interactive prompts for one issue; failed earlier if multiple issues specified.
-		if opts.Interactive {
+		if opts.EditorMode {
+			editable.Title.Value, editable.Body.Value, err = opts.TitledEditSurvey(issue.Title, issue.Body)
+			if err != nil {
+				return err
+			}
+		} else if opts.Interactive {
 			editorCommand, err := opts.DetermineEditor()
 			if err != nil {
 				return err
