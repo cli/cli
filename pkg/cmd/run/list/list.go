@@ -60,6 +60,11 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Long: heredoc.Docf(`
 			List recent workflow runs.
 
+			Date filters for the %[1]s--created%[1]s flag follow GitHub's search syntax, for example
+			%[1]s>=2026-01-01%[1]s, %[1]s<2026-02-01%[1]s, or %[1]s2026-01-01..2026-01-31%[1]s.
+			For more information, see:
+			<https://docs.github.com/search-github/getting-started-with-searching-on-github/understanding-the-search-syntax>
+
 			Note that providing the %[1]sworkflow_name%[1]s to the %[1]s-w%[1]s flag will not fetch disabled workflows.
 			Also pass the %[1]s-a%[1]s flag to fetch disabled workflow runs using the %[1]sworkflow_name%[1]s and the %[1]s-w%[1]s flag.
 
@@ -90,7 +95,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Filter runs by branch")
 	cmd.Flags().StringVarP(&opts.Actor, "user", "u", "", "Filter runs by user who triggered the run")
 	cmd.Flags().StringVarP(&opts.Event, "event", "e", "", "Filter runs by which `event` triggered the run")
-	cmd.Flags().StringVarP(&opts.Created, "created", "", "", "Filter runs by the `date` it was created")
+	cmd.Flags().StringVarP(&opts.Created, "created", "", "", "Filter runs by the `date` it was created (see GitHub search syntax)")
 	cmd.Flags().StringVarP(&opts.Commit, "commit", "c", "", "Filter runs by the `SHA` of the commit")
 	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Include disabled workflows")
 	cmdutil.StringEnumFlag(cmd, &opts.Status, "status", "s", "", shared.AllStatuses, "Filter runs by status")
