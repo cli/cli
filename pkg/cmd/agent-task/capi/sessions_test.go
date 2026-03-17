@@ -1161,7 +1161,7 @@ func TestListLatestSessionsForViewer(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			capiClient := NewCAPIClient(httpClient, "", "github.com")
+			capiClient := NewCAPIClient(httpClient, "", "github.com", "https://api.githubcopilot.com")
 
 			if tt.perPage != 0 {
 				last := defaultSessionsPerPage
@@ -1540,7 +1540,7 @@ func TestListSessionsByResourceID(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			capiClient := NewCAPIClient(httpClient, "", "github.com")
+			capiClient := NewCAPIClient(httpClient, "", "github.com", "https://api.githubcopilot.com")
 
 			if tt.perPage != 0 {
 				last := defaultSessionsPerPage
@@ -1819,7 +1819,7 @@ func TestGetSession(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			capiClient := NewCAPIClient(httpClient, "", "github.com")
+			capiClient := NewCAPIClient(httpClient, "", "github.com", "https://api.githubcopilot.com")
 
 			session, err := capiClient.GetSession(context.Background(), "some-uuid")
 
@@ -1895,7 +1895,7 @@ func TestGetPullRequestDatabaseID(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			capiClient := NewCAPIClient(httpClient, "", "github.com")
+			capiClient := NewCAPIClient(httpClient, "", "github.com", "https://api.githubcopilot.com")
 
 			databaseID, url, err := capiClient.GetPullRequestDatabaseID(context.Background(), "github.com", "OWNER", "REPO", 42)
 
