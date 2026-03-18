@@ -52,7 +52,7 @@ type JobError struct {
 }
 
 func (c *CAPIClient) jobsBasePathV1() string {
-	return c.capiURL + "/agents/swe/v1/jobs"
+	return c.capiBaseURL + "/agents/swe/v1/jobs"
 }
 
 // CreateJob queues a new job using the v1 Jobs API. It may or may not

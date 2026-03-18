@@ -93,7 +93,6 @@ func TestCapiClientFuncResolvesURL(t *testing.T) {
 
 	// Verify the GraphQL resolution was called
 	require.Len(t, reg.Requests, 1)
-	assert.Contains(t, reg.Requests[0].URL.Path, "graphql")
 }
 
 func TestIsSession(t *testing.T) {

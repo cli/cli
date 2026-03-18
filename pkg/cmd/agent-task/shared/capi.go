@@ -35,12 +35,12 @@ func CapiClientFunc(f *cmdutil.Factory) func() (capi.CapiClient, error) {
 		token, _ := authCfg.ActiveToken(host)
 
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Minute*10)
-		capiURL, err := resolveCapiURL(cachedClient, host)
+		capiBaseURL, err := resolveCapiURL(cachedClient, host)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve Copilot API URL: %w", err)
 		}
 
-		return capi.NewCAPIClient(httpClient, token, host, capiURL), nil
+		return capi.NewCAPIClient(httpClient, token, host, capiBaseURL), nil
 	}
 }
 

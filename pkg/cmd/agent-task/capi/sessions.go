@@ -217,7 +217,7 @@ func (c *CAPIClient) ListLatestSessionsForViewer(ctx context.Context, limit int)
 		return nil, nil
 	}
 
-	sessionsURL, err := url.JoinPath(c.capiURL, "agents", "sessions")
+	sessionsURL, err := url.JoinPath(c.capiBaseURL, "agents", "sessions")
 	if err != nil {
 		return nil, fmt.Errorf("failed to build sessions URL: %w", err)
 	}
@@ -299,7 +299,7 @@ func (c *CAPIClient) GetSession(ctx context.Context, id string) (*Session, error
 		return nil, fmt.Errorf("missing session ID")
 	}
 
-	url := fmt.Sprintf("%s/agents/sessions/%s", c.capiURL, url.PathEscape(id))
+	url := fmt.Sprintf("%s/agents/sessions/%s", c.capiBaseURL, url.PathEscape(id))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
@@ -338,7 +338,7 @@ func (c *CAPIClient) GetSessionLogs(ctx context.Context, id string) ([]byte, err
 		return nil, fmt.Errorf("missing session ID")
 	}
 
-	url := fmt.Sprintf("%s/agents/sessions/%s/logs", c.capiURL, url.PathEscape(id))
+	url := fmt.Sprintf("%s/agents/sessions/%s/logs", c.capiBaseURL, url.PathEscape(id))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
@@ -371,7 +371,7 @@ func (c *CAPIClient) ListSessionsByResourceID(ctx context.Context, resourceType 
 		return nil, nil
 	}
 
-	url := fmt.Sprintf("%s/agents/resource/%s/%d", c.capiURL, url.PathEscape(resourceType), resourceID)
+	url := fmt.Sprintf("%s/agents/resource/%s/%d", c.capiBaseURL, url.PathEscape(resourceType), resourceID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {

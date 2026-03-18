@@ -24,7 +24,7 @@ type CapiClient interface {
 type CAPIClient struct {
 	httpClient *http.Client
 	host       string
-	capiURL    string
+	capiBaseURL    string
 }
 
 // NewCAPIClient creates a new CAPI client. Provide a token, the user's GitHub
@@ -33,12 +33,12 @@ type CAPIClient struct {
 //
 // The provided HTTP client will be mutated for use with CAPI, so it should not
 // be reused elsewhere.
-func NewCAPIClient(httpClient *http.Client, token string, host string, capiURL string) *CAPIClient {
-	httpClient.Transport = newCAPITransport(token, capiURL, httpClient.Transport)
+func NewCAPIClient(httpClient *http.Client, token string, host string, capiBaseURL string) *CAPIClient {
+	httpClient.Transport = newCAPITransport(token, capiBaseURL, httpClient.Transport)
 	return &CAPIClient{
 		httpClient: httpClient,
 		host:       host,
-		capiURL:    capiURL,
+		capiBaseURL:    capiBaseURL,
 	}
 }
 
@@ -49,9 +49,9 @@ type capiTransport struct {
 	capiHost string
 }
 
-func newCAPITransport(token string, capiURL string, rp http.RoundTripper) *capiTransport {
+func newCAPITransport(token string, capiBaseURL string, rp http.RoundTripper) *capiTransport {
 	capiHost := ""
-	if u, err := url.Parse(capiURL); err == nil {
+	if u, err := url.Parse(capiBaseURL); err == nil {
 		capiHost = u.Host
 	}
 	return &capiTransport{
