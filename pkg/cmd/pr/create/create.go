@@ -626,11 +626,13 @@ func createRun(opts *CreateOptions) error {
 
 	if action == shared.SubmitDraftAction {
 		state.Draft = true
-		return submitPR(*opts, *ctx, *state, projectsV1Support)
+		err = submitPR(*opts, *ctx, *state, projectsV1Support)
+		return err
 	}
 
 	if action == shared.SubmitAction {
-		return submitPR(*opts, *ctx, *state, projectsV1Support)
+		err = submitPR(*opts, *ctx, *state, projectsV1Support)
+		return err
 	}
 
 	err = errors.New("expected to cancel, preview, or submit")

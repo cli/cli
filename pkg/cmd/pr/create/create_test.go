@@ -1561,6 +1561,58 @@ func Test_createRun(t *testing.T) {
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
 			expectedErrOut: "",
 		},
+		{
+			name: "interactive submit error saves recovery file",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestTemplates\b`),
+					httpmock.StringResponse(`{ "data": { "repository": { "pullRequestTemplates": [] } } }`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.WithHeader(
+						httpmock.StatusStringResponse(200, `
+							{ "data": {}, "errors": [{"message": "Draft pull requests are not supported in this repository.", "path": ["createPullRequest"]}] }
+						`),
+						"Content-Type",
+						"application/json",
+					),
+				)
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+				cs.Register(`git rev-parse --show-toplevel`, 0, "")
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.InputFunc = func(p, d string) (string, error) {
+					if p == "Title (required)" {
+						return "test title", nil
+					}
+					return "", prompter.NoSuchPromptErr(p)
+				}
+				pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
+					if p == "Body" {
+						return "test body", nil
+					}
+					return "", prompter.NoSuchPromptErr(p)
+				}
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "What's next?" {
+						return 0, nil
+					}
+					return -1, prompter.NoSuchPromptErr(p)
+				}
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.HeadBranch = "feature"
+				tmpfile, err := os.CreateTemp(t.TempDir(), "ghrecovery*")
+				assert.NoError(t, err)
+				opts.IO.TempFileOverride = tmpfile
+				return func() { tmpfile.Close() }
+			},
+			wantErr: "pull request create failed: GraphQL: Draft pull requests are not supported in this repository. (createPullRequest)",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1659,6 +1711,102 @@ func Test_createRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_createRun_recoverFileOnSubmitError(t *testing.T) {
+	reg := &httpmock.Registry{}
+	reg.StubRepoInfoResponse("OWNER", "REPO", "master")
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.GraphQL(`query PullRequestTemplates\b`),
+		httpmock.StringResponse(`{ "data": { "repository": { "pullRequestTemplates": [] } } }`),
+	)
+	reg.Register(
+		httpmock.GraphQL(`mutation PullRequestCreate\b`),
+		httpmock.WithHeader(
+			httpmock.StatusStringResponse(200, `
+				{ "data": {}, "errors": [{"message": "Draft pull requests are not supported in this repository.", "path": ["createPullRequest"]}] }
+			`),
+			"Content-Type",
+			"application/json",
+		),
+	)
+
+	pm := &prompter.PrompterMock{}
+	pm.InputFunc = func(p, d string) (string, error) {
+		if p == "Title (required)" {
+			return "test title", nil
+		}
+		return "", prompter.NoSuchPromptErr(p)
+	}
+	pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
+		if p == "Body" {
+			return "test body", nil
+		}
+		return "", prompter.NoSuchPromptErr(p)
+	}
+	pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+		if p == "What's next?" {
+			return 0, nil
+		}
+		return -1, prompter.NoSuchPromptErr(p)
+	}
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git config --get-regexp \^branch\\\..+\\\.\(remote\|merge\|pushremote\|gh-merge-base\)\$`, 0, "")
+	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+	cs.Register(`git rev-parse --show-toplevel`, 0, "")
+
+	ios, _, _, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStdinTTY(true)
+	ios.SetStderrTTY(true)
+
+	tmpfile, err := os.CreateTemp(t.TempDir(), "ghrecovery*")
+	require.NoError(t, err)
+	defer tmpfile.Close()
+	ios.TempFileOverride = tmpfile
+
+	opts := CreateOptions{
+		IO:         ios,
+		Prompter:   pm,
+		Browser:    &browser.Stub{},
+		HeadBranch: "feature",
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		Config: func() (gh.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		Remotes: func() (context.Remotes, error) {
+			return context.Remotes{
+				{
+					Remote: &git.Remote{
+						Name:     "origin",
+						Resolved: "base",
+					},
+					Repo: ghrepo.New("OWNER", "REPO"),
+				},
+			}, nil
+		},
+		Branch: func() (string, error) {
+			return "feature", nil
+		},
+		Finder:   shared.NewMockFinder("feature", nil, nil),
+		Detector: &fd.EnabledDetectorMock{},
+		GitClient: &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
+		},
+	}
+
+	err = createRun(&opts)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Draft pull requests are not supported")
+	assert.Contains(t, stderr.String(), "--recover")
+	assert.Contains(t, stderr.String(), "pr create --recover")
 }
 
 func Test_createRun_GHES(t *testing.T) {
