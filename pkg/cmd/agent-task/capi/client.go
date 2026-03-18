@@ -22,9 +22,9 @@ type CapiClient interface {
 
 // CAPIClient is a client for interacting with the Copilot API
 type CAPIClient struct {
-	httpClient *http.Client
-	host       string
-	capiBaseURL    string
+	httpClient  *http.Client
+	host        string
+	capiBaseURL string
 }
 
 // NewCAPIClient creates a new CAPI client. Provide a token, the user's GitHub
@@ -36,9 +36,9 @@ type CAPIClient struct {
 func NewCAPIClient(httpClient *http.Client, token string, host string, capiBaseURL string) *CAPIClient {
 	httpClient.Transport = newCAPITransport(token, capiBaseURL, httpClient.Transport)
 	return &CAPIClient{
-		httpClient: httpClient,
-		host:       host,
-		capiBaseURL:    capiBaseURL,
+		httpClient:  httpClient,
+		host:        host,
+		capiBaseURL: capiBaseURL,
 	}
 }
 
