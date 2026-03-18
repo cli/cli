@@ -217,13 +217,16 @@ func (c *CAPIClient) ListLatestSessionsForViewer(ctx context.Context, limit int)
 		return nil, nil
 	}
 
-	url := c.capiURL + "/agents/sessions"
+	sessionsURL, err := url.JoinPath(c.capiURL, "agents", "sessions")
+	if err != nil {
+		return nil, fmt.Errorf("failed to build sessions URL: %w", err)
+	}
 	pageSize := defaultSessionsPerPage
 
 	seenResources := make(map[int64]struct{})
 	latestSessions := make([]session, 0, limit)
 	for page := 1; ; page++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, sessionsURL, http.NoBody)
 		if err != nil {
 			return nil, err
 		}
