@@ -60,6 +60,50 @@ func Test_listReposWithLanguage(t *testing.T) {
 	assert.Equal(t, `sort:updated-desc fork:true language:go user:@me`, searchData.Variables["query"])
 }
 
+func Test_listReposWithVisibilityPrivate(t *testing.T) {
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	var searchData struct {
+		Query     string
+		Variables map[string]interface{}
+	}
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryListSearch\b`),
+		func(req *http.Request) (*http.Response, error) {
+			jsonData, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			err = json.Unmarshal(jsonData, &searchData)
+			if err != nil {
+				return nil, err
+			}
+
+			respBody, err := os.Open("./fixtures/repoSearch.json")
+			if err != nil {
+				return nil, err
+			}
+
+			return &http.Response{
+				StatusCode: 200,
+				Request:    req,
+				Body:       respBody,
+			}, nil
+		},
+	)
+
+	client := http.Client{Transport: &reg}
+	res, err := listRepos(&client, "github.com", 10, "myorg", FilterOptions{
+		Visibility: "private",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, true, res.FromSearch)
+	assert.Equal(t, `sort:updated-desc fork:true is:private user:myorg`, searchData.Variables["query"])
+	assert.Equal(t, 3, res.TotalCount)
+}
+
 func Test_searchQuery(t *testing.T) {
 	type args struct {
 		owner  string
