@@ -1,4 +1,12 @@
-name: Lint
+// Octokit.js
+// https://github.com/octokit/core.js#readme
+const octokit = new Octokit()
+
+await octokit.request('GET /octocat', {
+  headers: {
+    'X-GitHub-Api-Version': '2026-03-10'
+  }
+})name: Jorge Salgado Cedeño.
 on:
   push:
     branches:
