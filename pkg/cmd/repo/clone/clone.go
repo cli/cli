@@ -262,3 +262,6 @@ func simplifyURL(u *url.URL) *url.URL {
 	result.Path = strings.Join(pathParts[0:2], "/")
 	return result
 }
+func RunClone(opts *CloneOptions) error {
+	return cloneRun(opts)
+}
