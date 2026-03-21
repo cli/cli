@@ -1,0 +1,41 @@
+func NewCmdBatchClone(f *cmdutil.Factory, runF func(*BatchCloneOptions) error) *cobra.Command {
+	opts := &BatchCloneOptions{
+		IO:                 f.IOStreams,
+		Prompter:           f.Prompter,
+		UpstreamRemoteName: "upstream",
+	}
+
+	cmd := &cobra.Command{
+		Use:   "batch-clone --file <path> [-- <gitflags>...]",
+		Short: "Clone multiple repositories from a file",
+		Long: heredoc.Doc(`
+			Clone multiple GitHub repositories from a text file.
+
+			Supported formats:
+			- OWNER/REPO
+			- https://github.com/OWNER/REPO.git
+			- git@github.com:OWNER/REPO.git
+		`),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.GitArgs = args
+			if runF != nil {
+				return runF(opts)
+			}
+			return batchCloneRun(opts, f)
+		},
+	}
+
+	cmd.Flags().StringVarP(&opts.FilePath, "file", "f", "", "Path to repository list file")
+	cmd.Flags().StringVarP(&opts.TargetDir, "target-dir", "d", "", "Target directory for cloned repositories")
+	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip repositories whose destination already exists")
+	cmd.Flags().BoolVar(&opts.ContinueOnError, "continue-on-error", false, "Continue cloning after an error")
+	cmd.Flags().BoolVar(&opts.NoConfirm, "no-confirm", false, "Skip confirmation prompt")
+	cmd.Flags().BoolVar(&opts.NoUpstream, "no-upstream", false, "Do not add an upstream remote when cloning a fork")
+	cmd.Flags().StringVarP(&opts.UpstreamRemoteName, "upstream-remote-name", "u", "upstream", "Upstream remote name")
+	cmd.Flags().StringVar(&opts.LogFile, "log-file", "", "Path to write clone results log")
+
+	_ = cmd.MarkFlagRequired("file")
+	_ = cmd.MarkFlagsMutuallyExclusive("upstream-remote-name", "no-upstream")
+
+	return cmd
+}
