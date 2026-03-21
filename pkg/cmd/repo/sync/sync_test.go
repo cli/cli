@@ -260,6 +260,22 @@ func Test_SyncRun(t *testing.T) {
 			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER/REPO\" to local repository\n",
 		},
 		{
+			name: "sync local repo with parent - existing branch checked out in another worktree",
+			tty:  true,
+			opts: &SyncOptions{
+				Branch: "trunk",
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
+				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
+				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(assert.AnError).Once()
+			},
+			wantErr: true,
+			errMsg:  assert.AnError.Error(),
+		},
+		{
 			name: "sync local repo with parent - create new branch",
 			tty:  true,
 			opts: &SyncOptions{
