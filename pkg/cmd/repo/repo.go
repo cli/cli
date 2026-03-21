@@ -71,3 +71,8 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 
 	return cmd
 }
+import (
+	// ...
+	batchclone "github.com/cli/cli/v2/pkg/cmd/repo/batch-clone"
+)
+cmd.AddCommand(batchclone.NewCmdBatchClone(f, nil))
