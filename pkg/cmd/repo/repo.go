@@ -66,6 +66,11 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 		repoDeleteCmd.NewCmdDelete(f, nil),
 		creditsCmd.NewCmdRepoCredits(f, nil),
 		gardenCmd.NewCmdGarden(f, nil),
+					 import (
+	// ...
+	batchclone "github.com/cli/cli/v2/pkg/cmd/repo/batch-clone"
+)
+
 		repoAutolinkCmd.NewCmdAutolink(f),
 	)
 
