@@ -2,7 +2,7 @@
 name: "\U0001F41B Bug report"
 about: Report a bug or unexpected behavior while using GitHub CLI
 title: ''
-labels: bug
+labels: ''
 assignees: ''
 
 ---

@@ -51,7 +51,9 @@ type JobError struct {
 	Service            string `json:"service"`
 }
 
-const jobsBasePathV1 = baseCAPIURL + "/agents/swe/v1/jobs"
+func (c *CAPIClient) jobsBasePathV1() string {
+	return c.capiBaseURL + "/agents/swe/v1/jobs"
+}
 
 // CreateJob queues a new job using the v1 Jobs API. It may or may not
 // return Pull Request information. If Pull Request information is required
@@ -64,7 +66,7 @@ func (c *CAPIClient) CreateJob(ctx context.Context, owner, repo, problemStatemen
 		return nil, errors.New("problem statement is required")
 	}
 
-	url := fmt.Sprintf("%s/%s/%s", jobsBasePathV1, url.PathEscape(owner), url.PathEscape(repo))
+	url := fmt.Sprintf("%s/%s/%s", c.jobsBasePathV1(), url.PathEscape(owner), url.PathEscape(repo))
 
 	prOpts := JobPullRequest{}
 	if baseBranch != "" {
@@ -130,7 +132,7 @@ func (c *CAPIClient) GetJob(ctx context.Context, owner, repo, jobID string) (*Jo
 	if owner == "" || repo == "" || jobID == "" {
 		return nil, errors.New("owner, repo, and jobID are required")
 	}
-	url := fmt.Sprintf("%s/%s/%s/%s", jobsBasePathV1, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(jobID))
+	url := fmt.Sprintf("%s/%s/%s/%s", c.jobsBasePathV1(), url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(jobID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
