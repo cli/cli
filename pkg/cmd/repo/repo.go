@@ -20,6 +20,8 @@ import (
 	repoSyncCmd "github.com/cli/cli/v2/pkg/cmd/repo/sync"
 	repoUnarchiveCmd "github.com/cli/cli/v2/pkg/cmd/repo/unarchive"
 	repoViewCmd "github.com/cli/cli/v2/pkg/cmd/repo/view"
+        healthCmd "github.com/cli/cli/v2/pkg/cmd/repo/health"
+        healthCmd.NewCmdHealth(f, nil),
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
