@@ -722,7 +722,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 
 	var baseRepo *api.Repository
-	if br, err := resolvedRemotes.BaseRepo(opts.IO); err == nil {
+	if br, err := resolvedRemotes.BaseRepo(opts.IO, opts.Prompter.(prompter.Prompter), opts.GitClient); err == nil {
 		if r, ok := br.(*api.Repository); ok {
 			baseRepo = r
 		} else {
@@ -1314,7 +1314,7 @@ func requestableReviewersForCompletion(opts *CreateOptions) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	baseRepo, err := repoContext.BaseRepo(opts.IO)
+	baseRepo, err := repoContext.BaseRepo(opts.IO, opts.Prompter.(prompter.Prompter), opts.GitClient)
 	if err != nil {
 		return nil, err
 	}

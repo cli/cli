@@ -2,13 +2,16 @@
 package context
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"sort"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
@@ -58,7 +61,7 @@ type ResolvedRemotes struct {
 	apiClient    *api.Client
 }
 
-func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, error) {
+func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams, prompter prompter.Prompter, gitClient *git.Client) (ghrepo.Interface, error) {
 	if r.baseOverride != nil {
 		return r.baseOverride, nil
 	}
@@ -96,16 +99,33 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		return repos[0], nil
 	}
 
-	cs := io.ColorScheme()
+	if prompter != nil && gitClient != nil {
+		var repoNames []string
+		for _, repo := range repos {
+			repoNames = append(repoNames, ghrepo.FullName(repo))
+		}
 
-	fmt.Fprintf(io.ErrOut,
-		"%s No default remote repository has been set. To learn more about the default repository, run: gh repo set-default --help\n",
-		cs.FailureIcon())
+		selected, err := prompter.Select("Which repository should be the default?", "", repoNames)
+		if err != nil {
+			return nil, fmt.Errorf("could not prompt: %w", err)
+		}
+		selectedRepo := repos[selected]
 
-	fmt.Fprintln(io.Out)
+		resolution := "base"
+		selectedRemote, _ := r.RemoteForRepo(selectedRepo)
+		if selectedRemote == nil {
+			resolution = ghrepo.FullName(selectedRepo)
+			selectedRemote = r.remotes[0]
+		}
 
-	return nil, errors.New(
-		"please run `gh repo set-default` to select a default remote repository.")
+		if err := gitClient.SetRemoteResolution(context.Background(), selectedRemote.Name, resolution); err != nil {
+			return nil, err
+		}
+
+		return selectedRepo, nil
+	}
+
+	return r.remotes[0], nil
 }
 
 func (r *ResolvedRemotes) HeadRepos() ([]*api.Repository, error) {

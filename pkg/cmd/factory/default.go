@@ -167,7 +167,7 @@ func SmartBaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 		if err != nil {
 			return nil, err
 		}
-		baseRepo, err := resolvedRepos.BaseRepo(f.IOStreams)
+		baseRepo, err := resolvedRepos.BaseRepo(f.IOStreams, f.Prompter, f.GitClient)
 		if err != nil {
 			return nil, err
 		}
