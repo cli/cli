@@ -23,11 +23,11 @@ func (p *apiPlatform) List(runID string) ([]shared.Artifact, error) {
 	return shared.ListArtifacts(p.client, p.repo, runID)
 }
 
-func (p *apiPlatform) Download(url string, dir safepaths.Absolute) error {
-	return downloadArtifact(p.client, url, dir)
+func (p *apiPlatform) Download(name string, url string, dir safepaths.Absolute) error {
+	return downloadArtifact(p.client, name, url, dir)
 }
 
-func downloadArtifact(httpClient *http.Client, url string, destDir safepaths.Absolute) error {
+func downloadArtifact(httpClient *http.Client, name string, url string, destDir safepaths.Absolute) error {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -43,6 +43,25 @@ func downloadArtifact(httpClient *http.Client, url string, destDir safepaths.Abs
 
 	if resp.StatusCode > 299 {
 		return api.HandleHTTPError(resp)
+	}
+
+	if resp.Header.Get("Content-Type") != "application/zip" {
+		destPath, err := destDir.Join(name)
+		if err != nil {
+			return err
+		}
+
+		destFile, err := os.Create(destPath.String())
+		if err != nil {
+			return fmt.Errorf("error creating file %s: %w", name, err)
+		}
+		defer destFile.Close()
+
+		if _, err := io.Copy(destFile, resp.Body); err != nil {
+			return fmt.Errorf("error writing content for %s: %w", name, err)
+		}
+
+		return nil
 	}
 
 	tmpfile, err := os.CreateTemp("", "gh-artifact.*.zip")
