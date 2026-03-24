@@ -51,6 +51,10 @@ func downloadArtifact(httpClient *http.Client, name string, url string, destDir 
 			return err
 		}
 
+		if err := os.MkdirAll(destDir.String(), 0o755); err != nil {
+			return fmt.Errorf("error creating directory %s: %w", destDir, err)
+		}
+
 		destFile, err := os.Create(destPath.String())
 		if err != nil {
 			return fmt.Errorf("error creating file %s: %w", name, err)

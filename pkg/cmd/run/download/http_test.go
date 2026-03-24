@@ -110,7 +110,6 @@ func Test_NonZippedDownload(t *testing.T) {
 	tmpDir := t.TempDir()
 	destDir, err := safepaths.ParseAbsolute(filepath.Join(tmpDir, "artifact"))
 	require.NoError(t, err)
-	require.NoError(t, os.MkdirAll(destDir.String(), 0o755))
 
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
