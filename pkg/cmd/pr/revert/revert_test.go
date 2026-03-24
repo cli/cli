@@ -87,7 +87,6 @@ func TestPRRevert_acceptedIdentifierFormats(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 
@@ -137,7 +136,7 @@ func TestPRRevert_notRevertable(t *testing.T) {
 	// Target PR is not merged.
 	output, err := runCommand(http, true, "123")
 	// API error, non-zero exit.
-	assert.EqualError(t, err, "SilentError")
+	assert.EqualError(t, err, "ErrSilent")
 	assert.Equal(t, "X Pull request OWNER/REPO#123 (The title of the PR) can't be reverted because it has not been merged\n", output.Stderr())
 	// No URL printed.
 	assert.Equal(t, "", output.String())
@@ -318,7 +317,7 @@ func TestPRRevert_multipleInvocations(t *testing.T) {
 
 	output, err = runCommand(http, true, "123")
 	// Revert PR is not created, API error, non-zero exit.
-	assert.EqualError(t, err, "SilentError")
+	assert.EqualError(t, err, "ErrSilent")
 	assert.Equal(t, "X Pull request OWNER/REPO#123 (The title of the PR) can't be reverted because it has not been merged\n", output.Stderr())
 	// No URL printed.
 	assert.Equal(t, "", output.String())

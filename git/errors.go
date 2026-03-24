@@ -8,16 +8,16 @@ import (
 // ErrNotOnAnyBranch indicates that the user is in detached HEAD state.
 var ErrNotOnAnyBranch = errors.New("git: not on any branch")
 
-type NotInstalled struct {
+type NotInstalledError struct {
 	message string
 	err     error
 }
 
-func (e *NotInstalled) Error() string {
+func (e *NotInstalledError) Error() string {
 	return e.message
 }
 
-func (e *NotInstalled) Unwrap() error {
+func (e *NotInstalledError) Unwrap() error {
 	return e.err
 }
 

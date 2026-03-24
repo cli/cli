@@ -261,7 +261,7 @@ func TestManager_UpgradeExtensions(t *testing.T) {
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(exts))
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		exts[i].currentVersion = "old version"
 		exts[i].latestVersion = "new version"
 	}
@@ -300,7 +300,7 @@ func TestManager_UpgradeExtensions_DryRun(t *testing.T) {
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(exts))
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		exts[i].currentVersion = fmt.Sprintf("%d", i)
 		exts[i].latestVersion = fmt.Sprintf("%d", i+1)
 	}
@@ -719,7 +719,7 @@ func TestManager_UpgradeExtension_BinaryExtension_Pinned(t *testing.T) {
 
 	err = m.upgradeExtension(ext, false)
 	assert.NotNil(t, err)
-	assert.Equal(t, err, pinnedExtensionUpgradeError)
+	assert.Equal(t, err, errPinnedExtensionUpgrade)
 }
 
 func TestManager_UpgradeExtension_GitExtension_Pinned(t *testing.T) {
@@ -746,7 +746,7 @@ func TestManager_UpgradeExtension_GitExtension_Pinned(t *testing.T) {
 
 	err = m.upgradeExtension(ext, false)
 	assert.NotNil(t, err)
-	assert.Equal(t, err, pinnedExtensionUpgradeError)
+	assert.Equal(t, err, errPinnedExtensionUpgrade)
 	gc.AssertExpectations(t)
 	gcOne.AssertExpectations(t)
 }
@@ -814,7 +814,7 @@ func TestManager_Install_local_no_executable_found(t *testing.T) {
 	// to simulate an attempt to install a local extension without an executable
 
 	err := m.InstallLocal(localDir)
-	require.ErrorAs(t, err, new(*ErrExtensionExecutableNotFound))
+	require.ErrorAs(t, err, new(*ExtensionExecutableNotFoundError))
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
 	require.NoDirExistsf(t, extensionUpdatePath, "update directory should be removed")
@@ -1010,7 +1010,6 @@ func TestManager_Install_binary_pinned(t *testing.T) {
 
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
-
 }
 
 func TestManager_Install_binary_unsupported(t *testing.T) {
@@ -1275,8 +1274,8 @@ func TestManager_repo_not_found(t *testing.T) {
 
 	m := newTestManager(dataDir, updateDir, &http.Client{Transport: &reg}, nil, ios)
 
-	if err := m.Install(repo, ""); err != repositoryNotFoundErr {
-		t.Errorf("expected repositoryNotFoundErr, got: %v", err)
+	if err := m.Install(repo, ""); err != errRepositoryNotFound {
+		t.Errorf("expected errRepositoryNotFound, got: %v", err)
 	}
 
 	assert.Equal(t, "", stdout.String())

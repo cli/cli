@@ -61,7 +61,7 @@ func listRun(opts *ListOptions) error {
 			cs := opts.IO.ColorScheme()
 			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to list GPG keys\n")
 			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s read:gpg_key"))
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 		return err
 	}

@@ -315,7 +315,6 @@ jobs:
 			assert.Equal(t, tt.wantOut, result)
 		})
 	}
-
 }
 
 func TestRun(t *testing.T) {
@@ -994,7 +993,6 @@ jobs:
 				pm.RegisterSelect("name", []string{"monalisa", "cschleiden"}, func(_, _ string, opts []string) (int, error) {
 					return 0, nil
 				})
-
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -1052,7 +1050,6 @@ jobs:
 				pm.RegisterSelect("name", []string{"monalisa", "cschleiden"}, func(_, _ string, opts []string) (int, error) {
 					return 0, nil
 				})
-
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{

@@ -175,16 +175,16 @@ func (i *invoker) StartJupyterServer(ctx context.Context) (port int, serverUrl s
 		return 0, "", fmt.Errorf("failed to invoke JupyterLab RPC: %w", err)
 	}
 
-	if !response.Result {
-		return 0, "", fmt.Errorf("failed to start JupyterLab: %s", response.Message)
+	if !response.GetResult() {
+		return 0, "", fmt.Errorf("failed to start JupyterLab: %s", response.GetMessage())
 	}
 
-	port, err = strconv.Atoi(response.Port)
+	port, err = strconv.Atoi(response.GetPort())
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to parse JupyterLab port: %w", err)
 	}
 
-	return port, response.ServerUrl, err
+	return port, response.GetServerUrl(), err
 }
 
 // Rebuilds the container using cached layers by default or from scratch if full is true
@@ -200,7 +200,7 @@ func (i *invoker) RebuildContainer(ctx context.Context, full bool) error {
 		return fmt.Errorf("failed to invoke rebuild RPC: %w", err)
 	}
 
-	if !response.RebuildContainer {
+	if !response.GetRebuildContainer() {
 		return fmt.Errorf("couldn't rebuild codespace")
 	}
 
@@ -233,19 +233,19 @@ func (i *invoker) StartSSHServerWithOptions(ctx context.Context, options StartSS
 		return 0, "", fmt.Errorf("failed to invoke SSH RPC: %w", err)
 	}
 
-	if !response.Result {
-		return 0, "", fmt.Errorf("failed to start SSH server: %s", response.Message)
+	if !response.GetResult() {
+		return 0, "", fmt.Errorf("failed to start SSH server: %s", response.GetMessage())
 	}
 
-	port, err := strconv.Atoi(response.ServerPort)
+	port, err := strconv.Atoi(response.GetServerPort())
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to parse SSH server port: %w", err)
 	}
 
-	if !isUsernameValid(response.User) {
-		return 0, "", fmt.Errorf("invalid username: %s", response.User)
+	if !isUsernameValid(response.GetUser()) {
+		return 0, "", fmt.Errorf("invalid username: %s", response.GetUser())
 	}
-	return port, response.User, nil
+	return port, response.GetUser(), nil
 }
 
 func listenTCP() (*net.TCPListener, error) {
@@ -278,7 +278,7 @@ func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			reason := ""
+			var reason string
 
 			// If the keep alive override flag is set, we don't need to check for activity on the forwarder
 			// Otherwise, grab the reason from the forwarder

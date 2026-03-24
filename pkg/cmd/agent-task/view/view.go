@@ -150,7 +150,7 @@ func viewRun(opts *ViewOptions) error {
 		if err != nil {
 			if errors.Is(err, capi.ErrSessionNotFound) {
 				fmt.Fprintln(opts.IO.ErrOut, "session not found")
-				return cmdutil.SilentError
+				return cmdutil.ErrSilent
 			}
 			return err
 		}
@@ -234,7 +234,7 @@ func viewRun(opts *ViewOptions) error {
 
 		if len(sessions) == 0 {
 			fmt.Fprintln(opts.IO.ErrOut, "no session found for pull request")
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 
 		opts.IO.StopProgressIndicator()

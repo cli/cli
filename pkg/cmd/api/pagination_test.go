@@ -265,6 +265,7 @@ func TestJsonArrayWriter_Copy(t *testing.T) {
 
 type noWriteToReader struct {
 	io.Reader
+
 	limit int
 }
 

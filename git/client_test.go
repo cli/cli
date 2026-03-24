@@ -128,7 +128,7 @@ func TestClientRemotes(t *testing.T) {
 `
 	f, err := os.OpenFile(remoteFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
 	assert.NoError(t, err)
-	_, err = f.Write([]byte(remotes))
+	_, err = f.WriteString(remotes)
 	assert.NoError(t, err)
 	err = f.Close()
 	assert.NoError(t, err)
@@ -165,7 +165,7 @@ func TestClientRemotes_no_resolved_remote(t *testing.T) {
 `
 	f, err := os.OpenFile(remoteFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
 	assert.NoError(t, err)
-	_, err = f.Write([]byte(remotes))
+	_, err = f.WriteString(remotes)
 	assert.NoError(t, err)
 	err = f.Close()
 	assert.NoError(t, err)
@@ -1141,6 +1141,7 @@ func TestClientParsePushRevision(t *testing.T) {
 }
 
 func TestRemoteTrackingRef(t *testing.T) {
+	t.Parallel()
 	t.Run("parsing", func(t *testing.T) {
 		t.Parallel()
 
@@ -2098,6 +2099,7 @@ func TestCredentialPatternFromHost(t *testing.T) {
 }
 
 func TestPushDefault(t *testing.T) {
+	t.Parallel()
 	t.Run("it parses valid values correctly", func(t *testing.T) {
 		t.Parallel()
 

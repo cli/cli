@@ -101,11 +101,7 @@ func TestGenMdJSONFields(t *testing.T) {
 
 func TestGenMdTree(t *testing.T) {
 	c := &cobra.Command{Use: "do [OPTIONS] arg1 arg2"}
-	tmpdir, err := os.MkdirTemp("", "test-gen-md-tree")
-	if err != nil {
-		t.Fatalf("Failed to create tmpdir: %v", err)
-	}
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	if err := GenMarkdownTreeCustom(c, tmpdir, func(s string) string { return s }, func(s string) string { return s }); err != nil {
 		t.Fatalf("GenMarkdownTree failed: %v", err)
@@ -126,7 +122,7 @@ func BenchmarkGenMarkdownToFile(b *testing.B) {
 	linkHandler := func(s string) string { return s }
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if err := genMarkdownCustom(rootCmd, file, linkHandler); err != nil {
 			b.Fatal(err)
 		}
@@ -134,7 +130,6 @@ func BenchmarkGenMarkdownToFile(b *testing.B) {
 }
 
 func TestPrintFlagsHTMLShowsDefaultValues(t *testing.T) {
-
 	type TestOptions struct {
 		Limit     int
 		Template  string

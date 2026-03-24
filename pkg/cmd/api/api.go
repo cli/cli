@@ -299,7 +299,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	return cmd
 }
 
-func apiRun(opts *ApiOptions) error {
+func apiRun(opts *ApiOptions) error { //nolint:gocyclo
 	params, err := parseFields(opts)
 	if err != nil {
 		return err
@@ -458,7 +458,7 @@ func apiRun(opts *ApiOptions) error {
 
 var jsonContentTypeRE = regexp.MustCompile(`[/+]json(;|$)`)
 
-func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template, isFirstPage, isLastPage bool) (endCursor string, err error) {
+func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template, isFirstPage, isLastPage bool) (endCursor string, err error) { //nolint:gocyclo
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
 		printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
@@ -532,7 +532,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 		if u := factory.SSOURL(); u != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "Authorize in your web browser: %s\n", u)
 		}
-		err = cmdutil.SilentError
+		err = cmdutil.ErrSilent
 		return
 	}
 

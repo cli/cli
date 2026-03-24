@@ -164,5 +164,4 @@ func TestPrCheckStatusSummaryWithColor(t *testing.T) {
 		out := PrCheckStatusSummaryWithColor(cs, testCase.args)
 		assert.Equal(t, testCase.want, out)
 	}
-
 }

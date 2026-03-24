@@ -198,12 +198,12 @@ func creditsRun(opts *CreditsOptions) error {
 	margin := termWidth / 3
 
 	starLinesLeft := []string{}
-	for x := 0; x < len(lines); x++ {
+	for range lines {
 		starLinesLeft = append(starLinesLeft, starLine(r, margin))
 	}
 
 	starLinesRight := []string{}
-	for x := 0; x < len(lines); x++ {
+	for x := range lines {
 		lineWidth := termWidth - (margin + len(lines[x]))
 		starLinesRight = append(starLinesRight, starLine(r, lineWidth))
 	}
@@ -248,7 +248,7 @@ func creditsRun(opts *CreditsOptions) error {
 func starLine(r *rand.Rand, width int) string {
 	line := ""
 	starChance := 0.1
-	for y := 0; y < width; y++ {
+	for range width {
 		chance := r.Float64()
 		if chance <= starChance {
 			charRoll := r.Float64()

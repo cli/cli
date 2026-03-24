@@ -62,6 +62,6 @@ func TestJSONOutput(t *testing.T) {
 	err := json.Unmarshal(out.Bytes(), &target)
 
 	assert.Equal(t, "https://github.com/sigstore/sigstore-js", target.InspectedBundles[0].Certificate.SourceRepositoryURI)
-	assert.Equal(t, "https://slsa.dev/provenance/v1", target.InspectedBundles[0].Statement.PredicateType)
+	assert.Equal(t, "https://slsa.dev/provenance/v1", target.InspectedBundles[0].Statement.GetPredicateType())
 	require.NoError(t, err)
 }

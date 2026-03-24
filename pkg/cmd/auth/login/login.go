@@ -189,7 +189,7 @@ func loginRun(opts *LoginOptions) error {
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
 		fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment.\n")
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	plainHTTPClient, err := opts.PlainHttpClient()

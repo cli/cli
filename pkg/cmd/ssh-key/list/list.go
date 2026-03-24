@@ -69,7 +69,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if authKeyErr != nil && signKeyErr != nil {
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	sshKeys := append(sshAuthKeys, sshSigningKeys...)

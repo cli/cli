@@ -299,26 +299,26 @@ type PullRequestFile struct {
 	ChangeType string `json:"changeType"`
 }
 
-func (pr PullRequest) HeadLabel() string {
+func (pr *PullRequest) HeadLabel() string {
 	if pr.IsCrossRepository {
 		return fmt.Sprintf("%s:%s", pr.HeadRepositoryOwner.Login, pr.HeadRefName)
 	}
 	return pr.HeadRefName
 }
 
-func (pr PullRequest) Link() string {
+func (pr *PullRequest) Link() string {
 	return pr.URL
 }
 
-func (pr PullRequest) Identifier() string {
+func (pr *PullRequest) Identifier() string {
 	return pr.ID
 }
 
-func (pr PullRequest) CurrentUserComments() []Comment {
+func (pr *PullRequest) CurrentUserComments() []Comment {
 	return pr.Comments.CurrentUserComments()
 }
 
-func (pr PullRequest) IsOpen() bool {
+func (pr *PullRequest) IsOpen() bool {
 	return pr.State == "OPEN"
 }
 
@@ -387,7 +387,6 @@ func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
 			} else {
 				summary.Pending++
 			}
-
 		} else { // c.TypeName == StatusContext
 			switch parseCheckStatusFromStatusState(c.State) {
 			case passing:

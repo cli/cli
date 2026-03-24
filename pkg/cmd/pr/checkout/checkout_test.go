@@ -363,6 +363,7 @@ func Test_checkoutRun(t *testing.T) {
 }
 
 func TestSpecificPRResolver(t *testing.T) {
+	t.Parallel()
 	t.Run("when the PR Finder returns results, those are returned", func(t *testing.T) {
 		t.Parallel()
 
@@ -398,6 +399,7 @@ func TestSpecificPRResolver(t *testing.T) {
 }
 
 func TestPromptingPRResolver(t *testing.T) {
+	t.Parallel()
 	t.Run("when the PR Lister has results, then we prompt for a choice", func(t *testing.T) {
 		t.Parallel()
 

@@ -147,6 +147,7 @@ type BundleInspection struct {
 
 type CertificateInspection struct {
 	certificate.Summary
+
 	NotBefore time.Time `json:"notBefore"`
 	NotAfter  time.Time `json:"notAfter"`
 }
@@ -188,7 +189,6 @@ func runInspect(opts *Options) error {
 
 		// summarize cert if present
 		if leafCert := verificationContent.Certificate(); leafCert != nil {
-
 			certSummary, err := certificate.SummarizeCertificate(leafCert)
 			if err != nil {
 				return fmt.Errorf("failed to summarize certificate: %w", err)
@@ -199,7 +199,6 @@ func runInspect(opts *Options) error {
 				NotBefore: leafCert.NotBefore,
 				NotAfter:  leafCert.NotAfter,
 			}
-
 		}
 
 		// parse the sig content and pop the statement

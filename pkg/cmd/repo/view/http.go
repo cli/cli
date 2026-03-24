@@ -14,7 +14,7 @@ import (
 	"golang.org/x/text/transform"
 )
 
-var NotFoundError = errors.New("not found")
+var ErrNotFound = errors.New("not found")
 
 type RepoReadme struct {
 	Filename string
@@ -34,7 +34,7 @@ func RepositoryReadme(client *http.Client, repo ghrepo.Interface, branch string)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
-			return nil, NotFoundError
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}

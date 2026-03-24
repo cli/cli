@@ -282,7 +282,7 @@ func Test_editRun(t *testing.T) {
 						return prompter.IndexFor(opts, "Cancel")
 					})
 			},
-			wantErr: "CancelError",
+			wantErr: "ErrCancel",
 			mockGist: &shared.Gist{
 				ID: "1234",
 				Files: map[string]*shared.GistFile{

@@ -75,7 +75,7 @@ const (
 	TypePullRequest string = "PullRequest"
 )
 
-func (i Issue) IsPullRequest() bool {
+func (i *Issue) IsPullRequest() bool {
 	return i.Typename == TypePullRequest
 }
 
@@ -411,14 +411,14 @@ func IssueStatus(client *Client, repo ghrepo.Interface, options IssueStatusOptio
 	return &payload, nil
 }
 
-func (i Issue) Link() string {
+func (i *Issue) Link() string {
 	return i.URL
 }
 
-func (i Issue) Identifier() string {
+func (i *Issue) Identifier() string {
 	return i.ID
 }
 
-func (i Issue) CurrentUserComments() []Comment {
+func (i *Issue) CurrentUserComments() []Comment {
 	return i.Comments.CurrentUserComments()
 }

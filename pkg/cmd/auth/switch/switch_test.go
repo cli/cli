@@ -80,7 +80,6 @@ func TestNewCmdSwitch(t *testing.T) {
 			require.Equal(t, &tt.expectedOpts, gotOpts)
 		})
 	}
-
 }
 
 func TestSwitchRun(t *testing.T) {
@@ -235,7 +234,7 @@ func TestSwitchRun(t *testing.T) {
 			},
 			env: map[string]string{"GH_TOKEN": "unimportant-test-value"},
 			expectedFailure: failedExpectation{
-				err:    cmdutil.SilentError,
+				err:    cmdutil.ErrSilent,
 				stderr: "The value of the GH_TOKEN environment variable is being used for authentication.",
 			},
 		},

@@ -25,7 +25,9 @@ const (
 	EditCommitMessageAction
 	EditCommitSubjectAction
 	SubmitDraftAction
+)
 
+const (
 	noMilestone = "(none)"
 
 	submitLabel      = "Submit"
@@ -35,14 +37,7 @@ const (
 	cancelLabel      = "Cancel"
 )
 
-type Prompt interface {
-	Input(prompt string, defaultValue string) (string, error)
-	Select(prompt string, defaultValue string, options []string) (int, error)
-	MarkdownEditor(prompt string, defaultValue string, blankAllowed bool) (string, error)
-	Confirm(prompt string, defaultValue bool) (bool, error)
-	MultiSelect(prompt string, defaults []string, options []string) ([]int, error)
-	MultiSelectWithSearch(prompt, searchPrompt string, defaults []string, persistentOptions []string, searchFunc func(string) prompter.MultiSelectSearchResult) ([]string, error)
-}
+type Prompt = EditPrompter
 
 func ConfirmIssueSubmission(p Prompt, allowPreview bool, allowMetadata bool) (Action, error) {
 	return confirmSubmission(p, allowPreview, allowMetadata, false, false)
@@ -154,7 +149,7 @@ type RepoMetadataFetcher interface {
 	RepoMetadataFetch(api.RepoMetadataInput) (*api.RepoMetadataResult, error)
 }
 
-func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState, projectsV1Support gh.ProjectsV1Support, reviewerSearchFunc func(string) prompter.MultiSelectSearchResult) error {
+func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState, projectsV1Support gh.ProjectsV1Support, reviewerSearchFunc func(string) prompter.MultiSelectSearchResult) error { //nolint:gocyclo
 	isChosen := func(m string) bool {
 		for _, c := range state.Metadata {
 			if m == c {

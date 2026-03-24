@@ -30,13 +30,13 @@ type releaseNotes struct {
 	Body string `json:"body"`
 }
 
-var notImplementedError = errors.New("not implemented")
+var errNotImplemented = errors.New("not implemented")
 
-type errMissingRequiredWorkflowScope struct {
+type missingRequiredWorkflowScopeError struct {
 	Hostname string
 }
 
-func (e errMissingRequiredWorkflowScope) Error() string {
+func (e missingRequiredWorkflowScopeError) Error() string {
 	return "workflow scope may be required"
 }
 
@@ -123,7 +123,7 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		return nil, notImplementedError
+		return nil, errNotImplemented
 	}
 
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
@@ -200,7 +200,7 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	// https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps#available-scopes
 	if resp.StatusCode == http.StatusNotFound && !tokenHasWorkflowScope(resp) {
 		normalizedHostname := ghauth.NormalizeHostname(resp.Request.URL.Hostname())
-		return nil, &errMissingRequiredWorkflowScope{
+		return nil, &missingRequiredWorkflowScopeError{
 			Hostname: normalizedHostname,
 		}
 	}

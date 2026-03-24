@@ -107,9 +107,9 @@ func downloadAsset(httpClient *http.Client, asset releaseAsset, destPath string)
 	return
 }
 
-var commitNotFoundErr = errors.New("commit not found")
-var releaseNotFoundErr = errors.New("release not found")
-var repositoryNotFoundErr = errors.New("repository not found")
+var errCommitNotFound = errors.New("commit not found")
+var errReleaseNotFound = errors.New("release not found")
+var errRepositoryNotFound = errors.New("repository not found")
 
 // fetchLatestRelease finds the latest published release for a repository.
 func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*release, error) {
@@ -127,7 +127,7 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		return nil, releaseNotFoundErr
+		return nil, errReleaseNotFound
 	}
 	if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
@@ -164,7 +164,7 @@ func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tag
 
 	defer resp.Body.Close()
 	if resp.StatusCode == 404 {
-		return nil, releaseNotFoundErr
+		return nil, errReleaseNotFound
 	}
 	if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
@@ -201,7 +201,7 @@ func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRe
 
 	defer resp.Body.Close()
 	if resp.StatusCode == 422 {
-		return "", commitNotFoundErr
+		return "", errCommitNotFound
 	}
 	if resp.StatusCode > 299 {
 		return "", api.HandleHTTPError(resp)

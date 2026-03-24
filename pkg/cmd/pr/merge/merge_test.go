@@ -366,7 +366,7 @@ func TestPrMerge_blocked(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, nil, "main", true, "pr merge 1 --merge")
-	assert.EqualError(t, err, "SilentError")
+	assert.EqualError(t, err, "ErrSilent")
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Docf(`
@@ -399,7 +399,7 @@ func TestPrMerge_dirty(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, nil, "main", true, "pr merge 1 --merge")
-	assert.EqualError(t, err, "SilentError")
+	assert.EqualError(t, err, "ErrSilent")
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Docf(`
@@ -1634,7 +1634,7 @@ func TestPRTTY_cancelled(t *testing.T) {
 	}
 
 	output, err := runCommand(http, pm, "blueberries", true, "")
-	if !errors.Is(err, cmdutil.CancelError) {
+	if !errors.Is(err, cmdutil.ErrCancel) {
 		t.Fatalf("got error %v", err)
 	}
 

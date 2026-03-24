@@ -144,7 +144,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) (err error) {
+func createRun(opts *CreateOptions) (err error) { //nolint:gocyclo
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return
@@ -326,7 +326,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 		if action == prShared.CancelAction {
 			fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
-			err = cmdutil.CancelError
+			err = cmdutil.ErrCancel
 			return
 		}
 	} else {

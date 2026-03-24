@@ -76,6 +76,7 @@ func (md *EnabledDetectorMock) ActionsFeatures() (ActionsFeatures, error) {
 
 type AdvancedIssueSearchDetectorMock struct {
 	EnabledDetectorMock
+
 	searchFeatures SearchFeatures
 }
 

@@ -316,7 +316,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			for _, hostUsers := range tt.cfgHosts {
 				for _, user := range hostUsers.users {
 					_, _ = cfg.Authentication().Login(
-						string(hostUsers.host),
+						hostUsers.host,
 						user.name,
 						user.token, "ssh", tt.secureStorage,
 					)
@@ -511,7 +511,7 @@ func Test_logoutRun_nontty(t *testing.T) {
 			for _, hostUsers := range tt.cfgHosts {
 				for _, user := range hostUsers.users {
 					_, _ = cfg.Authentication().Login(
-						string(hostUsers.host),
+						hostUsers.host,
 						user.name,
 						user.token, "ssh", tt.secureStorage,
 					)

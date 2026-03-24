@@ -89,7 +89,7 @@ func newDeleteCmd(app *App) *cobra.Command {
 	return deleteCmd
 }
 
-func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
+func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) { //nolint:gocyclo
 	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {

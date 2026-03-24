@@ -206,7 +206,7 @@ func Test_updateBranchRun(t *testing.T) {
 				}, ghrepo.New("OWNER", "REPO")),
 			},
 			stderr:   "X Cannot update PR branch due to conflicts\n",
-			wantsErr: cmdutil.SilentError.Error(),
+			wantsErr: cmdutil.ErrSilent.Error(),
 		},
 		{
 			name: "success, merge",
@@ -357,7 +357,7 @@ func Test_updateBranchRun(t *testing.T) {
 					}))
 			},
 			stderr:   "X Cannot update PR branch due to conflicts\n",
-			wantsErr: cmdutil.SilentError.Error(),
+			wantsErr: cmdutil.ErrSilent.Error(),
 		},
 		{
 			name: "failure, API error on update request",

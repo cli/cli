@@ -332,7 +332,6 @@ func TestGetTrustDomain(t *testing.T) {
 		td, err := c.GetTrustDomain()
 		require.Nil(t, err)
 		require.Equal(t, "foo", td)
-
 	})
 
 	t.Run("with error", func(t *testing.T) {
@@ -346,7 +345,6 @@ func TestGetTrustDomain(t *testing.T) {
 		require.Equal(t, "", td)
 		require.ErrorContains(t, err, "test error")
 	})
-
 }
 
 func TestGetAttestationsRetries(t *testing.T) {

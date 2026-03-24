@@ -148,11 +148,11 @@ func runCopilot(opts *CopilotOptions) error {
 			}
 			if !confirmed {
 				fmt.Fprintf(opts.IO.ErrOut, "%s Copilot CLI was not installed", opts.IO.ColorScheme().WarningIcon())
-				return cmdutil.SilentError
+				return cmdutil.ErrSilent
 			}
 		} else if !update.IsCI() {
 			fmt.Fprintf(opts.IO.ErrOut, "%s Copilot CLI not installed", opts.IO.ColorScheme().WarningIcon())
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 
 		httpClient, err := opts.HttpClient()

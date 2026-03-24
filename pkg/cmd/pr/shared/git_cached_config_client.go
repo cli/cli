@@ -9,8 +9,9 @@ import (
 var _ GitConfigClient = &CachedBranchConfigGitConfigClient{}
 
 type CachedBranchConfigGitConfigClient struct {
-	CachedBranchConfig git.BranchConfig
 	GitConfigClient
+
+	CachedBranchConfig git.BranchConfig
 }
 
 func (c CachedBranchConfigGitConfigClient) ReadBranchConfig(ctx context.Context, branchName string) (git.BranchConfig, error) {

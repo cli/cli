@@ -276,7 +276,7 @@ func (s *StatusGetter) LoadNotifications() error {
 	fetched := make(chan StatusItem)
 
 	wg := new(errgroup.Group)
-	for i := 0; i < fetchWorkers; i++ {
+	for range fetchWorkers {
 		wg.Go(func() error {
 			for {
 				select {
@@ -337,7 +337,7 @@ func (s *StatusGetter) LoadNotifications() error {
 	// not work with PATs right now.
 	nIndex := 0
 	p := fmt.Sprintf("notifications?%s", query.Encode())
-	for pages := 0; pages < 3; pages++ {
+	for range 3 {
 		var resp []Notification
 		next, err := c.RESTWithNext(s.hostname(), "GET", p, nil, &resp)
 		if err != nil {

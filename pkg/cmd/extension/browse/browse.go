@@ -377,7 +377,7 @@ func getExtensions(opts ExtBrowseOpts) ([]extEntry, error) {
 	return extEntries, nil
 }
 
-func ExtBrowse(opts ExtBrowseOpts) error {
+func ExtBrowse(opts ExtBrowseOpts) error { //nolint:gocyclo
 	if opts.Debug {
 		f, err := os.CreateTemp("", "extBrowse-*.txt")
 		if err != nil {

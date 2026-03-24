@@ -268,7 +268,6 @@ func (a *App) UpdatePortVisibility(ctx context.Context, selector *CodespaceSelec
 		if err != nil {
 			return err
 		}
-
 	}
 
 	return nil

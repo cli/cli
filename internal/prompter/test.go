@@ -23,8 +23,9 @@ func NewMockPrompter(t *testing.T) *MockPrompter {
 }
 
 type MockPrompter struct {
-	t *testing.T
 	ghPrompter.PrompterMock
+
+	t                          *testing.T
 	authTokenStubs             []authTokenStub
 	confirmDeletionStubs       []confirmDeletionStub
 	inputHostnameStubs         []inputHostnameStub

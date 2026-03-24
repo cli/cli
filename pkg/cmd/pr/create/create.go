@@ -191,7 +191,7 @@ type CreateContext struct {
 	GitClient          *git.Client
 }
 
-func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
+func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command { //nolint:gocyclo
 	opts := &CreateOptions{
 		IO:               f.IOStreams,
 		HttpClient:       f.HttpClient,
@@ -373,7 +373,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) error {
+func createRun(opts *CreateOptions) error { //nolint:gocyclo
 	ctx, err := NewCreateContext(opts)
 	if err != nil {
 		return err
@@ -540,7 +540,6 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 	} else {
-
 		if !opts.TitleProvided {
 			err = shared.TitleSurvey(opts.Prompter, opts.IO, state)
 			if err != nil {
@@ -611,7 +610,7 @@ func createRun(opts *CreateOptions) error {
 
 	if action == shared.CancelAction {
 		fmt.Fprintln(opts.IO.ErrOut, "Discarding.")
-		err = cmdutil.CancelError
+		err = cmdutil.ErrCancel
 		return err
 	}
 
@@ -704,7 +703,7 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 	return state, nil
 }
 
-func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
+func NewCreateContext(opts *CreateOptions) (*CreateContext, error) { //nolint:gocyclo
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return nil, err
@@ -946,7 +945,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	// If we haven't got a repo by now, and we can't prompt then it's game over.
 	if !opts.IO.CanPrompt() {
 		fmt.Fprintln(opts.IO.ErrOut, "aborted: you must first push the current branch to a remote, or use the --head flag")
-		return nil, cmdutil.SilentError
+		return nil, cmdutil.ErrSilent
 	}
 
 	// Otherwise, hooray, prompting!
@@ -1007,7 +1006,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			baseRefs:         baseRefs,
 		}), nil
 	} else if pushOptions[selectedOption] == "Cancel" {
-		return nil, cmdutil.CancelError
+		return nil, cmdutil.ErrCancel
 	} else {
 		// A fork should be created.
 		return newCreateContext(forkableRefs{

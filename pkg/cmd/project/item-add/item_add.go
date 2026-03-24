@@ -111,7 +111,6 @@ func runAddItem(config addItemConfig) error {
 	}
 
 	return printResults(config, query.CreateProjectItem.ProjectV2Item)
-
 }
 
 func addItemArgs(config addItemConfig) (*addProjectItemMutation, map[string]interface{}) {

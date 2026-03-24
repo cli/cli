@@ -59,6 +59,7 @@ func (m *reqFailHttpClient) Get(url string) (*http.Response, error) {
 
 type failAfterNCallsHttpClient struct {
 	mock.Mock
+
 	mu                       sync.Mutex
 	FailOnCallN              int
 	FailOnAllSubsequentCalls bool

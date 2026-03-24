@@ -1255,7 +1255,6 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 // TODO projectsV1Deprecation
 // Remove this test.
 func TestProjectsV1Deprecation(t *testing.T) {
-
 	t.Run("non-interactive submission", func(t *testing.T) {
 		t.Run("when projects v1 is supported, queries for it", func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()

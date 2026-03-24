@@ -478,7 +478,7 @@ func Test_apiRun(t *testing.T) {
 				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
 				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			},
-			err:    cmdutil.SilentError,
+			err:    cmdutil.ErrSilent,
 			stdout: `{"message": "THIS IS FINE"}`,
 			stderr: "gh: THIS IS FINE (HTTP 400)\n",
 			isatty: false,
@@ -490,7 +490,7 @@ func Test_apiRun(t *testing.T) {
 				Body:       io.NopCloser(bytes.NewBufferString(`{"errors": ["ALSO", "FINE"]}`)),
 				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			},
-			err:    cmdutil.SilentError,
+			err:    cmdutil.ErrSilent,
 			stdout: `{"errors": ["ALSO", "FINE"]}`,
 			stderr: "gh: ALSO\nFINE\n",
 			isatty: false,
@@ -505,7 +505,7 @@ func Test_apiRun(t *testing.T) {
 				Body:       io.NopCloser(bytes.NewBufferString(`{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`)),
 				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			},
-			err:    cmdutil.SilentError,
+			err:    cmdutil.ErrSilent,
 			stdout: `{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`,
 			stderr: "gh: AGAIN\nFINE\n",
 			isatty: false,
@@ -516,7 +516,7 @@ func Test_apiRun(t *testing.T) {
 				StatusCode: 502,
 				Body:       io.NopCloser(bytes.NewBufferString(`gateway timeout`)),
 			},
-			err:    cmdutil.SilentError,
+			err:    cmdutil.ErrSilent,
 			stdout: `gateway timeout`,
 			stderr: "gh: HTTP 502\n",
 			isatty: false,
@@ -606,7 +606,7 @@ func Test_apiRun(t *testing.T) {
 				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
 				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			},
-			err:    cmdutil.SilentError,
+			err:    cmdutil.ErrSilent,
 			stdout: `{"message": "THIS IS FINE"}`,
 			stderr: "gh: THIS IS FINE (HTTP 400)\n",
 			isatty: false,
@@ -636,7 +636,7 @@ func Test_apiRun(t *testing.T) {
 				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
 				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			},
-			err:    cmdutil.SilentError,
+			err:    cmdutil.ErrSilent,
 			stdout: `{"message": "THIS IS FINE"}`,
 			stderr: "gh: THIS IS FINE (HTTP 400)\n",
 			isatty: false,
@@ -1258,7 +1258,7 @@ func Test_apiRun_HEAD(t *testing.T) {
 		RequestMethod:       "HEAD",
 		RequestMethodPassed: true,
 	})
-	if err != cmdutil.SilentError {
+	if err != cmdutil.ErrSilent {
 		t.Fatalf("got error %v", err)
 	}
 }

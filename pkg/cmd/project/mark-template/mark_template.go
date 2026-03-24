@@ -111,7 +111,6 @@ func runMarkTemplate(config markTemplateConfig) error {
 		}
 
 		return printResults(config, query.TemplateProject.Project)
-
 	}
 	query, variables := markTemplateArgs(config)
 	err = config.client.Mutate("MarkProjectTemplate", query, variables)

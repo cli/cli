@@ -408,7 +408,6 @@ func TestProjects_ViewerQueryDoesNotUseQueryItems(t *testing.T) {
 }
 
 func TestProjectFields_LowerLimit(t *testing.T) {
-
 	defer gock.Off()
 	gock.Observe(gock.DumpRequest)
 
@@ -605,7 +604,6 @@ func TestNewOwner_nonTTY(t *testing.T) {
 	client := NewTestClient()
 	_, err := client.NewOwner(false, "")
 	assert.EqualError(t, err, "owner is required when not running interactively")
-
 }
 
 func TestProjectItems_FieldTitle(t *testing.T) {

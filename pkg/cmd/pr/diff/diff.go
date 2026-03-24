@@ -341,7 +341,9 @@ type sanitizer struct{ transform.NopResetter }
 
 // Transform implements transform.Transformer.
 func (t sanitizer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
-	for r, size := rune(0), 0; nSrc < len(src); {
+	var r rune
+	var size int
+	for nSrc < len(src) {
 		if r = rune(src[nSrc]); r < utf8.RuneSelf {
 			size = 1
 		} else if r, size = utf8.DecodeRune(src[nSrc:]); size == 1 && !atEOF && !utf8.FullRune(src[nSrc:]) {
@@ -355,7 +357,7 @@ func (t sanitizer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err e
 				err = transform.ErrShortDst
 				break
 			}
-			for i := 0; i < size; i++ {
+			for range size {
 				dst[nDst] = src[nSrc]
 				nDst++
 				nSrc++

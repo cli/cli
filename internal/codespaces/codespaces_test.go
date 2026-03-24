@@ -10,7 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/api"
 )
 
-func init() {
+func init() { //nolint:gochecknoinits // Sets test backoff to 0 for fast test execution
 	// Set the backoff to 0 for testing so that they run quickly
 	codespaceStatePollingBackoff = backoff.NewConstantBackOff(time.Second * 0)
 }

@@ -86,7 +86,7 @@ func getAttestationDetail(tenant string, attr api.Attestation) (AttestationDetai
 	}
 
 	var predicate Predicate
-	predicateJson, err := json.Marshal(statement.Predicate)
+	predicateJson, err := json.Marshal(statement.GetPredicate())
 	if err != nil {
 		return AttestationDetail{}, fmt.Errorf("failed to marshal predicate: %v", err)
 	}

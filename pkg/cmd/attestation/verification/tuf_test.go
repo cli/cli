@@ -1,7 +1,6 @@
 package verification
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -11,7 +10,7 @@ import (
 )
 
 func TestGitHubTUFOptionsNoMetadataDir(t *testing.T) {
-	os.Setenv("CODESPACES", "true")
+	t.Setenv("CODESPACES", "true")
 	opts := GitHubTUFOptions(o.None[string](), nil)
 
 	require.Equal(t, GitHubTUFMirror, opts.RepositoryBaseURL)

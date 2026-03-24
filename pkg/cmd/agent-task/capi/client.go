@@ -71,7 +71,7 @@ func (ct *capiTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		req.Header.Add("Copilot-Integration-Id", "copilot-4-cli")
 
 		// Ensure we are not using GitHub API versions while targeting CAPI.
-		req.Header.Set("X-GitHub-Api-Version", "2026-01-09")
+		req.Header.Set("X-Github-Api-Version", "2026-01-09")
 	}
 	return ct.rp.RoundTrip(req)
 }

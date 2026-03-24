@@ -238,7 +238,7 @@ func (q Qualifiers) Map() map[string][]string {
 	m := map[string][]string{}
 	v := reflect.ValueOf(q)
 	t := reflect.TypeOf(q)
-	for i := 0; i < v.NumField(); i++ {
+	for i := range v.NumField() {
 		fieldName := t.Field(i).Name
 		key := camelToKebab(fieldName)
 		typ := v.FieldByName(fieldName).Kind()
@@ -255,7 +255,7 @@ func (q Qualifiers) Map() map[string][]string {
 				continue
 			}
 			s := []string{}
-			for i := 0; i < value.Len(); i++ {
+			for i := range value.Len() {
 				if value.Index(i).IsZero() {
 					continue
 				}

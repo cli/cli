@@ -175,7 +175,7 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(run.Title(), tableprinter.WithColor(cs.Bold))
 		tp.AddField(run.WorkflowName())
 		tp.AddField(run.HeadBranch, tableprinter.WithColor(cs.Bold))
-		tp.AddField(string(run.Event))
+		tp.AddField(run.Event)
 		tp.AddField(fmt.Sprintf("%d", run.ID), tableprinter.WithColor(cs.Cyan))
 		tp.AddField(run.Duration(opts.now).String())
 		tp.AddTimeField(opts.now, run.StartedTime(), cs.Muted)

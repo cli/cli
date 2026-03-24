@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	attio "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	o "github.com/cli/cli/v2/pkg/option"
@@ -26,6 +27,7 @@ type Options struct {
 	VerifyOnly  bool
 	Hostname    string
 	TrustDomain string
+	Out         io.Writer
 }
 
 type tufClientInstantiator func(o *tuf.Options) (*tuf.Client, error)
@@ -80,7 +82,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 				if !c.Authentication().HasActiveToken(opts.Hostname) {
 					return fmt.Errorf("not authenticated with %s", opts.Hostname)
 				}
-				logger := io.NewHandler(f.IOStreams)
+				logger := attio.NewHandler(f.IOStreams)
 				apiClient := api.NewLiveClient(hc, opts.Hostname, logger)
 				td, err := apiClient.GetTrustDomain()
 				if err != nil {
@@ -93,6 +95,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 				return runF(opts)
 			}
 
+			opts.Out = f.IOStreams.Out
 			if err := getTrustedRoot(tuf.New, opts, hc); err != nil {
 				return fmt.Errorf("Failed to verify the TUF repository: %w", err)
 			}
@@ -177,9 +180,9 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options, hc *http.Clien
 			}
 
 			if !opts.VerifyOnly {
-				fmt.Println(output)
+				fmt.Fprintln(opts.Out, output)
 			} else {
-				fmt.Printf("Local TUF repository for %s updated and verified\n", tufOpt.tufOptions.RepositoryBaseURL)
+				fmt.Fprintf(opts.Out, "Local TUF repository for %s updated and verified\n", tufOpt.tufOptions.RepositoryBaseURL)
 			}
 		}
 	}

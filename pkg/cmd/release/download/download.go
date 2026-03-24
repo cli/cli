@@ -259,7 +259,7 @@ func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload
 	close(jobs)
 
 	var downloadError error
-	for i := 0; i < len(toDownload); i++ {
+	for range toDownload {
 		if err := <-results; err != nil && !errors.Is(err, errSkipped) {
 			downloadError = err
 		}

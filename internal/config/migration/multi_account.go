@@ -10,7 +10,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/config"
 )
 
-var noTokenError = errors.New("no token found")
+var errNoToken = errors.New("no token found")
 
 type CowardlyRefusalError struct {
 	err error
@@ -107,7 +107,7 @@ func (m MultiAccount) Do(c *config.Config) error {
 		tokenSource, err := getToken(c, hostname)
 		// If no token existed for this host we'll remove the entry from the hosts file
 		// by deleting it and moving on to the next one.
-		if errors.Is(err, noTokenError) {
+		if errors.Is(err, errNoToken) {
 			// The only error that can be returned here is the key not existing, which
 			// we know can't be true.
 			_ = c.Remove(append(hostsKey, hostname))
@@ -150,7 +150,7 @@ func getToken(c *config.Config, hostname string) (tokenSource, error) {
 
 	// Otherwise we'll return a sentinel error
 	if err != nil || token == "" {
-		return tokenSource{}, noTokenError
+		return tokenSource{}, errNoToken
 	}
 
 	return tokenSource{

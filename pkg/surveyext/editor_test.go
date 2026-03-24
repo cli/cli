@@ -252,6 +252,7 @@ func (t *testTerminal) Stdio() terminal.Stdio {
 // teeWriter is a writer that duplicates all writes to a file into a buffer
 type teeWriter struct {
 	*os.File
+
 	buf bytes.Buffer
 	mu  sync.Mutex
 }

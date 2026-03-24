@@ -73,7 +73,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	return cmd
 }
 
-func viewRun(opts *ViewOptions) error {
+func viewRun(opts *ViewOptions) error { //nolint:gocyclo
 	gistID := opts.Selector
 	client, err := opts.HttpClient()
 	if err != nil {

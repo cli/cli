@@ -74,7 +74,7 @@ func (e *Extension) URL() string {
 		}
 	case GitKind:
 		if remoteURL, err := e.gitClient.Config("remote.origin.url"); err == nil {
-			url = strings.TrimSpace(string(remoteURL))
+			url = strings.TrimSpace(remoteURL)
 		}
 	}
 
@@ -196,7 +196,7 @@ func (e *Extension) Owner() string {
 		}
 	case GitKind:
 		if remoteURL, err := e.gitClient.Config("remote.origin.url"); err == nil {
-			if url, err := git.ParseURL(strings.TrimSpace(string(remoteURL))); err == nil {
+			if url, err := git.ParseURL(strings.TrimSpace(remoteURL)); err == nil {
 				if repo, err := ghrepo.FromURL(url); err == nil {
 					owner = repo.RepoOwner()
 				}

@@ -120,7 +120,7 @@ func newCreateCmd(app *App) *cobra.Command {
 }
 
 // Create creates a new Codespace
-func (a *App) Create(ctx context.Context, opts createOptions) error {
+func (a *App) Create(ctx context.Context, opts createOptions) error { //nolint:gocyclo
 	// Overrides for Codespace developers to target test environments
 	vscsLocation := os.Getenv("VSCS_LOCATION")
 	vscsTarget := os.Getenv("VSCS_TARGET")
@@ -237,7 +237,6 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 
 		if len(devcontainers) > 0 {
-
 			// if there is only one devcontainer.json file and it is one of the default paths we can auto-select it
 			if len(devcontainers) == 1 && stringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
 				devContainerPath = devcontainers[0].Path
@@ -323,7 +322,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 		codespace, err = a.handleAdditionalPermissions(ctx, prompter, createParams, aerr.AllowPermissionsURL)
 		if err != nil {
-			// this error could be a cmdutil.SilentError (in the case that the user opened the browser) so we don't want to wrap it
+			// this error could be a cmdutil.ErrSilent (in the case that the user opened the browser) so we don't want to wrap it
 			return err
 		}
 	}
@@ -356,7 +355,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, prompter SurveyPr
 	if !isInteractive {
 		fmt.Fprintf(a.io.ErrOut, "%s in your browser to review and authorize additional permissions: %s\n", cs.Bold("Open this URL"), allowPermissionsURL)
 		fmt.Fprintf(a.io.ErrOut, "Alternatively, you can run %q with the %q option to continue without authorizing additional permissions.\n", a.io.ColorScheme().Bold("create"), cs.Bold("--default-permissions"))
-		return nil, cmdutil.SilentError
+		return nil, cmdutil.ErrSilent
 	}
 
 	choices := []string{
@@ -527,7 +526,7 @@ func getMachineName(ctx context.Context, apiClient apiClient, prompter SurveyPro
 		}
 
 		availableMachines := make([]string, len(machines))
-		for i := 0; i < len(machines); i++ {
+		for i := range machines {
 			availableMachines[i] = machines[i].Name
 		}
 

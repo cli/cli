@@ -1217,7 +1217,7 @@ func Test_createRun(t *testing.T) {
 				To request it, run:
 				gh auth refresh -h github.com -s workflow
 			`),
-			wantErr: cmdutil.SilentError.Error(),
+			wantErr: cmdutil.ErrSilent.Error(),
 		},
 		{
 			name:  "API returns 404, OAuth token has workflow scope",

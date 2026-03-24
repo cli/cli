@@ -23,9 +23,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var alreadyInstalledError = errors.New("alreadyInstalledError")
+var errAlreadyInstalled = errors.New("errAlreadyInstalled")
 
-func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
+func NewCmdExtension(f *cmdutil.Factory) *cobra.Command { //nolint:gocyclo
 	m := f.ExtensionManager
 	io := f.IOStreams
 	gc := f.GitClient
@@ -61,12 +61,12 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		if err != nil {
 			if name != "" {
 				fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
-			} else if errors.Is(err, noExtensionsInstalledError) {
+			} else if errors.Is(err, errNoExtensionsInstalled) {
 				return cmdutil.NewNoResultsError("no installed extensions found")
 			} else {
 				fmt.Fprintf(io.ErrOut, "%s Failed upgrading extensions\n", cs.FailureIcon())
 			}
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 
 		if io.IsStdoutTTY() {
@@ -354,11 +354,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						}
 
 						err = m.InstallLocal(wd)
-						var ErrExtensionExecutableNotFound *ErrExtensionExecutableNotFound
-						if errors.As(err, &ErrExtensionExecutableNotFound) {
+						var ExtensionExecutableNotFoundError *ExtensionExecutableNotFoundError
+						if errors.As(err, &ExtensionExecutableNotFoundError) {
 							cs := io.ColorScheme()
 							if io.IsStdoutTTY() {
-								fmt.Fprintf(io.ErrOut, "%s %s", cs.WarningIcon(), ErrExtensionExecutableNotFound.Error())
+								fmt.Fprintf(io.ErrOut, "%s %s", cs.WarningIcon(), ExtensionExecutableNotFoundError.Error())
 							}
 							return nil
 						}
@@ -378,7 +378,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 							return upgradeFunc(ext.Name(), forceFlag)
 						}
 
-						if errors.Is(err, alreadyInstalledError) {
+						if errors.Is(err, errAlreadyInstalled) {
 							fmt.Fprintf(io.ErrOut, "%s Extension %s is already installed\n", cs.WarningIcon(), ghrepo.FullName(repo))
 							return nil
 						}
@@ -391,13 +391,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					io.StopProgressIndicator()
 
 					if err != nil {
-						if errors.Is(err, releaseNotFoundErr) {
+						if errors.Is(err, errReleaseNotFound) {
 							return fmt.Errorf("%s Could not find a release of %s for %s",
 								cs.FailureIcon(), args[0], cs.Cyan(pinFlag))
-						} else if errors.Is(err, commitNotFoundErr) {
+						} else if errors.Is(err, errCommitNotFound) {
 							return fmt.Errorf("%s %s does not exist in %s",
 								cs.FailureIcon(), cs.Cyan(pinFlag), args[0])
-						} else if errors.Is(err, repositoryNotFoundErr) {
+						} else if errors.Is(err, errRepositoryNotFound) {
 							return fmt.Errorf("%s Could not find extension '%s' on host %s",
 								cs.FailureIcon(), args[0], repo.RepoHost())
 						}
@@ -698,7 +698,7 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 	for _, ext := range m.List() {
 		if ext.Name() == commandName {
 			if extOwner != "" && ext.Owner() == extOwner {
-				return ext, alreadyInstalledError
+				return ext, errAlreadyInstalled
 			}
 			return ext, fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
 		}

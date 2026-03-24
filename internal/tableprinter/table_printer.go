@@ -12,6 +12,7 @@ import (
 
 type TablePrinter struct {
 	tableprinter.TablePrinter
+
 	isTTY bool
 	cs    *iostreams.ColorScheme
 }

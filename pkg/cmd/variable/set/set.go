@@ -203,7 +203,7 @@ func setRun(opts *SetOptions) error {
 
 	var errs []error
 	cs := opts.IO.ColorScheme()
-	for i := 0; i < len(variables); i++ {
+	for range len(variables) {
 		result := <-setc
 		if result.Err != nil {
 			errs = append(errs, result.Err)

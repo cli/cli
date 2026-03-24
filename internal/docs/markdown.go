@@ -32,7 +32,6 @@ func printAliases(w io.Writer, cmd *cobra.Command) {
 		fmt.Fprint(w, text.FormatSlice(strings.Split(strings.Join(root.BuildAliasList(cmd, cmd.Aliases), ", "), ","), 0, 0, "", "", true))
 		fmt.Fprint(w, "\n\n")
 	}
-
 }
 
 func printOptions(w io.Writer, cmd *cobra.Command) error {
@@ -80,7 +79,6 @@ var defaultValFormats = map[string]string{
 }
 
 func getDefaultValueDisplayString(f *pflag.Flag) string {
-
 	if hiddenFlagDefaults[f.DefValue] || hiddenFlagDefaults[f.Value.Type()] {
 		return ""
 	}
@@ -89,7 +87,6 @@ func getDefaultValueDisplayString(f *pflag.Flag) string {
 		return fmt.Sprintf(dvf, f.Value)
 	}
 	return fmt.Sprintf(" (default %s)", f.Value)
-
 }
 
 type flagView struct {

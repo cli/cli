@@ -102,7 +102,7 @@ func helperRun(opts *CredentialOptions) error {
 	}
 
 	if wants["protocol"] != "https" {
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	cfg, err := opts.Config()
@@ -128,11 +128,11 @@ func helperRun(opts *CredentialOptions) error {
 	}
 
 	if gotUser == "" || gotToken == "" {
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	if wants["username"] != "" && gotUser != tokenUser && !strings.EqualFold(wants["username"], gotUser) {
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	fmt.Fprint(opts.IO.Out, "protocol=https\n")

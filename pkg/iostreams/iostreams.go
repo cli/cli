@@ -22,8 +22,8 @@ import (
 
 const DefaultWidth = 80
 
-// ErrClosedPagerPipe is the error returned when writing to a pager that has been closed.
-type ErrClosedPagerPipe struct {
+// ClosedPagerPipeError is the error returned when writing to a pager that has been closed.
+type ClosedPagerPipeError struct {
 	error
 }
 
@@ -566,7 +566,7 @@ func isCygwinTerminal(fd uintptr) bool {
 	return isatty.IsCygwinTerminal(fd)
 }
 
-// pagerWriter implements a WriteCloser that wraps all EPIPE errors in an ErrClosedPagerPipe type.
+// pagerWriter implements a WriteCloser that wraps all EPIPE errors in an ClosedPagerPipeError type.
 type pagerWriter struct {
 	io.WriteCloser
 }
@@ -574,7 +574,7 @@ type pagerWriter struct {
 func (w *pagerWriter) Write(d []byte) (int, error) {
 	n, err := w.WriteCloser.Write(d)
 	if err != nil && (errors.Is(err, io.ErrClosedPipe) || isEpipeError(err)) {
-		return n, &ErrClosedPagerPipe{err}
+		return n, &ClosedPagerPipeError{err}
 	}
 	return n, err
 }
@@ -582,6 +582,7 @@ func (w *pagerWriter) Write(d []byte) (int, error) {
 // fdWriter represents a wrapped stdout Writer that preserves the original file descriptor
 type fdWriter struct {
 	io.Writer
+
 	fd uintptr
 }
 
@@ -592,6 +593,7 @@ func (w *fdWriter) Fd() uintptr {
 // fdWriteCloser represents a wrapped stdout Writer that preserves the original file descriptor
 type fdWriteCloser struct {
 	io.WriteCloser
+
 	fd uintptr
 }
 
@@ -602,6 +604,7 @@ func (w *fdWriteCloser) Fd() uintptr {
 // fdReader represents a wrapped stdin ReadCloser that preserves the original file descriptor
 type fdReader struct {
 	io.ReadCloser
+
 	fd uintptr
 }
 

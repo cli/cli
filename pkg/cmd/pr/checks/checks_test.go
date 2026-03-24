@@ -182,7 +182,7 @@ func Test_checksRun(t *testing.T) {
 				✓  cool tests               1m26s    sweet link
 				*  slow tests               1m26s    sweet link
 			`),
-			wantErr: "SilentError",
+			wantErr: "ErrSilent",
 		},
 		{
 			name: "some cancelled tty",
@@ -223,7 +223,7 @@ func Test_checksRun(t *testing.T) {
 				*  slow tests               1m26s    sweet link
 				-  sad tests                1m26s    sweet link
 			`),
-			wantErr: "PendingError",
+			wantErr: "ErrPending",
 		},
 		{
 			name: "all passing tty",
@@ -302,7 +302,7 @@ func Test_checksRun(t *testing.T) {
 				✓  cool tests               1m26s    sweet link
 				*  slow tests               1m26s    sweet link
 			`, "\x1b"),
-			wantErr: "SilentError",
+			wantErr: "ErrSilent",
 		},
 		{
 			name: "with statuses tty",
@@ -322,7 +322,7 @@ func Test_checksRun(t *testing.T) {
 				✓  cool tests               1m26s    sweet link
 				✓  rad tests                1m26s    sweet link
 			`),
-			wantErr: "SilentError",
+			wantErr: "ErrSilent",
 		},
 		{
 			name: "no commits",
@@ -355,7 +355,7 @@ func Test_checksRun(t *testing.T) {
 				)
 			},
 			wantOut: "sad tests\tfail\t1m26s\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\n",
-			wantErr: "SilentError",
+			wantErr: "ErrSilent",
 		},
 		{
 			name: "some pending",
@@ -366,7 +366,7 @@ func Test_checksRun(t *testing.T) {
 				)
 			},
 			wantOut: "cool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\nslow tests\tpending\t1m26s\tsweet link\t\nsad tests\tfail\t1m26s\tsweet link\t\n",
-			wantErr: "PendingError",
+			wantErr: "ErrPending",
 		},
 		{
 			name: "all passing",
@@ -388,7 +388,7 @@ func Test_checksRun(t *testing.T) {
 				)
 			},
 			wantOut: "a status\tfail\t0\tsweet link\t\ncool tests\tpass\t1m26s\tsweet link\t\nrad tests\tpass\t1m26s\tsweet link\t\n",
-			wantErr: "SilentError",
+			wantErr: "ErrSilent",
 		},
 		{
 			name: "some skipped tty",

@@ -87,11 +87,11 @@ func runAdd(opts *AddOptions) error {
 		if errors.Is(err, errScopesMissing) {
 			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to list GPG keys\n")
 			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s write:gpg_key"))
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 		if errors.Is(err, errDuplicateKey) {
 			fmt.Fprintf(opts.IO.ErrOut, "%s Error: the key already exists in your account\n", cs.FailureIcon())
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 		if errors.Is(err, errWrongFormat) {
 			fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
@@ -99,7 +99,7 @@ func runAdd(opts *AddOptions) error {
 				Find your GPG key ID with:    %s
 				Then add it to your account:  %s
 			`, cs.FailureIcon(), cs.Bold("gpg --list-keys"), cs.Bold("gpg --armor --export <ID> | gh gpg-key add -")))
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 		return err
 	}

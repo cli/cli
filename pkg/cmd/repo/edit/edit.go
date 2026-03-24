@@ -387,7 +387,7 @@ func interactiveChoice(p iprompter, r *api.Repository) ([]string, error) {
 	return answers, err
 }
 
-func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
+func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error { //nolint:gocyclo
 	for _, v := range r.RepositoryTopics.Nodes {
 		opts.topicsCache = append(opts.topicsCache, v.Topic.Name)
 	}
@@ -607,7 +607,7 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 		return err
 	}
 
-	req.Header.Set("Content-type", "application/json")
+	req.Header.Set("Content-Type", "application/json")
 	// "mercy-preview" is still needed for some GitHub Enterprise versions
 	req.Header.Set("Accept", "application/vnd.github.mercy-preview+json")
 	res, err := httpClient.Do(req)

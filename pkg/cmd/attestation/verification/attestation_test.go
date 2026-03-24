@@ -44,7 +44,7 @@ func TestLoadBundlesFromJSONLinesFile(t *testing.T) {
 
 func TestLoadBundlesFromJSONLinesFile_RejectEmptyJSONLFile(t *testing.T) {
 	// Create a temporary file
-	emptyJSONL, err := os.CreateTemp("", "empty.jsonl")
+	emptyJSONL, err := os.CreateTemp(t.TempDir(), "empty.jsonl")
 	require.NoError(t, err)
 	err = emptyJSONL.Close()
 	require.NoError(t, err)

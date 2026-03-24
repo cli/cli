@@ -484,7 +484,6 @@ func TestTryDetermineDefaultPRHead(t *testing.T) {
 			require.Equal(t, "feature-branch", defaultPRHead.BranchName)
 		})
 	})
-
 }
 
 func dummyRemotesFn() (ghContext.Remotes, error) {

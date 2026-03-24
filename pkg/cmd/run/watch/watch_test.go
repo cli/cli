@@ -243,7 +243,7 @@ func TestWatchRun(t *testing.T) {
 			},
 			wantOut: "Run CI (1234) has already completed with 'failure'\n",
 			wantErr: true,
-			errMsg:  "SilentError",
+			errMsg:  "ErrSilent",
 		},
 		{
 			name: "prompt, no in progress runs",
@@ -306,7 +306,7 @@ func TestWatchRun(t *testing.T) {
 			},
 			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk CI · 2\nTriggered via push about 59 minutes ago\n\n\x1b[?1049lX trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run CI (2) completed with 'failure'\n",
 			wantErr: true,
-			errMsg:  "SilentError",
+			errMsg:  "ErrSilent",
 		},
 		{
 			name: "failed to get run status",

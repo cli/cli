@@ -126,11 +126,11 @@ func TestStartJupyterServerSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected %v, got %v", nil, err)
 	}
-	if strconv.Itoa(port) != resp.Port {
-		t.Fatalf("expected %s, got %d", resp.Port, port)
+	if strconv.Itoa(port) != resp.GetPort() {
+		t.Fatalf("expected %s, got %d", resp.GetPort(), port)
 	}
-	if url != resp.ServerUrl {
-		t.Fatalf("expected %s, got %s", resp.ServerUrl, url)
+	if url != resp.GetServerUrl() {
+		t.Fatalf("expected %s, got %s", resp.GetServerUrl(), url)
 	}
 
 	verifyNotifyCodespaceOfClientActivity(t, server)
@@ -156,7 +156,7 @@ func TestStartJupyterServerFailure(t *testing.T) {
 	}
 	defer stop()
 
-	errorMessage := fmt.Sprintf("failed to start JupyterLab: %s", resp.Message)
+	errorMessage := fmt.Sprintf("failed to start JupyterLab: %s", resp.GetMessage())
 	port, url, err := invoker.StartJupyterServer(context.Background())
 	if err.Error() != errorMessage {
 		t.Fatalf("expected %v, got %v", errorMessage, err)
@@ -269,11 +269,11 @@ func TestStartSSHServerSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected %v, got %v", nil, err)
 	}
-	if strconv.Itoa(port) != resp.ServerPort {
-		t.Fatalf("expected %s, got %d", resp.ServerPort, port)
+	if strconv.Itoa(port) != resp.GetServerPort() {
+		t.Fatalf("expected %s, got %d", resp.GetServerPort(), port)
 	}
-	if user != resp.User {
-		t.Fatalf("expected %s, got %s", resp.User, user)
+	if user != resp.GetUser() {
+		t.Fatalf("expected %s, got %s", resp.GetUser(), user)
 	}
 
 	verifyNotifyCodespaceOfClientActivity(t, server)
@@ -299,7 +299,7 @@ func TestStartSSHServerFailure(t *testing.T) {
 	}
 	defer stop()
 
-	errorMessage := fmt.Sprintf("failed to start SSH server: %s", resp.Message)
+	errorMessage := fmt.Sprintf("failed to start SSH server: %s", resp.GetMessage())
 	port, user, err := invoker.StartSSHServer(context.Background())
 	if err.Error() != errorMessage {
 		t.Fatalf("expected %v, got %v", errorMessage, err)

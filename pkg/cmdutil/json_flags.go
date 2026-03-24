@@ -52,7 +52,6 @@ func addTemplateFlag(f *pflag.FlagSet, shorthand string) {
 }
 
 func setupJsonFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
-
 	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
 		var prefix string
@@ -264,7 +263,7 @@ func (e *jsonExporter) exportData(v reflect.Value) interface{} {
 		}
 	case reflect.Slice:
 		a := make([]interface{}, v.Len())
-		for i := 0; i < v.Len(); i++ {
+		for i := range v.Len() {
 			a[i] = e.exportData(v.Index(i))
 		}
 		return a

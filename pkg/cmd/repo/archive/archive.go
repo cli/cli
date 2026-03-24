@@ -121,7 +121,7 @@ func archiveRun(opts *ArchiveOptions) error {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
 		if !confirmed {
-			return cmdutil.CancelError
+			return cmdutil.ErrCancel
 		}
 	}
 

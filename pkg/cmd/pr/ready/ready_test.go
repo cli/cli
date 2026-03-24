@@ -216,7 +216,7 @@ func TestPRReady_closed(t *testing.T) {
 	}, ghrepo.New("OWNER", "REPO"))
 
 	output, err := runCommand(http, true, "123")
-	assert.EqualError(t, err, "SilentError")
+	assert.EqualError(t, err, "ErrSilent")
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "X Pull request OWNER/REPO#123 is closed. Only draft pull requests can be marked as \"ready for review\"\n", output.Stderr())
 }

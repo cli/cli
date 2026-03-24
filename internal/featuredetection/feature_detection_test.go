@@ -353,6 +353,7 @@ func TestRepositoryFeatures(t *testing.T) {
 }
 
 func TestProjectV1Support(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		hostname     string
@@ -421,6 +422,7 @@ func TestProjectV1Support(t *testing.T) {
 }
 
 func TestAdvancedIssueSearchSupport(t *testing.T) {
+	t.Parallel()
 	withIssueAdvanced := `{"data":{"SearchType":{"enumValues":[{"name":"ISSUE"},{"name":"ISSUE_ADVANCED"},{"name":"REPOSITORY"},{"name":"USER"},{"name":"DISCUSSION"}]}}}`
 	withoutIssueAdvanced := `{"data":{"SearchType":{"enumValues":[{"name":"ISSUE"},{"name":"REPOSITORY"},{"name":"USER"},{"name":"DISCUSSION"}]}}}`
 
@@ -653,6 +655,7 @@ func TestProjectFeatures(t *testing.T) {
 }
 
 func TestReleaseFeatures(t *testing.T) {
+	t.Parallel()
 	withImmutableReleaseSupport := `{"data":{"Release":{"fields":[{"name":"author"},{"name":"name"},{"name":"immutable"}]}}}`
 	withoutImmutableReleaseSupport := `{"data":{"Release":{"fields":[{"name":"author"},{"name":"name"}]}}}`
 
@@ -764,6 +767,7 @@ func TestReleaseFeatures(t *testing.T) {
 }
 
 func TestActionsFeatures(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		hostname     string

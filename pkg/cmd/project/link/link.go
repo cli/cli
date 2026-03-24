@@ -110,7 +110,6 @@ func NewCmdLink(f *cmdutil.Factory, runF func(config linkConfig) error) *cobra.C
 }
 
 func validateRepoOrTeamFlag(opts *linkOpts) error {
-
 	linkedTarget := ""
 	if opts.repo != "" {
 		linkedTarget = opts.repo

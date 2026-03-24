@@ -39,7 +39,7 @@ const (
 	exitPending exitCode = 8
 )
 
-func Main() exitCode {
+func Main() exitCode { //nolint:gocyclo
 	buildDate := build.Date
 	buildVersion := build.Version
 	hasDebug, _ := utils.IsDebugEnabled()
@@ -109,13 +109,13 @@ func Main() exitCode {
 	rootCmd.SetArgs(expandedArgs)
 
 	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
-		var pagerPipeError *iostreams.ErrClosedPagerPipe
+		var pagerPipeError *iostreams.ClosedPagerPipeError
 		var noResultsError cmdutil.NoResultsError
 		var extError *root.ExternalCommandExitError
 		var authError *root.AuthError
-		if err == cmdutil.SilentError {
+		if err == cmdutil.ErrSilent {
 			return exitError
-		} else if err == cmdutil.PendingError {
+		} else if err == cmdutil.ErrPending {
 			return exitPending
 		} else if cmdutil.IsUserCancellation(err) {
 			if errors.Is(err, terminal.InterruptErr) {

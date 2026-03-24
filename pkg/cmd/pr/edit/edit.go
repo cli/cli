@@ -22,6 +22,8 @@ import (
 )
 
 type EditOptions struct {
+	shared.Editable
+
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
@@ -35,11 +37,9 @@ type EditOptions struct {
 
 	SelectorArg string
 	Interactive bool
-
-	shared.Editable
 }
 
-func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
+func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command { //nolint:gocyclo
 	opts := &EditOptions{
 		IO:              f.IOStreams,
 		HttpClient:      f.HttpClient,

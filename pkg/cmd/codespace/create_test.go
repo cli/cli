@@ -56,7 +56,7 @@ func TestCreateCmdFlagError(t *testing.T) {
 	}
 }
 
-func TestApp_Create(t *testing.T) {
+func TestApp_Create(t *testing.T) { //nolint:gocyclo
 	type fields struct {
 		apiClient apiClient
 	}
@@ -373,7 +373,7 @@ func TestApp_Create(t *testing.T) {
 				showStatus:  false,
 				idleTimeout: 30 * time.Minute,
 			},
-			wantErr: cmdutil.SilentError,
+			wantErr: cmdutil.ErrSilent,
 			wantStderr: `  ✓ Codespaces usage for this repository is paid for by monalisa
 You must authorize or deny additional permissions requested by this codespace before continuing.
 Open this URL in your browser to review and authorize additional permissions: https://example.com/permissions
@@ -405,7 +405,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				showStatus:       false,
 				idleTimeout:      30 * time.Minute,
 			},
-			wantErr: cmdutil.SilentError,
+			wantErr: cmdutil.ErrSilent,
 			wantStderr: `  ✓ Codespaces usage for this repository is paid for by monalisa
 You must authorize or deny additional permissions requested by this codespace before continuing.
 Open this URL in your browser to review and authorize additional permissions: https://example.com/permissions?ref=feature-branch&devcontainer_path=.devcontainer/actions/devcontainer.json

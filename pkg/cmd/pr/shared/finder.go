@@ -108,7 +108,7 @@ type FindOptions struct {
 	Detector fd.Detector
 }
 
-func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, error) {
+func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, error) { //nolint:gocyclo
 	// If we have a URL, we don't need git stuff
 	if len(opts.Fields) == 0 {
 		return nil, nil, errors.New("Find error: no fields specified")

@@ -97,8 +97,7 @@ func deleteRun(opts *DeleteOptions) error {
 	// When executed in an interactive shell, require confirmation, unless
 	// already provided. Otherwise skip confirmation.
 	if opts.IO.CanPrompt() && !opts.Confirmed {
-		cs := opts.IO.ColorScheme()
-		fmt.Printf("%s Deleted issues cannot be recovered.\n", cs.WarningIcon())
+		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted issues cannot be recovered.\n", cs.WarningIcon())
 		err := opts.Prompter.ConfirmDeletion(fmt.Sprintf("%d", issue.Number))
 		if err != nil {
 			return err

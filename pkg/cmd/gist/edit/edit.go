@@ -114,7 +114,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	return cmd
 }
 
-func editRun(opts *EditOptions) error {
+func editRun(opts *EditOptions) error { //nolint:gocyclo
 	client, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func editRun(opts *EditOptions) error {
 
 	gist, err := shared.GetGist(client, host, gistID)
 	if err != nil {
-		if errors.Is(err, shared.NotFoundErr) {
+		if errors.Is(err, shared.ErrNotFound) {
 			return fmt.Errorf("gist not found: %s", gistID)
 		}
 		return err
@@ -335,12 +335,11 @@ func editRun(opts *EditOptions) error {
 			break
 		}
 
-		choice := ""
 		result, err := opts.Prompter.Select("What next?", "", editNextOptions)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
-		choice = editNextOptions[result]
+		choice := editNextOptions[result]
 
 		stop := false
 
@@ -350,7 +349,7 @@ func editRun(opts *EditOptions) error {
 		case "Submit":
 			stop = true
 		case "Cancel":
-			return cmdutil.CancelError
+			return cmdutil.ErrCancel
 		}
 
 		if stop {

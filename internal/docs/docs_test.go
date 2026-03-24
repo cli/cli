@@ -9,7 +9,7 @@ import (
 
 func emptyRun(*cobra.Command, []string) {}
 
-func init() {
+func init() { //nolint:gochecknoinits // Sets up test command tree for docs generation tests
 	rootCmd.PersistentFlags().StringP("rootflag", "r", "two", "")
 	rootCmd.PersistentFlags().StringP("strtwo", "t", "two", "help message for parent flag strtwo")
 

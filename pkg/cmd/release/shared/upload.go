@@ -23,7 +23,7 @@ type httpDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-type errNetwork struct{ error }
+type networkError struct{ error }
 
 type AssetForUpload struct {
 	Name  string
@@ -131,7 +131,7 @@ func ConcurrentUpload(httpClient httpDoer, uploadURL string, numWorkers int, ass
 }
 
 func shouldRetry(err error) bool {
-	var networkError errNetwork
+	var networkError networkError
 	if errors.As(err, &networkError) {
 		return true
 	}
@@ -184,7 +184,7 @@ func uploadAsset(ctx context.Context, httpClient httpDoer, uploadURL string, ass
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, errNetwork{err}
+		return nil, networkError{err}
 	}
 	defer resp.Body.Close()
 

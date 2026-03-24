@@ -103,7 +103,7 @@ func TestPRReopen_alreadyMerged(t *testing.T) {
 	}, ghrepo.New("OWNER", "REPO"))
 
 	output, err := runCommand(http, true, "123")
-	assert.EqualError(t, err, "SilentError")
+	assert.EqualError(t, err, "ErrSilent")
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "X Pull request OWNER/REPO#123 (The title of the PR) can't be reopened because it was already merged\n", output.Stderr())
 }

@@ -400,7 +400,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			env:     map[string]string{"GH_TOKEN": "value_from_env"},
-			wantErr: "SilentError",
+			wantErr: "ErrSilent",
 			wantStderr: heredoc.Doc(`
                 The value of the GH_TOKEN environment variable is being used for authentication.
                 To have GitHub CLI store credentials instead, first clear the value from the environment.
@@ -413,7 +413,7 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			env:     map[string]string{"GH_ENTERPRISE_TOKEN": "value_from_env"},
-			wantErr: "SilentError",
+			wantErr: "ErrSilent",
 			wantStderr: heredoc.Doc(`
                 The value of the GH_ENTERPRISE_TOKEN environment variable is being used for authentication.
                 To have GitHub CLI store credentials instead, first clear the value from the environment.

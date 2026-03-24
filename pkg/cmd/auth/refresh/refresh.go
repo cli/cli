@@ -169,7 +169,7 @@ func refreshRun(opts *RefreshOptions) error {
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
 		fmt.Fprint(opts.IO.ErrOut, "To refresh credentials stored in GitHub CLI, first clear the value from the environment.\n")
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	additionalScopes := set.NewStringSet()

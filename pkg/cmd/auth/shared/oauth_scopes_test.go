@@ -34,7 +34,7 @@ func Test_HasMinimumScopes(t *testing.T) {
 
 			var gotAuthorization string
 			fakehttp.Register(httpmock.REST("GET", ""), func(req *http.Request) (*http.Response, error) {
-				gotAuthorization = req.Header.Get("authorization")
+				gotAuthorization = req.Header.Get("Authorization")
 				return &http.Response{
 					Request:    req,
 					StatusCode: 200,
@@ -96,7 +96,6 @@ func Test_HeaderHasMinimumScopes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			err := HeaderHasMinimumScopes(tt.header)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)

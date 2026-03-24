@@ -81,7 +81,7 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 		}
 
 		if !confirmed {
-			return cmdutil.CancelError
+			return cmdutil.ErrCancel
 		}
 	}
 

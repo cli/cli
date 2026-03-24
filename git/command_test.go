@@ -42,7 +42,6 @@ func TestOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			cmd := Command{
 				&exec.Cmd{
 					Path: createMockExecutable(t, tt.stdout, tt.stderr, tt.exitCode),
@@ -87,7 +86,6 @@ func createMockExecutable(t *testing.T, stdout string, stderr string, exitCode i
 		t.Fatalf("failed to compile: %v\n%s", err, out)
 	}
 	return binaryPath
-
 }
 
 func buildCommandSourceCode(exitCode int, stdout, stderr string) string {

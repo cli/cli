@@ -19,6 +19,7 @@ const (
 
 type TunnelClient struct {
 	*tunnels.Client
+
 	connected bool
 	mu        sync.Mutex
 }

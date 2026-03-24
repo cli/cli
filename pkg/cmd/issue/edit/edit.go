@@ -21,6 +21,8 @@ import (
 )
 
 type EditOptions struct {
+	prShared.Editable
+
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -34,8 +36,6 @@ type EditOptions struct {
 
 	IssueNumbers []int
 	Interactive  bool
-
-	prShared.Editable
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {

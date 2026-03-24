@@ -252,7 +252,7 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 
 		tp.AddField(run.WorkflowName())
 		tp.AddField(run.HeadBranch, tableprinter.WithColor(cs.Bold))
-		tp.AddField(string(run.Event))
+		tp.AddField(run.Event)
 
 		if opts.Raw {
 			tp.AddField(run.Duration(opts.now).String())

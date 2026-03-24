@@ -106,16 +106,16 @@ type commandStub struct {
 	callbacks  []CommandCallback
 }
 
-type errWithExitCode struct {
+type withExitCodeError struct {
 	message  string
 	exitCode int
 }
 
-func (e errWithExitCode) Error() string {
+func (e withExitCodeError) Error() string {
 	return e.message
 }
 
-func (e errWithExitCode) ExitCode() int {
+func (e withExitCodeError) ExitCode() int {
 	return e.exitCode
 }
 
@@ -124,7 +124,7 @@ func (s *commandStub) Run() error {
 	if s.exitStatus != 0 {
 		// It's nontrivial to construct a fake `exec.ExitError` instance, so we return an error type
 		// that has the `ExitCode() int` method.
-		return errWithExitCode{
+		return withExitCodeError{
 			message:  fmt.Sprintf("%s exited with status %d", s.pattern, s.exitStatus),
 			exitCode: s.exitStatus,
 		}

@@ -189,9 +189,9 @@ func (m *templateManager) Choose() (Template, error) {
 		return nil, nil
 	}
 
-	names := make([]string, len(m.templates))
-	for i, t := range m.templates {
-		names[i] = t.Name()
+	names := make([]string, 0, len(m.templates))
+	for _, t := range m.templates {
+		names = append(names, t.Name())
 	}
 
 	blankOption := "Open a blank issue"

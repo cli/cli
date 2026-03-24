@@ -54,7 +54,7 @@ func (s *LiveStore) createMetadataFile(artifactDigest string, attestationsResp [
 		}
 
 		withNewline := fmt.Sprintf("%s\n", attBytes)
-		_, err = f.Write([]byte(withNewline))
+		_, err = f.WriteString(withNewline)
 		if err != nil {
 			if err = f.Close(); err != nil {
 				return "", errors.Join(ErrAttestationFileCreation, fmt.Errorf("failed to close file while handling write error: %v", err))

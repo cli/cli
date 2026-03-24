@@ -120,7 +120,7 @@ func unarchiveRun(opts *UnarchiveOptions) error {
 			return err
 		}
 		if !confirmed {
-			return cmdutil.CancelError
+			return cmdutil.ErrCancel
 		}
 	}
 

@@ -90,7 +90,7 @@ func updateBranchRun(opts *UpdateBranchOptions) error {
 	cs := opts.IO.ColorScheme()
 	if pr.Mergeable == api.PullRequestMergeableConflicting {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Cannot update PR branch due to conflicts\n", cs.FailureIcon())
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -126,7 +126,7 @@ func updateBranchRun(opts *UpdateBranchOptions) error {
 		// TODO: this is a best effort approach and not a resilient way of handling API errors.
 		if strings.Contains(err.Error(), "GraphQL: merge conflict between base and head (updatePullRequestBranch)") {
 			fmt.Fprintf(opts.IO.ErrOut, "%s Cannot update PR branch due to conflicts\n", cs.FailureIcon())
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 		return err
 	}

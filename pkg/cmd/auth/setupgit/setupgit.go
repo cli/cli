@@ -107,7 +107,7 @@ func setupGitRun(opts *SetupGitOptions) error {
 			cs.Bold("gh auth login"),
 		)
 
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	for _, hostname := range hostnames {

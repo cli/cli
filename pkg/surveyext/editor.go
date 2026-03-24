@@ -15,25 +15,26 @@ import (
 )
 
 var (
-	bom           = []byte{0xef, 0xbb, 0xbf}
-	defaultEditor = "nano" // EXTENDED to switch from vim as a default editor
+	bom = []byte{0xef, 0xbb, 0xbf}
+	// EXTENDED to switch from vim as a default editor
+	defaultEditor = func() string {
+		if g := os.Getenv("GIT_EDITOR"); g != "" {
+			return g
+		} else if v := os.Getenv("VISUAL"); v != "" {
+			return v
+		} else if e := os.Getenv("EDITOR"); e != "" {
+			return e
+		} else if runtime.GOOS == "windows" {
+			return "notepad"
+		}
+		return "nano"
+	}()
 )
-
-func init() {
-	if g := os.Getenv("GIT_EDITOR"); g != "" {
-		defaultEditor = g
-	} else if v := os.Getenv("VISUAL"); v != "" {
-		defaultEditor = v
-	} else if e := os.Getenv("EDITOR"); e != "" {
-		defaultEditor = e
-	} else if runtime.GOOS == "windows" {
-		defaultEditor = "notepad"
-	}
-}
 
 // EXTENDED to enable different prompting behavior
 type GhEditor struct {
 	*survey.Editor
+
 	EditorCommand string
 	BlankAllowed  bool
 
@@ -56,6 +57,7 @@ var EditorQuestionTemplate = `
 // EXTENDED to pass editor name (to use in prompt)
 type EditorTemplateData struct {
 	survey.Editor
+
 	EditorCommand string
 	BlankAllowed  bool
 	Answer        string

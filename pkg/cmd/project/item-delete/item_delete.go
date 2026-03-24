@@ -104,7 +104,6 @@ func runDeleteItem(config deleteItemConfig) error {
 	}
 
 	return printResults(config)
-
 }
 
 func deleteItemArgs(config deleteItemConfig) (*deleteProjectItemMutation, map[string]interface{}) {

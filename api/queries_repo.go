@@ -248,22 +248,22 @@ type GitIgnore struct {
 }
 
 // RepoOwner is the login name of the owner
-func (r Repository) RepoOwner() string {
+func (r *Repository) RepoOwner() string {
 	return r.Owner.Login
 }
 
 // RepoName is the name of the repository
-func (r Repository) RepoName() string {
+func (r *Repository) RepoName() string {
 	return r.Name
 }
 
 // RepoHost is the GitHub hostname of the repository
-func (r Repository) RepoHost() string {
+func (r *Repository) RepoHost() string {
 	return r.hostname
 }
 
 // ViewerCanPush is true when the requesting user has push access
-func (r Repository) ViewerCanPush() bool {
+func (r *Repository) ViewerCanPush() bool {
 	switch r.ViewerPermission {
 	case "ADMIN", "MAINTAIN", "WRITE":
 		return true
@@ -273,7 +273,7 @@ func (r Repository) ViewerCanPush() bool {
 }
 
 // ViewerCanTriage is true when the requesting user can triage issues and pull requests
-func (r Repository) ViewerCanTriage() bool {
+func (r *Repository) ViewerCanTriage() bool {
 	switch r.ViewerPermission {
 	case "ADMIN", "MAINTAIN", "WRITE", "TRIAGE":
 		return true

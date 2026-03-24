@@ -131,7 +131,7 @@ func deleteRun(opts *DeleteOptions) error {
 				statusCode == http.StatusPermanentRedirect {
 				cs := opts.IO.ColorScheme()
 				fmt.Fprintf(opts.IO.ErrOut, "%s Failed to delete repository: %s has changed name or transferred ownership\n", cs.FailureIcon(), fullName)
-				return cmdutil.SilentError
+				return cmdutil.ErrSilent
 			}
 		}
 		return err

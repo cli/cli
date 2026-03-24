@@ -73,7 +73,6 @@ func TestGitCredentialsSetup_setOurs_GH(t *testing.T) {
 	if err := f.Setup("github.com", "monalisa", "PASSWD"); err != nil {
 		t.Errorf("Setup() error = %v", err)
 	}
-
 }
 
 func TestSetup_setOurs_nonGH(t *testing.T) {

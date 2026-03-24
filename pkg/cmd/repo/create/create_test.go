@@ -186,7 +186,7 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
-func Test_createRun(t *testing.T) {
+func Test_createRun(t *testing.T) { //nolint:gocyclo
 	tests := []struct {
 		name        string
 		tty         bool
@@ -258,7 +258,6 @@ func Test_createRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("POST", "user/repos"),
 					httpmock.StringResponse(`{"name":"REPO", "owner":{"login": "OWNER"}, "html_url":"https://github.com/OWNER/REPO"}`))
-
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
@@ -380,7 +379,7 @@ func Test_createRun(t *testing.T) {
 			},
 			wantStdout: "",
 			wantErr:    true,
-			errMsg:     "CancelError",
+			errMsg:     "ErrCancel",
 		},
 		{
 			name: "interactive with existing repository public",

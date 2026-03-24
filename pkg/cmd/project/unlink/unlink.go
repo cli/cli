@@ -110,7 +110,6 @@ func NewCmdUnlink(f *cmdutil.Factory, runF func(config unlinkConfig) error) *cob
 }
 
 func validateRepoOrTeamFlag(opts *unlinkOpts) error {
-
 	unlinkedTarget := ""
 	if opts.repo != "" {
 		unlinkedTarget = opts.repo

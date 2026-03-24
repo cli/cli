@@ -55,7 +55,6 @@ func (c RunLogCache) Create(key string, content io.Reader) error {
 
 	if _, err := io.Copy(out, content); err != nil {
 		return fmt.Errorf("writing cache entry: %v", err)
-
 	}
 
 	return nil
@@ -201,7 +200,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	return cmd
 }
 
-func runView(opts *ViewOptions) error {
+func runView(opts *ViewOptions) error { //nolint:gocyclo
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %w", err)
@@ -336,7 +335,7 @@ func runView(opts *ViewOptions) error {
 		}
 
 		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 		return nil
 	}
@@ -349,7 +348,7 @@ func runView(opts *ViewOptions) error {
 
 	var artifacts []shared.Artifact
 	if selectedJob == nil {
-		artifacts, err = shared.ListArtifacts(httpClient, repo, strconv.FormatInt(int64(run.ID), 10))
+		artifacts, err = shared.ListArtifacts(httpClient, repo, strconv.FormatInt(run.ID, 10))
 		if err != nil {
 			return fmt.Errorf("failed to get artifacts: %w", err)
 		}
@@ -386,7 +385,7 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintf(out, "For more information, see: %s\n", cs.Bold(run.URL))
 
 		if opts.ExitStatus {
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 		return nil
 	}
@@ -432,7 +431,7 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out, cs.Mutedf("View this run on GitHub: %s", run.URL))
 
 		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 	} else {
 		fmt.Fprintln(out)
@@ -444,7 +443,7 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out, cs.Mutedf("View this run on GitHub: %s", run.URL))
 
 		if opts.ExitStatus && shared.IsFailureState(selectedJob.Conclusion) {
-			return cmdutil.SilentError
+			return cmdutil.ErrSilent
 		}
 	}
 

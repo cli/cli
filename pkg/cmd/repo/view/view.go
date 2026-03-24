@@ -124,7 +124,7 @@ func viewRun(opts *ViewOptions) error {
 
 	if !opts.Web && opts.Exporter == nil {
 		readme, err = RepositoryReadme(httpClient, toView, opts.Branch)
-		if err != nil && !errors.Is(err, NotFoundError) {
+		if err != nil && !errors.Is(err, ErrNotFound) {
 			return err
 		}
 	}

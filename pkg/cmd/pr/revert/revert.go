@@ -95,7 +95,7 @@ func revertRun(opts *RevertOptions) error {
 	}
 	if pr.State != "MERGED" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request %s#%d (%s) can't be reverted because it has not been merged\n", cs.FailureIcon(), ghrepo.FullName(baseRepo), pr.Number, pr.Title)
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	httpClient, err := opts.HttpClient()

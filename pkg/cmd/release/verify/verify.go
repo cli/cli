@@ -192,25 +192,25 @@ func printVerifiedSubjects(io *iostreams.IOStreams, att *verification.Attestatio
 	cs := io.ColorScheme()
 	w := io.Out
 
-	statement := att.Attestation.Bundle.GetDsseEnvelope().Payload
+	statement := att.Attestation.Bundle.GetDsseEnvelope().GetPayload()
 	var statementData v1.Statement
 
-	err := protojson.Unmarshal([]byte(statement), &statementData)
+	err := protojson.Unmarshal(statement, &statementData)
 	if err != nil {
 		return err
 	}
 
 	// If there aren't at least two subjects, there are no assets to display
-	if len(statementData.Subject) < 2 {
+	if len(statementData.GetSubject()) < 2 {
 		return nil
 	}
 
 	fmt.Fprintln(w, cs.Bold("Assets"))
 	table := tableprinter.New(io, tableprinter.WithHeader("Name", "Digest"))
 
-	for _, s := range statementData.Subject {
-		name := s.Name
-		digest := s.Digest
+	for _, s := range statementData.GetSubject() {
+		name := s.GetName()
+		digest := s.GetDigest()
 
 		if name != "" {
 			digestStr := ""

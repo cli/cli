@@ -187,7 +187,7 @@ func Test_viewRun(t *testing.T) {
 				}
 			},
 			wantStderr: "session not found\n",
-			wantErr:    cmdutil.SilentError,
+			wantErr:    cmdutil.ErrSilent,
 		},
 		{
 			name: "with session id, api error (tty)",
@@ -557,7 +557,7 @@ func Test_viewRun(t *testing.T) {
 				}
 			},
 			wantStderr: "session not found\n",
-			wantErr:    cmdutil.SilentError,
+			wantErr:    cmdutil.ErrSilent,
 		},
 		{
 			name: "with session id, without pr data, web mode (tty)",

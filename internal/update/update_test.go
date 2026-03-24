@@ -416,7 +416,7 @@ func TestShouldCheckForUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Clearenv()
 			for k, v := range tt.env {
-				os.Setenv(k, v)
+				t.Setenv(k, v)
 			}
 
 			actual := ShouldCheckForUpdate()
@@ -473,7 +473,7 @@ func TestShouldCheckForExtensionUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Clearenv()
 			for k, v := range tt.env {
-				os.Setenv(k, v)
+				t.Setenv(k, v)
 			}
 
 			actual := ShouldCheckForExtensionUpdate()

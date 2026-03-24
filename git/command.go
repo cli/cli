@@ -50,7 +50,7 @@ func (gc *Command) Output() ([]byte, error) {
 		// is not a method and so tests can't access it.
 		// THIS MEANS THAT TESTS WILL NOT CORRECTLY HAVE STDERR SET,
 		// but at least tests can get the exit code.
-		var exitErrorWithExitCode errWithExitCode
+		var exitErrorWithExitCode withExitCodeError
 		if errors.As(err, &exitErrorWithExitCode) {
 			ge.ExitCode = exitErrorWithExitCode.ExitCode()
 		}

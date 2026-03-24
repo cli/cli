@@ -148,7 +148,7 @@ func syncLocalRepo(opts *SyncOptions) error {
 	err = executeLocalRepoSync(srcRepo, remote, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		if errors.Is(err, divergingError) {
+		if errors.Is(err, errDiverging) {
 			return fmt.Errorf("can't sync because there are diverging changes; use `--force` to overwrite the destination branch")
 		}
 		return err
@@ -194,7 +194,7 @@ func syncRemoteRepo(opts *SyncOptions) error {
 	baseBranchLabel, err := executeRemoteRepoSync(apiClient, destRepo, srcRepo, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		if errors.Is(err, divergingError) {
+		if errors.Is(err, errDiverging) {
 			return fmt.Errorf("can't sync because there are diverging changes; use `--force` to overwrite the destination branch")
 		}
 		return err
@@ -216,7 +216,7 @@ func syncRemoteRepo(opts *SyncOptions) error {
 	return nil
 }
 
-var divergingError = errors.New("diverging changes")
+var errDiverging = errors.New("diverging changes")
 
 func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOptions) error {
 	git := opts.Git
@@ -230,7 +230,7 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 			return err
 		}
 		if !fastForward && !useForce {
-			return divergingError
+			return errDiverging
 		}
 		if fastForward && useForce {
 			useForce = false
@@ -288,7 +288,7 @@ func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interfac
 		}
 	}
 
-	var apiErr upstreamMergeErr
+	var apiErr upstreamMergeError
 	if baseBranch, err := triggerUpstreamMerge(client, destRepo, branchName); err == nil {
 		return baseBranch, nil
 	} else if !errors.As(err, &apiErr) {
@@ -320,7 +320,7 @@ func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interfac
 		if errors.As(err, &httpErr) {
 			switch httpErr.Message {
 			case notFastForwardErrorMessage:
-				return "", divergingError
+				return "", errDiverging
 			case branchDoesNotExistErrorMessage:
 				return "", fmt.Errorf("%s branch does not exist on %s repository", branchName, ghrepo.FullName(destRepo))
 			}

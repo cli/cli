@@ -82,7 +82,7 @@ func renameRun(opts *RenameOptions) error {
 
 	gist, err := shared.GetGist(client, host, gistID)
 	if err != nil {
-		if errors.Is(err, shared.NotFoundErr) {
+		if errors.Is(err, shared.ErrNotFound) {
 			return fmt.Errorf("gist not found: %s", gistID)
 		}
 		return err

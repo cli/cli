@@ -31,17 +31,17 @@ func (fe *FlagError) Unwrap() error {
 	return fe.err
 }
 
-// SilentError is an error that triggers exit code 1 without any error messaging
-var SilentError = errors.New("SilentError")
+// ErrSilent is an error that triggers exit code 1 without any error messaging
+var ErrSilent = errors.New("ErrSilent")
 
-// CancelError signals user-initiated cancellation
-var CancelError = errors.New("CancelError")
+// ErrCancel signals user-initiated cancellation
+var ErrCancel = errors.New("ErrCancel")
 
-// PendingError signals nothing failed but something is pending
-var PendingError = errors.New("PendingError")
+// ErrPending signals nothing failed but something is pending
+var ErrPending = errors.New("ErrPending")
 
 func IsUserCancellation(err error) bool {
-	return errors.Is(err, CancelError) || errors.Is(err, terminal.InterruptErr)
+	return errors.Is(err, ErrCancel) || errors.Is(err, terminal.InterruptErr)
 }
 
 func MutuallyExclusive(message string, conditions ...bool) error {

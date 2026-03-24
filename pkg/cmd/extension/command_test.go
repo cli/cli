@@ -290,7 +290,7 @@ func TestNewCmdExtension(t *testing.T) {
 			args: []string{"install", "."},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.InstallLocalFunc = func(dir string) error {
-					return &ErrExtensionExecutableNotFound{
+					return &ExtensionExecutableNotFoundError{
 						Dir:  tempDir,
 						Name: "gh-test",
 					}
@@ -309,7 +309,7 @@ func TestNewCmdExtension(t *testing.T) {
 			args: []string{"install", "."},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.InstallLocalFunc = func(dir string) error {
-					return &ErrExtensionExecutableNotFound{
+					return &ExtensionExecutableNotFoundError{
 						Dir:  tempDir,
 						Name: "gh-test",
 					}
@@ -331,7 +331,7 @@ func TestNewCmdExtension(t *testing.T) {
 					return []extensions.Extension{}
 				}
 				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
-					return repositoryNotFoundErr
+					return errRepositoryNotFound
 				}
 				return func(t *testing.T) {
 					installCalls := em.InstallCalls()
@@ -445,7 +445,7 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 			isTTY:      false,
 			wantErr:    true,
-			errMsg:     "SilentError",
+			errMsg:     "ErrSilent",
 			wantStdout: "",
 			wantStderr: "X Failed upgrading extension hello: oh no\n",
 		},
@@ -522,7 +522,7 @@ func TestNewCmdExtension(t *testing.T) {
 			args: []string{"upgrade", "--all"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.UpgradeFunc = func(name string, force bool) error {
-					return noExtensionsInstalledError
+					return errNoExtensionsInstalled
 				}
 				return func(t *testing.T) {
 					calls := em.UpgradeCalls()
@@ -1052,7 +1052,7 @@ func Test_checkValidExtension(t *testing.T) {
 				extOwner: "monalisa",
 				extName:  "gh-triage",
 			},
-			wantError: "alreadyInstalledError",
+			wantError: "errAlreadyInstalled",
 		},
 	}
 	for _, tt := range tests {

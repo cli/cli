@@ -324,7 +324,6 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldIterationValue(t *testing.
 		t,
 		`{"items":[{"sprint":{"title":"Iteration Title","startDate":"","duration":0,"iterationId":"iterationId"},"content":{"type":"DraftIssue","body":"a body","title":"Pull Request title","id":"draftIssueId"},"id":"draftIssueId"}],"totalCount":5}`,
 		string(out))
-
 }
 
 func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldMilestoneValue(t *testing.T) {
@@ -363,5 +362,4 @@ func TestJSONProjectItem_DraftIssue_ProjectV2ItemFieldMilestoneValue(t *testing.
 		t,
 		`{"items":[{"milestone":{"title":"Milestone Title","dueOn":"","description":""},"content":{"type":"DraftIssue","body":"a body","title":"Pull Request title","id":"draftIssueId"},"id":"draftIssueId"}],"totalCount":5}`,
 		string(out))
-
 }

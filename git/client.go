@@ -45,7 +45,7 @@ var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 // rather than the last null byte in the entire string.
 var commitLogRE = regexp.MustCompile(`(?m)^[0-9a-fA-F]{7,40}\x00.*?\x00[\S\s]*?\x00$`)
 
-type errWithExitCode interface {
+type withExitCodeError interface {
 	ExitCode() int
 }
 
@@ -704,7 +704,7 @@ func (c *Client) revParse(ctx context.Context, args ...string) ([]byte, error) {
 func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
 	_, err := c.GitDir(ctx)
 	if err != nil {
-		var execError errWithExitCode
+		var execError withExitCodeError
 		if errors.As(err, &execError) && execError.ExitCode() == 128 {
 			return false, nil
 		}
@@ -860,7 +860,7 @@ func resolveGitPath() (string, error) {
 			if runtime.GOOS == "windows" {
 				programName = "Git for Windows"
 			}
-			return "", &NotInstalled{
+			return "", &NotInstalledError{
 				message: fmt.Sprintf("unable to find git executable in PATH; please install %s before retrying", programName),
 				err:     err,
 			}

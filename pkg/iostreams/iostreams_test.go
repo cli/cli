@@ -52,7 +52,7 @@ func TestHelperProcess(t *testing.T) {
 	}
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		fmt.Printf("pager: %s\n", scanner.Text())
+		fmt.Printf("pager: %s\n", scanner.Text()) //nolint:forbidigo // This is a subprocess that simulates a pager, not CLI output
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintf(os.Stderr, "error reading stdin: %v", err)

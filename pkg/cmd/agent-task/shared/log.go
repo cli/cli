@@ -88,7 +88,7 @@ func (r *logRenderer) Render(logs []byte, w io.Writer, io *iostreams.IOStreams) 
 	return false, nil
 }
 
-func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.IOStreams) (bool, error) {
+func renderLogEntry(entry chatCompletionChunkEntry, w io.Writer, io *iostreams.IOStreams) (bool, error) { //nolint:gocyclo
 	cs := io.ColorScheme()
 	var stop bool
 	for _, choice := range entry.Choices {

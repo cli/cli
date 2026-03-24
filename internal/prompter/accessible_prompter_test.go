@@ -33,7 +33,6 @@ import (
 // are sufficient to ensure that the accessible prompter behaves roughly as expected
 // but doesn't mandate that prompts always look exactly the same.
 func TestAccessiblePrompter(t *testing.T) {
-
 	beforePasswordSendTimeout := 100 * time.Microsecond
 
 	t.Run("Select", func(t *testing.T) {

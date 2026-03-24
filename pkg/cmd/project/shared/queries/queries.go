@@ -61,6 +61,7 @@ type iprompter interface {
 
 type hostScopedClient struct {
 	*api.Client
+
 	hostname string
 }
 
@@ -207,6 +208,7 @@ type projectQueryBase struct {
 
 type projectQueryWithQueryableItems struct {
 	projectQueryBase
+
 	Items struct {
 		PageInfo   PageInfo
 		TotalCount int
@@ -216,6 +218,7 @@ type projectQueryWithQueryableItems struct {
 
 type projectQueryWithoutQueryableItems struct {
 	projectQueryBase
+
 	Items struct {
 		PageInfo   PageInfo
 		TotalCount int
@@ -1753,7 +1756,6 @@ func projectFieldValueData(v FieldValueNodes) interface{} {
 			}
 		}
 		return names
-
 	}
 
 	return nil

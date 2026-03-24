@@ -171,7 +171,6 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				if opts.Visibility == shared.Selected && (len(opts.RepositoryNames) == 0 && !noRepositoriesSelected) {
 					return cmdutil.FlagErrorf("`--repos` or `--no-repos-selected` required with `--visibility=selected`")
 				}
-
 			} else {
 				if len(opts.RepositoryNames) > 0 || noRepositoriesSelected {
 					opts.Visibility = shared.Selected
@@ -297,7 +296,7 @@ func setRun(opts *SetOptions) error {
 
 	var errs []error
 	cs := opts.IO.ColorScheme()
-	for i := 0; i < len(secrets); i++ {
+	for range len(secrets) {
 		result := <-setc
 		if result.err != nil {
 			errs = append(errs, result.err)

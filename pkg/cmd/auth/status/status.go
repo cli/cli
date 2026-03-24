@@ -206,7 +206,7 @@ func statusRun(opts *StatusOptions) error {
 			opts.Exporter.Write(opts.IO, newAuthStatus())
 			return nil
 		}
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	if opts.Hostname != "" && !slices.Contains(hostnames, opts.Hostname) {
@@ -217,7 +217,7 @@ func statusRun(opts *StatusOptions) error {
 			opts.Exporter.Write(opts.IO, newAuthStatus())
 			return nil
 		}
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -250,7 +250,7 @@ func statusRun(opts *StatusOptions) error {
 		statuses.Hosts[hostname] = append(statuses.Hosts[hostname], entry)
 
 		if finalErr == nil && entry.State != authEntryStateSuccess {
-			finalErr = cmdutil.SilentError
+			finalErr = cmdutil.ErrSilent
 		}
 
 		if opts.Active {
@@ -274,7 +274,7 @@ func statusRun(opts *StatusOptions) error {
 			statuses.Hosts[hostname] = append(statuses.Hosts[hostname], entry)
 
 			if finalErr == nil && entry.State != authEntryStateSuccess {
-				finalErr = cmdutil.SilentError
+				finalErr = cmdutil.ErrSilent
 			}
 		}
 	}

@@ -45,6 +45,7 @@ type EditableSlice struct {
 // It contains a flag to indicate whether the assignees are actors or not.
 type EditableAssignees struct {
 	EditableSlice
+
 	ActorAssignees bool
 	DefaultLogins  []string // For disambiguating actors from display names
 }
@@ -52,6 +53,7 @@ type EditableAssignees struct {
 // EditableReviewers is a special case of EditableSlice.
 type EditableReviewers struct {
 	EditableSlice
+
 	DefaultLogins []string // For disambiguating actors from display names
 }
 
@@ -59,6 +61,7 @@ type EditableReviewers struct {
 // Keep that map along with standard EditableSlice data.
 type EditableProjects struct {
 	EditableSlice
+
 	ProjectItems map[string]string
 }
 
@@ -222,7 +225,7 @@ func (e Editable) MilestoneId() (*string, error) {
 
 // Clone creates a mostly-shallow copy of Editable suitable for use in parallel
 // go routines. Fields that would be mutated will be copied.
-func (e *Editable) Clone() Editable {
+func (e Editable) Clone() Editable {
 	return Editable{
 		Title:     e.Title.clone(),
 		Body:      e.Body.clone(),

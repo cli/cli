@@ -30,12 +30,12 @@ import (
 // ErrInitialCommitFailed indicates the initial commit when making a new extension failed.
 var ErrInitialCommitFailed = errors.New("initial commit failed")
 
-type ErrExtensionExecutableNotFound struct {
+type ExtensionExecutableNotFoundError struct {
 	Dir  string
 	Name string
 }
 
-func (e *ErrExtensionExecutableNotFound) Error() string {
+func (e *ExtensionExecutableNotFoundError) Error() string {
 	return fmt.Sprintf("an extension has been installed but there is no executable: executable file named \"%s\" in %s is required to run the extension after install. Perhaps you need to build it?\n", e.Name, e.Dir)
 }
 
@@ -225,7 +225,7 @@ func (m *Manager) InstallLocal(dir string) error {
 	// the executable file is built or created manually somehow.
 	if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
 		if os.IsNotExist(err) {
-			return &ErrExtensionExecutableNotFound{
+			return &ExtensionExecutableNotFoundError{
 				Dir:  dir,
 				Name: name,
 			}
@@ -249,11 +249,11 @@ type binManifest struct {
 func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 	isBin, err := isBinExtension(m.client, repo)
 	if err != nil {
-		if errors.Is(err, releaseNotFoundErr) {
+		if errors.Is(err, errReleaseNotFound) {
 			if ok, err := repoExists(m.client, repo); err != nil {
 				return err
 			} else if !ok {
-				return repositoryNotFoundErr
+				return errRepositoryNotFound
 			}
 		} else {
 			return fmt.Errorf("could not check for binary extension: %w", err)
@@ -446,10 +446,10 @@ func (m *Manager) installGit(repo ghrepo.Interface, target string) error {
 	return f.Close()
 }
 
-var pinnedExtensionUpgradeError = errors.New("pinned extensions can not be upgraded")
-var localExtensionUpgradeError = errors.New("local extensions can not be upgraded")
-var upToDateError = errors.New("already up to date")
-var noExtensionsInstalledError = errors.New("no extensions installed")
+var errPinnedExtensionUpgrade = errors.New("pinned extensions can not be upgraded")
+var errLocalExtensionUpgrade = errors.New("local extensions can not be upgraded")
+var errUpToDate = errors.New("already up to date")
+var errNoExtensionsInstalled = errors.New("no extensions installed")
 
 func (m *Manager) Upgrade(name string, force bool) error {
 	// Fetch metadata during list only when upgrading all extensions.
@@ -458,7 +458,7 @@ func (m *Manager) Upgrade(name string, force bool) error {
 	fetchMetadata := name == ""
 	exts, _ := m.list(fetchMetadata)
 	if len(exts) == 0 {
-		return noExtensionsInstalledError
+		return errNoExtensionsInstalled
 	}
 	if name == "" {
 		return m.upgradeExtensions(exts, force)
@@ -468,7 +468,7 @@ func (m *Manager) Upgrade(name string, force bool) error {
 			continue
 		}
 		if f.IsLocal() {
-			return localExtensionUpgradeError
+			return errLocalExtensionUpgrade
 		}
 		// For single extensions manually retrieve latest version since we forgo doing it during list.
 		if latestVersion := f.LatestVersion(); latestVersion == "" {
@@ -491,9 +491,9 @@ func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
 		currentVersion := displayExtensionVersion(f, f.CurrentVersion())
 		err := m.upgradeExtension(f, force)
 		if err != nil {
-			if !errors.Is(err, localExtensionUpgradeError) &&
-				!errors.Is(err, upToDateError) &&
-				!errors.Is(err, pinnedExtensionUpgradeError) {
+			if !errors.Is(err, errLocalExtensionUpgrade) &&
+				!errors.Is(err, errUpToDate) &&
+				!errors.Is(err, errPinnedExtensionUpgrade) {
 				failed = true
 			}
 			fmt.Fprintf(m.io.Out, "%s\n", err)
@@ -514,13 +514,13 @@ func (m *Manager) upgradeExtensions(exts []*Extension, force bool) error {
 
 func (m *Manager) upgradeExtension(ext *Extension, force bool) error {
 	if ext.IsLocal() {
-		return localExtensionUpgradeError
+		return errLocalExtensionUpgrade
 	}
 	if !force && ext.IsPinned() {
-		return pinnedExtensionUpgradeError
+		return errPinnedExtensionUpgrade
 	}
 	if !ext.UpdateAvailable() {
-		return upToDateError
+		return errUpToDate
 	}
 	var err error
 	if ext.IsBinary() {

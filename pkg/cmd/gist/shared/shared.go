@@ -58,7 +58,7 @@ func (g Gist) TruncDescription() string {
 	return text.Truncate(100, text.RemoveExcessiveWhitespace(g.Description))
 }
 
-var NotFoundErr = errors.New("not found")
+var ErrNotFound = errors.New("not found")
 
 func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
 	gist := Gist{}
@@ -69,7 +69,7 @@ func GetGist(client *http.Client, hostname, gistID string) (*Gist, error) {
 	if err != nil {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
-			return nil, NotFoundErr
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}

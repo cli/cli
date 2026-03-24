@@ -171,11 +171,7 @@ func TestManPrintFlagsHidesShortDeprecated(t *testing.T) {
 
 func TestGenManTree(t *testing.T) {
 	c := &cobra.Command{Use: "do [OPTIONS] arg1 arg2"}
-	tmpdir, err := os.MkdirTemp("", "test-gen-man-tree")
-	if err != nil {
-		t.Fatalf("Failed to create tmpdir: %s", err.Error())
-	}
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	if err := GenManTree(c, tmpdir); err != nil {
 		t.Fatalf("GenManTree failed: %s", err.Error())
@@ -310,7 +306,7 @@ func BenchmarkGenManToFile(b *testing.B) {
 	defer file.Close()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if err := renderMan(rootCmd, nil, file); err != nil {
 			b.Fatal(err)
 		}

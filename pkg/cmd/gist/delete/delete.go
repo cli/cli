@@ -118,13 +118,13 @@ func deleteRun(opts *DeleteOptions) error {
 			return err
 		}
 		if !confirmed {
-			return cmdutil.CancelError
+			return cmdutil.ErrCancel
 		}
 	}
 
 	apiClient := api.NewClientFromHTTP(client)
 	if err := deleteGist(apiClient, host, gist.ID); err != nil {
-		if errors.Is(err, shared.NotFoundErr) {
+		if errors.Is(err, shared.ErrNotFound) {
 			return fmt.Errorf("unable to delete gist %q: either the gist is not found or it is not owned by you", gist.Filename())
 		}
 		return err
@@ -147,7 +147,7 @@ func deleteGist(apiClient *api.Client, hostname string, gistID string) error {
 	if err != nil {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
-			return shared.NotFoundErr
+			return shared.ErrNotFound
 		}
 		return err
 	}

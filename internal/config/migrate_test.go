@@ -239,7 +239,6 @@ func mockMigration(doFunc func(config *ghConfig.Config) error) *ghmock.Migration
 			return "not-expected"
 		},
 	}
-
 }
 
 func testFullConfig() string {

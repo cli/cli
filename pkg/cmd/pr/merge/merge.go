@@ -274,7 +274,7 @@ func (m *mergeContext) canMerge() error {
 		// TODO: show this flag only to repo admins
 		_ = m.warnf("To use administrator privileges to immediately merge the pull request, add the `--admin` flag.\n")
 	}
-	return cmdutil.SilentError
+	return cmdutil.ErrSilent
 }
 
 // Merge the pull request. May prompt the user for input parameters for the merge.
@@ -688,7 +688,7 @@ func confirmSubmission(client *http.Client, opts *MergeOptions, action shared.Ac
 
 	case shared.CancelAction:
 		fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
-		return false, cmdutil.CancelError
+		return false, cmdutil.ErrCancel
 
 	case shared.SubmitAction:
 		return true, nil

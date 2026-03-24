@@ -140,7 +140,7 @@ type Commit struct {
 }
 
 // Title is the display title for a run, falling back to the commit subject if unavailable
-func (r Run) Title() string {
+func (r *Run) Title() string {
 	if r.DisplayTitle != "" {
 		return r.DisplayTitle
 	}
@@ -155,7 +155,7 @@ func (r Run) Title() string {
 
 // WorkflowName returns the human-readable name of the workflow that this run belongs to.
 // TODO: consider lazy-loading the underlying API data to avoid extra API calls unless necessary
-func (r Run) WorkflowName() string {
+func (r *Run) WorkflowName() string {
 	return r.workflowName
 }
 

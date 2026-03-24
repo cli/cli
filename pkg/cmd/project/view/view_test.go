@@ -160,7 +160,6 @@ func TestRunView_User(t *testing.T) {
 
 	err := runView(config)
 	assert.NoError(t, err)
-
 }
 
 func TestRunView_Viewer(t *testing.T) {

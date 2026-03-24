@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type errWithExitCode interface {
+type withExitCodeError interface {
 	ExitCode() int
 }
 
@@ -65,7 +65,7 @@ type CreateOptions struct {
 	AddReadme          bool
 }
 
-func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
+func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command { //nolint:gocyclo
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
@@ -158,7 +158,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				if opts.Name == "" && !opts.Interactive {
 					return cmdutil.FlagErrorf("name argument required to create new remote repository")
 				}
-
 			} else if opts.Clone || opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "" || opts.Template != "" {
 				return cmdutil.FlagErrorf("the `--source` option is not supported with `--clone`, `--template`, `--license`, or `--gitignore`")
 			}
@@ -334,7 +333,7 @@ func createFromScratch(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		} else if !confirmed {
-			return cmdutil.CancelError
+			return cmdutil.ErrCancel
 		}
 	}
 
@@ -428,7 +427,6 @@ func createFromScratch(opts *CreateOptions) error {
 		} else if err := cloneWithRetry(opts, remoteURL, templateRepoMainBranch); err != nil {
 			return err
 		}
-
 	}
 
 	return nil
@@ -496,7 +494,7 @@ func createFromTemplate(opts *CreateOptions) error {
 	if err != nil {
 		return err
 	} else if !confirmed {
-		return cmdutil.CancelError
+		return cmdutil.ErrCancel
 	}
 
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
@@ -530,7 +528,7 @@ func createFromTemplate(opts *CreateOptions) error {
 }
 
 // create repo on remote host from existing local repo
-func createFromLocal(opts *CreateOptions) error {
+func createFromLocal(opts *CreateOptions) error { //nolint:gocyclo
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -722,7 +720,7 @@ func cloneWithRetry(opts *CreateOptions, remoteURL, branch string) error {
 		stderr := &bytes.Buffer{}
 		_, err := opts.GitClient.Clone(ctx, remoteURL, args, git.WithStderr(stderr))
 
-		var execError errWithExitCode
+		var execError withExitCodeError
 		if errors.As(err, &execError) && execError.ExitCode() == 128 {
 			return err
 		} else {
@@ -762,7 +760,7 @@ func hasCommits(gitClient *git.Client) (bool, error) {
 
 	var execError *exec.ExitError
 	if errors.As(err, &execError) {
-		exitCode := int(execError.ExitCode())
+		exitCode := execError.ExitCode()
 		if exitCode == 128 {
 			return false, nil
 		}
@@ -782,9 +780,9 @@ const (
 func localRepoType(gitClient *git.Client) (repoType, error) {
 	projectDir, projectDirErr := gitClient.GitDir(context.Background())
 	if projectDirErr != nil {
-		var execError errWithExitCode
+		var execError withExitCodeError
 		if errors.As(projectDirErr, &execError) {
-			if exitCode := int(execError.ExitCode()); exitCode == 128 {
+			if exitCode := execError.ExitCode(); exitCode == 128 {
 				return unknown, nil
 			}
 			return unknown, projectDirErr

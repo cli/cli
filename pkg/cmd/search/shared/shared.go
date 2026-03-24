@@ -21,7 +21,9 @@ const (
 	// Limitation of GitHub search see:
 	// https://docs.github.com/en/rest/reference/search
 	SearchMaxResults = 1000
+)
 
+const (
 	Both EntityType = iota
 	Issues
 	PullRequests

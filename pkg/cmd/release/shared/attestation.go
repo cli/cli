@@ -58,13 +58,13 @@ func (v *AttestationVerifier) VerifyAttestation(art *artifact.DigestedArtifact, 
 func FilterAttestationsByTag(attestations []*api.Attestation, tagName string) ([]*api.Attestation, error) {
 	var filtered []*api.Attestation
 	for _, att := range attestations {
-		statement := att.Bundle.Bundle.GetDsseEnvelope().Payload
+		statement := att.Bundle.Bundle.GetDsseEnvelope().GetPayload()
 		var statementData v1.Statement
-		err := protojson.Unmarshal([]byte(statement), &statementData)
+		err := protojson.Unmarshal(statement, &statementData)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal statement: %w", err)
 		}
-		tagValue := statementData.Predicate.GetFields()["tag"].GetStringValue()
+		tagValue := statementData.GetPredicate().GetFields()["tag"].GetStringValue()
 
 		if tagValue == tagName {
 			filtered = append(filtered, att)
@@ -76,14 +76,14 @@ func FilterAttestationsByTag(attestations []*api.Attestation, tagName string) ([
 func FilterAttestationsByFileDigest(attestations []*api.Attestation, fileDigest string) ([]*api.Attestation, error) {
 	var filtered []*api.Attestation
 	for _, att := range attestations {
-		statement := att.Bundle.Bundle.GetDsseEnvelope().Payload
+		statement := att.Bundle.Bundle.GetDsseEnvelope().GetPayload()
 		var statementData v1.Statement
-		err := protojson.Unmarshal([]byte(statement), &statementData)
+		err := protojson.Unmarshal(statement, &statementData)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal statement: %w", err)
 		}
-		subjects := statementData.Subject
+		subjects := statementData.GetSubject()
 		for _, subject := range subjects {
 			digestMap := subject.GetDigest()
 			alg := "sha256"
@@ -93,7 +93,6 @@ func FilterAttestationsByFileDigest(attestations []*api.Attestation, fileDigest 
 				filtered = append(filtered, att)
 			}
 		}
-
 	}
 	return filtered, nil
 }

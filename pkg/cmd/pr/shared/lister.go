@@ -167,7 +167,6 @@ func (m *mockLister) List(opt ListOptions) (*api.PullRequestAndTotalCount, error
 	}
 
 	if m.expectFields != nil {
-
 		if !isEqualSet(m.expectFields, opt.Fields) {
 			return nil, fmt.Errorf("unexpected fields: %v", opt.Fields)
 		}

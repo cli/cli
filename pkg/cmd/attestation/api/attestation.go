@@ -35,12 +35,12 @@ func FilterAttestations(predicateType string, attestations []*Attestation) ([]*A
 	for _, each := range attestations {
 		dsseEnvelope := each.Bundle.GetDsseEnvelope()
 		if dsseEnvelope != nil {
-			if dsseEnvelope.PayloadType != "application/vnd.in-toto+json" {
+			if dsseEnvelope.GetPayloadType() != "application/vnd.in-toto+json" {
 				// Don't fail just because an entry isn't intoto
 				continue
 			}
 			var intotoStatement IntotoStatement
-			if err := json.Unmarshal([]byte(dsseEnvelope.Payload), &intotoStatement); err != nil {
+			if err := json.Unmarshal(dsseEnvelope.GetPayload(), &intotoStatement); err != nil {
 				// Don't fail just because a single entry can't be unmarshalled
 				continue
 			}

@@ -147,7 +147,7 @@ func createRun(opts *CreateOptions) error {
 				return err
 			}
 
-			trimmed := strings.TrimSpace(string(desc))
+			trimmed := strings.TrimSpace(desc)
 			if trimmed == "" {
 				return errors.New("a task description is required")
 			}

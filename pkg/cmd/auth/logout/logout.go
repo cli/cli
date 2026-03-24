@@ -147,7 +147,7 @@ func logoutRun(opts *LogoutOptions) error {
 	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
 		fmt.Fprint(opts.IO.ErrOut, "To erase credentials stored in GitHub CLI, first clear the value from the environment.\n")
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	// We can ignore the error here because a host must always have an active user

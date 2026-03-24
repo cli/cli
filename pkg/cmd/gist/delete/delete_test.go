@@ -292,7 +292,6 @@ func Test_deleteRun(t *testing.T) {
 					return 0, nil
 				})
 			}
-
 		}
 
 		tt.opts.Prompter = pm
@@ -356,7 +355,7 @@ func Test_gistDelete(t *testing.T) {
 			},
 			hostname:      "github.com",
 			gistID:        "1234",
-			wantErr:       shared.NotFoundErr, // To make sure we return the pre-defined error instance.
+			wantErr:       shared.ErrNotFound, // To make sure we return the pre-defined error instance.
 			wantErrString: "not found",
 		},
 		{

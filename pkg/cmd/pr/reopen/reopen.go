@@ -65,7 +65,7 @@ func reopenRun(opts *ReopenOptions) error {
 
 	if pr.State == "MERGED" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request %s#%d (%s) can't be reopened because it was already merged\n", cs.FailureIcon(), ghrepo.FullName(baseRepo), pr.Number, pr.Title)
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	if pr.IsOpen() {

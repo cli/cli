@@ -177,7 +177,7 @@ func TestNewHTTPClient(t *testing.T) {
 			require.NoError(t, err)
 
 			req, err := http.NewRequest("GET", ts.URL, nil)
-			req.Header.Set("time-zone", "Europe/Amsterdam")
+			req.Header.Set("Time-Zone", "Europe/Amsterdam")
 			req.Host = tt.host
 			require.NoError(t, err)
 

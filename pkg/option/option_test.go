@@ -60,7 +60,7 @@ func ExampleOption_UnwrapOrZero() {
 	fmt.Println(o.Some(4).UnwrapOrZero())
 	fmt.Println(o.None[int]().UnwrapOrZero())
 
-	// Output
+	// Output:
 	// 4
 	// 0
 }

@@ -52,7 +52,7 @@ func TestApp_Select(t *testing.T) {
 			opts := selectOptions{}
 
 			if tt.outputToFile {
-				file, err := os.CreateTemp("", "codespace-selection-test")
+				file, err := os.CreateTemp(t.TempDir(), "codespace-selection-test")
 				if err != nil {
 					t.Fatal(err)
 				}

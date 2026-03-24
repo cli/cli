@@ -113,6 +113,7 @@ func addPerPage(p string, perPage int, params map[string]interface{}) string {
 // JSON array in order to apply pagination context between multiple API requests.
 type paginatedArrayReader struct {
 	io.Reader
+
 	isFirstPage bool
 	isLastPage  bool
 
@@ -153,6 +154,7 @@ func (r *paginatedArrayReader) Read(p []byte) (int, error) {
 // and objects. Call Close to write the end of the array.
 type jsonArrayWriter struct {
 	io.Writer
+
 	started bool
 	color   bool
 }

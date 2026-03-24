@@ -74,7 +74,6 @@ func TestParseIssuesFromArgs(t *testing.T) {
 			assert.Equal(t, tc.expectedRepo, repo)
 		})
 	}
-
 }
 
 func TestFindIssuesOrPRs(t *testing.T) {

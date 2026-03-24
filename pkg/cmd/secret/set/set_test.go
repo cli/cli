@@ -805,7 +805,7 @@ func Test_getBodyPrompt(t *testing.T) {
 
 func Test_getSecretsFromOptions(t *testing.T) {
 	genFile := func(s string) string {
-		f, err := os.CreateTemp("", "gh-env.*")
+		f, err := os.CreateTemp(t.TempDir(), "gh-env.*")
 		if err != nil {
 			t.Fatal(err)
 			return ""

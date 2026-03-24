@@ -8,19 +8,10 @@ import (
 )
 
 func TestFindNonLegacy(t *testing.T) {
-	tmpdir, err := os.MkdirTemp("", "gh-cli")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	type args struct {
-		rootDir string
-		name    string
-	}
 	tests := []struct {
 		name    string
 		prepare []string
-		args    args
+		argName string
 		want    []string
 	}{
 		{
@@ -34,11 +25,8 @@ func TestFindNonLegacy(t *testing.T) {
 				".github/issue_template.md",
 				"docs/issue_template.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: []string{},
+			argName: "ISSUE_TEMPLATE",
+			want:    []string{},
 		},
 		{
 			name: "Template folder in .github takes precedence",
@@ -48,13 +36,8 @@ func TestFindNonLegacy(t *testing.T) {
 				"ISSUE_TEMPLATE/abc.md",
 				".github/ISSUE_TEMPLATE/abc.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: []string{
-				path.Join(tmpdir, ".github/ISSUE_TEMPLATE/abc.md"),
-			},
+			argName: "ISSUE_TEMPLATE",
+			want:    []string{".github/ISSUE_TEMPLATE/abc.md"},
 		},
 		{
 			name: "Template folder in root",
@@ -63,13 +46,8 @@ func TestFindNonLegacy(t *testing.T) {
 				"docs/ISSUE_TEMPLATE/abc.md",
 				"ISSUE_TEMPLATE/abc.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: []string{
-				path.Join(tmpdir, "ISSUE_TEMPLATE/abc.md"),
-			},
+			argName: "ISSUE_TEMPLATE",
+			want:    []string{"ISSUE_TEMPLATE/abc.md"},
 		},
 		{
 			name: "Template folder in docs",
@@ -77,13 +55,8 @@ func TestFindNonLegacy(t *testing.T) {
 				"ISSUE_TEMPLATE.md",
 				"docs/ISSUE_TEMPLATE/abc.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: []string{
-				path.Join(tmpdir, "docs/ISSUE_TEMPLATE/abc.md"),
-			},
+			argName: "ISSUE_TEMPLATE",
+			want:    []string{"docs/ISSUE_TEMPLATE/abc.md"},
 		},
 		{
 			name: "Multiple templates in template folder",
@@ -95,14 +68,11 @@ func TestFindNonLegacy(t *testing.T) {
 				".github/PULL_REQUEST_TEMPLATE/three.md",
 				"docs/pull_request_template.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "PuLl_ReQuEsT_TeMpLaTe",
-			},
+			argName: "PuLl_ReQuEsT_TeMpLaTe",
 			want: []string{
-				path.Join(tmpdir, ".github/PULL_REQUEST_TEMPLATE/one.md"),
-				path.Join(tmpdir, ".github/PULL_REQUEST_TEMPLATE/three.md"),
-				path.Join(tmpdir, ".github/PULL_REQUEST_TEMPLATE/two.md"),
+				".github/PULL_REQUEST_TEMPLATE/one.md",
+				".github/PULL_REQUEST_TEMPLATE/three.md",
+				".github/PULL_REQUEST_TEMPLATE/two.md",
 			},
 		},
 		{
@@ -112,15 +82,13 @@ func TestFindNonLegacy(t *testing.T) {
 				".docs/ISSUE_TEMPLATE/.keep",
 				"ISSUE_TEMPLATE/.keep",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: []string{},
+			argName: "ISSUE_TEMPLATE",
+			want:    []string{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tmpdir := t.TempDir()
 			for _, p := range tt.prepare {
 				fp := path.Join(tmpdir, p)
 				_ = os.MkdirAll(path.Dir(fp), 0700)
@@ -131,28 +99,22 @@ func TestFindNonLegacy(t *testing.T) {
 				file.Close()
 			}
 
-			if got := FindNonLegacy(tt.args.rootDir, tt.args.name); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Find() = %v, want %v", got, tt.want)
+			want := make([]string, len(tt.want))
+			for i, w := range tt.want {
+				want[i] = path.Join(tmpdir, w)
+			}
+			if got := FindNonLegacy(tmpdir, tt.argName); !reflect.DeepEqual(got, want) {
+				t.Errorf("Find() = %v, want %v", got, want)
 			}
 		})
-		os.RemoveAll(tmpdir)
 	}
 }
 
 func TestFindLegacy(t *testing.T) {
-	tmpdir, err := os.MkdirTemp("", "gh-cli")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	type args struct {
-		rootDir string
-		name    string
-	}
 	tests := []struct {
 		name    string
 		prepare []string
-		args    args
+		argName string
 		want    string
 	}{
 		{
@@ -164,11 +126,8 @@ func TestFindLegacy(t *testing.T) {
 				"pull_request_template.md",
 				"docs/issue_template.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: path.Join(tmpdir, "issue_template.md"),
+			argName: "ISSUE_TEMPLATE",
+			want:    "issue_template.md",
 		},
 		{
 			name: "No extension",
@@ -177,11 +136,8 @@ func TestFindLegacy(t *testing.T) {
 				"issue_template",
 				"docs/issue_template.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: path.Join(tmpdir, "issue_template"),
+			argName: "ISSUE_TEMPLATE",
+			want:    "issue_template",
 		},
 		{
 			name: "Dash instead of underscore",
@@ -190,11 +146,8 @@ func TestFindLegacy(t *testing.T) {
 				"issue-template.txt",
 				"docs/issue_template.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: path.Join(tmpdir, "issue-template.txt"),
+			argName: "ISSUE_TEMPLATE",
+			want:    "issue-template.txt",
 		},
 		{
 			name: "Template in .github takes precedence",
@@ -203,11 +156,8 @@ func TestFindLegacy(t *testing.T) {
 				".github/issue_template.md",
 				"docs/issue_template.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: path.Join(tmpdir, ".github/issue_template.md"),
+			argName: "ISSUE_TEMPLATE",
+			want:    ".github/issue_template.md",
 		},
 		{
 			name: "Template in docs",
@@ -215,11 +165,8 @@ func TestFindLegacy(t *testing.T) {
 				"README.md",
 				"docs/issue_template.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "ISSUE_TEMPLATE",
-			},
-			want: path.Join(tmpdir, "docs/issue_template.md"),
+			argName: "ISSUE_TEMPLATE",
+			want:    "docs/issue_template.md",
 		},
 		{
 			name: "Non legacy templates ignored",
@@ -229,15 +176,13 @@ func TestFindLegacy(t *testing.T) {
 				"docs/PULL_REQUEST_TEMPLATE/abc.md",
 				".github/PULL_REQUEST_TEMPLATE.md",
 			},
-			args: args{
-				rootDir: tmpdir,
-				name:    "PuLl_ReQuEsT_TeMpLaTe",
-			},
-			want: path.Join(tmpdir, ".github/PULL_REQUEST_TEMPLATE.md"),
+			argName: "PuLl_ReQuEsT_TeMpLaTe",
+			want:    ".github/PULL_REQUEST_TEMPLATE.md",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tmpdir := t.TempDir()
 			for _, p := range tt.prepare {
 				fp := path.Join(tmpdir, p)
 				_ = os.MkdirAll(path.Dir(fp), 0700)
@@ -248,14 +193,14 @@ func TestFindLegacy(t *testing.T) {
 				file.Close()
 			}
 
-			got := FindLegacy(tt.args.rootDir, tt.args.name)
+			want := path.Join(tmpdir, tt.want)
+			got := FindLegacy(tmpdir, tt.argName)
 			if got == "" {
-				t.Errorf("FindLegacy() = nil, want %v", tt.want)
-			} else if got != tt.want {
-				t.Errorf("FindLegacy() = %v, want %v", got, tt.want)
+				t.Errorf("FindLegacy() = nil, want %v", want)
+			} else if got != want {
+				t.Errorf("FindLegacy() = %v, want %v", got, want)
 			}
 		})
-		os.RemoveAll(tmpdir)
 	}
 }
 

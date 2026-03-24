@@ -224,7 +224,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-func createRun(opts *CreateOptions) error {
+func createRun(opts *CreateOptions) error { //nolint:gocyclo
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -253,9 +253,9 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if len(tags) != 0 {
-			options := make([]string, len(tags))
-			for i, tag := range tags {
-				options[i] = tag.Name
+			options := make([]string, 0, len(tags)+1)
+			for _, tag := range tags {
+				options = append(options, tag.Name)
 			}
 			createNewTagOption := "Create a new tag"
 			options = append(options, createNewTagOption)
@@ -329,7 +329,7 @@ func createRun(opts *CreateOptions) error {
 		var generatedChangelog string
 
 		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
-		if err != nil && !errors.Is(err, notImplementedError) {
+		if err != nil && !errors.Is(err, errNotImplemented) {
 			return err
 		}
 
@@ -438,7 +438,7 @@ func createRun(opts *CreateOptions) error {
 		case "Save as draft":
 			opts.Draft = true
 		case "Cancel":
-			return cmdutil.CancelError
+			return cmdutil.ErrCancel
 		default:
 			return fmt.Errorf("invalid action: %v", opts.SubmitAction)
 		}
@@ -468,7 +468,7 @@ func createRun(opts *CreateOptions) error {
 	if opts.GenerateNotes {
 		if opts.NotesStartTag != "" {
 			generatedNotes, err := generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
-			if err != nil && !errors.Is(err, notImplementedError) {
+			if err != nil && !errors.Is(err, errNotImplemented) {
 				return err
 			}
 			if generatedNotes != nil {
@@ -512,9 +512,9 @@ func createRun(opts *CreateOptions) error {
 
 	newRelease, err := createRelease(httpClient, baseRepo, params)
 
-	var errMissingRequiredWorkflowScope *errMissingRequiredWorkflowScope
-	if errors.As(err, &errMissingRequiredWorkflowScope) {
-		host := errMissingRequiredWorkflowScope.Hostname
+	var missingRequiredWorkflowScopeError *missingRequiredWorkflowScopeError
+	if errors.As(err, &missingRequiredWorkflowScopeError) {
+		host := missingRequiredWorkflowScopeError.Hostname
 		refreshInstructions := fmt.Sprintf("gh auth refresh -h %[1]s -s workflow", host)
 		cs := opts.IO.ColorScheme()
 
@@ -523,7 +523,7 @@ func createRun(opts *CreateOptions) error {
 		sb.WriteString(fmt.Sprintf("To request it, run:\n%s\n", cs.Bold(refreshInstructions)))
 		fmt.Fprint(opts.IO.ErrOut, sb.String())
 
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	if err != nil {

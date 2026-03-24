@@ -88,7 +88,7 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 
 		if !confirmed {
-			return cmdutil.CancelError
+			return cmdutil.ErrCancel
 		}
 	}
 

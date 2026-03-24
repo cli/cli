@@ -53,7 +53,7 @@ type ForkOptions struct {
 	DefaultBranchOnly bool
 }
 
-type errWithExitCode interface {
+type withExitCodeError interface {
 	ExitCode() int
 }
 
@@ -146,7 +146,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 	return cmd
 }
 
-func forkRun(opts *ForkOptions) error {
+func forkRun(opts *ForkOptions) error { //nolint:gocyclo
 	var repoToFork ghrepo.Interface
 	var err error
 	inParent := false // whether or not we're forking the repo we're currently "in"
@@ -170,7 +170,6 @@ func forkRun(opts *ForkOptions) error {
 			if err != nil {
 				return fmt.Errorf("did not understand argument: %w", err)
 			}
-
 		} else if strings.HasPrefix(repoArg, "git@") {
 			parsedURL, err := git.ParseURL(repoArg)
 			if err != nil {
@@ -353,7 +352,7 @@ func forkRun(opts *ForkOptions) error {
 				if err == nil {
 					return dir, nil
 				}
-				var execError errWithExitCode
+				var execError withExitCodeError
 				if errors.As(err, &execError) && execError.ExitCode() == 128 {
 					return "", err
 				}

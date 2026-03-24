@@ -24,6 +24,28 @@ linters:
     - reassign # checks that package variables are not reassigned
     - unused # checks for unused constants, variables, functions and types
 
+    # Medium/low effort linters:
+    - canonicalheader # checks whether net/http.Header uses canonical header
+    - embeddedstructfieldcheck # checks embedded types in structs
+    - errname # checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error
+    - exhaustive # checks exhaustiveness of enum switch statements
+    - forbidigo # forbids identifiers
+    - gochecknoinits # checks that no init functions are present in Go code
+    - gocyclo # computes and checks the cyclomatic complexity of functions
+    - iface # checks the incorrect use of interfaces, helping developers avoid interface pollution
+    - intrange # finds places where for loops could make use of an integer range
+    - iotamixing # checks if iotas are being used in const blocks with other non-iota declarations
+    - makezero # finds slice declarations with non-zero initial length
+    - mirror # reports wrong mirror patterns of bytes/strings usage
+    - protogetter # reports direct reads from proto message fields when getters should be used
+    - recvcheck # checks for receiver type consistency
+    - testableexamples # checks if examples are testable (have an expected output)
+    - tparallel # detects inappropriate usage of t.Parallel() method in your Go test codes
+    - unconvert # removes unnecessary type conversions
+    - usetesting # reports uses of functions with replacement inside the testing package
+    - wastedassign # finds wasted assignment statements
+    - whitespace # detects leading and trailing whitespace
+
     # To enable later due to too many issues, and confirm we need them:
     # - gosec
     # - staticcheck
@@ -31,12 +53,21 @@ linters:
   exclusions:
     paths:
       - third-party
+      - script
     rules:
       - path: _test\.go$
         linters:
           - bodyclose
           - gosec
   settings:
+    exhaustive:
+      default-signifies-exhaustive: true
+    forbidigo:
+      forbid:
+        - pattern: ^(fmt\.Print(|f|ln)|print|println)$
+          msg: use the IOStreams abstraction instead
+    gocyclo:
+      min-complexity: 30
     gocritic:
       disabled-checks:
         - appendAssign

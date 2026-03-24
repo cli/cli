@@ -3,6 +3,7 @@ package trustedroot
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -176,6 +177,7 @@ func TestGetTrustedRoot(t *testing.T) {
 	opts := &Options{
 		TufUrl:      mirror,
 		TufRootPath: root,
+		Out:         io.Discard,
 	}
 
 	reg := &httpmock.Registry{}
@@ -194,11 +196,11 @@ func TestGetTrustedRoot(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to read root file")
 	})
-
 }
 
 type stubAuthConfig struct {
 	config.AuthConfig
+
 	hasActiveToken bool
 }
 

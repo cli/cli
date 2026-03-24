@@ -693,7 +693,7 @@ func TestRunItemEdit_NoChanges(t *testing.T) {
 	}
 
 	err := runEditItem(config)
-	assert.Error(t, err, "SilentError")
+	assert.Error(t, err, "ErrSilent")
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "error: no changes to make\n", stderr.String())
 }

@@ -165,7 +165,7 @@ func runEditItem(config editItemConfig) error {
 	if _, err := fmt.Fprintln(config.io.ErrOut, "error: no changes to make"); err != nil {
 		return err
 	}
-	return cmdutil.SilentError
+	return cmdutil.ErrSilent
 }
 
 func fetchDraftIssueByID(config editItemConfig, draftIssueID string) (*queries.DraftIssue, error) {

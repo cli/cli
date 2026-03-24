@@ -952,7 +952,6 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		resp.Body = io.NopCloser(bodyCopy)
 
 		return nil, api.HandleHTTPError(resp)
-
 	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return nil, api.HandleHTTPError(resp)
 	}

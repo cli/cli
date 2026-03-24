@@ -46,7 +46,7 @@ type LoginOptions struct {
 	sshContext ssh.Context
 }
 
-func Login(opts *LoginOptions) error {
+func Login(opts *LoginOptions) error { //nolint:gocyclo
 	cfg := opts.Config
 	hostname := opts.Hostname
 	httpClient := opts.HTTPClient

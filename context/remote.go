@@ -80,6 +80,7 @@ func (r Remotes) Less(i, j int) bool {
 // Remote represents a git remote mapped to a GitHub repository
 type Remote struct {
 	*git.Remote
+
 	Repo ghrepo.Interface
 }
 

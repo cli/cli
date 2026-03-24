@@ -160,7 +160,6 @@ func TestNewCmdRerun(t *testing.T) {
 			assert.Equal(t, tt.wants.Prompt, gotOpts.Prompt)
 		})
 	}
-
 }
 
 func TestRerun(t *testing.T) {

@@ -136,7 +136,7 @@ func Test_setupGitRun(t *testing.T) {
 		{
 			name:           "when there are no known hosts and no hostname is provided, return an error",
 			opts:           &SetupGitOptions{},
-			expectedErr:    cmdutil.SilentError,
+			expectedErr:    cmdutil.ErrSilent,
 			expectedErrOut: "You are not logged into any GitHub hosts. Run gh auth login to authenticate.\n",
 		},
 		{

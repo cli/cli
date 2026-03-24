@@ -77,7 +77,7 @@ func Test_runAdd(t *testing.T) {
 				Find your GPG key ID with:    gpg --list-keys
 				Then add it to your account:  gpg --armor --export <ID> | gh gpg-key add -
 			`),
-			wantErrMsg: "SilentError",
+			wantErrMsg: "ErrSilent",
 			opts:       AddOptions{KeyFile: "-"},
 		},
 		{
@@ -105,7 +105,7 @@ func Test_runAdd(t *testing.T) {
 			},
 			wantStdout: "",
 			wantStderr: "X Error: the key already exists in your account\n",
-			wantErrMsg: "SilentError",
+			wantErrMsg: "ErrSilent",
 			opts:       AddOptions{KeyFile: "-"},
 		},
 	}

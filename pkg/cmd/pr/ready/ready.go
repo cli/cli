@@ -77,7 +77,7 @@ func readyRun(opts *ReadyOptions) error {
 
 	if !pr.IsOpen() {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request %s#%d is closed. Only draft pull requests can be marked as \"ready for review\"\n", cs.FailureIcon(), ghrepo.FullName(baseRepo), pr.Number)
-		return cmdutil.SilentError
+		return cmdutil.ErrSilent
 	}
 
 	httpClient, err := opts.HttpClient()
