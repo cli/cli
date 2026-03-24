@@ -427,7 +427,7 @@ func TestTryDetermineDefaultPRHead(t *testing.T) {
 		require.Equal(t, "feature-branch", defaultPRHead.BranchName)
 	})
 
-	t.Run("when the push default is tracking or upstream, use the merge ref", func(t *testing.T) {
+	t.Run("when the push default is tracking, upstream, or simple, use the merge ref", func(t *testing.T) {
 		t.Parallel()
 
 		testCases := []struct {
@@ -435,6 +435,7 @@ func TestTryDetermineDefaultPRHead(t *testing.T) {
 		}{
 			{pushDefault: git.PushDefaultTracking},
 			{pushDefault: git.PushDefaultUpstream},
+			{pushDefault: git.PushDefaultSimple},
 		}
 
 		for _, tc := range testCases {
@@ -461,6 +462,34 @@ func TestTryDetermineDefaultPRHead(t *testing.T) {
 				require.Equal(t, "main", defaultPRHead.BranchName)
 			})
 		}
+
+		t.Run("simple mode with local branch name different from remote (fork PR scenario)", func(t *testing.T) {
+			t.Parallel()
+
+			// Simulates: local branch "feature-branch-fork" tracking origin/feature-branch
+			// with push.default=simple. @{push} fails because local name != remote name
+			// under simple mode. The merge ref should be used to find the correct remote
+			// branch name for PR discovery.
+			repoResolvedFromPushRemoteClient := stubGitConfigClient{
+				pushRevisionFn: stubPushRevision(git.RemoteTrackingRef{}, errors.New("fatal: cannot resolve 'simple' push to a single destination")),
+				readBranchConfigFn: stubBranchConfig(git.BranchConfig{
+					RemoteName: "origin",
+					MergeRef:   "refs/heads/feature-branch",
+				}, nil),
+				pushDefaultFn:       stubPushDefault(git.PushDefaultSimple, nil),
+				remotePushDefaultFn: stubRemotePushDefault("", nil),
+			}
+
+			defaultPRHead, err := TryDetermineDefaultPRHead(
+				repoResolvedFromPushRemoteClient,
+				stubRemoteToRepoResolver(ghContext.Remotes{&baseRemote, &forkRemote}, nil),
+				"feature-branch-fork",
+			)
+			require.NoError(t, err)
+
+			require.True(t, ghrepo.IsSame(defaultPRHead.Repo.Unwrap(), forkRepo), "expected repos to be the same")
+			require.Equal(t, "feature-branch", defaultPRHead.BranchName)
+		})
 
 		t.Run("but if the merge ref is empty, use the provided branch name", func(t *testing.T) {
 			t.Parallel()

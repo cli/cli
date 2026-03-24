@@ -332,10 +332,14 @@ func tryDetermineDefaultPushTarget(gitClient GitConfigClient, localBranchName st
 		return defaultPushTarget{}, err
 	}
 
-	// We assume the PR's branch name is the same as whatever was provided, unless the user has specified
-	// push.default = upstream or tracking, then we use the branch name from the merge ref if it exists. Otherwise, we fall back to the local branch name
+	// We assume the PR's branch name is the same as whatever was provided, unless:
+	// - push.default is upstream or tracking: always use the merge ref
+	// - push.default is simple: use the merge ref because @{push} failed above, which
+	//   means the local branch name differs from the remote tracking branch name. In
+	//   simple mode, git refuses to push when names differ, but for PR discovery we
+	//   still want to use the remote branch name from the merge ref.
 	remoteBranch := localBranchName
-	if pushDefault == git.PushDefaultUpstream || pushDefault == git.PushDefaultTracking {
+	if pushDefault == git.PushDefaultUpstream || pushDefault == git.PushDefaultTracking || pushDefault == git.PushDefaultSimple {
 		mergeRef := strings.TrimPrefix(branchConfig.MergeRef, "refs/heads/")
 		if mergeRef != "" {
 			remoteBranch = mergeRef
