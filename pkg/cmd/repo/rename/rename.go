@@ -120,13 +120,21 @@ func renameRun(opts *RenameOptions) error {
 
 	if newRepoName == "" {
 		if newRepoName, err = opts.Prompter.Input(fmt.Sprintf(
-			"Rename %s to:", ghrepo.FullName(currRepo)), ""); err != nil {
+			"New name for %s (without owner prefix):", ghrepo.FullName(currRepo)), ""); err != nil {
 			return err
 		}
 	}
 
+	cs := opts.IO.ColorScheme()
+
 	if strings.Contains(newRepoName, "/") {
-		return fmt.Errorf("New repository name cannot contain '/' character - to transfer a repository to a new owner, see <https://docs.github.com/en/repositories/creating-and-managing-repositories/transferring-a-repository>.")
+		parts := strings.SplitN(newRepoName, "/", 2)
+		if strings.EqualFold(parts[0], currRepo.RepoOwner()) {
+			newRepoName = parts[1]
+			fmt.Fprintf(opts.IO.ErrOut, "%s Owner prefix %q stripped - renaming to %q\n", cs.WarningIcon(), parts[0], newRepoName)
+		} else {
+			return fmt.Errorf("to rename, enter only the new repository name without an owner prefix.\nTo transfer this repository to a different owner, visit GitHub.com:\n<https://docs.github.com/en/repositories/creating-and-managing-repositories/transferring-a-repository>")
+		}
 	}
 
 	if opts.DoConfirm {
@@ -147,7 +155,6 @@ func renameRun(opts *RenameOptions) error {
 		return err
 	}
 
-	cs := opts.IO.ColorScheme()
 	if opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), ghrepo.FullName(newRepo))
 	}

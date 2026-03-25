@@ -120,7 +120,7 @@ func TestRenameRun(t *testing.T) {
 			name:    "none argument",
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n✓ Updated the \"origin\" remote\n",
 			promptStubs: func(pm *prompter.MockPrompter) {
-				pm.RegisterInput("Rename OWNER/REPO to:", func(_, _ string) (string, error) {
+				pm.RegisterInput("New name for OWNER/REPO (without owner prefix):", func(_, _ string) (string, error) {
 					return "NEW_REPO", nil
 				})
 			},
@@ -141,7 +141,7 @@ func TestRenameRun(t *testing.T) {
 			},
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
 			promptStubs: func(pm *prompter.MockPrompter) {
-				pm.RegisterInput("Rename OWNER/REPO to:", func(_, _ string) (string, error) {
+				pm.RegisterInput("New name for OWNER/REPO (without owner prefix):", func(_, _ string) (string, error) {
 					return "NEW_REPO", nil
 				})
 			},
@@ -221,13 +221,29 @@ func TestRenameRun(t *testing.T) {
 		},
 
 		{
-			name: "error on name with slash",
+			name: "error on different-owner prefix",
 			tty:  true,
 			opts: RenameOptions{
 				newRepoSelector: "org/new-name",
 			},
 			wantErr: true,
-			errMsg:  "New repository name cannot contain '/' character - to transfer a repository to a new owner, see <https://docs.github.com/en/repositories/creating-and-managing-repositories/transferring-a-repository>.",
+			errMsg:  "to rename, enter only the new repository name without an owner prefix.\nTo transfer this repository to a different owner, visit GitHub.com:\n<https://docs.github.com/en/repositories/creating-and-managing-repositories/transferring-a-repository>",
+		},
+		{
+			name: "strips same-owner prefix",
+			tty:  true,
+			opts: RenameOptions{
+				newRepoSelector: "OWNER/NEW_REPO",
+			},
+			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n✓ Updated the \"origin\" remote\n",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
+			},
 		},
 	}
 
