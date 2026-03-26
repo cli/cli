@@ -154,7 +154,7 @@ type RepoMetadataFetcher interface {
 	RepoMetadataFetch(api.RepoMetadataInput) (*api.RepoMetadataResult, error)
 }
 
-func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState, projectsV1Support gh.ProjectsV1Support, reviewerSearchFunc func(string) prompter.MultiSelectSearchResult) error {
+func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState, projectsV1Support gh.ProjectsV1Support, reviewerSearchFunc func(string) prompter.MultiSelectSearchResult, assigneeSearchFunc func(string) prompter.MultiSelectSearchResult) error {
 	isChosen := func(m string) bool {
 		for _, c := range state.Metadata {
 			if m == c {
@@ -181,18 +181,20 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	}
 
 	// Retrieve and process data for survey prompts based on the extra fields selected.
-	// When search-based reviewer selection is available, skip the expensive assignable-users
-	// and teams fetch since reviewers are found dynamically via the search function.
-	useReviewerSearch := state.ActorReviewers && reviewerSearchFunc != nil
+	// When search-based selection is available, skip the expensive assignable-users
+	// and teams fetch since they are found dynamically via the search function.
+	// TODO ApiActorsSupported
+	useReviewerSearch := state.ApiActorsSupported && reviewerSearchFunc != nil
+	useAssigneeSearch := state.ApiActorsSupported && assigneeSearchFunc != nil
 	metadataInput := api.RepoMetadataInput{
-		Reviewers:      isChosen("Reviewers") && !useReviewerSearch,
-		TeamReviewers:  isChosen("Reviewers") && !useReviewerSearch,
-		Assignees:      isChosen("Assignees"),
-		ActorAssignees: isChosen("Assignees") && state.ActorAssignees,
-		Labels:         isChosen("Labels"),
-		ProjectsV1:     isChosen("Projects") && projectsV1Support == gh.ProjectsV1Supported,
-		ProjectsV2:     isChosen("Projects"),
-		Milestones:     isChosen("Milestone"),
+		Reviewers:          isChosen("Reviewers") && !useReviewerSearch,
+		TeamReviewers:      isChosen("Reviewers") && !useReviewerSearch,
+		Assignees:          isChosen("Assignees") && !useAssigneeSearch,
+		ApiActorsSupported: state.ApiActorsSupported,
+		Labels:             isChosen("Labels"),
+		ProjectsV1:         isChosen("Projects") && projectsV1Support == gh.ProjectsV1Supported,
+		ProjectsV2:         isChosen("Projects"),
+		Milestones:         isChosen("Milestone"),
 	}
 	metadataResult, err := fetcher.RepoMetadataFetch(metadataInput)
 	if err != nil {
@@ -212,24 +214,26 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	}
 
 	// Populate the list of selectable assignees and their default selections.
-	// This logic maps the default assignees from `state` to the corresponding actors or users
-	// so that the correct display names are preselected in the prompt.
+	// When search-based selection is available, skip building the static list.
 	var assignees []string
 	var assigneesDefault []string
-	if state.ActorAssignees {
-		for _, u := range metadataResult.AssignableActors {
-			assignees = append(assignees, u.DisplayName())
+	if !useAssigneeSearch {
+		// TODO ApiActorsSupported
+		if state.ApiActorsSupported {
+			for _, u := range metadataResult.AssignableActors {
+				assignees = append(assignees, u.DisplayName())
 
-			if slices.Contains(state.Assignees, u.Login()) {
-				assigneesDefault = append(assigneesDefault, u.DisplayName())
+				if slices.Contains(state.Assignees, u.Login()) {
+					assigneesDefault = append(assigneesDefault, u.DisplayName())
+				}
 			}
-		}
-	} else {
-		for _, u := range metadataResult.AssignableUsers {
-			assignees = append(assignees, u.DisplayName())
+		} else {
+			for _, u := range metadataResult.AssignableUsers {
+				assignees = append(assignees, u.DisplayName())
 
-			if slices.Contains(state.Assignees, u.Login()) {
-				assigneesDefault = append(assigneesDefault, u.DisplayName())
+				if slices.Contains(state.Assignees, u.Login()) {
+					assigneesDefault = append(assigneesDefault, u.DisplayName())
+				}
 			}
 		}
 	}
@@ -259,7 +263,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	}{}
 
 	if isChosen("Reviewers") {
-		if reviewerSearchFunc != nil {
+		if useReviewerSearch {
 			selectedReviewers, err := p.MultiSelectWithSearch(
 				"Reviewers",
 				"Search reviewers",
@@ -271,7 +275,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 			}
 			values.Reviewers = selectedReviewers
 		} else if len(reviewers) > 0 {
-			// TODO requestReviewsByLoginCleanup
+			// TODO ApiActorsSupported
 			// The static MultiSelect path can be removed once GHES supports
 			// requestReviewsByLogin and search-based selection is always used.
 			selected, err := p.MultiSelect("Reviewers", state.Reviewers, reviewers)
@@ -286,17 +290,25 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		}
 	}
 	if isChosen("Assignees") {
-		if len(assignees) > 0 {
+		if useAssigneeSearch {
+			selectedAssignees, err := p.MultiSelectWithSearch(
+				"Assignees",
+				"Search assignees",
+				state.Assignees,
+				[]string{},
+				assigneeSearchFunc)
+			if err != nil {
+				return err
+			}
+			values.Assignees = selectedAssignees
+		} else if len(assignees) > 0 {
 			selected, err := p.MultiSelect("Assignees", assigneesDefault, assignees)
 			if err != nil {
 				return err
 			}
 			for _, i := range selected {
-				// Previously, this logic relied upon `assignees` being in `<login>` or `<login> (<name>)` form,
-				// however the inclusion of actors breaks this convention.
-				// Instead, we map the selected indexes to the source that populated `assignees` rather than
-				// relying on parsing the information out.
-				if state.ActorAssignees {
+				// TODO ApiActorsSupported
+				if state.ApiActorsSupported {
 					values.Assignees = append(values.Assignees, metadataResult.AssignableActors[i].Login())
 				} else {
 					values.Assignees = append(values.Assignees, metadataResult.AssignableUsers[i].Login())

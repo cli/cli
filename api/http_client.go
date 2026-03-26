@@ -18,6 +18,7 @@ type tokenGetter interface {
 
 type HTTPClientOptions struct {
 	AppVersion         string
+	InvokingAgent      string
 	CacheTTL           time.Duration
 	Config             tokenGetter
 	EnableCache        bool
@@ -48,8 +49,13 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		clientOpts.LogVerboseHTTP = opts.LogVerboseHTTP
 	}
 
+	ua := fmt.Sprintf("GitHub CLI %s", opts.AppVersion)
+	if opts.InvokingAgent != "" {
+		ua = fmt.Sprintf("%s Agent/%s", ua, opts.InvokingAgent)
+	}
+
 	headers := map[string]string{
-		userAgent:  fmt.Sprintf("GitHub CLI %s", opts.AppVersion),
+		userAgent:  ua,
 		apiVersion: apiVersionValue,
 	}
 	clientOpts.Headers = headers

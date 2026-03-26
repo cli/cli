@@ -314,6 +314,47 @@ func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*R
 	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
 }
 
+// IssueRepoInfo fetches only the repository fields needed for issue operations such as
+// issue creation and transfer, avoiding fields like defaultBranchRef that require additional
+// token permissions.
+func IssueRepoInfo(client *Client, repo ghrepo.Interface) (*Repository, error) {
+	query := `
+	query IssueRepositoryInfo($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {
+			id
+			name
+			owner { login }
+			hasIssuesEnabled
+			viewerPermission
+		}
+	}`
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"name":  repo.RepoName(),
+	}
+
+	var result struct {
+		Repository *Repository
+	}
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
+		return nil, err
+	}
+	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
+	// guaranteed to happen when an authentication token with insufficient permissions is being used.
+	if result.Repository == nil {
+		return nil, GraphQLError{
+			GraphQLError: &ghAPI.GraphQLError{
+				Errors: []ghAPI.GraphQLErrorItem{{
+					Type:    "NOT_FOUND",
+					Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+				}},
+			},
+		}
+	}
+
+	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
+}
+
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	fragment repo on Repository {
@@ -922,14 +963,15 @@ func (m *RepoMetadataResult) Merge(m2 *RepoMetadataResult) {
 }
 
 type RepoMetadataInput struct {
-	Assignees      bool
-	ActorAssignees bool
-	Reviewers      bool
-	TeamReviewers  bool
-	Labels         bool
-	ProjectsV1     bool
-	ProjectsV2     bool
-	Milestones     bool
+	Assignees     bool
+	Reviewers     bool
+	TeamReviewers bool
+	// TODO ApiActorsSupported
+	ApiActorsSupported bool
+	Labels             bool
+	ProjectsV1         bool
+	ProjectsV2         bool
+	Milestones         bool
 }
 
 // RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
@@ -938,7 +980,8 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	var g errgroup.Group
 
 	if input.Assignees || input.Reviewers {
-		if input.ActorAssignees {
+		// TODO ApiActorsSupported
+		if input.ApiActorsSupported {
 			g.Go(func() error {
 				actors, err := RepoAssignableActors(client, repo)
 				if err != nil {
@@ -1296,6 +1339,69 @@ func RepoAssignableActors(client *Client, repo ghrepo.Interface) ([]AssignableAc
 		variables["endCursor"] = githubv4.String(query.Repository.SuggestedActors.PageInfo.EndCursor)
 	}
 	return actors, nil
+}
+
+// SearchRepoAssignableActors searches assignable actors for a repository with an optional
+// query string. Unlike RepoAssignableActors which fetches all actors with pagination, this
+// returns up to 10 results matching the query, suitable for search-based selection.
+func SearchRepoAssignableActors(client *Client, repo ghrepo.Interface, query string) ([]AssignableActor, int, error) {
+	type responseData struct {
+		Repository struct {
+			AssignableUsers struct {
+				TotalCount int
+			}
+			SuggestedActors struct {
+				Nodes []struct {
+					User struct {
+						ID       string
+						Login    string
+						Name     string
+						TypeName string `graphql:"__typename"`
+					} `graphql:"... on User"`
+					Bot struct {
+						ID       string
+						Login    string
+						TypeName string `graphql:"__typename"`
+					} `graphql:"... on Bot"`
+				}
+			} `graphql:"suggestedActors(first: 10, query: $query, capabilities: CAN_BE_ASSIGNED)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	var q *githubv4.String
+	if query != "" {
+		v := githubv4.String(query)
+		q = &v
+	}
+
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repo.RepoOwner()),
+		"name":  githubv4.String(repo.RepoName()),
+		"query": q,
+	}
+
+	var result responseData
+	if err := client.Query(repo.RepoHost(), "SearchRepoAssignableActors", &result, variables); err != nil {
+		return nil, 0, err
+	}
+
+	var actors []AssignableActor
+	for _, node := range result.Repository.SuggestedActors.Nodes {
+		if node.User.TypeName == "User" {
+			actors = append(actors, AssignableUser{
+				id:    node.User.ID,
+				login: node.User.Login,
+				name:  node.User.Name,
+			})
+		} else if node.Bot.TypeName == "Bot" {
+			actors = append(actors, AssignableBot{
+				id:    node.Bot.ID,
+				login: node.Bot.Login,
+			})
+		}
+	}
+
+	return actors, result.Repository.AssignableUsers.TotalCount, nil
 }
 
 type RepoLabel struct {

@@ -415,9 +415,9 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Non-interactive with Add/Remove doesn't need reviewers/assignees metadata
 				// REST API accepts logins and team slugs directly
-				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: false, teamReviewers: false, assignees: true, labels: true, projects: true, milestones: true})
+				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: false, teamReviewers: false, assignees: false, labels: true, projects: true, milestones: true})
 				mockPullRequestUpdate(reg)
-				mockPullRequestUpdateActorAssignees(reg)
+				mockPullRequestUpdateApiActors(reg)
 				mockRequestReviewsByLogin(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
@@ -473,9 +473,9 @@ func Test_editRun(t *testing.T) {
 				Fetcher: testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockRepoMetadata(reg, mockRepoMetadataOptions{assignees: true, labels: true, projects: true, milestones: true})
+				mockRepoMetadata(reg, mockRepoMetadataOptions{assignees: false, labels: true, projects: true, milestones: true})
 				mockPullRequestUpdate(reg)
-				mockPullRequestUpdateActorAssignees(reg)
+				mockPullRequestUpdateApiActors(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
 			},
@@ -547,11 +547,11 @@ func Test_editRun(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Non-interactive with Remove doesn't need reviewers metadata
-				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: false, teamReviewers: false, assignees: true, labels: true, projects: true, milestones: true})
+				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: false, teamReviewers: false, assignees: false, labels: true, projects: true, milestones: true})
 				mockPullRequestUpdate(reg)
 				mockRequestReviewsByLogin(reg)
 				mockPullRequestUpdateLabels(reg)
-				mockPullRequestUpdateActorAssignees(reg)
+				mockPullRequestUpdateApiActors(reg)
 				mockProjectV2ItemUpdate(reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
@@ -756,7 +756,7 @@ func Test_editRun(t *testing.T) {
 				// (searchFunc handles dynamic fetching, metadata populated in test mock)
 				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: false, teamReviewers: false, assignees: false, labels: true, projects: true, milestones: true})
 				mockPullRequestUpdate(reg)
-				mockPullRequestUpdateActorAssignees(reg)
+				mockPullRequestUpdateApiActors(reg)
 				mockRequestReviewsByLogin(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
@@ -785,7 +785,7 @@ func Test_editRun(t *testing.T) {
 					editFields: func(e *shared.Editable, _ string) error {
 						e.Title.Value = "new title"
 						e.Body.Value = "new body"
-						// When ActorAssignees is enabled, the interactive flow returns display names (or logins for non-users)
+						// When ApiActorsSupported is enabled, the interactive flow returns display names (or logins for non-users)
 						e.Assignees.Value = []string{"monalisa (Mona Display Name)", "hubot"}
 						// Populate metadata to simulate what searchFunc would do during prompting
 						e.Metadata.AssignableActors = []api.AssignableActor{
@@ -808,7 +808,7 @@ func Test_editRun(t *testing.T) {
 				// assignees: false because searchFunc handles dynamic fetching (metadata populated in test mock)
 				mockRepoMetadata(reg, mockRepoMetadataOptions{assignees: false, labels: true, projects: true, milestones: true})
 				mockPullRequestUpdate(reg)
-				mockPullRequestUpdateActorAssignees(reg)
+				mockPullRequestUpdateApiActors(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
 			},
@@ -876,7 +876,7 @@ func Test_editRun(t *testing.T) {
 				mockRepoMetadata(reg, mockRepoMetadataOptions{reviewers: false, teamReviewers: false, assignees: false, labels: true, projects: true, milestones: true})
 				mockPullRequestUpdate(reg)
 				mockRequestReviewsByLogin(reg)
-				mockPullRequestUpdateActorAssignees(reg)
+				mockPullRequestUpdateApiActors(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
 			},
@@ -912,12 +912,8 @@ func Test_editRun(t *testing.T) {
 						require.Equal(t, []string{"hubot"}, e.Assignees.DefaultLogins)
 
 						// Adding monalisa as PR assignee, should preserve hubot.
-						e.Assignees.Value = []string{"hubot", "monalisa (Mona Display Name)"}
-						// Populate metadata to simulate what searchFunc would do during prompting
-						e.Metadata.AssignableActors = []api.AssignableActor{
-							api.NewAssignableBot("HUBOTID", "hubot"),
-							api.NewAssignableUser("MONAID", "monalisa", "Mona Display Name"),
-						}
+						// MultiSelectWithSearch returns Keys (logins), not display names.
+						e.Assignees.Value = []string{"hubot", "monalisa"}
 						return nil
 					},
 				},
@@ -931,10 +927,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
 						func(inputs map[string]interface{}) {
-							// Checking that despite the display name being returned
-							// from the EditFieldsSurvey, the ID is still
-							// used in the mutation.
-							require.Subset(t, inputs["actorIds"], []string{"MONAID", "HUBOTID"})
+							require.Subset(t, inputs["actorLogins"], []interface{}{"hubot", "monalisa"})
 						}),
 				)
 			},
@@ -997,7 +990,7 @@ func Test_editRun(t *testing.T) {
 						return nil
 					},
 					editFields: func(e *shared.Editable, _ string) error {
-						require.False(t, e.Assignees.ActorAssignees)
+						require.False(t, e.ApiActorsSupported)
 						require.Nil(t, e.AssigneeSearchFunc)
 						require.Contains(t, e.Assignees.Options, "monalisa")
 						require.Contains(t, e.Assignees.Options, "hubot")
@@ -1197,7 +1190,7 @@ type mockRepoMetadataOptions struct {
 }
 
 func mockRepoMetadata(reg *httpmock.Registry, opt mockRepoMetadataOptions) {
-	// Assignable actors (users/bots) are fetched when reviewers OR assignees edited with ActorAssignees enabled.
+	// Assignable actors (users/bots) are fetched when reviewers OR assignees edited with ApiActorsSupported enabled.
 	if opt.reviewers || opt.assignees {
 		reg.Register(
 			httpmock.GraphQL(`query RepositoryAssignableActors\b`),
@@ -1321,7 +1314,7 @@ func mockPullRequestUpdate(reg *httpmock.Registry) {
 		httpmock.StringResponse(`{}`))
 }
 
-func mockPullRequestUpdateActorAssignees(reg *httpmock.Registry) {
+func mockPullRequestUpdateApiActors(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 		httpmock.GraphQLMutation(`
@@ -1343,7 +1336,7 @@ func mockPullRequestRemoveReviewers(reg *httpmock.Registry) {
 }
 
 // mockRequestReviewsByLogin mocks the RequestReviewsByLogin GraphQL mutation
-// used on github.com when ActorAssignees is enabled.
+// used on github.com when ApiActorsSupported is enabled.
 func mockRequestReviewsByLogin(reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),

@@ -26,7 +26,7 @@ func TestVerifyIntegration(t *testing.T) {
 		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
-	cmdFactory := factory.New("test")
+	cmdFactory := factory.New("test", "")
 
 	hc, err := cmdFactory.HttpClient()
 	if err != nil {
@@ -143,7 +143,7 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
-	cmdFactory := factory.New("test")
+	cmdFactory := factory.New("test", "")
 
 	hc, err := cmdFactory.HttpClient()
 	if err != nil {
@@ -217,7 +217,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
-	cmdFactory := factory.New("test")
+	cmdFactory := factory.New("test", "")
 
 	hc, err := cmdFactory.HttpClient()
 	if err != nil {
@@ -310,7 +310,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 		TUFMetadataDir: o.Some(t.TempDir()),
 	}
 
-	cmdFactory := factory.New("test")
+	cmdFactory := factory.New("test", "")
 
 	hc, err := cmdFactory.HttpClient()
 	if err != nil {

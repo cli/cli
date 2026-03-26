@@ -74,12 +74,31 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			- %[1]s@copilot%[1]s: request or remove review from Copilot (not supported on GitHub Enterprise Server)
 		`, "`"),
 		Example: heredoc.Doc(`
+			# Edit the title and body of a pull request
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
+
+			# Use a file as the body
+			$ gh pr edit 23 --body-file body.txt
+
+			# Manage labels
 			$ gh pr edit 23 --add-label "bug,help wanted" --remove-label "core"
-			$ gh pr edit 23 --add-reviewer monalisa,hubot  --remove-reviewer myorg/team-name
+
+			# Manage reviewers
+			$ gh pr edit 23 --add-reviewer monalisa,hubot --remove-reviewer myorg/team-name
+
+			# Re-request review
+			$ gh pr edit 23 --add-reviewer monalisa
+
+			# Request a review from GitHub Copilot
 			$ gh pr edit 23 --add-reviewer "@copilot"
+
+			# Manage assignees
 			$ gh pr edit 23 --add-assignee "@me" --remove-assignee monalisa,hubot
+
+			# Assign GitHub Copilot
 			$ gh pr edit 23 --add-assignee "@copilot"
+
+			# Manage projects and milestones
 			$ gh pr edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh pr edit 23 --milestone "Version 1"
 			$ gh pr edit 23 --remove-milestone
@@ -190,7 +209,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Editable.Body.Value, "body", "b", "", "Set the new body.")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.Editable.Base.Value, "base", "B", "", "Change the base `branch` for this pull request")
-	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Add, "add-reviewer", nil, "Add reviewers by their `login`. Use \"@copilot\" to request review from Copilot.")
+	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Add, "add-reviewer", nil, "Add or re-request reviewers by their `login`. Use \"@copilot\" to request review from Copilot.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Remove, "remove-reviewer", nil, "Remove reviewers by their `login`. Use \"@copilot\" to remove review request from Copilot.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Add, "add-assignee", nil, "Add assigned users by their `login`. Use \"@me\" to assign yourself, or \"@copilot\" to assign Copilot.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Remove, "remove-assignee", nil, "Remove assigned users by their `login`. Use \"@me\" to unassign yourself, or \"@copilot\" to unassign Copilot.")
@@ -251,8 +270,8 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
-	// TODO actorIsAssignableCleanup
-	if issueFeatures.ActorIsAssignable {
+	// TODO ApiActorsSupported
+	if issueFeatures.ApiActorsSupported {
 		findOptions.Fields = append(findOptions.Fields, "assignedActors")
 	} else {
 		findOptions.Fields = append(findOptions.Fields, "assignees")
@@ -270,9 +289,9 @@ func editRun(opts *EditOptions) error {
 	editable.Base.Default = pr.BaseRefName
 	editable.Reviewers.Default = pr.ReviewRequests.DisplayNames()
 	editable.Reviewers.DefaultLogins = pr.ReviewRequests.Logins()
-	// TODO actorIsAssignableCleanup
-	if issueFeatures.ActorIsAssignable {
-		editable.Assignees.ActorAssignees = true
+	// TODO ApiActorsSupported
+	if issueFeatures.ApiActorsSupported {
+		editable.ApiActorsSupported = true
 		editable.Assignees.Default = pr.AssignedActors.DisplayNames()
 		editable.Assignees.DefaultLogins = pr.AssignedActors.Logins()
 	} else {
@@ -301,9 +320,9 @@ func editRun(opts *EditOptions) error {
 	// Wire up search functions for assignees and reviewers.
 	// When these aren't wired up, it triggers a downstream fallback
 	// to legacy reviewer/assignee fetching.
-	// TODO actorIsAssignableCleanup
-	if issueFeatures.ActorIsAssignable {
-		editable.AssigneeSearchFunc = assigneeSearchFunc(apiClient, repo, &editable, pr.ID)
+	// TODO ApiActorsSupported
+	if issueFeatures.ApiActorsSupported {
+		editable.AssigneeSearchFunc = shared.AssigneeSearchFunc(apiClient, repo, pr.ID)
 		editable.ReviewerSearchFunc = reviewerSearchFunc(apiClient, repo, &editable, pr.ID)
 	}
 
@@ -344,57 +363,6 @@ func editRun(opts *EditOptions) error {
 	fmt.Fprintln(opts.IO.Out, pr.URL)
 
 	return nil
-}
-
-// assigneeSearchFunc is intended to be an arg for MultiSelectWithSearch
-// to return potential assignee actors.
-// It also contains an important enclosure to update the editable's
-// assignable actors metadata for later ID resolution - this is required
-// while we continue to use IDs for mutating assignees with the GQL API.
-func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, editable *shared.Editable, assignableID string) func(string) prompter.MultiSelectSearchResult {
-	searchFunc := func(input string) prompter.MultiSelectSearchResult {
-		actors, availableAssigneesCount, err := api.SuggestedAssignableActors(
-			apiClient,
-			repo,
-			assignableID,
-			input)
-		if err != nil {
-			return prompter.MultiSelectSearchResult{
-				Keys:        nil,
-				Labels:      nil,
-				MoreResults: 0,
-				Err:         err,
-			}
-		}
-
-		logins := make([]string, 0, len(actors))
-		displayNames := make([]string, 0, len(actors))
-
-		for _, a := range actors {
-			if a.Login() != "" {
-				logins = append(logins, a.Login())
-			} else {
-				continue
-			}
-
-			if a.DisplayName() != "" {
-				displayNames = append(displayNames, a.DisplayName())
-			} else {
-				displayNames = append(displayNames, a.Login())
-			}
-
-			// Update the assignable actors metadata in the editable struct
-			// so that updating the PR later can resolve the actor ID.
-			editable.Metadata.AssignableActors = append(editable.Metadata.AssignableActors, a)
-		}
-		return prompter.MultiSelectSearchResult{
-			Keys:        logins,
-			Labels:      displayNames,
-			MoreResults: availableAssigneesCount,
-			Err:         nil,
-		}
-	}
-	return searchFunc
 }
 
 // reviewerSearchFunc is intended to be an arg for MultiSelectWithSearch
@@ -470,7 +438,8 @@ func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, pr
 		// Replace @copilot with the Copilot reviewer login (only on github.com).
 		// Also use DefaultLogins (not Default display names) for computing the set.
 		var defaultLogins []string
-		if editable.Assignees.ActorAssignees {
+		// TODO ApiActorsSupported
+		if editable.ApiActorsSupported {
 			copilotReplacer := shared.NewCopilotReviewerReplacer()
 			add = copilotReplacer.ReplaceSlice(add)
 			remove = copilotReplacer.ReplaceSlice(remove)
@@ -489,7 +458,8 @@ func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, pr
 
 	// On github.com, use the new GraphQL mutation which supports bots.
 	// On GHES, fall back to REST API.
-	if editable.Assignees.ActorAssignees {
+	// TODO ApiActorsSupported
+	if editable.ApiActorsSupported {
 		return updatePullRequestReviewsGraphQL(client, repo, prID, editable)
 	}
 	return updatePullRequestReviewsREST(client, repo, number, editable)

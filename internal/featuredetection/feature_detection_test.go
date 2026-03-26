@@ -23,7 +23,7 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "github.com",
 			hostname: "github.com",
 			wantFeatures: IssueFeatures{
-				ActorIsAssignable: true,
+				ApiActorsSupported: true,
 			},
 			wantErr: false,
 		},
@@ -31,7 +31,7 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "ghec data residency (ghe.com)",
 			hostname: "stampname.ghe.com",
 			wantFeatures: IssueFeatures{
-				ActorIsAssignable: true,
+				ApiActorsSupported: true,
 			},
 			wantErr: false,
 		},
@@ -39,7 +39,7 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "GHE",
 			hostname: "git.my.org",
 			wantFeatures: IssueFeatures{
-				ActorIsAssignable: false,
+				ApiActorsSupported: false,
 			},
 			wantErr: false,
 		},

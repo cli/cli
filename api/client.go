@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	accept          = "Accept"
 	apiVersion      = "X-GitHub-Api-Version"
 	apiVersionValue = "2022-11-28"
 	authorization   = "Authorization"

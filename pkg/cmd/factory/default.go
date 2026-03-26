@@ -26,23 +26,23 @@ import (
 var ssoHeader string
 var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
 
-func New(appVersion string) *cmdutil.Factory {
+func New(appVersion string, invokingAgent string) *cmdutil.Factory {
 	f := &cmdutil.Factory{
 		AppVersion:     appVersion,
 		Config:         configFunc(), // No factory dependencies
 		ExecutableName: "gh",
 	}
 
-	f.IOStreams = ioStreams(f)                             // Depends on Config
-	f.HttpClient = httpClientFunc(f, appVersion)           // Depends on Config, IOStreams, and appVersion
-	f.PlainHttpClient = plainHttpClientFunc(f, appVersion) // Depends on IOStreams, and appVersion
-	f.GitClient = newGitClient(f)                          // Depends on IOStreams, and Executable
-	f.Remotes = remotesFunc(f)                             // Depends on Config, and GitClient
-	f.BaseRepo = BaseRepoFunc(f)                           // Depends on Remotes
-	f.Prompter = newPrompter(f)                            // Depends on Config and IOStreams
-	f.Browser = newBrowser(f)                              // Depends on Config, and IOStreams
-	f.ExtensionManager = extensionManager(f)               // Depends on Config, HttpClient, and IOStreams
-	f.Branch = branchFunc(f)                               // Depends on GitClient
+	f.IOStreams = ioStreams(f)                                            // Depends on Config
+	f.HttpClient = httpClientFunc(f, appVersion, invokingAgent)           // Depends on Config, IOStreams, appVersion, and invokingAgent
+	f.PlainHttpClient = plainHttpClientFunc(f, appVersion, invokingAgent) // Depends on IOStreams, appVersion, and invokingAgent
+	f.GitClient = newGitClient(f)                                         // Depends on IOStreams, and Executable
+	f.Remotes = remotesFunc(f)                                            // Depends on Config, and GitClient
+	f.BaseRepo = BaseRepoFunc(f)                                          // Depends on Remotes
+	f.Prompter = newPrompter(f)                                           // Depends on Config and IOStreams
+	f.Browser = newBrowser(f)                                             // Depends on Config, and IOStreams
+	f.ExtensionManager = extensionManager(f)                              // Depends on Config, HttpClient, and IOStreams
+	f.Branch = branchFunc(f)                                              // Depends on GitClient
 
 	return f
 }
@@ -186,7 +186,7 @@ func remotesFunc(f *cmdutil.Factory) func() (ghContext.Remotes, error) {
 	return rr.Resolver()
 }
 
-func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client, error) {
+func httpClientFunc(f *cmdutil.Factory, appVersion string, invokingAgent string) func() (*http.Client, error) {
 	return func() (*http.Client, error) {
 		io := f.IOStreams
 		cfg, err := f.Config()
@@ -194,10 +194,11 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 			return nil, err
 		}
 		opts := api.HTTPClientOptions{
-			Config:      cfg.Authentication(),
-			Log:         io.ErrOut,
-			LogColorize: io.ColorEnabled(),
-			AppVersion:  appVersion,
+			Config:        cfg.Authentication(),
+			Log:           io.ErrOut,
+			LogColorize:   io.ColorEnabled(),
+			AppVersion:    appVersion,
+			InvokingAgent: invokingAgent,
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {
@@ -208,13 +209,14 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 	}
 }
 
-func plainHttpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client, error) {
+func plainHttpClientFunc(f *cmdutil.Factory, appVersion string, invokingAgent string) func() (*http.Client, error) {
 	return func() (*http.Client, error) {
 		io := f.IOStreams
 		opts := api.HTTPClientOptions{
-			Log:         io.ErrOut,
-			LogColorize: io.ColorEnabled(),
-			AppVersion:  appVersion,
+			Log:           io.ErrOut,
+			LogColorize:   io.ColorEnabled(),
+			AppVersion:    appVersion,
+			InvokingAgent: invokingAgent,
 			// This is required to prevent automatic setting of auth and other headers.
 			SkipDefaultHeaders: true,
 		}

@@ -66,7 +66,7 @@ func Test_BaseRepo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := New("1")
+			f := New("1", "")
 			rr := &remoteResolver{
 				readRemotes: func() (git.RemoteSet, error) {
 					return tt.remotes, nil
@@ -204,7 +204,7 @@ func Test_SmartBaseRepo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := New("1")
+			f := New("1", "")
 			rr := &remoteResolver{
 				readRemotes: func() (git.RemoteSet, error) {
 					return tt.remotes, nil
@@ -297,7 +297,7 @@ func Test_OverrideBaseRepo(t *testing.T) {
 			if tt.envOverride != "" {
 				t.Setenv("GH_REPO", tt.envOverride)
 			}
-			f := New("1")
+			f := New("1", "")
 			rr := &remoteResolver{
 				readRemotes: func() (git.RemoteSet, error) {
 					return tt.remotes, nil
@@ -375,7 +375,7 @@ func Test_ioStreams_pager(t *testing.T) {
 					t.Setenv(k, v)
 				}
 			}
-			f := New("1")
+			f := New("1", "")
 			f.Config = func() (gh.Config, error) {
 				if tt.config == nil {
 					return config.NewBlankConfig(), nil
@@ -418,7 +418,7 @@ func Test_ioStreams_prompt(t *testing.T) {
 					t.Setenv(k, v)
 				}
 			}
-			f := New("1")
+			f := New("1", "")
 			f.Config = func() (gh.Config, error) {
 				if tt.config == nil {
 					return config.NewBlankConfig(), nil
@@ -496,7 +496,7 @@ func Test_ioStreams_spinnerDisabled(t *testing.T) {
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
-			f := New("1")
+			f := New("1", "")
 			f.Config = func() (gh.Config, error) {
 				if tt.config == nil {
 					return config.NewBlankConfig(), nil
@@ -564,7 +564,7 @@ func Test_ioStreams_accessiblePrompterEnabled(t *testing.T) {
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
-			f := New("1")
+			f := New("1", "")
 			f.Config = func() (gh.Config, error) {
 				if tt.config == nil {
 					return config.NewBlankConfig(), nil
@@ -642,7 +642,7 @@ func Test_ioStreams_colorLabels(t *testing.T) {
 					t.Setenv(k, v)
 				}
 			}
-			f := New("1")
+			f := New("1", "")
 			f.Config = func() (gh.Config, error) {
 				if tt.config == nil {
 					return config.NewBlankConfig(), nil
@@ -683,13 +683,13 @@ func TestSSOURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := New("1")
+			f := New("1", "")
 			f.Config = func() (gh.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
 			ios, _, _, stderr := iostreams.Test()
 			f.IOStreams = ios
-			client, err := httpClientFunc(f, "v1.2.3")()
+			client, err := httpClientFunc(f, "v1.2.3", "")()
 			require.NoError(t, err)
 			req, err := http.NewRequest("GET", ts.URL, nil)
 			if tt.sso != "" {
@@ -718,13 +718,13 @@ func TestPlainHttpClient(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	f := New("1")
+	f := New("1", "")
 	f.Config = func() (gh.Config, error) {
 		return config.NewBlankConfig(), nil
 	}
 	ios, _, _, _ := iostreams.Test()
 	f.IOStreams = ios
-	client, err := plainHttpClientFunc(f, "v1.2.3")()
+	client, err := plainHttpClientFunc(f, "v1.2.3", "")()
 	require.NoError(t, err)
 
 	req, err := http.NewRequest("GET", ts.URL, nil)
@@ -759,7 +759,7 @@ func TestNewGitClient(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := New("1")
+			f := New("1", "")
 			f.Config = func() (gh.Config, error) {
 				if tt.config == nil {
 					return config.NewBlankConfig(), nil

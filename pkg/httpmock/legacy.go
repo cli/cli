@@ -22,6 +22,20 @@ func (r *Registry) StubRepoInfoResponse(owner, repo, branch string) {
 		`, repo, owner, branch)))
 }
 
+func (r *Registry) StubIssueRepoInfoResponse(owner, repo string) {
+	r.Register(
+		GraphQL(`query IssueRepositoryInfo\b`),
+		StringResponse(fmt.Sprintf(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "%s",
+			"owner": {"login": "%s"},
+			"hasIssuesEnabled": true,
+			"viewerPermission": "WRITE"
+		} } }
+		`, repo, owner)))
+}
+
 func (r *Registry) StubRepoResponse(owner, repo string) {
 	r.StubRepoResponseWithPermission(owner, repo, "WRITE")
 }

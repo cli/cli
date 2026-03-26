@@ -167,7 +167,7 @@ func TestGetJob(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			capiClient := NewCAPIClient(httpClient, "", "github.com")
+			capiClient := NewCAPIClient(httpClient, "", "github.com", "https://api.githubcopilot.com")
 
 			job, err := capiClient.GetJob(context.Background(), "OWNER", "REPO", "job123")
 
@@ -410,7 +410,7 @@ func TestCreateJob(t *testing.T) {
 
 			httpClient := &http.Client{Transport: reg}
 
-			capiClient := NewCAPIClient(httpClient, "", "github.com")
+			capiClient := NewCAPIClient(httpClient, "", "github.com", "https://api.githubcopilot.com")
 
 			job, err := capiClient.CreateJob(context.Background(), "OWNER", "REPO", "Do the thing", tt.baseBranch, tt.customAgent)
 

@@ -105,7 +105,7 @@ func issueTransfer(httpClient *http.Client, issueID string, destRepo ghrepo.Inte
 		destinationRepoID = r.ID
 	} else {
 		apiClient := api.NewClientFromHTTP(httpClient)
-		r, err := api.GitHubRepo(apiClient, destRepo)
+		r, err := api.IssueRepoInfo(apiClient, destRepo)
 		if err != nil {
 			return "", err
 		}

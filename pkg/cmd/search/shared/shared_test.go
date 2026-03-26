@@ -15,7 +15,7 @@ import (
 )
 
 func TestSearcher(t *testing.T) {
-	f := factory.New("1")
+	f := factory.New("1", "")
 	f.Config = func() (gh.Config, error) {
 		return config.NewBlankConfig(), nil
 	}

@@ -22,6 +22,13 @@ type Editable struct {
 	Projects           EditableProjects
 	Milestone          EditableString
 	Metadata           api.RepoMetadataResult
+
+	// TODO ApiActorsSupported
+	// ApiActorsSupported indicates the host supports actor-based APIs (github.com, ghe.com).
+	// When true, mutations use logins directly instead of resolving node IDs.
+	// Remove this flag (and collapse to actor-only paths) once GHES supports
+	// replaceActorsForAssignable and requestReviewsByLogin mutations.
+	ApiActorsSupported bool
 }
 
 type EditableString struct {
@@ -42,11 +49,9 @@ type EditableSlice struct {
 }
 
 // EditableAssignees is a special case of EditableSlice.
-// It contains a flag to indicate whether the assignees are actors or not.
 type EditableAssignees struct {
 	EditableSlice
-	ActorAssignees bool
-	DefaultLogins  []string // For disambiguating actors from display names
+	DefaultLogins []string // For disambiguating actors from display names
 }
 
 // EditableReviewers is a special case of EditableSlice.
@@ -95,22 +100,8 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	// If assignees came in from command line flags, we need to
 	// curate the final list of assignees from the default list.
 	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
-		meReplacer := NewMeReplacer(client, repo.RepoHost())
-		copilotReplacer := NewCopilotReplacer(true)
-
-		replaceSpecialAssigneeNames := func(value []string) ([]string, error) {
-			replaced, err := meReplacer.ReplaceSlice(value)
-			if err != nil {
-				return nil, err
-			}
-
-			// Only suppported for actor assignees.
-			if e.Assignees.ActorAssignees {
-				replaced = copilotReplacer.ReplaceSlice(replaced)
-			}
-
-			return replaced, nil
-		}
+		// TODO ApiActorsSupported
+		replacer := NewSpecialAssigneeReplacer(client, repo.RepoHost(), e.ApiActorsSupported, true)
 
 		assigneeSet := set.NewStringSet()
 
@@ -122,19 +113,20 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 		// So, we need to add the default logins here instead of the DisplayNames.
 		// Otherwise, the value the user provided won't be found in the
 		// set to be added or removed, causing unexpected behavior.
-		if e.Assignees.ActorAssignees {
+		// TODO ApiActorsSupported
+		if e.ApiActorsSupported {
 			assigneeSet.AddValues(e.Assignees.DefaultLogins)
 		} else {
 			assigneeSet.AddValues(e.Assignees.Default)
 		}
 
-		add, err := replaceSpecialAssigneeNames(e.Assignees.Add)
+		add, err := replacer.ReplaceSlice(e.Assignees.Add)
 		if err != nil {
 			return nil, err
 		}
 		assigneeSet.AddValues(add)
 
-		remove, err := replaceSpecialAssigneeNames(e.Assignees.Remove)
+		remove, err := replacer.ReplaceSlice(e.Assignees.Remove)
 		if err != nil {
 			return nil, err
 		}
@@ -144,6 +136,70 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	}
 	a, err := e.Metadata.MembersToIDs(e.Assignees.Value)
 	return &a, err
+}
+
+// AssigneeLogins computes the final list of assignee logins from the current
+// defaults plus any Add/Remove operations. Unlike AssigneeIds, this does not
+// resolve logins to node IDs, and is used on github.com where the
+// ReplaceActorsForAssignable mutation accepts logins directly.
+func (e Editable) AssigneeLogins(client *api.Client, repo ghrepo.Interface) ([]string, error) {
+	if !e.Assignees.Edited {
+		return nil, nil
+	}
+
+	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
+		replacer := NewSpecialAssigneeReplacer(client, repo.RepoHost(), true, true)
+
+		assigneeSet := set.NewStringSet()
+		assigneeSet.AddValues(e.Assignees.DefaultLogins)
+
+		add, err := replacer.ReplaceSlice(e.Assignees.Add)
+		if err != nil {
+			return nil, err
+		}
+		assigneeSet.AddValues(add)
+
+		remove, err := replacer.ReplaceSlice(e.Assignees.Remove)
+		if err != nil {
+			return nil, err
+		}
+		assigneeSet.RemoveValues(remove)
+
+		e.Assignees.Value = assigneeSet.ToSlice()
+	}
+
+	return e.Assignees.Value, nil
+}
+
+// SpecialAssigneeReplacer expands special assignee names (@me, Copilot actors)
+// in login slices. Use NewSpecialAssigneeReplacer to create one.
+type SpecialAssigneeReplacer struct {
+	meReplacer      *MeReplacer
+	copilotReplacer *CopilotReplacer
+	actorAssignees  bool
+}
+
+// NewSpecialAssigneeReplacer creates a replacer that expands @me and (when
+// actorAssignees is true) Copilot actor names in assignee slices.
+// copilotUseLogin controls whether Copilot actors are replaced with their
+// login (true) or display name (false, used for web mode).
+func NewSpecialAssigneeReplacer(client *api.Client, host string, actorAssignees bool, copilotUseLogin bool) *SpecialAssigneeReplacer {
+	return &SpecialAssigneeReplacer{
+		meReplacer:      NewMeReplacer(client, host),
+		copilotReplacer: NewCopilotReplacer(copilotUseLogin),
+		actorAssignees:  actorAssignees,
+	}
+}
+
+func (r *SpecialAssigneeReplacer) ReplaceSlice(logins []string) ([]string, error) {
+	replaced, err := r.meReplacer.ReplaceSlice(logins)
+	if err != nil {
+		return nil, err
+	}
+	if r.actorAssignees {
+		replaced = r.copilotReplacer.ReplaceSlice(replaced)
+	}
+	return replaced, nil
 }
 
 // ProjectIds returns a slice containing IDs of projects v1 that the issue or a PR has to be linked to.
@@ -224,14 +280,17 @@ func (e Editable) MilestoneId() (*string, error) {
 // go routines. Fields that would be mutated will be copied.
 func (e *Editable) Clone() Editable {
 	return Editable{
-		Title:     e.Title.clone(),
-		Body:      e.Body.clone(),
-		Base:      e.Base.clone(),
-		Reviewers: e.Reviewers.clone(),
-		Assignees: e.Assignees.clone(),
-		Labels:    e.Labels.clone(),
-		Projects:  e.Projects.clone(),
-		Milestone: e.Milestone.clone(),
+		Title:              e.Title.clone(),
+		Body:               e.Body.clone(),
+		Base:               e.Base.clone(),
+		Reviewers:          e.Reviewers.clone(),
+		ReviewerSearchFunc: e.ReviewerSearchFunc,
+		Assignees:          e.Assignees.clone(),
+		AssigneeSearchFunc: e.AssigneeSearchFunc,
+		Labels:             e.Labels.clone(),
+		Projects:           e.Projects.clone(),
+		Milestone:          e.Milestone.clone(),
+		ApiActorsSupported: e.ApiActorsSupported,
 		// Shallow copy since no mutation.
 		Metadata: e.Metadata,
 	}
@@ -268,9 +327,8 @@ func (es *EditableSlice) clone() EditableSlice {
 
 func (ea *EditableAssignees) clone() EditableAssignees {
 	return EditableAssignees{
-		EditableSlice:  ea.EditableSlice.clone(),
-		ActorAssignees: ea.ActorAssignees,
-		DefaultLogins:  ea.DefaultLogins,
+		EditableSlice: ea.EditableSlice.clone(),
+		DefaultLogins: ea.DefaultLogins,
 	}
 }
 
@@ -470,24 +528,24 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable,
 		if len(editable.Assignees.Add) == 0 && len(editable.Assignees.Remove) == 0 && editable.AssigneeSearchFunc == nil {
 			fetchAssignees = true
 		}
-		// However, if we have Add/Remove operations (non-interactive flow),
-		// we do need to fetch the assignees.
-		// TODO: KW noninteractive assignees need to migrate to directly use
-		// new logins input with ReplaceActorsForAssignable to prevent fetching.
-		if len(editable.Assignees.Add) > 0 || len(editable.Assignees.Remove) > 0 {
+		// For non-interactive Add/Remove operations, we only need to fetch assignees
+		// on GHES where ID resolution is required. On github.com (ApiActorsSupported),
+		// logins are passed directly to the mutation.
+		// TODO ApiActorsSupported
+		if (len(editable.Assignees.Add) > 0 || len(editable.Assignees.Remove) > 0) && !editable.ApiActorsSupported {
 			fetchAssignees = true
 		}
 	}
 
 	input := api.RepoMetadataInput{
-		Reviewers:      fetchReviewers,
-		TeamReviewers:  teamReviewers,
-		Assignees:      fetchAssignees,
-		ActorAssignees: editable.Assignees.ActorAssignees,
-		Labels:         editable.Labels.Edited,
-		ProjectsV1:     editable.Projects.Edited && projectV1Support == gh.ProjectsV1Supported,
-		ProjectsV2:     editable.Projects.Edited,
-		Milestones:     editable.Milestone.Edited,
+		Reviewers:          fetchReviewers,
+		TeamReviewers:      teamReviewers,
+		Assignees:          fetchAssignees,
+		ApiActorsSupported: editable.ApiActorsSupported,
+		Labels:             editable.Labels.Edited,
+		ProjectsV1:         editable.Projects.Edited && projectV1Support == gh.ProjectsV1Supported,
+		ProjectsV2:         editable.Projects.Edited,
+		Milestones:         editable.Milestone.Edited,
 	}
 	metadata, err := api.RepoMetadata(client, repo, input)
 	if err != nil {
@@ -524,7 +582,8 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable,
 
 	editable.Metadata = *metadata
 	editable.Reviewers.Options = append(users, teams...)
-	if editable.Assignees.ActorAssignees {
+	// TODO ApiActorsSupported
+	if editable.ApiActorsSupported {
 		editable.Assignees.Options = actors
 	} else {
 		editable.Assignees.Options = users
@@ -566,4 +625,51 @@ func milestoneSurvey(p EditPrompter, title string, opts []string) (result string
 
 	result = opts[selected]
 	return
+}
+
+// AssigneeSearchFunc returns a search function for MultiSelectWithSearch that
+// dynamically fetches assignable actors for the given assignable (Issue/PR) node ID.
+func AssigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, assignableID string) func(string) prompter.MultiSelectSearchResult {
+	return func(input string) prompter.MultiSelectSearchResult {
+		actors, count, err := api.SuggestedAssignableActors(apiClient, repo, assignableID, input)
+		if err != nil {
+			return prompter.MultiSelectSearchResult{Err: err}
+		}
+		return actorsToSearchResult(actors, count)
+	}
+}
+
+// RepoAssigneeSearchFunc returns a search function for MultiSelectWithSearch that
+// dynamically fetches assignable actors at the repository level. Used during create
+// flows where no issue/PR node ID exists yet.
+func RepoAssigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface) func(string) prompter.MultiSelectSearchResult {
+	return func(input string) prompter.MultiSelectSearchResult {
+		actors, count, err := api.SearchRepoAssignableActors(apiClient, repo, input)
+		if err != nil {
+			return prompter.MultiSelectSearchResult{Err: err}
+		}
+		return actorsToSearchResult(actors, count)
+	}
+}
+
+func actorsToSearchResult(actors []api.AssignableActor, totalCount int) prompter.MultiSelectSearchResult {
+	logins := make([]string, 0, len(actors))
+	displayNames := make([]string, 0, len(actors))
+
+	for _, a := range actors {
+		if a.Login() == "" {
+			continue
+		}
+		logins = append(logins, a.Login())
+		if a.DisplayName() != "" {
+			displayNames = append(displayNames, a.DisplayName())
+		} else {
+			displayNames = append(displayNames, a.Login())
+		}
+	}
+	return prompter.MultiSelectSearchResult{
+		Keys:        logins,
+		Labels:      displayNames,
+		MoreResults: totalCount,
+	}
 }

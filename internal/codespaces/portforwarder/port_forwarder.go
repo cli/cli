@@ -276,7 +276,7 @@ func (fwd *CodespacesPortForwarder) UpdatePortVisibility(ctx context.Context, re
 	done := make(chan error)
 	go func() {
 		// Connect to the tunnel
-		err = fwd.connection.Connect(ctx)
+		err := fwd.connection.Connect(ctx)
 		if err != nil {
 			done <- fmt.Errorf("connect failed: %v", err)
 			return

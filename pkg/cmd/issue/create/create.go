@@ -12,6 +12,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -178,29 +179,23 @@ func createRun(opts *CreateOptions) (err error) {
 
 	// Replace special values in assignees
 	// For web mode, @copilot should be replaced by name; otherwise, login.
-	assigneeSet := set.NewStringSet()
-	meReplacer := prShared.NewMeReplacer(apiClient, baseRepo.RepoHost())
-	copilotReplacer := prShared.NewCopilotReplacer(!opts.WebMode)
-	assignees, err := meReplacer.ReplaceSlice(opts.Assignees)
+	assigneeReplacer := prShared.NewSpecialAssigneeReplacer(apiClient, baseRepo.RepoHost(), issueFeatures.ApiActorsSupported, !opts.WebMode)
+	assignees, err := assigneeReplacer.ReplaceSlice(opts.Assignees)
 	if err != nil {
 		return err
 	}
-
-	// TODO actorIsAssignableCleanup
-	if issueFeatures.ActorIsAssignable {
-		assignees = copilotReplacer.ReplaceSlice(assignees)
-	}
+	assigneeSet := set.NewStringSet()
 	assigneeSet.AddValues(assignees)
 
 	tb := prShared.IssueMetadataState{
-		Type:           prShared.IssueMetadata,
-		ActorAssignees: issueFeatures.ActorIsAssignable,
-		Assignees:      assigneeSet.ToSlice(),
-		Labels:         opts.Labels,
-		ProjectTitles:  opts.Projects,
-		Milestones:     milestones,
-		Title:          opts.Title,
-		Body:           opts.Body,
+		Type:               prShared.IssueMetadata,
+		ApiActorsSupported: issueFeatures.ApiActorsSupported, // TODO ApiActorsSupported
+		Assignees:          assigneeSet.ToSlice(),
+		Labels:             opts.Labels,
+		ProjectTitles:      opts.Projects,
+		Milestones:         milestones,
+		Title:              opts.Title,
+		Body:               opts.Body,
 	}
 
 	if opts.RecoverFile != "" {
@@ -239,7 +234,7 @@ func createRun(opts *CreateOptions) (err error) {
 		fmt.Fprintf(opts.IO.ErrOut, "\nCreating issue in %s\n\n", ghrepo.FullName(baseRepo))
 	}
 
-	repo, err := api.GitHubRepo(apiClient, baseRepo)
+	repo, err := api.IssueRepoInfo(apiClient, baseRepo)
 	if err != nil {
 		return
 	}
@@ -313,7 +308,11 @@ func createRun(opts *CreateOptions) (err error) {
 				Repo:      baseRepo,
 				State:     &tb,
 			}
-			err = prShared.MetadataSurvey(opts.Prompter, opts.IO, baseRepo, fetcher, &tb, projectsV1Support, nil)
+			var assigneeSearchFunc func(string) prompter.MultiSelectSearchResult
+			if issueFeatures.ApiActorsSupported {
+				assigneeSearchFunc = prShared.RepoAssigneeSearchFunc(apiClient, baseRepo)
+			}
+			err = prShared.MetadataSurvey(opts.Prompter, opts.IO, baseRepo, fetcher, &tb, projectsV1Support, nil, assigneeSearchFunc)
 			if err != nil {
 				return
 			}

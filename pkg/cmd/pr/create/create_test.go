@@ -917,17 +917,6 @@ func Test_createRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "assignableUsers": {
-						"nodes": [
-							{ "login": "hubot", "id": "HUBOTID", "name": "" },
-							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				reg.Register(
 					httpmock.GraphQL(`query RepositoryLabelList\b`),
 					httpmock.StringResponse(`
 					{ "data": { "repository": { "labels": {
@@ -975,10 +964,20 @@ func Test_createRun(t *testing.T) {
 					} } }
 				`, func(inputs map[string]interface{}) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-						assert.Equal(t, []interface{}{"MONAID"}, inputs["assigneeIds"])
+						if _, ok := inputs["assigneeIds"]; ok {
+							t.Error("did not expect assigneeIds in updatePullRequest when ApiActorsSupported is true")
+						}
 						assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 						assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
 						assert.Equal(t, "BIGONEID", inputs["milestoneId"])
+					}))
+				reg.Register(
+					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }
+				`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "NEWPULLID", inputs["assignableId"])
+						assert.Equal(t, []interface{}{"monalisa"}, inputs["actorLogins"])
 					}))
 				reg.Register(
 					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),

@@ -18,9 +18,14 @@ const (
 type IssueMetadataState struct {
 	Type metadataStateType
 
-	Draft          bool
-	ActorAssignees bool
-	ActorReviewers bool
+	Draft bool
+
+	// TODO ApiActorsSupported
+	// ApiActorsSupported indicates the host supports actor-based APIs (github.com, ghe.com).
+	// When true, mutations use logins directly instead of resolving node IDs.
+	// Remove this flag (and collapse to actor-only paths) once GHES supports
+	// replaceActorsForAssignable and requestReviewsByLogin mutations.
+	ApiActorsSupported bool
 
 	Body  string
 	Title string

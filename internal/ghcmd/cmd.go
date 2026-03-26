@@ -15,6 +15,7 @@ import (
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/config/migration"
@@ -44,7 +45,7 @@ func Main() exitCode {
 	buildVersion := build.Version
 	hasDebug, _ := utils.IsDebugEnabled()
 
-	cmdFactory := factory.New(buildVersion)
+	cmdFactory := factory.New(buildVersion, string(agents.Detect()))
 	stderr := cmdFactory.IOStreams.ErrOut
 
 	ctx := context.Background()

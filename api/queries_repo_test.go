@@ -26,15 +26,181 @@ func TestGitHubRepo_notFound(t *testing.T) {
 
 	client := newTestClient(httpReg)
 	repo, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
-	if err == nil {
-		t.Fatal("GitHubRepo did not return an error")
+	require.EqualError(t, err, "GraphQL: Could not resolve to a Repository with the name 'OWNER/REPO'.")
+	assert.Nil(t, repo)
+}
+
+func TestGitHubRepo_success(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"hasIssuesEnabled": true,
+			"description": "a cool repo",
+			"hasWikiEnabled": true,
+			"viewerPermission": "ADMIN",
+			"defaultBranchRef": {"name": "main"},
+			"parent": null,
+			"mergeCommitAllowed": true,
+			"rebaseMergeAllowed": true,
+			"squashMergeAllowed": false
+		} } }`))
+
+	client := newTestClient(httpReg)
+	repo, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
+	require.NoError(t, err)
+	assert.Equal(t, &Repository{
+		ID:                 "REPOID",
+		Name:               "REPO",
+		Owner:              RepositoryOwner{Login: "OWNER"},
+		HasIssuesEnabled:   true,
+		Description:        "a cool repo",
+		HasWikiEnabled:     true,
+		ViewerPermission:   "ADMIN",
+		DefaultBranchRef:   BranchRef{Name: "main"},
+		MergeCommitAllowed: true,
+		RebaseMergeAllowed: true,
+		hostname:           "github.com",
+	}, repo)
+	assert.True(t, repo.ViewerCanPush())
+	assert.True(t, repo.ViewerCanTriage())
+}
+
+func TestGitHubRepo_withParent(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"hasIssuesEnabled": true,
+			"description": "",
+			"hasWikiEnabled": false,
+			"viewerPermission": "READ",
+			"defaultBranchRef": {"name": "main"},
+			"parent": {
+				"id": "PARENTID",
+				"name": "PARENT-REPO",
+				"owner": {"login": "PARENT-OWNER"},
+				"hasIssuesEnabled": true,
+				"description": "parent repo",
+				"hasWikiEnabled": true,
+				"viewerPermission": "READ",
+				"defaultBranchRef": {"name": "develop"}
+			},
+			"mergeCommitAllowed": false,
+			"rebaseMergeAllowed": false,
+			"squashMergeAllowed": true
+		} } }`))
+
+	client := newTestClient(httpReg)
+	repo, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
+	require.NoError(t, err)
+	wantParent := &Repository{
+		ID:               "PARENTID",
+		Name:             "PARENT-REPO",
+		Owner:            RepositoryOwner{Login: "PARENT-OWNER"},
+		HasIssuesEnabled: true,
+		Description:      "parent repo",
+		HasWikiEnabled:   true,
+		ViewerPermission: "READ",
+		DefaultBranchRef: BranchRef{Name: "develop"},
+		hostname:         "github.com",
 	}
-	if wants := "GraphQL: Could not resolve to a Repository with the name 'OWNER/REPO'."; err.Error() != wants {
-		t.Errorf("GitHubRepo error: want %q, got %q", wants, err.Error())
-	}
-	if repo != nil {
-		t.Errorf("GitHubRepo: expected nil repo, got %v", repo)
-	}
+	assert.Equal(t, &Repository{
+		ID:                 "REPOID",
+		Name:               "REPO",
+		Owner:              RepositoryOwner{Login: "OWNER"},
+		HasIssuesEnabled:   true,
+		ViewerPermission:   "READ",
+		DefaultBranchRef:   BranchRef{Name: "main"},
+		Parent:             wantParent,
+		SquashMergeAllowed: true,
+		hostname:           "github.com",
+	}, repo)
+	assert.False(t, repo.ViewerCanPush())
+	assert.False(t, repo.ViewerCanTriage())
+}
+
+func TestIssueRepoInfo_notFound(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+		httpmock.StringResponse(`{ "data": { "repository": null } }`))
+
+	client := newTestClient(httpReg)
+	repo, err := IssueRepoInfo(client, ghrepo.New("OWNER", "REPO"))
+	require.EqualError(t, err, "GraphQL: Could not resolve to a Repository with the name 'OWNER/REPO'.")
+	assert.Nil(t, repo)
+}
+
+func TestIssueRepoInfo_success(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"hasIssuesEnabled": true,
+			"viewerPermission": "WRITE"
+		} } }`))
+
+	client := newTestClient(httpReg)
+	repo, err := IssueRepoInfo(client, ghrepo.New("OWNER", "REPO"))
+	require.NoError(t, err)
+	assert.Equal(t, &Repository{
+		ID:               "REPOID",
+		Name:             "REPO",
+		Owner:            RepositoryOwner{Login: "OWNER"},
+		HasIssuesEnabled: true,
+		ViewerPermission: "WRITE",
+		hostname:         "github.com",
+	}, repo)
+	assert.True(t, repo.ViewerCanTriage())
+}
+
+func TestIssueRepoInfo_issuesDisabled(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {"login": "OWNER"},
+			"hasIssuesEnabled": false,
+			"viewerPermission": "READ"
+		} } }`))
+
+	client := newTestClient(httpReg)
+	repo, err := IssueRepoInfo(client, ghrepo.New("OWNER", "REPO"))
+	require.NoError(t, err)
+	assert.Equal(t, &Repository{
+		ID:               "REPOID",
+		Name:             "REPO",
+		Owner:            RepositoryOwner{Login: "OWNER"},
+		ViewerPermission: "READ",
+		hostname:         "github.com",
+	}, repo)
+	assert.False(t, repo.ViewerCanTriage())
 }
 
 func Test_RepoMetadata(t *testing.T) {

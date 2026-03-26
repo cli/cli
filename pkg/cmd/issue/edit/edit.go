@@ -215,9 +215,9 @@ func editRun(opts *EditOptions) error {
 
 	lookupFields := []string{"id", "number", "title", "body", "url"}
 	if editable.Assignees.Edited {
-		// TODO actorIsAssignableCleanup
-		if issueFeatures.ActorIsAssignable {
-			editable.Assignees.ActorAssignees = true
+		// TODO ApiActorsSupported
+		if issueFeatures.ApiActorsSupported {
+			editable.ApiActorsSupported = true
 			lookupFields = append(lookupFields, "assignedActors")
 		} else {
 			lookupFields = append(lookupFields, "assignees")
@@ -248,6 +248,13 @@ func editRun(opts *EditOptions) error {
 
 	// Fetch editable shared fields once for all issues.
 	apiClient := api.NewClientFromHTTP(httpClient)
+
+	// Wire up search function for assignees when ApiActorsSupported is available.
+	// Interactive mode only supports a single issue, so we use its ID for the search query.
+	if issueFeatures.ApiActorsSupported && opts.Interactive && len(issues) == 1 {
+		editable.AssigneeSearchFunc = prShared.AssigneeSearchFunc(apiClient, baseRepo, issues[0].ID)
+	}
+
 	opts.IO.StartProgressIndicatorWithLabel("Fetching repository information")
 	err = opts.FetchOptions(apiClient, baseRepo, &editable, opts.Detector.ProjectsV1())
 	opts.IO.StopProgressIndicator()
@@ -273,7 +280,8 @@ func editRun(opts *EditOptions) error {
 		editable.Body.Default = issue.Body
 		// We use Actors as the default assignees if Actors are assignable
 		// on this GitHub host.
-		if editable.Assignees.ActorAssignees {
+		// TODO ApiActorsSupported
+		if editable.ApiActorsSupported {
 			editable.Assignees.Default = issue.AssignedActors.DisplayNames()
 			editable.Assignees.DefaultLogins = issue.AssignedActors.Logins()
 		} else {

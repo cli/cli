@@ -20,6 +20,7 @@ func TestNewHTTPClient(t *testing.T) {
 	type args struct {
 		config             tokenGetter
 		appVersion         string
+		invokingAgent      string
 		logVerboseHTTP     bool
 		skipDefaultHeaders bool
 	}
@@ -155,6 +156,18 @@ func TestNewHTTPClient(t *testing.T) {
 				* Request took <duration>
 			`),
 		},
+		{
+			name: "includes invoking agent in user-agent header",
+			args: args{
+				appVersion:    "v1.2.3",
+				invokingAgent: "copilot-cli",
+			},
+			host: "github.com",
+			wantHeader: map[string][]string{
+				"user-agent": {"GitHub CLI v1.2.3 Agent/copilot-cli"},
+			},
+			wantStderr: "",
+		},
 	}
 
 	var gotReq *http.Request
@@ -169,6 +182,7 @@ func TestNewHTTPClient(t *testing.T) {
 			ios, _, _, stderr := iostreams.Test()
 			client, err := NewHTTPClient(HTTPClientOptions{
 				AppVersion:         tt.args.appVersion,
+				InvokingAgent:      tt.args.invokingAgent,
 				Config:             tt.args.config,
 				Log:                ios.ErrOut,
 				LogVerboseHTTP:     tt.args.logVerboseHTTP,

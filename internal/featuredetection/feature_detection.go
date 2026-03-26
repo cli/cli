@@ -23,11 +23,35 @@ type Detector interface {
 }
 
 type IssueFeatures struct {
-	ActorIsAssignable bool
+	// TODO ApiActorsSupported
+	// ApiActorsSupported indicates the host supports actor-based APIs. True for
+	// github.com and ghe.com, false for GHES.
+	//
+	// The GitHub API has two generations of assignee/reviewer types:
+	//
+	// Legacy (GHES): Uses AssignableUser (users only) and node-ID-based mutations.
+	//   - assignableUsers query returns []AssignableUser
+	//   - Mutations take node IDs (assigneeIds, userReviewerIds, teamReviewerIds)
+	//
+	// Actor-based (github.com): Uses AssignableActor (User + Bot union) and
+	// login-based mutations, enabling assignment of non-user actors like Copilot.
+	//   - suggestedActors query returns []AssignableActor (User | Bot)
+	//   - suggestedReviewerActors returns []ReviewerCandidate (User | Bot | Team)
+	//   - Mutations take logins (replaceActorsForAssignable, requestReviewsByLogin)
+	//
+	// When GHES adds support for the actor-based types and mutations, this flag
+	// can be removed and all // TODO ApiActorsSupported sites collapsed to the
+	// actor-only path. To verify GHES support, check whether the GHES GraphQL
+	// schema includes:
+	//   - The suggestedActors field on Repository (assignee search)
+	//   - The suggestedReviewerActors field on PullRequest (reviewer search)
+	//   - The replaceActorsForAssignable mutation
+	//   - The requestReviewsByLogin mutation
+	ApiActorsSupported bool
 }
 
 var allIssueFeatures = IssueFeatures{
-	ActorIsAssignable: true,
+	ApiActorsSupported: true,
 }
 
 type PullRequestFeatures struct {
@@ -136,7 +160,7 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 	}
 
 	return IssueFeatures{
-		ActorIsAssignable: false, // replaceActorsForAssignable GraphQL mutation unavailable on GHES
+		ApiActorsSupported: false, // TODO ApiActorsSupported — actor-based mutations unavailable on GHES
 	}, nil
 }
 

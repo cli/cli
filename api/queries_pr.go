@@ -524,7 +524,15 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}
 	}
 
-	// TODO requestReviewsByLoginCleanup
+	// Assign users using login-based mutation when ApiActorsSupported is true (github.com).
+	if assigneeLogins, ok := params["assigneeLogins"].([]string); ok && len(assigneeLogins) > 0 {
+		err := ReplaceActorsForAssignableByLogin(client, repo, pr.ID, assigneeLogins)
+		if err != nil {
+			return pr, err
+		}
+	}
+
+	// TODO ApiActorsSupported
 	// Request reviewers using either login-based (github.com) or ID-based (GHES) mutation.
 	// The ID-based path can be removed once GHES supports requestReviewsByLogin.
 	userLogins, hasUserLogins := params["userReviewerLogins"].([]string)
@@ -579,6 +587,41 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	}
 
 	return pr, nil
+}
+
+// ReplaceActorsForAssignableByLogin calls the replaceActorsForAssignable mutation
+// using actor logins. This avoids the need to resolve logins to node IDs.
+func ReplaceActorsForAssignableByLogin(client *Client, repo ghrepo.Interface, assignableID string, logins []string) error {
+	type ReplaceActorsForAssignableInput struct {
+		AssignableID githubv4.ID       `json:"assignableId"`
+		ActorLogins  []githubv4.String `json:"actorLogins"`
+	}
+
+	actorLogins := make([]githubv4.String, len(logins))
+	for i, l := range logins {
+		// The replaceActorsForAssignable mutation requires the [bot] suffix
+		// for bot actor logins (e.g. "copilot-swe-agent[bot]"), unlike
+		// requestReviewsByLogin which has a separate botLogins field.
+		if l == CopilotAssigneeLogin {
+			l = l + "[bot]"
+		}
+		actorLogins[i] = githubv4.String(l)
+	}
+
+	var mutation struct {
+		ReplaceActorsForAssignable struct {
+			TypeName string `graphql:"__typename"`
+		} `graphql:"replaceActorsForAssignable(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": ReplaceActorsForAssignableInput{
+			AssignableID: githubv4.ID(assignableID),
+			ActorLogins:  actorLogins,
+		},
+	}
+
+	return client.Mutate(repo.RepoHost(), "ReplaceActorsForAssignable", &mutation, variables)
 }
 
 // SuggestedAssignableActors fetches up to 10 suggested actors for a specific assignable
