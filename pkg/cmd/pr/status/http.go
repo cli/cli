@@ -162,11 +162,36 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 
 	var currentPR = resp.Repository.PullRequest
 	if currentPR == nil {
+		var bestMatch *api.PullRequest
+		var bestScore int = -1
+
 		for _, edge := range resp.Repository.PullRequests.Edges {
-			if edge.Node.HeadLabel() == currentPRHeadRef {
-				currentPR = &edge.Node
-				break // Take the most recent PR for the current branch
+			pr := edge.Node
+			score := -1
+
+			if pr.HeadLabel() == currentPRHeadRef {
+				if pr.State == "OPEN" {
+					score = 4
+				} else {
+					score = 3
+				}
+			} else if pr.HeadRefName == branchWithoutOwner {
+				if pr.State == "OPEN" {
+					score = 2
+				} else {
+					score = 1
+				}
 			}
+
+			if score > bestScore {
+				bestScore = score
+				matchedPr := pr
+				bestMatch = &matchedPr
+			}
+		}
+
+		if bestMatch != nil {
+			currentPR = bestMatch
 		}
 	}
 
