@@ -316,6 +316,13 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 		io.SetAccessiblePrompterEnabled(true)
 	}
 
+	experimentalPrompterValue, experimentalPrompterIsSet := os.LookupEnv("GH_EXPERIMENTAL_PROMPTER")
+	if experimentalPrompterIsSet {
+		if !slices.Contains(falseyValues, experimentalPrompterValue) {
+			io.SetExperimentalPrompterEnabled(true)
+		}
+	}
+
 	ghSpinnerDisabledValue, ghSpinnerDisabledIsSet := os.LookupEnv("GH_SPINNER_DISABLED")
 	if ghSpinnerDisabledIsSet {
 		if !slices.Contains(falseyValues, ghSpinnerDisabledValue) {

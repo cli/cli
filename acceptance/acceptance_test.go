@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghcmd"
 	"github.com/cli/go-internal/testscript"
+	"github.com/MakeNowJust/heredoc"
 )
 
 func ghMain() int {
@@ -223,6 +225,19 @@ func sharedSetup(tsEnv testScriptEnv) func(ts *testscript.Env) error {
 		ts.Setenv("GH_TOKEN", tsEnv.token)
 
 		ts.Setenv("RANDOM_STRING", randomString(10))
+
+		// The sandbox overrides HOME, so git cannot find the user's global
+		// config. Write a minimal identity so commits inside the sandbox
+		// don't fail with "Author identity unknown".
+		gitCfg := filepath.Join(ts.Cd, ".gitconfig")
+		gitCfgContent := heredoc.Doc(`
+			[user]
+				name = GitHub CLI Acceptance Test Runner
+				email = cli-acceptance-test-runner@github.com
+		`)
+		if err := os.WriteFile(gitCfg, []byte(gitCfgContent), 0o644); err != nil {
+			return fmt.Errorf("writing sandbox .gitconfig: %w", err)
+		}
 
 		ts.Values[keyT] = ts.T()
 		return nil

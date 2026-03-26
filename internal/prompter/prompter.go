@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
+	"charm.land/huh/v2"
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/charmbracelet/huh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/surveyext"
@@ -53,6 +53,15 @@ type Prompter interface {
 }
 
 func New(editorCmd string, io *iostreams.IOStreams) Prompter {
+	if io.ExperimentalPrompterEnabled() {
+		return &huhPrompter{
+			stdin:     io.In,
+			stdout:    io.Out,
+			stderr:    io.ErrOut,
+			editorCmd: editorCmd,
+		}
+	}
+
 	if io.AccessiblePrompterEnabled() {
 		return &accessiblePrompter{
 			stdin:     io.In,
@@ -80,7 +89,7 @@ type accessiblePrompter struct {
 
 func (p *accessiblePrompter) newForm(groups ...*huh.Group) *huh.Form {
 	return huh.NewForm(groups...).
-		WithTheme(huh.ThemeBase16()).
+		WithTheme(huh.ThemeFunc(huh.ThemeBase16)).
 		WithAccessible(true).
 		WithInput(p.stdin).
 		WithOutput(p.stdout)

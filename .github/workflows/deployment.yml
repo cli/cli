@@ -208,7 +208,7 @@ jobs:
         run: git tag "$TAG_NAME"
       - name: Authenticate to Azure for code signing
         if: inputs.environment == 'production'
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         with:
           client-id: ${{ secrets.SPN_GITHUB_CLI_SIGNING_CLIENT_ID }}
           tenant-id: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
@@ -226,7 +226,7 @@ jobs:
         run: script/release --local "$TAG_NAME" --platform windows
       - name: Set up MSBuild
         id: setupmsbuild
-        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57
       - name: Build MSI
         shell: bash
         env:
@@ -414,7 +414,7 @@ jobs:
             git diff --name-status @{upstream}..
           fi
       - name: Bump homebrew-core formula
-        uses: mislav/bump-homebrew-formula-action@56a283fa15557e9abaa4bdb63b8212abc68e655c
+        uses: mislav/bump-homebrew-formula-action@ccf2332299a883f6af50a1d2d41e5df7904dd769
         if: inputs.environment == 'production' && !contains(inputs.tag_name, '-')
         with:
           formula-name: gh

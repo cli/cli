@@ -109,7 +109,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear without the invalid default value
-			_, err := console.ExpectString("Select a number \r\n")
+			_, err := console.ExpectString("Select a number")
 			require.NoError(t, err)
 
 			// Select option 2
@@ -128,7 +128,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Input a number between 0 and 3:")
+			_, err := console.ExpectString("Enter a number between 0 and 3:")
 			require.NoError(t, err)
 
 			// Select options 1 and 2
@@ -207,7 +207,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear without the invalid default values
-			_, err := console.ExpectString("Select a number \r\n")
+			_, err := console.ExpectString("Select a number")
 			require.NoError(t, err)
 
 			// Not selecting anything will fail because there are no defaults.
@@ -259,7 +259,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Select an option \r\n")
+			_, err := console.ExpectString("Select an option")
 			require.NoError(t, err)
 
 			// Select the search option, which will always be the first option
@@ -279,7 +279,7 @@ func TestAccessiblePrompter(t *testing.T) {
 			require.NoError(t, err)
 
 			// Wait for the multiselect prompt to re-appear after search
-			_, err = console.ExpectString("Select an option \r\n")
+			_, err = console.ExpectString("Select an option")
 			require.NoError(t, err)
 
 			// Select the first search result
@@ -325,7 +325,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Select an option (default: Initial Result Label 1) \r\n")
+			_, err := console.ExpectString("Select an option (default: Initial Result Label 1)")
 			require.NoError(t, err)
 
 			// This confirms default selections
@@ -379,7 +379,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Select an option \r\n")
+			_, err := console.ExpectString("Select an option")
 			require.NoError(t, err)
 
 			// Select one of our initial search results
@@ -524,7 +524,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		// expected string matches any part of the stream, we have to use an
 		// anchored regexp (i.e., with ^ and $) to make sure the password/token
 		// is not printed at all.
-		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
+		_, err = console.Expect(expect.RegexpPattern(`^(\x1b\[[\d;]*m)* \r\n\r\n$`))
 		require.NoError(t, err)
 	})
 
@@ -615,7 +615,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		// expected string matches any part of the stream, we have to use an
 		// anchored regexp (i.e., with ^ and $) to make sure the password/token
 		// is not printed at all.
-		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
+		_, err = console.Expect(expect.RegexpPattern(`^(\x1b\[[\d;]*m)* \r\n\r\n$`))
 		require.NoError(t, err)
 	})
 
@@ -660,7 +660,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		// expected string matches any part of the stream, we have to use an
 		// anchored regexp (i.e., with ^ and $) to make sure the password/token
 		// is not printed at all.
-		_, err = console.Expect(expect.RegexpPattern("^ \r\n\r\n$"))
+		_, err = console.Expect(expect.RegexpPattern(`^(\x1b\[[\d;]*m)* \r\n\r\n$`))
 		require.NoError(t, err)
 	})
 

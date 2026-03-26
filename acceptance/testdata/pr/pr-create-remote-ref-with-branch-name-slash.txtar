@@ -43,4 +43,4 @@ stdout https://${GH_HOST}/${ORG}/${REPO}/pull/1
 
 # Assert that the PR was created with the correct head repository and refs
 exec gh pr view --json headRefName,headRepository,baseRefName,isCrossRepository
-stdout {"baseRefName":"main","headRefName":"feature/branch","headRepository":{"id":"${FORK_ID}","name":"${FORK}"},"isCrossRepository":true}
+stdout {"baseRefName":"main","headRefName":"feature/branch","headRepository":{"id":"${FORK_ID}","name":"${FORK}","nameWithOwner":"${USER}/${FORK}"},"isCrossRepository":true}

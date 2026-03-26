@@ -387,7 +387,7 @@ func IssueGraphQL(fields []string) string {
 		case "headRepositoryOwner":
 			q = append(q, `headRepositoryOwner{id,login,...on User{name}}`)
 		case "headRepository":
-			q = append(q, `headRepository{id,name}`)
+			q = append(q, `headRepository{id,name,nameWithOwner}`)
 		case "assignees":
 			q = append(q, `assignees(first:100){nodes{id,login,name,databaseId},totalCount}`)
 		case "assignedActors":
