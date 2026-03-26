@@ -66,6 +66,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			Runs created by organization and enterprise ruleset workflows will not display a workflow name due to GitHub API limitations.
 
 			To see runs associated with a pull request, users should run %[1]sgh pr checks%[1]s.
+
+			Examples:
+			  gh run list --created ">=2024-01-01"
+			  gh run list --created "2024-01-01..2024-02-01"
+
+			Date filtering uses GitHub search syntax:
+			https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests
 		`, "`"),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -83,7 +90,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 			return listRun(opts)
 		},
-	}
+	}		
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of runs to fetch")
 	cmd.Flags().StringVarP(&opts.WorkflowSelector, "workflow", "w", "", "Filter runs by workflow")
