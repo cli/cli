@@ -444,6 +444,14 @@ func findForRefs(httpClient *http.Client, prRefs PRFindRefs, stateFilters, field
 		}
 	}
 
+	for _, pr := range prs {
+		// Fallback for cases where fork owner info is unavailable locally.
+		isNotClosedOrMergedWhenHeadIsDefault := pr.State == "OPEN" || resp.Repository.DefaultBranchRef.Name != prRefs.QualifiedHeadRef()
+		if prRefs.Matches(pr.BaseRefName, pr.HeadRefName) && isNotClosedOrMergedWhenHeadIsDefault {
+			return &pr, nil
+		}
+	}
+
 	return nil, &NotFoundError{fmt.Errorf("no pull requests found for branch %q", prRefs.QualifiedHeadRef())}
 }
 
