@@ -32,3 +32,5 @@ jobs:
     uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/pitch-surface-top-issues.yml@main
     permissions:
       issues: write
+			commit
+			
