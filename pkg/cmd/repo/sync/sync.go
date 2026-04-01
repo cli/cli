@@ -258,6 +258,13 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 		}
 	} else {
 		if hasLocalBranch {
+			checkedOutInWorktree, err := git.IsBranchCheckedOutInWorktree(branch)
+			if err != nil {
+				return err
+			}
+			if checkedOutInWorktree {
+				return fmt.Errorf("can't sync branch %q because it is checked out in another worktree; switch to that worktree and run `gh repo sync` there", branch)
+			}
 			if err := git.UpdateBranch(branch, "FETCH_HEAD"); err != nil {
 				return err
 			}

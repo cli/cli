@@ -23,6 +23,11 @@ func (g *mockGitClient) CurrentBranch() (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (g *mockGitClient) IsBranchCheckedOutInWorktree(branch string) (bool, error) {
+	args := g.Called(branch)
+	return args.Bool(0), args.Error(1)
+}
+
 func (g *mockGitClient) Fetch(a, b string) error {
 	args := g.Called(a, b)
 	return args.Error(0)

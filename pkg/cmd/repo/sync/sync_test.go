@@ -255,9 +255,26 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("IsBranchCheckedOutInWorktree", "trunk").Return(false, nil).Once()
 				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(nil).Once()
 			},
 			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER/REPO\" to local repository\n",
+		},
+		{
+			name: "sync local repo with parent - existing branch checked out in another worktree",
+			tty:  true,
+			opts: &SyncOptions{
+				Branch: "trunk",
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
+				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
+				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("IsBranchCheckedOutInWorktree", "trunk").Return(true, nil).Once()
+			},
+			wantErr: true,
+			errMsg:  "can't sync branch \"trunk\" because it is checked out in another worktree; switch to that worktree and run `gh repo sync` there",
 		},
 		{
 			name: "sync local repo with parent - create new branch",

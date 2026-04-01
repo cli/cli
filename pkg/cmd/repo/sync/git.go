@@ -3,12 +3,14 @@ package sync
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cli/cli/v2/git"
 )
 
 type gitClient interface {
 	CurrentBranch() (string, error)
+	IsBranchCheckedOutInWorktree(string) (bool, error)
 	UpdateBranch(string, string) error
 	CreateBranch(string, string, string) error
 	Fetch(string, string) error
@@ -51,6 +53,26 @@ func (g *gitExecuter) CreateBranch(branch, ref, upstream string) error {
 
 func (g *gitExecuter) CurrentBranch() (string, error) {
 	return g.client.CurrentBranch(context.Background())
+}
+
+func (g *gitExecuter) IsBranchCheckedOutInWorktree(branch string) (bool, error) {
+	cmd, err := g.client.Command(context.Background(), "worktree", "list", "--porcelain")
+	if err != nil {
+		return false, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return false, err
+	}
+
+	worktreeBranchRef := fmt.Sprintf("branch refs/heads/%s", branch)
+	for _, line := range strings.Split(string(out), "\n") {
+		if line == worktreeBranchRef {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (g *gitExecuter) Fetch(remote, ref string) error {
