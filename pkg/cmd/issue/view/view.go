@@ -117,16 +117,14 @@ func viewRun(opts *ViewOptions) error {
 			lookupFields.Remove("lastComment")
 		}
 
+		lookupFields.Add("projectItems")
 		// TODO projectsV1Deprecation
 		// Remove this section as we should no longer add projectCards
 		if opts.Detector == nil {
 			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
 			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
 		}
-
-		lookupFields.Add("projectItems")
-		projectsV1Support := opts.Detector.ProjectsV1()
-		if projectsV1Support == gh.ProjectsV1Supported {
+		if opts.Detector.ProjectsV1() == gh.ProjectsV1Supported {
 			lookupFields.Add("projectCards")
 		}
 	}

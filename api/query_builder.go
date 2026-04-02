@@ -323,7 +323,6 @@ var sharedIssuePRFields = []string{
 	"labels",
 	"milestone",
 	"number",
-	"projectCards",
 	"projectItems",
 	"reactionGroups",
 	"state",
