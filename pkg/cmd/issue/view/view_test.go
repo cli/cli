@@ -20,6 +20,7 @@ import (
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestJSONFields(t *testing.T) {
@@ -47,9 +48,10 @@ func TestJSONFields(t *testing.T) {
 	})
 }
 
-func TestJSONField_projectCards_unknown(t *testing.T) {
+func TestJSONFieldProjectCardsUnknown(t *testing.T) {
 	_, err := runCommand(nil, true, "123 --json projectCards")
-	assert.ErrorContains(t, err, `Unknown JSON field: "projectCards"`)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `Unknown JSON field: "projectCards"`)
 }
 
 func TestNewCmdView(t *testing.T) {
