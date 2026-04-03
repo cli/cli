@@ -166,6 +166,11 @@ type AuthConfig interface {
 	// DefaultHost.
 	// Use for testing purposes only.
 	SetDefaultHost(host, source string)
+
+	// SetActiveUser will override the active user resolution for all hosts, returning the given user
+	// for all calls to ActiveUser and using that user's token for all calls to ActiveToken.
+	// This is used by the --user flag to override the active account per-invocation.
+	SetActiveUser(user string)
 }
 
 // AliasConfig defines an interface for managing command aliases.

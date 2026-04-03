@@ -223,6 +223,7 @@ type AuthConfig struct {
 	defaultHostOverride func() (string, string)
 	hostsOverride       func() []string
 	tokenOverride       func(string) (string, string)
+	activeUserOverride  string
 }
 
 // ActiveToken will retrieve the active auth token for the given hostname,
@@ -231,6 +232,13 @@ type AuthConfig struct {
 func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	if c.tokenOverride != nil {
 		return c.tokenOverride(hostname)
+	}
+	if c.activeUserOverride != "" {
+		token, source, err := c.TokenForUser(hostname, c.activeUserOverride)
+		if err == nil {
+			return token, source
+		}
+		return "", "default"
 	}
 	token, source := ghauth.TokenFromEnvOrConfig(hostname)
 	if token == "" {
@@ -311,6 +319,9 @@ func (c *AuthConfig) TokenFromKeyringForUser(hostname, username string) (string,
 // ActiveUser will retrieve the username for the active user at the given hostname.
 // This will not be accurate if the oauth token is set from an environment variable.
 func (c *AuthConfig) ActiveUser(hostname string) (string, error) {
+	if c.activeUserOverride != "" {
+		return c.activeUserOverride, nil
+	}
 	return c.cfg.Get([]string{hostsKey, hostname, userKey})
 }
 
@@ -342,6 +353,12 @@ func (c *AuthConfig) SetDefaultHost(host, source string) {
 	c.defaultHostOverride = func() (string, string) {
 		return host, source
 	}
+}
+
+// SetActiveUser will override the active user resolution for all hosts, returning the given user
+// for all calls to ActiveUser and using that user's token for all calls to ActiveToken.
+func (c *AuthConfig) SetActiveUser(user string) {
+	c.activeUserOverride = user
 }
 
 // Login will set user, git protocol, and auth token for the given hostname.

@@ -923,6 +923,100 @@ func TestLoginSecurePostMigrationRemovesTokenFromConfig(t *testing.T) {
 	requireNoKey(t, authCfg.cfg, []string{hostsKey, "github.com", usersKey, "test-user", oauthTokenKey})
 }
 
+func TestSetActiveUserOverridesActiveUser(t *testing.T) {
+	// Given two users are logged in
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "user1", "token1", "", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "user2", "token2", "", false)
+	require.NoError(t, err)
+
+	// When we set an active user override
+	authCfg.SetActiveUser("user1")
+
+	// Then ActiveUser returns the overridden user
+	user, err := authCfg.ActiveUser("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "user1", user)
+}
+
+func TestSetActiveUserOverridesActiveUserForAllHosts(t *testing.T) {
+	// Given users are logged in on multiple hosts
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "user1", "token1", "", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("ghe.io", "user1", "ghe-token1", "", false)
+	require.NoError(t, err)
+
+	// When we set an active user override
+	authCfg.SetActiveUser("user1")
+
+	// Then ActiveUser returns the overridden user for all hosts
+	user, err := authCfg.ActiveUser("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "user1", user)
+
+	user, err = authCfg.ActiveUser("ghe.io")
+	require.NoError(t, err)
+	require.Equal(t, "user1", user)
+}
+
+func TestSetActiveUserOverridesActiveToken(t *testing.T) {
+	// Given two users are logged in with insecure storage
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "user1", "token1", "", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "user2", "token2", "", false)
+	require.NoError(t, err)
+
+	// The active user after login is user2 (most recently logged in)
+	user, err := authCfg.ActiveUser("github.com")
+	require.NoError(t, err)
+	require.Equal(t, "user2", user)
+
+	// When we override the active user to user1
+	authCfg.SetActiveUser("user1")
+
+	// Then ActiveToken returns user1's token
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "token1", token)
+	require.Equal(t, oauthTokenKey, source)
+}
+
+func TestSetActiveUserOverridesActiveTokenFromKeyring(t *testing.T) {
+	// Given two users are logged in with secure storage
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "user1", "token1", "", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "user2", "token2", "", true)
+	require.NoError(t, err)
+
+	// When we override the active user to user1
+	authCfg.SetActiveUser("user1")
+
+	// Then ActiveToken returns user1's token from the keyring
+	token, source := authCfg.ActiveToken("github.com")
+	require.Equal(t, "token1", token)
+	require.Equal(t, "keyring", source)
+}
+
+func TestSetActiveUserReturnsNoTokenForUnknownUser(t *testing.T) {
+	// Given a user is logged in
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "user1", "token1", "", false)
+	require.NoError(t, err)
+
+	// When we override to a non-existent user
+	authCfg.SetActiveUser("unknown-user")
+
+	// Then ActiveToken returns an empty token
+	token, _ := authCfg.ActiveToken("github.com")
+	require.Empty(t, token)
+
+	// And HasActiveToken returns false
+	require.False(t, authCfg.HasActiveToken("github.com"))
+}
+
 // Copied and pasted directly from the trunk branch before doing any work on
 // login, plus the addition of AuthConfig as the first arg since it is a method
 // receiver in the real implementation.
