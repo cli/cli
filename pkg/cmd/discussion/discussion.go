@@ -3,6 +3,7 @@ package discussion
 import (
 	"github.com/MakeNowJust/heredoc"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/discussion/list"
+	cmdView "github.com/cli/cli/v2/pkg/cmd/discussion/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -34,6 +35,10 @@ func NewCmdDiscussion(f *cmdutil.Factory) *cobra.Command {
 
 	cmdutil.AddGroup(cmd, "General commands",
 		cmdList.NewCmdList(f, nil),
+	)
+
+	cmdutil.AddGroup(cmd, "Targeted commands",
+		cmdView.NewCmdView(f, nil),
 	)
 
 	return cmd

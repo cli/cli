@@ -358,8 +358,53 @@ func (c *discussionClient) Search(repo ghrepo.Interface, filters SearchFilters, 
 	return &result, nil
 }
 
-func (c *discussionClient) GetByNumber(_ ghrepo.Interface, _ int) (*Discussion, error) {
-	return nil, fmt.Errorf("not implemented")
+func (c *discussionClient) GetByNumber(repo ghrepo.Interface, number int) (*Discussion, error) {
+	query := fmt.Sprintf(`query DiscussionByNumber($owner: String!, $name: String!, $number: Int!) {
+		repository(owner: $owner, name: $name) {
+			hasDiscussionsEnabled
+			discussion(number: $number) {
+				%s
+				body
+				comments { totalCount }
+			}
+		}
+	}`, discussionFields)
+
+	variables := map[string]interface{}{
+		"owner":  repo.RepoOwner(),
+		"name":   repo.RepoName(),
+		"number": number,
+	}
+
+	type response struct {
+		Repository struct {
+			HasDiscussionsEnabled bool `json:"hasDiscussionsEnabled"`
+			Discussion            *struct {
+				discussionNode
+				Body     string `json:"body"`
+				Comments struct {
+					TotalCount int `json:"totalCount"`
+				} `json:"comments"`
+			} `json:"discussion"`
+		} `json:"repository"`
+	}
+
+	var data response
+	err := c.gql.GraphQL(repo.RepoHost(), query, variables, &data)
+	if err != nil {
+		return nil, err
+	}
+	if !data.Repository.HasDiscussionsEnabled {
+		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
+	}
+	if data.Repository.Discussion == nil {
+		return nil, fmt.Errorf("discussion #%d not found in '%s/%s'", number, repo.RepoOwner(), repo.RepoName())
+	}
+
+	d := mapDiscussion(data.Repository.Discussion.discussionNode)
+	d.Body = data.Repository.Discussion.Body
+	d.Comments = DiscussionCommentList{TotalCount: data.Repository.Discussion.Comments.TotalCount}
+	return &d, nil
 }
 
 func (c *discussionClient) GetWithComments(_ ghrepo.Interface, _ int, _ int, _ string) (*Discussion, error) {
