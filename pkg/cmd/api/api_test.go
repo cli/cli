@@ -685,6 +685,37 @@ func Test_apiRun(t *testing.T) {
 			stderr: ``,
 			isatty: false,
 		},
+		{
+			name: "verbose mode still parses GraphQL errors",
+			options: ApiOptions{
+				Verbose:     true,
+				RequestPath: "graphql",
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"errors": [{"message":"BROKEN"}, {"message":"TWICE"}]}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"errors": [{"message":"BROKEN"}, {"message":"TWICE"}]}`,
+			stderr: "gh: BROKEN\nTWICE\n",
+			isatty: false,
+		},
+		{
+			name: "verbose mode still parses REST errors",
+			options: ApiOptions{
+				Verbose: true,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "BAD REQUEST"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"message": "BAD REQUEST"}`,
+			stderr: "gh: BAD REQUEST (HTTP 400)\n",
+			isatty: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1032,6 +1063,95 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 	endCursor, hasCursor := requestData.Variables["endCursor"].(string)
 	assert.Equal(t, true, hasCursor)
 	assert.Equal(t, "PAGE1_END", endCursor)
+}
+
+func Test_apiRun_paginationGraphQL_verbose(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+
+	requestCount := 0
+	responses := []*http.Response{
+		{
+			StatusCode: 200,
+			Header:     http.Header{"Content-Type": []string{`application/json`}},
+			Body: io.NopCloser(bytes.NewBufferString(heredoc.Doc(`
+			{
+				"data": {
+					"nodes": ["page one"],
+					"pageInfo": {
+						"endCursor": "PAGE1_END",
+						"hasNextPage": true
+					}
+				}
+			}`))),
+		},
+		{
+			StatusCode: 200,
+			Header:     http.Header{"Content-Type": []string{`application/json`}},
+			Body: io.NopCloser(bytes.NewBufferString(heredoc.Doc(`
+			{
+				"data": {
+					"nodes": ["page two"],
+					"pageInfo": {
+						"endCursor": "PAGE2_END",
+						"hasNextPage": false
+					}
+				}
+			}`))),
+		},
+	}
+
+	options := ApiOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				resp := responses[requestCount]
+				resp.Request = req
+				requestCount++
+				return resp, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (gh.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+
+		RawFields:     []string{"foo=bar"},
+		RequestMethod: "POST",
+		RequestPath:   "graphql",
+		Paginate:      true,
+		Verbose:       true,
+	}
+
+	err := apiRun(&options)
+	require.NoError(t, err)
+
+	// Verbose mode should print each page's body and pagination should still advance.
+	assert.Contains(t, stdout.String(), `"nodes": ["page one"]`)
+	assert.Contains(t, stdout.String(), `"nodes": ["page two"]`)
+	assert.Equal(t, "", stderr.String(), "stderr")
+
+	// Verify endCursor was used for the second request.
+	var requestData struct {
+		Variables map[string]interface{}
+	}
+
+	bb, err := io.ReadAll(responses[0].Request.Body)
+	require.NoError(t, err)
+	err = json.Unmarshal(bb, &requestData)
+	require.NoError(t, err)
+	_, hasCursor := requestData.Variables["endCursor"].(string)
+	assert.Equal(t, false, hasCursor)
+
+	bb, err = io.ReadAll(responses[1].Request.Body)
+	require.NoError(t, err)
+	err = json.Unmarshal(bb, &requestData)
+	require.NoError(t, err)
+	endCursor, hasCursor := requestData.Variables["endCursor"].(string)
+	assert.Equal(t, true, hasCursor)
+	assert.Equal(t, "PAGE1_END", endCursor)
+
+	// Verify both pages were requested.
+	assert.Equal(t, 2, requestCount)
 }
 
 func Test_apiRun_paginationGraphQL_slurp(t *testing.T) {
