@@ -423,6 +423,18 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
+		// In verbose mode, buffer the response body so it can be printed and
+		// also processed for error detection and GraphQL pagination.
+		if opts.Verbose {
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			resp.Body.Close()
+			fmt.Fprint(opts.IO.Out, string(bodyBytes))
+			resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
+
 		if !isGraphQL {
 			requestPath, hasNextPage = findNextPage(resp)
 			requestBody = nil // prevent repeating GET parameters

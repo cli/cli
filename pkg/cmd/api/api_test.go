@@ -656,6 +656,35 @@ func Test_apiRun(t *testing.T) {
 			stderr: ``,
 			isatty: true,
 		},
+		{
+			name: "verbose mode outputs response body",
+			options: ApiOptions{
+				Verbose: true,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"status":"ok"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			err:    nil,
+			stdout: `{"status":"ok"}`,
+			stderr: ``,
+			isatty: false,
+		},
+		{
+			name: "verbose mode outputs plain text response body",
+			options: ApiOptions{
+				Verbose: true,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(`octocat art here`)),
+			},
+			err:    nil,
+			stdout: `octocat art here`,
+			stderr: ``,
+			isatty: false,
+		},
 	}
 
 	for _, tt := range tests {
