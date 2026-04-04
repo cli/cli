@@ -59,6 +59,11 @@ func Test_NewCmdList(t *testing.T) {
 			},
 		},
 		{
+			name:    "zero limit",
+			args:    "--limit 0",
+			wantErr: "invalid limit: 0",
+		},
+		{
 			name: "with order",
 			args: "--order asc",
 			want: ListOptions{

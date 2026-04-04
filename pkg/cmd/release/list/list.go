@@ -44,6 +44,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
+			if opts.LimitResults < 1 {
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.LimitResults)
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
