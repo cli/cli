@@ -338,6 +338,9 @@ func editRun(opts *EditOptions) error {
 		if err != nil {
 			return err
 		}
+		if editable.Title.Value == "" {
+			return fmt.Errorf("title can't be blank")
+		}
 	} else if opts.Interactive {
 		err = opts.Surveyor.FieldsToEdit(&editable)
 		if err != nil {

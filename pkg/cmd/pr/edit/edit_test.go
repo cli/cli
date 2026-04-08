@@ -406,6 +406,7 @@ func Test_editRun(t *testing.T) {
 		httpStubs func(*testing.T, *httpmock.Registry)
 		stdout    string
 		stderr    string
+		wantsErr  string
 	}{
 		{
 			name: "non-interactive",
@@ -1234,6 +1235,26 @@ func Test_editRun(t *testing.T) {
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
+		{
+			name: "editor mode empty title",
+			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL:   "https://github.com/OWNER/REPO/pull/123",
+					Title: "pr title",
+					Body:  "pr body",
+				}, ghrepo.New("OWNER", "REPO")),
+				EditorMode: true,
+				TitledEditSurvey: func(title, body string) (string, string, error) {
+					return "", "", nil
+				},
+				Surveyor: testSurveyor{},
+				Fetcher:  testFetcher{},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {},
+			wantsErr:  "title can't be blank",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1254,6 +1275,10 @@ func Test_editRun(t *testing.T) {
 			tt.input.BaseRepo = baseRepo
 
 			err := editRun(tt.input)
+			if tt.wantsErr != "" {
+				require.EqualError(t, err, tt.wantsErr)
+				return
+			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.stdout, stdout.String())
 			assert.Equal(t, tt.stderr, stderr.String())
