@@ -1,6 +1,6 @@
 module github.com/cli/cli/v2
 
-go 1.26.1
+go 1.26.0
 
 toolchain go1.26.2
 
