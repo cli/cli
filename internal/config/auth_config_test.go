@@ -666,6 +666,88 @@ func TestTokenForUserNotFoundErrors(t *testing.T) {
 	require.EqualError(t, err, "no token found for 'test-user-1'")
 }
 
+func TestSetOwnerUserAndUserForOwner(t *testing.T) {
+	// Given two users logged in to a host
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "personal-user", "personal-token", "", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "work-user", "work-token", "", false)
+	require.NoError(t, err)
+
+	// When we set an owner mapping
+	err = authCfg.SetOwnerUser("github.com", "work-org", "work-user")
+	require.NoError(t, err)
+
+	// Then UserForOwner returns the mapped user
+	user, err := authCfg.UserForOwner("github.com", "work-org")
+	require.NoError(t, err)
+	require.Equal(t, "work-user", user)
+}
+
+func TestUserForOwnerNotFound(t *testing.T) {
+	// Given no owner mappings
+	authCfg := newTestAuthConfig(t)
+
+	// When we look up an owner with no mapping
+	_, err := authCfg.UserForOwner("github.com", "unknown-org")
+
+	// Then it returns an error
+	require.Error(t, err)
+}
+
+func TestActiveTokenUsesOwnerMappingWhenRepoOwnerSet(t *testing.T) {
+	// Given two users logged in insecurely, with an owner mapping
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "personal-user", "personal-token", "", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "work-user", "work-token", "", false)
+	require.NoError(t, err)
+	require.NoError(t, authCfg.SetOwnerUser("github.com", "work-org", "work-user"))
+
+	// When we set the repo owner to the mapped org and get the active token
+	authCfg.SetRepoOwner("work-org")
+	token, source := authCfg.ActiveToken("github.com")
+
+	// Then the work user's token is returned
+	require.Equal(t, "work-token", token)
+	require.Equal(t, oauthTokenKey, source)
+}
+
+func TestActiveTokenFallsBackToActiveUserWhenNoOwnerMapping(t *testing.T) {
+	// Given two users logged in, work-user is globally active, no owner mapping
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "personal-user", "personal-token", "", false)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "work-user", "work-token", "", false)
+	require.NoError(t, err)
+
+	// When we set the repo owner to an unmapped org
+	authCfg.SetRepoOwner("unknown-org")
+	token, source := authCfg.ActiveToken("github.com")
+
+	// Then the globally active user's token is returned
+	require.Equal(t, "work-token", token)
+	require.Equal(t, oauthTokenKey, source)
+}
+
+func TestActiveTokenUsesOwnerMappingFromKeyring(t *testing.T) {
+	// Given two users logged in securely, with an owner mapping
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "personal-user", "personal-token", "", true)
+	require.NoError(t, err)
+	_, err = authCfg.Login("github.com", "work-user", "work-token", "", true)
+	require.NoError(t, err)
+	require.NoError(t, authCfg.SetOwnerUser("github.com", "work-org", "work-user"))
+
+	// When we set the repo owner to the mapped org and get the active token
+	authCfg.SetRepoOwner("work-org")
+	token, source := authCfg.ActiveToken("github.com")
+
+	// Then the work user's token is returned from the keyring
+	require.Equal(t, "work-token", token)
+	require.Equal(t, "keyring", source)
+}
+
 func requireKeyWithValue(t *testing.T, cfg *ghConfig.Config, keys []string, value string) {
 	t.Helper()
 

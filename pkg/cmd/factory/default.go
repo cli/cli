@@ -194,8 +194,17 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string, invokingAgent string)
 		if err != nil {
 			return nil, err
 		}
+		authCfg := cfg.Authentication()
+
+		// If we can resolve the current repo's owner, set it on the auth config so
+		// that ActiveToken will prefer the token mapped to that owner over the
+		// globally active user.
+		if remotes, err := f.Remotes(); err == nil && len(remotes) > 0 {
+			authCfg.SetRepoOwner(remotes[0].RepoOwner())
+		}
+
 		opts := api.HTTPClientOptions{
-			Config:        cfg.Authentication(),
+			Config:        authCfg,
 			Log:           io.ErrOut,
 			LogColorize:   io.ColorEnabled(),
 			AppVersion:    appVersion,

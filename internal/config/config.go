@@ -33,6 +33,7 @@ const (
 	spinnerKey            = "spinner"
 	userKey               = "user"
 	usersKey              = "users"
+	ownersKey             = "owners"
 	versionKey            = "version"
 )
 
@@ -223,11 +224,16 @@ type AuthConfig struct {
 	defaultHostOverride func() (string, string)
 	hostsOverride       func() []string
 	tokenOverride       func(string) (string, string)
+	repoOwner           string
 }
 
 // ActiveToken will retrieve the active auth token for the given hostname,
 // searching environment variables, plain text config, and
 // lastly encrypted storage.
+//
+// If a repo owner has been set via SetRepoOwner and a mapping exists for that
+// owner, the token for the mapped user will be used instead of the globally
+// active user.
 func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	if c.tokenOverride != nil {
 		return c.tokenOverride(hostname)
@@ -236,7 +242,15 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	if token == "" {
 		var user string
 		var err error
-		if user, err = c.ActiveUser(hostname); err == nil {
+		// If a repo owner is set and maps to a specific user, use that user's token.
+		if c.repoOwner != "" {
+			user, err = c.UserForOwner(hostname, c.repoOwner)
+		}
+		// Fall back to the globally active user if no owner mapping exists.
+		if err != nil || user == "" {
+			user, err = c.ActiveUser(hostname)
+		}
+		if err == nil {
 			token, err = c.TokenFromKeyringForUser(hostname, user)
 		}
 		if err != nil {
@@ -251,6 +265,13 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 		}
 	}
 	return token, source
+}
+
+// SetRepoOwner sets the GitHub owner (user or org) of the current repo context.
+// When set, ActiveToken will prefer the token for the user mapped to this owner
+// over the globally active user.
+func (c *AuthConfig) SetRepoOwner(owner string) {
+	c.repoOwner = owner
 }
 
 // HasActiveToken returns true when a token for the hostname is present.
@@ -312,6 +333,19 @@ func (c *AuthConfig) TokenFromKeyringForUser(hostname, username string) (string,
 // This will not be accurate if the oauth token is set from an environment variable.
 func (c *AuthConfig) ActiveUser(hostname string) (string, error) {
 	return c.cfg.Get([]string{hostsKey, hostname, userKey})
+}
+
+// UserForOwner retrieves the gh username mapped to the given GitHub owner (user or org)
+// for the given hostname. Returns an error if no mapping exists.
+func (c *AuthConfig) UserForOwner(hostname, owner string) (string, error) {
+	return c.cfg.Get([]string{hostsKey, hostname, ownersKey, owner})
+}
+
+// SetOwnerUser stores a mapping from a GitHub owner (user or org) to a gh username
+// for the given hostname, persisting it to the config file.
+func (c *AuthConfig) SetOwnerUser(hostname, owner, username string) error {
+	c.cfg.Set([]string{hostsKey, hostname, ownersKey, owner}, username)
+	return ghConfig.Write(c.cfg)
 }
 
 func (c *AuthConfig) Hosts() []string {
