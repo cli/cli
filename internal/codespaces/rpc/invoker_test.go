@@ -2,15 +2,20 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/cli/cli/v2/internal/codespaces/portforwarder"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
 	rpctest "github.com/cli/cli/v2/internal/codespaces/rpc/test"
+	"github.com/microsoft/dev-tunnels/go/tunnels"
 	"google.golang.org/grpc"
 )
 
@@ -309,5 +314,73 @@ func TestStartSSHServerFailure(t *testing.T) {
 	}
 	if user != "" {
 		t.Fatalf("expected %s, got %s", "", user)
+	}
+}
+
+type blockingFailPortForwarder struct {
+	failCh chan struct{}
+	err    error
+}
+
+func (f blockingFailPortForwarder) Close() error {
+	return nil
+}
+
+func (f blockingFailPortForwarder) ConnectToForwardedPort(context.Context, io.ReadWriteCloser, portforwarder.ForwardPortOpts) error {
+	panic("unimplemented")
+}
+
+func (f blockingFailPortForwarder) ForwardPort(context.Context, portforwarder.ForwardPortOpts) error {
+	panic("unimplemented")
+}
+
+func (f blockingFailPortForwarder) GetKeepAliveReason() string {
+	return ""
+}
+
+func (f blockingFailPortForwarder) KeepAlive(string) {
+}
+
+func (f blockingFailPortForwarder) ForwardPortToListener(context.Context, portforwarder.ForwardPortOpts, *net.TCPListener) error {
+	<-f.failCh
+	return f.err
+}
+
+func (f blockingFailPortForwarder) ListPorts(context.Context) ([]*tunnels.TunnelPort, error) {
+	panic("unimplemented")
+}
+
+func (f blockingFailPortForwarder) UpdatePortVisibility(context.Context, int, string) error {
+	panic("unimplemented")
+}
+
+func TestCreateInvokerReturnsPortForwardError(t *testing.T) {
+	expectedErr := errors.New("port forward failed")
+	failCh := make(chan struct{})
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := CreateInvoker(context.Background(), blockingFailPortForwarder{
+			failCh: failCh,
+			err:    expectedErr,
+		})
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("CreateInvoker returned before port forwarding failed: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(failCh)
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, expectedErr) {
+			t.Fatalf("expected %v, got %v", expectedErr, err)
+		}
+	case <-time.After(ConnectionTimeout):
+		t.Fatal("timed out waiting for CreateInvoker to return")
 	}
 }

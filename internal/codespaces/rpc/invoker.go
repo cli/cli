@@ -114,12 +114,13 @@ func connect(ctx context.Context, fwd portforwarder.PortForwarder) (Invoker, err
 
 	var conn *grpc.ClientConn
 	go func() {
-		// Attempt to connect to the port
+		// Attempt to connect to the forwarded local port.
 		opts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
 		}
-		conn, err = grpc.NewClient(localAddress, opts...)
-		ch <- err // nil if we successfully connected
+		conn, err = grpc.DialContext(ctx, localAddress, opts...)
+		ch <- err // nil only once the connection is actually established
 	}()
 
 	// Wait for the connection to be established or for the context to be cancelled
