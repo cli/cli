@@ -315,6 +315,136 @@ func TestHTTPClientSanitizeControlCharactersC1(t *testing.T) {
 	assert.Equal(t, "monalisa¡", issue.Author.Login)
 }
 
+func TestAddAPIURLOverride(t *testing.T) {
+	tests := []struct {
+		name       string
+		apiURL     string
+		requestURL string
+		wantURL    string
+		wantHost   string
+	}{
+		{
+			name:       "rewrites api.github.com to override URL",
+			apiURL:     "https://proxy.example.com",
+			requestURL: "https://api.github.com/repos/cli/cli",
+			wantURL:    "https://proxy.example.com/repos/cli/cli",
+			wantHost:   "proxy.example.com",
+		},
+		{
+			name:       "rewrites api.github.com with path prefix",
+			apiURL:     "https://proxy.example.com/github",
+			requestURL: "https://api.github.com/repos/cli/cli",
+			wantURL:    "https://proxy.example.com/github/repos/cli/cli",
+			wantHost:   "proxy.example.com",
+		},
+		{
+			name:       "rewrites api.github.com with trailing slash in override",
+			apiURL:     "https://proxy.example.com/github/",
+			requestURL: "https://api.github.com/repos/cli/cli",
+			wantURL:    "https://proxy.example.com/github/repos/cli/cli",
+			wantHost:   "proxy.example.com",
+		},
+		{
+			name:       "rewrites graphql endpoint",
+			apiURL:     "https://proxy.example.com",
+			requestURL: "https://api.github.com/graphql",
+			wantURL:    "https://proxy.example.com/graphql",
+			wantHost:   "proxy.example.com",
+		},
+		{
+			name:       "does not rewrite non-github hosts",
+			apiURL:     "https://proxy.example.com",
+			requestURL: "https://example.com/api/v3/repos",
+			wantURL:    "https://example.com/api/v3/repos",
+			wantHost:   "",
+		},
+		{
+			name:       "handles case-insensitive hostname match",
+			apiURL:     "https://proxy.example.com",
+			requestURL: "https://API.GITHUB.COM/repos/cli/cli",
+			wantURL:    "https://proxy.example.com/repos/cli/cli",
+			wantHost:   "proxy.example.com",
+		},
+		{
+			name:       "invalid override URL returns passthrough",
+			apiURL:     "://not-a-url",
+			requestURL: "https://api.github.com/repos/cli/cli",
+			wantURL:    "https://api.github.com/repos/cli/cli",
+			wantHost:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotReq *http.Request
+			inner := &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+				gotReq = req
+				return &http.Response{StatusCode: http.StatusOK}, nil
+			}}
+
+			transport := AddAPIURLOverride(inner, tt.apiURL)
+
+			req, err := http.NewRequest("GET", tt.requestURL, nil)
+			require.NoError(t, err)
+
+			_, err = transport.RoundTrip(req)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantURL, gotReq.URL.String())
+			if tt.wantHost != "" {
+				assert.Equal(t, tt.wantHost, gotReq.Host)
+			}
+		})
+	}
+}
+
+func TestAddAPIURLOverrideSkipsRedirects(t *testing.T) {
+	var gotReq *http.Request
+	inner := &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		gotReq = req
+		return &http.Response{StatusCode: http.StatusOK}, nil
+	}}
+
+	transport := AddAPIURLOverride(inner, "https://proxy.example.com")
+
+	// Simulate a redirect request by setting req.Response
+	req, err := http.NewRequest("GET", "https://api.github.com/repos/cli/cli", nil)
+	require.NoError(t, err)
+	req.Response = &http.Response{
+		Request: req,
+	}
+
+	_, err = transport.RoundTrip(req)
+	require.NoError(t, err)
+
+	// URL should NOT be rewritten for redirect requests
+	assert.Equal(t, "https://api.github.com/repos/cli/cli", gotReq.URL.String())
+}
+
+func TestAddAPIURLOverridePreservesAuth(t *testing.T) {
+	var gotReq *http.Request
+	inner := &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		gotReq = req
+		return &http.Response{StatusCode: http.StatusOK}, nil
+	}}
+
+	// Build the chain: AddAuthTokenHeader → AddAPIURLOverride → inner
+	// This mirrors the real transport chain order
+	cfg := tinyConfig{"github.com:oauth_token": "MYTOKEN"}
+	transport := AddAuthTokenHeader(AddAPIURLOverride(inner, "https://proxy.example.com"), cfg)
+
+	req, err := http.NewRequest("GET", "https://api.github.com/repos/cli/cli", nil)
+	require.NoError(t, err)
+
+	_, err = transport.RoundTrip(req)
+	require.NoError(t, err)
+
+	// Auth header should be set (resolved from api.github.com before rewrite)
+	assert.Equal(t, "token MYTOKEN", gotReq.Header.Get("Authorization"))
+	// URL should be rewritten
+	assert.Equal(t, "https://proxy.example.com/repos/cli/cli", gotReq.URL.String())
+}
+
 type tinyConfig map[string]string
 
 func (c tinyConfig) ActiveToken(host string) (string, string) {

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -70,6 +72,10 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		return nil, err
 	}
 
+	if apiURL := os.Getenv("GH_API_URL"); apiURL != "" {
+		client.Transport = AddAPIURLOverride(client.Transport, apiURL)
+	}
+
 	if opts.Config != nil {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
 	}
@@ -112,6 +118,31 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
 				}
 			}
+		}
+		return rt.RoundTrip(req)
+	}}
+}
+
+// AddAPIURLOverride rewrites GitHub API requests to a custom base URL.
+// It replaces the scheme, host, and prepends the override URL's path to
+// the original request path for any request targeting api.github.com.
+// Redirect requests (where req.Response is set) are not rewritten to
+// avoid interfering with CDN or storage redirect URLs.
+func AddAPIURLOverride(rt http.RoundTripper, apiURL string) http.RoundTripper {
+	parsed, err := url.Parse(apiURL)
+	if err != nil || parsed.Host == "" {
+		return rt
+	}
+	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		if req.Response != nil {
+			return rt.RoundTrip(req)
+		}
+		if strings.EqualFold(req.URL.Hostname(), "api.github.com") {
+			req = req.Clone(req.Context())
+			req.URL.Scheme = parsed.Scheme
+			req.URL.Host = parsed.Host
+			req.URL.Path = strings.TrimRight(parsed.Path, "/") + req.URL.Path
+			req.Host = parsed.Host
 		}
 		return rt.RoundTrip(req)
 	}}

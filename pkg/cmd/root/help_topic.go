@@ -54,6 +54,14 @@ var HelpTopics = []helpTopic{
 			authenticated with, the stored credentials will be used. Otherwise, setting %[1]sGH_TOKEN%[1]s or
 			%[1]sGH_ENTERPRISE_TOKEN%[1]s is required, depending on the targeted host.
 
+			%[1]sGH_API_URL%[1]s: redirect API requests destined for %[1]sapi.github.com%[1]s to a custom base URL.
+			This is useful for routing traffic through an API proxy or gateway. For example, setting
+			%[1]sGH_API_URL=https://proxy.example.com/github%[1]s will rewrite a request from
+			%[1]shttps://api.github.com/repos/cli/cli%[1]s to %[1]shttps://proxy.example.com/github/repos/cli/cli%[1]s.
+			Authentication headers are resolved before the URL is rewritten, so existing credentials
+			for %[1]sgithub.com%[1]s continue to work. This setting only affects requests to %[1]sapi.github.com%[1]s
+			and does not apply to GitHub Enterprise Server hosts.
+
 			%[1]sGH_REPO%[1]s: specify the GitHub repository in the %[1]s[HOST/]OWNER/REPO%[1]s format for commands
 			that otherwise operate on a local repository.
 
