@@ -130,7 +130,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 // avoid interfering with CDN or storage redirect URLs.
 func AddAPIURLOverride(rt http.RoundTripper, apiURL string) http.RoundTripper {
 	parsed, err := url.Parse(apiURL)
-	if err != nil || parsed.Host == "" {
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return rt
 	}
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
@@ -142,6 +142,7 @@ func AddAPIURLOverride(rt http.RoundTripper, apiURL string) http.RoundTripper {
 			req.URL.Scheme = parsed.Scheme
 			req.URL.Host = parsed.Host
 			req.URL.Path = strings.TrimRight(parsed.Path, "/") + req.URL.Path
+			req.URL.RawPath = ""
 			req.Host = parsed.Host
 		}
 		return rt.RoundTrip(req)

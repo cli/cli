@@ -372,6 +372,13 @@ func TestAddAPIURLOverride(t *testing.T) {
 			wantURL:    "https://api.github.com/repos/cli/cli",
 			wantHost:   "",
 		},
+		{
+			name:       "override URL without scheme returns passthrough",
+			apiURL:     "//proxy.example.com",
+			requestURL: "https://api.github.com/repos/cli/cli",
+			wantURL:    "https://api.github.com/repos/cli/cli",
+			wantHost:   "",
+		},
 	}
 
 	for _, tt := range tests {
