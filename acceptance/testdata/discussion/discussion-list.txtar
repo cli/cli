@@ -1,0 +1,31 @@
+# List open discussions in a public repo (read-only smoke test)
+exec gh discussion list -R cli/cli --limit 2
+stdout '#\d+'
+
+# Non-TTY output includes state column
+exec gh discussion list -R cli/cli --limit 1
+stdout '\d+\tOPEN'
+
+# JSON output includes expected envelope fields
+exec gh discussion list -R cli/cli --limit 1 --json number,title,state,url
+stdout '"totalCount"'
+stdout '"discussions"'
+stdout '"number"'
+stdout '"state"'
+stdout '"OPEN"'
+
+# JSON output includes next cursor for pagination
+exec gh discussion list -R cli/cli --limit 1 --json number
+stdout '"next"'
+
+# List closed discussions
+exec gh discussion list -R cli/cli --limit 1 --state closed --json number,state
+stdout '"CLOSED"'
+
+# Category filter
+exec gh discussion list -R cli/cli --limit 1 --category general --json number,category
+stdout '"slug":"general"'
+
+# Sort and order flags
+exec gh discussion list -R cli/cli --limit 1 --sort created --order asc --json number
+stdout '"number"'

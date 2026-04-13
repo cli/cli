@@ -65,6 +65,15 @@ func TestExtensions(t *testing.T) {
 	testscript.Run(t, testScriptParamsFor(tsEnv, "extension"))
 }
 
+func TestDiscussions(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "discussion"))
+}
+
 func TestIssues(t *testing.T) {
 	var tsEnv testScriptEnv
 	if err := tsEnv.fromEnv(); err != nil {
