@@ -178,7 +178,10 @@ func publishRun(opts *PublishOptions) error {
 
 	canPrompt := opts.IO.CanPrompt()
 
-	// Use injected client or create one from the factory HttpClient
+	// Use injected client or create one from the factory HttpClient.
+	// Initialization is deferred until after local validation so that
+	// simple errors (missing skills/, bad SKILL.md, etc.) are reported
+	// without requiring an HTTP client.
 	client := opts.client
 	host := opts.host
 
@@ -336,52 +339,49 @@ func publishRun(opts *PublishOptions) error {
 		owner = repoInfo.Repo.RepoOwner()
 		repo = repoInfo.Repo.RepoName()
 	}
+
 	hasTopic := false
 	var existingTags []tagEntry
 	if owner != "" && repo != "" {
+		// Create API client from factory if not already injected (tests inject directly).
+		if client == nil {
+			httpClient, err := opts.HttpClient()
+			if err != nil {
+				return err
+			}
+			client = api.NewClientFromHTTP(httpClient)
+		}
+
 		if host == "" && repoInfo != nil {
 			host = repoInfo.Repo.RepoHost()
 		}
-		if host != "" {
-			if err := source.ValidateSupportedHost(host); err != nil {
+		if host == "" {
+			cfg, err := opts.Config()
+			if err != nil {
 				return err
 			}
+			host, _ = cfg.Authentication().DefaultHost()
+		}
+		if err := source.ValidateSupportedHost(host); err != nil {
+			return err
 		}
 
-		// Create API client for remote checks if not already injected
-		if client == nil {
-			httpClient, httpErr := opts.HttpClient()
-			if httpErr == nil {
-				apiClient := api.NewClientFromHTTP(httpClient)
-				cfg, cfgErr := opts.Config()
-				if cfgErr == nil {
-					host, _ = cfg.Authentication().DefaultHost()
-					if err := source.ValidateSupportedHost(host); err != nil {
-						return err
-					}
-					client = apiClient
-				}
-			}
+		// Security and ruleset checks (advisory, always shown)
+		var skillAbsDirs []string
+		for _, skill := range skills {
+			skillAbsDirs = append(skillAbsDirs, filepath.Join(dir, filepath.FromSlash(skill.Path)))
 		}
+		securityDiags := checkSecuritySettings(client, host, owner, repo, skillAbsDirs)
+		diagnostics = append(diagnostics, securityDiags...)
 
-		if client != nil {
-			// Security and ruleset checks (advisory, always shown)
-			var skillAbsDirs []string
-			for _, skill := range skills {
-				skillAbsDirs = append(skillAbsDirs, filepath.Join(dir, filepath.FromSlash(skill.Path)))
-			}
-			securityDiags := checkSecuritySettings(client, host, owner, repo, skillAbsDirs)
-			diagnostics = append(diagnostics, securityDiags...)
+		rulesetDiags := checkTagProtection(client, host, owner, repo)
+		diagnostics = append(diagnostics, rulesetDiags...)
 
-			rulesetDiags := checkTagProtection(client, host, owner, repo)
-			diagnostics = append(diagnostics, rulesetDiags...)
+		// Check topic (needed for publish flow, not a blocking error)
+		hasTopic = repoHasTopic(client, host, owner, repo)
 
-			// Check topic (needed for publish flow, not a blocking error)
-			hasTopic = repoHasTopic(client, host, owner, repo)
-
-			// Fetch existing tags (needed for version suggestion)
-			existingTags = fetchTags(client, host, owner, repo)
-		}
+		// Fetch existing tags (needed for version suggestion)
+		existingTags = fetchTags(client, host, owner, repo)
 	} else {
 		diagnostics = append(diagnostics, detectMissingRepoDiagnostic(opts.GitClient, dir)...)
 	}
@@ -422,11 +422,6 @@ func publishRun(opts *PublishOptions) error {
 
 	if !canPrompt && opts.Tag == "" {
 		fmt.Fprintf(opts.IO.ErrOut, "\nValidation passed. Use --tag to publish non-interactively.\n")
-		return nil
-	}
-
-	if client == nil {
-		fmt.Fprintf(opts.IO.ErrOut, "\nValidation passed but could not create API client. Check your authentication configuration.\n")
 		return nil
 	}
 
