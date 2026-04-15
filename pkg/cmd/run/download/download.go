@@ -21,14 +21,17 @@ type DownloadOptions struct {
 
 	DoPrompt       bool
 	RunID          string
+	ArtifactID     int64
 	DestinationDir string
 	Names          []string
 	FilePatterns   []string
+	SingleStream   bool
 }
 
 type platform interface {
 	List(runID string) ([]shared.Artifact, error)
 	Download(url string, dir safepaths.Absolute) error
+	DownloadByID(id int64, dir safepaths.Absolute) error
 }
 
 type iprompter interface {
@@ -66,13 +69,25 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			# Download specific artifacts across all runs in a repository
 			$ gh run download -n <name1> -n <name2>
 
+			# Download a single artifact directly by its ID
+			$ gh run download -a <artifact-id>
+
 			# Select artifacts to download interactively
 			$ gh run download
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.RunID = args[0]
-			} else if len(opts.Names) == 0 &&
+			}
+			if opts.ArtifactID != 0 {
+				if opts.RunID != "" {
+					return cmdutil.FlagErrorf("--artifact-id cannot be combined with a run ID argument")
+				}
+				if len(opts.Names) > 0 || len(opts.FilePatterns) > 0 {
+					return cmdutil.FlagErrorf("--artifact-id cannot be combined with --name or --pattern")
+				}
+			} else if len(args) == 0 &&
+				len(opts.Names) == 0 &&
 				len(opts.FilePatterns) == 0 &&
 				opts.IO.CanPrompt() {
 				opts.DoPrompt = true
@@ -87,8 +102,9 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				return err
 			}
 			opts.Platform = &apiPlatform{
-				client: httpClient,
-				repo:   baseRepo,
+				client:       httpClient,
+				repo:         baseRepo,
+				singleStream: opts.SingleStream,
 			}
 
 			if runF != nil {
@@ -101,11 +117,22 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.DestinationDir, "dir", "D", ".", "The directory to download artifacts into")
 	cmd.Flags().StringArrayVarP(&opts.Names, "name", "n", nil, "Download artifacts that match any of the given names")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download artifacts that match a glob pattern")
+	cmd.Flags().Int64VarP(&opts.ArtifactID, "artifact-id", "a", 0, "Download a single artifact by its numeric ID")
+	cmd.Flags().BoolVar(&opts.SingleStream, "single-stream", false, "Disable parallel chunked download and use a single HTTP connection per artifact")
 
 	return cmd
 }
 
 func runDownload(opts *DownloadOptions) error {
+	absoluteDestinationDir, err := safepaths.ParseAbsolute(opts.DestinationDir)
+	if err != nil {
+		return fmt.Errorf("error parsing destination directory: %w", err)
+	}
+
+	if opts.ArtifactID != 0 {
+		return opts.Platform.DownloadByID(opts.ArtifactID, absoluteDestinationDir)
+	}
+
 	opts.IO.StartProgressIndicator()
 	artifacts, err := opts.Platform.List(opts.RunID)
 	opts.IO.StopProgressIndicator()
@@ -156,11 +183,6 @@ func runDownload(opts *DownloadOptions) error {
 	// track downloaded artifacts and avoid re-downloading any of the same name, isolate if multiple artifacts
 	downloaded := set.NewStringSet()
 	isolateArtifacts := isolateArtifacts(wantNames, wantPatterns)
-
-	absoluteDestinationDir, err := safepaths.ParseAbsolute(opts.DestinationDir)
-	if err != nil {
-		return fmt.Errorf("error parsing destination directory: %w", err)
-	}
 
 	for _, a := range artifacts {
 		if a.Expired {
