@@ -115,57 +115,57 @@ func (c *cfg) Authentication() gh.AuthConfig {
 }
 
 func (c *cfg) AccessibleColors(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, accessibleColorsKey).Unwrap()
 }
 
 func (c *cfg) AccessiblePrompter(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, accessiblePrompterKey).Unwrap()
 }
 
 func (c *cfg) Browser(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, browserKey).Unwrap()
 }
 
 func (c *cfg) ColorLabels(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, colorLabelsKey).Unwrap()
 }
 
 func (c *cfg) Editor(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, editorKey).Unwrap()
 }
 
 func (c *cfg) GitProtocol(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, gitProtocolKey).Unwrap()
 }
 
 func (c *cfg) HTTPUnixSocket(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, httpUnixSocketKey).Unwrap()
 }
 
 func (c *cfg) Pager(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, pagerKey).Unwrap()
 }
 
 func (c *cfg) Prompt(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, promptKey).Unwrap()
 }
 
 func (c *cfg) PreferEditorPrompt(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, preferEditorPromptKey).Unwrap()
 }
 
 func (c *cfg) Spinner(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	// Intentionally panic if there is no user-provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, spinnerKey).Unwrap()
 }
 
