@@ -1,6 +1,6 @@
 # List open discussions in a public repo (read-only smoke test)
 exec gh discussion list -R cli/cli --limit 2
-stdout '#\d+'
+stdout '\d+\tOPEN'
 
 # Non-TTY output includes state column
 exec gh discussion list -R cli/cli --limit 1

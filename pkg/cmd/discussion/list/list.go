@@ -30,6 +30,7 @@ var discussionListFields = []string{
 	"body",
 	"url",
 	"closed",
+	"state",
 	"stateReason",
 	"author",
 	"category",
