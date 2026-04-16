@@ -359,51 +359,47 @@ func (c *discussionClient) Search(repo ghrepo.Interface, filters SearchFilters, 
 }
 
 func (c *discussionClient) GetByNumber(repo ghrepo.Interface, number int) (*Discussion, error) {
-	query := fmt.Sprintf(`query DiscussionByNumber($owner: String!, $name: String!, $number: Int!) {
-		repository(owner: $owner, name: $name) {
-			hasDiscussionsEnabled
-			discussion(number: $number) {
-				%s
-				body
-				comments { totalCount }
-			}
-		}
-	}`, discussionFields)
+	var query struct {
+		Repository struct {
+			HasDiscussionsEnabled bool
+			Discussion            *struct {
+				discussionListNode
+				Body     string
+				Comments struct {
+					TotalCount int
+				}
+			} `graphql:"discussion(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
 
 	variables := map[string]interface{}{
-		"owner":  repo.RepoOwner(),
-		"name":   repo.RepoName(),
-		"number": number,
+		"owner":  githubv4.String(repo.RepoOwner()),
+		"name":   githubv4.String(repo.RepoName()),
+		"number": githubv4.Int(number),
 	}
 
-	type response struct {
-		Repository struct {
-			HasDiscussionsEnabled bool `json:"hasDiscussionsEnabled"`
-			Discussion            *struct {
-				discussionNode
-				Body     string `json:"body"`
-				Comments struct {
-					TotalCount int `json:"totalCount"`
-				} `json:"comments"`
-			} `json:"discussion"`
-		} `json:"repository"`
-	}
-
-	var data response
-	err := c.gql.GraphQL(repo.RepoHost(), query, variables, &data)
+	err := c.gql.Query(repo.RepoHost(), "DiscussionByNumber", &query, variables)
 	if err != nil {
 		return nil, err
 	}
-	if !data.Repository.HasDiscussionsEnabled {
+	if !query.Repository.HasDiscussionsEnabled {
 		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
 	}
-	if data.Repository.Discussion == nil {
+	if query.Repository.Discussion == nil {
 		return nil, fmt.Errorf("discussion #%d not found in '%s/%s'", number, repo.RepoOwner(), repo.RepoName())
 	}
 
-	d := mapDiscussion(data.Repository.Discussion.discussionNode)
-	d.Body = data.Repository.Discussion.Body
-	d.Comments = DiscussionCommentList{TotalCount: data.Repository.Discussion.Comments.TotalCount}
+	d := mapDiscussionFromListNode(query.Repository.Discussion.discussionListNode)
+	d.Body = query.Repository.Discussion.Body
+	d.Comments = DiscussionCommentList{TotalCount: query.Repository.Discussion.Comments.TotalCount}
+
+	for _, rg := range query.Repository.Discussion.ReactionGroups {
+		d.ReactionGroups = append(d.ReactionGroups, ReactionGroup{
+			Content:    rg.Content,
+			TotalCount: rg.Users.TotalCount,
+		})
+	}
+
 	return &d, nil
 }
 

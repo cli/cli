@@ -22,8 +22,8 @@ func testDiscussion() *client.Discussion {
 		Title:  "How to authenticate with SSO?",
 		Body:   "I need help with SSO authentication.",
 		URL:    "https://github.com/OWNER/REPO/discussions/123",
-		State:  "OPEN",
-		Author: client.DiscussionAuthor{Login: "monalisa"},
+		Closed: false,
+		Author: client.DiscussionActor{Login: "monalisa"},
 		Category: client.DiscussionCategory{
 			Name: "Q&A", Slug: "q-a", IsAnswerable: true,
 		},

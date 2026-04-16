@@ -19,6 +19,7 @@ type Discussion struct {
 	AnswerChosenAt time.Time
 	AnswerChosenBy *DiscussionActor
 	Comments       DiscussionCommentList
+	ReactionGroups []ReactionGroup
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	ClosedAt       time.Time
@@ -44,6 +45,12 @@ func (d Discussion) ExportData(fields []string) map[string]interface{} {
 			data[f] = d.URL
 		case "closed":
 			data[f] = d.Closed
+		case "state":
+			if d.Closed {
+				data[f] = "CLOSED"
+			} else {
+				data[f] = "OPEN"
+			}
 		case "stateReason":
 			data[f] = d.StateReason
 		case "author":
@@ -79,6 +86,12 @@ func (d Discussion) ExportData(fields []string) map[string]interface{} {
 				"totalCount": d.Comments.TotalCount,
 				"nodes":      comments,
 			}
+		case "reactionGroups":
+			reactions := make([]interface{}, len(d.ReactionGroups))
+			for i, rg := range d.ReactionGroups {
+				reactions[i] = rg.Export()
+			}
+			data[f] = reactions
 		case "createdAt":
 			data[f] = d.CreatedAt
 		case "updatedAt":

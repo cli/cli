@@ -140,7 +140,7 @@ func printHumanView(opts *ViewOptions, d *client.Discussion) error {
 	cs := opts.IO.ColorScheme()
 
 	numberStr := fmt.Sprintf("#%d", d.Number)
-	if d.State == "OPEN" {
+	if !d.Closed {
 		numberStr = cs.Green(numberStr)
 	} else {
 		numberStr = cs.Muted(numberStr)
@@ -149,7 +149,7 @@ func printHumanView(opts *ViewOptions, d *client.Discussion) error {
 
 	state := "Open"
 	stateColor := cs.Green
-	if d.State != "OPEN" {
+	if d.Closed {
 		state = "Closed"
 		stateColor = cs.Muted
 	}
@@ -199,7 +199,11 @@ func printHumanView(opts *ViewOptions, d *client.Discussion) error {
 
 func printRawView(out io.Writer, d *client.Discussion) error {
 	fmt.Fprintf(out, "title:\t%s\n", d.Title)
-	fmt.Fprintf(out, "state:\t%s\n", d.State)
+	state := "OPEN"
+	if d.Closed {
+		state = "CLOSED"
+	}
+	fmt.Fprintf(out, "state:\t%s\n", state)
 	fmt.Fprintf(out, "category:\t%s\n", d.Category.Name)
 	fmt.Fprintf(out, "author:\t%s\n", d.Author.Login)
 	fmt.Fprintf(out, "labels:\t%s\n", labelList(d.Labels, nil))

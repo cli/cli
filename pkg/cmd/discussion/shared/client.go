@@ -7,6 +7,31 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 )
 
+// DiscussionFields lists all field names available for --json output
+// on discussion commands that return a full discussion (e.g. view).
+var DiscussionFields = []string{
+	"id",
+	"number",
+	"title",
+	"body",
+	"url",
+	"closed",
+	"state",
+	"stateReason",
+	"author",
+	"category",
+	"labels",
+	"answered",
+	"answerChosenAt",
+	"answerChosenBy",
+	"comments",
+	"reactionGroups",
+	"createdAt",
+	"updatedAt",
+	"closedAt",
+	"locked",
+}
+
 // DiscussionClientFunc returns a factory function that creates a DiscussionClient
 // from the given Factory. The returned function is intended to be stored in
 // command Options structs and called lazily inside RunE.
