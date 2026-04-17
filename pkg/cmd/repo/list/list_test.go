@@ -470,10 +470,12 @@ func TestRepoList_filtering(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
+	// --visibility=private must use the search backend so private and
+	// internal repositories are not conflated (see #12900).
 	http.Register(
-		httpmock.GraphQL(`query RepositoryList\b`),
+		httpmock.GraphQL(`query RepositoryListSearch\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
-			assert.Equal(t, "PRIVATE", params["privacy"])
+			assert.Equal(t, `sort:updated-desc fork:true is:private user:@me`, params["query"])
 			assert.Equal(t, float64(2), params["perPage"])
 		}),
 	)
