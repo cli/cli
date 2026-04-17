@@ -87,10 +87,22 @@ func ShouldCheckForUpdate() bool {
 }
 
 // CheckForUpdate checks whether an update exists for the GitHub CLI based on recency of last check within past 24 hours.
+//
+// The update check runs concurrently with the user's command in a goroutine, so
+// the state timestamp is persisted before the HTTP request is issued. This way,
+// if the user's command fails fast and the process exits before the release
+// lookup completes, subsequent invocations still honor the 24-hour cooldown
+// instead of re-issuing a request on every failure (see #12599).
 func CheckForUpdate(ctx context.Context, client *http.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
 	stateEntry, _ := getStateEntry(stateFilePath)
 	if stateEntry != nil && time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24 {
 		return nil, nil
+	}
+
+	// Persist the check time before making the network request so that the
+	// cooldown is honored even if the process exits before the request finishes.
+	if err := setStateEntry(stateFilePath, time.Now(), ReleaseInfo{}); err != nil {
+		return nil, err
 	}
 
 	releaseInfo, err := getLatestReleaseInfo(ctx, client, repo)
@@ -98,8 +110,7 @@ func CheckForUpdate(ctx context.Context, client *http.Client, stateFilePath, rep
 		return nil, err
 	}
 
-	err = setStateEntry(stateFilePath, time.Now(), *releaseInfo)
-	if err != nil {
+	if err := setStateEntry(stateFilePath, time.Now(), *releaseInfo); err != nil {
 		return nil, err
 	}
 

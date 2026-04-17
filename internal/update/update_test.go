@@ -122,6 +122,41 @@ func TestCheckForUpdate(t *testing.T) {
 	}
 }
 
+func TestCheckForUpdate_cooldownOnFailure(t *testing.T) {
+	// When the release lookup fails (or is interrupted before it completes),
+	// the state file must still record the check time so the 24-hour cooldown
+	// kicks in on the next invocation. Otherwise a command that reliably
+	// fails fast would re-issue the GitHub releases request every time
+	// (see cli/cli#12599).
+	statePath := tempFilePath()
+
+	reg := &httpmock.Registry{}
+	httpClient := &http.Client{}
+	httpmock.ReplaceTripper(httpClient, reg)
+	reg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"),
+		httpmock.StatusStringResponse(500, `{"message":"boom"}`),
+	)
+
+	_, err := CheckForUpdate(context.TODO(), httpClient, statePath, "OWNER/REPO", "v1.0.0")
+	require.Error(t, err)
+
+	entry, entryErr := getStateEntry(statePath)
+	require.NoError(t, entryErr)
+	require.NotNil(t, entry)
+	require.False(t, entry.CheckedForUpdateAt.IsZero(), "expected check time to be recorded even on failure")
+
+	// Drop the recorded HTTP request so the mock registry only expects the
+	// one we just made. A second call within the cooldown window must not
+	// issue another request.
+	reg.Requests = nil
+
+	rel, err := CheckForUpdate(context.TODO(), httpClient, statePath, "OWNER/REPO", "v1.0.0")
+	require.NoError(t, err)
+	require.Nil(t, rel)
+	require.Empty(t, reg.Requests, "expected no HTTP request during cooldown window")
+}
+
 func TestCheckForExtensionUpdate(t *testing.T) {
 	now := time.Date(2024, 12, 17, 12, 0, 0, 0, time.UTC)
 	previousTooSoon := now.Add(-23 * time.Hour).Add(-59 * time.Minute).Add(-59 * time.Second)
