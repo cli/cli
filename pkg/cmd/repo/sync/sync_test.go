@@ -255,9 +255,26 @@ func Test_SyncRun(t *testing.T) {
 				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
 				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
 				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("IsCheckedOutInOtherWorktree", "trunk").Return(false, nil).Once()
 				mgc.On("UpdateBranch", "trunk", "FETCH_HEAD").Return(nil).Once()
 			},
 			wantStdout: "✓ Synced the \"trunk\" branch from \"OWNER/REPO\" to local repository\n",
+		},
+		{
+			name: "sync local repo with parent - refuse when branch checked out in another worktree",
+			tty:  true,
+			opts: &SyncOptions{
+				Branch: "trunk",
+			},
+			gitStubs: func(mgc *mockGitClient) {
+				mgc.On("Fetch", "origin", "refs/heads/trunk").Return(nil).Once()
+				mgc.On("HasLocalBranch", "trunk").Return(true).Once()
+				mgc.On("IsAncestor", "trunk", "FETCH_HEAD").Return(true, nil).Once()
+				mgc.On("CurrentBranch").Return("test", nil).Once()
+				mgc.On("IsCheckedOutInOtherWorktree", "trunk").Return(true, nil).Once()
+			},
+			wantErr: true,
+			errMsg:  "refusing to sync \"trunk\" because it is checked out in another worktree\ntip: run sync from that worktree (or check it out here first) so the working tree is updated alongside the ref",
 		},
 		{
 			name: "sync local repo with parent - create new branch",
