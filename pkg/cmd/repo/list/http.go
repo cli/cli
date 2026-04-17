@@ -30,7 +30,10 @@ type FilterOptions struct {
 }
 
 func listRepos(client *http.Client, hostname string, limit int, owner string, filter FilterOptions) (*RepositoryList, error) {
-	if filter.Language != "" || filter.Archived || filter.NonArchived || len(filter.Topic) > 0 || filter.Visibility == "internal" {
+	// The GraphQL `privacy: PRIVATE` filter returns both private and internal repositories,
+	// so route --visibility=private through the search path, where `is:private` excludes internal.
+	// See https://github.com/cli/cli/issues/12900.
+	if filter.Language != "" || filter.Archived || filter.NonArchived || len(filter.Topic) > 0 || filter.Visibility == "internal" || filter.Visibility == "private" {
 		return searchRepos(client, hostname, limit, owner, filter)
 	}
 
