@@ -789,17 +789,10 @@ func resolveHosts(opts *InstallOptions, canPrompt bool) ([]*registry.AgentHost, 
 	}
 
 	fmt.Fprintln(opts.IO.ErrOut)
-	cs := opts.IO.ColorScheme()
 	labels := make([]string, len(registry.Agents))
-	nameWidth := 0
-	for _, h := range registry.Agents {
-		if n := len(h.Name); n > nameWidth {
-			nameWidth = n
-		}
-	}
 	defaultLabel := ""
 	for i, h := range registry.Agents {
-		labels[i] = fmt.Sprintf("%-*s  %s", nameWidth, h.Name, cs.Mutedf("(%s)", h.ProjectDir))
+		labels[i] = h.Name
 		if h.ID == registry.DefaultAgentID {
 			defaultLabel = labels[i]
 		}

@@ -1408,7 +1408,7 @@ func TestInstallRun_DeduplicatesSharedProjectDirAcrossHosts(t *testing.T) {
 			// (GitHub Copilot and Cursor) to exercise deduplication.
 			var indices []int
 			for i, label := range options {
-				if strings.HasPrefix(label, "GitHub Copilot ") || strings.HasPrefix(label, "Cursor ") {
+				if label == "GitHub Copilot" || label == "Cursor" {
 					indices = append(indices, i)
 				}
 			}
