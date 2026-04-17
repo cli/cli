@@ -823,6 +823,100 @@ func TestRepoExists(t *testing.T) {
 	}
 }
 
+func TestCommitExists(t *testing.T) {
+	tests := []struct {
+		name       string
+		httpStub   func(*httpmock.Registry)
+		repo       ghrepo.Interface
+		ref        string
+		exists     bool
+		wantErrMsg string
+	}{
+		{
+			name: "commit exists",
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/commits/309628980"),
+					httpmock.StringResponse("{}"),
+				)
+			},
+			repo:   ghrepo.New("OWNER", "REPO"),
+			ref:    "309628980",
+			exists: true,
+		},
+		{
+			name: "commit does not exist",
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/commits/1234567"),
+					httpmock.StatusStringResponse(404, "Not Found"),
+				)
+			},
+			repo:   ghrepo.New("OWNER", "REPO"),
+			ref:    "1234567",
+			exists: false,
+		},
+		{
+			name: "commit ref is invalid",
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/commits/7654321"),
+					httpmock.StatusStringResponse(422, "Unprocessable Entity"),
+				)
+			},
+			repo:   ghrepo.New("OWNER", "REPO"),
+			ref:    "7654321",
+			exists: false,
+		},
+		{
+			name: "commit lookup is conflicted",
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/commits/7654322"),
+					httpmock.StatusStringResponse(409, "Conflict"),
+				)
+			},
+			repo:   ghrepo.New("OWNER", "REPO"),
+			ref:    "7654322",
+			exists: false,
+		},
+		{
+			name: "http error",
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/commits/9999999"),
+					httpmock.StatusStringResponse(500, "Internal Server Error"),
+				)
+			},
+			repo:       ghrepo.New("OWNER", "REPO"),
+			ref:        "9999999",
+			exists:     false,
+			wantErrMsg: "HTTP 500 (https://api.github.com/repos/OWNER/REPO/commits/9999999)",
+		},
+	}
+	for _, tt := range tests {
+		reg := &httpmock.Registry{}
+		if tt.httpStub != nil {
+			tt.httpStub(reg)
+		}
+
+		client := newTestClient(reg)
+
+		t.Run(tt.name, func(t *testing.T) {
+			exists, err := CommitExists(client, tt.repo, tt.ref)
+			if tt.wantErrMsg != "" {
+				assert.Equal(t, tt.wantErrMsg, err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
+			if exists != tt.exists {
+				t.Errorf("CommitExists() returns %v, expected %v", exists, tt.exists)
+			}
+		})
+	}
+}
+
 func TestForkRepoReturnsErrorWhenForkIsNotPossible(t *testing.T) {
 	// Given our API returns 202 with a Fork that is the same as
 	// the repo we provided

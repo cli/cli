@@ -357,6 +357,56 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/kevin/MinTy/issues/217",
 		},
 		{
+			name: "decimal-only short hash in selector arg that resolves to a commit",
+			opts: BrowseOptions{
+				SelectorArg: "309628980",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/kevin/MinTy/commits/309628980"),
+					httpmock.StringResponse("{}"),
+				)
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/commit/309628980",
+		},
+		{
+			name: "decimal-only short hash in selector arg that does not resolve to a commit",
+			opts: BrowseOptions{
+				SelectorArg: "1234567",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/kevin/MinTy/commits/1234567"),
+					httpmock.StatusStringResponse(404, "Not Found"),
+				)
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/1234567",
+		},
+		{
+			name: "decimal-only short hash in selector arg with conflicted commit lookup falls back to an issue",
+			opts: BrowseOptions{
+				SelectorArg: "7654322",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/kevin/MinTy/commits/7654322"),
+					httpmock.StatusStringResponse(409, "Conflict"),
+				)
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/7654322",
+		},
+		{
+			name: "decimal-only short hash with hashtag argument",
+			opts: BrowseOptions{
+				SelectorArg: "#309628980",
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/309628980",
+		},
+		{
 			name: "branch flag",
 			opts: BrowseOptions{
 				Branch: "trunk",

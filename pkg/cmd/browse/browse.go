@@ -250,6 +250,19 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 			return "", nil
 		}
 		if isNumber(opts.SelectorArg) {
+			if isCommit(opts.SelectorArg) {
+				httpClient, err := opts.HttpClient()
+				if err != nil {
+					return "", err
+				}
+				exists, err := api.CommitExists(api.NewClientFromHTTP(httpClient), baseRepo, opts.SelectorArg)
+				if err != nil {
+					return "", err
+				}
+				if exists {
+					return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+				}
+			}
 			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 		}
 		if isCommit(opts.SelectorArg) {
