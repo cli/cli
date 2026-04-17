@@ -1256,6 +1256,36 @@ func TestSearcherURL(t *testing.T) {
 			},
 			url: "https://github.com/search?q=%22keyword+with+whitespace%22&type=repositories",
 		},
+		{
+			name: "pull request search opens pull requests tab",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Kind:     KindIssues,
+				Qualifiers: Qualifiers{
+					Type: "pr",
+				},
+			},
+			url: "https://github.com/search?q=keyword+type%3Apr&type=pullrequests",
+		},
+		{
+			name: "issue search opens issues tab",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Kind:     KindIssues,
+				Qualifiers: Qualifiers{
+					Type: "issue",
+				},
+			},
+			url: "https://github.com/search?q=keyword+type%3Aissue&type=issues",
+		},
+		{
+			name: "combined issue and pull request search defaults to issues tab",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Kind:     KindIssues,
+			},
+			url: "https://github.com/search?q=keyword&type=issues",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

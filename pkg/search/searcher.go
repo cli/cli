@@ -268,7 +268,7 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 func (s searcher) URL(query Query) string {
 	path := fmt.Sprintf("https://%s/search", s.host)
 	qs := url.Values{}
-	qs.Set("type", query.Kind)
+	qs.Set("type", webSearchType(query))
 
 	// TODO advancedSearchFuture
 	// Currently, the global search GUI does not support the advanced issue
@@ -285,6 +285,17 @@ func (s searcher) URL(query Query) string {
 	}
 	url := fmt.Sprintf("%s?%s", path, qs.Encode())
 	return url
+}
+
+// webSearchType maps the query onto the tab identifier used by the global
+// search GUI at github.com/search. The Issues backend kind is shared between
+// issue and pull request searches, which are rendered in separate tabs on the
+// web, so we disambiguate via the type qualifier set by the gh search subcommand.
+func webSearchType(query Query) string {
+	if query.Kind == KindIssues && query.Qualifiers.Type == "pr" {
+		return "pullrequests"
+	}
+	return query.Kind
 }
 
 func (err httpError) Error() string {
