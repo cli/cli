@@ -258,6 +258,16 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 		}
 	} else {
 		if hasLocalBranch {
+			// Refuse to advance the ref if the branch is checked out in
+			// another worktree — git update-ref would silently leave that
+			// worktree's index and working tree out of sync. See #12927.
+			inOtherWorktree, err := git.IsCheckedOutInOtherWorktree(branch)
+			if err != nil {
+				return err
+			}
+			if inOtherWorktree {
+				return fmt.Errorf("refusing to sync %q because it is checked out in another worktree\ntip: run sync from that worktree (or check it out here first) so the working tree is updated alongside the ref", branch)
+			}
 			if err := git.UpdateBranch(branch, "FETCH_HEAD"); err != nil {
 				return err
 			}
