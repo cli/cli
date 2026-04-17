@@ -66,6 +66,12 @@ var Agents = []AgentHost{
 		UserDir:    ".gemini/skills",
 	},
 	{
+		ID:         "junie",
+		Name:       "Junie",
+		ProjectDir: ".junie/skills",
+		UserDir:    ".junie/skills",
+	},
+	{
 		ID:         "antigravity",
 		Name:       "Antigravity",
 		ProjectDir: sharedProjectSkillsDir,

@@ -119,6 +119,16 @@ func TestDetectWith(t *testing.T) {
 			wantAgent: "copilot-cli",
 		},
 		{
+			name:      "JUNIE_DATA",
+			env:       map[string]string{"JUNIE_DATA": "/tmp/junie/data"},
+			wantAgent: "junie",
+		},
+		{
+			name:      "MATTERHORN_SESSION_ID",
+			env:       map[string]string{"MATTERHORN_SESSION_ID": "a3f8d1c2-4b7e-4d9a-8c5f-2e6b1a9c3d7f"},
+			wantAgent: "junie",
+		},
+		{
 			name:      "OPENCODE",
 			env:       map[string]string{"OPENCODE": "1"},
 			wantAgent: "opencode",

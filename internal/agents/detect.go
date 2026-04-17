@@ -15,6 +15,7 @@ const (
 	agentCodex      AgentName = "codex"
 	agentCopilotCLI AgentName = "copilot-cli"
 	agentGeminiCLI  AgentName = "gemini-cli"
+	agentJunie      AgentName = "junie"
 	agentOpencode   AgentName = "opencode"
 )
 
@@ -78,6 +79,11 @@ func detectWith(lookup func(string) (string, bool)) AgentName {
 	// No first-party docs
 	if isSet("COPILOT_CLI") {
 		return agentCopilotCLI
+	}
+
+	// Junie
+	if isSet("JUNIE_DATA") || isSet("MATTERHORN_SESSION_ID") {
+		return agentJunie
 	}
 
 	// OpenCode — https://github.com/anomalyco/opencode

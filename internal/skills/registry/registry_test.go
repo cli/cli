@@ -20,6 +20,7 @@ func TestFindByID(t *testing.T) {
 		{name: "cursor", id: "cursor", wantName: "Cursor"},
 		{name: "codex", id: "codex", wantName: "Codex"},
 		{name: "gemini", id: "gemini", wantName: "Gemini CLI"},
+		{name: "junie", id: "junie", wantName: "Junie"},
 		{name: "antigravity", id: "antigravity", wantName: "Antigravity"},
 		{name: "unknown agent", id: "nonexistent", wantErr: "unknown agent"},
 	}
@@ -96,6 +97,22 @@ func TestInstallDir(t *testing.T) {
 			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
 		},
 		{
+			name:    "junie project scope",
+			hostID:  "junie",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".junie", "skills"),
+		},
+		{
+			name:    "junie user scope",
+			hostID:  "junie",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".junie", "skills"),
+		},
+		{
 			name:    "antigravity project scope",
 			hostID:  "antigravity",
 			scope:   ScopeProject,
@@ -167,7 +184,7 @@ func TestRepoNameFromRemote(t *testing.T) {
 
 func TestUniqueProjectDirs(t *testing.T) {
 	dirs := UniqueProjectDirs()
-	assert.Equal(t, []string{".agents/skills", ".claude/skills"}, dirs)
+	assert.Equal(t, []string{".agents/skills", ".claude/skills", ".junie/skills"}, dirs)
 }
 
 func TestScopeLabels(t *testing.T) {

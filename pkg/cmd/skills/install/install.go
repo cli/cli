@@ -83,6 +83,7 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*InstallOptions) error) *cobra.
 			  - Cursor         (%[1]s.agents/skills%[1]s, %[1]s~/.cursor/skills%[1]s)
 			  - Codex          (%[1]s.agents/skills%[1]s, %[1]s~/.codex/skills%[1]s)
 			  - Gemini CLI     (%[1]s.agents/skills%[1]s, %[1]s~/.gemini/skills%[1]s)
+			  - Junie          (%[1]s.junie/skills%[1]s, %[1]s~/.junie/skills%[1]s)
 			  - Antigravity    (%[1]s.agents/skills%[1]s, %[1]s~/.gemini/antigravity/skills%[1]s)
 
 			Use %[1]s--agent%[1]s and %[1]s--scope%[1]s to control placement, or %[1]s--dir%[1]s for a

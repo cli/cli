@@ -80,7 +80,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			tree SHA (from %[1]sSKILL.md%[1]s frontmatter) against the remote repository.
 
 			Scans all known agent host directories (Copilot, Claude, Cursor, Codex,
-			Gemini, Antigravity) in both project and user scope automatically.
+			Gemini, Junie, Antigravity) in both project and user scope automatically.
 
 			Without arguments, checks all installed skills. With skill names,
 			checks only those specific skills.
