@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/skills/discovery"
+	"github.com/cli/cli/v2/internal/skills/registry"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -1950,6 +1951,87 @@ func Test_printReviewHint(t *testing.T) {
 				assert.Empty(t, buf.String())
 			} else {
 				assert.Contains(t, buf.String(), tt.wantOutput)
+			}
+		})
+	}
+}
+
+func Test_printHostHints(t *testing.T) {
+	kiro := &registry.AgentHost{ID: "kiro-cli", Name: "Kiro CLI", ProjectDir: ".kiro/skills", UserDir: ".kiro/skills"}
+	copilot := &registry.AgentHost{ID: "copilot-cli", Name: "GitHub Copilot CLI", ProjectDir: ".github/skills"}
+
+	tests := []struct {
+		name       string
+		hosts      []*registry.AgentHost
+		installed  []string
+		installDir string
+		gitRoot    string
+		wantSub    []string
+		wantNot    []string
+	}{
+		{
+			name:       "no installs produces no output",
+			hosts:      []*registry.AgentHost{kiro},
+			installed:  nil,
+			installDir: "/repo/.kiro/skills",
+			gitRoot:    "/repo",
+			wantNot:    []string{"Kiro CLI"},
+		},
+		{
+			name:       "non-kiro host produces no output",
+			hosts:      []*registry.AgentHost{copilot},
+			installed:  []string{"s1"},
+			installDir: "/repo/.github/skills",
+			gitRoot:    "/repo",
+			wantNot:    []string{"Kiro CLI"},
+		},
+		{
+			name:       "kiro project scope uses relative path",
+			hosts:      []*registry.AgentHost{kiro},
+			installed:  []string{"s1"},
+			installDir: filepath.Join("/repo", ".kiro", "skills"),
+			gitRoot:    "/repo",
+			wantSub:    []string{"Kiro CLI", `"skill://.kiro/skills/**/SKILL.md"`},
+		},
+		{
+			name:       "kiro user scope uses absolute install dir",
+			hosts:      []*registry.AgentHost{kiro},
+			installed:  []string{"s1"},
+			installDir: "/home/user/.kiro/skills",
+			gitRoot:    "/repo",
+			wantSub:    []string{`"skill:///home/user/.kiro/skills/**/SKILL.md"`},
+			wantNot:    []string{`skill://.kiro/skills`},
+		},
+		{
+			name:       "kiro custom dir outside git root uses absolute path",
+			hosts:      []*registry.AgentHost{kiro},
+			installed:  []string{"s1"},
+			installDir: "/tmp/my-skills",
+			gitRoot:    "/repo",
+			wantSub:    []string{`"skill:///tmp/my-skills/**/SKILL.md"`},
+		},
+		{
+			name:       "kiro without git root falls back to install dir",
+			hosts:      []*registry.AgentHost{kiro},
+			installed:  []string{"s1"},
+			installDir: "/home/user/.kiro/skills",
+			gitRoot:    "",
+			wantSub:    []string{`"skill:///home/user/.kiro/skills/**/SKILL.md"`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			cs := ios.ColorScheme()
+			var buf strings.Builder
+			printHostHints(&buf, cs, tt.hosts, tt.installed, tt.installDir, tt.gitRoot)
+			got := buf.String()
+			for _, s := range tt.wantSub {
+				assert.Contains(t, got, s)
+			}
+			for _, s := range tt.wantNot {
+				assert.NotContains(t, got, s)
 			}
 		})
 	}

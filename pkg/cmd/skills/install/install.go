@@ -83,8 +83,8 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			scope (in your home directory, available everywhere).
 
 			A wide range of AI coding agents are supported, including GitHub
-			Copilot, Claude Code, Cursor, Codex, Gemini CLI, Antigravity, Amp, Goose, 
-			Junie, OpenCode, Windsurf, and many more. 
+			Copilot, Claude Code, Cursor, Codex, Gemini CLI, Antigravity, Amp, 
+			Goose, Junie, OpenCode, Windsurf, and many more. 
 			Run %[1]sgh skill install --help%[1]s to see the full list of
 			supported %[1]s--agent%[1]s values, or select interactively.
 
@@ -334,7 +334,7 @@ func installRun(opts *InstallOptions) error {
 
 			printFileTree(opts.IO.ErrOut, cs, result.Dir, result.Installed)
 			printReviewHint(opts.IO.ErrOut, cs, repoSource, resolved.SHA, result.Installed)
-			printHostHints(opts.IO.ErrOut, cs, plan.hosts, result.Installed)
+			printHostHints(opts.IO.ErrOut, cs, plan.hosts, result.Installed, result.Dir, gitRoot)
 		}
 
 		if err != nil {
@@ -473,7 +473,7 @@ func runLocalInstall(opts *InstallOptions) error {
 
 		printFileTree(opts.IO.ErrOut, cs, result.Dir, result.Installed)
 		printReviewHint(opts.IO.ErrOut, cs, "", "", result.Installed)
-		printHostHints(opts.IO.ErrOut, cs, plan.hosts, result.Installed)
+		printHostHints(opts.IO.ErrOut, cs, plan.hosts, result.Installed, result.Dir, gitRoot)
 	}
 
 	return nil
@@ -1079,8 +1079,9 @@ func printReviewHint(w io.Writer, cs *iostreams.ColorScheme, repo, sha string, s
 // printHostHints prints any agent-specific post-install guidance for the
 // hosts that were installed to. Most agents need no extra steps; this is
 // currently used for Kiro CLI, which requires skills to be registered as
-// resources on a custom agent.
-func printHostHints(w io.Writer, cs *iostreams.ColorScheme, hosts []*registry.AgentHost, installed []string) {
+// resources on a custom agent. The path in the example is derived from
+// the actual install directory so it matches the chosen scope or --dir.
+func printHostHints(w io.Writer, cs *iostreams.ColorScheme, hosts []*registry.AgentHost, installed []string, installDir, gitRoot string) {
 	if len(installed) == 0 {
 		return
 	}
@@ -1090,10 +1091,24 @@ func printHostHints(w io.Writer, cs *iostreams.ColorScheme, hosts []*registry.Ag
 			fmt.Fprintln(w, "  .kiro/agents/<agent>.json under \"resources\", for example:")
 			fmt.Fprintln(w)
 			fmt.Fprintln(w, "    {")
-			fmt.Fprintf(w, "      \"resources\": [\"skill://%s/**/SKILL.md\"]\n", filepath.ToSlash(h.ProjectDir))
+			fmt.Fprintf(w, "      \"resources\": [\"skill://%s/**/SKILL.md\"]\n", kiroResourcePath(installDir, gitRoot))
 			fmt.Fprintln(w, "    }")
 			fmt.Fprintln(w)
 			return
 		}
 	}
+}
+
+// kiroResourcePath returns a slash-separated path suitable for use in the
+// "resources" field of a Kiro agent config. When the install directory is
+// inside the current git repository the path is made relative to the repo
+// root so the example works for project-scoped agent configs; otherwise
+// the absolute install path is used (e.g. for --scope user or --dir).
+func kiroResourcePath(installDir, gitRoot string) string {
+	if gitRoot != "" && installDir != "" {
+		if rel, err := filepath.Rel(gitRoot, installDir); err == nil && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel) {
+			return filepath.ToSlash(rel)
+		}
+	}
+	return filepath.ToSlash(installDir)
 }
