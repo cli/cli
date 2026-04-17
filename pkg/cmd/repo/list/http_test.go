@@ -60,6 +60,53 @@ func Test_listReposWithLanguage(t *testing.T) {
 	assert.Equal(t, `sort:updated-desc fork:true language:go user:@me`, searchData.Variables["query"])
 }
 
+// Regression test for https://github.com/cli/cli/issues/12900 — GraphQL
+// `privacy: PRIVATE` returns both private and internal repos, so
+// --visibility=private must be routed through the search path where
+// `is:private` reliably excludes internal repositories.
+func Test_listReposWithPrivateVisibility(t *testing.T) {
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	var searchData struct {
+		Query     string
+		Variables map[string]interface{}
+	}
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryListSearch\b`),
+		func(req *http.Request) (*http.Response, error) {
+			jsonData, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			err = json.Unmarshal(jsonData, &searchData)
+			if err != nil {
+				return nil, err
+			}
+
+			respBody, err := os.Open("./fixtures/repoSearch.json")
+			if err != nil {
+				return nil, err
+			}
+
+			return &http.Response{
+				StatusCode: 200,
+				Request:    req,
+				Body:       respBody,
+			}, nil
+		},
+	)
+
+	client := http.Client{Transport: &reg}
+	res, err := listRepos(&client, "github.com", 10, "", FilterOptions{
+		Visibility: "private",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, true, res.FromSearch, "private visibility should go through search path")
+	assert.Equal(t, `sort:updated-desc fork:true is:private user:@me`, searchData.Variables["query"])
+}
+
 func Test_searchQuery(t *testing.T) {
 	type args struct {
 		owner  string
