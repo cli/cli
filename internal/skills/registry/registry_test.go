@@ -19,7 +19,7 @@ func TestFindByID(t *testing.T) {
 		{name: "claude-code", id: "claude-code", wantName: "Claude Code"},
 		{name: "cursor", id: "cursor", wantName: "Cursor"},
 		{name: "codex", id: "codex", wantName: "Codex"},
-		{name: "gemini", id: "gemini", wantName: "Gemini CLI"},
+		{name: "gemini-cli", id: "gemini-cli", wantName: "Gemini CLI"},
 		{name: "antigravity", id: "antigravity", wantName: "Antigravity"},
 		{name: "unknown agent", id: "nonexistent", wantErr: "unknown agent"},
 	}
@@ -89,7 +89,7 @@ func TestInstallDir(t *testing.T) {
 		},
 		{
 			name:    "gemini project scope",
-			hostID:  "gemini",
+			hostID:  "gemini-cli",
 			scope:   ScopeProject,
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
@@ -167,7 +167,18 @@ func TestRepoNameFromRemote(t *testing.T) {
 
 func TestUniqueProjectDirs(t *testing.T) {
 	dirs := UniqueProjectDirs()
-	assert.Equal(t, []string{".agents/skills", ".claude/skills"}, dirs)
+	// The shared .agents/skills dir and .claude/skills must both be present
+	// and listed exactly once each.
+	seen := map[string]int{}
+	for _, d := range dirs {
+		seen[d]++
+	}
+	assert.Equal(t, 1, seen[".agents/skills"], "expected .agents/skills exactly once")
+	assert.Equal(t, 1, seen[".claude/skills"], "expected .claude/skills exactly once")
+	// No project dir should appear more than once.
+	for d, n := range seen {
+		assert.LessOrEqualf(t, n, 1, "project dir %q appears %d times", d, n)
+	}
 }
 
 func TestScopeLabels(t *testing.T) {

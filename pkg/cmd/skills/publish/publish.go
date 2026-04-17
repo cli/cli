@@ -859,6 +859,11 @@ func checkInstalledSkillDirs(gitClient *git.Client, repoDir string) []publishDia
 	var diagnostics []publishDiagnostic
 
 	for _, relPath := range registry.UniqueProjectDirs() {
+		// Skip non-hidden project dirs (such as "skills") to avoid
+		// flagging the canonical authoring layout used when publishing.
+		if !strings.HasPrefix(relPath, ".") {
+			continue
+		}
 		absPath := filepath.Join(repoDir, relPath)
 		if _, err := os.Stat(absPath); os.IsNotExist(err) {
 			continue

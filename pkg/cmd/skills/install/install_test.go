@@ -1403,7 +1403,15 @@ func TestInstallRun_DeduplicatesSharedProjectDirAcrossHosts(t *testing.T) {
 
 	pm := &prompter.PrompterMock{
 		MultiSelectFunc: func(prompt string, defaults []string, options []string) ([]int, error) {
-			return []int{0, 2}, nil // GitHub Copilot + Cursor share .agents/skills
+			// Select two agents that share the .agents/skills project dir
+			// (GitHub Copilot and Cursor) to exercise deduplication.
+			var indices []int
+			for i, label := range options {
+				if strings.HasPrefix(label, "GitHub Copilot ") || strings.HasPrefix(label, "Cursor ") {
+					indices = append(indices, i)
+				}
+			}
+			return indices, nil
 		},
 		SelectFunc: func(prompt, defaultValue string, options []string) (int, error) {
 			return 0, nil // project scope
