@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"strings"
 	"fmt"
 
 	"github.com/cli/cli/v2/git"
@@ -14,6 +15,7 @@ type gitClient interface {
 	Fetch(string, string) error
 	HasLocalBranch(string) bool
 	IsAncestor(string, string) (bool, error)
+	IsCheckedOutInOtherWorktree(string) (bool, error)
 	IsDirty() (bool, error)
 	MergeFastForward(string) error
 	ResetHard(string) error
@@ -64,6 +66,55 @@ func (g *gitExecuter) Fetch(remote, ref string) error {
 
 func (g *gitExecuter) HasLocalBranch(branch string) bool {
 	return g.client.HasLocalBranch(context.Background(), branch)
+}
+
+// IsCheckedOutInOtherWorktree returns true if the given branch is checked
+// out in any git worktree other than the current one. This is used to avoid
+// advancing a branch ref (via `git update-ref`) while another worktree has
+// that branch checked out, which would silently leave that worktree's index
+// and working tree out of sync with the new ref. See cli/cli#12927.
+func (g *gitExecuter) IsCheckedOutInOtherWorktree(branch string) (bool, error) {
+	cmd, err := g.client.Command(context.Background(), "worktree", "list", "--porcelain")
+	if err != nil {
+		return false, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return false, err
+	}
+
+	// `git worktree list --porcelain` emits one record per worktree separated
+	// by a blank line. Each record starts with `worktree <path>` and, for
+	// worktrees with a checked-out branch, contains `branch refs/heads/<name>`.
+	// We scan for the target branch in a worktree other than the current one.
+	currentWorktree, err := g.currentWorktreePath()
+	if err != nil {
+		return false, err
+	}
+
+	target := "branch refs/heads/" + branch
+	var wt string
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.HasPrefix(line, "worktree ") {
+			wt = strings.TrimPrefix(line, "worktree ")
+		} else if line == target && wt != currentWorktree {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// currentWorktreePath returns the absolute path of the current git worktree.
+func (g *gitExecuter) currentWorktreePath() (string, error) {
+	cmd, err := g.client.Command(context.Background(), "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 func (g *gitExecuter) IsAncestor(ancestor, progeny string) (bool, error) {
