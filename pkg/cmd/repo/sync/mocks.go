@@ -38,6 +38,11 @@ func (g *mockGitClient) IsAncestor(a, b string) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
+func (g *mockGitClient) IsCheckedOutInOtherWorktree(a string) (bool, error) {
+	args := g.Called(a)
+	return args.Bool(0), args.Error(1)
+}
+
 func (g *mockGitClient) IsDirty() (bool, error) {
 	args := g.Called()
 	return args.Bool(0), args.Error(1)
