@@ -167,12 +167,12 @@ func TestRepoNameFromRemote(t *testing.T) {
 
 func TestUniqueProjectDirs(t *testing.T) {
 	dirs := UniqueProjectDirs()
-	// The shared .agents/skills dir and .claude/skills must both be present
-	// and listed exactly once each.
 	seen := map[string]int{}
 	for _, d := range dirs {
 		seen[d]++
 	}
+	// The shared .agents/skills dir and .claude/skills must both be present
+	// and listed exactly once each.
 	assert.Equal(t, 1, seen[".agents/skills"], "expected .agents/skills exactly once")
 	assert.Equal(t, 1, seen[".claude/skills"], "expected .claude/skills exactly once")
 	// No project dir should appear more than once.
