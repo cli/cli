@@ -1083,12 +1083,15 @@ func printHostHints(w io.Writer, cs *iostreams.ColorScheme, hosts []*registry.Ag
 	}
 	for _, h := range hosts {
 		if h.ID == "kiro-cli" {
-			fmt.Fprintf(w, "\n%s Kiro CLI: register these skills on a custom agent by adding them to\n", cs.WarningIcon())
-			fmt.Fprintln(w, "  .kiro/agents/<agent>.json under \"resources\", for example:")
 			fmt.Fprintln(w)
-			fmt.Fprintln(w, "    {")
-			fmt.Fprintf(w, "      \"resources\": [\"skill://%s/**/SKILL.md\"]\n", kiroResourcePath(installDir, gitRoot))
-			fmt.Fprintln(w, "    }")
+			fmt.Fprint(w, heredoc.Docf(`
+				%s Kiro CLI: register these skills on a custom agent by adding them to
+				  .kiro/agents/<agent>.json under "resources", for example:
+
+				    {
+				      "resources": ["skill://%s/**/SKILL.md"]
+				    }
+			`, cs.WarningIcon(), kiroResourcePath(installDir, gitRoot)))
 			fmt.Fprintln(w)
 			return
 		}
