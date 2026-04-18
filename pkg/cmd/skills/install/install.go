@@ -83,10 +83,12 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			scope (in your home directory, available everywhere).
 
 			A wide range of AI coding agents are supported, including GitHub
-			Copilot, Claude Code, Cursor, Codex, Gemini CLI, Antigravity, Amp, 
-			Goose, Junie, OpenCode, Windsurf, and many more. 
-			Run %[1]sgh skill install --help%[1]s to see the full list of
-			supported %[1]s--agent%[1]s values, or select interactively.
+			Copilot, Claude Code, Cursor, Codex, Gemini CLI, Antigravity, Amp,
+			Goose, Junie, OpenCode, Windsurf, and many more.
+
+			Supported %[1]s--agent%[1]s values:
+
+			%[2]s
 
 			Use %[1]s--agent%[1]s and %[1]s--scope%[1]s to control placement, or %[1]s--dir%[1]s for a
 			custom directory. The default scope is %[1]sproject%[1]s, and the default
@@ -131,7 +133,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			When run interactively, the command prompts for any missing arguments.
 			When run non-interactively, %[1]srepository%[1]s and a skill name are
 			required.
-		`, "`"),
+		`, "`", registry.AgentHelpList()),
 		Example: heredoc.Doc(`
 			# Interactive: choose repo, skill, and agent
 			$ gh skill install
@@ -196,7 +198,8 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 		},
 	}
 
-	cmdutil.StringEnumFlag(cmd, &opts.Agent, "agent", "", "", registry.AgentIDs(), "Target agent")
+	agentFlag := cmdutil.StringEnumFlag(cmd, &opts.Agent, "agent", "", "", registry.AgentIDs(), "Target agent")
+	agentFlag.Usage = "Target agent (see supported values above)"
 	cmdutil.StringEnumFlag(cmd, &opts.Scope, "scope", "", "project", []string{"project", "user"}, "Installation scope")
 	cmd.Flags().StringVar(&opts.Pin, "pin", "", "Pin to a specific git tag or commit SHA")
 	cmd.Flags().StringVar(&opts.Dir, "dir", "", "Install to a custom directory (overrides --agent and --scope)")

@@ -342,6 +342,15 @@ func AgentIDs() []string {
 	return ids
 }
 
+// AgentHelpList returns a newline-separated bulleted list of agents for help text.
+func AgentHelpList() string {
+	lines := make([]string, len(Agents))
+	for i, h := range Agents {
+		lines[i] = fmt.Sprintf("  - %s (%s)", h.Name, h.ID)
+	}
+	return strings.Join(lines, "\n")
+}
+
 // AgentNames returns the display names of all agents for prompting.
 func AgentNames() []string {
 	names := make([]string, len(Agents))
