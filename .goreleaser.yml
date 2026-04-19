@@ -104,5 +104,12 @@ nfpms: #build:linux
         dst: "/usr/share/bash-completion/completions/gh"
       - src: "./share/fish/vendor_completions.d/gh.fish"
         dst: "/usr/share/fish/vendor_completions.d/gh.fish"
-      - src: "./share/zsh/site-functions/_gh"
-        dst: "/usr/share/zsh/site-functions/_gh"
+    overrides:
+      deb:
+        contents:
+          - src: "./share/zsh/site-functions/_gh"
+            dst: "/usr/share/zsh/vendor-completions/_gh"
+      rpm:
+        contents:
+          - src: "./share/zsh/site-functions/_gh"
+            dst: "/usr/share/zsh/site-functions/_gh"
