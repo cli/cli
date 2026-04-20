@@ -597,7 +597,7 @@ func Test_requiredScopesFromServerMessage(t *testing.T) {
 
 func TestNewProject_nonTTY(t *testing.T) {
 	client := NewTestClient()
-	_, err := client.NewProject(false, &Owner{}, 0, false)
+	_, err := client.NewProject(false, &Owner{}, 0, false, nil)
 	assert.EqualError(t, err, "project number is required when not running interactively")
 }
 

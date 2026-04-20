@@ -97,7 +97,7 @@ func runCopy(config copyConfig) error {
 		return err
 	}
 
-	project, err := config.client.NewProject(canPrompt, sourceOwner, config.opts.number, false)
+	project, err := config.client.NewProject(canPrompt, sourceOwner, config.opts.number, false, nil)
 	if err != nil {
 		return err
 	}

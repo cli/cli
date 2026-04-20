@@ -97,7 +97,7 @@ func runEdit(config editConfig) error {
 		return err
 	}
 
-	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, false)
+	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, false, nil)
 	if err != nil {
 		return err
 	}

@@ -1482,8 +1482,9 @@ func (c *Client) NewOwner(canPrompt bool, login string) (*Owner, error) {
 // if canPrompt is false, number is required as we cannot prompt for it
 // if number is 0 it will prompt the user to select a project interactively
 // otherwise it will make a request to get the project by number
-// set `fields“ to true to get the project's field data
-func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool) (*Project, error) {
+// set `fields` to true to get the project's field data
+// filter, if non-nil, limits which projects appear in the interactive prompt
+func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool, filter func(*Project) bool) (*Project, error) {
 	if number != 0 {
 		variables := map[string]any{
 			"number":      githubv4.Int(number),
@@ -1527,8 +1528,22 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool)
 		return nil, fmt.Errorf("no projects found for %s", o.Login)
 	}
 
-	options := make([]string, 0, len(projects.Nodes))
-	for _, p := range projects.Nodes {
+	// Build the filtered list of projects for the interactive prompt.
+	// When a filter is provided, only matching projects are shown.
+	filtered := make([]*Project, 0, len(projects.Nodes))
+	for i := range projects.Nodes {
+		p := &projects.Nodes[i]
+		if filter == nil || filter(p) {
+			filtered = append(filtered, p)
+		}
+	}
+
+	if len(filtered) == 0 {
+		return nil, fmt.Errorf("no projects found for %s", o.Login)
+	}
+
+	options := make([]string, 0, len(filtered))
+	for _, p := range filtered {
 		title := fmt.Sprintf("%s (#%d)", p.Title, p.Number)
 		options = append(options, title)
 	}
@@ -1538,7 +1553,7 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool)
 		return nil, err
 	}
 
-	return &projects.Nodes[answerIndex], nil
+	return filtered[answerIndex], nil
 }
 
 // Projects returns all the projects for an Owner. If the OwnerType is VIEWER, no login is required.
