@@ -126,7 +126,8 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 
 			Use %[1]s--dry-run%[1]s to validate without publishing.
 			Use %[1]s--tag%[1]s to publish non-interactively with a specific tag.
-			Use %[1]s--fix%[1]s to automatically strip install metadata from committed files.
+			Use %[1]s--fix%[1]s to automatically strip install metadata from committed files
+			without publishing. Review and commit the changes, then run publish again.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Validate and publish interactively
@@ -138,13 +139,16 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 			# Validate only (no publish)
 			$ gh skill publish --dry-run
 
-			# Validate and strip install metadata
-			$ gh skills publish --fix
+			# Strip install metadata without publishing
+			$ gh skill publish --fix
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 1 {
 				opts.Dir = args[0]
+			}
+			if err := cmdutil.MutuallyExclusive("specify only one of `--fix` or `--dry-run`", opts.Fix, opts.DryRun); err != nil {
+				return err
 			}
 			if runF != nil {
 				return runF(opts)
@@ -153,7 +157,7 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.Fix, "fix", false, "Auto-fix issues where possible (e.g. strip install metadata)")
+	cmd.Flags().BoolVar(&opts.Fix, "fix", false, "Auto-fix issues where possible without publishing (e.g. strip install metadata)")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Validate without publishing")
 	cmd.Flags().StringVar(&opts.Tag, "tag", "", "Version tag for the release (e.g. v1.0.0)")
 
@@ -407,6 +411,15 @@ func publishRun(opts *PublishOptions) error {
 	// --- Publish flow ---
 	if opts.DryRun {
 		fmt.Fprintf(opts.IO.ErrOut, "\nDry run complete. Use without --dry-run to publish.\n")
+		return nil
+	}
+
+	if opts.Fix {
+		if fixes > 0 {
+			fmt.Fprintf(opts.IO.ErrOut, "\nFixed %d file(s). Review and commit the changes, then run %s to publish.\n", fixes, "gh skill publish")
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "\nNo issues to fix.\n")
+		}
 		return nil
 	}
 
@@ -1059,7 +1072,7 @@ func renderDiagnosticsTTY(opts *PublishOptions, skillCount int, diagnostics []pu
 		fmt.Fprintf(opts.IO.ErrOut, "\n%s\n", d.message)
 	}
 
-	if errors == 0 {
+	if errors == 0 && !opts.Fix {
 		if owner != "" && repo != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "\n%s Repository: %s/%s\n", cs.Green("Ready to publish!"), owner, repo)
 		} else {
