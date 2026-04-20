@@ -18,10 +18,10 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/safepaths"
-	"github.com/cli/cli/v2/internal/update"
 	ghzip "github.com/cli/cli/v2/internal/zip"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -150,7 +150,7 @@ func runCopilot(opts *CopilotOptions) error {
 				fmt.Fprintf(opts.IO.ErrOut, "%s Copilot CLI was not installed", opts.IO.ColorScheme().WarningIcon())
 				return cmdutil.SilentError
 			}
-		} else if !update.IsCI() {
+		} else if !ci.IsCI() {
 			fmt.Fprintf(opts.IO.ErrOut, "%s Copilot CLI not installed", opts.IO.ColorScheme().WarningIcon())
 			return cmdutil.SilentError
 		}

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/hashicorp/go-version"
 	"github.com/mattn/go-isatty"
@@ -42,7 +43,7 @@ func ShouldCheckForExtensionUpdate() bool {
 	if os.Getenv("CODESPACES") != "" {
 		return false
 	}
-	return !IsCI() && IsTerminal(os.Stdout) && IsTerminal(os.Stderr)
+	return !ci.IsCI() && IsTerminal(os.Stdout) && IsTerminal(os.Stderr)
 }
 
 // CheckForExtensionUpdate checks whether an update exists for a specific extension based on extension type and recency of last check within past 24 hours.
@@ -83,7 +84,7 @@ func ShouldCheckForUpdate() bool {
 	if os.Getenv("CODESPACES") != "" {
 		return false
 	}
-	return !IsCI() && IsTerminal(os.Stdout) && IsTerminal(os.Stderr)
+	return !ci.IsCI() && IsTerminal(os.Stdout) && IsTerminal(os.Stderr)
 }
 
 // CheckForUpdate checks whether an update exists for the GitHub CLI based on recency of last check within past 24 hours.
@@ -181,12 +182,4 @@ func versionGreaterThan(v, w string) bool {
 // IsTerminal determines if a file descriptor is an interactive terminal / TTY.
 func IsTerminal(f *os.File) bool {
 	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
-}
-
-// IsCI determines if the current execution context is within a known CI/CD system.
-// This is based on https://github.com/watson/ci-info/blob/HEAD/index.js.
-func IsCI() bool {
-	return os.Getenv("CI") != "" || // GitHub Actions, Travis CI, CircleCI, Cirrus CI, GitLab CI, AppVeyor, CodeShip, dsari
-		os.Getenv("BUILD_NUMBER") != "" || // Jenkins, TeamCity
-		os.Getenv("RUN_ID") != "" // TaskCluster, dsari
 }

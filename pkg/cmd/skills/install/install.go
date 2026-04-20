@@ -47,15 +47,16 @@ type InstallOptions struct {
 	GitClient  *git.Client
 	Remotes    func() (ghContext.Remotes, error)
 
-	SkillSource  string // owner/repo or local path (when --from-local is set)
-	SkillName    string // possibly with @version suffix
-	Agent        string
-	Scope        string
-	ScopeChanged bool // true when --scope was explicitly set
-	Pin          string
-	Dir          string // overrides --agent and --scope
-	Force        bool
-	FromLocal    bool // treat SkillSource as a local directory path
+	SkillSource     string // owner/repo or local path (when --from-local is set)
+	SkillName       string // possibly with @version suffix
+	Agent           string
+	Scope           string
+	ScopeChanged    bool // true when --scope was explicitly set
+	Pin             string
+	Dir             string // overrides --agent and --scope
+	Force           bool
+	FromLocal       bool // treat SkillSource as a local directory path
+	AllowHiddenDirs bool // include skills in dot-prefixed directories
 
 	repo      ghrepo.Interface // set when SkillSource is a GitHub repository
 	localPath string           // set when FromLocal is true
@@ -161,6 +162,9 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 
 			# Pin to a specific git ref
 			$ gh skill install github/awesome-copilot git-commit --pin v2.0.0
+
+			# Install skills from hidden directories (e.g. .claude/skills/)
+			$ gh skill install owner/repo --allow-hidden-dirs
 		`),
 		Aliases: []string{"add"},
 		Args:    cobra.MaximumNArgs(2),
@@ -205,6 +209,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 	cmd.Flags().StringVar(&opts.Dir, "dir", "", "Install to a custom directory (overrides --agent and --scope)")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing skills without prompting")
 	cmd.Flags().BoolVar(&opts.FromLocal, "from-local", false, "Treat the argument as a local directory path instead of a repository")
+	cmd.Flags().BoolVar(&opts.AllowHiddenDirs, "allow-hidden-dirs", false, "Include skills in hidden directories (e.g. .claude/skills/, .agents/skills/)")
 	cmdutil.DisableAuthCheckFlag(cmd.Flags().Lookup("from-local"))
 
 	return cmd
@@ -417,8 +422,13 @@ func runLocalInstall(opts *InstallOptions) error {
 	}
 
 	opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
-	skills, err := discovery.DiscoverLocalSkills(absSource)
+	allSkills, err := discovery.DiscoverLocalSkillsWithOptions(absSource, discovery.DiscoverOptions{})
 	opts.IO.StopProgressIndicator()
+	if err != nil {
+		return err
+	}
+
+	skills, err := filterHiddenDirSkills(opts, allSkills)
 	if err != nil {
 		return err
 	}
@@ -553,7 +563,7 @@ func resolveVersion(opts *InstallOptions, client *api.Client, hostname string) (
 
 func discoverSkills(opts *InstallOptions, client *api.Client, hostname string, resolved *discovery.ResolvedRef) ([]discovery.Skill, error) {
 	opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
-	skills, err := discovery.DiscoverSkills(client, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA)
+	allSkills, err := discovery.DiscoverSkillsWithOptions(client, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA, discovery.DiscoverOptions{})
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		var treeTooLarge *discovery.TreeTooLargeError
@@ -563,6 +573,10 @@ func discoverSkills(opts *InstallOptions, client *api.Client, hostname string, r
 			return nil, err
 		}
 		return nil, err
+	}
+	skills, filterErr := filterHiddenDirSkills(opts, allSkills)
+	if filterErr != nil {
+		return nil, filterErr
 	}
 	logConventions(opts.IO, skills)
 	for _, s := range skills {
@@ -1110,4 +1124,43 @@ func kiroResourcePath(installDir, gitRoot string) string {
 		}
 	}
 	return filepath.ToSlash(installDir)
+}
+
+// filterHiddenDirSkills separates hidden-dir skills from the full list and
+// applies the --allow-hidden-dirs flag logic. When the flag is set, all skills
+// are returned and a warning is printed. When the flag is not set, hidden-dir
+// skills are excluded and an error is returned if no standard skills remain.
+func filterHiddenDirSkills(opts *InstallOptions, allSkills []discovery.Skill) ([]discovery.Skill, error) {
+	cs := opts.IO.ColorScheme()
+
+	if opts.AllowHiddenDirs {
+		if discovery.HasHiddenDirSkills(allSkills) {
+			fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
+				%[1]s Skills in hidden directories (e.g. .claude/, .agents/) may be installed
+				  copies from another publisher. Verify the skill's origin and check for a
+				  canonical source.
+			`, cs.WarningIcon()))
+		}
+		return allSkills, nil
+	}
+
+	var standard []discovery.Skill
+	var hiddenCount int
+	for _, s := range allSkills {
+		if s.IsHiddenDirConvention() {
+			hiddenCount++
+		} else {
+			standard = append(standard, s)
+		}
+	}
+
+	if len(standard) == 0 && hiddenCount > 0 {
+		return nil, fmt.Errorf(
+			"no standard skills found, but %d skill(s) exist in hidden directories\n"+
+				"  Use --allow-hidden-dirs to include them",
+			hiddenCount,
+		)
+	}
+
+	return standard, nil
 }

@@ -66,6 +66,8 @@ func (s Skill) DisplayName() string {
 		return "[plugins] " + name
 	case "root":
 		return "[root] " + name
+	case "hidden-dir", "hidden-dir-namespaced":
+		return "[hidden-dir] " + name
 	default:
 		return name
 	}
@@ -80,6 +82,23 @@ func (s Skill) InstallName() string {
 		return s.Namespace + "/" + s.Name
 	}
 	return s.Name
+}
+
+// IsHiddenDirConvention returns true if the skill was discovered in a hidden
+// (dot-prefixed) directory such as .claude/skills/ or .agents/skills/.
+func (s Skill) IsHiddenDirConvention() bool {
+	return s.Convention == "hidden-dir" || s.Convention == "hidden-dir-namespaced"
+}
+
+// HasHiddenDirSkills returns true if any of the given skills were discovered
+// in hidden directories.
+func HasHiddenDirSkills(skills []Skill) bool {
+	for _, s := range skills {
+		if s.IsHiddenDirConvention() {
+			return true
+		}
+	}
+	return false
 }
 
 // ResolvedRef contains the resolved git reference and its SHA.
@@ -393,8 +412,87 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 	return nil
 }
 
-// DiscoverSkills finds all skills in a repository at the given commit SHA.
+// matchHiddenDirConventions checks if a blob path matches a skill convention
+// under a hidden (dot-prefixed) root directory. These patterns mirror the
+// standard skills/ conventions but rooted under .{host}/skills/:
+//
+//   - .{host}/skills/*/SKILL.md         -> "hidden-dir"
+//   - .{host}/skills/{scope}/*/SKILL.md -> "hidden-dir-namespaced"
+func matchHiddenDirConventions(entry treeEntry) *skillMatch {
+	if path.Base(entry.Path) != "SKILL.md" {
+		return nil
+	}
+
+	// .{host}/skills/*
+	// .{host}/skills/{scope}/*
+	dir := path.Dir(entry.Path)
+	skillName := path.Base(dir)
+
+	if !validateName(skillName) {
+		return nil
+	}
+
+	// .{host}/skills
+	// .{host}/skills/{scope}
+	parentDir := path.Dir(dir)
+
+	// .{host}/skills/*/SKILL.md
+	if path.Base(parentDir) == "skills" {
+		hiddenRoot := path.Dir(parentDir)
+		if path.Dir(hiddenRoot) == "." && strings.HasPrefix(hiddenRoot, ".") {
+			return &skillMatch{entry: entry, name: skillName, skillDir: dir, convention: "hidden-dir"}
+		}
+	}
+
+	// .{host}/skills/{scope}/*/SKILL.md
+	grandparentDir := path.Dir(parentDir)
+	if path.Base(grandparentDir) == "skills" {
+		hiddenRoot := path.Dir(grandparentDir)
+		if path.Dir(hiddenRoot) == "." && strings.HasPrefix(hiddenRoot, ".") {
+			namespace := path.Base(parentDir)
+			if !validateName(namespace) {
+				return nil
+			}
+			return &skillMatch{entry: entry, name: skillName, namespace: namespace, skillDir: dir, convention: "hidden-dir-namespaced"}
+		}
+	}
+
+	return nil
+}
+
+// DiscoverOptions controls optional discovery behaviors.
+type DiscoverOptions struct {
+}
+
+// DiscoverSkills finds all non-hidden-dir skills in a repository at the given
+// commit SHA. Hidden-dir skills are excluded; use DiscoverSkillsWithOptions to
+// retrieve all skills including those in hidden directories.
 func DiscoverSkills(client *api.Client, host, owner, repo, commitSHA string) ([]Skill, error) {
+	all, err := DiscoverSkillsWithOptions(client, host, owner, repo, commitSHA, DiscoverOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var skills []Skill
+	for _, s := range all {
+		if !s.IsHiddenDirConvention() {
+			skills = append(skills, s)
+		}
+	}
+	if len(skills) == 0 {
+		return nil, fmt.Errorf(
+			"no skills found in %s/%s\n"+
+				"  Expected skills in skills/*/SKILL.md, skills/{scope}/*/SKILL.md,\n"+
+				"  */SKILL.md, or plugins/*/skills/*/SKILL.md\n"+
+				"  This repository may be a curated list rather than a skills publisher",
+			owner, repo,
+		)
+	}
+	return skills, nil
+}
+
+// DiscoverSkillsWithOptions finds all skills in a repository at the given
+// commit SHA, with configurable discovery behavior.
+func DiscoverSkillsWithOptions(client *api.Client, host, owner, repo, commitSHA string, opts DiscoverOptions) ([]Skill, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s?recursive=true", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(commitSHA))
 	var tree treeResponse
 	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
@@ -419,6 +517,9 @@ func DiscoverSkills(client *api.Client, host, owner, repo, commitSHA string) ([]
 			continue
 		}
 		m := matchSkillConventions(entry)
+		if m == nil {
+			m = matchHiddenDirConventions(entry)
+		}
 		if m == nil {
 			continue
 		}
@@ -703,9 +804,35 @@ func FetchBlob(client *api.Client, host, owner, repo, sha string) (string, error
 	return string(decoded), nil
 }
 
-// DiscoverLocalSkills finds skills in a local directory using the same
-// conventions as remote discovery.
+// DiscoverLocalSkills finds non-hidden-dir skills in a local directory using
+// the same conventions as remote discovery. Hidden-dir skills are excluded; use
+// DiscoverLocalSkillsWithOptions to retrieve all skills including those in
+// hidden directories.
 func DiscoverLocalSkills(dir string) ([]Skill, error) {
+	all, err := DiscoverLocalSkillsWithOptions(dir, DiscoverOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var skills []Skill
+	for _, s := range all {
+		if !s.IsHiddenDirConvention() {
+			skills = append(skills, s)
+		}
+	}
+	if len(skills) == 0 {
+		return nil, fmt.Errorf(
+			"no skills found in %s\n"+
+				"  Expected SKILL.md in the directory, or skills in skills/*/SKILL.md,\n"+
+				"  skills/{scope}/*/SKILL.md, */SKILL.md, or plugins/*/skills/*/SKILL.md",
+			dir,
+		)
+	}
+	return skills, nil
+}
+
+// DiscoverLocalSkillsWithOptions finds skills in a local directory using the
+// same conventions as remote discovery, with configurable discovery behavior.
+func DiscoverLocalSkillsWithOptions(dir string, opts DiscoverOptions) ([]Skill, error) {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve path: %w", err)
@@ -751,6 +878,9 @@ func DiscoverLocalSkills(dir string) ([]Skill, error) {
 
 		entry := treeEntry{Path: relPath, Type: "blob"}
 		m := matchSkillConventions(entry)
+		if m == nil {
+			m = matchHiddenDirConventions(entry)
+		}
 		if m == nil {
 			return nil
 		}

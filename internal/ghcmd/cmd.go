@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/build"
+	"github.com/cli/cli/v2/internal/ci"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/config/migration"
 	"github.com/cli/cli/v2/internal/gh"
@@ -69,9 +70,11 @@ func Main() exitCode {
 	ghExecutablePath := executablePath("gh")
 
 	additionalCommonDimensions := ghtelemetry.Dimensions{
-		"version": strings.TrimPrefix(buildVersion, "v"),
-		"is_tty":  strconv.FormatBool(ioStreams.IsStdoutTTY()),
-		"agent":   string(agents.Detect()),
+		"version":        strings.TrimPrefix(buildVersion, "v"),
+		"is_tty":         strconv.FormatBool(ioStreams.IsStdoutTTY()),
+		"agent":          string(agents.Detect()),
+		"ci":             strconv.FormatBool(ci.IsCI()),
+		"github_actions": strconv.FormatBool(ci.IsGitHubActions()),
 	}
 
 	var telemetryService ghtelemetry.Service

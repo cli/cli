@@ -116,6 +116,155 @@ func TestMatchSkillConventions(t *testing.T) {
 	}
 }
 
+func TestMatchHiddenDirConventions(t *testing.T) {
+	tests := []struct {
+		name           string
+		path           string
+		wantNil        bool
+		wantName       string
+		wantNamespace  string
+		wantConvention string
+	}{
+		{
+			name:           "claude skills directory",
+			path:           ".claude/skills/code-review/SKILL.md",
+			wantName:       "code-review",
+			wantConvention: "hidden-dir",
+		},
+		{
+			name:           "agents skills directory",
+			path:           ".agents/skills/git-commit/SKILL.md",
+			wantName:       "git-commit",
+			wantConvention: "hidden-dir",
+		},
+		{
+			name:           "github skills directory",
+			path:           ".github/skills/issue-triage/SKILL.md",
+			wantName:       "issue-triage",
+			wantConvention: "hidden-dir",
+		},
+		{
+			name:           "copilot skills directory",
+			path:           ".copilot/skills/pr-summary/SKILL.md",
+			wantName:       "pr-summary",
+			wantConvention: "hidden-dir",
+		},
+		{
+			name:           "namespaced hidden dir skill",
+			path:           ".claude/skills/monalisa/code-review/SKILL.md",
+			wantName:       "code-review",
+			wantNamespace:  "monalisa",
+			wantConvention: "hidden-dir-namespaced",
+		},
+		{
+			name:    "not a SKILL.md file",
+			path:    ".claude/skills/code-review/README.md",
+			wantNil: true,
+		},
+		{
+			name:    "too shallow - just hidden dir and SKILL.md",
+			path:    ".claude/SKILL.md",
+			wantNil: true,
+		},
+		{
+			name:    "no skills subdirectory",
+			path:    ".claude/code-review/SKILL.md",
+			wantNil: true,
+		},
+		{
+			name:    "non-hidden dir does not match",
+			path:    "visible/skills/code-review/SKILL.md",
+			wantNil: true,
+		},
+		{
+			name:    "non-hidden-namespaced dir does not match",
+			path:    "visible/skills/monalisa/code-review/SKILL.md",
+			wantNil: true,
+		},
+		{
+			name:    "too deeply nested hidden dir",
+			path:    ".claude/nested/skills/code-review/SKILL.md",
+			wantNil: true,
+		},
+		{
+			name:    "invalid skill name",
+			path:    ".claude/skills/../SKILL.md",
+			wantNil: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := matchHiddenDirConventions(treeEntry{Path: tt.path, Type: "blob"})
+			if tt.wantNil {
+				assert.Nil(t, m)
+				return
+			}
+			require.NotNil(t, m)
+			assert.Equal(t, tt.wantName, m.name)
+			assert.Equal(t, tt.wantNamespace, m.namespace)
+			assert.Equal(t, tt.wantConvention, m.convention)
+		})
+	}
+}
+
+func TestHasHiddenDirSkills(t *testing.T) {
+	tests := []struct {
+		name   string
+		skills []Skill
+		want   bool
+	}{
+		{
+			name:   "empty list",
+			skills: nil,
+			want:   false,
+		},
+		{
+			name:   "only standard skills",
+			skills: []Skill{{Convention: "skills"}, {Convention: "root"}},
+			want:   false,
+		},
+		{
+			name:   "has hidden-dir skill",
+			skills: []Skill{{Convention: "skills"}, {Convention: "hidden-dir"}},
+			want:   true,
+		},
+		{
+			name:   "has hidden-dir-namespaced skill",
+			skills: []Skill{{Convention: "hidden-dir-namespaced"}},
+			want:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, HasHiddenDirSkills(tt.skills))
+		})
+	}
+}
+
+func TestDisplayNameHiddenDir(t *testing.T) {
+	tests := []struct {
+		name     string
+		skill    Skill
+		wantName string
+	}{
+		{
+			name:     "hidden-dir skill",
+			skill:    Skill{Name: "code-review", Convention: "hidden-dir"},
+			wantName: "[hidden-dir] code-review",
+		},
+		{
+			name:     "hidden-dir-namespaced skill",
+			skill:    Skill{Name: "code-review", Namespace: "monalisa", Convention: "hidden-dir-namespaced"},
+			wantName: "[hidden-dir] monalisa/code-review",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.wantName, tt.skill.DisplayName())
+		})
+	}
+}
+
 func TestValidateName(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -740,6 +889,82 @@ func TestDiscoverSkills(t *testing.T) {
 	}
 }
 
+func TestDiscoverSkillsWithOptions(t *testing.T) {
+	hiddenDirTree := map[string]interface{}{
+		"sha": "abc123", "truncated": false,
+		"tree": []map[string]interface{}{
+			{"path": ".claude/skills/code-review", "type": "tree", "sha": "tree-sha-1"},
+			{"path": ".claude/skills/code-review/SKILL.md", "type": "blob", "sha": "blob-1"},
+			{"path": ".agents/skills/git-commit", "type": "tree", "sha": "tree-sha-2"},
+			{"path": ".agents/skills/git-commit/SKILL.md", "type": "blob", "sha": "blob-2"},
+			{"path": "README.md", "type": "blob", "sha": "readme"},
+		},
+	}
+
+	mixedTree := map[string]interface{}{
+		"sha": "abc123", "truncated": false,
+		"tree": []map[string]interface{}{
+			{"path": "skills/standard-skill", "type": "tree", "sha": "tree-sha-1"},
+			{"path": "skills/standard-skill/SKILL.md", "type": "blob", "sha": "blob-1"},
+			{"path": ".claude/skills/hidden-skill", "type": "tree", "sha": "tree-sha-2"},
+			{"path": ".claude/skills/hidden-skill/SKILL.md", "type": "blob", "sha": "blob-2"},
+		},
+	}
+
+	emptyTree := map[string]interface{}{
+		"sha": "abc123", "truncated": false,
+		"tree": []map[string]interface{}{
+			{"path": "README.md", "type": "blob", "sha": "readme"},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		tree       map[string]interface{}
+		wantSkills []string
+		wantErr    string
+	}{
+		{
+			name:       "returns hidden-dir skills",
+			tree:       hiddenDirTree,
+			wantSkills: []string{"code-review", "git-commit"},
+		},
+		{
+			name:       "mixed tree returns all skills",
+			tree:       mixedTree,
+			wantSkills: []string{"hidden-skill", "standard-skill"},
+		},
+		{
+			name:    "no skills at all",
+			tree:    emptyTree,
+			wantErr: "no skills found",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(
+				httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/abc123"),
+				httpmock.JSONResponse(tt.tree))
+			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+
+			skills, err := DiscoverSkillsWithOptions(client, "github.com", "monalisa", "octocat-skills", "abc123", DiscoverOptions{})
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			var names []string
+			for _, s := range skills {
+				names = append(names, s.Name)
+			}
+			assert.Equal(t, tt.wantSkills, names)
+		})
+	}
+}
+
 func TestDiscoverSkillByPath(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -969,6 +1194,64 @@ func TestDiscoverLocalSkills(t *testing.T) {
 			tt.setup(t, dir)
 
 			skills, err := DiscoverLocalSkills(dir)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			var names []string
+			for _, s := range skills {
+				names = append(names, s.Name)
+			}
+			assert.ElementsMatch(t, tt.wantSkills, names)
+		})
+	}
+}
+
+func TestDiscoverLocalSkillsWithOptions(t *testing.T) {
+	tests := []struct {
+		name       string
+		setup      func(t *testing.T, dir string)
+		wantSkills []string
+		wantErr    string
+	}{
+		{
+			name: "returns hidden dir skills",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, ".claude", "skills", "code-review")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# code-review"), 0o644))
+			},
+			wantSkills: []string{"code-review"},
+		},
+		{
+			name: "mixed standard and hidden returns all",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				for _, p := range []string{"skills/standard", ".agents/skills/hidden"} {
+					skillDir := filepath.Join(dir, filepath.FromSlash(p))
+					require.NoError(t, os.MkdirAll(skillDir, 0o755))
+					name := filepath.Base(p)
+					require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# "+name), 0o644))
+				}
+			},
+			wantSkills: []string{"standard", "hidden"},
+		},
+		{
+			name:    "no skills at all",
+			setup:   func(t *testing.T, _ string) { t.Helper() },
+			wantErr: "no skills found",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "repo")
+			require.NoError(t, os.MkdirAll(dir, 0o755))
+			tt.setup(t, dir)
+
+			skills, err := DiscoverLocalSkillsWithOptions(dir, DiscoverOptions{})
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
