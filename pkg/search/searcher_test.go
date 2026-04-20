@@ -1256,6 +1256,28 @@ func TestSearcherURL(t *testing.T) {
 			},
 			url: "https://github.com/search?q=%22keyword+with+whitespace%22&type=repositories",
 		},
+		{
+			name: "outputs encoded query url with OR-ed multiple repos for web search",
+			query: Query{
+				Keywords: []string{"HTTPClient"},
+				Kind:     "code",
+				Qualifiers: Qualifiers{
+					Repo: []string{"cli/cli", "cli/go-gh"},
+				},
+			},
+			url: "https://github.com/search?q=HTTPClient+%28repo%3Acli%2Fcli+OR+repo%3Acli%2Fgo-gh%29&type=code",
+		},
+		{
+			name: "outputs encoded query url with single repo unchanged for web search",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Kind:     "code",
+				Qualifiers: Qualifiers{
+					Repo: []string{"cli/cli"},
+				},
+			},
+			url: "https://github.com/search?q=keyword+repo%3Acli%2Fcli&type=code",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

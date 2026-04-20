@@ -127,6 +127,30 @@ func (q Query) StandardSearchString() string {
 	return strings.TrimSpace(strings.Join(all, " "))
 }
 
+// WebSearchString returns the string representation of the query suitable for
+// use in the global search web GUI (i.e. github.com/search). Unlike the
+// standard search string, this format uses explicit OR operators for qualifiers
+// that the web search GUI does not implicitly OR, such as repo and user.
+func (q Query) WebSearchString() string {
+	qualifiers := formatQualifiers(q.Qualifiers, formatWebSearch)
+	var keywords []string
+	if q.ImmutableKeywords != "" {
+		keywords = []string{q.ImmutableKeywords}
+	} else if ks := formatKeywords(q.Keywords); len(ks) > 0 {
+		keywords = ks
+	}
+	all := append(keywords, qualifiers...)
+	return strings.TrimSpace(strings.Join(all, " "))
+}
+
+func formatWebSearch(qualifier string, vs []string) (s []string, applicable bool) {
+	switch qualifier {
+	case "repo", "user":
+		return []string{groupWithOR(qualifier, vs)}, true
+	}
+	return nil, false
+}
+
 // AdvancedIssueSearchString returns the string representation of the query
 // compatible with the advanced issue search syntax. The query can be used in
 // Issues tab (of repositories) and the Issues dashboard (i.e.

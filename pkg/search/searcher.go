@@ -275,7 +275,10 @@ func (s searcher) URL(query Query) string {
 	// search syntax (even for the issues/PRs tab on the sidebar). When the GUI
 	// is updated, we can use feature detection, and, if available, use the
 	// advanced search syntax.
-	qs.Set("q", query.StandardSearchString())
+	//
+	// Unlike the REST API which implicitly ORs certain qualifiers like repo and
+	// user, the web search GUI ANDs them, requiring explicit OR operators.
+	qs.Set("q", query.WebSearchString())
 
 	if query.Order != "" {
 		qs.Set(orderKey, query.Order)

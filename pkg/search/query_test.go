@@ -238,6 +238,98 @@ func TestAdvancedIssueSearchString(t *testing.T) {
 	}
 }
 
+func TestWebSearchString(t *testing.T) {
+	tests := []struct {
+		name  string
+		query Query
+		out   string
+	}{
+		{
+			name: "empty query",
+			out:  "",
+		},
+		{
+			name: "single repo does not use OR",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Qualifiers: Qualifiers{
+					Repo: []string{"cli/cli"},
+				},
+			},
+			out: "keyword repo:cli/cli",
+		},
+		{
+			name: "multiple repos are OR-ed",
+			query: Query{
+				Keywords: []string{"HTTPClient"},
+				Qualifiers: Qualifiers{
+					Repo: []string{"cli/cli", "cli/go-gh"},
+				},
+			},
+			out: "HTTPClient (repo:cli/cli OR repo:cli/go-gh)",
+		},
+		{
+			name: "multiple users are OR-ed",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Qualifiers: Qualifiers{
+					User: []string{"johndoe", "janedoe"},
+				},
+			},
+			out: "keyword (user:janedoe OR user:johndoe)",
+		},
+		{
+			name: "repos and users are both OR-ed",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Qualifiers: Qualifiers{
+					Repo:  []string{"cli/cli", "cli/go-gh"},
+					User:  []string{"alice", "bob"},
+					Label: []string{"bug"},
+				},
+			},
+			out: "keyword label:bug (repo:cli/cli OR repo:cli/go-gh) (user:alice OR user:bob)",
+		},
+		{
+			name: "non-special qualifiers are not OR-ed",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Qualifiers: Qualifiers{
+					Repo:   []string{"cli/cli", "cli/go-gh"},
+					Label:  []string{"bug", "enhancement"},
+					Topic:  []string{"topic1", "topic2"},
+				},
+			},
+			out: "keyword label:bug label:enhancement (repo:cli/cli OR repo:cli/go-gh) topic:topic1 topic:topic2",
+		},
+		{
+			name: "respects immutable keywords with multiple repos",
+			query: Query{
+				ImmutableKeywords: "immutable keyword",
+				Qualifiers: Qualifiers{
+					Repo: []string{"cli/cli", "cli/go-gh"},
+				},
+			},
+			out: "immutable keyword (repo:cli/cli OR repo:cli/go-gh)",
+		},
+		{
+			name: "quotes qualifiers in web search",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Qualifiers: Qualifiers{
+					Repo: []string{"cli/cli", "org/repo with spaces"},
+				},
+			},
+			out: `keyword (repo:"org/repo with spaces" OR repo:cli/cli)`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.out, tt.query.WebSearchString())
+		})
+	}
+}
+
 func TestQualifiersMap(t *testing.T) {
 	tests := []struct {
 		name       string

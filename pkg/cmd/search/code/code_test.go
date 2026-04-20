@@ -361,6 +361,22 @@ func TestCodeRun(t *testing.T) {
 			wantBrowse: "https://github.com/search?q=map+path%3Atesting.cpp&type=code",
 		},
 		{
+			name: "opens browser with OR-ed repos in web mode",
+			opts: &CodeOptions{
+				Query: search.Query{
+					Keywords: []string{"HTTPClient"},
+					Kind:     "code",
+					Limit:    30,
+					Qualifiers: search.Qualifiers{
+						Repo: []string{"cli/cli", "cli/go-gh"},
+					},
+				},
+				Searcher: search.NewSearcher(nil, "github.com", &fd.DisabledDetectorMock{}),
+				WebMode:  true,
+			},
+			wantBrowse: "https://github.com/search?q=HTTPClient+%28repo%3Acli%2Fcli+OR+repo%3Acli%2Fgo-gh%29&type=code",
+		},
+		{
 			name: "does not convert filename and extension qualifiers for GHES web search",
 			opts: &CodeOptions{
 				Config: func() (gh.Config, error) {
