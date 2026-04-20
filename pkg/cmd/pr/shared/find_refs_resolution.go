@@ -21,7 +21,7 @@ import (
 // <owner>:<branch>. The GitHub API is able to interpret this format in order
 // to discover the correct fork repository.
 //
-// In other parts of the code, you may see this refered to as a HeadLabel.
+// In other parts of the code, you may see this referred to as a HeadLabel.
 type QualifiedHeadRef struct {
 	owner      o.Option[string]
 	branchName string
