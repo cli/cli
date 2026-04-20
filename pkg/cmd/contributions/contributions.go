@@ -24,7 +24,6 @@ type ContributionsOptions struct {
 	HttpClient func() (*http.Client, error)
 	HostConfig hostConfig
 	IO         *iostreams.IOStreams
-	Now        func() time.Time
 
 	User     string
 	From     string
@@ -37,7 +36,6 @@ func NewCmdContributions(f *cmdutil.Factory, runF func(*ContributionsOptions) er
 	opts := &ContributionsOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Now:        time.Now,
 	}
 
 	cmd := &cobra.Command{
@@ -139,7 +137,7 @@ func contributionsRun(opts *ContributionsOptions) error {
 // exportable shapes the result for JSON output, flattening days for
 // easier consumption.
 func exportable(r *ContributionsResult) map[string]any {
-	days := make([]ContributionDay, 0)
+	days := make([]ContributionDay, 0, len(r.Calendar.Weeks)*7)
 	for _, w := range r.Calendar.Weeks {
 		days = append(days, w.ContributionDays...)
 	}
@@ -200,7 +198,7 @@ func hexToRGB(h string) (int, int, int) {
 	return r, g, b
 }
 
-const dayLabelWidth = 4
+const dayLabelWidth = 3
 
 func renderCalendar(io *iostreams.IOStreams, r *ContributionsResult) error {
 	cs := io.ColorScheme()

@@ -191,9 +191,10 @@ func TestContributionsRun_RendersCalendar(t *testing.T) {
 	assert.Contains(t, out, "Feb")
 	assert.Contains(t, out, "Less")
 	assert.Contains(t, out, "More")
-	assert.Contains(t, out, "M")
-	assert.Contains(t, out, "W")
-	assert.Contains(t, out, "F")
+	// Day labels are rendered as a left-aligned column of width dayLabelWidth (4),
+	assert.Contains(t, out, "M ")
+	assert.Contains(t, out, "W ")
+	assert.Contains(t, out, "F ")
 }
 
 func TestContributionsRun_JSON(t *testing.T) {
