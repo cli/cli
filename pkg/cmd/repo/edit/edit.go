@@ -235,6 +235,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 func editRun(ctx context.Context, opts *EditOptions) error {
 	repo := opts.Repository
 
+	var changesMade bool
+	var needsUpdate bool
 	if opts.InteractiveMode {
 		detector := opts.Detector
 		if detector == nil {
@@ -281,10 +283,13 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		if err != nil {
 			return err
 		}
-		err = interactiveRepoEdit(opts, fetchedRepo)
+		changesMade, err = interactiveRepoEdit(opts, fetchedRepo)
 		if err != nil {
 			return err
 		}
+		needsUpdate = changesMade
+	} else {
+		needsUpdate = len(opts.AddTopics) > 0 || len(opts.RemoveTopics) > 0 || hasRepoEdits(opts.Edits)
 	}
 
 	if opts.Edits.SecurityAndAnalysis != nil {
@@ -308,7 +313,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 
 	g := errgroup.Group{}
 
-	if body.Len() > 3 {
+	if needsUpdate && body.Len() > 3 {
 		g.Go(func() error {
 			apiClient := api.NewClientFromHTTP(opts.HTTPClient)
 			_, err := api.CreateRepoTransformToV4(apiClient, repo.RepoHost(), "PATCH", apiPath, body)
@@ -348,10 +353,17 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out,
-			"%s Edited repository %s\n",
-			cs.SuccessIcon(),
-			ghrepo.FullName(repo))
+
+		if needsUpdate {
+			fmt.Fprintf(opts.IO.Out,
+				"%s Edited repository %s\n",
+				cs.SuccessIcon(),
+				ghrepo.FullName(repo))
+		} else {
+			fmt.Fprintf(opts.IO.Out,
+				"No changes made to repository %s\n",
+				ghrepo.FullName(repo))
+		}
 	}
 
 	return nil
@@ -387,33 +399,46 @@ func interactiveChoice(p iprompter, r *api.Repository) ([]string, error) {
 	return answers, err
 }
 
-func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
+func interactiveRepoEdit(opts *EditOptions, r *api.Repository) (bool, error) {
 	for _, v := range r.RepositoryTopics.Nodes {
 		opts.topicsCache = append(opts.topicsCache, v.Topic.Name)
 	}
 	p := opts.Prompter
 	choices, err := interactiveChoice(p, r)
 	if err != nil {
-		return err
+		return false, err
 	}
+	if len(choices) == 0 {
+		return false, nil
+	}
+	actualChange := false
 	for _, c := range choices {
 		switch c {
 		case optionDescription:
 			answer, err := p.Input("Description of the repository", r.Description)
 			if err != nil {
-				return err
+				return false, err
 			}
-			opts.Edits.Description = &answer
+			if answer != r.Description {
+				opts.Edits.Description = &answer
+				actualChange = true
+			}
 		case optionHomePageURL:
 			a, err := p.Input("Repository home page URL", r.HomepageURL)
 			if err != nil {
-				return err
+				return false, err
 			}
-			opts.Edits.Homepage = &a
+			if a != r.HomepageURL {
+				opts.Edits.Homepage = &a
+				actualChange = true
+			}
 		case optionTopics:
+			oldTopics := set.NewStringSet()
+			oldTopics.AddValues(opts.topicsCache)
+
 			addTopics, err := p.Input("Add topics?(csv format)", "")
 			if err != nil {
-				return err
+				return false, err
 			}
 			if len(strings.TrimSpace(addTopics)) > 0 {
 				opts.AddTopics = parseTopics(addTopics)
@@ -422,36 +447,56 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			if len(opts.topicsCache) > 0 {
 				selected, err := p.MultiSelect("Remove Topics", nil, opts.topicsCache)
 				if err != nil {
-					return err
+					return false, err
 				}
 				for _, i := range selected {
 					opts.RemoveTopics = append(opts.RemoveTopics, opts.topicsCache[i])
 				}
 			}
+
+			newTopics := set.NewStringSet()
+			newTopics.AddValues(opts.topicsCache)
+			newTopics.AddValues(opts.AddTopics)
+			newTopics.RemoveValues(opts.RemoveTopics)
+			if !oldTopics.Equal(newTopics) {
+				actualChange = true
+			}
 		case optionDefaultBranchName:
 			name, err := p.Input("Default branch name", r.DefaultBranchRef.Name)
 			if err != nil {
-				return err
+				return false, err
 			}
-			opts.Edits.DefaultBranch = &name
+			if name != r.DefaultBranchRef.Name {
+				opts.Edits.DefaultBranch = &name
+				actualChange = true
+			}
 		case optionWikis:
 			c, err := p.Confirm("Enable Wikis?", r.HasWikiEnabled)
 			if err != nil {
-				return err
+				return false, err
 			}
-			opts.Edits.EnableWiki = &c
+			if c != r.HasWikiEnabled {
+				opts.Edits.EnableWiki = &c
+				actualChange = true
+			}
 		case optionIssues:
 			a, err := p.Confirm("Enable Issues?", r.HasIssuesEnabled)
 			if err != nil {
-				return err
+				return false, err
 			}
-			opts.Edits.EnableIssues = &a
+			if a != r.HasIssuesEnabled {
+				opts.Edits.EnableIssues = &a
+				actualChange = true
+			}
 		case optionProjects:
 			a, err := p.Confirm("Enable Projects?", r.HasProjectsEnabled)
 			if err != nil {
-				return err
+				return false, err
 			}
-			opts.Edits.EnableProjects = &a
+			if a != r.HasProjectsEnabled {
+				opts.Edits.EnableProjects = &a
+				actualChange = true
+			}
 		case optionVisibility:
 			cs := opts.IO.ColorScheme()
 			fmt.Fprintf(opts.IO.ErrOut, "%s Danger zone: changing repository visibility can have unexpected consequences; consult https://gh.io/setting-repository-visibility before continuing.\n", cs.WarningIcon())
@@ -459,7 +504,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			visibilityOptions := []string{"public", "private", "internal"}
 			selected, err := p.Select("Visibility", strings.ToLower(r.Visibility), visibilityOptions)
 			if err != nil {
-				return err
+				return false, err
 			}
 			selectedVisibility := visibilityOptions[selected]
 
@@ -469,10 +514,11 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 
 			confirmed, err := p.Confirm(fmt.Sprintf("Do you want to change visibility to %s?", selectedVisibility), false)
 			if err != nil {
-				return err
+				return false, err
 			}
-			if confirmed {
+			if confirmed && selectedVisibility != r.Visibility {
 				opts.Edits.Visibility = &selectedVisibility
+				actualChange = true
 			}
 		case optionMergeOptions:
 			var defaultMergeOptions []string
@@ -492,21 +538,29 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				defaultMergeOptions,
 				mergeOpts)
 			if err != nil {
-				return err
+				return false, err
 			}
 			for _, i := range selected {
 				selectedMergeOptions = append(selectedMergeOptions, mergeOpts[i])
 			}
 			enableMergeCommit := isIncluded(allowMergeCommits, selectedMergeOptions)
-			opts.Edits.EnableMergeCommit = &enableMergeCommit
 			enableSquashMerge := isIncluded(allowSquashMerge, selectedMergeOptions)
-			opts.Edits.EnableSquashMerge = &enableSquashMerge
 			enableRebaseMerge := isIncluded(allowRebaseMerge, selectedMergeOptions)
-			opts.Edits.EnableRebaseMerge = &enableRebaseMerge
 			if !enableMergeCommit && !enableSquashMerge && !enableRebaseMerge {
-				return fmt.Errorf("you need to allow at least one merge strategy")
+				return false, fmt.Errorf("you need to allow at least one merge strategy")
 			}
-
+			if enableMergeCommit != r.MergeCommitAllowed {
+				opts.Edits.EnableMergeCommit = &enableMergeCommit
+				actualChange = true
+			}
+			if enableSquashMerge != r.SquashMergeAllowed {
+				opts.Edits.EnableSquashMerge = &enableSquashMerge
+				actualChange = true
+			}
+			if enableRebaseMerge != r.RebaseMergeAllowed {
+				opts.Edits.EnableRebaseMerge = &enableRebaseMerge
+				actualChange = true
+			}
 			if enableSquashMerge {
 				squashMsgOptions := validSquashMsgValues
 				idx, err := p.Select(
@@ -514,44 +568,53 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 					squashMsgDefault,
 					squashMsgOptions)
 				if err != nil {
-					return err
+					return false, err
 				}
 				selected := squashMsgOptions[idx]
 				opts.Edits.squashMergeCommitMsg = &selected
 				transformSquashMergeOpts(&opts.Edits)
 			}
-
-			opts.Edits.EnableAutoMerge = &r.AutoMergeAllowed
 			c, err := p.Confirm("Enable Auto Merge?", r.AutoMergeAllowed)
 			if err != nil {
-				return err
+				return false, err
 			}
-			opts.Edits.EnableAutoMerge = &c
+			if c != r.AutoMergeAllowed {
+				opts.Edits.EnableAutoMerge = &c
+				actualChange = true
+			}
 
-			opts.Edits.DeleteBranchOnMerge = &r.DeleteBranchOnMerge
 			c, err = p.Confirm(
 				"Automatically delete head branches after merging?", r.DeleteBranchOnMerge)
 			if err != nil {
-				return err
+				return false, err
 			}
-			opts.Edits.DeleteBranchOnMerge = &c
+			if c != r.DeleteBranchOnMerge {
+				opts.Edits.DeleteBranchOnMerge = &c
+				actualChange = true
+			}
 		case optionTemplateRepo:
 			c, err := p.Confirm("Convert into a template repository?", r.IsTemplate)
 			if err != nil {
-				return err
+				return false, err
 			}
-			opts.Edits.IsTemplate = &c
+			if c != r.IsTemplate {
+				opts.Edits.IsTemplate = &c
+				actualChange = true
+			}
 		case optionAllowForking:
 			c, err := p.Confirm(
 				"Allow forking (of an organization repository)?",
 				r.ForkingAllowed)
 			if err != nil {
-				return err
+				return false, err
 			}
-			opts.Edits.AllowForking = &c
+			if c != r.ForkingAllowed {
+				opts.Edits.AllowForking = &c
+				actualChange = true
+			}
 		}
 	}
-	return nil
+	return actualChange, nil
 }
 
 func parseTopics(s string) []string {
@@ -648,6 +711,10 @@ func boolToStatus(status bool) *string {
 
 func hasSecurityEdits(edits EditRepositoryInput) bool {
 	return edits.enableAdvancedSecurity != nil || edits.enableSecretScanning != nil || edits.enableSecretScanningPushProtection != nil
+}
+
+func hasRepoEdits(edits EditRepositoryInput) bool {
+	return edits.AllowForking != nil || edits.AllowUpdateBranch != nil || edits.DefaultBranch != nil || edits.DeleteBranchOnMerge != nil || edits.Description != nil || edits.EnableAutoMerge != nil || edits.EnableIssues != nil || edits.EnableMergeCommit != nil || edits.EnableProjects != nil || edits.EnableDiscussions != nil || edits.EnableRebaseMerge != nil || edits.EnableSquashMerge != nil || edits.EnableWiki != nil || edits.Homepage != nil || edits.IsTemplate != nil || edits.SquashMergeCommitTitle != nil || edits.SquashMergeCommitMessage != nil || edits.Visibility != nil || hasSecurityEdits(edits)
 }
 
 type SecurityAndAnalysisInput struct {
