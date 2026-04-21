@@ -551,221 +551,220 @@ func TestRunClose_JSON(t *testing.T) {
 		stdout.String())
 }
 
-
 func TestRunClose_PromptFiltersOpenProjects(t *testing.T) {
-defer gock.Off()
-// gock.Observe(gock.DumpRequest)
+	defer gock.Off()
+	// gock.Observe(gock.DumpRequest)
 
-gock.New("https://api.github.com").
-Post("/graphql").
-MatchType("json").
-JSON(map[string]interface{}{
-"query": "query ViewerLoginAndOrgs.*",
-"variables": map[string]interface{}{
-"after": nil,
-},
-}).
-Reply(200).
-JSON(map[string]interface{}{
-"data": map[string]interface{}{
-"viewer": map[string]interface{}{
-"id":    "viewer-ID",
-"login": "monalisa",
-"organizations": map[string]interface{}{
-"nodes": []interface{}{},
-},
-},
-},
-})
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query ViewerLoginAndOrgs.*",
+			"variables": map[string]interface{}{
+				"after": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"id":    "viewer-ID",
+					"login": "monalisa",
+					"organizations": map[string]interface{}{
+						"nodes": []interface{}{},
+					},
+				},
+			},
+		})
 
-gock.New("https://api.github.com").
-Post("/graphql").
-MatchType("json").
-JSON(map[string]interface{}{
-"query": "query ViewerProjects.*",
-"variables": map[string]interface{}{
-"after": nil, "afterFields": nil, "afterItems": nil,
-"first": 30, "firstFields": 0, "firstItems": 0,
-},
-}).
-Reply(200).
-JSON(map[string]interface{}{
-"data": map[string]interface{}{
-"viewer": map[string]interface{}{
-"login": "monalisa",
-"projectsV2": map[string]interface{}{
-"totalCount": 2,
-"nodes": []interface{}{
-map[string]interface{}{
-"id": "open-project-ID", "number": 1,
-"title": "Open Project", "closed": false,
-"url": "http://open-url.com",
-},
-map[string]interface{}{
-"id": "closed-project-ID", "number": 2,
-"title": "Closed Project", "closed": true,
-"url": "http://closed-url.com",
-},
-},
-},
-},
-},
-})
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query ViewerProjects.*",
+			"variables": map[string]interface{}{
+				"after": nil, "afterFields": nil, "afterItems": nil,
+				"first": 30, "firstFields": 0, "firstItems": 0,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"totalCount": 2,
+						"nodes": []interface{}{
+							map[string]interface{}{
+								"id": "open-project-ID", "number": 1,
+								"title": "Open Project", "closed": false,
+								"url": "http://open-url.com",
+							},
+							map[string]interface{}{
+								"id": "closed-project-ID", "number": 2,
+								"title": "Closed Project", "closed": true,
+								"url": "http://closed-url.com",
+							},
+						},
+					},
+				},
+			},
+		})
 
-gock.New("https://api.github.com").
-Post("/graphql").
-BodyString(`{"query":"mutation CloseProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"open-project-ID","closed":true}}}`).
-Reply(200).
-JSON(map[string]interface{}{
-"data": map[string]interface{}{
-"updateProjectV2": map[string]interface{}{
-"projectV2": map[string]interface{}{
-"title": "Open Project",
-"url":   "http://open-url.com",
-"owner": map[string]interface{}{
-"__typename": "User",
-"login":      "monalisa",
-},
-},
-},
-},
-})
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation CloseProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"open-project-ID","closed":true}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"updateProjectV2": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"title": "Open Project",
+						"url":   "http://open-url.com",
+						"owner": map[string]interface{}{
+							"__typename": "User",
+							"login":      "monalisa",
+						},
+					},
+				},
+			},
+		})
 
-pm := &prompter.PrompterMock{}
-pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
-switch prompt {
-case "Which owner would you like to use?":
-return prompter.IndexFor(opts, "monalisa")
-case "Which project would you like to use?":
-// Only open projects should appear when closing
-assert.NotContains(t, opts, "Closed Project (#2)")
-return prompter.IndexFor(opts, "Open Project (#1)")
-default:
-return -1, prompter.NoSuchPromptErr(prompt)
-}
-}
+	pm := &prompter.PrompterMock{}
+	pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+		switch prompt {
+		case "Which owner would you like to use?":
+			return prompter.IndexFor(opts, "monalisa")
+		case "Which project would you like to use?":
+			// Only open projects should appear when closing
+			assert.NotContains(t, opts, "Closed Project (#2)")
+			return prompter.IndexFor(opts, "Open Project (#1)")
+		default:
+			return -1, prompter.NoSuchPromptErr(prompt)
+		}
+	}
 
-client := queries.NewTestClient(queries.WithPrompter(pm))
-ios, _, stdout, _ := iostreams.Test()
-ios.SetStdoutTTY(true)
-ios.SetStdinTTY(true)
+	client := queries.NewTestClient(queries.WithPrompter(pm))
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStdinTTY(true)
 
-config := closeConfig{
-io:     ios,
-opts:   closeOpts{},
-client: client,
-}
+	config := closeConfig{
+		io:     ios,
+		opts:   closeOpts{},
+		client: client,
+	}
 
-err := runClose(config)
-assert.NoError(t, err)
-assert.Equal(t, "http://open-url.com\n", stdout.String())
+	err := runClose(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "http://open-url.com\n", stdout.String())
 }
 
 func TestRunClose_PromptFiltersClosedProjectsOnUndo(t *testing.T) {
-defer gock.Off()
-// gock.Observe(gock.DumpRequest)
+	defer gock.Off()
+	// gock.Observe(gock.DumpRequest)
 
-gock.New("https://api.github.com").
-Post("/graphql").
-MatchType("json").
-JSON(map[string]interface{}{
-"query": "query ViewerLoginAndOrgs.*",
-"variables": map[string]interface{}{
-"after": nil,
-},
-}).
-Reply(200).
-JSON(map[string]interface{}{
-"data": map[string]interface{}{
-"viewer": map[string]interface{}{
-"id":    "viewer-ID",
-"login": "monalisa",
-"organizations": map[string]interface{}{
-"nodes": []interface{}{},
-},
-},
-},
-})
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query ViewerLoginAndOrgs.*",
+			"variables": map[string]interface{}{
+				"after": nil,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"id":    "viewer-ID",
+					"login": "monalisa",
+					"organizations": map[string]interface{}{
+						"nodes": []interface{}{},
+					},
+				},
+			},
+		})
 
-gock.New("https://api.github.com").
-Post("/graphql").
-MatchType("json").
-JSON(map[string]interface{}{
-"query": "query ViewerProjects.*",
-"variables": map[string]interface{}{
-"after": nil, "afterFields": nil, "afterItems": nil,
-"first": 30, "firstFields": 0, "firstItems": 0,
-},
-}).
-Reply(200).
-JSON(map[string]interface{}{
-"data": map[string]interface{}{
-"viewer": map[string]interface{}{
-"login": "monalisa",
-"projectsV2": map[string]interface{}{
-"totalCount": 2,
-"nodes": []interface{}{
-map[string]interface{}{
-"id": "open-project-ID", "number": 1,
-"title": "Open Project", "closed": false,
-"url": "http://open-url.com",
-},
-map[string]interface{}{
-"id": "closed-project-ID", "number": 2,
-"title": "Closed Project", "closed": true,
-"url": "http://closed-url.com",
-},
-},
-},
-},
-},
-})
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"query": "query ViewerProjects.*",
+			"variables": map[string]interface{}{
+				"after": nil, "afterFields": nil, "afterItems": nil,
+				"first": 30, "firstFields": 0, "firstItems": 0,
+			},
+		}).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"viewer": map[string]interface{}{
+					"login": "monalisa",
+					"projectsV2": map[string]interface{}{
+						"totalCount": 2,
+						"nodes": []interface{}{
+							map[string]interface{}{
+								"id": "open-project-ID", "number": 1,
+								"title": "Open Project", "closed": false,
+								"url": "http://open-url.com",
+							},
+							map[string]interface{}{
+								"id": "closed-project-ID", "number": 2,
+								"title": "Closed Project", "closed": true,
+								"url": "http://closed-url.com",
+							},
+						},
+					},
+				},
+			},
+		})
 
-gock.New("https://api.github.com").
-Post("/graphql").
-BodyString(`{"query":"mutation CloseProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"closed-project-ID","closed":false}}}`).
-Reply(200).
-JSON(map[string]interface{}{
-"data": map[string]interface{}{
-"updateProjectV2": map[string]interface{}{
-"projectV2": map[string]interface{}{
-"title": "Closed Project",
-"url":   "http://closed-url.com",
-"owner": map[string]interface{}{
-"__typename": "User",
-"login":      "monalisa",
-},
-},
-},
-},
-})
+	gock.New("https://api.github.com").
+		Post("/graphql").
+		BodyString(`{"query":"mutation CloseProjectV2.*"variables":{"afterFields":null,"afterItems":null,"firstFields":0,"firstItems":0,"input":{"projectId":"closed-project-ID","closed":false}}}`).
+		Reply(200).
+		JSON(map[string]interface{}{
+			"data": map[string]interface{}{
+				"updateProjectV2": map[string]interface{}{
+					"projectV2": map[string]interface{}{
+						"title": "Closed Project",
+						"url":   "http://closed-url.com",
+						"owner": map[string]interface{}{
+							"__typename": "User",
+							"login":      "monalisa",
+						},
+					},
+				},
+			},
+		})
 
-pm := &prompter.PrompterMock{}
-pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
-switch prompt {
-case "Which owner would you like to use?":
-return prompter.IndexFor(opts, "monalisa")
-case "Which project would you like to use?":
-// Only closed projects should appear when reopening
-assert.NotContains(t, opts, "Open Project (#1)")
-return prompter.IndexFor(opts, "Closed Project (#2)")
-default:
-return -1, prompter.NoSuchPromptErr(prompt)
-}
-}
+	pm := &prompter.PrompterMock{}
+	pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+		switch prompt {
+		case "Which owner would you like to use?":
+			return prompter.IndexFor(opts, "monalisa")
+		case "Which project would you like to use?":
+			// Only closed projects should appear when reopening
+			assert.NotContains(t, opts, "Open Project (#1)")
+			return prompter.IndexFor(opts, "Closed Project (#2)")
+		default:
+			return -1, prompter.NoSuchPromptErr(prompt)
+		}
+	}
 
-client := queries.NewTestClient(queries.WithPrompter(pm))
-ios, _, stdout, _ := iostreams.Test()
-ios.SetStdoutTTY(true)
-ios.SetStdinTTY(true)
+	client := queries.NewTestClient(queries.WithPrompter(pm))
+	ios, _, stdout, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStdinTTY(true)
 
-config := closeConfig{
-io:     ios,
-opts:   closeOpts{reopen: true},
-client: client,
-}
+	config := closeConfig{
+		io:     ios,
+		opts:   closeOpts{reopen: true},
+		client: client,
+	}
 
-err := runClose(config)
-assert.NoError(t, err)
-assert.Equal(t, "http://closed-url.com\n", stdout.String())
+	err := runClose(config)
+	assert.NoError(t, err)
+	assert.Equal(t, "http://closed-url.com\n", stdout.String())
 }
