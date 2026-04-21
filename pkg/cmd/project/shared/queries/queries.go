@@ -1539,6 +1539,9 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool,
 	}
 
 	if len(filtered) == 0 {
+		if len(projects.Nodes) > 0 {
+			return nil, fmt.Errorf("no matching projects found for %s", o.Login)
+		}
 		return nil, fmt.Errorf("no projects found for %s", o.Login)
 	}
 
