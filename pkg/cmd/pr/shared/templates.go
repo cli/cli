@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -225,7 +226,41 @@ func (m *templateManager) Select(name string) (Template, error) {
 		}
 	}
 
+	if !m.isPR {
+		if t := m.selectIssueTemplateByFilename(name); t != nil {
+			return t, nil
+		}
+	}
+
 	return nil, fmt.Errorf("template %q not found", name)
+}
+
+func (m *templateManager) selectIssueTemplateByFilename(name string) Template {
+	if !m.allowFS {
+		return nil
+	}
+
+	dir := m.rootDir
+	if dir == "" {
+		gitClient := &git.Client{}
+		var err error
+		dir, err = gitClient.ToplevelDir(context.Background())
+		if err != nil {
+			return nil
+		}
+	}
+
+	for _, templatePath := range githubtemplate.FindNonLegacy(dir, "ISSUE_TEMPLATE") {
+		if path.Base(templatePath) == name {
+			return &filesystemIssueTemplate{filesystemTemplate{path: templatePath}}
+		}
+	}
+
+	if legacyTemplate := githubtemplate.FindLegacy(dir, "ISSUE_TEMPLATE"); legacyTemplate != "" && path.Base(legacyTemplate) == name {
+		return &filesystemIssueTemplate{filesystemTemplate{path: legacyTemplate}}
+	}
+
+	return nil
 }
 
 func (m *templateManager) memoizedFetch() error {
@@ -294,12 +329,20 @@ type filesystemTemplate struct {
 	path string
 }
 
+type filesystemIssueTemplate struct {
+	filesystemTemplate
+}
+
 func (t *filesystemTemplate) Name() string {
 	return githubtemplate.ExtractName(t.path)
 }
 
 func (t *filesystemTemplate) NameForSubmit() string {
 	return ""
+}
+
+func (t *filesystemIssueTemplate) NameForSubmit() string {
+	return t.Name()
 }
 
 func (t *filesystemTemplate) Body() []byte {

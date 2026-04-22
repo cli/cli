@@ -223,3 +223,44 @@ func TestTemplateManagerSelect(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplateManagerSelect_IssueTemplateByFilenameFallback(t *testing.T) {
+	rootDir := t.TempDir()
+	templateFile := filepath.Join(rootDir, ".github", "ISSUE_TEMPLATE", "task.md")
+	_ = os.MkdirAll(filepath.Dir(templateFile), 0755)
+	_ = os.WriteFile(templateFile, []byte(`---
+name: Task
+title: 'task: '
+---
+
+Describe the task
+`), 0644)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.GraphQL(`query IssueTemplates\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "issueTemplates": [
+			{ "name": "Task", "body": "Describe the task", "title": "task: " }
+		] } } }`),
+	)
+
+	m := templateManager{
+		repo:       ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
+		rootDir:    rootDir,
+		allowFS:    true,
+		isPR:       false,
+		httpClient: &http.Client{Transport: reg},
+		detector:   &fd.EnabledDetectorMock{},
+	}
+
+	tmpl, err := m.Select("task.md")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Task", tmpl.Name())
+	assert.Equal(t, "Task", tmpl.NameForSubmit())
+	assert.Equal(t, "task: ", tmpl.Title())
+	assert.Equal(t, "Describe the task\n", string(tmpl.Body()))
+}
