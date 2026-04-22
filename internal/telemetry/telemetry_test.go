@@ -351,6 +351,23 @@ func TestNewServiceLogModeWithColorLogsToWriter(t *testing.T) {
 	assert.Contains(t, output, "\033[", "expected ANSI escape sequences when color is enabled")
 }
 
+func TestLogFlusherWritesNoneMarkerForEmptyPayload(t *testing.T) {
+	t.Run("no color", func(t *testing.T) {
+		var buf bytes.Buffer
+		LogFlusher(&buf, false)(SendTelemetryPayload{})
+		assert.Equal(t, "Telemetry payload: none\n", buf.String())
+	})
+
+	t.Run("with color", func(t *testing.T) {
+		var buf bytes.Buffer
+		LogFlusher(&buf, true)(SendTelemetryPayload{})
+		output := buf.String()
+		assert.Contains(t, output, "Telemetry payload:")
+		assert.Contains(t, output, "none")
+		assert.Contains(t, output, "\x1b") // ANSI escape char for color codes
+	})
+}
+
 func TestServiceDeviceIDFallback(t *testing.T) {
 	t.Cleanup(stubDeviceIDError(errors.New("no device id")))
 
@@ -365,14 +382,19 @@ func TestServiceDeviceIDFallback(t *testing.T) {
 }
 
 func TestServiceFlush(t *testing.T) {
-	t.Run("does nothing when no events recorded", func(t *testing.T) {
+	t.Run("calls flusher with empty payload when no events recorded", func(t *testing.T) {
 		t.Cleanup(stubDeviceID("test-device"))
 
+		var captured SendTelemetryPayload
 		called := false
-		svc := newService(func(SendTelemetryPayload) { called = true }, nil)
+		svc := newService(func(p SendTelemetryPayload) {
+			called = true
+			captured = p
+		}, nil)
 		svc.Flush()
 
-		assert.False(t, called, "flusher should not be called with no events")
+		assert.True(t, called, "flusher should be called even with no events so log mode can surface the absence")
+		assert.Empty(t, captured.Events, "payload should have no events")
 	})
 
 	t.Run("flushes events with merged dimensions", func(t *testing.T) {
@@ -599,24 +621,33 @@ func TestWithAdditionalCommonDimensions(t *testing.T) {
 }
 
 func TestServiceDisable(t *testing.T) {
-	t.Run("prevents flush from sending events", func(t *testing.T) {
+	t.Run("drops recorded events from flushed payload", func(t *testing.T) {
 		t.Cleanup(stubDeviceID("test-device"))
 
+		var captured SendTelemetryPayload
 		called := false
-		svc := newService(func(SendTelemetryPayload) { called = true }, nil)
+		svc := newService(func(p SendTelemetryPayload) {
+			called = true
+			captured = p
+		}, nil)
 
 		svc.Record(ghtelemetry.Event{Type: "test"})
 		svc.Disable()
 		svc.Flush()
 
-		assert.False(t, called, "flusher should not be called after Disable()")
+		assert.True(t, called, "flusher should still be called so log mode can surface the absence of events")
+		assert.Empty(t, captured.Events, "recorded events should be dropped after Disable()")
 	})
 
-	t.Run("prevents flush even with multiple recorded events", func(t *testing.T) {
+	t.Run("drops events even with multiple recorded events", func(t *testing.T) {
 		t.Cleanup(stubDeviceID("test-device"))
 
+		var captured SendTelemetryPayload
 		called := false
-		svc := newService(func(SendTelemetryPayload) { called = true }, nil)
+		svc := newService(func(p SendTelemetryPayload) {
+			called = true
+			captured = p
+		}, nil)
 
 		svc.Record(ghtelemetry.Event{Type: "event1"})
 		svc.Record(ghtelemetry.Event{Type: "event2"})
@@ -624,20 +655,26 @@ func TestServiceDisable(t *testing.T) {
 		svc.Disable()
 		svc.Flush()
 
-		assert.False(t, called, "flusher should not be called after Disable()")
+		assert.True(t, called, "flusher should still be called")
+		assert.Empty(t, captured.Events, "recorded events should be dropped after Disable()")
 	})
 
 	t.Run("can be called before any events are recorded", func(t *testing.T) {
 		t.Cleanup(stubDeviceID("test-device"))
 
+		var captured SendTelemetryPayload
 		called := false
-		svc := newService(func(SendTelemetryPayload) { called = true }, nil)
+		svc := newService(func(p SendTelemetryPayload) {
+			called = true
+			captured = p
+		}, nil)
 
 		svc.Disable()
 		svc.Record(ghtelemetry.Event{Type: "test"})
 		svc.Flush()
 
-		assert.False(t, called, "flusher should not be called when disabled before recording")
+		assert.True(t, called, "flusher should still be called")
+		assert.Empty(t, captured.Events, "events recorded after Disable() should be dropped")
 	})
 }
 

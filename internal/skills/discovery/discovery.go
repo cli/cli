@@ -405,6 +405,24 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 		return &skillMatch{entry: entry, name: skillName, namespace: namespace, skillDir: dir, convention: "plugins"}
 	}
 
+	// Deeply nested skills/ directory: <prefix>/skills/<name>/SKILL.md
+	// Matches skills/ at any depth, not just at the repository root.
+	// Exclude paths with dot-prefixed segments (handled by
+	// matchHiddenDirConventions) and paths under a plugins/ directory
+	// (handled by the plugins convention above).
+	if path.Base(parentDir) == "skills" && !hasHiddenSegment(entry.Path) && !hasPluginsAncestor(entry.Path) {
+		return &skillMatch{entry: entry, name: skillName, skillDir: dir, convention: "skills"}
+	}
+
+	// Deeply nested namespaced: <prefix>/skills/<namespace>/<name>/SKILL.md
+	if path.Base(grandparentDir) == "skills" && !hasHiddenSegment(entry.Path) && !hasPluginsAncestor(entry.Path) {
+		namespace := path.Base(parentDir)
+		if !validateName(namespace) {
+			return nil
+		}
+		return &skillMatch{entry: entry, name: skillName, namespace: namespace, skillDir: dir, convention: "skills-namespaced"}
+	}
+
 	if parentDir == "." && skillName != "skills" && skillName != "plugins" && !strings.HasPrefix(skillName, ".") {
 		return &skillMatch{entry: entry, name: skillName, skillDir: dir, convention: "root"}
 	}
@@ -534,6 +552,7 @@ func DiscoverSkillsWithOptions(client *api.Client, host, owner, repo, commitSHA 
 		return nil, fmt.Errorf(
 			"no skills found in %s/%s\n"+
 				"  Expected skills in skills/*/SKILL.md, skills/{scope}/*/SKILL.md,\n"+
+				"  {prefix}/skills/*/SKILL.md, {prefix}/skills/{scope}/*/SKILL.md,\n"+
 				"  */SKILL.md, or plugins/*/skills/*/SKILL.md\n"+
 				"  This repository may be a curated list rather than a skills publisher",
 			owner, repo,
@@ -667,18 +686,35 @@ func DiscoverSkillByPath(client *api.Client, host, owner, repo, commitSHA, skill
 		return nil, fmt.Errorf("no SKILL.md found in %s", skillPath)
 	}
 
-	var namespace string
+	var namespace, convention string
 	parts := strings.Split(skillPath, "/")
-	if len(parts) >= 3 && parts[0] == "skills" {
-		namespace = parts[1]
+	for i, p := range parts {
+		if p != "skills" {
+			continue
+		}
+
+		// Plugin convention: .../plugins/<ns>/skills/<name>
+		if i >= 2 && parts[i-2] == "plugins" {
+			namespace = parts[i-1]
+			convention = "plugins"
+			break
+		}
+
+		// Namespaced skill convention: .../skills/<ns>/<name>
+		afterSkills := parts[i+1:]
+		if len(afterSkills) >= 2 {
+			namespace = afterSkills[0]
+		}
+		break
 	}
 
 	skill := &Skill{
-		Name:      skillName,
-		Namespace: namespace,
-		Path:      skillPath,
-		BlobSHA:   blobSHA,
-		TreeSHA:   treeSHA,
+		Name:       skillName,
+		Namespace:  namespace,
+		Convention: convention,
+		Path:       skillPath,
+		BlobSHA:    blobSHA,
+		TreeSHA:    treeSHA,
 	}
 
 	skill.Description = fetchDescription(client, host, owner, repo, skill)
@@ -907,7 +943,9 @@ func DiscoverLocalSkillsWithOptions(dir string, opts DiscoverOptions) ([]Skill, 
 		return nil, fmt.Errorf(
 			"no skills found in %s\n"+
 				"  Expected SKILL.md in the directory, or skills in skills/*/SKILL.md,\n"+
-				"  skills/{scope}/*/SKILL.md, */SKILL.md, or plugins/*/skills/*/SKILL.md",
+				"  skills/{scope}/*/SKILL.md, {prefix}/skills/*/SKILL.md,\n"+
+				"  {prefix}/skills/{scope}/*/SKILL.md, */SKILL.md, or\n"+
+				"  plugins/*/skills/*/SKILL.md",
 			dir,
 		)
 	}
@@ -953,6 +991,26 @@ func validateName(name string) bool {
 		return false
 	}
 	return safeNamePattern.MatchString(name)
+}
+
+// hasHiddenSegment reports whether any path component starts with a dot.
+func hasHiddenSegment(p string) bool {
+	for _, seg := range strings.Split(p, "/") {
+		if strings.HasPrefix(seg, ".") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasPluginsAncestor reports whether any path component is "plugins".
+func hasPluginsAncestor(p string) bool {
+	for _, seg := range strings.Split(p, "/") {
+		if seg == "plugins" {
+			return true
+		}
+	}
+	return false
 }
 
 // IsSpecCompliant checks if a skill name matches the strict agentskills.io spec.

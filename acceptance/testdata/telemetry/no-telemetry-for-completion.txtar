@@ -4,4 +4,4 @@ env GH_TELEMETRY=log
 env GH_TELEMETRY_SAMPLE_RATE=100
 
 exec gh completion -s bash
-! stderr 'Telemetry payload:'
+stderr 'Telemetry payload: none'

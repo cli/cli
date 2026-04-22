@@ -82,19 +82,31 @@ func Main() exitCode {
 	case cfgErr != nil:
 		// Without a valid on-disk config we can't honour user telemetry preferences, so disable it to be safe.
 		telemetryService = &telemetry.NoOpService{}
-	case os.Getenv("GH_PRIVATE_ENABLE_TELEMETRY") == "" || mightBeGHESUser(cfg):
-		telemetryService = &telemetry.NoOpService{}
 	default:
 		telemetryState := telemetry.ParseTelemetryState(cfg.Telemetry().Value)
+		telemetryDisabled := os.Getenv("GH_PRIVATE_ENABLE_TELEMETRY") == "" || mightBeGHESUser(cfg)
+
 		switch telemetryState {
 		case telemetry.Disabled:
 			telemetryService = &telemetry.NoOpService{}
 		case telemetry.Logged:
+			// Always construct the real service in log mode so that the log
+			// flusher runs and surfaces an explicit "Telemetry payload: none"
+			// marker when no events will be sent. This gives the user an
+			// observable signal that telemetry is wired up even when their
+			// context (e.g. GHES) causes events to be dropped.
 			telemetryService = telemetry.NewService(
 				telemetry.LogFlusher(ioStreams.ErrOut, ioStreams.ColorEnabled()),
 				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
 			)
+			if telemetryDisabled {
+				telemetryService.Disable()
+			}
 		case telemetry.Enabled:
+			if telemetryDisabled {
+				telemetryService = &telemetry.NoOpService{}
+				break
+			}
 			sampleRate := 1
 			if v, err := strconv.Atoi(os.Getenv("GH_TELEMETRY_SAMPLE_RATE")); err == nil && v >= 0 && v <= 100 {
 				sampleRate = v

@@ -207,6 +207,51 @@ func TestPreviewRun(t *testing.T) {
 			wantStdout: "My Skill",
 		},
 		{
+			name: "preview plugins skill matched by install name",
+			tty:  true,
+			opts: &PreviewOptions{
+				repo:      ghrepo.New("owner", "repo"),
+				SkillName: "aws-common/aws-mcp-setup",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/git/trees/abc123"),
+					httpmock.StringResponse(`{
+						"sha": "abc123",
+						"truncated": false,
+						"tree": [
+							{"path": "plugins", "type": "tree", "sha": "tree-plugins"},
+							{"path": "plugins/aws-common", "type": "tree", "sha": "tree-awscommon"},
+							{"path": "plugins/aws-common/skills", "type": "tree", "sha": "tree-awsskills"},
+							{"path": "plugins/aws-common/skills/aws-mcp-setup", "type": "tree", "sha": "treeSHA3"},
+							{"path": "plugins/aws-common/skills/aws-mcp-setup/SKILL.md", "type": "blob", "sha": "blob789"}
+						]
+					}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/git/trees/treeSHA3"),
+					httpmock.StringResponse(`{
+						"tree": [
+							{"path": "SKILL.md", "type": "blob", "sha": "blob789", "size": 50}
+						]
+					}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/git/blobs/blob789"),
+					httpmock.StringResponse(`{"sha": "blob789", "content": "`+encodedContent+`", "encoding": "base64"}`),
+				)
+			},
+			wantStdout: "My Skill",
+		},
+		{
 			name: "skill not found",
 			tty:  true,
 			opts: &PreviewOptions{

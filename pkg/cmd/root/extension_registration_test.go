@@ -57,6 +57,9 @@ func TestNewCmdRoot_ExtensionRegistration(t *testing.T) {
 					NameFunc: func() string {
 						return extName
 					},
+					OwnerFunc: func() string {
+						return ""
+					},
 				})
 			}
 

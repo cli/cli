@@ -79,7 +79,14 @@ func NewCmdExtension(io *iostreams.IOStreams, em extensions.ExtensionManager, ex
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
-	cmdutil.DisableTelemetry(cmd)
+	// Extensions are user-installed and their names can be arbitrary
+	// (potentially including sensitive identifiers such as project or
+	// organization names), so we must not record telemetry for them by
+	// default. Official GitHub-owned extensions are a known, fixed set and
+	// can safely contribute their command name to telemetry.
+	if !extensions.IsOfficial(ext.Name(), ext.Owner()) {
+		cmdutil.DisableTelemetry(cmd)
+	}
 
 	return cmd
 }

@@ -1,4 +1,6 @@
-# Extensions should not generate telemetry events
+# Third-party extensions must not generate telemetry events, since the
+# extension command name can be a user-authored identifier (e.g. an
+# organization or project name).
 [!exec:bash] skip
 
 env GH_PRIVATE_ENABLE_TELEMETRY=1
@@ -20,7 +22,7 @@ cd $WORK
 # Run the extension and verify no telemetry is logged
 exec gh hello
 stdout 'hello from extension'
-! stderr 'Telemetry payload:'
+stderr 'Telemetry payload: none'
 
 -- gh-hello.sh --
 #!/usr/bin/env bash

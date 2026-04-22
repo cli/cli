@@ -3,6 +3,7 @@ package telemetry
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -166,17 +167,24 @@ func WithSampleRate(rate int) telemetryServiceOption {
 }
 
 // LogFlusher returns a flush function that writes telemetry payloads to the provided log writer. This is used for the "log" telemetry mode, which is intended for debugging and development.
+// When there are no events to report (for example the command opted out of telemetry, the user is on GHES, or no events were recorded), a "Telemetry payload: none" marker is written so that the absence of events is observable.
 var LogFlusher = func(log io.Writer, colorEnabled bool) func(payload SendTelemetryPayload) {
 	return func(payload SendTelemetryPayload) {
+		header := "Telemetry payload:"
+		if colorEnabled {
+			header = ansi.Color(header, "cyan+b")
+		}
+
+		if len(payload.Events) == 0 {
+			fmt.Fprintf(log, "%s none\n", header)
+			return
+		}
+
 		payloadBytes, err := json.Marshal(payload)
 		if err != nil {
 			return
 		}
 
-		header := "Telemetry payload:"
-		if colorEnabled {
-			header = ansi.Color(header, "cyan+b")
-		}
 		fmt.Fprintf(log, "%s\n", header)
 
 		if colorEnabled {
@@ -190,8 +198,12 @@ var LogFlusher = func(log io.Writer, colorEnabled bool) func(payload SendTelemet
 }
 
 // GitHubFlusher returns a flush function that sends telemetry payloads to a child `gh send-telemetry` process. This is used for the "enabled" telemetry mode.
+// Empty payloads are dropped without spawning a subprocess.
 var GitHubFlusher = func(executable string) func(payload SendTelemetryPayload) {
 	return func(payload SendTelemetryPayload) {
+		if len(payload.Events) == 0 {
+			return
+		}
 		SpawnSendTelemetry(executable, payload)
 	}
 }
@@ -221,7 +233,7 @@ func NewService(flusher func(SendTelemetryPayload), opts ...telemetryServiceOpti
 	maps.Copy(commonDimensions, telemetryServiceOpts.additionalDimensions)
 
 	hash := uuid.NewSHA1(uuid.Nil, []byte(invocationID))
-	sampleBucket := hash[0] % 100
+	sampleBucket := byte(binary.BigEndian.Uint32(hash[:4]) % 100)
 
 	s := &service{
 		flush:            flusher,
@@ -278,28 +290,29 @@ func (s *service) Flush() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.disabled {
-		return
-	}
-
 	if s.previouslyCalled {
 		return
 	}
 	s.previouslyCalled = true
 
-	if len(s.events) == 0 {
-		return
-	}
-
 	if s.sampleRate > 0 && s.sampleRate < 100 && int(s.sampleBucket) >= s.sampleRate {
 		return
 	}
 
-	payload := SendTelemetryPayload{
-		Events: make([]PayloadEvent, len(s.events)),
+	// When the service has been disabled mid-invocation (e.g. an enterprise host
+	// was contacted), discard any recorded events. We still call the flusher
+	// with an empty payload so that the log-mode flusher can surface the
+	// absence of telemetry rather than leaving the user staring at silence.
+	events := s.events
+	if s.disabled {
+		events = nil
 	}
 
-	for i, recorded := range s.events {
+	payload := SendTelemetryPayload{
+		Events: make([]PayloadEvent, len(events)),
+	}
+
+	for i, recorded := range events {
 		dimensions := map[string]string{
 			"timestamp": recorded.recordedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
 		}

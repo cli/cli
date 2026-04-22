@@ -1,6 +1,7 @@
 package install
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -57,6 +58,7 @@ type InstallOptions struct {
 	Force           bool
 	FromLocal       bool // treat SkillSource as a local directory path
 	AllowHiddenDirs bool // include skills in dot-prefixed directories
+	Upstream        bool // install from upstream when re-published skill detected
 
 	repo      ghrepo.Interface // set when SkillSource is a GitHub repository
 	localPath string           // set when FromLocal is true
@@ -107,7 +109,9 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			tracking metadata injected into frontmatter.
 
 			Skills are discovered automatically using the %[1]sskills/*/SKILL.md%[1]s convention
-			defined by the Agent Skills specification. For more information on the specification, 
+			defined by the Agent Skills specification, including when the %[1]sskills/%[1]s
+			directory is nested under a prefix (e.g. %[1]sterraform/code-generation/skills/...%[1]s).
+			For more information on the specification,
 			see: https://agentskills.io/specification
 
 			The skill argument can be a name, a namespaced name (%[1]sauthor/skill%[1]s),
@@ -191,6 +195,10 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive("--from-local and --upstream cannot be used together", opts.FromLocal, opts.Upstream); err != nil {
+				return err
+			}
+
 			if opts.Pin != "" && opts.SkillName != "" && strings.Contains(opts.SkillName, "@") {
 				return cmdutil.FlagErrorf("cannot use --pin with an inline @version in the skill name")
 			}
@@ -210,6 +218,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing skills without prompting")
 	cmd.Flags().BoolVar(&opts.FromLocal, "from-local", false, "Treat the argument as a local directory path instead of a repository")
 	cmd.Flags().BoolVar(&opts.AllowHiddenDirs, "allow-hidden-dirs", false, "Include skills in hidden directories (e.g. .claude/skills/, .agents/skills/)")
+	cmd.Flags().BoolVar(&opts.Upstream, "upstream", false, "Install from the upstream source when a re-published skill is detected")
 	cmdutil.DisableAuthCheckFlag(cmd.Flags().Lookup("from-local"))
 
 	return cmd
@@ -246,13 +255,17 @@ func installRun(opts *InstallOptions) error {
 	// Kick off the visibility fetch in parallel with the install work so
 	// the extra API roundtrip doesn't add latency on the critical path.
 	// The result is consumed when the telemetry event is emitted below.
+	// Capture repo fields now to avoid a data race if opts.repo is
+	// swapped during an upstream redirect.
 	type visResult struct {
 		vis discovery.RepoVisibility
 		err error
 	}
 	visCh := make(chan visResult, 1)
+	visOwner := opts.repo.RepoOwner()
+	visRepo := opts.repo.RepoName()
 	go func() {
-		vis, err := discovery.FetchRepoVisibility(apiClient, hostname, opts.repo.RepoOwner(), opts.repo.RepoName())
+		vis, err := discovery.FetchRepoVisibility(apiClient, hostname, visOwner, visRepo)
 		visCh <- visResult{vis: vis, err: err}
 	}()
 
@@ -288,6 +301,43 @@ func installRun(opts *InstallOptions) error {
 		})
 		if err != nil {
 			return err
+		}
+	}
+
+	// Track upstream provenance detection result for telemetry.
+	upstreamSource := "none"
+
+	// Check if the selected skill was re-published from an upstream source.
+	// The re-publisher's SKILL.md will have github-repo metadata pointing
+	// to the original source repo. If detected, offer to install directly
+	// from upstream instead.
+	if len(selectedSkills) == 1 && selectedSkills[0].BlobSHA != "" {
+		upstreamRepo, detected, err := checkUpstreamProvenance(opts, apiClient, hostname, selectedSkills[0], resolved.SHA)
+		if err != nil {
+			return err
+		}
+		if upstreamRepo != nil {
+			redirectDims := map[string]string{}
+			select {
+			case r := <-visCh:
+				if r.err == nil && r.vis == discovery.RepoVisibilityPublic {
+					redirectDims["from_owner"] = visOwner
+					redirectDims["from_repo"] = visRepo
+				}
+			case <-time.After(visibilityWaitTimeout):
+			}
+			opts.Telemetry.Record(ghtelemetry.Event{
+				Type:       "skill_upstream_redirect",
+				Dimensions: redirectDims,
+			})
+			opts.repo = upstreamRepo
+			opts.SkillSource = ghrepo.FullName(upstreamRepo)
+			opts.version = ""
+			opts.Pin = ""
+			return installRun(opts)
+		}
+		if detected {
+			upstreamSource = "republisher"
 		}
 	}
 
@@ -353,6 +403,7 @@ func installRun(opts *InstallOptions) error {
 	dims := map[string]string{
 		"agent_hosts":     mapAgentHostsToIDs(selectedHosts),
 		"skill_host_type": ghinstance.CategorizeHost(opts.repo.RepoHost()),
+		"upstream_source": upstreamSource,
 	}
 	select {
 	case r := <-visCh:
@@ -502,6 +553,9 @@ func isSkillPath(name string) bool {
 		return true
 	}
 	if strings.HasPrefix(name, "skills/") || strings.HasPrefix(name, "plugins/") {
+		return true
+	}
+	if strings.Contains(name, "/skills/") || strings.Contains(name, "/plugins/") {
 		return true
 	}
 	return false
@@ -1163,4 +1217,86 @@ func filterHiddenDirSkills(opts *InstallOptions, allSkills []discovery.Skill) ([
 	}
 
 	return standard, nil
+}
+
+// checkUpstreamProvenance fetches the skill's SKILL.md via the contents API
+// to check if it contains github-repo metadata pointing to a different
+// repository, indicating the skill was re-published from an upstream source.
+// In interactive mode, the user is asked whether to install from the
+// re-publisher or redirect to the upstream. Non-interactive mode always
+// installs from the re-publisher.
+// Returns (repo to redirect to, whether upstream was detected, error).
+func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname string, skill discovery.Skill, commitSHA string) (ghrepo.Interface, bool, error) {
+	apiPath := fmt.Sprintf("repos/%s/%s/contents/%s?ref=%s",
+		opts.repo.RepoOwner(), opts.repo.RepoName(),
+		skill.Path+"/SKILL.md", commitSHA)
+	var fileResp struct {
+		Content  string `json:"content"`
+		Encoding string `json:"encoding"`
+	}
+	if err := client.REST(hostname, "GET", apiPath, nil, &fileResp); err != nil {
+		return nil, false, nil //nolint:nilerr // best-effort check; failing to fetch is not fatal
+	}
+	if fileResp.Encoding != "base64" {
+		return nil, false, nil
+	}
+	decoded, decodeErr := io.ReadAll(base64.NewDecoder(base64.StdEncoding, strings.NewReader(fileResp.Content)))
+	if decodeErr != nil {
+		return nil, false, nil //nolint:nilerr // best-effort; decode failure is not fatal
+	}
+	content := string(decoded)
+
+	result, parseErr := frontmatter.Parse(content)
+	if parseErr != nil || result.Metadata.Meta == nil {
+		//nolint:nilerr // unparseable frontmatter means no upstream to detect
+		return nil, false, nil
+	}
+
+	existingRepo, _ := result.Metadata.Meta["github-repo"].(string)
+	if existingRepo == "" {
+		return nil, false, nil
+	}
+
+	currentRepoURL := source.BuildRepoURL(hostname, opts.repo.RepoOwner(), opts.repo.RepoName())
+	if existingRepo == currentRepoURL {
+		return nil, false, nil
+	}
+
+	upstreamRepo, parseErr := source.ParseRepoURL(existingRepo)
+	if parseErr != nil {
+		//nolint:nilerr // invalid repo URL means we can't redirect; install normally
+		return nil, false, nil
+	}
+
+	cs := opts.IO.ColorScheme()
+	upstreamLabel := ghrepo.FullName(upstreamRepo)
+	repoSource := ghrepo.FullName(opts.repo)
+
+	fmt.Fprintf(opts.IO.ErrOut, "%s This skill was originally published in %s\n", cs.WarningIcon(), upstreamLabel)
+
+	if opts.Upstream {
+		fmt.Fprintf(opts.IO.ErrOut, "Redirecting install to %s...\n", upstreamLabel)
+		return upstreamRepo, true, nil
+	}
+
+	if !opts.IO.CanPrompt() {
+		fmt.Fprintf(opts.IO.ErrOut, "  Installing from %s (use --upstream or interactive mode to choose upstream)\n", repoSource)
+		return nil, true, nil
+	}
+
+	choices := []string{
+		fmt.Sprintf("%s (re-publisher, recommended)", repoSource),
+		fmt.Sprintf("%s (upstream)", upstreamLabel),
+	}
+	idx, err := opts.Prompter.Select("Install from:", "", choices)
+	if err != nil {
+		return nil, true, err
+	}
+
+	if idx == 1 {
+		fmt.Fprintf(opts.IO.ErrOut, "Redirecting install to %s...\n", upstreamLabel)
+		return upstreamRepo, true, nil
+	}
+
+	return nil, true, nil
 }

@@ -8,7 +8,7 @@ env GH_TELEMETRY_ENDPOINT_URL=http://localhost:1
 # It will fail to connect but that's fine — we only care about telemetry logging.
 stdin payload.json
 ! exec gh send-telemetry
-! stderr 'Telemetry payload:'
+stderr 'Telemetry payload: none'
 
 -- payload.json --
 {"events":[{"type":"test","dimensions":{},"measures":{}}]}
