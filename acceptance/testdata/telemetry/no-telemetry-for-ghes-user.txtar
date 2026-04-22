@@ -1,5 +1,4 @@
 # GHES users should not get telemetry even when telemetry is enabled
-env GH_PRIVATE_ENABLE_TELEMETRY=1
 env GH_TELEMETRY=log
 env GH_TELEMETRY_SAMPLE_RATE=100
 env GH_ENTERPRISE_TOKEN=fake-enterprise-token

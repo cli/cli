@@ -3,7 +3,6 @@
 # organization or project name).
 [!exec:bash] skip
 
-env GH_PRIVATE_ENABLE_TELEMETRY=1
 env GH_TELEMETRY=log
 env GH_TELEMETRY_SAMPLE_RATE=100
 

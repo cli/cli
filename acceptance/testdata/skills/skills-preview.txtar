@@ -10,7 +10,6 @@ stderr 'not found'
 
 # Telemetry: skill_preview event records repo identifiers and, for a
 # public repo, the skill name.
-env GH_PRIVATE_ENABLE_TELEMETRY=1
 env GH_TELEMETRY=log
 env GH_TELEMETRY_SAMPLE_RATE=100
 exec gh skill preview github/awesome-copilot git-commit

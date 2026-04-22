@@ -2,7 +2,6 @@
 # resolved inner command should still record normally — its path is a core
 # gh command and conveys no user-authored identifier.
 
-env GH_PRIVATE_ENABLE_TELEMETRY=1
 env GH_TELEMETRY=log
 env GH_TELEMETRY_SAMPLE_RATE=100
 

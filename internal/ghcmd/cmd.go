@@ -84,7 +84,7 @@ func Main() exitCode {
 		telemetryService = &telemetry.NoOpService{}
 	default:
 		telemetryState := telemetry.ParseTelemetryState(cfg.Telemetry().Value)
-		telemetryDisabled := os.Getenv("GH_PRIVATE_ENABLE_TELEMETRY") == "" || mightBeGHESUser(cfg)
+		telemetryDisabled := mightBeGHESUser(cfg)
 
 		switch telemetryState {
 		case telemetry.Disabled:

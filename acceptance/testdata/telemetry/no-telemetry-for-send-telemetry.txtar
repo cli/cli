@@ -1,5 +1,4 @@
 # The send-telemetry command should not itself generate a telemetry event
-env GH_PRIVATE_ENABLE_TELEMETRY=1
 env GH_TELEMETRY=log
 env GH_TELEMETRY_SAMPLE_RATE=100
 env GH_TELEMETRY_ENDPOINT_URL=http://localhost:1
