@@ -3,6 +3,7 @@ package view
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -15,7 +16,7 @@ func viewRepoRuleset(httpClient *http.Client, repo ghrepo.Interface, databaseId 
 }
 
 func viewOrgRuleset(httpClient *http.Client, orgLogin string, databaseId string, host string) (*shared.RulesetREST, error) {
-	path := fmt.Sprintf("orgs/%s/rulesets/%s", orgLogin, databaseId)
+	path := fmt.Sprintf("orgs/%s/rulesets/%s", url.PathEscape(orgLogin), databaseId)
 	return viewRuleset(httpClient, host, path)
 }
 

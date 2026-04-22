@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -101,13 +102,13 @@ func getRun(opts *GetOptions) error {
 	var host string
 	switch variableEntity {
 	case shared.Organization:
-		path = fmt.Sprintf("orgs/%s/actions/variables/%s", orgName, opts.VariableName)
+		path = fmt.Sprintf("orgs/%s/actions/variables/%s", url.PathEscape(orgName), url.PathEscape(opts.VariableName))
 		host, _ = cfg.Authentication().DefaultHost()
 	case shared.Environment:
-		path = fmt.Sprintf("repos/%s/environments/%s/variables/%s", ghrepo.FullName(baseRepo), envName, opts.VariableName)
+		path = fmt.Sprintf("repos/%s/environments/%s/variables/%s", ghrepo.FullName(baseRepo), url.PathEscape(envName), url.PathEscape(opts.VariableName))
 		host = baseRepo.RepoHost()
 	case shared.Repository:
-		path = fmt.Sprintf("repos/%s/actions/variables/%s", ghrepo.FullName(baseRepo), opts.VariableName)
+		path = fmt.Sprintf("repos/%s/actions/variables/%s", ghrepo.FullName(baseRepo), url.PathEscape(opts.VariableName))
 		host = baseRepo.RepoHost()
 	}
 

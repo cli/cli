@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -156,7 +157,7 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions
 }
 
 func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *editOptions) error {
-	path := fmt.Sprintf("repos/%s/%s/labels/%s", repo.RepoOwner(), repo.RepoName(), opts.Name)
+	path := fmt.Sprintf("repos/%s/%s/labels/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(opts.Name))
 	properties := map[string]string{}
 	if opts.Description != "" {
 		properties["description"] = opts.Description

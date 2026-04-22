@@ -3,6 +3,7 @@ package label
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -94,7 +95,7 @@ func deleteRun(opts *deleteOptions) error {
 
 func deleteLabel(client *http.Client, repo ghrepo.Interface, name string) error {
 	apiClient := api.NewClientFromHTTP(client)
-	path := fmt.Sprintf("repos/%s/%s/labels/%s", repo.RepoOwner(), repo.RepoName(), name)
+	path := fmt.Sprintf("repos/%s/%s/labels/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(name))
 
 	return apiClient.REST(repo.RepoHost(), "DELETE", path, nil, nil)
 }

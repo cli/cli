@@ -3,6 +3,7 @@ package delete
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/MakeNowJust/heredoc"
@@ -127,16 +128,16 @@ func removeRun(opts *DeleteOptions) error {
 	var host string
 	switch secretEntity {
 	case shared.Organization:
-		path = fmt.Sprintf("orgs/%s/%s/secrets/%s", orgName, secretApp, opts.SecretName)
+		path = fmt.Sprintf("orgs/%s/%s/secrets/%s", url.PathEscape(orgName), secretApp, url.PathEscape(opts.SecretName))
 		host, _ = cfg.Authentication().DefaultHost()
 	case shared.Environment:
-		path = fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(baseRepo), envName, opts.SecretName)
+		path = fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(baseRepo), url.PathEscape(envName), url.PathEscape(opts.SecretName))
 		host = baseRepo.RepoHost()
 	case shared.User:
-		path = fmt.Sprintf("user/codespaces/secrets/%s", opts.SecretName)
+		path = fmt.Sprintf("user/codespaces/secrets/%s", url.PathEscape(opts.SecretName))
 		host, _ = cfg.Authentication().DefaultHost()
 	case shared.Repository:
-		path = fmt.Sprintf("repos/%s/%s/secrets/%s", ghrepo.FullName(baseRepo), secretApp, opts.SecretName)
+		path = fmt.Sprintf("repos/%s/%s/secrets/%s", ghrepo.FullName(baseRepo), secretApp, url.PathEscape(opts.SecretName))
 		host = baseRepo.RepoHost()
 	}
 

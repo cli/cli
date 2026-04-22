@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -254,7 +255,7 @@ func (r *ownerResponse) IsOrganization() bool {
 
 func resolveOwner(client *api.Client, hostname, orgName string) (*ownerResponse, error) {
 	var response ownerResponse
-	err := client.REST(hostname, "GET", fmt.Sprintf("users/%s", orgName), nil, &response)
+	err := client.REST(hostname, "GET", fmt.Sprintf("users/%s", url.PathEscape(orgName)), nil, &response)
 	return &response, err
 }
 
@@ -268,7 +269,7 @@ type teamResponse struct {
 
 func resolveOrganizationTeam(client *api.Client, hostname, orgName, teamSlug string) (*teamResponse, error) {
 	var response teamResponse
-	err := client.REST(hostname, "GET", fmt.Sprintf("orgs/%s/teams/%s", orgName, teamSlug), nil, &response)
+	err := client.REST(hostname, "GET", fmt.Sprintf("orgs/%s/teams/%s", url.PathEscape(orgName), url.PathEscape(teamSlug)), nil, &response)
 	return &response, err
 }
 

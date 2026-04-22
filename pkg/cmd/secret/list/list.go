@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -248,7 +249,7 @@ func fmtVisibility(s Secret) string {
 }
 
 func getOrgSecrets(client *http.Client, host, orgName string, showSelectedRepoInfo bool, app shared.App) ([]Secret, error) {
-	secrets, err := getSecrets(client, host, fmt.Sprintf("orgs/%s/%s/secrets", orgName, app))
+	secrets, err := getSecrets(client, host, fmt.Sprintf("orgs/%s/%s/secrets", url.PathEscape(orgName), app))
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +280,7 @@ func getUserSecrets(client *http.Client, host string, showSelectedRepoInfo bool)
 }
 
 func getEnvSecrets(client *http.Client, repo ghrepo.Interface, envName string) ([]Secret, error) {
-	path := fmt.Sprintf("repos/%s/environments/%s/secrets", ghrepo.FullName(repo), envName)
+	path := fmt.Sprintf("repos/%s/environments/%s/secrets", ghrepo.FullName(repo), url.PathEscape(envName))
 	return getSecrets(client, repo.RepoHost(), path)
 }
 

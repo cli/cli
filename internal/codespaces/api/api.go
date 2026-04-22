@@ -374,10 +374,10 @@ func (a *API) ListCodespaces(ctx context.Context, opts ListCodespacesOptions) (c
 		orgName := opts.OrgName
 		if opts.UserName != "" {
 			userName := opts.UserName
-			listURL = fmt.Sprintf("%s/orgs/%s/members/%s/codespaces?per_page=%d", a.githubAPI, orgName, userName, perPage)
+			listURL = fmt.Sprintf("%s/orgs/%s/members/%s/codespaces?per_page=%d", a.githubAPI, url.PathEscape(orgName), url.PathEscape(userName), perPage)
 			spanName = "/orgs/*/members/*/codespaces"
 		} else {
-			listURL = fmt.Sprintf("%s/orgs/%s/codespaces?per_page=%d", a.githubAPI, orgName, perPage)
+			listURL = fmt.Sprintf("%s/orgs/%s/codespaces?per_page=%d", a.githubAPI, url.PathEscape(orgName), perPage)
 			spanName = "/orgs/*/codespaces"
 		}
 	} else {
@@ -445,7 +445,7 @@ func findNextPage(linkValue string) string {
 
 func (a *API) GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*Codespace, error) {
 	perPage := 100
-	listURL := fmt.Sprintf("%s/orgs/%s/members/%s/codespaces?per_page=%d", a.githubAPI, orgName, userName, perPage)
+	listURL := fmt.Sprintf("%s/orgs/%s/members/%s/codespaces?per_page=%d", a.githubAPI, url.PathEscape(orgName), url.PathEscape(userName), perPage)
 
 	for {
 		req, err := http.NewRequest(http.MethodGet, listURL, nil)
@@ -569,10 +569,10 @@ func (a *API) StopCodespace(ctx context.Context, codespaceName string, orgName s
 	var spanName string
 
 	if orgName != "" {
-		stopURL = fmt.Sprintf("%s/orgs/%s/members/%s/codespaces/%s/stop", a.githubAPI, orgName, userName, codespaceName)
+		stopURL = fmt.Sprintf("%s/orgs/%s/members/%s/codespaces/%s/stop", a.githubAPI, url.PathEscape(orgName), url.PathEscape(userName), url.PathEscape(codespaceName))
 		spanName = "/orgs/*/members/*/codespaces/*/stop"
 	} else {
-		stopURL = fmt.Sprintf("%s/user/codespaces/%s/stop", a.githubAPI, codespaceName)
+		stopURL = fmt.Sprintf("%s/user/codespaces/%s/stop", a.githubAPI, url.PathEscape(codespaceName))
 		spanName = "/user/codespaces/*/stop"
 	}
 
@@ -976,10 +976,10 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string, orgName
 	var spanName string
 
 	if orgName != "" && userName != "" {
-		deleteURL = fmt.Sprintf("%s/orgs/%s/members/%s/codespaces/%s", a.githubAPI, orgName, userName, codespaceName)
+		deleteURL = fmt.Sprintf("%s/orgs/%s/members/%s/codespaces/%s", a.githubAPI, url.PathEscape(orgName), url.PathEscape(userName), url.PathEscape(codespaceName))
 		spanName = "/orgs/*/members/*/codespaces/*"
 	} else {
-		deleteURL = a.githubAPI + "/user/codespaces/" + codespaceName
+		deleteURL = a.githubAPI + "/user/codespaces/" + url.PathEscape(codespaceName)
 		spanName = "/user/codespaces/*"
 	}
 
