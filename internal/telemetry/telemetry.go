@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -283,6 +284,7 @@ func (s *service) SetSampleRate(rate int) {
 	defer s.mu.Unlock()
 
 	s.sampleRate = rate
+	s.commonDimensions["sample_rate"] = strconv.Itoa(rate)
 }
 
 func (s *service) Flush() {

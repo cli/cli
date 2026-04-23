@@ -32,8 +32,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate tag name format
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
         run: |
-          if [[ ! "${{ inputs.tag_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid tag name format. Must be in the form v1.2.3"
             exit 1
           fi

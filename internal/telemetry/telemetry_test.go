@@ -579,6 +579,24 @@ func TestServiceSampling(t *testing.T) {
 		assert.False(t, called, "flusher should not be called after SetSampleRate reduced the rate")
 	})
 
+	t.Run("SetSampleRate updates sample_rate dimension", func(t *testing.T) {
+		t.Cleanup(stubDeviceID("test-device"))
+
+		var captured SendTelemetryPayload
+		svc := newService(func(p SendTelemetryPayload) { captured = p }, ghtelemetry.Dimensions{
+			"sample_rate": "1",
+		})
+		svc.sampleRate = 1
+		svc.sampleBucket = 0
+
+		svc.SetSampleRate(100)
+		svc.Record(ghtelemetry.Event{Type: "test"})
+		svc.Flush()
+
+		require.Len(t, captured.Events, 1)
+		assert.Equal(t, "100", captured.Events[0].Dimensions["sample_rate"])
+	})
+
 	t.Run("WithSampleRate option sets rate on construction", func(t *testing.T) {
 		t.Cleanup(stubDeviceID("test-device"))
 
