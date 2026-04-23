@@ -11,12 +11,12 @@ import (
 )
 
 func viewRepoRuleset(httpClient *http.Client, repo ghrepo.Interface, databaseId string) (*shared.RulesetREST, error) {
-	path := fmt.Sprintf("repos/%s/%s/rulesets/%s", repo.RepoOwner(), repo.RepoName(), databaseId)
+	path := fmt.Sprintf("repos/%s/%s/rulesets/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(databaseId))
 	return viewRuleset(httpClient, repo.RepoHost(), path)
 }
 
 func viewOrgRuleset(httpClient *http.Client, orgLogin string, databaseId string, host string) (*shared.RulesetREST, error) {
-	path := fmt.Sprintf("orgs/%s/rulesets/%s", url.PathEscape(orgLogin), databaseId)
+	path := fmt.Sprintf("orgs/%s/rulesets/%s", url.PathEscape(orgLogin), url.PathEscape(databaseId))
 	return viewRuleset(httpClient, host, path)
 }
 
