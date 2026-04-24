@@ -23,6 +23,7 @@ type HTTPClientOptions struct {
 	CacheTTL           time.Duration
 	Config             tokenGetter
 	EnableCache        bool
+	EnableETagCache    bool
 	Log                io.Writer
 	LogColorize        bool
 	LogVerboseHTTP     bool
@@ -74,6 +75,16 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 
 	if opts.Config != nil {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
+	}
+
+	if opts.EnableETagCache {
+		cache, cacheErr := newEtagCache()
+		if cacheErr == nil {
+			client.Transport = &etagTransport{
+				transport: client.Transport,
+				cache:     cache,
+			}
+		}
 	}
 
 	if opts.TelemetryDisabler != nil {

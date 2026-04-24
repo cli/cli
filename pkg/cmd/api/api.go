@@ -57,6 +57,7 @@ type ApiOptions struct {
 	Silent              bool
 	Template            string
 	CacheTTL            time.Duration
+	ETagCache           bool
 	FilterOutput        string
 	Verbose             bool
 }
@@ -243,6 +244,18 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return cmdutil.FlagErrorf("the `--paginate` option is not supported for non-GET requests")
 			}
 
+			if opts.ETagCache && opts.RequestMethodPassed && !strings.EqualFold(opts.RequestMethod, "GET") {
+				return cmdutil.FlagErrorf("the `--cache-etag` flag is not supported for non-GET requests")
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--cache` or `--cache-etag`",
+				opts.CacheTTL > 0,
+				opts.ETagCache,
+			); err != nil {
+				return err
+			}
+
 			if err := cmdutil.MutuallyExclusive(
 				"the `--paginate` option is not supported with `--input`",
 				opts.Paginate,
@@ -297,6 +310,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
+	cmd.Flags().BoolVar(&opts.ETagCache, "cache-etag", false, "Cache the response based on ETag conditional requests")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 	return cmd
 }
@@ -386,14 +400,15 @@ func apiRun(opts *ApiOptions) error {
 				log = opts.IO.Out
 			}
 			opts := api.HTTPClientOptions{
-				AppVersion:     opts.AppVersion,
-				InvokingAgent:  opts.InvokingAgent,
-				CacheTTL:       opts.CacheTTL,
-				Config:         cfg.Authentication(),
-				EnableCache:    opts.CacheTTL > 0,
-				Log:            log,
-				LogColorize:    opts.IO.ColorEnabled(),
-				LogVerboseHTTP: opts.Verbose,
+				AppVersion:      opts.AppVersion,
+				InvokingAgent:   opts.InvokingAgent,
+				CacheTTL:        opts.CacheTTL,
+				Config:          cfg.Authentication(),
+				EnableCache:     opts.CacheTTL > 0,
+				EnableETagCache: opts.ETagCache,
+				Log:             log,
+				LogColorize:     opts.IO.ColorEnabled(),
+				LogVerboseHTTP:  opts.Verbose,
 			}
 			return api.NewHTTPClient(opts)
 		}

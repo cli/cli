@@ -346,6 +346,39 @@ func Test_NewCmdApi(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name: "with cache-etag",
+			cli:  "user --cache-etag",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				ETagCache:           true,
+				Template:            "",
+				FilterOutput:        "",
+				Verbose:             false,
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "cache-etag with cache",
+			cli:      "user --cache-etag --cache 5m",
+			wantsErr: true,
+		},
+		{
+			name:     "cache-etag with non-GET",
+			cli:      "user --cache-etag -XPOST",
+			wantsErr: true,
+		},
+		{
 			name: "with verbose",
 			cli:  "user --verbose",
 			wants: ApiOptions{
@@ -401,6 +434,7 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.Paginate, opts.Paginate)
 			assert.Equal(t, tt.wants.Silent, opts.Silent)
 			assert.Equal(t, tt.wants.CacheTTL, opts.CacheTTL)
+			assert.Equal(t, tt.wants.ETagCache, opts.ETagCache)
 			assert.Equal(t, tt.wants.Template, opts.Template)
 			assert.Equal(t, tt.wants.FilterOutput, opts.FilterOutput)
 			assert.Equal(t, tt.wants.Verbose, opts.Verbose)
