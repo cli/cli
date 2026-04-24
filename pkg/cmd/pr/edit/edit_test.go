@@ -1426,6 +1426,14 @@ func TestProjectsV1Deprecation(t *testing.T) {
 
 			Finder: shared.NewFinder(f),
 
+			Editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{
+						Edited: true,
+					},
+				},
+			},
+
 			SelectorArg: "https://github.com/cli/cli/pull/123",
 		})
 
@@ -1457,10 +1465,58 @@ func TestProjectsV1Deprecation(t *testing.T) {
 
 			Finder: shared.NewFinder(f),
 
+			Editable: shared.Editable{
+				Projects: shared.EditableProjects{
+					EditableSlice: shared.EditableSlice{
+						Edited: true,
+					},
+				},
+			},
+
 			SelectorArg: "https://github.com/cli/cli/pull/123",
 		})
 
 		// Verify that our request did not contain projectCards
 		reg.Verify(t)
 	})
+}
+
+func TestEditSkipsProjectFieldsWhenNotEditingProjects(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	reg := &httpmock.Registry{}
+	// Ensure that neither projectCards nor projectItems appear in the query
+	reg.Exclude(t, httpmock.GraphQL(`projectCards`))
+	reg.Exclude(t, httpmock.GraphQL(`projectItems`))
+
+	f := &cmdutil.Factory{
+		IOStreams: ios,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+	}
+
+	// Ignore the error because we have no way to really stub it without
+	// fully stubbing a GQL error structure in the request body.
+	_ = editRun(&EditOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		Detector: &fd.EnabledDetectorMock{},
+
+		Finder: shared.NewFinder(f),
+
+		Editable: shared.Editable{
+			Title: shared.EditableString{
+				Edited: true,
+				Value:  "new title",
+			},
+		},
+
+		SelectorArg: "https://github.com/cli/cli/pull/123",
+	})
+
+	// Verify that our request did not contain project fields
+	reg.Verify(t)
 }

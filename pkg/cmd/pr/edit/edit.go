@@ -259,15 +259,28 @@ func editRun(opts *EditOptions) error {
 		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
 	}
 
-	findOptions := shared.FindOptions{
-		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "author", "url", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone"},
-		Detector: opts.Detector,
+	editable := opts.Editable
+	editable.Reviewers.Selectable = true
+
+	// In interactive mode, prompt the user for which fields to edit before
+	// fetching the PR. This avoids querying fields that require extra
+	// permissions (e.g. projectItems) when the user doesn't intend to edit them.
+	if opts.Interactive {
+		err = opts.Surveyor.FieldsToEdit(&editable)
+		if err != nil {
+			return err
+		}
 	}
 
 	issueFeatures, err := opts.Detector.IssueFeatures()
 	if err != nil {
 		return err
+	}
+
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"id", "author", "url", "title", "body", "baseRefName", "reviewRequests", "labels", "milestone"},
+		Detector: opts.Detector,
 	}
 
 	// TODO ApiActorsSupported
@@ -277,13 +290,17 @@ func editRun(opts *EditOptions) error {
 		findOptions.Fields = append(findOptions.Fields, "assignees")
 	}
 
+	// Only fetch project data when the user is editing projects to avoid
+	// requiring the project permission scope for unrelated edits.
+	if editable.Projects.Edited {
+		findOptions.Fields = append(findOptions.Fields, "projectCards", "projectItems")
+	}
+
 	pr, repo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
 
-	editable := opts.Editable
-	editable.Reviewers.Selectable = true
 	editable.Title.Default = pr.Title
 	editable.Body.Default = pr.Body
 	editable.Base.Default = pr.BaseRefName
@@ -298,21 +315,16 @@ func editRun(opts *EditOptions) error {
 		editable.Assignees.Default = pr.Assignees.Logins()
 	}
 	editable.Labels.Default = pr.Labels.Names()
-	editable.Projects.Default = append(pr.ProjectCards.ProjectNames(), pr.ProjectItems.ProjectTitles()...)
-	projectItems := map[string]string{}
-	for _, n := range pr.ProjectItems.Nodes {
-		projectItems[n.Project.ID] = n.ID
+	if editable.Projects.Edited {
+		editable.Projects.Default = append(pr.ProjectCards.ProjectNames(), pr.ProjectItems.ProjectTitles()...)
+		projectItems := map[string]string{}
+		for _, n := range pr.ProjectItems.Nodes {
+			projectItems[n.Project.ID] = n.ID
+		}
+		editable.Projects.ProjectItems = projectItems
 	}
-	editable.Projects.ProjectItems = projectItems
 	if pr.Milestone != nil {
 		editable.Milestone.Default = pr.Milestone.Title
-	}
-
-	if opts.Interactive {
-		err = opts.Surveyor.FieldsToEdit(&editable)
-		if err != nil {
-			return err
-		}
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
