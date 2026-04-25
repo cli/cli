@@ -33,7 +33,7 @@ func TestSearchRun_UnsupportedHost(t *testing.T) {
 		HttpClient: func() (*http.Client, error) { return &http.Client{}, nil },
 		Config:     func() (gh.Config, error) { return cfg, nil },
 	})
-	require.ErrorContains(t, err, "supports only github.com")
+	require.ErrorContains(t, err, "does not currently support GitHub Enterprise Server")
 }
 
 func TestNewCmdSearch(t *testing.T) {

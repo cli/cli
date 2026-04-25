@@ -33,10 +33,14 @@ manpages: script/build$(EXE)
 
 .PHONY: completions
 completions: bin/gh$(EXE)
-	mkdir -p ./share/bash-completion/completions ./share/fish/vendor_completions.d ./share/zsh/site-functions
+	mkdir -p ./share/bash-completion/completions ./share/fish/vendor_completions.d ./share/zsh/site-functions ./share/zsh/vendor-completions
 	bin/gh$(EXE) completion -s bash > ./share/bash-completion/completions/gh
 	bin/gh$(EXE) completion -s fish > ./share/fish/vendor_completions.d/gh.fish
 	bin/gh$(EXE) completion -s zsh > ./share/zsh/site-functions/_gh
+	# On Debian/Ubuntu the default zsh fpath does not include /usr/share/zsh/site-functions
+	# but does include /usr/share/zsh/vendor-completions, so we ship both paths in our
+	# .deb and .rpm packages. See https://github.com/cli/cli/issues/13166
+	cp ./share/zsh/site-functions/_gh ./share/zsh/vendor-completions/_gh
 
 .PHONY: lint
 lint:

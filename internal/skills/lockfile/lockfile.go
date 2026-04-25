@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/flock"
+	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
 const (
@@ -93,7 +94,7 @@ func writeTo(f *os.File, lf *file) error {
 // RecordInstall adds or updates a skill entry in the lock file.
 // It uses a file-based lock to prevent concurrent read-modify-write races
 // when multiple install processes run simultaneously.
-func RecordInstall(skillName, owner, repo, skillPath, treeSHA, pinnedRef string) error {
+func RecordInstall(host, skillName, owner, repo, skillPath, treeSHA, pinnedRef string) error {
 	lockPath, err := lockfilePath()
 	if err != nil {
 		return err
@@ -124,7 +125,7 @@ func RecordInstall(skillName, owner, repo, skillPath, treeSHA, pinnedRef string)
 	f.Skills[skillName] = entry{
 		Source:          owner + "/" + repo,
 		SourceType:      "github",
-		SourceURL:       "https://github.com/" + owner + "/" + repo + ".git",
+		SourceURL:       ghinstance.HostPrefix(host) + owner + "/" + repo + ".git",
 		SkillPath:       skillPath,
 		SkillFolderHash: treeSHA,
 		InstalledAt:     installedAt,

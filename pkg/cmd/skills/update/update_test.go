@@ -171,7 +171,7 @@ func TestScanInstalledSkills(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, skills, 1)
 				require.Error(t, skills[0].metadataErr)
-				assert.Contains(t, skills[0].metadataErr.Error(), "supports only github.com")
+				assert.Contains(t, skills[0].metadataErr.Error(), "does not currently support GitHub Enterprise Server")
 			},
 		},
 		{
@@ -726,10 +726,14 @@ func TestUpdateRun(t *testing.T) {
 			},
 			verify: func(t *testing.T, dir string) {
 				t.Helper()
-				content, err := os.ReadFile(filepath.Join(dir, "monalisa", "code-review", "SKILL.md"))
+				// After update, skill should be installed flat (not namespaced).
+				content, err := os.ReadFile(filepath.Join(dir, "code-review", "SKILL.md"))
 				require.NoError(t, err)
 				assert.Contains(t, string(content), "github-repo: https://github.com/monalisa/octocat-skills")
 				assert.NotContains(t, string(content), "Old namespaced content")
+				// Old namespaced directory should be cleaned up.
+				_, err = os.Stat(filepath.Join(dir, "monalisa", "code-review"))
+				assert.True(t, os.IsNotExist(err), "old namespaced directory should be removed")
 			},
 			wantStdout: "Updated monalisa/code-review",
 		},

@@ -414,6 +414,24 @@ func updateRun(opts *UpdateOptions) error {
 			failed = true
 			continue
 		}
+
+		// When the install location has changed (e.g. migrating from a
+		// namespaced layout to flat), remove the old directory so that the
+		// stale copy does not shadow the freshly installed one.
+		newDir := filepath.Join(installOpts.Dir, u.skill.Name)
+		if installOpts.Dir == "" && u.local.host != nil {
+			if d, err := u.local.host.InstallDir(u.local.scope, gitRoot, homeDir); err == nil {
+				newDir = filepath.Join(d, u.skill.Name)
+			}
+		}
+		if newDir != "" && u.local.dir != "" && filepath.Clean(newDir) != filepath.Clean(u.local.dir) {
+			_ = os.RemoveAll(u.local.dir)
+			// Remove the parent if it is now empty (leftover namespace directory).
+			parent := filepath.Dir(u.local.dir)
+			if entries, readErr := os.ReadDir(parent); readErr == nil && len(entries) == 0 {
+				_ = os.Remove(parent)
+			}
+		}
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.Out, "%s Updated %s\n", cs.SuccessIcon(), u.local.name)
 		} else {

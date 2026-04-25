@@ -76,7 +76,7 @@ func Install(opts *Options) (*Result, error) {
 			return nil, fmt.Errorf("failed to install skill %q: %w", skill.InstallName(), err)
 		}
 		var warnings []string
-		if err := lockfile.RecordInstall(skill.InstallName(), opts.Owner, opts.Repo, skill.Path+"/SKILL.md", skill.TreeSHA, opts.PinnedRef); err != nil {
+		if err := lockfile.RecordInstall(opts.Host, skill.InstallName(), opts.Owner, opts.Repo, skill.Path+"/SKILL.md", skill.TreeSHA, opts.PinnedRef); err != nil {
 			warnings = append(warnings, fmt.Sprintf("could not record install for %s: %v", skill.InstallName(), err))
 		}
 		return &Result{Installed: []string{skill.InstallName()}, Dir: targetDir, Warnings: warnings}, nil
@@ -129,7 +129,7 @@ func Install(opts *Options) (*Result, error) {
 		}
 		installed = append(installed, r.name)
 		skill := opts.Skills[i]
-		if err := lockfile.RecordInstall(skill.InstallName(), opts.Owner, opts.Repo, skill.Path+"/SKILL.md", skill.TreeSHA, opts.PinnedRef); err != nil {
+		if err := lockfile.RecordInstall(opts.Host, skill.InstallName(), opts.Owner, opts.Repo, skill.Path+"/SKILL.md", skill.TreeSHA, opts.PinnedRef); err != nil {
 			warnings = append(warnings, fmt.Sprintf("could not record install for %s: %v", skill.InstallName(), err))
 		}
 	}
@@ -178,7 +178,10 @@ func InstallLocal(opts *LocalOptions) (*Result, error) {
 }
 
 func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string) error {
-	skillDir := filepath.Join(baseDir, filepath.FromSlash(skill.InstallName()))
+	// Use skill.Name (not InstallName) so skills are always installed flat.
+	// Most agent clients only discover immediate subdirectories of their
+	// skills folder and do not find skills nested under namespace directories.
+	skillDir := filepath.Join(baseDir, skill.Name)
 	if err := os.MkdirAll(skillDir, 0o755); err != nil {
 		return fmt.Errorf("could not create directory %s: %w", skillDir, err)
 	}
@@ -246,7 +249,8 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 }
 
 func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
-	skillDir := filepath.Join(baseDir, filepath.FromSlash(skill.InstallName()))
+	// Use skill.Name (not InstallName) for a flat directory layout.
+	skillDir := filepath.Join(baseDir, skill.Name)
 	if err := os.MkdirAll(skillDir, 0o755); err != nil {
 		return fmt.Errorf("could not create directory %s: %w", skillDir, err)
 	}

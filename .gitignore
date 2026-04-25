@@ -3,6 +3,7 @@
 /share/fish/vendor_completions.d
 /share/man/man1
 /share/zsh/site-functions
+/share/zsh/vendor-completions
 /gh-cli
 .envrc
 /dist

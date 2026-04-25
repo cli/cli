@@ -22,7 +22,9 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/transform"
 )
 
 type RunLogCache struct {
@@ -579,7 +581,8 @@ func displayLogSegments(w io.Writer, segments []logSegment) error {
 }
 
 func copyLogWithLinePrefix(w io.Writer, r io.Reader, prefix string) error {
-	scanner := bufio.NewScanner(r)
+	sanitized := transform.NewReader(r, &asciisanitizer.Sanitizer{})
+	scanner := bufio.NewScanner(sanitized)
 	for scanner.Scan() {
 		fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
 	}

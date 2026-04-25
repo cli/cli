@@ -101,6 +101,26 @@ func HasHiddenDirSkills(skills []Skill) bool {
 	return false
 }
 
+// HiddenDirFilterResult holds the outcome of partitioning skills into standard
+// and hidden-dir buckets.
+type HiddenDirFilterResult struct {
+	Standard    []Skill
+	HiddenCount int
+}
+
+// PartitionHiddenDirSkills splits skills into standard and hidden-dir groups.
+func PartitionHiddenDirSkills(skills []Skill) HiddenDirFilterResult {
+	var r HiddenDirFilterResult
+	for _, s := range skills {
+		if s.IsHiddenDirConvention() {
+			r.HiddenCount++
+		} else {
+			r.Standard = append(r.Standard, s)
+		}
+	}
+	return r
+}
+
 // ResolvedRef contains the resolved git reference and its SHA.
 type ResolvedRef struct {
 	Ref string // fully qualified ref (refs/heads/*, refs/tags/*) or commit SHA

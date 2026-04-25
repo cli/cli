@@ -2759,6 +2759,46 @@ var expectedRunLogOutput = fmt.Sprintf("%s%s", coolJobRunLogOutput, sadJobRunLog
 var expectedRunLogOutputWithNoSteps = fmt.Sprintf("%s%s", coolJobRunWithNoStepLogsLogOutput, sadJobRunWithNoStepLogsLogOutput)
 var expectedLegacyRunLogOutputWithNoSteps = fmt.Sprintf("%s%s", legacyCoolJobRunWithNoStepLogsLogOutput, legacySadJobRunWithNoStepLogsLogOutput)
 
+func TestCopyLogWithLinePrefix_TerminalEscapeSequences(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "OSC title set sequence",
+			input: "normal prefix\x1b]0;HIJACKED TITLE\x07trailing text\n",
+		},
+		{
+			name:  "CSI color sequence",
+			input: "\x1b[31mRED TEXT\x1b[0m normal text\n",
+		},
+		{
+			name:  "screen title set sequence used in original report",
+			input: "\x1bk;echo this is an arbitrary command;\x1b\\\n",
+		},
+		{
+			name:  "CSI window title query",
+			input: "before\x1b[21tafter\n",
+		},
+		{
+			name:  "multiple escape sequences",
+			input: "\x1b]0;title\x07\x1b[31mred\x1b[0m\x1b[21t\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			err := copyLogWithLinePrefix(&buf, strings.NewReader(tt.input), "jobname\tstep\t")
+			require.NoError(t, err)
+
+			output := buf.String()
+			assert.NotContains(t, output, "\x1b",
+				"output should not contain raw ESC (0x1b) bytes, got: %q", output)
+		})
+	}
+}
+
 func TestRunLog(t *testing.T) {
 	t.Run("when the cache dir doesn't exist, exists return false", func(t *testing.T) {
 		cacheDir := t.TempDir() + "/non-existent-dir"

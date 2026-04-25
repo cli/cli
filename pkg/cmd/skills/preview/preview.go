@@ -32,9 +32,10 @@ type PreviewOptions struct {
 	ExecutablePath string
 	RenderFile     func(string, string) string
 
-	RepoArg   string
-	SkillName string
-	Version   string // resolved from @suffix on SkillName
+	RepoArg         string
+	SkillName       string
+	Version         string // resolved from @suffix on SkillName
+	AllowHiddenDirs bool   // include skills in dot-prefixed directories
 
 	repo ghrepo.Interface
 }
@@ -110,6 +111,8 @@ func NewCmdPreview(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 		},
 	}
 
+	cmd.Flags().BoolVar(&opts.AllowHiddenDirs, "allow-hidden-dirs", false, "Include skills in hidden directories (e.g. .claude/skills/, .agents/skills/)")
+
 	return cmd
 }
 
@@ -151,8 +154,13 @@ func previewRun(opts *PreviewOptions) error {
 	}
 
 	opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
-	skills, err := discovery.DiscoverSkills(apiClient, hostname, owner, repoName, resolved.SHA)
+	allSkills, err := discovery.DiscoverSkillsWithOptions(apiClient, hostname, owner, repoName, resolved.SHA, discovery.DiscoverOptions{})
 	opts.IO.StopProgressIndicator()
+	if err != nil {
+		return err
+	}
+
+	skills, err := filterHiddenDirSkills(opts, allSkills)
 	if err != nil {
 		return err
 	}
@@ -386,6 +394,39 @@ func isMarkdownFile(filePath string) bool {
 	default:
 		return false
 	}
+}
+
+// filterHiddenDirSkills applies the --allow-hidden-dirs flag logic. When the
+// flag is set, all skills are returned with a warning. Otherwise, hidden-dir
+// skills are excluded with a hint or error.
+func filterHiddenDirSkills(opts *PreviewOptions, allSkills []discovery.Skill) ([]discovery.Skill, error) {
+	cs := opts.IO.ColorScheme()
+
+	if opts.AllowHiddenDirs {
+		if discovery.HasHiddenDirSkills(allSkills) {
+			fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
+				%[1]s Skills in hidden directories (e.g. .claude/, .agents/) may be installed
+				  copies from another publisher. Verify the skill's origin and check for a
+				  canonical source.
+			`, cs.WarningIcon()))
+		}
+		return allSkills, nil
+	}
+
+	r := discovery.PartitionHiddenDirSkills(allSkills)
+	if r.HiddenCount > 0 {
+		if len(r.Standard) == 0 {
+			return nil, fmt.Errorf(
+				"no standard skills found, but %d skill(s) exist in hidden directories\n"+
+					"  Use --allow-hidden-dirs to include them",
+				r.HiddenCount,
+			)
+		}
+		fmt.Fprintf(opts.IO.ErrOut, "%s %d skill(s) in hidden directories were excluded, use --%s to include them\n",
+			cs.Yellow("!"), r.HiddenCount, "allow-hidden-dirs")
+	}
+
+	return r.Standard, nil
 }
 
 func selectSkill(opts *PreviewOptions, skills []discovery.Skill) (discovery.Skill, error) {

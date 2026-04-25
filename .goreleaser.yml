@@ -106,3 +106,8 @@ nfpms: #build:linux
         dst: "/usr/share/fish/vendor_completions.d/gh.fish"
       - src: "./share/zsh/site-functions/_gh"
         dst: "/usr/share/zsh/site-functions/_gh"
+      # Debian/Ubuntu zsh does not look in /usr/share/zsh/site-functions by default,
+      # so we also install to vendor-completions. See https://github.com/cli/cli/issues/13166
+      - src: "./share/zsh/vendor-completions/_gh"
+        dst: "/usr/share/zsh/vendor-completions/_gh"
+        packager: deb

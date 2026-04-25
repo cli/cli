@@ -11,6 +11,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -22,12 +23,13 @@ import (
 
 func TestNewCmdPreview(t *testing.T) {
 	tests := []struct {
-		name          string
-		input         string
-		wantRepo      string
-		wantSkillName string
-		wantVersion   string
-		wantErr       bool
+		name                string
+		input               string
+		wantRepo            string
+		wantSkillName       string
+		wantVersion         string
+		wantAllowHiddenDirs bool
+		wantErr             bool
 	}{
 		{
 			name:          "repo and skill",
@@ -64,6 +66,13 @@ func TestNewCmdPreview(t *testing.T) {
 			input:   "a b c",
 			wantErr: true,
 		},
+		{
+			name:                "allow-hidden-dirs flag",
+			input:               "github/awesome-copilot my-skill --allow-hidden-dirs",
+			wantRepo:            "github/awesome-copilot",
+			wantSkillName:       "my-skill",
+			wantAllowHiddenDirs: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -95,6 +104,7 @@ func TestNewCmdPreview(t *testing.T) {
 			assert.Equal(t, tt.wantRepo, gotOpts.RepoArg)
 			assert.Equal(t, tt.wantSkillName, gotOpts.SkillName)
 			assert.Equal(t, tt.wantVersion, gotOpts.Version)
+			assert.Equal(t, tt.wantAllowHiddenDirs, gotOpts.AllowHiddenDirs)
 		})
 	}
 }
@@ -403,7 +413,7 @@ func TestPreviewRun_UnsupportedHost(t *testing.T) {
 		repo:       ghrepo.NewWithHost("github", "awesome-copilot", "acme.ghes.com"),
 		Telemetry:  &telemetry.NoOpService{},
 	})
-	require.ErrorContains(t, err, "supports only github.com")
+	require.ErrorContains(t, err, "does not currently support GitHub Enterprise Server")
 }
 
 func TestPreviewRun_Interactive(t *testing.T) {
@@ -1067,4 +1077,245 @@ func TestPreviewRun_TelemetryVisibility(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFilterHiddenDirSkills(t *testing.T) {
+	standardSkill := discovery.Skill{Name: "my-skill", Convention: "standard"}
+	hiddenSkill := discovery.Skill{Name: "hidden-skill", Convention: "hidden-dir"}
+	hiddenNS := discovery.Skill{Name: "ns-skill", Convention: "hidden-dir-namespaced"}
+
+	tests := []struct {
+		name            string
+		allowHiddenDirs bool
+		skills          []discovery.Skill
+		wantCount       int
+		wantErr         string
+		wantStderr      string
+	}{
+		{
+			name:      "no hidden skills returns all",
+			skills:    []discovery.Skill{standardSkill},
+			wantCount: 1,
+		},
+		{
+			name:       "hidden skills excluded by default",
+			skills:     []discovery.Skill{standardSkill, hiddenSkill},
+			wantCount:  1,
+			wantStderr: "1 skill(s) in hidden directories were excluded",
+		},
+		{
+			name:       "multiple hidden skills excluded with hint",
+			skills:     []discovery.Skill{standardSkill, hiddenSkill, hiddenNS},
+			wantCount:  1,
+			wantStderr: "2 skill(s) in hidden directories were excluded",
+		},
+		{
+			name:    "only hidden skills returns error",
+			skills:  []discovery.Skill{hiddenSkill, hiddenNS},
+			wantErr: "no standard skills found, but 2 skill(s) exist in hidden directories",
+		},
+		{
+			name:            "allow-hidden-dirs includes all skills",
+			allowHiddenDirs: true,
+			skills:          []discovery.Skill{standardSkill, hiddenSkill},
+			wantCount:       2,
+			wantStderr:      "Skills in hidden directories",
+		},
+		{
+			name:            "allow-hidden-dirs with no hidden skills",
+			allowHiddenDirs: true,
+			skills:          []discovery.Skill{standardSkill},
+			wantCount:       1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, stderr := iostreams.Test()
+			opts := &PreviewOptions{
+				IO:              ios,
+				AllowHiddenDirs: tt.allowHiddenDirs,
+			}
+
+			result, err := filterHiddenDirSkills(opts, tt.skills)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Len(t, result, tt.wantCount)
+			if tt.wantStderr != "" {
+				assert.Contains(t, stderr.String(), tt.wantStderr)
+			}
+		})
+	}
+}
+
+func TestPreviewRun_HiddenDirSkillsExcluded(t *testing.T) {
+	skillContent := heredoc.Doc(`
+		---
+		name: my-skill
+		description: A test skill
+		---
+		# My Skill
+
+		This is the skill content.
+	`)
+	encodedContent := base64.StdEncoding.EncodeToString([]byte(skillContent))
+
+	// Tree contains both a standard skill and a hidden-dir skill
+	treeJSON := `{
+		"sha": "abc123",
+		"truncated": false,
+		"tree": [
+			{"path": "skills/my-skill", "type": "tree", "sha": "treeSHA"},
+			{"path": "skills/my-skill/SKILL.md", "type": "blob", "sha": "blob123"},
+			{"path": ".claude/skills/hidden-skill", "type": "tree", "sha": "treeHidden"},
+			{"path": ".claude/skills/hidden-skill/SKILL.md", "type": "blob", "sha": "blobHidden"}
+		]
+	}`
+
+	t.Run("hidden skills excluded by default with hint", func(t *testing.T) {
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/releases/latest"),
+			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/trees/abc123"),
+			httpmock.StringResponse(treeJSON),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/trees/treeSHA"),
+			httpmock.StringResponse(`{
+				"tree": [
+					{"path": "SKILL.md", "type": "blob", "sha": "blob123", "size": 50}
+				]
+			}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/blobs/blob123"),
+			httpmock.StringResponse(`{"sha": "blob123", "content": "`+encodedContent+`", "encoding": "base64"}`),
+		)
+
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdoutTTY(false)
+		ios.SetStdinTTY(false)
+
+		opts := &PreviewOptions{
+			IO:         ios,
+			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			Prompter:   &prompter.PrompterMock{},
+			repo:       ghrepo.New("owner", "repo"),
+			SkillName:  "my-skill",
+			Telemetry:  &telemetry.NoOpService{},
+		}
+
+		err := previewRun(opts)
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "My Skill")
+		assert.Contains(t, stderr.String(), "skill(s) in hidden directories were excluded")
+		assert.Contains(t, stderr.String(), "allow-hidden-dirs")
+	})
+
+	t.Run("allow-hidden-dirs includes hidden skills", func(t *testing.T) {
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/releases/latest"),
+			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/trees/abc123"),
+			httpmock.StringResponse(treeJSON),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/trees/treeHidden"),
+			httpmock.StringResponse(`{
+				"tree": [
+					{"path": "SKILL.md", "type": "blob", "sha": "blobHidden", "size": 50}
+				]
+			}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/blobs/blobHidden"),
+			httpmock.StringResponse(`{"sha": "blobHidden", "content": "`+encodedContent+`", "encoding": "base64"}`),
+		)
+
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdoutTTY(false)
+		ios.SetStdinTTY(false)
+
+		opts := &PreviewOptions{
+			IO:              ios,
+			HttpClient:      func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			Prompter:        &prompter.PrompterMock{},
+			repo:            ghrepo.New("owner", "repo"),
+			SkillName:       "hidden-skill",
+			AllowHiddenDirs: true,
+			Telemetry:       &telemetry.NoOpService{},
+		}
+
+		err := previewRun(opts)
+		require.NoError(t, err)
+		assert.Contains(t, stdout.String(), "My Skill")
+		assert.Contains(t, stderr.String(), "Skills in hidden directories")
+		assert.NotContains(t, stderr.String(), "were excluded")
+	})
+
+	t.Run("only hidden skills without flag returns error", func(t *testing.T) {
+		onlyHiddenTree := `{
+			"sha": "abc123",
+			"truncated": false,
+			"tree": [
+				{"path": ".claude/skills/hidden-skill", "type": "tree", "sha": "treeHidden"},
+				{"path": ".claude/skills/hidden-skill/SKILL.md", "type": "blob", "sha": "blobHidden"}
+			]
+		}`
+
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/releases/latest"),
+			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/trees/abc123"),
+			httpmock.StringResponse(onlyHiddenTree),
+		)
+
+		ios, _, _, _ := iostreams.Test()
+		ios.SetStdoutTTY(false)
+		ios.SetStdinTTY(false)
+
+		opts := &PreviewOptions{
+			IO:         ios,
+			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			Prompter:   &prompter.PrompterMock{},
+			repo:       ghrepo.New("owner", "repo"),
+			SkillName:  "hidden-skill",
+			Telemetry:  &telemetry.NoOpService{},
+		}
+
+		err := previewRun(opts)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no standard skills found")
+		assert.Contains(t, err.Error(), "--allow-hidden-dirs")
+	})
 }

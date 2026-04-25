@@ -857,7 +857,7 @@ func TestInstallRun(t *testing.T) {
 			wantErr: "conflicting names",
 		},
 		{
-			name:  "remote install all with namespaced skills avoids collisions",
+			name:  "remote install all with namespaced skills detects collisions",
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
 				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
@@ -868,7 +868,7 @@ func TestInstallRun(t *testing.T) {
 					`{"path": "skills/bob/xlsx-pro", "type": "tree", "sha": "treeB"}, ` +
 					`{"path": "skills/bob/xlsx-pro/SKILL.md", "type": "blob", "sha": "blobB"}`
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123", treeJSON)
-				// Extra blob stubs consumed by FetchDescriptionsConcurrent during interactive selection.
+				// Blob stubs consumed by FetchDescriptionsConcurrent during interactive selection.
 				contentA := base64.StdEncoding.EncodeToString([]byte("---\nname: xlsx-pro\ndescription: Alice\n---\n# A\n"))
 				contentB := base64.StdEncoding.EncodeToString([]byte("---\nname: xlsx-pro\ndescription: Bob\n---\n# B\n"))
 				reg.Register(
@@ -877,10 +877,6 @@ func TestInstallRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/git/blobs/blobB"),
 					httpmock.StringResponse(fmt.Sprintf(`{"sha": "blobB", "content": %q, "encoding": "base64"}`, contentB)))
-				stubInstallFiles(reg, "monalisa", "skills-repo", "treeA", "blobA",
-					"---\nname: xlsx-pro\ndescription: Alice\n---\n# A\n")
-				stubInstallFiles(reg, "monalisa", "skills-repo", "treeB", "blobB",
-					"---\nname: xlsx-pro\ndescription: Bob\n---\n# B\n")
 			},
 			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
@@ -901,7 +897,7 @@ func TestInstallRun(t *testing.T) {
 					Dir:          t.TempDir(),
 				}
 			},
-			wantStdout: "Installed",
+			wantErr: "conflicting names",
 		},
 		{
 			name:  "remote install friendlyDir shows tilde for home paths",
@@ -1177,7 +1173,7 @@ func TestInstallRun(t *testing.T) {
 					SkillName:   "git-commit",
 				}
 			},
-			wantErr: "supports only github.com",
+			wantErr: "does not currently support GitHub Enterprise Server",
 		},
 		{
 			name:  "select all skills in interactive prompt",
@@ -1670,7 +1666,7 @@ func TestRunLocalInstall(t *testing.T) {
 			wantStdout: "Installed direct-skill",
 		},
 		{
-			name:  "namespaced skills install to separate directories",
+			name:  "namespaced skills with same name collide in flat install",
 			isTTY: true,
 			setup: func(t *testing.T, sourceDir, _ string) {
 				t.Helper()
@@ -1699,38 +1695,25 @@ func TestRunLocalInstall(t *testing.T) {
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 				}
 			},
-			verify: func(t *testing.T, targetDir string) {
-				t.Helper()
-				_, err := os.Stat(filepath.Join(targetDir, "alice", "xlsx-pro", "SKILL.md"))
-				assert.NoError(t, err, "alice/xlsx-pro should be installed")
-				_, err = os.Stat(filepath.Join(targetDir, "bob", "xlsx-pro", "SKILL.md"))
-				assert.NoError(t, err, "bob/xlsx-pro should be installed")
-			},
-			wantStdout: "Installed alice/xlsx-pro",
+			wantErr: "conflicting names",
 		},
 		{
-			name:  "local install with --force overwrites namespaced skill",
+			name:  "local install with --force overwrites namespaced skill flat",
 			isTTY: true,
 			setup: func(t *testing.T, sourceDir, targetDir string) {
 				t.Helper()
-				for _, ns := range []string{"alice", "bob"} {
-					writeLocalTestSkill(t, sourceDir, filepath.Join("skills", ns, "xlsx-pro"),
-						fmt.Sprintf("---\nname: xlsx-pro\ndescription: %s xlsx-pro\n---\n# Test\n", ns))
-				}
-				require.NoError(t, os.MkdirAll(filepath.Join(targetDir, "alice", "xlsx-pro"), 0o755))
+				writeLocalTestSkill(t, sourceDir, filepath.Join("skills", "alice", "xlsx-pro"),
+					"---\nname: xlsx-pro\ndescription: alice xlsx-pro\n---\n# Test\n")
+				require.NoError(t, os.MkdirAll(filepath.Join(targetDir, "xlsx-pro"), 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(targetDir, "xlsx-pro", "SKILL.md"), []byte("old"), 0o644))
 			},
 			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
-				pm := &prompter.PrompterMock{
-					MultiSelectWithSearchFunc: func(_, _ string, _, _ []string, _ func(string) prompter.MultiSelectSearchResult) ([]string, error) {
-						return []string{allSkillsKey}, nil
-					},
-				}
 				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
-					Prompter:     pm,
+					SkillName:    "xlsx-pro",
 					Force:        true,
 					Agent:        "github-copilot",
 					Scope:        "project",
@@ -1738,6 +1721,12 @@ func TestRunLocalInstall(t *testing.T) {
 					Dir:          targetDir,
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 				}
+			},
+			verify: func(t *testing.T, targetDir string) {
+				t.Helper()
+				content, err := os.ReadFile(filepath.Join(targetDir, "xlsx-pro", "SKILL.md"))
+				require.NoError(t, err)
+				assert.Contains(t, string(content), "alice xlsx-pro")
 			},
 			wantStdout: "Installed",
 		},
@@ -2141,11 +2130,12 @@ func Test_isSkillPath(t *testing.T) {
 
 func Test_printReviewHint(t *testing.T) {
 	tests := []struct {
-		name       string
-		repo       string
-		sha        string
-		skillNames []string
-		wantOutput string
+		name            string
+		repo            string
+		sha             string
+		skillNames      []string
+		allowHiddenDirs bool
+		wantOutput      string
 	}{
 		{
 			name:       "remote install with SHA includes SHA in preview command",
@@ -2182,6 +2172,22 @@ func Test_printReviewHint(t *testing.T) {
 			skillNames: []string{},
 			wantOutput: "",
 		},
+		{
+			name:            "allow-hidden-dirs appends flag to preview command",
+			repo:            "owner/repo",
+			sha:             "abc123",
+			skillNames:      []string{"hidden-skill"},
+			allowHiddenDirs: true,
+			wantOutput:      "gh skill preview owner/repo hidden-skill@abc123 --allow-hidden-dirs",
+		},
+		{
+			name:            "allow-hidden-dirs without SHA",
+			repo:            "owner/repo",
+			sha:             "",
+			skillNames:      []string{"hidden-skill"},
+			allowHiddenDirs: true,
+			wantOutput:      "gh skill preview owner/repo hidden-skill --allow-hidden-dirs",
+		},
 	}
 
 	for _, tt := range tests {
@@ -2189,7 +2195,7 @@ func Test_printReviewHint(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 			cs := ios.ColorScheme()
 			var buf strings.Builder
-			printReviewHint(&buf, cs, tt.repo, tt.sha, tt.skillNames)
+			printReviewHint(&buf, cs, tt.repo, tt.sha, tt.skillNames, tt.allowHiddenDirs)
 			if tt.wantOutput == "" {
 				assert.Empty(t, buf.String())
 			} else {
