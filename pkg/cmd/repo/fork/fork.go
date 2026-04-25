@@ -334,8 +334,6 @@ func forkRun(opts *ForkOptions) error {
 
 			if err := gitClient.Fetch(ctx, remoteName, ""); err != nil {
 				fmt.Fprintf(stderr, "warning: failed to fetch %q: %s\n", remoteName, err)
-			} else if err := gitClient.SetRemoteHead(ctx, remoteName); err != nil {
-				fmt.Fprintf(stderr, "warning: failed to set HEAD for %q: %s\n", remoteName, err)
 			}
 		}
 	} else {
@@ -385,10 +383,6 @@ func forkRun(opts *ForkOptions) error {
 
 			if err := gc.Fetch(ctx, upstreamRemote, ""); err != nil {
 				return err
-			}
-
-			if err := gc.SetRemoteHead(ctx, upstreamRemote); err != nil {
-				fmt.Fprintf(stderr, "warning: failed to set HEAD for %q: %s\n", upstreamRemote, err)
 			}
 
 			if connectedToTerminal {

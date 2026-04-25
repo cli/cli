@@ -142,7 +142,7 @@ func (s *commandStub) Output() ([]byte, error) {
 
 // Inject git authentication string for specific git commands.
 func addGitAuthentication(s string) string {
-	pattern := regexp.MustCompile(`( fetch | pull | push | clone | remote add.+-f | remote set-head | submodule )`)
+	pattern := regexp.MustCompile(`( fetch | pull | push | clone | remote add.+-f | submodule )`)
 	loc := pattern.FindStringIndex(s)
 	if loc == nil {
 		return s

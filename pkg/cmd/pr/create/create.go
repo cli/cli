@@ -1239,8 +1239,6 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 
 		if err := gitClient.Fetch(context.Background(), remoteName, ""); err != nil {
 			fmt.Fprintf(opts.IO.ErrOut, "warning: failed to fetch %q: %s\n", remoteName, err)
-		} else if err := gitClient.SetRemoteHead(context.Background(), remoteName); err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "warning: failed to set HEAD for %q: %s\n", remoteName, err)
 		}
 
 		// Only mark `upstream` remote as default if `gh pr create` created the remote.
