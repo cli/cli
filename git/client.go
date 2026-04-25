@@ -830,6 +830,20 @@ func (c *Client) Fetch(ctx context.Context, remote string, refspec string, mods 
 	return cmd.Run()
 }
 
+// SetRemoteHead resolves refs/remotes/<remote>/HEAD to point at the remote's
+// current default branch by querying it over the network (git remote set-head -a).
+func (c *Client) SetRemoteHead(ctx context.Context, remote string, mods ...CommandModifier) error {
+	args := []string{"remote", "set-head", remote, "-a"}
+	cmd, err := c.AuthenticatedCommand(ctx, AllMatchingCredentialsPattern, args...)
+	if err != nil {
+		return err
+	}
+	for _, mod := range mods {
+		mod(cmd)
+	}
+	return cmd.Run()
+}
+
 func (c *Client) Pull(ctx context.Context, remote, branch string, mods ...CommandModifier) error {
 	args := []string{"pull", "--ff-only"}
 	if remote != "" && branch != "" {
