@@ -15,7 +15,7 @@ import (
 func newTestEtagCache(t *testing.T) *etagCache {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "etag")
-	require.NoError(t, os.MkdirAll(dir, 0755))
+	require.NoError(t, os.MkdirAll(dir, 0700))
 	return &etagCache{dir: dir}
 }
 
@@ -79,4 +79,18 @@ func TestEtagCache_CacheKey(t *testing.T) {
 
 	assert.NotEqual(t, key1, key2, "different tokens should produce different keys")
 	assert.Equal(t, key1, key3, "same URL and token should produce the same key")
+
+	req4, _ := http.NewRequest("GET", "https://api.github.com/repos/cli/cli", nil)
+	req4.Header.Set("Authorization", "token AAA")
+	req4.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	key4 := cacheKey(req4)
+	assert.NotEqual(t, key1, key4, "different Accept headers should produce different keys")
+
+	req5, _ := http.NewRequest("GET", "https://api.github.com/repos/cli/cli", nil)
+	req5.Header.Set("Authorization", "token AAA")
+	req5.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	key5 := cacheKey(req5)
+	assert.NotEqual(t, key1, key5, "different API version headers should produce different keys")
 }

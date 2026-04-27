@@ -244,8 +244,14 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return cmdutil.FlagErrorf("the `--paginate` option is not supported for non-GET requests")
 			}
 
-			if opts.ETagCache && opts.RequestMethodPassed && !strings.EqualFold(opts.RequestMethod, "GET") {
-				return cmdutil.FlagErrorf("the `--cache-etag` flag is not supported for non-GET requests")
+			if opts.ETagCache {
+				effectiveMethod := opts.RequestMethod
+				if !opts.RequestMethodPassed && (len(opts.RawFields) > 0 || len(opts.MagicFields) > 0 || opts.RequestInputFile != "") {
+					effectiveMethod = "POST"
+				}
+				if !strings.EqualFold(effectiveMethod, "GET") {
+					return cmdutil.FlagErrorf("the `--cache-etag` flag is not supported for non-GET requests")
+				}
 			}
 
 			if err := cmdutil.MutuallyExclusive(

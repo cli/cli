@@ -73,18 +73,19 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		return nil, err
 	}
 
-	if opts.Config != nil {
-		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
+	if opts.EnableETagCache {
+		cache, err := newEtagCache()
+		if err != nil {
+			return nil, err
+		}
+		client.Transport = &etagTransport{
+			transport: client.Transport,
+			cache:     cache,
+		}
 	}
 
-	if opts.EnableETagCache {
-		cache, cacheErr := newEtagCache()
-		if cacheErr == nil {
-			client.Transport = &etagTransport{
-				transport: client.Transport,
-				cache:     cache,
-			}
-		}
+	if opts.Config != nil {
+		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
 	}
 
 	if opts.TelemetryDisabler != nil {

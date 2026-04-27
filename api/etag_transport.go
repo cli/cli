@@ -65,10 +65,12 @@ func (t *etagTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 // can be written to the cache when the body is closed.
 type etagCacheWriter struct {
 	io.ReadCloser
-	cache  *etagCache
-	key    string
-	header http.Header
-	buf    *bytes.Buffer
+	cache   *etagCache
+	key     string
+	header  http.Header
+	buf     *bytes.Buffer
+	sawEOF  bool
+	readErr bool
 }
 
 func (w *etagCacheWriter) Read(p []byte) (int, error) {
@@ -76,11 +78,19 @@ func (w *etagCacheWriter) Read(p []byte) (int, error) {
 	if n > 0 {
 		w.buf.Write(p[:n])
 	}
+	if err == io.EOF {
+		w.sawEOF = true
+	} else if err != nil {
+		w.readErr = true
+	}
 	return n, err
 }
 
 func (w *etagCacheWriter) Close() error {
 	err := w.ReadCloser.Close()
+	if !w.sawEOF || w.readErr {
+		return err
+	}
 	// Reconstruct a full response for caching
 	cachedResp := &http.Response{
 		StatusCode: http.StatusOK,

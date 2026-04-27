@@ -379,6 +379,16 @@ func Test_NewCmdApi(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name:     "cache-etag with raw fields implies POST",
+			cli:      "user --cache-etag -f key=value",
+			wantsErr: true,
+		},
+		{
+			name:     "cache-etag with input implies POST",
+			cli:      "user --cache-etag --input file.json",
+			wantsErr: true,
+		},
+		{
 			name: "with verbose",
 			cli:  "user --verbose",
 			wants: ApiOptions{

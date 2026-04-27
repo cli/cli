@@ -20,16 +20,22 @@ type etagCache struct {
 
 func newEtagCache() (*etagCache, error) {
 	dir := filepath.Join(ghConfig.CacheDir(), "etag")
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("creating etag cache dir: %w", err)
 	}
 	return &etagCache{dir: dir}, nil
 }
 
-// cacheKey computes a SHA-256 hash of the URL and Authorization header.
+// cacheKey computes a SHA-256 hash of the URL and request headers that affect
+// authorization and response representation.
 func cacheKey(req *http.Request) string {
 	h := sha256.New()
-	fmt.Fprintf(h, "%s\n%s", req.URL.String(), req.Header.Get("Authorization"))
+	fmt.Fprintf(h, "%s\n%s\n%s\n%s",
+		req.URL.String(),
+		req.Header.Get("Authorization"),
+		req.Header.Get("Accept"),
+		req.Header.Get("X-GitHub-Api-Version"),
+	)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
@@ -50,12 +56,28 @@ func (c *etagCache) Load(key string) *http.Response {
 	return resp
 }
 
-// Store serializes a full HTTP response to disk.
-func (c *etagCache) Store(key string, resp *http.Response) error {
-	f, err := os.Create(c.path(key))
+// Store serializes a full HTTP response to disk atomically.
+func (c *etagCache) Store(key string, resp *http.Response) (err error) {
+	tmp, err := os.CreateTemp(c.dir, key+".tmp-*")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return resp.Write(f)
+
+	tmpPath := tmp.Name()
+	defer func() {
+		if err != nil {
+			_ = tmp.Close()
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if err = resp.Write(tmp); err != nil {
+		return err
+	}
+
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(tmpPath, c.path(key))
 }
