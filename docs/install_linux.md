@@ -100,7 +100,7 @@ To install:
 ```bash
 sudo dnf install dnf5-plugins
 sudo dnf config-manager addrepo --from-repofile=https://cli.github.com/packages/rpm/gh-cli.repo
-sudo dnf install gh --enablerepo gh-cli
+sudo dnf install gh
 ```
 
 To upgrade:
@@ -119,7 +119,7 @@ To install:
 ```bash
 sudo dnf install 'dnf-command(config-manager)'
 sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
-sudo dnf install gh --enablerepo gh-cli
+sudo dnf install gh
 ```
 
 To upgrade:
