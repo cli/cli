@@ -110,6 +110,12 @@ type AuthConfig interface {
 	// general configuration, and finally encrypted storage.
 	ActiveToken(hostname string) (token string, source string)
 
+	// ActiveTokenWithError is like ActiveToken but additionally returns any error encountered while resolving
+	// the active token, such as a keyring access timeout. Callers that need to distinguish "no token configured
+	// for this host" from "token resolution failed" should prefer this method so a keyring failure does not
+	// silently produce an unauthenticated request.
+	ActiveTokenWithError(hostname string) (token string, source string, err error)
+
 	// HasEnvToken returns true when a token has been specified in an environment variable, else returns false.
 	HasEnvToken() bool
 

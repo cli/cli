@@ -33,8 +33,20 @@ func Set(service, user, secret string) error {
 	}
 }
 
+// getOverride, when non-nil, intercepts Get calls before they reach the
+// underlying provider. It exists solely to let tests simulate per-(service,user)
+// failure modes that the upstream mock can only express globally.
+var getOverride func(service, user string) (string, error)
+
 // Get secret from keyring given service and user name.
 func Get(service, user string) (string, error) {
+	if fn := getOverride; fn != nil {
+		val, err := fn(service, user)
+		if errors.Is(err, keyring.ErrNotFound) {
+			return "", ErrNotFound
+		}
+		return val, err
+	}
 	ch := make(chan struct {
 		val string
 		err error
@@ -75,8 +87,24 @@ func Delete(service, user string) error {
 
 func MockInit() {
 	keyring.MockInit()
+	getOverride = nil
 }
 
 func MockInitWithError(err error) {
 	keyring.MockInitWithError(err)
+	getOverride = nil
+}
+
+// MockGetOverride installs fn as an interceptor for Get calls. Pass nil to
+// remove the override. Intended for tests that need per-(service,user) failure
+// modes which the upstream mock cannot express.
+//
+// The override is stored in a package-level variable without synchronization,
+// so callers must not use this with t.Parallel(). Either MockInit or
+// MockInitWithError will clear the override, preserving the isolation
+// contract for tests that reset keyring state at setup; callers should still
+// prefer registering t.Cleanup to restore nil promptly when the override is
+// only needed for one test.
+func MockGetOverride(fn func(service, user string) (string, error)) {
+	getOverride = fn
 }

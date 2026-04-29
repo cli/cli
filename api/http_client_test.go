@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -442,6 +443,103 @@ type tinyConfig map[string]string
 
 func (c tinyConfig) ActiveToken(host string) (string, string) {
 	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], "oauth_token"
+}
+
+func TestAddAuthTokenHeaderResolutionPaths(t *testing.T) {
+	resolutionErr := errors.New("simulated keyring failure")
+
+	tests := []struct {
+		name             string
+		path             string
+		token            string
+		err              error
+		wantErr          error
+		wantInnerCalled  bool
+		wantResolverCall bool
+		wantAuthHeader   string
+	}{
+		{
+			name:             "resolution error fails the request",
+			err:              resolutionErr,
+			wantErr:          resolutionErr,
+			wantInnerCalled:  false,
+			wantResolverCall: true,
+		},
+		{
+			name:             "resolved token is attached as Authorization",
+			token:            "RESOLVED-TOKEN",
+			wantInnerCalled:  true,
+			wantResolverCall: true,
+			wantAuthHeader:   "token RESOLVED-TOKEN",
+		},
+		{
+			name:             "empty token with no error proceeds anonymously",
+			wantInnerCalled:  true,
+			wantResolverCall: true,
+		},
+		{
+			name:            "zen proceeds without resolving a token",
+			path:            "/zen",
+			err:             resolutionErr,
+			wantInnerCalled: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var innerCalled bool
+			var resolverCalled bool
+			var captured *http.Request
+			inner := funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+				innerCalled = true
+				captured = req
+				return &http.Response{StatusCode: http.StatusOK}, nil
+			}}
+			rt := addAuthTokenHeader(inner, func(string) (string, error) {
+				resolverCalled = true
+				return tt.token, tt.err
+			})
+
+			req, err := http.NewRequest("GET", "https://api.github.com"+tt.path, nil)
+			require.NoError(t, err)
+
+			_, err = rt.RoundTrip(req)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantInnerCalled, innerCalled)
+			assert.Equal(t, tt.wantResolverCall, resolverCalled)
+			if tt.wantInnerCalled {
+				require.NotNil(t, captured)
+				assert.Equal(t, tt.wantAuthHeader, captured.Header.Get(authorization))
+			}
+		})
+	}
+}
+
+func TestNewHTTPClientUsesTokenResolver(t *testing.T) {
+	resolutionErr := errors.New("simulated keyring failure")
+	var requestReceived bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestReceived = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewHTTPClient(HTTPClientOptions{
+		Config: tinyConfig{},
+		TokenResolver: func(string) (string, error) {
+			return "", resolutionErr
+		},
+	})
+	require.NoError(t, err)
+
+	_, err = client.Get(server.URL)
+
+	require.ErrorIs(t, err, resolutionErr)
+	assert.False(t, requestReceived)
 }
 
 var requestAtRE = regexp.MustCompile(`(?m)^\* Request at .+`)

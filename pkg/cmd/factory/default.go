@@ -191,8 +191,13 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 		if err != nil {
 			return nil, err
 		}
+		authConfig := cfg.Authentication()
 		opts := api.HTTPClientOptions{
-			Config:            cfg.Authentication(),
+			Config: authConfig,
+			TokenResolver: func(hostname string) (string, error) {
+				token, _, err := authConfig.ActiveTokenWithError(hostname)
+				return token, err
+			},
 			Log:               ios.ErrOut,
 			LogColorize:       ios.ColorEnabled(),
 			AppVersion:        appVersion,

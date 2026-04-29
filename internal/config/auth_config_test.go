@@ -76,6 +76,202 @@ func TestHasNoActiveToken(t *testing.T) {
 	require.False(t, hasActiveToken, "expected there to be no active token")
 }
 
+func TestActiveTokenWithErrorFallsBackWhenActiveUserIsBlank(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+	authCfg.cfg.Set([]string{hostsKey, "github.com", userKey}, "")
+	require.NoError(t, keyring.Set(keyringServiceName("github.com"), "", "test-token"))
+
+	token, source, err := authCfg.ActiveTokenWithError("github.com")
+
+	require.NoError(t, err)
+	require.Equal(t, "test-token", token)
+	require.Equal(t, "keyring", source)
+}
+
+func TestActiveTokenWithErrorSurfacesKeyringFailure(t *testing.T) {
+	// Given a host with a configured user whose token lives in the keyring
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
+	require.NoError(t, err)
+
+	// And a keyring that subsequently fails on every access (simulating a
+	// macOS Keychain access timeout or other non-ErrNotFound failure)
+	keyringErr := errors.New("simulated keyring failure")
+	keyring.MockInitWithError(keyringErr)
+
+	// When we resolve the active token via ActiveTokenWithError
+	token, _, err := authCfg.ActiveTokenWithError("github.com")
+
+	// Then the failure is surfaced rather than silently producing an empty
+	// token, so callers can distinguish "no token here" from "keyring is
+	// inaccessible" and avoid sending unauthenticated requests.
+	require.Empty(t, token)
+	require.Error(t, err)
+	require.ErrorIs(t, err, keyringErr)
+	require.ErrorContains(t, err, "github.com")
+}
+
+func TestActiveTokenWithErrorSurfacesUserScopedFailureWhenUnkeyedFallbackIsAbsent(t *testing.T) {
+	// Given a host with a configured user whose user-scoped keyring lookup
+	// fails with a real keyring access error (not ErrNotFound), while the
+	// legacy unkeyed fallback slot is genuinely empty (ErrNotFound).
+	//
+	// This is the regression case for the silent-failure bug: the fallback's
+	// "not found" must not be allowed to mask the user-scoped lookup's real
+	// failure, otherwise AddAuthTokenHeader will proceed unauthenticated.
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
+	require.NoError(t, err)
+
+	keyringErr := errors.New("simulated user-scoped keyring failure")
+	keyring.MockGetOverride(func(_, user string) (string, error) {
+		if user == "" {
+			return "", keyring.ErrNotFound
+		}
+		return "", keyringErr
+	})
+	t.Cleanup(func() { keyring.MockGetOverride(nil) })
+
+	// When we resolve the active token via ActiveTokenWithError
+	token, _, err := authCfg.ActiveTokenWithError("github.com")
+
+	// Then the user-scoped failure is surfaced rather than being masked by
+	// the fallback's ErrNotFound.
+	require.Empty(t, token)
+	require.Error(t, err)
+	require.ErrorIs(t, err, keyringErr)
+	require.ErrorContains(t, err, "github.com")
+}
+
+func TestActiveTokenWithErrorPrefersFallbackErrorWhenBothLookupsFail(t *testing.T) {
+	// Given a host with a configured user where the user-scoped keyring lookup
+	// fails with a real error AND the legacy unkeyed fallback also fails with
+	// a different real error. This locks in the current precedence: when both
+	// lookups produce non-ErrNotFound errors the fallback's error wins, since
+	// the swap at config.go only fires when the fallback returns ErrNotFound.
+	// Either error is "real" enough to surface; this test is characterization:
+	// flipping precedence would silently change which error message users see,
+	// so any future change should be deliberate and update this test.
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
+	require.NoError(t, err)
+
+	userScopedErr := errors.New("simulated user-scoped failure")
+	unkeyedErr := errors.New("simulated unkeyed failure")
+	keyring.MockGetOverride(func(_, user string) (string, error) {
+		if user == "" {
+			return "", unkeyedErr
+		}
+		return "", userScopedErr
+	})
+	t.Cleanup(func() { keyring.MockGetOverride(nil) })
+
+	// When we resolve the active token via ActiveTokenWithError
+	token, _, err := authCfg.ActiveTokenWithError("github.com")
+
+	// Then a real failure is surfaced. The fallback's error is the one that
+	// reaches the wrapper; the user-scoped error is intentionally not
+	// preferred when both are real.
+	require.Empty(t, token)
+	require.Error(t, err)
+	require.ErrorIs(t, err, unkeyedErr)
+	require.NotErrorIs(t, err, userScopedErr)
+	require.ErrorContains(t, err, "github.com")
+}
+
+func TestActiveTokenWithErrorSurfacesUnkeyedFailureWhenUserScopedReturnsNotFound(t *testing.T) {
+	// Given a host with a configured user whose user-scoped keyring lookup
+	// returns ErrNotFound (legitimately empty) while the legacy unkeyed slot
+	// fails with a real keyring access error. The user-scoped ErrNotFound
+	// must not be stashed (it's not a real failure), so the unkeyed real
+	// error reaches the wrapper.
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
+	require.NoError(t, err)
+
+	unkeyedErr := errors.New("simulated unkeyed failure")
+	keyring.MockGetOverride(func(_, user string) (string, error) {
+		if user == "" {
+			return "", unkeyedErr
+		}
+		return "", keyring.ErrNotFound
+	})
+	t.Cleanup(func() { keyring.MockGetOverride(nil) })
+
+	// When we resolve the active token via ActiveTokenWithError
+	token, _, err := authCfg.ActiveTokenWithError("github.com")
+
+	// Then the unkeyed real failure is surfaced.
+	require.Empty(t, token)
+	require.Error(t, err)
+	require.ErrorIs(t, err, unkeyedErr)
+	require.ErrorContains(t, err, "github.com")
+}
+
+func TestActiveTokenSilentlyDiscardsKeyringFailure(t *testing.T) {
+	// Given the same scenario as above
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
+	require.NoError(t, err)
+	keyring.MockInitWithError(errors.New("simulated keyring failure"))
+
+	// When we resolve the active token via the original ActiveToken
+	token, _ := authCfg.ActiveToken("github.com")
+
+	// Then it returns empty without surfacing the error, preserving its
+	// historical signature for existing callers that have not migrated to
+	// ActiveTokenWithError.
+	require.Empty(t, token)
+}
+
+func TestActiveTokenWithErrorDoesNotSurfaceErrNotFound(t *testing.T) {
+	// Given a fresh config with no users and a clean keyring (ErrNotFound
+	// is the legitimate "no token configured for this host" signal)
+	authCfg := newTestAuthConfig(t)
+
+	// When we resolve the active token via ActiveTokenWithError
+	token, _, err := authCfg.ActiveTokenWithError("github.com")
+
+	// Then the empty token is returned without an error, so callers can
+	// proceed anonymously against unconfigured hosts.
+	require.Empty(t, token)
+	require.NoError(t, err)
+}
+
+func TestActiveTokenWithErrorReturnsEnvTokenWithoutKeyring(t *testing.T) {
+	// Given an environment-provided token and a keyring that would fail if
+	// it were consulted
+	t.Setenv("GH_TOKEN", "env-test-token")
+	authCfg := newTestAuthConfig(t)
+	keyring.MockInitWithError(errors.New("keyring should not be consulted"))
+
+	// When we resolve the active token via ActiveTokenWithError
+	token, source, err := authCfg.ActiveTokenWithError("github.com")
+
+	// Then the env-var path short-circuits keyring access entirely and
+	// returns successfully without error.
+	require.NoError(t, err)
+	require.Equal(t, "env-test-token", token)
+	require.Equal(t, "GH_TOKEN", source)
+}
+
+func TestActiveTokenWithErrorReturnsKeyringToken(t *testing.T) {
+	// Given a host with a configured user and a healthy keyring containing
+	// that user's token
+	authCfg := newTestAuthConfig(t)
+	_, err := authCfg.Login("github.com", "test-user", "test-token", "", true)
+	require.NoError(t, err)
+
+	// When we resolve the active token via ActiveTokenWithError
+	token, source, err := authCfg.ActiveTokenWithError("github.com")
+
+	// Then it returns the keyring-stored token with the "keyring" source
+	// label and no error.
+	require.NoError(t, err)
+	require.Equal(t, "test-token", token)
+	require.Equal(t, "keyring", source)
+}
+
 func TestTokenStoredInConfig(t *testing.T) {
 	// Given the user has logged in insecurely
 	authCfg := newTestAuthConfig(t)
