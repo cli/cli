@@ -1222,19 +1222,29 @@ func (c *Client) OwnerIDAndType(login string) (string, OwnerType, error) {
 
 	err := c.doQueryWithProgressIndicator("UserOrgOwner", &query, variables)
 	if err != nil {
-		// Due to the way the queries are structured, we don't know if a login belongs to a user
-		// or to an org, even though they are unique. To deal with this, we try both - if neither
-		// is found, we return the error.
+		// The query asks for both user and organization simultaneously. Since logins are
+		// unique on GitHub, we expect one to succeed and the other to return NOT_FOUND.
+		// We use that NOT_FOUND pattern to determine which type the login belongs to.
+		// If we get a different error (e.g., FORBIDDEN), we return it directly.
 		var graphErr api.GraphQLError
 		if errors.As(err, &graphErr) {
 			if graphErr.Match("NOT_FOUND", "user") && graphErr.Match("NOT_FOUND", "organization") {
 				return "", "", err
-			} else if graphErr.Match("NOT_FOUND", "organization") { // org isn't found must be a user
+			} else if graphErr.Match("NOT_FOUND", "organization") && query.User.Id != "" {
 				return query.User.Id, UserOwner, nil
-			} else if graphErr.Match("NOT_FOUND", "user") { // user isn't found must be an org
+			} else if graphErr.Match("NOT_FOUND", "user") && query.Organization.Id != "" {
 				return query.Organization.Id, OrgOwner, nil
 			}
 		}
+		return "", "", err
+	}
+
+	// When the query succeeds without error, determine owner type from the response.
+	if query.User.Id != "" {
+		return query.User.Id, UserOwner, nil
+	}
+	if query.Organization.Id != "" {
+		return query.Organization.Id, OrgOwner, nil
 	}
 
 	return "", "", errors.New("unknown owner type")
