@@ -177,9 +177,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				return cmdutil.FlagErrorf("specify properties to edit when not running interactively")
 			}
 
-			if opts.Edits.Visibility != nil && !opts.AcceptVisibilityChangeConsequences {
-				return cmdutil.FlagErrorf("use of --visibility flag requires --accept-visibility-change-consequences flag")
-			}
+		if opts.Edits.Visibility != nil && !opts.AcceptVisibilityChangeConsequences {
+			return cmdutil.FlagErrorf("use of --visibility flag requires --accept-visibility-change-consequences flag")
+		}
 
 			if opts.Edits.squashMergeCommitMsg != nil {
 				if opts.Edits.EnableSquashMerge == nil {
@@ -258,6 +258,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			// "hasDiscussionsEnabled",
 			"homepageUrl",
 			"isInOrganization",
+			"isFork",
 			"isTemplate",
 			"mergeCommitAllowed",
 			"rebaseMergeAllowed",
@@ -369,11 +370,13 @@ func interactiveChoice(p iprompter, r *api.Repository) ([]string, error) {
 		// optionDiscussions,
 		optionTemplateRepo,
 		optionTopics,
-		optionVisibility,
 		optionWikis,
 	}
 	if r.IsInOrganization {
 		options = append(options, optionAllowForking)
+	}
+	if !r.IsFork {
+		options = append(options, optionVisibility)
 	}
 	var answers []string
 	selected, err := p.MultiSelect("What do you want to edit?", nil, options)
