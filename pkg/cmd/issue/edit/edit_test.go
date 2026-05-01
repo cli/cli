@@ -342,6 +342,24 @@ func TestNewCmdEdit(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name:  "prefer_editor_prompt config with body-file flag",
+			input: fmt.Sprintf("23 --body-file '%s'", tmpFile),
+			config: func() (gh.Config, error) {
+				return config.NewFromString("prefer_editor_prompt: enabled"), nil
+			},
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				EditorMode:   false,
+				Editable: prShared.Editable{
+					Body: prShared.EditableString{
+						Value:  "a body from file",
+						Edited: true,
+					},
+				},
+			},
+			wantsErr: false,
+		},
+		{
 			name:  "prefer_editor_prompt config with multiple issues and label",
 			input: "23 34 --add-label bug",
 			config: func() (gh.Config, error) {
