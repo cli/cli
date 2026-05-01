@@ -74,7 +74,7 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 		input := api.RepoMetadataInput{
 			Reviewers: needReviewerIDs,
 			TeamReviewers: needReviewerIDs && slices.ContainsFunc(tb.Reviewers, func(r string) bool {
-				return strings.ContainsRune(r, '/')
+				return strings.ContainsRune(strings.TrimPrefix(r, "@"), '/')
 			}),
 			Assignees:  needAssigneeIDs,
 			Labels:     len(tb.Labels) > 0,
@@ -132,6 +132,8 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	var botReviewers []string
 	var teamReviewers []string
 	for _, r := range tb.Reviewers {
+		// Strip a leading "@" that users commonly include (e.g. "@org/team" or "@user")
+		r = strings.TrimPrefix(r, "@")
 		if strings.ContainsRune(r, '/') {
 			teamReviewers = append(teamReviewers, r)
 		} else if r == api.CopilotReviewerLogin {
