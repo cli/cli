@@ -39,6 +39,9 @@ type Config interface {
 	AccessibleColors(hostname string) ConfigEntry
 	// AccessiblePrompter returns the configured accessible_prompter setting, optionally scoped by host.
 	AccessiblePrompter(hostname string) ConfigEntry
+	// APIBaseURL returns the host-specific API base URL override.
+	// It does not fall back to top-level config.
+	APIBaseURL(hostname string) ConfigEntry
 	// Browser returns the configured browser, optionally scoped by host.
 	Browser(hostname string) ConfigEntry
 	// ColorLabels returns the configured color_label setting, optionally scoped by host.

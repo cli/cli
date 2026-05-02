@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -15,6 +16,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	configDir, err := os.MkdirTemp("", "gh-cli-api-test")
+	if err != nil {
+		panic(err)
+	}
+
+	os.Setenv("GH_CONFIG_DIR", configDir)
+	os.Unsetenv("GH_HOST")
+
+	code := m.Run()
+	os.RemoveAll(configDir)
+	os.Exit(code)
+}
 
 func TestNewHTTPClient(t *testing.T) {
 	type args struct {
@@ -190,6 +205,7 @@ func TestNewHTTPClient(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			gotReq = nil
 			req, err := http.NewRequest("GET", ts.URL, nil)
 			req.Header.Set("time-zone", "Europe/Amsterdam")
 			req.Host = tt.host
@@ -198,6 +214,7 @@ func TestNewHTTPClient(t *testing.T) {
 			res, err := client.Do(req)
 
 			require.NoError(t, err)
+			require.NotNil(t, gotReq)
 
 			for name, value := range tt.wantHeader {
 				assert.Equal(t, value, gotReq.Header.Values(name), name)
@@ -241,6 +258,82 @@ func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
 	assert.Equal(t, "token REDIRECT-TOKEN", redirectRequest.Header.Get(authorization))
 	assert.Equal(t, "", request.Header.Get(authorization))
 	assert.Equal(t, 204, res.StatusCode)
+}
+
+func TestHTTPClientAPIBaseURLRewriteUsesCanonicalHostForAuth(t *testing.T) {
+	var gotReq *http.Request
+	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotReq = r
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer proxyServer.Close()
+
+	client, err := NewHTTPClient(HTTPClientOptions{
+		APIBaseURL: func(hostname string) string {
+			if hostname == "git.corp.example.com" {
+				return proxyServer.URL
+			}
+			return ""
+		},
+		Config: tinyConfig{
+			"git.corp.example.com:oauth_token":                              "CANONICAL-TOKEN",
+			strings.TrimPrefix(proxyServer.URL, "http://") + ":oauth_token": "PROXY-TOKEN",
+		},
+	})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", "https://git.corp.example.com/api/v3/user", nil)
+	require.NoError(t, err)
+
+	res, err := client.Do(req)
+	require.NoError(t, err)
+
+	require.NotNil(t, gotReq)
+	assert.Equal(t, http.StatusNoContent, res.StatusCode)
+	assert.Equal(t, "/api/v3/user", gotReq.URL.Path)
+	assert.Equal(t, strings.TrimPrefix(proxyServer.URL, "http://"), gotReq.Host)
+	assert.Equal(t, "token CANONICAL-TOKEN", gotReq.Header.Get(authorization))
+}
+
+func TestHTTPClientAPIBaseURLRewriteRejectsQueryAndFragment(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseURL string
+	}{
+		{
+			name:    "rejects query",
+			baseURL: "https://github-proxy.example.com/api?foo=bar",
+		},
+		{
+			name:    "rejects fragment",
+			baseURL: "https://github-proxy.example.com/api#fragment",
+		},
+		{
+			name:    "rejects query and fragment",
+			baseURL: "https://github-proxy.example.com/api?foo=bar#fragment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := NewHTTPClient(HTTPClientOptions{
+				APIBaseURL: func(hostname string) string {
+					if hostname == "git.corp.example.com" {
+						return tt.baseURL
+					}
+					return ""
+				},
+			})
+			require.NoError(t, err)
+
+			req, err := http.NewRequest("GET", "https://git.corp.example.com/api/v3/user", nil)
+			require.NoError(t, err)
+
+			_, err = client.Do(req)
+			require.EqualError(t, err,
+				`Get "https://git.corp.example.com/api/v3/user": invalid api_base_url for git.corp.example.com: must not include query or fragment`)
+		})
+	}
 }
 
 func TestHTTPClientSanitizeJSONControlCharactersC0(t *testing.T) {

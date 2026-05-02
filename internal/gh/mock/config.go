@@ -32,6 +32,9 @@ var _ gh.Config = &ConfigMock{}
 //			AuthenticationFunc: func() gh.AuthConfig {
 //				panic("mock out the Authentication method")
 //			},
+//			APIBaseURLFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the APIBaseURL method")
+//			},
 //			BrowserFunc: func(hostname string) gh.ConfigEntry {
 //				panic("mock out the Browser method")
 //			},
@@ -99,6 +102,9 @@ type ConfigMock struct {
 	// AuthenticationFunc mocks the Authentication method.
 	AuthenticationFunc func() gh.AuthConfig
 
+	// APIBaseURLFunc mocks the APIBaseURL method.
+	APIBaseURLFunc func(hostname string) gh.ConfigEntry
+
 	// BrowserFunc mocks the Browser method.
 	BrowserFunc func(hostname string) gh.ConfigEntry
 
@@ -164,6 +170,11 @@ type ConfigMock struct {
 		}
 		// Authentication holds details about calls to the Authentication method.
 		Authentication []struct {
+		}
+		// APIBaseURL holds details about calls to the APIBaseURL method.
+		APIBaseURL []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
 		}
 		// Browser holds details about calls to the Browser method.
 		Browser []struct {
@@ -248,6 +259,7 @@ type ConfigMock struct {
 	lockAccessiblePrompter sync.RWMutex
 	lockAliases            sync.RWMutex
 	lockAuthentication     sync.RWMutex
+	lockAPIBaseURL         sync.RWMutex
 	lockBrowser            sync.RWMutex
 	lockCacheDir           sync.RWMutex
 	lockColorLabels        sync.RWMutex
@@ -381,6 +393,38 @@ func (mock *ConfigMock) AuthenticationCalls() []struct {
 	mock.lockAuthentication.RLock()
 	calls = mock.calls.Authentication
 	mock.lockAuthentication.RUnlock()
+	return calls
+}
+
+// APIBaseURL calls APIBaseURLFunc.
+func (mock *ConfigMock) APIBaseURL(hostname string) gh.ConfigEntry {
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockAPIBaseURL.Lock()
+	mock.calls.APIBaseURL = append(mock.calls.APIBaseURL, callInfo)
+	mock.lockAPIBaseURL.Unlock()
+	if mock.APIBaseURLFunc == nil {
+		return gh.ConfigEntry{Value: "", Source: gh.ConfigDefaultProvided}
+	}
+	return mock.APIBaseURLFunc(hostname)
+}
+
+// APIBaseURLCalls gets all the calls that were made to APIBaseURL.
+// Check the length with:
+//
+//	len(mockedConfig.APIBaseURLCalls())
+func (mock *ConfigMock) APIBaseURLCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockAPIBaseURL.RLock()
+	calls = mock.calls.APIBaseURL
+	mock.lockAPIBaseURL.RUnlock()
 	return calls
 }
 

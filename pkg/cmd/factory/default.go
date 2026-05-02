@@ -197,6 +197,9 @@ func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams,
 			AppVersion:        appVersion,
 			InvokingAgent:     invokingAgent,
 			TelemetryDisabler: telemetryDisabler,
+			APIBaseURL: func(hostname string) string {
+				return cfg.APIBaseURL(hostname).Value
+			},
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {

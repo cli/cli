@@ -20,6 +20,7 @@ const (
 	accessibleColorsKey   = "accessible_colors" // used by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
 	accessiblePrompterKey = "accessible_prompter"
 	aliasesKey            = "aliases"
+	apiBaseURLKey         = "api_base_url"
 	browserKey            = "browser" // used by cli/go-gh to open URLs in web browsers
 	colorLabelsKey        = "color_labels"
 	editorKey             = "editor" // used by cli/go-gh to open interactive text editor
@@ -125,6 +126,14 @@ func (c *cfg) AccessiblePrompter(hostname string) gh.ConfigEntry {
 	return c.GetOrDefault(hostname, accessiblePrompterKey).Unwrap()
 }
 
+func (c *cfg) APIBaseURL(hostname string) gh.ConfigEntry {
+	if hostname == "" {
+		return gh.ConfigEntry{Value: "", Source: gh.ConfigDefaultProvided}
+	}
+	
+	return c.GetOrDefault(hostname, apiBaseURLKey).Unwrap()
+}
+
 func (c *cfg) Browser(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, browserKey).Unwrap()
@@ -215,7 +224,7 @@ func (c *cfg) CacheDir() string {
 func defaultFor(key string) o.Option[string] {
 	for _, co := range Options {
 		if co.Key == key {
-			return o.Some(co.DefaultValue)
+		return o.Some(co.DefaultValue)
 		}
 	}
 	return o.None[string]()
@@ -686,6 +695,14 @@ var Options = []ConfigOption{
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Spinner(hostname).Value
+		},
+	},
+	{
+		Key:         apiBaseURLKey,
+		Description: "the base URL to use for GitHub API requests for this host",
+		DefaultValue: "",
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.APIBaseURL(hostname).Value
 		},
 	},
 	{

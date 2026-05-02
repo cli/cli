@@ -129,6 +129,16 @@ func TestGetOrDefaultHostnameSpecificKeyFallsBackToTopLevel(t *testing.T) {
 	require.Equal(t, gh.ConfigUserProvided, entry.Source)
 }
 
+func TestAPIBaseURLDoesNotFallBackToTopLevel(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.cfg.Set([]string{apiBaseURLKey}, "https://top-level-proxy.example.com")
+
+	entry := cfg.APIBaseURL("git.corp.example.com")
+
+	require.Equal(t, "", entry.Value)
+	require.Equal(t, gh.ConfigDefaultProvided, entry.Source)
+}
+
 func TestFallbackConfig(t *testing.T) {
 	cfg := fallbackConfig()
 	requireKeyWithValue(t, cfg, []string{gitProtocolKey}, "https")

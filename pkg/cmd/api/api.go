@@ -388,6 +388,7 @@ func apiRun(opts *ApiOptions) error {
 			opts := api.HTTPClientOptions{
 				AppVersion:     opts.AppVersion,
 				InvokingAgent:  opts.InvokingAgent,
+				APIBaseURL:     func(hostname string) string { return cfg.APIBaseURL(hostname).Value },
 				CacheTTL:       opts.CacheTTL,
 				Config:         cfg.Authentication(),
 				EnableCache:    opts.CacheTTL > 0,
