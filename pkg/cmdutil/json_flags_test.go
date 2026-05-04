@@ -157,6 +157,87 @@ func TestAddJSONFlagsWithoutShorthand(t *testing.T) {
 	}
 }
 
+func TestAddJSONAndJQFlags(t *testing.T) {
+	tests := []struct {
+		name        string
+		fields      []string
+		args        []string
+		addTplFlag  bool
+		wantsExport *jsonExporter
+		wantsError  string
+	}{
+		{
+			name:   "adds json and jq flags only",
+			fields: []string{"id", "url", "number"},
+			args:   []string{"--json", "id,url"},
+			wantsExport: &jsonExporter{
+				fields:   []string{"id", "url"},
+				filter:   "",
+				template: "",
+			},
+		},
+		{
+			name:   "with jq filter",
+			fields: []string{"id", "url", "number"},
+			args:   []string{"--json", "number", "--jq", ".number"},
+			wantsExport: &jsonExporter{
+				fields:   []string{"number"},
+				filter:   ".number",
+				template: "",
+			},
+		},
+		{
+			name:       "host template flag coexists with json",
+			fields:     []string{"id", "url", "number"},
+			args:       []string{"--json", "number", "--template", "pull_request_template.md"},
+			addTplFlag: true,
+			wantsExport: &jsonExporter{
+				fields:   []string{"number"},
+				filter:   "",
+				template: "",
+			},
+		},
+		{
+			name:       "cannot use jq without json",
+			fields:     []string{"id", "url", "number"},
+			args:       []string{"--jq", ".number"},
+			wantsError: "cannot use `--jq` without specifying `--json`",
+		},
+		{
+			name:       "invalid json field",
+			fields:     []string{"id", "url", "number"},
+			args:       []string{"--json", "bogus"},
+			wantsError: "Unknown JSON field: \"bogus\"\nAvailable fields:\n  id\n  number\n  url",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{Run: func(*cobra.Command, []string) {}}
+			if tt.addTplFlag {
+				// Simulate a command that already has --template for a different purpose.
+				cmd.Flags().StringP("template", "T", "", "Template file")
+			}
+			var exporter Exporter
+			AddJSONAndJQFlags(cmd, &exporter, tt.fields)
+			cmd.SetArgs(tt.args)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			_, err := cmd.ExecuteC()
+			if tt.wantsError == "" {
+				require.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantsError)
+				return
+			}
+			if tt.wantsExport == nil {
+				assert.Nil(t, exporter)
+			} else {
+				assert.Equal(t, tt.wantsExport, exporter)
+			}
+		})
+	}
+}
+
 // TestAddJSONFlagsSetsAnnotations asserts that `AddJSONFlags` function adds the
 // appropriate annotation to the command, which could later be used by doc
 // generator functions.
