@@ -472,7 +472,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 					url
 				}
 			}
-	}`
+		}`
 
 	inputParams := map[string]interface{}{
 		"repositoryId": repo.ID,

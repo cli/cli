@@ -236,6 +236,10 @@ func (e *jsonExporter) SetFields(fields []string) {
 	e.fields = fields
 }
 
+func (e *jsonExporter) SetFilter(filter string) {
+	e.filter = filter
+}
+
 // Write serializes data into JSON output written to w. If the object passed as data implements exportable,
 // or if data is a map or slice of exportable object, ExportData() will be called on each object to obtain
 // raw data for serialization.

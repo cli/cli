@@ -225,6 +225,12 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name:     "web and json",
+			tty:      false,
+			cli:      "--title mytitle --body '' --web --json id",
+			wantsErr: true,
+		},
+		{
 			name:     "editor by cli",
 			tty:      true,
 			cli:      "--editor",
@@ -428,6 +434,87 @@ func Test_createRun(t *testing.T) {
 				opts.Title = "my title"
 				opts.Body = "my body"
 				opts.HeadBranch = "feature"
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(createOutputFields)
+				opts.Exporter = exporter
+				return func() {}
+			},
+			expectedOut: "{\"id\":\"\",\"number\":12,\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
+		},
+		{
+			name: "tty json output",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"Number": 12,
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]interface{}) {}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(createOutputFields)
+				opts.Exporter = exporter
+				return func() {}
+			},
+			expectedOut:    "{\"id\":\"\",\"number\":12,\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "json output with jq filter",
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"Number": 12,
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]interface{}) {}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(createOutputFields)
+				exporter.SetFilter(".number")
+				opts.Exporter = exporter
+				return func() {}
+			},
+			expectedOut: "12\n",
+		},
+		{
+			name: "json output with pr template",
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"Number": 12,
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`,
+						func(input map[string]interface{}) {
+							assert.Equal(t, "my title", input["title"])
+						}))
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				opts.Template = "bug_fix.md"
 				exporter := cmdutil.NewJSONExporter()
 				exporter.SetFields(createOutputFields)
 				opts.Exporter = exporter
