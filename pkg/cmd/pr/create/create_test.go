@@ -419,6 +419,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
+							"ID": "PR_kwDOA1KnGc6WELLE",
 							"Number": 12,
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
@@ -439,7 +440,7 @@ func Test_createRun(t *testing.T) {
 				opts.Exporter = exporter
 				return func() {}
 			},
-			expectedOut: "{\"id\":\"\",\"number\":12,\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
+			expectedOut: "{\"id\":\"PR_kwDOA1KnGc6WELLE\",\"number\":12,\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
 		},
 		{
 			name: "tty json output",
@@ -449,6 +450,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
+							"ID": "PR_kwDOA1KnGc6WELLE",
 							"Number": 12,
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
@@ -465,7 +467,7 @@ func Test_createRun(t *testing.T) {
 				opts.Exporter = exporter
 				return func() {}
 			},
-			expectedOut:    "{\"id\":\"\",\"number\":12,\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
+			expectedOut:    "{\"id\":\"PR_kwDOA1KnGc6WELLE\",\"number\":12,\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 		{
@@ -475,6 +477,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
+							"ID": "PR_kwDOA1KnGc6WELLE",
 							"Number": 12,
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
@@ -501,6 +504,7 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
 						{ "data": { "createPullRequest": { "pullRequest": {
+							"ID": "PR_kwDOA1KnGc6WELLE",
 							"Number": 12,
 							"URL": "https://github.com/OWNER/REPO/pull/12"
 						} } } }`,
@@ -520,7 +524,7 @@ func Test_createRun(t *testing.T) {
 				opts.Exporter = exporter
 				return func() {}
 			},
-			expectedOut: "{\"id\":\"\",\"number\":12,\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
+			expectedOut: "{\"id\":\"PR_kwDOA1KnGc6WELLE\",\"number\":12,\"url\":\"https://github.com/OWNER/REPO/pull/12\"}\n",
 		},
 		{
 			name: "json output does not print URL",
