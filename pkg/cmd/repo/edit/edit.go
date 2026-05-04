@@ -298,6 +298,17 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		}
 	}
 
+	if opts.Edits.Visibility != nil {
+		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
+		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, []string{"isFork"})
+		if err != nil {
+			return err
+		}
+		if fetchedRepo.IsFork {
+			return fmt.Errorf("cannot change the visibility of a fork repository")
+		}
+	}
+
 	apiPath := fmt.Sprintf("repos/%s/%s", repo.RepoOwner(), repo.RepoName())
 
 	body := &bytes.Buffer{}
