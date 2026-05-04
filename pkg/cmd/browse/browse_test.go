@@ -674,6 +674,45 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/owner/repo/blame/abc123/src/app.js#L50",
 			wantsErr:    false,
 		},
+		{
+			name: "decimal-only short SHA that is a valid commit",
+			opts: BrowseOptions{
+				SelectorArg: "309628980",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("HEAD", "repos/cli/cli/commits/309628980"),
+					httpmock.StatusStringResponse(200, ""),
+				)
+			},
+			baseRepo:    ghrepo.New("cli", "cli"),
+			expectedURL: "https://github.com/cli/cli/commit/309628980",
+			wantsErr:    false,
+		},
+		{
+			name: "decimal-only string that is not a valid commit",
+			opts: BrowseOptions{
+				SelectorArg: "1234567",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("HEAD", "repos/cli/cli/commits/1234567"),
+					httpmock.StatusStringResponse(404, ""),
+				)
+			},
+			baseRepo:    ghrepo.New("cli", "cli"),
+			expectedURL: "https://github.com/cli/cli/issues/1234567",
+			wantsErr:    false,
+		},
+		{
+			name: "decimal-only short SHA with # prefix forces issue",
+			opts: BrowseOptions{
+				SelectorArg: "#309628980",
+			},
+			baseRepo:    ghrepo.New("cli", "cli"),
+			expectedURL: "https://github.com/cli/cli/issues/309628980",
+			wantsErr:    false,
+		},
 	}
 
 	for _, tt := range tests {
