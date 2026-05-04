@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -1007,4 +1008,150 @@ func (s *stubProgressIndicator) StartProgressIndicator() {
 
 func (s *stubProgressIndicator) StopProgressIndicator() {
 	s.stopCalled = true
+}
+
+func TestPreloadPrFiles(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupPR   func() *api.PullRequest
+		httpStub  func(*httpmock.Registry)
+		wantPaths []string
+	}{
+		{
+			name: "no pagination needed",
+			setupPR: func() *api.PullRequest {
+				pr := &api.PullRequest{}
+				pr.Files.Nodes = []api.PullRequestFile{
+					{Path: "file1.go"},
+				}
+				return pr
+			},
+			wantPaths: []string{"file1.go"},
+		},
+		{
+			name: "paginates through additional pages",
+			setupPR: func() *api.PullRequest {
+				pr := &api.PullRequest{ID: "PR_123"}
+				pr.Files.Nodes = []api.PullRequestFile{
+					{Path: "file1.go"},
+				}
+				pr.Files.PageInfo.HasNextPage = true
+				pr.Files.PageInfo.EndCursor = "page1"
+				return pr
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query FilesForPullRequest\b`),
+					httpmock.StringResponse(`{"data":{"node":{"files":{
+						"nodes":[{"path":"file2.go","additions":5,"deletions":2,"changeType":"ADDED"}],
+						"pageInfo":{"hasNextPage":true,"endCursor":"page2"}}}}}`),
+				)
+				r.Register(
+					httpmock.GraphQL(`query FilesForPullRequest\b`),
+					httpmock.StringResponse(`{"data":{"node":{"files":{
+						"nodes":[{"path":"file3.go","additions":1,"deletions":0,"changeType":"ADDED"}],
+						"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}`),
+				)
+			},
+			wantPaths: []string{"file1.go", "file2.go", "file3.go"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStub != nil {
+				tt.httpStub(reg)
+			}
+
+			client := &http.Client{Transport: reg}
+			repo := ghrepo.New("OWNER", "REPO")
+			pr := tt.setupPR()
+
+			err := preloadPrFiles(client, repo, pr)
+			require.NoError(t, err)
+
+			var gotPaths []string
+			for _, f := range pr.Files.Nodes {
+				gotPaths = append(gotPaths, f.Path)
+			}
+			assert.Equal(t, tt.wantPaths, gotPaths)
+			assert.False(t, pr.Files.PageInfo.HasNextPage)
+		})
+	}
+}
+
+func TestPreloadPrCommits(t *testing.T) {
+	tests := []struct {
+		name     string
+		setupPR  func() *api.PullRequest
+		httpStub func(*httpmock.Registry)
+		wantOIDs []string
+	}{
+		{
+			name: "no pagination needed",
+			setupPR: func() *api.PullRequest {
+				pr := &api.PullRequest{}
+				pr.Commits.TotalCount = 1
+				pr.Commits.Nodes = []api.PullRequestCommit{
+					{Commit: api.PullRequestCommitCommit{OID: "aaa"}},
+				}
+				return pr
+			},
+			wantOIDs: []string{"aaa"},
+		},
+		{
+			name: "paginates through additional pages",
+			setupPR: func() *api.PullRequest {
+				pr := &api.PullRequest{ID: "PR_123"}
+				pr.Commits.Nodes = []api.PullRequestCommit{
+					{Commit: api.PullRequestCommitCommit{OID: "aaa"}},
+				}
+				pr.Commits.PageInfo.HasNextPage = true
+				pr.Commits.PageInfo.EndCursor = "page1"
+				return pr
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query CommitsForPullRequest\b`),
+					httpmock.StringResponse(`{"data":{"node":{"commits":{
+						"nodes":[{"commit":{"oid":"bbb","authors":{"nodes":[]},"messageHeadline":"second","messageBody":"","committedDate":"2025-01-01T00:00:00Z","authoredDate":"2025-01-01T00:00:00Z"}}],
+						"pageInfo":{"hasNextPage":true,"endCursor":"page2"}}}}}`),
+				)
+				r.Register(
+					httpmock.GraphQL(`query CommitsForPullRequest\b`),
+					httpmock.StringResponse(`{"data":{"node":{"commits":{
+						"nodes":[{"commit":{"oid":"ccc","authors":{"nodes":[]},"messageHeadline":"third","messageBody":"","committedDate":"2025-01-01T00:00:00Z","authoredDate":"2025-01-01T00:00:00Z"}}],
+						"pageInfo":{"hasNextPage":false,"endCursor":""}}}}}`),
+				)
+			},
+			wantOIDs: []string{"aaa", "bbb", "ccc"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStub != nil {
+				tt.httpStub(reg)
+			}
+
+			client := &http.Client{Transport: reg}
+			repo := ghrepo.New("OWNER", "REPO")
+			pr := tt.setupPR()
+
+			err := preloadPrCommits(client, repo, pr)
+			require.NoError(t, err)
+
+			var gotOIDs []string
+			for _, c := range pr.Commits.Nodes {
+				gotOIDs = append(gotOIDs, c.Commit.OID)
+			}
+			assert.Equal(t, tt.wantOIDs, gotOIDs)
+			assert.Equal(t, len(tt.wantOIDs), pr.Commits.TotalCount)
+			assert.False(t, pr.Commits.PageInfo.HasNextPage)
+		})
+	}
 }
