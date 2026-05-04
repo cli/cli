@@ -15,11 +15,13 @@ import (
 	gitIgnoreCmd "github.com/cli/cli/v2/pkg/cmd/repo/gitignore"
 	licenseCmd "github.com/cli/cli/v2/pkg/cmd/repo/license"
 	repoListCmd "github.com/cli/cli/v2/pkg/cmd/repo/list"
+	repoLsFilesCmd "github.com/cli/cli/v2/pkg/cmd/repo/ls-files"
 	repoRenameCmd "github.com/cli/cli/v2/pkg/cmd/repo/rename"
 	repoDefaultCmd "github.com/cli/cli/v2/pkg/cmd/repo/setdefault"
 	repoSyncCmd "github.com/cli/cli/v2/pkg/cmd/repo/sync"
 	repoUnarchiveCmd "github.com/cli/cli/v2/pkg/cmd/repo/unarchive"
 	repoViewCmd "github.com/cli/cli/v2/pkg/cmd/repo/view"
+	repoViewFileCmd "github.com/cli/cli/v2/pkg/cmd/repo/view-file"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -52,6 +54,8 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 
 	cmdutil.AddGroup(cmd, "Targeted commands",
 		repoViewCmd.NewCmdView(f, nil),
+		repoViewFileCmd.NewCmdViewFile(f, nil),
+		repoLsFilesCmd.NewCmdLsFiles(f, nil),
 		repoCloneCmd.NewCmdClone(f, nil),
 		repoForkCmd.NewCmdFork(f, nil),
 		repoDefaultCmd.NewCmdSetDefault(f, nil),
