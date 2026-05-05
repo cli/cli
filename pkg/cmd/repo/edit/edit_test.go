@@ -709,10 +709,23 @@ func Test_editRun_interactive(t *testing.T) {
 				InteractiveMode: true,
 			},
 			promptStubs: func(pm *prompter.MockPrompter) {
-				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
-					func(_ string, _, opts []string) ([]int, error) {
-						return []int{8}, nil
-					})
+				// Verify that "Visibility" is not in the list of options
+				pm.RegisterMultiSelect("What do you want to edit?", nil, []string{
+					"Default Branch Name",
+					"Description",
+					"Home Page URL",
+					"Issues",
+					"Merge Options",
+					"Projects",
+					"Template Repository",
+					"Topics",
+					"Wikis",
+				}, func(_ string, _, _ []string) ([]int, error) {
+					return []int{1}, nil // Select Description instead
+				})
+				pm.RegisterInput("Description of the repository", func(_, _ string) (string, error) {
+					return "new description", nil
+				})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -735,8 +748,13 @@ func Test_editRun_interactive(t *testing.T) {
 							}
 						}
 					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "new description", payload["description"])
+						assert.NotContains(t, payload, "visibility")
+					}))
 			},
-			wantsErr: "cannot change the visibility of a forked repository",
 		},
 		{
 			name: "updates repo merge options without squash",

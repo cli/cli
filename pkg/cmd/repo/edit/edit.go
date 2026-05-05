@@ -387,13 +387,20 @@ func interactiveChoice(p iprompter, r *api.Repository) ([]string, error) {
 	if r.IsInOrganization {
 		options = append(options, optionAllowForking)
 	}
+	var filteredOptions []string
+	for _, o := range options {
+		if o == optionVisibility && r.IsFork {
+			continue
+		}
+		filteredOptions = append(filteredOptions, o)
+	}
 	var answers []string
-	selected, err := p.MultiSelect("What do you want to edit?", nil, options)
+	selected, err := p.MultiSelect("What do you want to edit?", nil, filteredOptions)
 	if err != nil {
 		return nil, err
 	}
 	for _, i := range selected {
-		answers = append(answers, options[i])
+		answers = append(answers, filteredOptions[i])
 	}
 
 	return answers, err
@@ -465,9 +472,6 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 			opts.Edits.EnableProjects = &a
 		case optionVisibility:
-			if r.IsFork {
-				return fmt.Errorf("cannot change the visibility of a forked repository")
-			}
 			cs := opts.IO.ColorScheme()
 			fmt.Fprintf(opts.IO.ErrOut, "%s Danger zone: changing repository visibility can have unexpected consequences; consult https://gh.io/setting-repository-visibility before continuing.\n", cs.WarningIcon())
 
