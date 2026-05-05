@@ -308,6 +308,28 @@ func Test_editRun(t *testing.T) {
 			},
 			wantsErr: "you do not have sufficient permissions to edit repository security and analysis features",
 		},
+		{
+			name: "non-interactive visibility change on fork",
+			opts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					Visibility: sp("private"),
+				},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"isFork": true
+							}
+						}
+					}`))
+			},
+			wantsErr: "cannot change the visibility of a forked repository",
+		},
 	}
 
 	for _, tt := range tests {
@@ -679,6 +701,42 @@ func Test_editRun_interactive(t *testing.T) {
 						assert.Equal(t, []interface{}{"a", "b", "c", "d"}, payload["names"])
 					}))
 			},
+		},
+		{
+			name: "visibility change on fork",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterMultiSelect("What do you want to edit?", nil, editList,
+					func(_ string, _, opts []string) ([]int, error) {
+						return []int{8}, nil
+					})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"isFork": true,
+								"visibility": "public",
+								"description": "description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"isInOrganization": false,
+								"repositoryTopics": {
+									"nodes": []
+								}
+							}
+						}
+					}`))
+			},
+			wantsErr: "cannot change the visibility of a forked repository",
 		},
 		{
 			name: "updates repo merge options without squash",

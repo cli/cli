@@ -257,6 +257,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			// TODO: GitHub Enterprise Server does not support has_discussions yet
 			// "hasDiscussionsEnabled",
 			"homepageUrl",
+			"isFork",
 			"isInOrganization",
 			"isTemplate",
 			"mergeCommitAllowed",
@@ -295,6 +296,17 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		}
 		if !repo.ViewerCanAdminister {
 			return fmt.Errorf("you do not have sufficient permissions to edit repository security and analysis features")
+		}
+	}
+
+	if !opts.InteractiveMode && opts.Edits.Visibility != nil {
+		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
+		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, []string{"isFork"})
+		if err != nil {
+			return err
+		}
+		if fetchedRepo.IsFork {
+			return fmt.Errorf("cannot change the visibility of a forked repository")
 		}
 	}
 
@@ -453,6 +465,9 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 			opts.Edits.EnableProjects = &a
 		case optionVisibility:
+			if r.IsFork {
+				return fmt.Errorf("cannot change the visibility of a forked repository")
+			}
 			cs := opts.IO.ColorScheme()
 			fmt.Fprintf(opts.IO.ErrOut, "%s Danger zone: changing repository visibility can have unexpected consequences; consult https://gh.io/setting-repository-visibility before continuing.\n", cs.WarningIcon())
 
