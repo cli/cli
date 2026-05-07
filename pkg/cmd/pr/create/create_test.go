@@ -1010,6 +1010,35 @@ func Test_createRun(t *testing.T) {
 			wantErr: "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123",
 		},
 		{
+			name: "continue in browser with quoted branch",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.BodyProvided = true
+				opts.Body = "body"
+				opts.HeadBranch = `test-"quoted"-branch-pr`
+				return func() {}
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.test-"quoted"-branch-pr`, 0, "")
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.InputFunc = func(p, d string) (string, error) {
+					if p == "Title (required)" {
+						return "title", nil
+					}
+					return "", prompter.NoSuchPromptErr(p)
+				}
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "What's next?" {
+						return prompter.IndexFor(opts, "Continue in browser")
+					}
+					return -1, prompter.NoSuchPromptErr(p)
+				}
+			},
+			expectedErrOut: "\nCreating pull request for test-\"quoted\"-branch-pr into master in OWNER/REPO\n\nOpening https://github.com/OWNER/REPO/compare/master...test-%22quoted%22-branch-pr in your browser.\n",
+			expectedBrowse: "https://github.com/OWNER/REPO/compare/master...test-%22quoted%22-branch-pr?body=body&expand=1&title=title",
+		},
+		{
 			name: "web",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
@@ -2380,6 +2409,20 @@ func Test_generateCompareURL(t *testing.T) {
 				Labels: []string{"one", "two three"},
 			},
 			want:    "https://github.com/OWNER/REPO/compare/a...b?body=&expand=1&labels=one%2Ctwo+three",
+			wantErr: false,
+		},
+		{
+			name: "quotes in branch names are percent-encoded",
+			ctx: CreateContext{
+				PRRefs: &skipPushRefs{
+					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner(`test-"quoted"-branch-pr`),
+					baseRefs: baseRefs{
+						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+						baseBranchName: "main",
+					},
+				},
+			},
+			want:    "https://github.com/OWNER/REPO/compare/main...test-%22quoted%22-branch-pr?body=&expand=1",
 			wantErr: false,
 		},
 		{

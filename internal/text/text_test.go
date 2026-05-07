@@ -169,6 +169,11 @@ func TestDisplayURL(t *testing.T) {
 			want: "https://github.com/cli/cli/issues/9470",
 		},
 		{
+			name: "preserve escaped path characters",
+			url:  "https://github.com/OWNER/REPO/compare/...test-%22quoted%22-branch-pr?body=&expand=1",
+			want: "https://github.com/OWNER/REPO/compare/...test-%22quoted%22-branch-pr",
+		},
+		{
 			name: "preserve http protocol use despite insecure",
 			url:  "http://github.com/cli/cli/issues/9470",
 			want: "http://github.com/cli/cli/issues/9470",
