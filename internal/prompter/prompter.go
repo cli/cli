@@ -71,9 +71,10 @@ func New(editorCmd string, io *iostreams.IOStreams) Prompter {
 		}
 	}
 
+	surveyStdin := newSurveyEscapeReader(io.In)
 	return &surveyPrompter{
-		prompter:  ghPrompter.New(io.In, io.Out, io.ErrOut),
-		stdin:     io.In,
+		prompter:  ghPrompter.New(surveyStdin, io.Out, io.ErrOut),
+		stdin:     surveyStdin,
 		stdout:    io.Out,
 		stderr:    io.ErrOut,
 		editorCmd: editorCmd,
