@@ -3067,3 +3067,192 @@ func TestCreate(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdate(t *testing.T) {
+	repo := ghrepo.New("OWNER", "REPO")
+
+	titleStr := "Updated title"
+	bodyStr := "Updated body"
+	catID := "CAT_2"
+
+	tests := []struct {
+		name       string
+		input      UpdateDiscussionInput
+		httpStubs  func(*testing.T, *httpmock.Registry)
+		wantErr    string
+		assertDisc *Discussion
+	}{
+		{
+			name: "maps all fields",
+			input: UpdateDiscussionInput{
+				DiscussionID: "D_1",
+				Title:        &titleStr,
+				Body:         &bodyStr,
+				CategoryID:   &catID,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateDiscussion\b`),
+					httpmock.StringResponse(heredoc.Doc(`
+						{
+							"data": {
+								"updateDiscussion": {
+									"discussion": {
+										"id": "D_1",
+										"number": 5,
+										"title": "Updated title",
+										"body": "Updated body",
+										"url": "https://github.com/OWNER/REPO/discussions/5",
+										"closed": false,
+										"stateReason": "",
+										"isAnswered": false,
+										"answerChosenAt": "0001-01-01T00:00:00Z",
+										"author": {"__typename": "User", "login": "alice", "id": "U1", "name": "Alice"},
+										"category": {"id": "CAT_2", "name": "Q&A", "slug": "q-a", "emoji": ":question:", "isAnswerable": true},
+										"answerChosenBy": null,
+										"labels": {"nodes": []},
+										"reactionGroups": [{"content": "THUMBS_UP", "users": {"totalCount": 0}}],
+										"createdAt": "2025-06-01T00:00:00Z",
+										"updatedAt": "2025-06-02T00:00:00Z",
+										"closedAt": "0001-01-01T00:00:00Z",
+										"locked": false,
+										"comments": {"totalCount": 0}
+									}
+								}
+							}
+						}
+					`)),
+				)
+			},
+			assertDisc: &Discussion{
+				ID:     "D_1",
+				Number: 5,
+				Title:  "Updated title",
+				Body:   "Updated body",
+				URL:    "https://github.com/OWNER/REPO/discussions/5",
+				Author: DiscussionActor{ID: "U1", Login: "alice", Name: "Alice"},
+				Category: DiscussionCategory{
+					ID:           "CAT_2",
+					Name:         "Q&A",
+					Slug:         "q-a",
+					Emoji:        ":question:",
+					IsAnswerable: true,
+				},
+				Labels:         []DiscussionLabel{},
+				ReactionGroups: []ReactionGroup{{Content: "THUMBS_UP", TotalCount: 0}},
+				CreatedAt:      time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+				UpdatedAt:      time.Date(2025, 6, 2, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			name: "partial update title only",
+			input: UpdateDiscussionInput{
+				DiscussionID: "D_1",
+				Title:        &titleStr,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateDiscussion\b`),
+					httpmock.StringResponse(heredoc.Doc(`
+						{
+							"data": {
+								"updateDiscussion": {
+									"discussion": {
+										"id": "D_1",
+										"number": 5,
+										"title": "Updated title",
+										"body": "Original body",
+										"url": "https://github.com/OWNER/REPO/discussions/5",
+										"closed": false,
+										"stateReason": "",
+										"isAnswered": false,
+										"answerChosenAt": "0001-01-01T00:00:00Z",
+										"author": {"__typename": "User", "login": "alice", "id": "U1", "name": "Alice"},
+										"category": {"id": "CAT_1", "name": "General", "slug": "general", "emoji": ":speech_balloon:", "isAnswerable": false},
+										"answerChosenBy": null,
+										"labels": {"nodes": []},
+										"reactionGroups": [],
+										"createdAt": "2025-06-01T00:00:00Z",
+										"updatedAt": "2025-06-02T00:00:00Z",
+										"closedAt": "0001-01-01T00:00:00Z",
+										"locked": false,
+										"comments": {"totalCount": 0}
+									}
+								}
+							}
+						}
+					`)),
+				)
+			},
+			assertDisc: &Discussion{
+				ID:     "D_1",
+				Number: 5,
+				Title:  "Updated title",
+				Body:   "Original body",
+				URL:    "https://github.com/OWNER/REPO/discussions/5",
+				Author: DiscussionActor{ID: "U1", Login: "alice", Name: "Alice"},
+				Category: DiscussionCategory{
+					ID:    "CAT_1",
+					Name:  "General",
+					Slug:  "general",
+					Emoji: ":speech_balloon:",
+				},
+				Labels:         []DiscussionLabel{},
+				ReactionGroups: []ReactionGroup{},
+				CreatedAt:      time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+				UpdatedAt:      time.Date(2025, 6, 2, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			name: "mutation error",
+			input: UpdateDiscussionInput{
+				DiscussionID: "D_1",
+				Title:        &titleStr,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateDiscussion\b`),
+					httpmock.StringResponse(heredoc.Doc(`
+						{
+							"data": {
+								"updateDiscussion": null
+							},
+							"errors": [
+								{
+									"type": "NOT_FOUND",
+									"message": "Could not resolve to a Discussion with the global id of 'D_1'."
+								}
+							]
+						}
+					`)),
+				)
+			},
+			wantErr: "Could not resolve to a Discussion with the global id of 'D_1'.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			if tt.httpStubs != nil {
+				tt.httpStubs(t, reg)
+			}
+
+			c := newTestDiscussionClient(reg)
+			d, err := c.Update(repo, tt.input)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, d)
+			require.NotNil(t, tt.assertDisc, "assertDisc must be set for non-error cases")
+			assert.Equal(t, tt.assertDisc, d)
+		})
+	}
+}
