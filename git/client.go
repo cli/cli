@@ -615,6 +615,40 @@ func (c *Client) DeleteLocalBranch(ctx context.Context, branch string) error {
 	return nil
 }
 
+// DeleteBranchRef removes a branch ref via git update-ref, which succeeds even
+// when the branch is checked out in a worktree (unlike git branch -D).
+func (c *Client) DeleteBranchRef(ctx context.Context, branch string) error {
+	args := []string{"update-ref", "-d", "refs/heads/" + branch}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	return err
+}
+
+// IsBranchCheckedOutElsewhere reports whether the given branch is the current
+// branch in any git worktree. It is used to detect cases where switching to a
+// branch would fail because it is already checked out elsewhere.
+func (c *Client) IsBranchCheckedOutElsewhere(ctx context.Context, branch string) (bool, error) {
+	args := []string{"worktree", "list", "--porcelain"}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return false, err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return false, err
+	}
+	needle := "branch refs/heads/" + branch
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.TrimRight(line, "\r") == needle {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (c *Client) CheckoutBranch(ctx context.Context, branch string) error {
 	args := []string{"checkout", branch}
 	cmd, err := c.Command(ctx, args...)

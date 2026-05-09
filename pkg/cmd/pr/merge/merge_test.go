@@ -641,6 +641,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git worktree list --porcelain`, 0, "worktree /some/path\nHEAD abc123\nbranch refs/heads/blueberries\n")
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
@@ -656,6 +657,59 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	assert.Equal(t, heredoc.Doc(`
 		✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
 		✓ Deleted local branch blueberries and switched to branch main
+		✓ Deleted remote branch blueberries
+	`), output.Stderr())
+}
+
+func TestPrMerge_deleteBranch_baseInWorktree(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"",
+		&api.PullRequest{
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			BaseRefName:      "main",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	// Simulate a two-worktree layout: main checked out in the parent worktree,
+	// blueberries checked out here. git checkout main would fail in this state.
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "") // NewMergeContext: localBranchExists
+	cs.Register(`git worktree list --porcelain`, 0,
+		"worktree /path/to/repo\nHEAD abc123\nbranch refs/heads/main\n\n"+
+			"worktree /path/to/repo-blueberries\nHEAD def456\nbranch refs/heads/blueberries\n")
+	cs.Register(`git update-ref -d refs/heads/blueberries`, 0, "")
+
+	output, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Merged pull request OWNER/REPO#10 (Blueberries are a good fruit)
+		✓ Deleted local branch blueberries
 		✓ Deleted remote branch blueberries
 	`), output.Stderr())
 }
@@ -738,6 +792,7 @@ func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 			cs, cmdTeardown := run.Stub()
 			defer cmdTeardown(t)
 
+			cs.Register(`git worktree list --porcelain`, 0, "worktree /some/path\nHEAD abc123\nbranch refs/heads/blueberries\n")
 			cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 			cs.Register(`git checkout main`, 0, "")
 			cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
@@ -812,6 +867,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git worktree list --porcelain`, 0, "worktree /some/path\nHEAD abc123\nbranch refs/heads/blueberries\n")
 	cs.Register(`git rev-parse --verify refs/heads/fruit`, 0, "")
 	cs.Register(`git checkout fruit`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
@@ -861,6 +917,7 @@ func TestPrMerge_deleteBranch_onlyLocally(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git worktree list --porcelain`, 0, "worktree /some/path\nHEAD abc123\nbranch refs/heads/blueberries\n")
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
@@ -911,6 +968,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git worktree list --porcelain`, 0, "worktree /some/path\nHEAD abc123\nbranch refs/heads/blueberries\n")
 	cs.Register(`git rev-parse --verify refs/heads/fruit`, 1, "")
 	cs.Register(`git checkout -b fruit --track origin/fruit`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
@@ -1198,6 +1256,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git worktree list --porcelain`, 0, "worktree /some/path\nHEAD abc123\nbranch refs/heads/blueberries\n")
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
@@ -1441,6 +1500,7 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git worktree list --porcelain`, 0, "worktree /some/path\nHEAD abc123\nbranch refs/heads/blueberries\n")
 	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")

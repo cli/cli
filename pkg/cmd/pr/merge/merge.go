@@ -421,6 +421,21 @@ func (m *mergeContext) deleteLocalBranch() error {
 		}
 
 		targetBranch := m.pr.BaseRefName
+
+		// When the base branch is already checked out in another worktree we
+		// cannot switch to it here. Delete the branch ref directly instead of
+		// going through checkout, so the caller's worktree is left untouched.
+		inWorktree, err := m.opts.GitClient.IsBranchCheckedOutElsewhere(ctx, targetBranch)
+		if err != nil {
+			inWorktree = false // non-fatal; fall through to normal checkout
+		}
+		if inWorktree {
+			if err := m.opts.GitClient.DeleteBranchRef(ctx, m.pr.HeadRefName); err != nil {
+				return fmt.Errorf("failed to delete local branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
+			}
+			return m.infof("%s Deleted local branch %s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName))
+		}
+
 		if m.opts.GitClient.HasLocalBranch(ctx, targetBranch) {
 			if err := m.opts.GitClient.CheckoutBranch(ctx, targetBranch); err != nil {
 				return err
