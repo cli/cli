@@ -3,6 +3,8 @@ package edit
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -112,13 +114,14 @@ func TestNewCmdEdit(t *testing.T) {
 
 func TestEditRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		opts      EditOptions
-		isTTY     bool
-		setupMock func(*client.DiscussionClientMock)
-		prompter  *prompter.PrompterMock
-		wantErr   string
-		wantOut   string
+		name            string
+		opts            EditOptions
+		bodyFileContent string // if non-empty, creates a temp file and sets opts.BodyFile
+		isTTY           bool
+		setupMock       func(*client.DiscussionClientMock)
+		prompter        *prompter.PrompterMock
+		wantErr         string
+		wantOut         string
 	}{
 		{
 			name: "success non-tty title only",
@@ -359,24 +362,35 @@ func TestEditRun(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/discussions/5\n",
 		},
 		{
-			name:  "tty interactive nothing selected still calls Update",
+			name:  "tty interactive nothing selected is a no-op",
 			isTTY: true,
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
-				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
-					assert.Equal(t, "D_1", input.DiscussionID)
-					assert.Nil(t, input.Title)
-					assert.Nil(t, input.Body)
-					assert.Nil(t, input.CategoryID)
-					return sampleDiscussion(), nil
-				}
+				// UpdateFunc intentionally not set: Update must not be called when nothing is selected.
 			},
 			prompter: &prompter.PrompterMock{
 				MultiSelectFunc: func(prompt string, defaults []string, options []string) ([]int, error) {
 					return []int{}, nil
 				},
+			},
+			wantOut: "",
+		},
+		{
+			name:            "success non-tty body-file",
+			bodyFileContent: "Body from file",
+			setupMock: func(m *client.DiscussionClientMock) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+					return sampleDiscussion(), nil
+				}
+				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
+					assert.Nil(t, input.Title)
+					require.NotNil(t, input.Body)
+					assert.Equal(t, "Body from file", *input.Body)
+					assert.Nil(t, input.CategoryID)
+					return sampleDiscussion(), nil
+				}
 			},
 			wantOut: "https://github.com/OWNER/REPO/discussions/5\n",
 		},
@@ -412,6 +426,12 @@ func TestEditRun(t *testing.T) {
 			}
 
 			opts := tt.opts
+			if tt.bodyFileContent != "" {
+				dir := t.TempDir()
+				f := filepath.Join(dir, "body.md")
+				require.NoError(t, os.WriteFile(f, []byte(tt.bodyFileContent), 0600))
+				opts.BodyFile = f
+			}
 			opts.IO = ios
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil

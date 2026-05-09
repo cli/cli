@@ -136,11 +136,18 @@ func editRun(opts *EditOptions) error {
 		DiscussionID: discussion.ID,
 	}
 
+	// noFlagsSet omits BodyFile intentionally: ReadFile above already copied its
+	// contents into opts.Body, so Body == "" implies no body update was requested.
 	noFlagsSet := opts.Title == "" && opts.Body == "" && opts.Category == ""
 	if noFlagsSet {
 		// Interactive mode: prompt user to select which fields to edit.
 		if err := promptEdit(opts, discussion, c, repo, &input); err != nil {
 			return err
+		}
+		// If the user dismissed the prompt without selecting anything, skip the
+		// API call — there is nothing to update.
+		if input.Title == nil && input.Body == nil && input.CategoryID == nil {
+			return nil
 		}
 	} else {
 		// Non-interactive: apply only the flags that were set.
