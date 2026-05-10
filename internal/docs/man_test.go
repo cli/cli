@@ -169,6 +169,33 @@ func TestManPrintFlagsHidesShortDeprecated(t *testing.T) {
 	}
 }
 
+func TestNormalizeMarkdownForManAddsMissingBlockSeparators(t *testing.T) {
+	input := "Intro paragraph:\n- first bullet\n- second bullet\nCode sample:\n```\ngh test --flag\n```"
+	expected := "Intro paragraph:\n\n- first bullet\n- second bullet\nCode sample:\n\n```\ngh test --flag\n```"
+	output := normalizeMarkdownForMan(input)
+	if output != expected {
+		t.Fatalf("Expected %q, got %q", expected, output)
+	}
+}
+
+func TestRenderManFormatsDescriptionLists(t *testing.T) {
+	cmd := &cobra.Command{
+		Use:   "test",
+		Short: "test command",
+		Long: "Intro paragraph:\n" +
+			"- first bullet\n" +
+			"- second bullet",
+	}
+
+	buf := new(bytes.Buffer)
+	if err := renderMan(cmd, &GenManHeader{}, buf); err != nil {
+		t.Fatal(err)
+	}
+
+	output := buf.String()
+	checkStringContains(t, output, ".IP \\(bu 2")
+}
+
 func TestGenManTree(t *testing.T) {
 	c := &cobra.Command{Use: "do [OPTIONS] arg1 arg2"}
 	tmpdir, err := os.MkdirTemp("", "test-gen-man-tree")

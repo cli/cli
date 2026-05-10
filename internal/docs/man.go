@@ -135,8 +135,84 @@ func manPreamble(buf *bytes.Buffer, header *GenManHeader, cmd *cobra.Command, da
 
 	if cmd.Long != "" && cmd.Long != cmd.Short {
 		buf.WriteString("# DESCRIPTION\n")
-		buf.WriteString(cmd.Long + "\n\n")
+		buf.WriteString(normalizeMarkdownForMan(cmd.Long) + "\n\n")
 	}
+}
+
+func normalizeMarkdownForMan(input string) string {
+	lines := strings.Split(input, "\n")
+	out := make([]string, 0, len(lines))
+	inFencedCodeBlock := false
+
+	for _, line := range lines {
+		isFence := isFencedCodeDelimiter(line)
+		if shouldInsertBlockSeparator(line, out, inFencedCodeBlock, isFence) {
+			out = append(out, "")
+		}
+		out = append(out, line)
+		if isFence {
+			inFencedCodeBlock = !inFencedCodeBlock
+		}
+	}
+
+	return strings.Join(out, "\n")
+}
+
+func shouldInsertBlockSeparator(line string, previousLines []string, inFencedCodeBlock bool, isFence bool) bool {
+	if len(previousLines) == 0 {
+		return false
+	}
+	if inFencedCodeBlock {
+		return false
+	}
+	if isFence && len(previousLines) > 0 && isFencedCodeDelimiter(previousLines[len(previousLines)-1]) {
+		return false
+	}
+
+	if !startsMarkdownBlock(line) {
+		return false
+	}
+
+	prev := previousLines[len(previousLines)-1]
+	prevTrimmed := strings.TrimSpace(prev)
+	if prevTrimmed == "" {
+		return false
+	}
+
+	// If the previous line already begins a block, adding a separator can break nesting.
+	return !startsMarkdownBlock(prev)
+}
+
+func isFencedCodeDelimiter(line string) bool {
+	return strings.HasPrefix(strings.TrimLeft(line, " \t"), "```")
+}
+
+func startsMarkdownBlock(line string) bool {
+	trimmed := strings.TrimLeft(line, " \t")
+	if trimmed == "" {
+		return false
+	}
+
+	if isFencedCodeDelimiter(line) {
+		return true
+	}
+	if strings.HasPrefix(line, "    ") || strings.HasPrefix(line, "\t") {
+		return true
+	}
+	if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") || strings.HasPrefix(trimmed, "+ ") {
+		return true
+	}
+	return startsOrderedListItem(trimmed)
+}
+
+func startsOrderedListItem(line string) bool {
+	i := 0
+	for ; i < len(line); i++ {
+		if line[i] < '0' || line[i] > '9' {
+			break
+		}
+	}
+	return i > 0 && i+1 < len(line) && line[i] == '.' && line[i+1] == ' '
 }
 
 func manPrintFlags(buf *bytes.Buffer, flags *pflag.FlagSet) {
