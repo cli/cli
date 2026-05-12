@@ -181,6 +181,17 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				return cmdutil.FlagErrorf("use of --visibility flag requires --accept-visibility-change-consequences flag")
 			}
 
+			if opts.Edits.Visibility != nil && !opts.InteractiveMode {
+				apiClient := api.NewClientFromHTTP(opts.HTTPClient)
+				repo, err := api.FetchRepository(apiClient, opts.Repository, []string{"isFork"})
+				if err != nil {
+					return err
+				}
+				if repo.IsFork {
+					return fmt.Errorf("changing visibility of a forked repository is not supported")
+				}
+			}
+
 			if opts.Edits.squashMergeCommitMsg != nil {
 				if opts.Edits.EnableSquashMerge == nil {
 					return cmdutil.FlagErrorf("--squash-merge-commit-message requires --enable-squash-merge")
@@ -257,6 +268,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			// TODO: GitHub Enterprise Server does not support has_discussions yet
 			// "hasDiscussionsEnabled",
 			"homepageUrl",
+			"isFork",
 			"isInOrganization",
 			"isTemplate",
 			"mergeCommitAllowed",
@@ -453,6 +465,9 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 			opts.Edits.EnableProjects = &a
 		case optionVisibility:
+			if r.IsFork {
+				return fmt.Errorf("changing visibility of a forked repository is not supported")
+			}
 			cs := opts.IO.ColorScheme()
 			fmt.Fprintf(opts.IO.ErrOut, "%s Danger zone: changing repository visibility can have unexpected consequences; consult https://gh.io/setting-repository-visibility before continuing.\n", cs.WarningIcon())
 
