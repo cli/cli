@@ -408,6 +408,13 @@ func Test_setRun_repo(t *testing.T) {
 			wantApp: "actions",
 		},
 		{
+			name: "Agents",
+			opts: &SetOptions{
+				Application: "agents",
+			},
+			wantApp: "agents",
+		},
+		{
 			name: "Dependabot",
 			opts: &SetOptions{
 				Application: "dependabot",

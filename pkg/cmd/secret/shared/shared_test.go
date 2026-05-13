@@ -82,6 +82,11 @@ func TestGetSecretApp(t *testing.T) {
 			want: Actions,
 		},
 		{
+			name: "Agents",
+			app:  "agents",
+			want: Agents,
+		},
+		{
 			name: "Codespaces",
 			app:  "codespaces",
 			want: Codespaces,

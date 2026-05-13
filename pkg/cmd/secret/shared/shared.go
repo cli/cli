@@ -20,6 +20,7 @@ type App string
 
 const (
 	Actions    = "actions"
+	Agents     = "agents"
 	Codespaces = "codespaces"
 	Dependabot = "dependabot"
 	Unknown    = "unknown"
@@ -66,6 +67,8 @@ func GetSecretApp(app string, entity SecretEntity) (App, error) {
 	switch strings.ToLower(app) {
 	case Actions:
 		return Actions, nil
+	case Agents:
+		return Agents, nil
 	case Codespaces:
 		return Codespaces, nil
 	case Dependabot:
@@ -84,6 +87,8 @@ func IsSupportedSecretEntity(app App, entity SecretEntity) bool {
 	switch app {
 	case Actions:
 		return entity == Repository || entity == Organization || entity == Environment
+	case Agents:
+		return entity == Repository || entity == Organization
 	case Codespaces:
 		return entity == User || entity == Organization || entity == Repository
 	case Dependabot:
