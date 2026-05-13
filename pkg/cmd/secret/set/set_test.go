@@ -603,6 +603,37 @@ func Test_setRun_org(t *testing.T) {
 			wantRepositories: []int64{},
 			wantApp:          "dependabot",
 		},
+		{
+			name: "Agents",
+			opts: &SetOptions{
+				OrgName:     "UmbrellaCorporation",
+				Visibility:  shared.All,
+				Application: shared.Agents,
+			},
+			wantApp: "agents",
+		},
+		{
+			name: "Agents selected visibility",
+			opts: &SetOptions{
+				OrgName:         "UmbrellaCorporation",
+				Visibility:      shared.Selected,
+				Application:     shared.Agents,
+				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
+			},
+			wantRepositories: []int64{1, 2},
+			wantApp:          "agents",
+		},
+		{
+			name: "Agents no repos visibility",
+			opts: &SetOptions{
+				OrgName:         "UmbrellaCorporation",
+				Visibility:      shared.Selected,
+				Application:     shared.Agents,
+				RepositoryNames: []string{},
+			},
+			wantRepositories: []int64{},
+			wantApp:          "agents",
+		},
 	}
 
 	for _, tt := range tests {
