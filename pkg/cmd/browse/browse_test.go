@@ -357,6 +357,42 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/kevin/MinTy/issues/217",
 		},
 		{
+			name: "decimal-only commit hash in selector arg",
+			opts: BrowseOptions{
+				SelectorArg: "309628980",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/kevin/MinTy/commits/309628980"),
+					httpmock.JSONResponse(map[string]string{"sha": "3096289800000000000000000000000000000000"}),
+				)
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/commit/309628980",
+		},
+		{
+			name: "decimal-only selector falls back to issue when commit is not found",
+			opts: BrowseOptions{
+				SelectorArg: "1234567",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/kevin/MinTy/commits/1234567"),
+					httpmock.StatusStringResponse(http.StatusUnprocessableEntity, "No commit found for SHA"),
+				)
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/1234567",
+		},
+		{
+			name: "hashtag argument forces issue for decimal-only commit hash",
+			opts: BrowseOptions{
+				SelectorArg: "#309628980",
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/309628980",
+		},
+		{
 			name: "branch flag",
 			opts: BrowseOptions{
 				Branch: "trunk",

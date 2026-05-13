@@ -2,6 +2,7 @@ package browse
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -250,6 +251,15 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 			return "", nil
 		}
 		if isNumber(opts.SelectorArg) {
+			if !strings.HasPrefix(opts.SelectorArg, "#") && isCommit(opts.SelectorArg) {
+				exists, err := isCommitInRepo(baseRepo, opts, opts.SelectorArg)
+				if err != nil {
+					return "", err
+				}
+				if exists {
+					return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+				}
+			}
 			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 		}
 		if isCommit(opts.SelectorArg) {
@@ -352,6 +362,28 @@ var commitHash = regexp.MustCompile(`\A[a-f0-9]{7,64}\z`)
 
 func isCommit(arg string) bool {
 	return commitHash.MatchString(arg)
+}
+
+func isCommitInRepo(baseRepo ghrepo.Interface, opts *BrowseOptions, commitRef string) (bool, error) {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return false, err
+	}
+
+	var result struct {
+		SHA string `json:"sha"`
+	}
+	path := fmt.Sprintf("repos/%s/%s/commits/%s", baseRepo.RepoOwner(), baseRepo.RepoName(), url.PathEscape(commitRef))
+	err = api.NewClientFromHTTP(httpClient).REST(baseRepo.RepoHost(), http.MethodGet, path, nil, &result)
+	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && (httpErr.StatusCode == http.StatusNotFound || httpErr.StatusCode == http.StatusUnprocessableEntity) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
 }
 
 // gitClient is used to implement functions that can be performed on both local and remote git repositories
