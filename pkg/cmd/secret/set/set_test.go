@@ -213,6 +213,29 @@ func TestNewCmdSet(t *testing.T) {
 				Application:     "Codespaces",
 			},
 		},
+		{
+			name: "Agents org",
+			args: `random_secret --org coolOrg --body "random value" --visibility selected --repos "coolRepo,cli/cli" --app Agents`,
+			wants: SetOptions{
+				SecretName:      "random_secret",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"coolRepo", "cli/cli"},
+				Body:            "random value",
+				OrgName:         "coolOrg",
+				Application:     "Agents",
+			},
+		},
+		{
+			name: "Agents repo",
+			args: `cool_secret --body "a secret" --app Agents`,
+			wants: SetOptions{
+				SecretName:  "cool_secret",
+				Visibility:  shared.Private,
+				Body:        "a secret",
+				OrgName:     "",
+				Application: "Agents",
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -89,6 +89,23 @@ func TestNewCmdDelete(t *testing.T) {
 				Application: "Codespaces",
 			},
 		},
+		{
+			name: "Agents org",
+			cli:  "cool --app agents --org UmbrellaCorporation",
+			wants: DeleteOptions{
+				SecretName:  "cool",
+				OrgName:     "UmbrellaCorporation",
+				Application: "Agents",
+			},
+		},
+		{
+			name: "Agents repo",
+			cli:  "cool --app Agents",
+			wants: DeleteOptions{
+				SecretName:  "cool",
+				Application: "Agents",
+			},
+		},
 	}
 
 	for _, tt := range tests {

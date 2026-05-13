@@ -167,6 +167,19 @@ func TestIsSupportedSecretEntity(t *testing.T) {
 			},
 		},
 		{
+			name: "Agents",
+			app:  Agents,
+			supportedEntities: []SecretEntity{
+				Repository,
+				Organization,
+			},
+			unsupportedEntities: []SecretEntity{
+				Environment,
+				User,
+				Unknown,
+			},
+		},
+		{
 			name: "Codespaces",
 			app:  Codespaces,
 			supportedEntities: []SecretEntity{

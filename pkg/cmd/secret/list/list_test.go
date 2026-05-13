@@ -74,6 +74,21 @@ func Test_NewCmdList(t *testing.T) {
 				OrgName:     "UmbrellaCorporation",
 			},
 		},
+		{
+			name: "Agents repo",
+			cli:  "--app Agents",
+			wants: ListOptions{
+				Application: "Agents",
+			},
+		},
+		{
+			name: "Agents org",
+			cli:  "--app Agents --org UmbrellaCorporation",
+			wants: ListOptions{
+				Application: "Agents",
+				OrgName:     "UmbrellaCorporation",
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -81,7 +81,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Delete a secret for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Delete a secret for an environment")
 	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "Delete a secret for your user")
-	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Codespaces, shared.Dependabot}, "Delete a secret for a specific application")
+	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Agents, shared.Codespaces, shared.Dependabot}, "Delete a secret for a specific application")
 
 	return cmd
 }
