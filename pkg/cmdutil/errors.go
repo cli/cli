@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -41,7 +42,7 @@ var CancelError = errors.New("CancelError")
 var PendingError = errors.New("PendingError")
 
 func IsUserCancellation(err error) bool {
-	return errors.Is(err, CancelError) || errors.Is(err, terminal.InterruptErr)
+	return errors.Is(err, CancelError) || errors.Is(err, terminal.InterruptErr) || errors.Is(err, context.Canceled)
 }
 
 func MutuallyExclusive(message string, conditions ...bool) error {

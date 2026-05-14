@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -139,7 +140,8 @@ func Main() exitCode {
 		}
 	}
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 	updateCtx, updateCancel := context.WithCancel(ctx)
 	defer updateCancel()
 	updateMessageChan := make(chan *update.ReleaseInfo)

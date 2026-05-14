@@ -378,9 +378,8 @@ func (s *IOStreams) StartAlternateScreenBuffer() {
 
 			go func() {
 				<-ch
+				signal.Stop(ch)
 				s.StopAlternateScreenBuffer()
-
-				os.Exit(1)
 			}()
 		}
 	}
