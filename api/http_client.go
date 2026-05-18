@@ -80,6 +80,7 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		client.Transport = telemetryDisablerTransport{
 			wrappedTransport:  client.Transport,
 			telemetryDisabler: opts.TelemetryDisabler,
+			config:            opts.Config,
 		}
 	}
 
@@ -160,11 +161,20 @@ func getHost(r *http.Request) string {
 type telemetryDisablerTransport struct {
 	wrappedTransport  http.RoundTripper
 	telemetryDisabler ghtelemetry.Disabler
+	config            tokenGetter
 }
 
 func (t telemetryDisablerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if ghauth.IsEnterprise(getHost(req)) {
-		t.telemetryDisabler.Disable()
+	host := getHost(req)
+	// Only disable telemetry for hosts the user has actually authenticated
+	// to (i.e. configured GHES instances). Hitting a third-party URL like
+	// the dev-tunnels API or a release asset shouldn't take telemetry
+	// down for the rest of the invocation.
+	if ghauth.IsEnterprise(host) && t.config != nil {
+		token, _ := t.config.ActiveToken(host)
+		if token != "" {
+			t.telemetryDisabler.Disable()
+		}
 	}
 	return t.wrappedTransport.RoundTrip(req)
 }

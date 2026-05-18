@@ -321,24 +321,35 @@ func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	cfgWithGHES := tinyConfig{"ghes.example.com:oauth_token": "configured-token"}
 	tests := []struct {
 		name         string
 		host         string
+		config       tokenGetter
 		wantDisabled bool
 	}{
 		{
-			name:         "enterprise host triggers disable",
+			name:         "configured enterprise host triggers disable",
 			host:         "ghes.example.com",
+			config:       cfgWithGHES,
 			wantDisabled: true,
 		},
 		{
 			name:         "github.com does not trigger disable",
 			host:         "github.com",
+			config:       cfgWithGHES,
 			wantDisabled: false,
 		},
 		{
 			name:         "tenancy host does not trigger disable",
 			host:         "my-company.ghe.com",
+			config:       cfgWithGHES,
+			wantDisabled: false,
+		},
+		{
+			name:         "unconfigured third-party host does not trigger disable",
+			host:         "global.rel.tunnels.api.visualstudio.com",
+			config:       cfgWithGHES,
 			wantDisabled: false,
 		},
 	}
@@ -348,6 +359,7 @@ func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
 			disabler := &fakeTelemetryDisabler{}
 			client, err := NewHTTPClient(HTTPClientOptions{
 				TelemetryDisabler: disabler,
+				Config:            tt.config,
 			})
 			require.NoError(t, err)
 
