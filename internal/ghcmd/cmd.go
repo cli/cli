@@ -8,10 +8,12 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
@@ -50,6 +52,20 @@ const (
 )
 
 func Main() exitCode {
+	// Catch SIGINT/SIGTERM ourselves so Go's default handler doesn't bail
+	// out via os.Exit before deferred work (telemetry flush, connection
+	// cleanup, temp-file removal) gets a chance to run. A second signal
+	// after we've already received one falls back to a hard exit so users
+	// can still force-quit something that's stuck.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	go func() {
+		<-sigCh
+		<-sigCh
+		os.Exit(int(exitCancel))
+	}()
+
 	buildDate := build.Date
 	buildVersion := build.Version
 	hasDebug, _ := utils.IsDebugEnabled()
