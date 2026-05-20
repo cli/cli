@@ -18,6 +18,14 @@ func (c tinyConfig) ActiveUser(host string) (string, error) {
 	return c[fmt.Sprintf("%s:%s", host, "user")], nil
 }
 
+func (c tinyConfig) TokenForUser(hostname, user string) (string, string, error) {
+	key := fmt.Sprintf("%s:users:%s:oauth_token", hostname, user)
+	if token, ok := c[key]; ok {
+		return token, "oauth_token", nil
+	}
+	return "", "", fmt.Errorf("no token for %s on %s", user, hostname)
+}
+
 func Test_helperRun(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -234,6 +242,86 @@ func Test_helperRun(t *testing.T) {
 			opts: CredentialOptions{
 				Operation: "unknown",
 			},
+			wantErr: true,
+		},
+		{
+			name: "account with existing token",
+			opts: CredentialOptions{
+				Operation: "get",
+				Account:   "user2",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"example.com:users:user2:oauth_token": "TOKEN2",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+			`),
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=user2
+				password=TOKEN2
+			`),
+			wantErr: false,
+		},
+		{
+			name: "account token not found",
+			opts: CredentialOptions{
+				Operation: "get",
+				Account:   "user2",
+				Config: func() (config, error) {
+					return tinyConfig{}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+			`),
+			wantErr: true,
+		},
+		{
+			name: "account matches requested username",
+			opts: CredentialOptions{
+				Operation: "get",
+				Account:   "user2",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"example.com:users:user2:oauth_token": "TOKEN2",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=user2
+			`),
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=user2
+				password=TOKEN2
+			`),
+			wantErr: false,
+		},
+		{
+			name: "account conflicts with requested username",
+			opts: CredentialOptions{
+				Operation: "get",
+				Account:   "user2",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"example.com:users:user2:oauth_token": "TOKEN2",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=user1
+			`),
 			wantErr: true,
 		},
 	}

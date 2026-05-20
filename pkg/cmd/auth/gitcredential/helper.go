@@ -16,6 +16,7 @@ const tokenUser = "x-access-token"
 type config interface {
 	ActiveToken(string) (string, string)
 	ActiveUser(string) (string, error)
+	TokenForUser(hostname, user string) (string, string, error)
 }
 
 type CredentialOptions struct {
@@ -23,6 +24,7 @@ type CredentialOptions struct {
 	Config func() (config, error)
 
 	Operation string
+	Account   string
 }
 
 func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *cobra.Command {
@@ -51,6 +53,8 @@ func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *
 			return helperRun(opts)
 		},
 	}
+
+	cmd.Flags().StringVar(&opts.Account, "account", "", "Use credentials for a specific GitHub account")
 
 	return cmd
 }
@@ -111,6 +115,26 @@ func helperRun(opts *CredentialOptions) error {
 	}
 
 	lookupHost := wants["host"]
+
+	if opts.Account != "" {
+		if wants["username"] != "" && !strings.EqualFold(wants["username"], opts.Account) {
+			return fmt.Errorf("gh auth git-credential: --account %q conflicts with requested username %q", opts.Account, wants["username"])
+		}
+		tokenLookupHost := lookupHost
+		if strings.HasPrefix(tokenLookupHost, "gist.") {
+			tokenLookupHost = strings.TrimPrefix(tokenLookupHost, "gist.")
+		}
+		gotToken, _, tokenErr := cfg.TokenForUser(tokenLookupHost, opts.Account)
+		if tokenErr != nil {
+			return fmt.Errorf("gh auth git-credential: account %q not found on %s", opts.Account, lookupHost)
+		}
+		fmt.Fprint(opts.IO.Out, "protocol=https\n")
+		fmt.Fprintf(opts.IO.Out, "host=%s\n", wants["host"])
+		fmt.Fprintf(opts.IO.Out, "username=%s\n", opts.Account)
+		fmt.Fprintf(opts.IO.Out, "password=%s\n", gotToken)
+		return nil
+	}
+
 	var gotUser string
 	gotToken, source := cfg.ActiveToken(lookupHost)
 	if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
