@@ -62,16 +62,30 @@ func newCAPITransport(token string, capiBaseURL string, rp http.RoundTripper) *c
 }
 
 func (ct *capiTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("Authorization", "Bearer "+ct.token)
+	var redirectHostnameChange bool
+	if req.Response != nil && req.Response.Request != nil {
+		redirectHostnameChange = reqHost(req) != reqHost(req.Response.Request)
+	}
+
+	if !redirectHostnameChange {
+		req.Header.Set("Authorization", "Bearer "+ct.token)
+	}
 
 	// Since this RoundTrip is reused for both Copilot API and
 	// GitHub API requests, we conditionally add the integration
 	// ID only when performing requests to the Copilot API.
-	if req.URL.Host == ct.capiHost {
+	if !redirectHostnameChange && req.URL.Host == ct.capiHost {
 		req.Header.Add("Copilot-Integration-Id", "copilot-4-cli")
 
 		// Ensure we are not using GitHub API versions while targeting CAPI.
 		req.Header.Set("X-GitHub-Api-Version", "2026-01-09")
 	}
 	return ct.rp.RoundTrip(req)
+}
+
+func reqHost(r *http.Request) string {
+	if r.Host != "" {
+		return r.Host
+	}
+	return r.URL.Host
 }
