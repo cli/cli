@@ -324,6 +324,53 @@ func Test_helperRun(t *testing.T) {
 			`),
 			wantErr: true,
 		},
+		{
+			name: "account with gist host",
+			opts: CredentialOptions{
+				Operation: "get",
+				Account:   "user2",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"github.com:users:user2:oauth_token": "TOKEN2",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=gist.github.com
+			`),
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=gist.github.com
+				username=user2
+				password=TOKEN2
+			`),
+			wantErr: false,
+		},
+		{
+			name: "account with x-access-token username is not a conflict",
+			opts: CredentialOptions{
+				Operation: "get",
+				Account:   "user2",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"example.com:users:user2:oauth_token": "TOKEN2",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=x-access-token
+			`),
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=user2
+				password=TOKEN2
+			`),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

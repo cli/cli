@@ -117,7 +117,7 @@ func helperRun(opts *CredentialOptions) error {
 	lookupHost := wants["host"]
 
 	if opts.Account != "" {
-		if wants["username"] != "" && !strings.EqualFold(wants["username"], opts.Account) {
+		if wants["username"] != "" && wants["username"] != tokenUser && !strings.EqualFold(wants["username"], opts.Account) {
 			return cmdutil.SilentError
 		}
 		tokenLookupHost := lookupHost
