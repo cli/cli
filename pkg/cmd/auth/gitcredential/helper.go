@@ -118,7 +118,7 @@ func helperRun(opts *CredentialOptions) error {
 
 	if opts.Account != "" {
 		if wants["username"] != "" && !strings.EqualFold(wants["username"], opts.Account) {
-			return fmt.Errorf("gh auth git-credential: --account %q conflicts with requested username %q", opts.Account, wants["username"])
+			return cmdutil.SilentError
 		}
 		tokenLookupHost := lookupHost
 		if strings.HasPrefix(tokenLookupHost, "gist.") {
@@ -126,7 +126,7 @@ func helperRun(opts *CredentialOptions) error {
 		}
 		gotToken, _, tokenErr := cfg.TokenForUser(tokenLookupHost, opts.Account)
 		if tokenErr != nil {
-			return fmt.Errorf("gh auth git-credential: account %q not found on %s", opts.Account, lookupHost)
+			return cmdutil.SilentError
 		}
 		fmt.Fprint(opts.IO.Out, "protocol=https\n")
 		fmt.Fprintf(opts.IO.Out, "host=%s\n", wants["host"])
