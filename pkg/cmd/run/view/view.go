@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -26,6 +27,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/text/transform"
 )
+
+var terminalEscapeSequenceRE = regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[PX^_][^\x07\x1b]*(?:\x07|\x1b\\)|k[^\x07\x1b]*(?:\x07|\x1b\\)|[@-_])`)
 
 type RunLogCache struct {
 	cacheDir string
@@ -581,10 +584,22 @@ func displayLogSegments(w io.Writer, segments []logSegment) error {
 }
 
 func copyLogWithLinePrefix(w io.Writer, r io.Reader, prefix string) error {
-	sanitized := transform.NewReader(r, &asciisanitizer.Sanitizer{})
-	scanner := bufio.NewScanner(sanitized)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
+		line, err := sanitizeLogLine(scanner.Text())
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%s%s\n", prefix, line)
 	}
-	return nil
+	return scanner.Err()
+}
+
+func sanitizeLogLine(line string) (string, error) {
+	stripped := terminalEscapeSequenceRE.ReplaceAllString(line, "")
+	sanitized, err := io.ReadAll(transform.NewReader(bytes.NewReader([]byte(stripped)), &asciisanitizer.Sanitizer{}))
+	if err != nil {
+		return "", err
+	}
+	return string(sanitized), nil
 }

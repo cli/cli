@@ -2763,26 +2763,32 @@ func TestCopyLogWithLinePrefix_TerminalEscapeSequences(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
+		want  string
 	}{
 		{
 			name:  "OSC title set sequence",
 			input: "normal prefix\x1b]0;HIJACKED TITLE\x07trailing text\n",
+			want:  "jobname\tstep\tnormal prefixtrailing text\n",
 		},
 		{
 			name:  "CSI color sequence",
-			input: "\x1b[31mRED TEXT\x1b[0m normal text\n",
+			input: "\x1b[1;93m  •\x1b[m \x1b[1;93mskipping announce\x1b[m\n",
+			want:  "jobname\tstep\t  • skipping announce\n",
 		},
 		{
 			name:  "screen title set sequence used in original report",
 			input: "\x1bk;echo this is an arbitrary command;\x1b\\\n",
+			want:  "jobname\tstep\t\n",
 		},
 		{
 			name:  "CSI window title query",
 			input: "before\x1b[21tafter\n",
+			want:  "jobname\tstep\tbeforeafter\n",
 		},
 		{
 			name:  "multiple escape sequences",
 			input: "\x1b]0;title\x07\x1b[31mred\x1b[0m\x1b[21t\n",
+			want:  "jobname\tstep\tred\n",
 		},
 	}
 
@@ -2793,8 +2799,11 @@ func TestCopyLogWithLinePrefix_TerminalEscapeSequences(t *testing.T) {
 			require.NoError(t, err)
 
 			output := buf.String()
+			assert.Equal(t, tt.want, output)
 			assert.NotContains(t, output, "\x1b",
 				"output should not contain raw ESC (0x1b) bytes, got: %q", output)
+			assert.NotContains(t, output, "^[",
+				"output should not contain escaped terminal control bytes, got: %q", output)
 		})
 	}
 }
