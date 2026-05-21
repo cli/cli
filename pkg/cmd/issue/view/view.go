@@ -186,15 +186,10 @@ func viewRun(opts *ViewOptions) error {
 		return printHumanIssuePreview(opts, baseRepo, issue)
 	}
 
-	if opts.Comments {
-		fmt.Fprint(opts.IO.Out, prShared.RawCommentList(issue.Comments, api.PullRequestReviews{}))
-		return nil
-	}
-
-	return printRawIssuePreview(opts.IO.Out, issue)
+	return printRawIssuePreview(opts.IO.Out, issue, opts.Comments)
 }
 
-func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
+func printRawIssuePreview(out io.Writer, issue *api.Issue, includeComments bool) error {
 	assignees := issueAssigneeList(*issue)
 	labels := issueLabelList(issue, nil)
 	projects := issueProjectList(*issue)
@@ -234,6 +229,10 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	fmt.Fprintf(out, "number:\t%d\n", issue.Number)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
+	if includeComments && len(issue.Comments.Nodes) > 0 {
+		fmt.Fprintln(out, "--")
+		fmt.Fprint(out, prShared.RawCommentList(issue.Comments, api.PullRequestReviews{}))
+	}
 	return nil
 }
 

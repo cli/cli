@@ -487,6 +487,12 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 				mockEmptyV2ProjectItems(t, r)
 			},
 			expectedOutputs: []string{
+				`title:\tsome title`,
+				`state:\tOPEN`,
+				`author:\tmarseilles`,
+				`comments:\t6`,
+				`number:\t123`,
+				`some body`,
 				`author:\tmonalisa`,
 				`association:\t`,
 				`edited:\ttrue`,
@@ -507,6 +513,64 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 				`association:\tcollaborator`,
 				`edited:\tfalse`,
 				`Comment 5`,
+			},
+		},
+		"with comments flag and no comments": {
+			cli: "123 --comments",
+			httpStubs: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.JSONResponse(map[string]any{
+						"data": map[string]any{
+							"repository": map[string]any{
+								"hasIssuesEnabled": true,
+								"issue": map[string]any{
+									"number":    123,
+									"title":     "some title",
+									"body":      "some body",
+									"state":     "OPEN",
+									"createdAt": "2020-01-01T12:00:00Z",
+									"author": map[string]any{
+										"login": "marseilles",
+									},
+									"assignees": map[string]any{
+										"nodes":      []any{},
+										"totalCount": 0,
+									},
+									"labels": map[string]any{
+										"nodes":      []any{},
+										"totalCount": 0,
+									},
+									"projectItems": map[string]any{
+										"nodes":      []any{},
+										"totalCount": 0,
+									},
+									"milestone": map[string]any{
+										"title": "",
+									},
+									"comments": map[string]any{
+										"nodes":      []any{},
+										"totalCount": 0,
+										"pageInfo": map[string]any{
+											"hasNextPage": false,
+											"endCursor":   nil,
+										},
+									},
+									"url": "https://github.com/OWNER/REPO/issues/123",
+								},
+							},
+						},
+					}),
+				)
+				mockEmptyV2ProjectItems(t, r)
+			},
+			expectedOutputs: []string{
+				`title:\tsome title`,
+				`state:\tOPEN`,
+				`author:\tmarseilles`,
+				`comments:\t0`,
+				`number:\t123`,
+				`some body`,
 			},
 		},
 		"with invalid comments flag": {
