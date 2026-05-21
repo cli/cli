@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	acrURL = "https://accessibility.github.com/conformance/cli/"
+	acrURL             = "https://accessibility.github.com/conformance/cli/"
 	a11yDiscussionsURL = "https://github.com/orgs/community/discussions/categories/accessibility"
 )
 
