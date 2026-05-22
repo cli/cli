@@ -458,6 +458,58 @@ func Test_listRun(t *testing.T) {
 				"SECRET_THREE\t1975-11-30T00:00:00Z\tSELECTED",
 			},
 		},
+		{
+			name: "Agents repo tty",
+			tty:  true,
+			opts: &ListOptions{
+				Application: "Agents",
+			},
+			wantOut: []string{
+				"NAME          UPDATED",
+				"SECRET_ONE    about 34 years ago",
+				"SECRET_TWO    about 2 years ago",
+				"SECRET_THREE  about 47 years ago",
+			},
+		},
+		{
+			name: "Agents repo not tty",
+			tty:  false,
+			opts: &ListOptions{
+				Application: "Agents",
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11T00:00:00Z",
+				"SECRET_TWO\t2020-12-04T00:00:00Z",
+				"SECRET_THREE\t1975-11-30T00:00:00Z",
+			},
+		},
+		{
+			name: "Agents org tty",
+			tty:  true,
+			opts: &ListOptions{
+				Application: "Agents",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantOut: []string{
+				"NAME          UPDATED             VISIBILITY",
+				"SECRET_ONE    about 34 years ago  Visible to all repositories",
+				"SECRET_TWO    about 2 years ago   Visible to private repositories",
+				"SECRET_THREE  about 47 years ago  Visible to 2 selected repositories",
+			},
+		},
+		{
+			name: "Agents org not tty",
+			tty:  false,
+			opts: &ListOptions{
+				Application: "Agents",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11T00:00:00Z\tALL",
+				"SECRET_TWO\t2020-12-04T00:00:00Z\tPRIVATE",
+				"SECRET_THREE\t1975-11-30T00:00:00Z\tSELECTED",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -557,6 +609,8 @@ func Test_listRun(t *testing.T) {
 
 			if tt.opts.Application == "Dependabot" {
 				path = strings.Replace(path, "actions", "dependabot", 1)
+			} else if tt.opts.Application == "Agents" {
+				path = strings.Replace(path, "actions", "agents", 1)
 			}
 
 			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))
