@@ -86,7 +86,7 @@ func HeaderHasMinimumScopes(scopesHeader string) error {
 		"read:org":  false,
 		"admin:org": false,
 	}
-	for _, s := range strings.Split(scopesHeader, ",") {
+	for s := range strings.SplitSeq(scopesHeader, ",") {
 		search[strings.TrimSpace(s)] = true
 	}
 
