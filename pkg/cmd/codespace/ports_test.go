@@ -184,3 +184,35 @@ func testingPortsApp() *App {
 
 	return NewApp(ios, nil, apiMock, nil, nil)
 }
+
+func TestGetPortPairs(t *testing.T) {
+	tests := []struct {
+		name    string
+		ports   []string
+		wantLen int
+		wantErr bool
+	}{
+		{name: "single port", ports: []string{"80:80"}, wantLen: 1, wantErr: false},
+		{name: "multiple ports", ports: []string{"80:80", "8080:8080", "3306:3306"}, wantLen: 3, wantErr: false},
+		{name: "invalid format", ports: []string{"80"}, wantLen: 0, wantErr: true},
+		{name: "empty", ports: []string{}, wantLen: 0, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pairs, err := getPortPairs(tt.ports)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if len(pairs) != tt.wantLen {
+				t.Errorf("got %d pairs, want %d", len(pairs), tt.wantLen)
+			}
+		})
+	}
+}
