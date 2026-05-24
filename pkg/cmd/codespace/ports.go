@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -328,9 +327,6 @@ func (a *App) ForwardPorts(ctx context.Context, selector *CodespaceSelector, por
 
 	// Run forwarding of all ports concurrently, aborting all of
 	// them at the first failure, including cancellation of the context.
-	// A mutex serializes tunnel port creation calls to avoid a race
-	// in the vendored dev-tunnels package (concurrent map writes).
-	var fwdMu sync.Mutex
 	group, ctx := errgroup.WithContext(ctx)
 	for _, pair := range portPairs {
 		group.Go(func() error {
@@ -350,10 +346,7 @@ func (a *App) ForwardPorts(ctx context.Context, selector *CodespaceSelector, por
 			opts := portforwarder.ForwardPortOpts{
 				Port: pair.remote,
 			}
-			fwdMu.Lock()
-			err = fwd.ForwardPortToListener(ctx, opts, listen)
-			fwdMu.Unlock()
-			return err
+			return fwd.ForwardPortToListener(ctx, opts, listen)
 		})
 	}
 	return group.Wait() // first error

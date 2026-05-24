@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 
 	"github.com/cli/cli/v2/internal/codespaces/connection"
 	"github.com/microsoft/dev-tunnels/go/tunnels"
@@ -40,6 +41,10 @@ type CodespacesPortForwarder struct {
 	keepAliveReason chan string
 }
 
+// fwdMu serializes tunnel port creation across all forwarder instances
+// to prevent concurrent map writes in the vendored dev-tunnels package.
+var fwdMu sync.Mutex
+
 type PortForwarder interface {
 	ForwardPortToListener(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener) error
 	ForwardPort(ctx context.Context, opts ForwardPortOpts) error
@@ -61,7 +66,9 @@ func NewPortForwarder(ctx context.Context, codespaceConnection *connection.Codes
 
 // ForwardPortToListener forwards the specified port to the given TCP listener.
 func (fwd *CodespacesPortForwarder) ForwardPortToListener(ctx context.Context, opts ForwardPortOpts, listener *net.TCPListener) error {
+	fwdMu.Lock()
 	err := fwd.ForwardPort(ctx, opts)
+	fwdMu.Unlock()
 	if err != nil {
 		return fmt.Errorf("error forwarding port: %w", err)
 	}
