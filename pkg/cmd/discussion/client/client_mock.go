@@ -42,6 +42,9 @@ var _ DiscussionClient = &DiscussionClientMock{}
 //			ListCategoriesFunc: func(repo ghrepo.Interface) ([]DiscussionCategory, error) {
 //				panic("mock out the ListCategories method")
 //			},
+//			ListLabelsFunc: func(repo ghrepo.Interface) ([]DiscussionLabel, error) {
+//				panic("mock out the ListLabels method")
+//			},
 //			LockFunc: func(repo ghrepo.Interface, id string, reason string) error {
 //				panic("mock out the Lock method")
 //			},
@@ -93,6 +96,9 @@ type DiscussionClientMock struct {
 
 	// ListCategoriesFunc mocks the ListCategories method.
 	ListCategoriesFunc func(repo ghrepo.Interface) ([]DiscussionCategory, error)
+
+	// ListLabelsFunc mocks the ListLabels method.
+	ListLabelsFunc func(repo ghrepo.Interface) ([]DiscussionLabel, error)
 
 	// LockFunc mocks the Lock method.
 	LockFunc func(repo ghrepo.Interface, id string, reason string) error
@@ -195,6 +201,11 @@ type DiscussionClientMock struct {
 			// Repo is the repo argument value.
 			Repo ghrepo.Interface
 		}
+		// ListLabels holds details about calls to the ListLabels method.
+		ListLabels []struct {
+			// Repo is the repo argument value.
+			Repo ghrepo.Interface
+		}
 		// Lock holds details about calls to the Lock method.
 		Lock []struct {
 			// Repo is the repo argument value.
@@ -259,6 +270,7 @@ type DiscussionClientMock struct {
 	lockGetWithComments   sync.RWMutex
 	lockList              sync.RWMutex
 	lockListCategories    sync.RWMutex
+	lockListLabels        sync.RWMutex
 	lockLock              sync.RWMutex
 	lockMarkAnswer        sync.RWMutex
 	lockReopen            sync.RWMutex
@@ -597,6 +609,38 @@ func (mock *DiscussionClientMock) ListCategoriesCalls() []struct {
 	mock.lockListCategories.RLock()
 	calls = mock.calls.ListCategories
 	mock.lockListCategories.RUnlock()
+	return calls
+}
+
+// ListLabels calls ListLabelsFunc.
+func (mock *DiscussionClientMock) ListLabels(repo ghrepo.Interface) ([]DiscussionLabel, error) {
+	if mock.ListLabelsFunc == nil {
+		panic("DiscussionClientMock.ListLabelsFunc: method is nil but DiscussionClient.ListLabels was just called")
+	}
+	callInfo := struct {
+		Repo ghrepo.Interface
+	}{
+		Repo: repo,
+	}
+	mock.lockListLabels.Lock()
+	mock.calls.ListLabels = append(mock.calls.ListLabels, callInfo)
+	mock.lockListLabels.Unlock()
+	return mock.ListLabelsFunc(repo)
+}
+
+// ListLabelsCalls gets all the calls that were made to ListLabels.
+// Check the length with:
+//
+//	len(mockedDiscussionClient.ListLabelsCalls())
+func (mock *DiscussionClientMock) ListLabelsCalls() []struct {
+	Repo ghrepo.Interface
+} {
+	var calls []struct {
+		Repo ghrepo.Interface
+	}
+	mock.lockListLabels.RLock()
+	calls = mock.calls.ListLabels
+	mock.lockListLabels.RUnlock()
 	return calls
 }
 

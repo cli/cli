@@ -15,6 +15,7 @@ type DiscussionClient interface {
 	GetWithComments(repo ghrepo.Interface, number int, commentLimit int, after string, newest bool) (*Discussion, error)
 	GetCommentReplies(repo ghrepo.Interface, number int, commentID string, limit int, after string, newest bool) (*Discussion, error)
 	ListCategories(repo ghrepo.Interface) ([]DiscussionCategory, error)
+	ListLabels(repo ghrepo.Interface) ([]DiscussionLabel, error)
 	Create(repo ghrepo.Interface, input CreateDiscussionInput) (*Discussion, error)
 	Update(repo ghrepo.Interface, input UpdateDiscussionInput) (*Discussion, error)
 	Close(repo ghrepo.Interface, id string, reason CloseReason) (*Discussion, error)

@@ -805,13 +805,8 @@ func (c *discussionClient) getRepositoryMeta(repo ghrepo.Interface) (*repository
 	}, nil
 }
 
-// resolveLabels fetches all labels for a repository and matches the requested names
-// case-insensitively. Returns an error if any requested label name is not found.
-func (c *discussionClient) resolveLabels(repo ghrepo.Interface, labelNames []string) ([]DiscussionLabel, error) {
-	if len(labelNames) == 0 {
-		return nil, nil
-	}
-
+// ListLabels fetches all labels for a repository, ordered alphabetically by name.
+func (c *discussionClient) ListLabels(repo ghrepo.Interface) ([]DiscussionLabel, error) {
 	var query struct {
 		Repository struct {
 			Labels struct {
@@ -824,7 +819,7 @@ func (c *discussionClient) resolveLabels(repo ghrepo.Interface, labelNames []str
 					HasNextPage bool
 					EndCursor   string
 				}
-			} `graphql:"labels(first: 100, after: $endCursor)"`
+			} `graphql:"labels(first: 100, after: $endCursor, orderBy: {field: NAME, direction: ASC})"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
@@ -834,23 +829,13 @@ func (c *discussionClient) resolveLabels(repo ghrepo.Interface, labelNames []str
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	wanted := make(map[string]bool, len(labelNames))
-	for _, n := range labelNames {
-		wanted[strings.ToLower(n)] = true
-	}
-
-	found := make(map[string]DiscussionLabel, len(labelNames))
+	var labels []DiscussionLabel
 	for {
-		if err := c.gql.Query(repo.RepoHost(), "RepositoryLabels", &query, variables); err != nil {
+		if err := c.gql.Query(repo.RepoHost(), "RepositoryLabelsForDiscussions", &query, variables); err != nil {
 			return nil, err
 		}
 		for _, n := range query.Repository.Labels.Nodes {
-			if wanted[strings.ToLower(n.Name)] {
-				found[strings.ToLower(n.Name)] = DiscussionLabel{ID: n.ID, Name: n.Name, Color: n.Color}
-			}
-		}
-		if len(found) == len(wanted) {
-			break
+			labels = append(labels, DiscussionLabel{ID: n.ID, Name: n.Name, Color: n.Color})
 		}
 		if !query.Repository.Labels.PageInfo.HasNextPage {
 			break
@@ -858,20 +843,40 @@ func (c *discussionClient) resolveLabels(repo ghrepo.Interface, labelNames []str
 		variables["endCursor"] = githubv4.String(query.Repository.Labels.PageInfo.EndCursor)
 	}
 
-	if len(found) != len(wanted) {
-		var missing []string
-		for _, name := range labelNames {
-			if _, ok := found[strings.ToLower(name)]; !ok {
-				missing = append(missing, name)
-			}
-		}
-		return nil, fmt.Errorf("labels not found: %s", strings.Join(missing, ", "))
+	return labels, nil
+}
+
+// resolveLabels matches the requested label names case-insensitively against
+// the repository's labels. Returns an error if any name is not found.
+func (c *discussionClient) resolveLabels(repo ghrepo.Interface, labelNames []string) ([]DiscussionLabel, error) {
+	if len(labelNames) == 0 {
+		return nil, nil
+	}
+
+	allLabels, err := c.ListLabels(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	byName := make(map[string]DiscussionLabel, len(allLabels))
+	for _, l := range allLabels {
+		byName[strings.ToLower(l.Name)] = l
 	}
 
 	result := make([]DiscussionLabel, 0, len(labelNames))
+	var missing []string
 	for _, name := range labelNames {
-		result = append(result, found[strings.ToLower(name)])
+		if l, ok := byName[strings.ToLower(name)]; ok {
+			result = append(result, l)
+		} else {
+			missing = append(missing, name)
+		}
 	}
+
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("labels not found: %s", strings.Join(missing, ", "))
+	}
+
 	return result, nil
 }
 
