@@ -70,7 +70,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			number, repo, err := shared.ParseDiscussionArg(args[0])
 			if err != nil {
-				return cmdutil.FlagErrorf("%s", err)
+				return cmdutil.FlagErrorWrap(err)
 			}
 
 			if repo != nil {
