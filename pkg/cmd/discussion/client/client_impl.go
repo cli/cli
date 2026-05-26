@@ -53,72 +53,6 @@ func mapActorFromListNode(n actorNode) DiscussionActor {
 	return a
 }
 
-// rawActorNode is a JSON-compatible actor type for use with c.gql.GraphQL() (raw
-// query strings). Unlike actorNode, it does not use shurcooL graphql struct tags
-// and works with standard json.Unmarshal. GitHub flattens inline fragment fields
-// (... on User { id name }) to the top level of the actor object in JSON responses.
-type rawActorNode struct {
-	TypeName string `json:"__typename"`
-	Login    string
-	ID       string
-	Name     string
-}
-
-func mapActorFromRawNode(n rawActorNode) DiscussionActor {
-	a := DiscussionActor{Login: n.Login}
-	switch n.TypeName {
-	case "User":
-		a.ID = n.ID
-		a.Name = n.Name
-	case "Bot":
-		a.ID = n.ID
-	}
-	return a
-}
-
-// updateDiscussionDiscNode is the JSON response shape for the discussion field
-// inside an updateDiscussion mutation response.
-type updateDiscussionDiscNode struct {
-	ID          string
-	Number      int
-	Title       string
-	Body        string
-	URL         string
-	Closed      bool
-	StateReason string
-	Author      rawActorNode
-	Category    struct {
-		ID           string
-		Name         string
-		Slug         string
-		Emoji        string
-		IsAnswerable bool
-	}
-	Labels struct {
-		Nodes []struct {
-			ID    string
-			Name  string
-			Color string
-		}
-	}
-	IsAnswered     bool
-	AnswerChosenAt time.Time
-	AnswerChosenBy *rawActorNode
-	ReactionGroups []struct {
-		Content string
-		Users   struct {
-			TotalCount int
-		}
-	}
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	ClosedAt  time.Time
-	Locked    bool
-	Comments  struct {
-		TotalCount int
-	}
-}
-
 // discussionListNode is the GraphQL response shape for a discussion in
 // list and search results. It covers high-level fields only (no comments, or
 // other detail-level data that commands like view would need).
@@ -1058,83 +992,48 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 	return &d, nil
 }
 
-const updateDiscussionMutation = `
-mutation UpdateDiscussion($input: UpdateDiscussionInput!) {
-  updateDiscussion(input: $input) {
-    discussion {
-      id number title body url closed stateReason
-      isAnswered answerChosenAt
-      author { __typename login ... on User { id name } ... on Bot { id } }
-      answerChosenBy { __typename login ... on User { id name } ... on Bot { id } }
-      category { id name slug emoji isAnswerable }
-      labels(first: 20) { nodes { id name color } }
-      reactionGroups { content users { totalCount } }
-      createdAt updatedAt closedAt locked
-      comments { totalCount }
-    }
-  }
-}`
-
 func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionInput) (*Discussion, error) {
-	inputMap := map[string]interface{}{
-		"discussionId": input.DiscussionID,
+	if input.Title == nil && input.Body == nil && input.CategoryID == nil {
+		return nil, fmt.Errorf("nothing to update")
+	}
+
+	gqlInput := githubv4.UpdateDiscussionInput{
+		DiscussionID: githubv4.ID(input.DiscussionID),
 	}
 	if input.Title != nil {
-		inputMap["title"] = *input.Title
+		gqlInput.Title = githubv4.NewString(githubv4.String(*input.Title))
 	}
 	if input.Body != nil {
-		inputMap["body"] = *input.Body
+		gqlInput.Body = githubv4.NewString(githubv4.String(*input.Body))
 	}
 	if input.CategoryID != nil {
-		inputMap["categoryId"] = *input.CategoryID
+		id := githubv4.ID(*input.CategoryID)
+		gqlInput.CategoryID = &id
+	}
+
+	var mutation struct {
+		UpdateDiscussion struct {
+			Discussion struct {
+				discussionListNode
+			}
+		} `graphql:"updateDiscussion(input: $input)"`
 	}
 
 	variables := map[string]interface{}{
-		"input": inputMap,
+		"input": gqlInput,
 	}
 
-	var result struct {
-		UpdateDiscussion struct {
-			Discussion updateDiscussionDiscNode
-		}
-	}
-	if err := c.gql.GraphQL(repo.RepoHost(), updateDiscussionMutation, variables, &result); err != nil {
+	if err := c.gql.Mutate(repo.RepoHost(), "UpdateDiscussion", &mutation, variables); err != nil {
 		return nil, err
 	}
 
-	disc := result.UpdateDiscussion.Discussion
-	d := Discussion{
-		ID:             disc.ID,
-		Number:         disc.Number,
-		Title:          disc.Title,
-		Body:           disc.Body,
-		URL:            disc.URL,
-		Closed:         disc.Closed,
-		StateReason:    disc.StateReason,
-		Author:         mapActorFromRawNode(disc.Author),
-		Category:       DiscussionCategory{ID: disc.Category.ID, Name: disc.Category.Name, Slug: disc.Category.Slug, Emoji: disc.Category.Emoji, IsAnswerable: disc.Category.IsAnswerable},
-		Answered:       disc.IsAnswered,
-		AnswerChosenAt: disc.AnswerChosenAt,
-		CreatedAt:      disc.CreatedAt,
-		UpdatedAt:      disc.UpdatedAt,
-		ClosedAt:       disc.ClosedAt,
-		Locked:         disc.Locked,
-		Comments:       DiscussionCommentList{TotalCount: disc.Comments.TotalCount},
-	}
+	d := mapDiscussionFromListNode(mutation.UpdateDiscussion.Discussion.discussionListNode)
 
-	if disc.AnswerChosenBy != nil {
-		a := mapActorFromRawNode(*disc.AnswerChosenBy)
-		d.AnswerChosenBy = &a
-	}
-
-	d.Labels = make([]DiscussionLabel, len(disc.Labels.Nodes))
-	for i, l := range disc.Labels.Nodes {
-		d.Labels[i] = DiscussionLabel{ID: l.ID, Name: l.Name, Color: l.Color}
-	}
-
-	d.ReactionGroups = make([]ReactionGroup, 0, len(disc.ReactionGroups))
-	for _, rg := range disc.ReactionGroups {
-		d.ReactionGroups = append(d.ReactionGroups, ReactionGroup{Content: rg.Content, TotalCount: rg.Users.TotalCount})
+	for _, rg := range mutation.UpdateDiscussion.Discussion.ReactionGroups {
+		d.ReactionGroups = append(d.ReactionGroups, ReactionGroup{
+			Content:    rg.Content,
+			TotalCount: rg.Users.TotalCount,
+		})
 	}
 
 	return &d, nil

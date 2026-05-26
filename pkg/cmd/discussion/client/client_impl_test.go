@@ -3187,6 +3187,13 @@ func TestUpdate(t *testing.T) {
 		assertDisc *Discussion
 	}{
 		{
+			name: "nothing to update",
+			input: UpdateDiscussionInput{
+				DiscussionID: "D_1",
+			},
+			wantErr: "nothing to update",
+		},
+		{
 			name: "maps all fields",
 			input: UpdateDiscussionInput{
 				DiscussionID: "D_1",
@@ -3219,8 +3226,7 @@ func TestUpdate(t *testing.T) {
 										"createdAt": "2025-06-01T00:00:00Z",
 										"updatedAt": "2025-06-02T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false,
-										"comments": {"totalCount": 0}
+										"locked": false
 									}
 								}
 							}
@@ -3279,8 +3285,7 @@ func TestUpdate(t *testing.T) {
 										"createdAt": "2025-06-01T00:00:00Z",
 										"updatedAt": "2025-06-02T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false,
-										"comments": {"totalCount": 0}
+										"locked": false
 									}
 								}
 							}
@@ -3301,10 +3306,9 @@ func TestUpdate(t *testing.T) {
 					Slug:  "general",
 					Emoji: ":speech_balloon:",
 				},
-				Labels:         []DiscussionLabel{},
-				ReactionGroups: []ReactionGroup{},
-				CreatedAt:      time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
-				UpdatedAt:      time.Date(2025, 6, 2, 0, 0, 0, 0, time.UTC),
+				Labels:    []DiscussionLabel{},
+				CreatedAt: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+				UpdatedAt: time.Date(2025, 6, 2, 0, 0, 0, 0, time.UTC),
 			},
 		},
 		{
