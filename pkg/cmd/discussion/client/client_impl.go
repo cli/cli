@@ -941,27 +941,58 @@ func (c *discussionClient) resolveLabels(repo ghrepo.Interface, labelNames []str
 	return result, nil
 }
 
-// addLabelsToDiscussion applies labels to a discussion via the addLabelsToLabelable mutation.
-func (c *discussionClient) addLabelsToDiscussion(repo ghrepo.Interface, discussionID string, labelIDs []string) error {
-	ids := make([]githubv4.ID, len(labelIDs))
-	for i, id := range labelIDs {
-		ids[i] = githubv4.ID(id)
+// editDiscussionLabels adds and removes labels on a discussion. Removals are
+// applied before additions. Either slice may be nil or empty to skip that step.
+func (c *discussionClient) editDiscussionLabels(repo ghrepo.Interface, discussionID string, addIDs, removeIDs []string) error {
+	if len(removeIDs) > 0 {
+		ids := make([]githubv4.ID, len(removeIDs))
+		for i, id := range removeIDs {
+			ids[i] = githubv4.ID(id)
+		}
+
+		var mutation struct {
+			RemoveLabelsFromLabelable struct {
+				Typename string `graphql:"__typename"`
+			} `graphql:"removeLabelsFromLabelable(input: $input)"`
+		}
+
+		variables := map[string]interface{}{
+			"input": githubv4.RemoveLabelsFromLabelableInput{
+				LabelableID: githubv4.ID(discussionID),
+				LabelIDs:    ids,
+			},
+		}
+
+		if err := c.gql.Mutate(repo.RepoHost(), "RemoveLabelsFromDiscussion", &mutation, variables); err != nil {
+			return err
+		}
 	}
 
-	var mutation struct {
-		AddLabelsToLabelable struct {
-			Typename string `graphql:"__typename"`
-		} `graphql:"addLabelsToLabelable(input: $input)"`
+	if len(addIDs) > 0 {
+		ids := make([]githubv4.ID, len(addIDs))
+		for i, id := range addIDs {
+			ids[i] = githubv4.ID(id)
+		}
+
+		var mutation struct {
+			AddLabelsToLabelable struct {
+				Typename string `graphql:"__typename"`
+			} `graphql:"addLabelsToLabelable(input: $input)"`
+		}
+
+		variables := map[string]interface{}{
+			"input": githubv4.AddLabelsToLabelableInput{
+				LabelableID: githubv4.ID(discussionID),
+				LabelIDs:    ids,
+			},
+		}
+
+		if err := c.gql.Mutate(repo.RepoHost(), "AddLabelsToDiscussion", &mutation, variables); err != nil {
+			return err
+		}
 	}
 
-	variables := map[string]interface{}{
-		"input": githubv4.AddLabelsToLabelableInput{
-			LabelableID: githubv4.ID(discussionID),
-			LabelIDs:    ids,
-		},
-	}
-
-	return c.gql.Mutate(repo.RepoHost(), "AddLabelsToDiscussion", &mutation, variables)
+	return nil
 }
 
 func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionInput) (*Discussion, error) {
@@ -1022,7 +1053,7 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 		for i, l := range resolvedLabels {
 			labelIDs[i] = l.ID
 		}
-		if err := c.addLabelsToDiscussion(repo, d.ID, labelIDs); err != nil {
+		if err := c.editDiscussionLabels(repo, d.ID, labelIDs, nil); err != nil {
 			return nil, err
 		}
 		d.Labels = resolvedLabels

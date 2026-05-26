@@ -3068,6 +3068,115 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+func TestEditDiscussionLabels(t *testing.T) {
+	repo := ghrepo.New("OWNER", "REPO")
+
+	tests := []struct {
+		name      string
+		addIDs    []string
+		removeIDs []string
+		setupMock func(reg *httpmock.Registry)
+		wantErr   string
+	}{
+		{
+			name:      "adds and removes labels",
+			addIDs:    []string{"L_bug", "L_enh"},
+			removeIDs: []string{"L_old"},
+			setupMock: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQLMutationMatcher(`mutation RemoveLabelsFromDiscussion\b`, func(input map[string]interface{}) bool {
+						assert.Equal(t, "D_1", input["labelableId"])
+						assert.Equal(t, []interface{}{"L_old"}, input["labelIds"])
+						return true
+					}),
+					httpmock.StringResponse(`{"data":{"removeLabelsFromLabelable":{"__typename":"Labelable"}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQLMutationMatcher(`mutation AddLabelsToDiscussion\b`, func(input map[string]interface{}) bool {
+						assert.Equal(t, "D_1", input["labelableId"])
+						assert.Equal(t, []interface{}{"L_bug", "L_enh"}, input["labelIds"])
+						return true
+					}),
+					httpmock.StringResponse(`{"data":{"addLabelsToLabelable":{"__typename":"Labelable"}}}`),
+				)
+			},
+		},
+		{
+			name:      "only adds labels",
+			addIDs:    []string{"L_bug"},
+			removeIDs: nil,
+			setupMock: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation AddLabelsToDiscussion\b`),
+					httpmock.StringResponse(`{"data":{"addLabelsToLabelable":{"__typename":"Labelable"}}}`),
+				)
+			},
+		},
+		{
+			name:      "only removes labels",
+			addIDs:    nil,
+			removeIDs: []string{"L_old"},
+			setupMock: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RemoveLabelsFromDiscussion\b`),
+					httpmock.StringResponse(`{"data":{"removeLabelsFromLabelable":{"__typename":"Labelable"}}}`),
+				)
+			},
+		},
+		{
+			name:      "skips both when empty",
+			addIDs:    nil,
+			removeIDs: nil,
+			setupMock: func(reg *httpmock.Registry) {},
+		},
+		{
+			name:      "remove error stops before add",
+			addIDs:    []string{"L_bug"},
+			removeIDs: []string{"L_old"},
+			setupMock: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RemoveLabelsFromDiscussion\b`),
+					httpmock.StringResponse(`{"data":null,"errors":[{"message":"could not remove labels"}]}`),
+				)
+			},
+			wantErr: "could not remove labels",
+		},
+		{
+			name:      "add error is returned",
+			addIDs:    []string{"L_bug"},
+			removeIDs: nil,
+			setupMock: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation AddLabelsToDiscussion\b`),
+					httpmock.StringResponse(`{"data":null,"errors":[{"message":"could not add labels"}]}`),
+				)
+			},
+			wantErr: "could not add labels",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			tt.setupMock(reg)
+
+			client := newTestDiscussionClient(reg).(*discussionClient)
+
+			err := client.editDiscussionLabels(repo, "D_1", tt.addIDs, tt.removeIDs)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestUpdate(t *testing.T) {
 	repo := ghrepo.New("OWNER", "REPO")
 
