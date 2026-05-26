@@ -336,8 +336,10 @@ type CreateDiscussionInput struct {
 // UpdateDiscussionInput holds optional parameters for updating a discussion.
 // Nil pointer fields are left unchanged.
 type UpdateDiscussionInput struct {
-	DiscussionID string
-	Title        *string
-	Body         *string
-	CategoryID   *string
+	DiscussionID   string
+	Title          *string
+	Body           *string
+	CategoryID     *string
+	AddLabels    []string
+	RemoveLabels []string
 }

@@ -877,7 +877,10 @@ func (c *discussionClient) resolveLabels(repo ghrepo.Interface, labelNames []str
 
 // editDiscussionLabels adds and removes labels on a discussion. Removals are
 // applied before additions. Either slice may be nil or empty to skip that step.
-func (c *discussionClient) editDiscussionLabels(repo ghrepo.Interface, discussionID string, addIDs, removeIDs []string) error {
+// Returns the discussion state as returned by the last mutation executed.
+func (c *discussionClient) editDiscussionLabels(repo ghrepo.Interface, discussionID string, addIDs, removeIDs []string) (*discussionListNode, error) {
+	var node *discussionListNode
+
 	if len(removeIDs) > 0 {
 		ids := make([]githubv4.ID, len(removeIDs))
 		for i, id := range removeIDs {
@@ -886,7 +889,11 @@ func (c *discussionClient) editDiscussionLabels(repo ghrepo.Interface, discussio
 
 		var mutation struct {
 			RemoveLabelsFromLabelable struct {
-				Typename string `graphql:"__typename"`
+				Labelable struct {
+					Discussion struct {
+						discussionListNode
+					} `graphql:"... on Discussion"`
+				}
 			} `graphql:"removeLabelsFromLabelable(input: $input)"`
 		}
 
@@ -898,8 +905,9 @@ func (c *discussionClient) editDiscussionLabels(repo ghrepo.Interface, discussio
 		}
 
 		if err := c.gql.Mutate(repo.RepoHost(), "RemoveLabelsFromDiscussion", &mutation, variables); err != nil {
-			return err
+			return nil, err
 		}
+		node = &mutation.RemoveLabelsFromLabelable.Labelable.Discussion.discussionListNode
 	}
 
 	if len(addIDs) > 0 {
@@ -910,7 +918,11 @@ func (c *discussionClient) editDiscussionLabels(repo ghrepo.Interface, discussio
 
 		var mutation struct {
 			AddLabelsToLabelable struct {
-				Typename string `graphql:"__typename"`
+				Labelable struct {
+					Discussion struct {
+						discussionListNode
+					} `graphql:"... on Discussion"`
+				}
 			} `graphql:"addLabelsToLabelable(input: $input)"`
 		}
 
@@ -922,11 +934,12 @@ func (c *discussionClient) editDiscussionLabels(repo ghrepo.Interface, discussio
 		}
 
 		if err := c.gql.Mutate(repo.RepoHost(), "AddLabelsToDiscussion", &mutation, variables); err != nil {
-			return err
+			return nil, err
 		}
+		node = &mutation.AddLabelsToLabelable.Labelable.Discussion.discussionListNode
 	}
 
-	return nil
+	return node, nil
 }
 
 func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionInput) (*Discussion, error) {
@@ -969,67 +982,106 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 		return nil, err
 	}
 
-	d := mapDiscussionFromListNode(mutation.CreateDiscussion.Discussion.discussionListNode)
-
-	for _, rg := range mutation.CreateDiscussion.Discussion.ReactionGroups {
-		d.ReactionGroups = append(d.ReactionGroups, ReactionGroup{
-			Content:    rg.Content,
-			TotalCount: rg.Users.TotalCount,
-		})
-	}
+	node := &mutation.CreateDiscussion.Discussion.discussionListNode
 
 	if len(resolvedLabels) > 0 {
 		labelIDs := make([]string, len(resolvedLabels))
 		for i, l := range resolvedLabels {
 			labelIDs[i] = l.ID
 		}
-		if err := c.editDiscussionLabels(repo, d.ID, labelIDs, nil); err != nil {
+		labelNode, err := c.editDiscussionLabels(repo, node.ID, labelIDs, nil)
+		if err != nil {
 			return nil, err
 		}
-		d.Labels = resolvedLabels
+		node = labelNode
+	}
+
+	d := mapDiscussionFromListNode(*node)
+
+	for _, rg := range node.ReactionGroups {
+		d.ReactionGroups = append(d.ReactionGroups, ReactionGroup{
+			Content:    rg.Content,
+			TotalCount: rg.Users.TotalCount,
+		})
 	}
 
 	return &d, nil
 }
 
 func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionInput) (*Discussion, error) {
-	if input.Title == nil && input.Body == nil && input.CategoryID == nil {
+	hasFieldUpdate := input.Title != nil || input.Body != nil || input.CategoryID != nil
+	hasLabelUpdate := len(input.AddLabels) > 0 || len(input.RemoveLabels) > 0
+
+	if !hasFieldUpdate && !hasLabelUpdate {
 		return nil, fmt.Errorf("nothing to update")
 	}
 
-	gqlInput := githubv4.UpdateDiscussionInput{
-		DiscussionID: githubv4.ID(input.DiscussionID),
-	}
-	if input.Title != nil {
-		gqlInput.Title = githubv4.NewString(githubv4.String(*input.Title))
-	}
-	if input.Body != nil {
-		gqlInput.Body = githubv4.NewString(githubv4.String(*input.Body))
-	}
-	if input.CategoryID != nil {
-		id := githubv4.ID(*input.CategoryID)
-		gqlInput.CategoryID = &id
+	var node *discussionListNode
+
+	if hasFieldUpdate {
+		gqlInput := githubv4.UpdateDiscussionInput{
+			DiscussionID: githubv4.ID(input.DiscussionID),
+		}
+		if input.Title != nil {
+			gqlInput.Title = githubv4.NewString(githubv4.String(*input.Title))
+		}
+		if input.Body != nil {
+			gqlInput.Body = githubv4.NewString(githubv4.String(*input.Body))
+		}
+		if input.CategoryID != nil {
+			id := githubv4.ID(*input.CategoryID)
+			gqlInput.CategoryID = &id
+		}
+
+		var mutation struct {
+			UpdateDiscussion struct {
+				Discussion struct {
+					discussionListNode
+				}
+			} `graphql:"updateDiscussion(input: $input)"`
+		}
+
+		variables := map[string]interface{}{
+			"input": gqlInput,
+		}
+
+		if err := c.gql.Mutate(repo.RepoHost(), "UpdateDiscussion", &mutation, variables); err != nil {
+			return nil, err
+		}
+
+		node = &mutation.UpdateDiscussion.Discussion.discussionListNode
 	}
 
-	var mutation struct {
-		UpdateDiscussion struct {
-			Discussion struct {
-				discussionListNode
-			}
-		} `graphql:"updateDiscussion(input: $input)"`
+	if hasLabelUpdate {
+		allNames := append(input.AddLabels, input.RemoveLabels...)
+		resolved, err := c.resolveLabels(repo, allNames)
+		if err != nil {
+			return nil, err
+		}
+		labelByName := make(map[string]string, len(resolved))
+		for _, l := range resolved {
+			labelByName[strings.ToLower(l.Name)] = l.ID
+		}
+
+		addIDs := make([]string, 0, len(input.AddLabels))
+		for _, name := range input.AddLabels {
+			addIDs = append(addIDs, labelByName[strings.ToLower(name)])
+		}
+		removeIDs := make([]string, 0, len(input.RemoveLabels))
+		for _, name := range input.RemoveLabels {
+			removeIDs = append(removeIDs, labelByName[strings.ToLower(name)])
+		}
+
+		labelNode, err := c.editDiscussionLabels(repo, input.DiscussionID, addIDs, removeIDs)
+		if err != nil {
+			return nil, err
+		}
+		node = labelNode
 	}
 
-	variables := map[string]interface{}{
-		"input": gqlInput,
-	}
+	d := mapDiscussionFromListNode(*node)
 
-	if err := c.gql.Mutate(repo.RepoHost(), "UpdateDiscussion", &mutation, variables); err != nil {
-		return nil, err
-	}
-
-	d := mapDiscussionFromListNode(mutation.UpdateDiscussion.Discussion.discussionListNode)
-
-	for _, rg := range mutation.UpdateDiscussion.Discussion.ReactionGroups {
+	for _, rg := range node.ReactionGroups {
 		d.ReactionGroups = append(d.ReactionGroups, ReactionGroup{
 			Content:    rg.Content,
 			TotalCount: rg.Users.TotalCount,
