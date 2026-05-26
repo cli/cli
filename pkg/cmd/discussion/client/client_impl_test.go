@@ -2539,8 +2539,7 @@ func TestCreate(t *testing.T) {
 										"createdAt": "2025-06-01T00:00:00Z",
 										"updatedAt": "2025-06-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false,
-										"comments": {"totalCount": 0}
+										"locked": false
 									}
 								}
 							}
@@ -2678,8 +2677,7 @@ func TestCreate(t *testing.T) {
 										"createdAt": "2025-06-01T00:00:00Z",
 										"updatedAt": "2025-06-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false,
-										"comments": {"totalCount": 0}
+										"locked": false
 									}
 								}
 							}
@@ -2783,8 +2781,7 @@ func TestCreate(t *testing.T) {
 										"createdAt": "2025-06-01T00:00:00Z",
 										"updatedAt": "2025-06-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false,
-										"comments": {"totalCount": 0}
+										"locked": false
 									}
 								}
 							}
@@ -2874,8 +2871,7 @@ func TestCreate(t *testing.T) {
 										"createdAt": "2025-06-01T00:00:00Z",
 										"updatedAt": "2025-06-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false,
-										"comments": {"totalCount": 0}
+										"locked": false
 									}
 								}
 							}
@@ -3003,8 +2999,7 @@ func TestCreate(t *testing.T) {
 										"createdAt": "2025-06-01T00:00:00Z",
 										"updatedAt": "2025-06-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false,
-										"comments": {"totalCount": 0}
+										"locked": false
 									}
 								}
 							}

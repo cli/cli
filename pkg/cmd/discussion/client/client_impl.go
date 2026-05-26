@@ -1018,9 +1018,6 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 		CreateDiscussion struct {
 			Discussion struct {
 				discussionListNode
-				Comments struct {
-					TotalCount int
-				}
 			}
 		} `graphql:"createDiscussion(input: $input)"`
 	}
@@ -1039,7 +1036,6 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 	}
 
 	d := mapDiscussionFromListNode(mutation.CreateDiscussion.Discussion.discussionListNode)
-	d.Comments = DiscussionCommentList{TotalCount: mutation.CreateDiscussion.Discussion.Comments.TotalCount}
 
 	for _, rg := range mutation.CreateDiscussion.Discussion.ReactionGroups {
 		d.ReactionGroups = append(d.ReactionGroups, ReactionGroup{
