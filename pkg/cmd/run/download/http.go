@@ -23,11 +23,11 @@ func (p *apiPlatform) List(runID string) ([]shared.Artifact, error) {
 	return shared.ListArtifacts(p.client, p.repo, runID)
 }
 
-func (p *apiPlatform) Download(url string, dir safepaths.Absolute) error {
-	return downloadArtifact(p.client, url, dir)
+func (p *apiPlatform) Download(url string, name string, dir safepaths.Absolute) error {
+	return downloadArtifact(p.client, url, name, dir)
 }
 
-func downloadArtifact(httpClient *http.Client, url string, destDir safepaths.Absolute) error {
+func downloadArtifact(httpClient *http.Client, url string, name string, destDir safepaths.Absolute) error {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -45,6 +45,30 @@ func downloadArtifact(httpClient *http.Client, url string, destDir safepaths.Abs
 		return api.HandleHTTPError(resp)
 	}
 
+	// Check if the artifact is a zip file by checking Content-Type
+	contentType := resp.Header.Get("Content-Type")
+	isZip := contentType == "application/zip" || contentType == "application/x-zip-compressed"
+
+	if !isZip {
+		// Non-zipped artifact: write directly to destination
+		destPath, err := destDir.Join(name)
+		if err != nil {
+			return fmt.Errorf("error creating destination path: %w", err)
+		}
+		outFile, err := os.Create(destPath.String())
+		if err != nil {
+			return fmt.Errorf("error creating output file: %w", err)
+		}
+		defer outFile.Close()
+
+		_, err = io.Copy(outFile, resp.Body)
+		if err != nil {
+			return fmt.Errorf("error writing artifact: %w", err)
+		}
+		return nil
+	}
+
+	// Zipped artifact: extract to destination
 	tmpfile, err := os.CreateTemp("", "gh-artifact.*.zip")
 	if err != nil {
 		return fmt.Errorf("error initializing temporary file: %w", err)
