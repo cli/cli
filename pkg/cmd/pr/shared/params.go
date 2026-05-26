@@ -235,6 +235,9 @@ func SearchQueryBuild(options FilterOptions, advancedIssueSearchSyntax bool) str
 		state = options.State
 	case "merged":
 		is = "merged"
+	case "all":
+		// When state is "all", we don't set a state qualifier
+		// The search API will search all states by default
 	}
 	query := search.Query{
 		Qualifiers: search.Qualifiers{
