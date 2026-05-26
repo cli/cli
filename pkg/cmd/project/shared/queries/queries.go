@@ -1483,8 +1483,13 @@ func (c *Client) NewOwner(canPrompt bool, login string) (*Owner, error) {
 // if number is 0 it will prompt the user to select a project interactively
 // otherwise it will make a request to get the project by number
 // set `fields` to true to get the project's field data
-// filter, if non-nil, limits which projects appear in the interactive prompt
-func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool, filter func(*Project) bool) (*Project, error) {
+// filters, when provided, limit which projects appear in the interactive prompt
+func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool, filters ...func(*Project) bool) (*Project, error) {
+	var filter func(*Project) bool
+	if len(filters) > 0 {
+		filter = filters[0]
+	}
+
 	if number != 0 {
 		variables := map[string]any{
 			"number":      githubv4.Int(number),

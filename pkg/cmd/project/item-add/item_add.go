@@ -88,7 +88,7 @@ func runAddItem(config addItemConfig) error {
 		return err
 	}
 
-	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, false, nil)
+	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, false)
 	if err != nil {
 		return err
 	}

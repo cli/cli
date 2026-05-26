@@ -88,7 +88,7 @@ func runView(config viewConfig) error {
 		return err
 	}
 
-	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, true, nil)
+	project, err := config.client.NewProject(canPrompt, owner, config.opts.number, true)
 	if err != nil {
 		return err
 	}
