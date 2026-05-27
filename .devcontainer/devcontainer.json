@@ -1,4 +1,6 @@
-{
+{"ghcr.io/devcontainer-config/features/unset-git-credential-helper:0": {}
+
+	
 	"image": "mcr.microsoft.com/devcontainers/go:1.25",
 	"features": {
 		"ghcr.io/devcontainers/features/sshd:1": {}
