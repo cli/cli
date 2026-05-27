@@ -23,11 +23,19 @@ type EditOptions struct {
 	Client     func() (client.DiscussionClient, error)
 	Prompter   prompter.Prompter
 
+	Interactive      bool
+	TitleProvided    bool
+	BodyProvided     bool
+	CategoryProvided bool
+	LabelsProvided   bool
+
 	DiscussionNumber int
 	Title            string
 	Body             string
 	BodyFile         string
 	Category         string
+	AddLabels        []string
+	RemoveLabels     []string
 }
 
 // NewCmdEdit returns a cobra command for editing a GitHub Discussion.
@@ -42,24 +50,24 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "edit {<number> | <url>}",
 		Short: "Edit a discussion (preview)",
-		Long: heredoc.Docf(`
+		Long: heredoc.Doc(`
 			Edit a GitHub Discussion.
 
-			With %[1]s--title%[1]s, %[1]s--body%[1]s, and %[1]s--category%[1]s flags, the discussion is updated
-			non-interactively. Omitting all flags triggers interactive prompts when connected to a terminal.
-		`, "`"),
+			Without flags, the command runs interactively when connected to a terminal.
+			Use flags to update specific fields non-interactively.
+		`),
 		Example: heredoc.Doc(`
 			# Edit interactively
 			$ gh discussion edit 123
 
-			# Set a new title
-			$ gh discussion edit 123 --title "Updated title"
-
-			# Change the category
-			$ gh discussion edit 123 --category "Ideas"
+			# Update title, body, and category
+			$ gh discussion edit 123 --title "Updated title" --body "Updated body" --category "Ideas"
 
 			# Update body from a file
 			$ gh discussion edit 123 --body-file body.md
+
+			# Add and remove labels
+			$ gh discussion edit 123 --add-label "bug,help wanted" --remove-label "stale"
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -83,10 +91,18 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			opts.DiscussionNumber = number
 
-			noFlagsSet := opts.Title == "" && opts.Body == "" && opts.BodyFile == "" && opts.Category == ""
+			flags := cmd.Flags()
+			opts.TitleProvided = flags.Changed("title")
+			opts.BodyProvided = flags.Changed("body") || flags.Changed("body-file")
+			opts.CategoryProvided = flags.Changed("category")
+			opts.LabelsProvided = len(opts.AddLabels) > 0 || len(opts.RemoveLabels) > 0
+
+			noFlagsSet := !opts.TitleProvided && !opts.BodyProvided && !opts.CategoryProvided && !opts.LabelsProvided
 			if noFlagsSet && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("specify at least one of --title, --body, --body-file, or --category when not running interactively")
+				return cmdutil.FlagErrorf("specify at least one flag to update the discussion non-interactively")
 			}
+
+			opts.Interactive = noFlagsSet
 
 			if runF != nil {
 				return runF(opts)
@@ -101,6 +117,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "New body for the discussion")
 	cmd.Flags().StringVarP(&opts.BodyFile, "body-file", "F", "", "Read body text from file (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.Category, "category", "c", "", "New category name or slug for the discussion")
+	cmd.Flags().StringSliceVar(&opts.AddLabels, "add-label", nil, "Add labels by `name`")
+	cmd.Flags().StringSliceVar(&opts.RemoveLabels, "remove-label", nil, "Remove labels by `name`")
 
 	return cmd
 }
@@ -120,47 +138,40 @@ func editRun(opts *EditOptions) error {
 	discussion, err := c.GetByNumber(repo, opts.DiscussionNumber)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		return fmt.Errorf("fetching discussion: %w", err)
-	}
-
-	// Resolve body from file if provided.
-	if opts.BodyFile != "" {
-		bodyBytes, err := cmdutil.ReadFile(opts.BodyFile, opts.IO.In)
-		if err != nil {
-			return err
-		}
-		opts.Body = string(bodyBytes)
+		return err
 	}
 
 	input := client.UpdateDiscussionInput{
 		DiscussionID: discussion.ID,
 	}
 
-	// noFlagsSet omits BodyFile intentionally: ReadFile above already copied its
-	// contents into opts.Body, so Body == "" implies no body update was requested.
-	noFlagsSet := opts.Title == "" && opts.Body == "" && opts.Category == ""
-	if noFlagsSet {
-		// Interactive mode: prompt user to select which fields to edit.
-		if err := promptEdit(opts, discussion, c, repo, &input); err != nil {
+	if opts.Interactive {
+		changed, err := promptEdit(opts, discussion, c, repo, &input)
+		if err != nil {
 			return err
 		}
-		// If the user dismissed the prompt without selecting anything, skip the
-		// API call — there is nothing to update.
-		if input.Title == nil && input.Body == nil && input.CategoryID == nil {
-			return nil
+
+		if !changed {
+			return fmt.Errorf("no changes made")
 		}
 	} else {
-		// Non-interactive: apply only the flags that were set.
-		if opts.Title != "" {
+		if opts.TitleProvided {
 			if strings.TrimSpace(opts.Title) == "" {
 				return cmdutil.FlagErrorf("title cannot be blank")
 			}
 			input.Title = &opts.Title
 		}
-		if opts.Body != "" {
+		if opts.BodyProvided {
+			if opts.BodyFile != "" {
+				bodyBytes, err := cmdutil.ReadFile(opts.BodyFile, opts.IO.In)
+				if err != nil {
+					return err
+				}
+				opts.Body = string(bodyBytes)
+			}
 			input.Body = &opts.Body
 		}
-		if opts.Category != "" {
+		if opts.CategoryProvided {
 			opts.IO.StartProgressIndicator()
 			categories, err := c.ListCategories(repo)
 			opts.IO.StopProgressIndicator()
@@ -173,68 +184,90 @@ func editRun(opts *EditOptions) error {
 			}
 			input.CategoryID = &cat.ID
 		}
+
+		if opts.LabelsProvided {
+			opts.IO.StartProgressIndicator()
+			allLabels, err := c.ListLabels(repo)
+			opts.IO.StopProgressIndicator()
+			if err != nil {
+				return fmt.Errorf("fetching labels: %w", err)
+			}
+			if len(opts.AddLabels) > 0 {
+				input.AddLabelIDs, err = shared.ResolveLabels(allLabels, opts.AddLabels)
+				if err != nil {
+					return err
+				}
+			}
+			if len(opts.RemoveLabels) > 0 {
+				input.RemoveLabelIDs, err = shared.ResolveLabels(allLabels, opts.RemoveLabels)
+				if err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	opts.IO.StartProgressIndicator()
 	updated, err := c.Update(repo, input)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		return fmt.Errorf("failed to update discussion: %w", err)
+		return err
 	}
 
 	fmt.Fprintln(opts.IO.Out, updated.URL)
 	return nil
 }
 
-// promptEdit runs the interactive flow, populating input with user choices.
-func promptEdit(opts *EditOptions, discussion *client.Discussion, c client.DiscussionClient, repo ghrepo.Interface, input *client.UpdateDiscussionInput) error {
-	choices := []string{"title", "body", "category"}
+// promptEdit runs the interactive flow, populating input with user choices. It returns a boolean indicating whether any
+// changes were made, and an error if the process failed.
+func promptEdit(opts *EditOptions, discussion *client.Discussion, c client.DiscussionClient, repo ghrepo.Interface, input *client.UpdateDiscussionInput) (bool, error) {
+	choices := []string{"Title", "Body", "Category"}
 	selected, err := opts.Prompter.MultiSelect("What would you like to edit?", nil, choices)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if len(selected) == 0 {
-		return nil
+		return false, nil
 	}
 
 	for _, idx := range selected {
 		switch choices[idx] {
-		case "title":
-			title, err := opts.Prompter.Input("Discussion title", discussion.Title)
+		case "Title":
+			title, err := opts.Prompter.Input("Title", discussion.Title)
 			if err != nil {
-				return err
+				return false, err
 			}
 			if strings.TrimSpace(title) == "" {
-				return fmt.Errorf("title cannot be blank")
+				return false, fmt.Errorf("title cannot be blank")
 			}
 			input.Title = &title
 
-		case "body":
-			body, err := opts.Prompter.MarkdownEditor("Discussion body", discussion.Body, false)
+		case "Body":
+			body, err := opts.Prompter.MarkdownEditor("Body", discussion.Body, false)
 			if err != nil {
-				return err
+				return false, err
 			}
 			input.Body = &body
 
-		case "category":
+		case "Category":
 			opts.IO.StartProgressIndicator()
 			categories, err := c.ListCategories(repo)
 			opts.IO.StopProgressIndicator()
 			if err != nil {
-				return fmt.Errorf("fetching categories: %w", err)
+				return false, err
 			}
 			names := make([]string, len(categories))
 			for i, cat := range categories {
 				names[i] = cat.Name
 			}
 			currentName := discussion.Category.Name
-			idx, err := opts.Prompter.Select("Discussion category", currentName, names)
+			idx, err := opts.Prompter.Select("Category", currentName, names)
 			if err != nil {
-				return err
+				return false, err
 			}
 			input.CategoryID = &categories[idx].ID
 		}
 	}
 
-	return nil
+	return true, nil
 }

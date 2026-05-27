@@ -32,8 +32,11 @@ func TestNewCmdEdit(t *testing.T) {
 			isTTY: true,
 			wantOpts: EditOptions{
 				DiscussionNumber: 123,
+				TitleProvided:    true,
 				Title:            "New title",
+				BodyProvided:     true,
 				Body:             "New body",
+				CategoryProvided: true,
 				Category:         "Ideas",
 			},
 		},
@@ -43,8 +46,29 @@ func TestNewCmdEdit(t *testing.T) {
 			isTTY: true,
 			wantOpts: EditOptions{
 				DiscussionNumber: 42,
+				Interactive:      true,
 			},
 			wantBaseRepo: ghrepo.New("OWNER2", "REPO2"),
+		},
+		{
+			name:  "interactive mode when no flags and tty",
+			args:  "123",
+			isTTY: true,
+			wantOpts: EditOptions{
+				DiscussionNumber: 123,
+				Interactive:      true,
+			},
+		},
+		{
+			name:  "labels flags",
+			args:  "123 --add-label 'bug,help wanted' --remove-label stale",
+			isTTY: true,
+			wantOpts: EditOptions{
+				DiscussionNumber: 123,
+				AddLabels:        []string{"bug", "help wanted"},
+				RemoveLabels:     []string{"stale"},
+				LabelsProvided:   true,
+			},
 		},
 		{
 			name:    "mutual exclusion --body and --body-file",
@@ -56,7 +80,7 @@ func TestNewCmdEdit(t *testing.T) {
 			name:    "no flags no TTY",
 			args:    "123",
 			isTTY:   false,
-			wantErr: "specify at least one of --title, --body, --body-file, or --category when not running interactively",
+			wantErr: "specify at least one flag to update the discussion non-interactively",
 		},
 		{
 			name:    "no args",
@@ -99,9 +123,16 @@ func TestNewCmdEdit(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantOpts.DiscussionNumber, gotOpts.DiscussionNumber)
+			assert.Equal(t, tt.wantOpts.Interactive, gotOpts.Interactive)
+			assert.Equal(t, tt.wantOpts.TitleProvided, gotOpts.TitleProvided)
+			assert.Equal(t, tt.wantOpts.BodyProvided, gotOpts.BodyProvided)
+			assert.Equal(t, tt.wantOpts.CategoryProvided, gotOpts.CategoryProvided)
+			assert.Equal(t, tt.wantOpts.LabelsProvided, gotOpts.LabelsProvided)
 			assert.Equal(t, tt.wantOpts.Title, gotOpts.Title)
 			assert.Equal(t, tt.wantOpts.Body, gotOpts.Body)
 			assert.Equal(t, tt.wantOpts.Category, gotOpts.Category)
+			assert.Equal(t, tt.wantOpts.AddLabels, gotOpts.AddLabels)
+			assert.Equal(t, tt.wantOpts.RemoveLabels, gotOpts.RemoveLabels)
 
 			if tt.wantBaseRepo != nil {
 				baseRepo, err := gotOpts.BaseRepo()
@@ -117,6 +148,7 @@ func TestEditRun(t *testing.T) {
 		name            string
 		opts            EditOptions
 		bodyFileContent string // if non-empty, creates a temp file and sets opts.BodyFile
+		stdinContent    string // if non-empty, writes to stdin buffer
 		isTTY           bool
 		setupMock       func(*client.DiscussionClientMock)
 		prompter        *prompter.PrompterMock
@@ -126,7 +158,8 @@ func TestEditRun(t *testing.T) {
 		{
 			name: "success non-tty title only",
 			opts: EditOptions{
-				Title: "Updated title",
+				Title:         "Updated title",
+				TitleProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
@@ -146,7 +179,8 @@ func TestEditRun(t *testing.T) {
 		{
 			name: "success non-tty body only",
 			opts: EditOptions{
-				Body: "Updated body",
+				Body:         "Updated body",
+				BodyProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
@@ -165,7 +199,8 @@ func TestEditRun(t *testing.T) {
 		{
 			name: "success non-tty category change",
 			opts: EditOptions{
-				Category: "Q&A",
+				Category:         "Q&A",
+				CategoryProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
@@ -185,11 +220,93 @@ func TestEditRun(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/discussions/5\n",
 		},
 		{
+			name: "success non-tty add/remove labels only",
+			opts: EditOptions{
+				AddLabels:      []string{"bug", "enhancement"},
+				RemoveLabels:   []string{"stale"},
+				LabelsProvided: true,
+			},
+			setupMock: func(m *client.DiscussionClientMock) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+					return sampleDiscussion(), nil
+				}
+				m.ListLabelsFunc = func(repo ghrepo.Interface) ([]client.DiscussionLabel, error) {
+					return []client.DiscussionLabel{
+						{ID: "L_bug", Name: "bug"},
+						{ID: "L_enh", Name: "enhancement"},
+						{ID: "L_stale", Name: "stale"},
+					}, nil
+				}
+				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
+					assert.Nil(t, input.Title)
+					assert.Nil(t, input.Body)
+					assert.Nil(t, input.CategoryID)
+					assert.Equal(t, []string{"L_bug", "L_enh"}, input.AddLabelIDs)
+					assert.Equal(t, []string{"L_stale"}, input.RemoveLabelIDs)
+					return sampleDiscussion(), nil
+				}
+			},
+			wantOut: "https://github.com/OWNER/REPO/discussions/5\n",
+		},
+		{
+			name: "success non-tty add labels only",
+			opts: EditOptions{
+				AddLabels:      []string{"bug", "enhancement"},
+				LabelsProvided: true,
+			},
+			setupMock: func(m *client.DiscussionClientMock) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+					return sampleDiscussion(), nil
+				}
+				m.ListLabelsFunc = func(repo ghrepo.Interface) ([]client.DiscussionLabel, error) {
+					return []client.DiscussionLabel{
+						{ID: "L_bug", Name: "bug"},
+						{ID: "L_enh", Name: "enhancement"},
+					}, nil
+				}
+				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
+					assert.Equal(t, []string{"L_bug", "L_enh"}, input.AddLabelIDs)
+					assert.Nil(t, input.RemoveLabelIDs)
+					return sampleDiscussion(), nil
+				}
+			},
+			wantOut: "https://github.com/OWNER/REPO/discussions/5\n",
+		},
+		{
+			name: "success non-tty remove labels only",
+			opts: EditOptions{
+				RemoveLabels:   []string{"stale"},
+				LabelsProvided: true,
+			},
+			setupMock: func(m *client.DiscussionClientMock) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+					return sampleDiscussion(), nil
+				}
+				m.ListLabelsFunc = func(repo ghrepo.Interface) ([]client.DiscussionLabel, error) {
+					return []client.DiscussionLabel{
+						{ID: "L_stale", Name: "stale"},
+					}, nil
+				}
+				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
+					assert.Nil(t, input.AddLabelIDs)
+					assert.Equal(t, []string{"L_stale"}, input.RemoveLabelIDs)
+					return sampleDiscussion(), nil
+				}
+			},
+			wantOut: "https://github.com/OWNER/REPO/discussions/5\n",
+		},
+		{
 			name: "success non-tty all flags",
 			opts: EditOptions{
-				Title:    "New title",
-				Body:     "New body",
-				Category: "General",
+				Title:            "New title",
+				Body:             "New body",
+				Category:         "General",
+				AddLabels:        []string{"bug"},
+				RemoveLabels:     []string{"stale"},
+				TitleProvided:    true,
+				BodyProvided:     true,
+				CategoryProvided: true,
+				LabelsProvided:   true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
@@ -198,6 +315,12 @@ func TestEditRun(t *testing.T) {
 				m.ListCategoriesFunc = func(repo ghrepo.Interface) ([]client.DiscussionCategory, error) {
 					return sampleCategories(), nil
 				}
+				m.ListLabelsFunc = func(repo ghrepo.Interface) ([]client.DiscussionLabel, error) {
+					return []client.DiscussionLabel{
+						{ID: "L_bug", Name: "bug"},
+						{ID: "L_stale", Name: "stale"},
+					}, nil
+				}
 				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
 					require.NotNil(t, input.Title)
 					assert.Equal(t, "New title", *input.Title)
@@ -205,6 +328,8 @@ func TestEditRun(t *testing.T) {
 					assert.Equal(t, "New body", *input.Body)
 					require.NotNil(t, input.CategoryID)
 					assert.Equal(t, "CAT1", *input.CategoryID)
+					assert.Equal(t, []string{"L_bug"}, input.AddLabelIDs)
+					assert.Equal(t, []string{"L_stale"}, input.RemoveLabelIDs)
 					return sampleDiscussion(), nil
 				}
 			},
@@ -213,7 +338,8 @@ func TestEditRun(t *testing.T) {
 		{
 			name: "non-tty blank title returns error",
 			opts: EditOptions{
-				Title: "   ",
+				Title:         "   ",
+				TitleProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
@@ -225,7 +351,8 @@ func TestEditRun(t *testing.T) {
 		{
 			name: "non-tty unknown category",
 			opts: EditOptions{
-				Category: "nonexistent",
+				Category:         "nonexistent",
+				CategoryProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
@@ -240,7 +367,8 @@ func TestEditRun(t *testing.T) {
 		{
 			name: "non-tty list categories error",
 			opts: EditOptions{
-				Category: "General",
+				Category:         "General",
+				CategoryProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
@@ -250,24 +378,44 @@ func TestEditRun(t *testing.T) {
 					return nil, fmt.Errorf("network error")
 				}
 			},
-			wantErr: "fetching categories: network error",
+			wantErr: "network error",
+		},
+		{
+			name: "non-tty unresolvable label returns error",
+			opts: EditOptions{
+				AddLabels:      []string{"bug", "nonexistent", "also-missing"},
+				LabelsProvided: true,
+			},
+			setupMock: func(m *client.DiscussionClientMock) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+					return sampleDiscussion(), nil
+				}
+				m.ListLabelsFunc = func(repo ghrepo.Interface) ([]client.DiscussionLabel, error) {
+					return []client.DiscussionLabel{
+						{ID: "L_bug", Name: "bug"},
+					}, nil
+				}
+			},
+			wantErr: "labels not found: nonexistent, also-missing",
 		},
 		{
 			name: "GetByNumber error",
 			opts: EditOptions{
-				Title: "whatever",
+				Title:         "whatever",
+				TitleProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
 					return nil, fmt.Errorf("not found")
 				}
 			},
-			wantErr: "fetching discussion: not found",
+			wantErr: "not found",
 		},
 		{
 			name: "Update error",
 			opts: EditOptions{
-				Title: "Updated title",
+				Title:         "Updated title",
+				TitleProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
@@ -277,11 +425,12 @@ func TestEditRun(t *testing.T) {
 					return nil, fmt.Errorf("mutation failed")
 				}
 			},
-			wantErr: "failed to update discussion: mutation failed",
+			wantErr: "mutation failed",
 		},
 		{
 			name:  "tty interactive select title",
 			isTTY: true,
+			opts:  EditOptions{Interactive: true},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
@@ -296,7 +445,7 @@ func TestEditRun(t *testing.T) {
 			},
 			prompter: &prompter.PrompterMock{
 				MultiSelectFunc: func(prompt string, defaults []string, options []string) ([]int, error) {
-					assert.Equal(t, []string{"title", "body", "category"}, options)
+					assert.Equal(t, []string{"Title", "Body", "Category"}, options)
 					return []int{0}, nil
 				},
 				InputFunc: func(prompt, defaultValue string) (string, error) {
@@ -309,6 +458,7 @@ func TestEditRun(t *testing.T) {
 		{
 			name:  "tty interactive select body",
 			isTTY: true,
+			opts:  EditOptions{Interactive: true},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
@@ -334,6 +484,7 @@ func TestEditRun(t *testing.T) {
 		{
 			name:  "tty interactive select category",
 			isTTY: true,
+			opts:  EditOptions{Interactive: true},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
@@ -364,22 +515,25 @@ func TestEditRun(t *testing.T) {
 		{
 			name:  "tty interactive nothing selected is a no-op",
 			isTTY: true,
+			opts:  EditOptions{Interactive: true},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
-				// UpdateFunc intentionally not set: Update must not be called when nothing is selected.
 			},
 			prompter: &prompter.PrompterMock{
 				MultiSelectFunc: func(prompt string, defaults []string, options []string) ([]int, error) {
 					return []int{}, nil
 				},
 			},
-			wantOut: "",
+			wantErr: "no changes made",
 		},
 		{
 			name:            "success non-tty body-file",
 			bodyFileContent: "Body from file",
+			opts: EditOptions{
+				BodyProvided: true,
+			},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
@@ -397,6 +551,7 @@ func TestEditRun(t *testing.T) {
 		{
 			name:  "tty interactive blank title returns error",
 			isTTY: true,
+			opts:  EditOptions{Interactive: true},
 			setupMock: func(m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
@@ -412,13 +567,38 @@ func TestEditRun(t *testing.T) {
 			},
 			wantErr: "title cannot be blank",
 		},
+		{
+			name:         "success non-tty body-file from stdin",
+			stdinContent: "Body from stdin",
+			opts: EditOptions{
+				BodyFile:     "-",
+				BodyProvided: true,
+			},
+			setupMock: func(m *client.DiscussionClientMock) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+					return sampleDiscussion(), nil
+				}
+				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
+					assert.Nil(t, input.Title)
+					require.NotNil(t, input.Body)
+					assert.Equal(t, "Body from stdin", *input.Body)
+					assert.Nil(t, input.CategoryID)
+					return sampleDiscussion(), nil
+				}
+			},
+			wantOut: "https://github.com/OWNER/REPO/discussions/5\n",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, _ := iostreams.Test()
+			ios, stdin, stdout, _ := iostreams.Test()
 			ios.SetStdoutTTY(tt.isTTY)
 			ios.SetStdinTTY(tt.isTTY)
+
+			if tt.stdinContent != "" {
+				stdin.WriteString(tt.stdinContent)
+			}
 
 			mockClient := &client.DiscussionClientMock{}
 			if tt.setupMock != nil {
