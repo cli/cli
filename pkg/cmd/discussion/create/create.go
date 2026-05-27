@@ -146,11 +146,26 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
+	var labelIDs []string
+	if len(opts.Labels) > 0 {
+		opts.IO.StartProgressIndicator()
+		allLabels, err := c.ListLabels(repo)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+
+		labelIDs, err = shared.ResolveLabels(allLabels, opts.Labels)
+		if err != nil {
+			return err
+		}
+	}
+
 	input := client.CreateDiscussionInput{
 		CategoryID: category.ID,
 		Title:      opts.Title,
 		Body:       opts.Body,
-		Labels:     opts.Labels,
+		LabelIDs:   labelIDs,
 	}
 
 	opts.IO.StartProgressIndicator()

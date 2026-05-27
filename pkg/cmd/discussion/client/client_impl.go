@@ -846,40 +846,6 @@ func (c *discussionClient) ListLabels(repo ghrepo.Interface) ([]DiscussionLabel,
 	return labels, nil
 }
 
-// resolveLabels matches the requested label names case-insensitively against
-// the repository's labels. Returns an error if any name is not found.
-func (c *discussionClient) resolveLabels(repo ghrepo.Interface, labelNames []string) ([]DiscussionLabel, error) {
-	if len(labelNames) == 0 {
-		return nil, nil
-	}
-
-	allLabels, err := c.ListLabels(repo)
-	if err != nil {
-		return nil, err
-	}
-
-	byName := make(map[string]DiscussionLabel, len(allLabels))
-	for _, l := range allLabels {
-		byName[strings.ToLower(l.Name)] = l
-	}
-
-	result := make([]DiscussionLabel, 0, len(labelNames))
-	var missing []string
-	for _, name := range labelNames {
-		if l, ok := byName[strings.ToLower(name)]; ok {
-			result = append(result, l)
-		} else {
-			missing = append(missing, name)
-		}
-	}
-
-	if len(missing) > 0 {
-		return nil, fmt.Errorf("labels not found: %s", strings.Join(missing, ", "))
-	}
-
-	return result, nil
-}
-
 // editDiscussionLabels adds and removes labels on a discussion. Removals are
 // applied before additions. Either slice may be nil or empty to skip that step.
 // Returns the discussion state as returned by the last mutation executed.
@@ -956,16 +922,6 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
 	}
 
-	// Resolve labels before creating the discussion so that an unknown label
-	// name aborts without leaving a half-created discussion behind.
-	var resolvedLabels []DiscussionLabel
-	if len(input.Labels) > 0 {
-		resolvedLabels, err = c.resolveLabels(repo, input.Labels)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	var mutation struct {
 		CreateDiscussion struct {
 			Discussion struct {
@@ -989,12 +945,8 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 
 	node := &mutation.CreateDiscussion.Discussion.discussionListNode
 
-	if len(resolvedLabels) > 0 {
-		labelIDs := make([]string, len(resolvedLabels))
-		for i, l := range resolvedLabels {
-			labelIDs[i] = l.ID
-		}
-		labelNode, err := c.editDiscussionLabels(repo, node.ID, labelIDs, nil)
+	if len(input.LabelIDs) > 0 {
+		labelNode, err := c.editDiscussionLabels(repo, node.ID, input.LabelIDs, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1015,7 +967,7 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 
 func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionInput) (*Discussion, error) {
 	hasFieldUpdate := input.Title != nil || input.Body != nil || input.CategoryID != nil
-	hasLabelUpdate := len(input.AddLabels) > 0 || len(input.RemoveLabels) > 0
+	hasLabelUpdate := len(input.AddLabelIDs) > 0 || len(input.RemoveLabelIDs) > 0
 
 	if !hasFieldUpdate && !hasLabelUpdate {
 		return nil, fmt.Errorf("nothing to update")
@@ -1058,26 +1010,7 @@ func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionI
 	}
 
 	if hasLabelUpdate {
-		allNames := append(input.AddLabels, input.RemoveLabels...)
-		resolved, err := c.resolveLabels(repo, allNames)
-		if err != nil {
-			return nil, err
-		}
-		labelByName := make(map[string]string, len(resolved))
-		for _, l := range resolved {
-			labelByName[strings.ToLower(l.Name)] = l.ID
-		}
-
-		addIDs := make([]string, 0, len(input.AddLabels))
-		for _, name := range input.AddLabels {
-			addIDs = append(addIDs, labelByName[strings.ToLower(name)])
-		}
-		removeIDs := make([]string, 0, len(input.RemoveLabels))
-		for _, name := range input.RemoveLabels {
-			removeIDs = append(removeIDs, labelByName[strings.ToLower(name)])
-		}
-
-		labelNode, err := c.editDiscussionLabels(repo, input.DiscussionID, addIDs, removeIDs)
+		labelNode, err := c.editDiscussionLabels(repo, input.DiscussionID, input.AddLabelIDs, input.RemoveLabelIDs)
 		if err != nil {
 			return nil, err
 		}

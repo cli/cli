@@ -2641,148 +2641,12 @@ func TestCreate(t *testing.T) {
 			wantErr: "Could not resolve to a node with the global id of 'BAD_CAT'.",
 		},
 		{
-			name: "paginates labels across multiple pages",
+			name: "creates discussion with labels via addLabels mutation",
 			input: CreateDiscussionInput{
 				CategoryID: "CAT_1",
 				Title:      "New Discussion",
 				Body:       "Discussion body",
-				Labels:     []string{"bug", "enhancement"},
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryMeta\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", true)),
-				)
-				reg.Register(
-					httpmock.GraphQL(`mutation CreateDiscussion\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"createDiscussion": {
-									"discussion": {
-										"id": "D_new",
-										"number": 99,
-										"title": "New Discussion",
-										"body": "Discussion body",
-										"url": "https://github.com/OWNER/REPO/discussions/99",
-										"closed": false,
-										"stateReason": "",
-										"isAnswered": false,
-										"answerChosenAt": "0001-01-01T00:00:00Z",
-										"author": {"__typename": "User", "login": "alice", "id": "U1", "name": "Alice"},
-										"category": {"id": "CAT_1", "name": "General", "slug": "general", "emoji": ":speech_balloon:", "isAnswerable": false},
-										"answerChosenBy": null,
-										"labels": {"nodes": []},
-										"reactionGroups": [],
-										"createdAt": "2025-06-01T00:00:00Z",
-										"updatedAt": "2025-06-01T00:00:00Z",
-										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false
-									}
-								}
-							}
-						}
-					`)),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryLabelsForDiscussions\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"labels": {
-										"nodes": [
-											{"id": "L_bug", "name": "bug", "color": "d73a4a"}
-										],
-										"pageInfo": {"hasNextPage": true, "endCursor": "LABEL_CUR_1"}
-									}
-								}
-							}
-						}
-					`)),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryLabelsForDiscussions\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"labels": {
-										"nodes": [
-											{"id": "L_enh", "name": "enhancement", "color": "a2eeef"}
-										],
-										"pageInfo": {"hasNextPage": false, "endCursor": ""}
-									}
-								}
-							}
-						}
-					`)),
-				)
-				reg.Register(
-					httpmock.GraphQL(`mutation AddLabelsToDiscussion\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"addLabelsToLabelable": {
-									"labelable": {
-										"id": "D_new",
-										"number": 99,
-										"title": "New Discussion",
-										"body": "Discussion body",
-										"url": "https://github.com/OWNER/REPO/discussions/99",
-										"closed": false,
-										"stateReason": "",
-										"isAnswered": false,
-										"answerChosenAt": "0001-01-01T00:00:00Z",
-										"author": {"__typename": "User", "login": "alice", "id": "U1", "name": "Alice"},
-										"category": {"id": "CAT_1", "name": "General", "slug": "general", "emoji": ":speech_balloon:", "isAnswerable": false},
-										"answerChosenBy": null,
-										"labels": {
-											"nodes": [
-												{"id": "L_bug", "name": "bug", "color": "d73a4a"},
-												{"id": "L_enh", "name": "enhancement", "color": "a2eeef"}
-											]
-										},
-										"reactionGroups": [],
-										"createdAt": "2025-06-01T00:00:00Z",
-										"updatedAt": "2025-06-01T00:00:00Z",
-										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false
-									}
-								}
-							}
-						}
-					`)),
-				)
-			},
-			assertDisc: &Discussion{
-				ID:     "D_new",
-				Number: 99,
-				Title:  "New Discussion",
-				Body:   "Discussion body",
-				URL:    "https://github.com/OWNER/REPO/discussions/99",
-				Author: DiscussionActor{ID: "U1", Login: "alice", Name: "Alice"},
-				Category: DiscussionCategory{
-					ID:    "CAT_1",
-					Name:  "General",
-					Slug:  "general",
-					Emoji: ":speech_balloon:",
-				},
-				Labels: []DiscussionLabel{
-					{ID: "L_bug", Name: "bug", Color: "d73a4a"},
-					{ID: "L_enh", Name: "enhancement", Color: "a2eeef"},
-				},
-				CreatedAt: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
-				UpdatedAt: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
-			},
-		},
-		{
-			name: "creates discussion with labels",
-			input: CreateDiscussionInput{
-				CategoryID: "CAT_1",
-				Title:      "New Discussion",
-				Body:       "Discussion body",
-				Labels:     []string{"bug", "enhancement"},
+				LabelIDs:   []string{"L_bug", "L_enh"},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -2814,24 +2678,6 @@ func TestCreate(t *testing.T) {
 										"updatedAt": "2025-06-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
 										"locked": false
-									}
-								}
-							}
-						}
-					`)),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryLabelsForDiscussions\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"labels": {
-										"nodes": [
-											{"id": "L_bug", "name": "bug", "color": "d73a4a"},
-											{"id": "L_enh", "name": "enhancement", "color": "a2eeef"}
-										],
-										"pageInfo": {"hasNextPage": false, "endCursor": ""}
 									}
 								}
 							}
@@ -2904,45 +2750,12 @@ func TestCreate(t *testing.T) {
 			},
 		},
 		{
-			name: "label not found returns error without creating discussion",
-			input: CreateDiscussionInput{
-				CategoryID: "CAT_1",
-				Title:      "Test",
-				Body:       "Body",
-				Labels:     []string{"nonexistent", "also-missing"},
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryMeta\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", true)),
-				)
-				// No CreateDiscussion stub — reg.Verify(t) proves it is never called,
-				// confirming that label validation is atomic with discussion creation.
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryLabelsForDiscussions\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"labels": {
-										"nodes": [],
-										"pageInfo": {"hasNextPage": false, "endCursor": ""}
-									}
-								}
-							}
-						}
-					`)),
-				)
-			},
-			wantErr: `labels not found: nonexistent, also-missing`,
-		},
-		{
 			name: "add labels mutation failure returns error",
 			input: CreateDiscussionInput{
 				CategoryID: "CAT_1",
 				Title:      "Test",
 				Body:       "Body",
-				Labels:     []string{"bug"},
+				LabelIDs:   []string{"L_bug"},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -2974,23 +2787,6 @@ func TestCreate(t *testing.T) {
 										"updatedAt": "2025-06-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
 										"locked": false
-									}
-								}
-							}
-						}
-					`)),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryLabelsForDiscussions\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"labels": {
-										"nodes": [
-											{"id": "L_bug", "name": "bug", "color": "d73a4a"}
-										],
-										"pageInfo": {"hasNextPage": false, "endCursor": ""}
 									}
 								}
 							}
@@ -3465,12 +3261,12 @@ func TestUpdate(t *testing.T) {
 		{
 			name: "maps all fields",
 			input: UpdateDiscussionInput{
-				DiscussionID: "D_1",
-				Title:        &titleStr,
-				Body:         &bodyStr,
-				CategoryID:   &catID,
-				AddLabels:    []string{"bug", "enhancement"},
-				RemoveLabels: []string{"old", "stale"},
+				DiscussionID:   "D_1",
+				Title:          &titleStr,
+				Body:           &bodyStr,
+				CategoryID:     &catID,
+				AddLabelIDs:    []string{"L_bug", "L_enh"},
+				RemoveLabelIDs: []string{"L_old", "L_stale"},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -3498,26 +3294,6 @@ func TestUpdate(t *testing.T) {
 										"updatedAt": "2025-06-02T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
 										"locked": false
-									}
-								}
-							}
-						}
-					`)),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryLabelsForDiscussions\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"labels": {
-										"nodes": [
-											{"id": "L_bug", "name": "bug", "color": "d73a4a"},
-											{"id": "L_enh", "name": "enhancement", "color": "a2eeef"},
-											{"id": "L_old", "name": "old", "color": "000000"},
-											{"id": "L_stale", "name": "stale", "color": "111111"}
-										],
-										"pageInfo": {"hasNextPage": false, "endCursor": ""}
 									}
 								}
 							}
@@ -3639,31 +3415,11 @@ func TestUpdate(t *testing.T) {
 		{
 			name: "label only update",
 			input: UpdateDiscussionInput{
-				DiscussionID: "D_1",
-				AddLabels:    []string{"bug", "enhancement"},
-				RemoveLabels: []string{"old", "stale"},
+				DiscussionID:   "D_1",
+				AddLabelIDs:    []string{"L_bug", "L_enh"},
+				RemoveLabelIDs: []string{"L_old", "L_stale"},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryLabelsForDiscussions\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"labels": {
-										"nodes": [
-											{"id": "L_bug", "name": "bug", "color": "d73a4a"},
-											{"id": "L_enh", "name": "enhancement", "color": "a2eeef"},
-											{"id": "L_old", "name": "old", "color": "000000"},
-											{"id": "L_stale", "name": "stale", "color": "111111"}
-										],
-										"pageInfo": {"hasNextPage": false, "endCursor": ""}
-									}
-								}
-							}
-						}
-					`)),
-				)
 				reg.Register(
 					httpmock.GraphQL(`mutation RemoveLabelsFromDiscussion\b`),
 					httpmock.StringResponse(`{"data":{"removeLabelsFromLabelable":{"labelable":{"id":"D_1","number":5,"title":"T","body":"B","url":"https://github.com/OWNER/REPO/discussions/5","closed":false,"stateReason":"","isAnswered":false,"answerChosenAt":"0001-01-01T00:00:00Z","author":{"__typename":"User","login":"alice","id":"U1","name":"Alice"},"category":{"id":"CAT_1","name":"General","slug":"general","emoji":"","isAnswerable":false},"answerChosenBy":null,"labels":{"nodes":[]},"reactionGroups":[],"createdAt":"2025-06-01T00:00:00Z","updatedAt":"2025-06-01T00:00:00Z","closedAt":"0001-01-01T00:00:00Z","locked":false}}}}`),

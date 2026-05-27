@@ -166,8 +166,14 @@ func TestCreateRun(t *testing.T) {
 				m.ListCategoriesFunc = func(repo ghrepo.Interface) ([]client.DiscussionCategory, error) {
 					return sampleCategories(), nil
 				}
+				m.ListLabelsFunc = func(repo ghrepo.Interface) ([]client.DiscussionLabel, error) {
+					return []client.DiscussionLabel{
+						{ID: "L_bug", Name: "bug"},
+						{ID: "L_enh", Name: "enhancement"},
+					}, nil
+				}
 				m.CreateFunc = func(repo ghrepo.Interface, input client.CreateDiscussionInput) (*client.Discussion, error) {
-					assert.Equal(t, []string{"enhancement", "bug"}, input.Labels)
+					assert.Equal(t, []string{"L_enh", "L_bug"}, input.LabelIDs)
 					return sampleDiscussion(), nil
 				}
 			},
