@@ -103,7 +103,7 @@ func putUserSecret(client *api.Client, host string, pk *PubKey, key, eValue stri
 		KeyID:          pk.ID,
 		Repositories:   repositoryIDs,
 	}
-	path := fmt.Sprintf("user/codespaces/secrets/%s", key)
+	path := fmt.Sprintf("user/codespaces/secrets/%s", url.PathEscape(key))
 	return putSecret(client, host, path, payload)
 }
 

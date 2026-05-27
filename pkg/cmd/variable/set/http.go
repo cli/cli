@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -98,7 +99,7 @@ func postOrgVariable(client *api.Client, host, orgName, visibility, variableName
 		Visibility:   visibility,
 		Repositories: repositoryIDs,
 	}
-	path := fmt.Sprintf(`orgs/%s/actions/variables`, orgName)
+	path := fmt.Sprintf(`orgs/%s/actions/variables`, url.PathEscape(orgName))
 	return postVariable(client, host, path, payload)
 }
 
@@ -107,7 +108,7 @@ func postEnvVariable(client *api.Client, host string, repoID int64, envName, var
 		Name:  variableName,
 		Value: value,
 	}
-	path := fmt.Sprintf(`repositories/%d/environments/%s/variables`, repoID, envName)
+	path := fmt.Sprintf(`repositories/%d/environments/%s/variables`, repoID, url.PathEscape(envName))
 	return postVariable(client, host, path, payload)
 }
 
@@ -135,7 +136,7 @@ func patchOrgVariable(client *api.Client, host, orgName, visibility, variableNam
 		Visibility:   visibility,
 		Repositories: repositoryIDs,
 	}
-	path := fmt.Sprintf(`orgs/%s/actions/variables/%s`, orgName, variableName)
+	path := fmt.Sprintf(`orgs/%s/actions/variables/%s`, url.PathEscape(orgName), url.PathEscape(variableName))
 	return patchVariable(client, host, path, payload)
 }
 
@@ -143,7 +144,7 @@ func patchEnvVariable(client *api.Client, host string, repoID int64, envName, va
 	payload := setPayload{
 		Value: value,
 	}
-	path := fmt.Sprintf(`repositories/%d/environments/%s/variables/%s`, repoID, envName, variableName)
+	path := fmt.Sprintf(`repositories/%d/environments/%s/variables/%s`, repoID, url.PathEscape(envName), url.PathEscape(variableName))
 	return patchVariable(client, host, path, payload)
 }
 
@@ -151,6 +152,6 @@ func patchRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, 
 	payload := setPayload{
 		Value: value,
 	}
-	path := fmt.Sprintf(`repos/%s/actions/variables/%s`, ghrepo.FullName(repo), variableName)
+	path := fmt.Sprintf(`repos/%s/actions/variables/%s`, ghrepo.FullName(repo), url.PathEscape(variableName))
 	return patchVariable(client, repo.RepoHost(), path, payload)
 }
