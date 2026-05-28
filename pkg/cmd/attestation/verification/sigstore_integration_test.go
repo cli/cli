@@ -52,9 +52,9 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			verifier, err := NewLiveSigstoreVerifier(SigstoreConfig{
-				HttpClient:     http.DefaultClient,
-				Logger:         io.NewTestHandler(),
-				TUFMetadataDir: o.Some(t.TempDir()),
+				ExternalHttpClient: http.DefaultClient,
+				Logger:             io.NewTestHandler(),
+				TUFMetadataDir:     o.Some(t.TempDir()),
 			})
 			require.NoError(t, err)
 
@@ -73,9 +73,9 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 
 	t.Run("with 2/3 verified attestations", func(t *testing.T) {
 		verifier, err := NewLiveSigstoreVerifier(SigstoreConfig{
-			HttpClient:     http.DefaultClient,
-			Logger:         io.NewTestHandler(),
-			TUFMetadataDir: o.Some(t.TempDir()),
+			ExternalHttpClient: http.DefaultClient,
+			Logger:             io.NewTestHandler(),
+			TUFMetadataDir:     o.Some(t.TempDir()),
 		})
 		require.NoError(t, err)
 
@@ -92,9 +92,9 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 
 	t.Run("fail with 0/2 verified attestations", func(t *testing.T) {
 		verifier, err := NewLiveSigstoreVerifier(SigstoreConfig{
-			HttpClient:     http.DefaultClient,
-			Logger:         io.NewTestHandler(),
-			TUFMetadataDir: o.Some(t.TempDir()),
+			ExternalHttpClient: http.DefaultClient,
+			Logger:             io.NewTestHandler(),
+			TUFMetadataDir:     o.Some(t.TempDir()),
 		})
 		require.NoError(t, err)
 
@@ -118,9 +118,9 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 		attestations := getAttestationsFor(t, "../test/data/github_provenance_demo-0.0.12-py3-none-any-bundle.jsonl")
 
 		verifier, err := NewLiveSigstoreVerifier(SigstoreConfig{
-			HttpClient:     http.DefaultClient,
-			Logger:         io.NewTestHandler(),
-			TUFMetadataDir: o.Some(t.TempDir()),
+			ExternalHttpClient: http.DefaultClient,
+			Logger:             io.NewTestHandler(),
+			TUFMetadataDir:     o.Some(t.TempDir()),
 		})
 		require.NoError(t, err)
 
@@ -133,10 +133,10 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 		attestations := getAttestationsFor(t, "../test/data/sigstore-js-2.1.0_with_2_bundles.jsonl")
 
 		verifier, err := NewLiveSigstoreVerifier(SigstoreConfig{
-			HttpClient:     http.DefaultClient,
-			Logger:         io.NewTestHandler(),
-			TrustedRoot:    test.NormalizeRelativePath("../test/data/trusted_root.json"),
-			TUFMetadataDir: o.Some(t.TempDir()),
+			ExternalHttpClient: http.DefaultClient,
+			Logger:             io.NewTestHandler(),
+			TrustedRoot:        test.NormalizeRelativePath("../test/data/trusted_root.json"),
+			TUFMetadataDir:     o.Some(t.TempDir()),
 		})
 		require.NoError(t, err)
 

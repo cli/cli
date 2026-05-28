@@ -25,9 +25,9 @@ func TestVerifyIntegration(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		HttpClient:     http.DefaultClient,
-		Logger:         logger,
-		TUFMetadataDir: o.Some(t.TempDir()),
+		ExternalHttpClient: http.DefaultClient,
+		Logger:             logger,
+		TUFMetadataDir:     o.Some(t.TempDir()),
 	}
 
 	ios, _, _, _ := iostreams.Test()
@@ -45,7 +45,7 @@ func TestVerifyIntegration(t *testing.T) {
 	sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(sigstoreConfig)
 	require.NoError(t, err)
 	publicGoodOpts := Options{
-		APIClient:        api.NewLiveClient(hc, host, logger),
+		APIClient:        api.NewLiveClient(hc, http.DefaultClient, host, logger),
 		ArtifactPath:     artifactPath,
 		BundlePath:       bundlePath,
 		DigestAlgorithm:  "sha512",
@@ -120,7 +120,7 @@ func TestVerifyIntegration(t *testing.T) {
 		sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(sigstoreConfig)
 		require.NoError(t, err)
 		opts := Options{
-			APIClient:             api.NewLiveClient(hc, host, logger),
+			APIClient:             api.NewLiveClient(hc, http.DefaultClient, host, logger),
 			ArtifactPath:          "oci://ghcr.io/github/artifact-attestations-helm-charts/policy-controller:v0.10.0-github9",
 			UseBundleFromRegistry: true,
 			DigestAlgorithm:       "sha256",
@@ -145,9 +145,9 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		HttpClient:     http.DefaultClient,
-		Logger:         logger,
-		TUFMetadataDir: o.Some(t.TempDir()),
+		ExternalHttpClient: http.DefaultClient,
+		Logger:             logger,
+		TUFMetadataDir:     o.Some(t.TempDir()),
 	}
 
 	ios, _, _, _ := iostreams.Test()
@@ -165,7 +165,7 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 	sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(sigstoreConfig)
 	require.NoError(t, err)
 	baseOpts := Options{
-		APIClient:        api.NewLiveClient(hc, host, logger),
+		APIClient:        api.NewLiveClient(hc, http.DefaultClient, host, logger),
 		ArtifactPath:     artifactPath,
 		BundlePath:       bundlePath,
 		DigestAlgorithm:  "sha256",
@@ -222,9 +222,9 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		HttpClient:     http.DefaultClient,
-		Logger:         logger,
-		TUFMetadataDir: o.Some(t.TempDir()),
+		ExternalHttpClient: http.DefaultClient,
+		Logger:             logger,
+		TUFMetadataDir:     o.Some(t.TempDir()),
 	}
 
 	cfg := config.NewBlankConfig()
@@ -243,7 +243,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 	sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(sigstoreConfig)
 	require.NoError(t, err)
 	baseOpts := Options{
-		APIClient:        api.NewLiveClient(hc, host, logger),
+		APIClient:        api.NewLiveClient(hc, http.DefaultClient, host, logger),
 		ArtifactPath:     artifactPath,
 		BundlePath:       bundlePath,
 		DigestAlgorithm:  "sha256",
@@ -319,9 +319,9 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
-		HttpClient:     http.DefaultClient,
-		Logger:         logger,
-		TUFMetadataDir: o.Some(t.TempDir()),
+		ExternalHttpClient: http.DefaultClient,
+		Logger:             logger,
+		TUFMetadataDir:     o.Some(t.TempDir()),
 	}
 
 	cfg := config.NewBlankConfig()
@@ -340,7 +340,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 	sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(sigstoreConfig)
 	require.NoError(t, err)
 	baseOpts := Options{
-		APIClient:    api.NewLiveClient(hc, host, logger),
+		APIClient:    api.NewLiveClient(hc, http.DefaultClient, host, logger),
 		ArtifactPath: artifactPath,
 		BundlePath:   bundlePath,
 		Config: func() (gh.Config, error) {

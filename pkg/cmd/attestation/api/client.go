@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -67,18 +68,18 @@ type Client interface {
 }
 
 type LiveClient struct {
-	githubAPI  githubApiClient
-	httpClient httpClient
-	host       string
-	logger     *ioconfig.Handler
+	githubAPI          githubApiClient
+	externalHttpClient httpClient
+	host               string
+	logger             *ioconfig.Handler
 }
 
-func NewLiveClient(hc *http.Client, host string, l *ioconfig.Handler) *LiveClient {
+func NewLiveClient(hc *http.Client, externalClient *http.Client, host string, l *ioconfig.Handler) *LiveClient {
 	return &LiveClient{
-		githubAPI:  api.NewClientFromHTTP(hc),
-		host:       strings.TrimSuffix(host, "/"),
-		httpClient: hc,
-		logger:     l,
+		githubAPI:          api.NewClientFromHTTP(hc),
+		host:               strings.TrimSuffix(host, "/"),
+		externalHttpClient: externalClient,
+		logger:             l,
 	}
 }
 
@@ -121,7 +122,7 @@ func (c *LiveClient) buildRequestURL(params FetchParams) (string, error) {
 	// ref: https://github.com/cli/go-gh/blob/d32c104a9a25c9de3d7c7b07a43ae0091441c858/example_gh_test.go#L96
 	url = fmt.Sprintf("%s?per_page=%d", url, perPage)
 	if params.PredicateType != "" {
-		url = fmt.Sprintf("%s&predicate_type=%s", url, params.PredicateType)
+		url = fmt.Sprintf("%s&predicate_type=%s", url, neturl.QueryEscape(params.PredicateType))
 	}
 	return url, nil
 }
@@ -225,7 +226,7 @@ func (c *LiveClient) getBundle(url string) (*bundle.Bundle, error) {
 	var sgBundle *bundle.Bundle
 	bo := backoff.NewConstantBackOff(getAttestationRetryInterval)
 	err := backoff.Retry(func() error {
-		resp, err := c.httpClient.Get(url)
+		resp, err := c.externalHttpClient.Get(url)
 		if err != nil {
 			return fmt.Errorf("request to fetch bundle from URL failed: %w", err)
 		}

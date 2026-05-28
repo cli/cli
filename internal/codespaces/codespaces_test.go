@@ -202,8 +202,8 @@ func (m *mockApiClient) GetCodespace(ctx context.Context, name string, includeCo
 	return m.onGetCodespace()
 }
 
-func (m *mockApiClient) HTTPClient() (*http.Client, error) {
-	panic("Not implemented")
+func (m *mockApiClient) ExternalHTTPClient() (*http.Client, error) {
+	return nil, nil
 }
 
 type mockProgressIndicator struct{}

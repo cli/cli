@@ -26,6 +26,9 @@ import (
 //			EditCodespaceFunc: func(ctx context.Context, codespaceName string, params *codespacesAPI.EditCodespaceParams) (*codespacesAPI.Codespace, error) {
 //				panic("mock out the EditCodespace method")
 //			},
+//			ExternalHTTPClientFunc: func() (*http.Client, error) {
+//				panic("mock out the ExternalHTTPClient method")
+//			},
 //			GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*codespacesAPI.Codespace, error) {
 //				panic("mock out the GetCodespace method")
 //			},
@@ -52,9 +55,6 @@ import (
 //			},
 //			GetUserFunc: func(ctx context.Context) (*codespacesAPI.User, error) {
 //				panic("mock out the GetUser method")
-//			},
-//			HTTPClientFunc: func() (*http.Client, error) {
-//				panic("mock out the HTTPClient method")
 //			},
 //			ListCodespacesFunc: func(ctx context.Context, opts codespacesAPI.ListCodespacesOptions) ([]*codespacesAPI.Codespace, error) {
 //				panic("mock out the ListCodespaces method")
@@ -87,6 +87,9 @@ type apiClientMock struct {
 	// EditCodespaceFunc mocks the EditCodespace method.
 	EditCodespaceFunc func(ctx context.Context, codespaceName string, params *codespacesAPI.EditCodespaceParams) (*codespacesAPI.Codespace, error)
 
+	// ExternalHTTPClientFunc mocks the ExternalHTTPClient method.
+	ExternalHTTPClientFunc func() (*http.Client, error)
+
 	// GetCodespaceFunc mocks the GetCodespace method.
 	GetCodespaceFunc func(ctx context.Context, name string, includeConnection bool) (*codespacesAPI.Codespace, error)
 
@@ -113,9 +116,6 @@ type apiClientMock struct {
 
 	// GetUserFunc mocks the GetUser method.
 	GetUserFunc func(ctx context.Context) (*codespacesAPI.User, error)
-
-	// HTTPClientFunc mocks the HTTPClient method.
-	HTTPClientFunc func() (*http.Client, error)
 
 	// ListCodespacesFunc mocks the ListCodespaces method.
 	ListCodespacesFunc func(ctx context.Context, opts codespacesAPI.ListCodespacesOptions) ([]*codespacesAPI.Codespace, error)
@@ -160,6 +160,9 @@ type apiClientMock struct {
 			CodespaceName string
 			// Params is the params argument value.
 			Params *codespacesAPI.EditCodespaceParams
+		}
+		// ExternalHTTPClient holds details about calls to the ExternalHTTPClient method.
+		ExternalHTTPClient []struct {
 		}
 		// GetCodespace holds details about calls to the GetCodespace method.
 		GetCodespace []struct {
@@ -242,9 +245,6 @@ type apiClientMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
-		// HTTPClient holds details about calls to the HTTPClient method.
-		HTTPClient []struct {
-		}
 		// ListCodespaces holds details about calls to the ListCodespaces method.
 		ListCodespaces []struct {
 			// Ctx is the ctx argument value.
@@ -288,6 +288,7 @@ type apiClientMock struct {
 	lockCreateCodespace                sync.RWMutex
 	lockDeleteCodespace                sync.RWMutex
 	lockEditCodespace                  sync.RWMutex
+	lockExternalHTTPClient             sync.RWMutex
 	lockGetCodespace                   sync.RWMutex
 	lockGetCodespaceBillableOwner      sync.RWMutex
 	lockGetCodespaceRepoSuggestions    sync.RWMutex
@@ -297,7 +298,6 @@ type apiClientMock struct {
 	lockGetOrgMemberCodespace          sync.RWMutex
 	lockGetRepository                  sync.RWMutex
 	lockGetUser                        sync.RWMutex
-	lockHTTPClient                     sync.RWMutex
 	lockListCodespaces                 sync.RWMutex
 	lockListDevContainers              sync.RWMutex
 	lockServerURL                      sync.RWMutex
@@ -422,6 +422,33 @@ func (mock *apiClientMock) EditCodespaceCalls() []struct {
 	mock.lockEditCodespace.RLock()
 	calls = mock.calls.EditCodespace
 	mock.lockEditCodespace.RUnlock()
+	return calls
+}
+
+// ExternalHTTPClient calls ExternalHTTPClientFunc.
+func (mock *apiClientMock) ExternalHTTPClient() (*http.Client, error) {
+	if mock.ExternalHTTPClientFunc == nil {
+		panic("apiClientMock.ExternalHTTPClientFunc: method is nil but apiClient.ExternalHTTPClient was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockExternalHTTPClient.Lock()
+	mock.calls.ExternalHTTPClient = append(mock.calls.ExternalHTTPClient, callInfo)
+	mock.lockExternalHTTPClient.Unlock()
+	return mock.ExternalHTTPClientFunc()
+}
+
+// ExternalHTTPClientCalls gets all the calls that were made to ExternalHTTPClient.
+// Check the length with:
+//
+//	len(mockedapiClient.ExternalHTTPClientCalls())
+func (mock *apiClientMock) ExternalHTTPClientCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockExternalHTTPClient.RLock()
+	calls = mock.calls.ExternalHTTPClient
+	mock.lockExternalHTTPClient.RUnlock()
 	return calls
 }
 
@@ -782,33 +809,6 @@ func (mock *apiClientMock) GetUserCalls() []struct {
 	mock.lockGetUser.RLock()
 	calls = mock.calls.GetUser
 	mock.lockGetUser.RUnlock()
-	return calls
-}
-
-// HTTPClient calls HTTPClientFunc.
-func (mock *apiClientMock) HTTPClient() (*http.Client, error) {
-	if mock.HTTPClientFunc == nil {
-		panic("apiClientMock.HTTPClientFunc: method is nil but apiClient.HTTPClient was just called")
-	}
-	callInfo := struct {
-	}{}
-	mock.lockHTTPClient.Lock()
-	mock.calls.HTTPClient = append(mock.calls.HTTPClient, callInfo)
-	mock.lockHTTPClient.Unlock()
-	return mock.HTTPClientFunc()
-}
-
-// HTTPClientCalls gets all the calls that were made to HTTPClient.
-// Check the length with:
-//
-//	len(mockedapiClient.HTTPClientCalls())
-func (mock *apiClientMock) HTTPClientCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockHTTPClient.RLock()
-	calls = mock.calls.HTTPClient
-	mock.lockHTTPClient.RUnlock()
 	return calls
 }
 
