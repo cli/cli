@@ -249,11 +249,11 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		if opts.SelectorArg == "" {
 			return "", nil
 		}
-		if isNumber(opts.SelectorArg) {
-			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
-		}
 		if isCommit(opts.SelectorArg) {
 			return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+		}
+		if isNumber(opts.SelectorArg) {
+			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 		}
 	}
 
