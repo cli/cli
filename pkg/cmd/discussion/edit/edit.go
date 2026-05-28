@@ -71,11 +71,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := cmdutil.MutuallyExclusive("specify only one of --body or --body-file",
-				opts.Body != "", opts.BodyFile != ""); err != nil {
-				return err
-			}
-
 			number, repo, err := shared.ParseDiscussionArg(args[0])
 			if err != nil {
 				return cmdutil.FlagErrorWrap(err)
@@ -91,10 +86,14 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			opts.DiscussionNumber = number
 
-			flags := cmd.Flags()
-			opts.TitleProvided = flags.Changed("title")
-			opts.BodyProvided = flags.Changed("body") || flags.Changed("body-file")
-			opts.CategoryProvided = flags.Changed("category")
+			if err := cmdutil.MutuallyExclusive("specify only one of --body or --body-file",
+				cmd.Flags().Changed("body"), cmd.Flags().Changed("body-file")); err != nil {
+				return err
+			}
+
+			opts.TitleProvided = cmd.Flags().Changed("title")
+			opts.BodyProvided = cmd.Flags().Changed("body") || cmd.Flags().Changed("body-file")
+			opts.CategoryProvided = cmd.Flags().Changed("category")
 			opts.LabelsProvided = len(opts.AddLabels) > 0 || len(opts.RemoveLabels) > 0
 
 			noFlagsSet := !opts.TitleProvided && !opts.BodyProvided && !opts.CategoryProvided && !opts.LabelsProvided
