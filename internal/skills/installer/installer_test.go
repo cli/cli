@@ -24,8 +24,10 @@ func TestInstallLocal(t *testing.T) {
 		skills       []discovery.Skill
 		useAgentHost bool
 		setup        func(t *testing.T, srcDir string)
+		preinstall   func(t *testing.T, destDir string)
 		verify       func(t *testing.T, destDir string)
 		wantErr      string
+		omitDir      bool
 	}{
 		{
 			name:   "copies files via Dir",
@@ -83,6 +85,31 @@ func TestInstallLocal(t *testing.T) {
 				_, err = os.Stat(filepath.Join(destDir, "pr-summary", "link.txt"))
 				assert.True(t, os.IsNotExist(err))
 			},
+		},
+		{
+			name:   "rejects target symlink file",
+			skills: []discovery.Skill{{Name: "code-review", Path: "skills/code-review"}},
+			setup: func(t *testing.T, srcDir string) {
+				t.Helper()
+				skillSrc := filepath.Join(srcDir, "skills", "code-review")
+				require.NoError(t, os.MkdirAll(skillSrc, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillSrc, "prompt.txt"), []byte("replace target"), 0o644))
+			},
+			preinstall: func(t *testing.T, destDir string) {
+				t.Helper()
+				skillDest := filepath.Join(destDir, "code-review")
+				require.NoError(t, os.MkdirAll(skillDest, 0o755))
+				outside := filepath.Join(destDir, "outside.txt")
+				require.NoError(t, os.WriteFile(outside, []byte("keep"), 0o644))
+				require.NoError(t, os.Symlink(outside, filepath.Join(skillDest, "prompt.txt")))
+			},
+			verify: func(t *testing.T, destDir string) {
+				t.Helper()
+				content, err := os.ReadFile(filepath.Join(destDir, "outside.txt"))
+				require.NoError(t, err)
+				assert.Equal(t, "keep", string(content))
+			},
+			wantErr: "refusing to install through symlink",
 		},
 		{
 			name:   "injects metadata into SKILL.md",
@@ -143,6 +170,7 @@ func TestInstallLocal(t *testing.T) {
 			skills:  []discovery.Skill{{Name: "code-review"}},
 			setup:   func(t *testing.T, srcDir string) {},
 			wantErr: "either Dir or AgentHost must be specified",
+			omitDir: true,
 		},
 	}
 	for _, tt := range tests {
@@ -150,6 +178,9 @@ func TestInstallLocal(t *testing.T) {
 			srcDir := t.TempDir()
 			destDir := t.TempDir()
 			tt.setup(t, srcDir)
+			if tt.preinstall != nil {
+				tt.preinstall(t, destDir)
+			}
 
 			opts := &LocalOptions{
 				SourceDir: srcDir,
@@ -164,7 +195,7 @@ func TestInstallLocal(t *testing.T) {
 				opts.Scope = registry.ScopeProject
 				opts.GitRoot = destDir
 			}
-			if tt.wantErr != "" {
+			if tt.omitDir {
 				opts.Dir = ""
 			}
 
@@ -172,6 +203,9 @@ func TestInstallLocal(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+				if tt.verify != nil {
+					tt.verify(t, destDir)
+				}
 				return
 			}
 			require.NoError(t, err)
@@ -184,10 +218,12 @@ func TestInstallLocal(t *testing.T) {
 
 func TestInstallSkill(t *testing.T) {
 	tests := []struct {
-		name   string
-		skill  discovery.Skill
-		stubs  func(*httpmock.Registry)
-		verify func(t *testing.T, destDir string)
+		name     string
+		skill    discovery.Skill
+		stubs    func(*httpmock.Registry)
+		setup    func(t *testing.T, destDir string)
+		verify   func(t *testing.T, destDir string)
+		wantErr  string
 	}{
 		{
 			name:  "installs files from remote",
@@ -283,11 +319,49 @@ func TestInstallSkill(t *testing.T) {
 				_, err := os.Stat(filepath.Join(destDir, "..", "etc", "passwd"))
 				assert.True(t, os.IsNotExist(err), "traversal path should not be written")
 			},
+			wantErr: "blocked path traversal",
+		},
+		{
+			name:  "rejects target symlink directory",
+			skill: discovery.Skill{Name: "code-review", Path: "skills/code-review", TreeSHA: "tree123"},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree123"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "tree123", "truncated": false,
+						"tree": []map[string]interface{}{
+							{"path": "scripts/run.sh", "type": "blob", "sha": "run-sha", "size": 10},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/run-sha"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "run-sha", "encoding": "base64",
+						"content": base64.StdEncoding.EncodeToString([]byte("outside write")),
+					}))
+			},
+			setup: func(t *testing.T, destDir string) {
+				t.Helper()
+				skillDest := filepath.Join(destDir, "code-review")
+				require.NoError(t, os.MkdirAll(skillDest, 0o755))
+				outsideDir := filepath.Join(destDir, "outside")
+				require.NoError(t, os.MkdirAll(outsideDir, 0o755))
+				require.NoError(t, os.Symlink(outsideDir, filepath.Join(skillDest, "scripts")))
+			},
+			verify: func(t *testing.T, destDir string) {
+				t.Helper()
+				_, err := os.Stat(filepath.Join(destDir, "outside", "run.sh"))
+				assert.True(t, os.IsNotExist(err), "symlink target should not receive installed files")
+			},
+			wantErr: "refusing to install through symlink",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			destDir := t.TempDir()
+			if tt.setup != nil {
+				tt.setup(t, destDir)
+			}
 			reg := &httpmock.Registry{}
 			defer reg.Verify(t)
 			tt.stubs(reg)
@@ -302,9 +376,9 @@ func TestInstallSkill(t *testing.T) {
 			}
 
 			err := installSkill(opts, tt.skill, destDir)
-			if tt.name == "fails on path traversal from malicious tree" {
+			if tt.wantErr != "" {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), "blocked path traversal")
+				assert.Contains(t, err.Error(), tt.wantErr)
 			} else {
 				require.NoError(t, err)
 			}

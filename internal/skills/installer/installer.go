@@ -182,8 +182,8 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 	// Most agent clients only discover immediate subdirectories of their
 	// skills folder and do not find skills nested under namespace directories.
 	skillDir := filepath.Join(baseDir, skill.Name)
-	if err := os.MkdirAll(skillDir, 0o755); err != nil {
-		return fmt.Errorf("could not create directory %s: %w", skillDir, err)
+	if err := createInstallDirectory(baseDir, skillDir); err != nil {
+		return err
 	}
 
 	srcDir := filepath.Join(sourceRoot, filepath.FromSlash(skill.Path))
@@ -226,8 +226,8 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 		destPath := safeDest.String()
 
 		if dir := filepath.Dir(destPath); dir != skillDir {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return fmt.Errorf("could not create directory: %w", err)
+			if err := createInstallDirectory(baseDir, dir); err != nil {
+				return err
 			}
 		}
 
@@ -244,6 +244,9 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 			content = []byte(injected)
 		}
 
+		if err := ensureInstallPathNoSymlink(baseDir, destPath); err != nil {
+			return err
+		}
 		return os.WriteFile(destPath, content, 0o644)
 	})
 }
@@ -251,8 +254,8 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 	// Use skill.Name (not InstallName) for a flat directory layout.
 	skillDir := filepath.Join(baseDir, skill.Name)
-	if err := os.MkdirAll(skillDir, 0o755); err != nil {
-		return fmt.Errorf("could not create directory %s: %w", skillDir, err)
+	if err := createInstallDirectory(baseDir, skillDir); err != nil {
+		return err
 	}
 
 	files, err := discovery.DiscoverSkillFiles(opts.Client, opts.Host, opts.Owner, opts.Repo, skill.TreeSHA, skill.Path)
@@ -284,8 +287,8 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 		destPath := safeDest.String()
 
 		if dir := filepath.Dir(destPath); dir != skillDir {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return fmt.Errorf("could not create directory: %w", err)
+			if err := createInstallDirectory(baseDir, dir); err != nil {
+				return err
 			}
 		}
 
@@ -296,11 +299,82 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 			}
 		}
 
+		if err := ensureInstallPathNoSymlink(baseDir, destPath); err != nil {
+			return err
+		}
 		if err := os.WriteFile(destPath, []byte(content), 0o644); err != nil {
 			return fmt.Errorf("could not write %s: %w", destPath, err)
 		}
 	}
 
+	return nil
+}
+
+func createInstallDirectory(baseDir, dir string) error {
+	if err := ensureInstallPathNoSymlink(baseDir, dir); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("could not create directory %s: %w", dir, err)
+	}
+	return ensureInstallPathNoSymlink(baseDir, dir)
+}
+
+func ensureInstallPathNoSymlink(baseDir, targetPath string) error {
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return fmt.Errorf("could not resolve install directory path: %w", err)
+	}
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		return fmt.Errorf("could not resolve target path: %w", err)
+	}
+
+	relToBase, err := filepath.Rel(absBase, absTarget)
+	if err != nil {
+		return fmt.Errorf("could not resolve target path: %w", err)
+	}
+	if relToBase == ".." || strings.HasPrefix(relToBase, ".."+string(os.PathSeparator)) || filepath.IsAbs(relToBase) {
+		return fmt.Errorf("target path %s is outside install directory %s", targetPath, baseDir)
+	}
+
+	installRoot := filepath.Dir(absBase)
+	relPath, err := filepath.Rel(installRoot, absTarget)
+	if err != nil {
+		return fmt.Errorf("could not resolve target path: %w", err)
+	}
+
+	current := installRoot
+	if err := rejectSymlink(current); err != nil {
+		return err
+	}
+	if relPath == "." {
+		return nil
+	}
+
+	for _, part := range strings.Split(relPath, string(os.PathSeparator)) {
+		if part == "" || part == "." {
+			continue
+		}
+		current = filepath.Join(current, part)
+		if err := rejectSymlink(current); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func rejectSymlink(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("could not inspect target path %s: %w", path, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to install through symlink %s", path)
+	}
 	return nil
 }
 
