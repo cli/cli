@@ -24,6 +24,7 @@ import (
 	"github.com/cli/cli/v2/internal/skills/installer"
 	"github.com/cli/cli/v2/internal/skills/registry"
 	"github.com/cli/cli/v2/internal/skills/source"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -138,9 +139,14 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			frontmatter. This metadata identifies the source repository and
 			enables %[1]sgh skill update%[1]s to detect changes.
 
+			When run interactively, the command prompts for any missing arguments.
+
 			Use %[1]s--all%[1]s to install every discovered skill from the repository
-			without prompting for skill selection. When run non-interactively, %[1]srepository%[1]s and either
-			a skill name or %[1]s--all%[1]s are required.
+			without prompting for skill selection. When run non-interactively,
+			%[1]srepository%[1]s is required; without a skill name or %[1]s--all%[1]s the
+			matching skills are listed (as tab-separated values when piped) so you can
+			browse or filter them with tools like %[1]sgrep%[1]s before re-running with
+			a specific skill.
 		`, "`", registry.AgentHelpList()),
 		Example: heredoc.Doc(`
 			# Interactive: choose repo, skill, and agent
@@ -148,6 +154,9 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 
 			# Choose a skill from the repo interactively
 			$ gh skill install github/awesome-copilot
+
+			# List available skills non-interactively (e.g. to pipe into grep)
+			$ gh skill install github/awesome-copilot | grep review
 
 			# Install a specific skill
 			$ gh skill install github/awesome-copilot git-commit
@@ -314,6 +323,9 @@ func installRun(opts *InstallOptions) error {
 			},
 		})
 		if err != nil {
+			if errors.Is(err, errSkillsListed) {
+				return nil
+			}
 			return err
 		}
 	}
@@ -507,6 +519,9 @@ func runLocalInstall(opts *InstallOptions) error {
 		sourceHint:  absSource,
 	})
 	if err != nil {
+		if errors.Is(err, errSkillsListed) {
+			return nil
+		}
 		return err
 	}
 
@@ -669,6 +684,12 @@ type installPlan struct {
 	skills []discovery.Skill
 }
 
+// errSkillsListed is a sentinel returned by selectSkillsWithSelector when
+// the command runs non-interactively without a skill name. In that case the
+// selector prints the available skills to stdout (so they can be piped into
+// grep or similar) and the caller exits without installing.
+var errSkillsListed = errors.New("skills listed")
+
 func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, canPrompt bool, sel skillSelector) ([]discovery.Skill, error) {
 	checkCollisions := func(ss []discovery.Skill) error {
 		if err := collisionError(ss); err != nil {
@@ -690,7 +711,10 @@ func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, ca
 	}
 
 	if !canPrompt {
-		return nil, cmdutil.FlagErrorf("must specify a skill name when not running interactively")
+		if err := listAvailableSkills(opts, skills, sel); err != nil {
+			return nil, err
+		}
+		return nil, errSkillsListed
 	}
 
 	if sel.fetchDescriptions != nil {
@@ -732,6 +756,43 @@ func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, ca
 		return nil, err
 	}
 	return result, checkCollisions(result)
+}
+
+// listAvailableSkills prints discovered skills as a table for non-interactive
+// callers, mirroring the information shown in the interactive picker so the
+// output can be browsed or piped into tools like grep.
+func listAvailableSkills(opts *InstallOptions, skills []discovery.Skill, sel skillSelector) error {
+	if len(skills) == 0 {
+		return fmt.Errorf("no skills found in %s", sel.sourceHint)
+	}
+
+	if sel.fetchDescriptions != nil {
+		sel.fetchDescriptions()
+	}
+
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.ErrOut, "Showing %s from %s. Re-run with a skill name to install.\n\n",
+			text.Pluralize(len(skills), "skill"), sel.sourceHint)
+	}
+
+	tw := opts.IO.TerminalWidth()
+	descWidth := tw - 40
+	if descWidth < 20 {
+		descWidth = 20
+	}
+	isTTY := opts.IO.IsStdoutTTY()
+
+	table := tableprinter.New(opts.IO, tableprinter.WithHeader("SKILL", "DESCRIPTION"))
+	for _, s := range skills {
+		table.AddField(s.DisplayName())
+		desc := s.Description
+		if isTTY {
+			desc = text.Truncate(descWidth, desc)
+		}
+		table.AddField(desc)
+		table.EndRow()
+	}
+	return table.Render()
 }
 
 func matchSkillByName(opts *InstallOptions, skills []discovery.Skill) ([]discovery.Skill, error) {
