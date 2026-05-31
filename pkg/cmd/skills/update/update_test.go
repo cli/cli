@@ -1164,9 +1164,7 @@ func TestUpdateRun(t *testing.T) {
 			wantStdout: "pinned-skill",
 		},
 		{
-			// Regression for #13542: skills installed via --allow-hidden-dirs
-			// must remain updatable even when the source repo exposes them
-			// only under hidden directories.
+			// Regression for #13542.
 			name: "updates skill installed from a hidden directory",
 			setup: func(t *testing.T, dir string) {
 				t.Helper()
@@ -1195,8 +1193,6 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/openai/skills/git/trees/commithidden1"),
 					httpmock.StringResponse(`{"sha": "commithidden1", "tree": [{"path": "skills/.curated/gh-address-comments/SKILL.md", "type": "blob", "sha": "blobhidden1"}, {"path": "skills/.curated/gh-address-comments", "type": "tree", "sha": "newhiddensha"}, {"path": "skills/.curated", "type": "tree", "sha": "treeshaCurated"}, {"path": "skills", "type": "tree", "sha": "treeshaSkills"}], "truncated": false}`),
 				)
-				// The DiscoverSkillByPath fallback queries the parent directory
-				// via the contents API, then fetches the skill's own tree.
 				reg.Register(
 					httpmock.REST("GET", "repos/openai/skills/contents/skills%2F.curated"),
 					httpmock.StringResponse(`[{"name": "gh-address-comments", "path": "skills/.curated/gh-address-comments", "sha": "newhiddensha", "type": "dir"}]`),
@@ -1225,9 +1221,6 @@ func TestUpdateRun(t *testing.T) {
 			wantStdout: "gh-address-comments",
 		},
 		{
-			// When the source repo's tree is too large for bulk discovery,
-			// the per-skill fallback via the contents API must still resolve
-			// updates for skills with a recorded sourcePath.
 			name: "falls back to per-skill discovery when repository tree is truncated",
 			setup: func(t *testing.T, dir string) {
 				t.Helper()
@@ -1284,9 +1277,6 @@ func TestUpdateRun(t *testing.T) {
 			wantStdout: "huge-repo-skill",
 		},
 		{
-			// Legacy installs without github-path metadata cannot use the
-			// per-skill fallback. The repository-level discovery error must
-			// still be surfaced (regression for silent skip).
 			name: "warns when bulk discovery fails and skill lacks sourcePath",
 			setup: func(t *testing.T, dir string) {
 				t.Helper()
@@ -1310,7 +1300,6 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/legacy/skills/git/ref/tags/v1.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "commitlegacy", "type": "commit"}}`),
 				)
-				// Tree contains no convention-discoverable SKILL.md.
 				reg.Register(
 					httpmock.REST("GET", "repos/legacy/skills/git/trees/commitlegacy"),
 					httpmock.StringResponse(`{"sha": "commitlegacy", "tree": [{"path": "README.md", "type": "blob", "sha": "readmesha"}], "truncated": false}`),

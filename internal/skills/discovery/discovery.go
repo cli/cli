@@ -24,13 +24,11 @@ import (
 // 1-64 chars, lowercase alphanumeric + hyphens, no leading/trailing/consecutive hyphens.
 var specNamePattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
-// TreeTooLargeError is returned when a repository's git tree exceeds the
-// GitHub API truncation limit and full skill discovery is not possible.
-// ErrNoSkillsFound is returned (wrapped) when DiscoverSkills /
-// DiscoverSkillsWithOptions cannot locate any convention-discoverable skills
-// in the target repository. Callers can detect this with errors.Is.
+// ErrNoSkillsFound is returned (wrapped) when no skills can be discovered in the target repository.
 var ErrNoSkillsFound = errors.New("no skills found")
 
+// TreeTooLargeError is returned when a repository's git tree exceeds the
+// GitHub API truncation limit and full skill discovery is not possible.
 type TreeTooLargeError struct {
 	Owner string
 	Repo  string

@@ -253,7 +253,6 @@ func updateRun(opts *UpdateOptions) error {
 	repoSkills := make(map[repoKey][]discovery.Skill)
 	repoRefs := make(map[repoKey]*discovery.ResolvedRef)
 	repoErrors := make(map[repoKey]bool)
-	// Preserves the recoverable bulk-discovery error so it can be surfaced for skills that lack a sourcePath and therefore cannot use the per-skill fallback.
 	repoRecoverableErrs := make(map[repoKey]error)
 
 	for _, s := range installed {
@@ -283,7 +282,7 @@ func updateRun(opts *UpdateOptions) error {
 			}
 			repoRefs[key] = resolved
 
-			// Include hidden-dir skills (e.g. .claude/skills/) so installs made via --allow-hidden-dirs remain updatable.
+			// Include hidden-dir skills so installs made via --allow-hidden-dirs remain updatable.
 			skills, discoverErr := discovery.DiscoverSkillsWithOptions(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA, discovery.DiscoverOptions{})
 			if discoverErr != nil {
 				if !isRecoverableDiscoveryErr(discoverErr) {
@@ -293,7 +292,6 @@ func updateRun(opts *UpdateOptions) error {
 					opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
 					continue
 				}
-				// Recoverable (e.g. tree too large, no convention-discovered skills): the per-skill fallback below may still resolve individual skills; the original error is reported per-skill for entries that cannot use the fallback.
 				repoRecoverableErrs[key] = discoverErr
 			}
 			repoSkills[key] = skills
@@ -322,7 +320,6 @@ func updateRun(opts *UpdateOptions) error {
 			}
 		}
 
-		// Fallback for skills installed by exact path (e.g. via --allow-hidden-dirs into a non-conventional location like skills/.curated/).
 		if !foundMatch && s.sourcePath != "" {
 			remote, pathErr := discovery.DiscoverSkillByPath(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA, s.sourcePath)
 			if pathErr != nil {
@@ -342,7 +339,6 @@ func updateRun(opts *UpdateOptions) error {
 			continue
 		}
 
-		// Surface the original repo-level discovery error for skills that lack a sourcePath (legacy installs without github-path metadata) and could not be located via bulk discovery.
 		if !foundMatch && s.sourcePath == "" && repoRecoverableErrs[key] != nil {
 			opts.IO.StopProgressIndicator()
 			fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, repoRecoverableErrs[key])
@@ -624,7 +620,7 @@ func promptForSkillOrigin(p prompter.Prompter, skillName string) (owner, repo, r
 	return r.RepoOwner(), r.RepoName(), "", true, nil
 }
 
-// isRecoverableDiscoveryErr reports whether a repository-level discovery failure can be retried via the per-skill DiscoverSkillByPath fallback.
+// isRecoverableDiscoveryErr reports whether bulk discovery can be retried per-skill via DiscoverSkillByPath.
 func isRecoverableDiscoveryErr(err error) bool {
 	var treeTooLarge *discovery.TreeTooLargeError
 	if errors.As(err, &treeTooLarge) {
