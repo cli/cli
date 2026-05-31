@@ -1485,11 +1485,6 @@ func (c *Client) NewOwner(canPrompt bool, login string) (*Owner, error) {
 // set `fields` to true to get the project's field data
 // filters, when provided, limit which projects appear in the interactive prompt
 func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool, filters ...func(*Project) bool) (*Project, error) {
-	var filter func(*Project) bool
-	if len(filters) > 0 {
-		filter = filters[0]
-	}
-
 	if number != 0 {
 		variables := map[string]any{
 			"number":      githubv4.Int(number),
@@ -1538,7 +1533,7 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool,
 	filtered := make([]*Project, 0, len(projects.Nodes))
 	for i := range projects.Nodes {
 		p := &projects.Nodes[i]
-		if filter == nil || filter(p) {
+		if projectMatchesFilters(p, filters) {
 			filtered = append(filtered, p)
 		}
 	}
@@ -1562,6 +1557,15 @@ func (c *Client) NewProject(canPrompt bool, o *Owner, number int32, fields bool,
 	}
 
 	return filtered[answerIndex], nil
+}
+
+func projectMatchesFilters(p *Project, filters []func(*Project) bool) bool {
+	for _, filter := range filters {
+		if filter != nil && !filter(p) {
+			return false
+		}
+	}
+	return true
 }
 
 // Projects returns all the projects for an Owner. If the OwnerType is VIEWER, no login is required.

@@ -553,7 +553,6 @@ func TestRunClose_JSON(t *testing.T) {
 
 func TestRunClose_PromptFiltersOpenProjects(t *testing.T) {
 	defer gock.Off()
-	// gock.Observe(gock.DumpRequest)
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
@@ -662,7 +661,6 @@ func TestRunClose_PromptFiltersOpenProjects(t *testing.T) {
 
 func TestRunClose_PromptFiltersClosedProjectsOnUndo(t *testing.T) {
 	defer gock.Off()
-	// gock.Observe(gock.DumpRequest)
 
 	gock.New("https://api.github.com").
 		Post("/graphql").
