@@ -357,6 +357,42 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/kevin/MinTy/issues/217",
 		},
 		{
+			name: "ambiguous decimal-only short hash that is a valid commit",
+			opts: BrowseOptions{
+				SelectorArg: "309628980",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/kevin/MinTy/commits/309628980"),
+					httpmock.StringResponse("{}"),
+				)
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/commit/309628980",
+		},
+		{
+			name: "ambiguous decimal-only string that is not a commit",
+			opts: BrowseOptions{
+				SelectorArg: "1234567",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/kevin/MinTy/commits/1234567"),
+					httpmock.StatusStringResponse(404, "{}"),
+				)
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/1234567",
+		},
+		{
+			name: "hashtag decimal-only argument forces issue",
+			opts: BrowseOptions{
+				SelectorArg: "#309628980",
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/309628980",
+		},
+		{
 			name: "branch flag",
 			opts: BrowseOptions{
 				Branch: "trunk",
