@@ -26,6 +26,11 @@ var specNamePattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
 // TreeTooLargeError is returned when a repository's git tree exceeds the
 // GitHub API truncation limit and full skill discovery is not possible.
+// ErrNoSkillsFound is returned (wrapped) when DiscoverSkills /
+// DiscoverSkillsWithOptions cannot locate any convention-discoverable skills
+// in the target repository. Callers can detect this with errors.Is.
+var ErrNoSkillsFound = errors.New("no skills found")
+
 type TreeTooLargeError struct {
 	Owner string
 	Repo  string
@@ -518,11 +523,11 @@ func DiscoverSkills(client *api.Client, host, owner, repo, commitSHA string) ([]
 	}
 	if len(skills) == 0 {
 		return nil, fmt.Errorf(
-			"no skills found in %s/%s\n"+
+			"%w in %s/%s\n"+
 				"  Expected skills in skills/*/SKILL.md, skills/{scope}/*/SKILL.md,\n"+
 				"  */SKILL.md, or plugins/*/skills/*/SKILL.md\n"+
 				"  This repository may be a curated list rather than a skills publisher",
-			owner, repo,
+			ErrNoSkillsFound, owner, repo,
 		)
 	}
 	return skills, nil
@@ -570,12 +575,12 @@ func DiscoverSkillsWithOptions(client *api.Client, host, owner, repo, commitSHA 
 
 	if len(matches) == 0 {
 		return nil, fmt.Errorf(
-			"no skills found in %s/%s\n"+
+			"%w in %s/%s\n"+
 				"  Expected skills in skills/*/SKILL.md, skills/{scope}/*/SKILL.md,\n"+
 				"  {prefix}/skills/*/SKILL.md, {prefix}/skills/{scope}/*/SKILL.md,\n"+
 				"  */SKILL.md, or plugins/*/skills/*/SKILL.md\n"+
 				"  This repository may be a curated list rather than a skills publisher",
-			owner, repo,
+			ErrNoSkillsFound, owner, repo,
 		)
 	}
 

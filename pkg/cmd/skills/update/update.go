@@ -1,6 +1,7 @@
 package update
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -252,6 +253,8 @@ func updateRun(opts *UpdateOptions) error {
 	repoSkills := make(map[repoKey][]discovery.Skill)
 	repoRefs := make(map[repoKey]*discovery.ResolvedRef)
 	repoErrors := make(map[repoKey]bool)
+	// Preserves the recoverable bulk-discovery error so it can be surfaced for skills that lack a sourcePath and therefore cannot use the per-skill fallback.
+	repoRecoverableErrs := make(map[repoKey]error)
 
 	for _, s := range installed {
 		if s.owner == "" || s.repo == "" {
@@ -280,18 +283,24 @@ func updateRun(opts *UpdateOptions) error {
 			}
 			repoRefs[key] = resolved
 
-			skills, discoverErr := discovery.DiscoverSkills(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA)
+			// Include hidden-dir skills (e.g. .claude/skills/) so installs made via --allow-hidden-dirs remain updatable.
+			skills, discoverErr := discovery.DiscoverSkillsWithOptions(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA, discovery.DiscoverOptions{})
 			if discoverErr != nil {
-				repoErrors[key] = true
-				opts.IO.StopProgressIndicator()
-				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, discoverErr)
-				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
-				continue
+				if !isRecoverableDiscoveryErr(discoverErr) {
+					repoErrors[key] = true
+					opts.IO.StopProgressIndicator()
+					fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, discoverErr)
+					opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+					continue
+				}
+				// Recoverable (e.g. tree too large, no convention-discovered skills): the per-skill fallback below may still resolve individual skills; the original error is reported per-skill for entries that cannot use the fallback.
+				repoRecoverableErrs[key] = discoverErr
 			}
 			repoSkills[key] = skills
 		}
 
 		resolved := repoRefs[key]
+		foundMatch := false
 		for _, remote := range repoSkills[key] {
 			matched := false
 			if s.sourcePath != "" {
@@ -299,15 +308,45 @@ func updateRun(opts *UpdateOptions) error {
 			} else {
 				matched = remote.InstallName() == s.name
 			}
-			if matched && (remote.TreeSHA != s.treeSHA || opts.Force) {
+			if matched {
+				foundMatch = true
+				if remote.TreeSHA != s.treeSHA || opts.Force {
+					updates = append(updates, pendingUpdate{
+						local:    s,
+						newSHA:   remote.TreeSHA,
+						resolved: resolved,
+						skill:    remote,
+					})
+				}
+				break
+			}
+		}
+
+		// Fallback for skills installed by exact path (e.g. via --allow-hidden-dirs into a non-conventional location like skills/.curated/).
+		if !foundMatch && s.sourcePath != "" {
+			remote, pathErr := discovery.DiscoverSkillByPath(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA, s.sourcePath)
+			if pathErr != nil {
+				opts.IO.StopProgressIndicator()
+				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, pathErr)
+				opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
+				continue
+			}
+			if remote.TreeSHA != s.treeSHA || opts.Force {
 				updates = append(updates, pendingUpdate{
 					local:    s,
 					newSHA:   remote.TreeSHA,
 					resolved: resolved,
-					skill:    remote,
+					skill:    *remote,
 				})
-				break
 			}
+			continue
+		}
+
+		// Surface the original repo-level discovery error for skills that lack a sourcePath (legacy installs without github-path metadata) and could not be located via bulk discovery.
+		if !foundMatch && s.sourcePath == "" && repoRecoverableErrs[key] != nil {
+			opts.IO.StopProgressIndicator()
+			fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: %v\n", cs.WarningIcon(), s.name, repoRecoverableErrs[key])
+			opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Checking %d installed skill(s) for updates", len(installed)))
 		}
 	}
 
@@ -583,4 +622,13 @@ func promptForSkillOrigin(p prompter.Prompter, skillName string) (owner, repo, r
 		return "", "", fmt.Sprintf("invalid repository %q: expected owner/repo", input), false, nil
 	}
 	return r.RepoOwner(), r.RepoName(), "", true, nil
+}
+
+// isRecoverableDiscoveryErr reports whether a repository-level discovery failure can be retried via the per-skill DiscoverSkillByPath fallback.
+func isRecoverableDiscoveryErr(err error) bool {
+	var treeTooLarge *discovery.TreeTooLargeError
+	if errors.As(err, &treeTooLarge) {
+		return true
+	}
+	return errors.Is(err, discovery.ErrNoSkillsFound)
 }

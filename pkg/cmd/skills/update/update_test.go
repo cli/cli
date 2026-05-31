@@ -1,6 +1,7 @@
 package update
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/registry"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -1161,6 +1163,173 @@ func TestUpdateRun(t *testing.T) {
 			wantStderr: "1 update(s) available:",
 			wantStdout: "pinned-skill",
 		},
+		{
+			// Regression for #13542: skills installed via --allow-hidden-dirs
+			// must remain updatable even when the source repo exposes them
+			// only under hidden directories.
+			name: "updates skill installed from a hidden directory",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "gh-address-comments")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: gh-address-comments
+					metadata:
+					  github-repo: https://github.com/openai/skills
+					  github-tree-sha: oldhiddensha
+					  github-path: skills/.curated/gh-address-comments
+					---
+				`)), 0o644))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/openai/skills/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/openai/skills/git/ref/tags/v1.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "commithidden1", "type": "commit"}}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/openai/skills/git/trees/commithidden1"),
+					httpmock.StringResponse(`{"sha": "commithidden1", "tree": [{"path": "skills/.curated/gh-address-comments/SKILL.md", "type": "blob", "sha": "blobhidden1"}, {"path": "skills/.curated/gh-address-comments", "type": "tree", "sha": "newhiddensha"}, {"path": "skills/.curated", "type": "tree", "sha": "treeshaCurated"}, {"path": "skills", "type": "tree", "sha": "treeshaSkills"}], "truncated": false}`),
+				)
+				// The DiscoverSkillByPath fallback queries the parent directory
+				// via the contents API, then fetches the skill's own tree.
+				reg.Register(
+					httpmock.REST("GET", "repos/openai/skills/contents/skills%2F.curated"),
+					httpmock.StringResponse(`[{"name": "gh-address-comments", "path": "skills/.curated/gh-address-comments", "sha": "newhiddensha", "type": "dir"}]`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/openai/skills/git/trees/newhiddensha"),
+					httpmock.StringResponse(`{"sha": "newhiddensha", "tree": [{"path": "SKILL.md", "type": "blob", "sha": "blobhidden1"}], "truncated": false}`),
+				)
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(true)
+				ios.SetStderrTTY(true)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					Prompter:  &prompter.PrompterMock{},
+					GitClient: &git.Client{RepoDir: dir},
+					Dir:       dir,
+					DryRun:    true,
+				}
+			},
+			wantStderr: "1 update(s) available:",
+			wantStdout: "gh-address-comments",
+		},
+		{
+			// When the source repo's tree is too large for bulk discovery,
+			// the per-skill fallback via the contents API must still resolve
+			// updates for skills with a recorded sourcePath.
+			name: "falls back to per-skill discovery when repository tree is truncated",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "huge-repo-skill")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: huge-repo-skill
+					metadata:
+					  github-repo: https://github.com/giant/skills
+					  github-tree-sha: oldhugesha
+					  github-path: skills/huge-repo-skill
+					---
+				`)), 0o644))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/giant/skills/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v3.0.0"}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/giant/skills/git/ref/tags/v3.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "commithuge", "type": "commit"}}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/giant/skills/git/trees/commithuge"),
+					httpmock.StringResponse(`{"sha": "commithuge", "tree": [], "truncated": true}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/giant/skills/contents/skills"),
+					httpmock.StringResponse(`[{"name": "huge-repo-skill", "path": "skills/huge-repo-skill", "sha": "newhugesha", "type": "dir"}]`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/giant/skills/git/trees/newhugesha"),
+					httpmock.StringResponse(`{"sha": "newhugesha", "tree": [{"path": "SKILL.md", "type": "blob", "sha": "blobhuge"}], "truncated": false}`),
+				)
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(true)
+				ios.SetStderrTTY(true)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					Prompter:  &prompter.PrompterMock{},
+					GitClient: &git.Client{RepoDir: dir},
+					Dir:       dir,
+					DryRun:    true,
+				}
+			},
+			wantStderr: "1 update(s) available:",
+			wantStdout: "huge-repo-skill",
+		},
+		{
+			// Legacy installs without github-path metadata cannot use the
+			// per-skill fallback. The repository-level discovery error must
+			// still be surfaced (regression for silent skip).
+			name: "warns when bulk discovery fails and skill lacks sourcePath",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "legacy-skill")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: legacy-skill
+					metadata:
+					  github-repo: https://github.com/legacy/skills
+					  github-tree-sha: oldlegacysha
+					---
+				`)), 0o644))
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/legacy/skills/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/legacy/skills/git/ref/tags/v1.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "commitlegacy", "type": "commit"}}`),
+				)
+				// Tree contains no convention-discoverable SKILL.md.
+				reg.Register(
+					httpmock.REST("GET", "repos/legacy/skills/git/trees/commitlegacy"),
+					httpmock.StringResponse(`{"sha": "commitlegacy", "tree": [{"path": "README.md", "type": "blob", "sha": "readmesha"}], "truncated": false}`),
+				)
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(false)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					GitClient: &git.Client{RepoDir: dir},
+					Dir:       dir,
+				}
+			},
+			wantStderr: "Skipping legacy-skill: no skills found",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1195,6 +1364,47 @@ func TestUpdateRun(t *testing.T) {
 			if tt.verify != nil {
 				tt.verify(t, dir)
 			}
+		})
+	}
+}
+
+func TestIsRecoverableDiscoveryErr(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "nil is not recoverable",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "wrapped ErrNoSkillsFound is recoverable",
+			err:  fmt.Errorf("%w in owner/repo", discovery.ErrNoSkillsFound),
+			want: true,
+		},
+		{
+			name: "TreeTooLargeError is recoverable",
+			err:  &discovery.TreeTooLargeError{Owner: "owner", Repo: "repo"},
+			want: true,
+		},
+		{
+			name: "wrapped TreeTooLargeError is recoverable",
+			err:  fmt.Errorf("discover failed: %w", &discovery.TreeTooLargeError{Owner: "owner", Repo: "repo"}),
+			want: true,
+		},
+		{
+			name: "unrelated error is not recoverable",
+			err:  errors.New("network failure"),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isRecoverableDiscoveryErr(tt.err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
