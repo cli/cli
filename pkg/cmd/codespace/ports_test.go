@@ -159,7 +159,7 @@ func GetMockApi(allowOrgPorts bool) *apiClientMock {
 		GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
 			return nil, nil
 		},
-		HTTPClientFunc: func() (*http.Client, error) {
+		ExternalHTTPClientFunc: func() (*http.Client, error) {
 			return connection.NewMockHttpClient()
 		},
 	}

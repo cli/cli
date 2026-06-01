@@ -55,6 +55,7 @@ type InstallOptions struct {
 	ScopeChanged    bool // true when --scope was explicitly set
 	Pin             string
 	Dir             string // overrides --agent and --scope
+	All             bool
 	Force           bool
 	FromLocal       bool // treat SkillSource as a local directory path
 	AllowHiddenDirs bool // include skills in dot-prefixed directories
@@ -135,9 +136,9 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			frontmatter. This metadata identifies the source repository and
 			enables %[1]sgh skill update%[1]s to detect changes.
 
-			When run interactively, the command prompts for any missing arguments.
-			When run non-interactively, %[1]srepository%[1]s and a skill name are
-			required.
+			Use %[1]s--all%[1]s to install every discovered skill from the repository
+			without prompting for skill selection. When run non-interactively, %[1]srepository%[1]s and either
+			a skill name or %[1]s--all%[1]s are required.
 		`, "`", registry.AgentHelpList()),
 		Example: heredoc.Doc(`
 			# Interactive: choose repo, skill, and agent
@@ -148,6 +149,9 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 
 			# Install a specific skill
 			$ gh skill install github/awesome-copilot git-commit
+
+			# Install all skills from a repository
+			$ gh skill install github/awesome-copilot --all
 
 			# Install a specific version
 			$ gh skill install github/awesome-copilot git-commit@v1.2.0
@@ -180,6 +184,10 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 				opts.SkillName = args[1]
 			}
 			opts.ScopeChanged = cmd.Flags().Changed("scope")
+
+			if opts.All && opts.SkillName != "" {
+				return cmdutil.FlagErrorf("cannot use --all with a skill argument")
+			}
 
 			// Resolve the source type early so installRun can branch directly.
 			if opts.FromLocal {
@@ -215,6 +223,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 	cmdutil.StringEnumFlag(cmd, &opts.Scope, "scope", "", "project", []string{"project", "user"}, "Installation scope")
 	cmd.Flags().StringVar(&opts.Pin, "pin", "", "Pin to a specific git tag or commit SHA")
 	cmd.Flags().StringVar(&opts.Dir, "dir", "", "Install to a custom directory (overrides --agent and --scope)")
+	cmd.Flags().BoolVar(&opts.All, "all", false, "Install all skills without prompting for skill selection")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing skills without prompting")
 	cmd.Flags().BoolVar(&opts.FromLocal, "from-local", false, "Treat the argument as a local directory path instead of a repository")
 	cmd.Flags().BoolVar(&opts.AllowHiddenDirs, "allow-hidden-dirs", false, "Include skills in hidden directories (e.g. .claude/skills/, .agents/skills/)")
@@ -680,6 +689,13 @@ func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, ca
 			return err
 		}
 		return nil
+	}
+
+	if opts.All {
+		if err := checkCollisions(skills); err != nil {
+			return nil, err
+		}
+		return skills, nil
 	}
 
 	if opts.SkillName != "" {

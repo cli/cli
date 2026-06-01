@@ -475,6 +475,42 @@ func TestUpdateRun(t *testing.T) {
 			wantStderr: "no GitHub metadata",
 		},
 		{
+			name: "all skips no-metadata skill without prompting",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "manual-skill")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: manual-skill
+					---
+					No metadata
+				`)), 0o644))
+			},
+			stubs: func(reg *httpmock.Registry) {},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
+				ios.SetStdoutTTY(true)
+				ios.SetStdinTTY(true)
+				ios.SetStderrTTY(true)
+				return &UpdateOptions{
+					IO:     ios,
+					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
+					HttpClient: func() (*http.Client, error) {
+						return &http.Client{Transport: reg}, nil
+					},
+					Prompter: &prompter.PrompterMock{
+						InputFunc: func(prompt string, defaultValue string) (string, error) {
+							return "", fmt.Errorf("unexpected prompt")
+						},
+					},
+					GitClient: &git.Client{RepoDir: dir},
+					Dir:       dir,
+					All:       true,
+				}
+			},
+			wantStderr: "Run `gh skill update manual-skill` interactively",
+		},
+		{
 			name: "all up to date",
 			setup: func(t *testing.T, dir string) {
 				t.Helper()

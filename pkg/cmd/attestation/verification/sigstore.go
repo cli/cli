@@ -31,10 +31,10 @@ type AttestationProcessingResult struct {
 }
 
 type SigstoreConfig struct {
-	TrustedRoot  string
-	Logger       *io.Handler
-	NoPublicGood bool
-	HttpClient   *http.Client
+	TrustedRoot        string
+	Logger             *io.Handler
+	NoPublicGood       bool
+	ExternalHttpClient *http.Client
 	// If tenancy mode is not used, trust domain is empty
 	TrustDomain string
 	// TUFMetadataDir
@@ -76,7 +76,7 @@ func NewLiveSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, erro
 
 	// No custom trusted root is set, so configure Public Good and GitHub verifiers
 	if !config.NoPublicGood {
-		publicGoodVerifier, err := newPublicGoodVerifier(config.TUFMetadataDir, config.HttpClient)
+		publicGoodVerifier, err := newPublicGoodVerifier(config.TUFMetadataDir, config.ExternalHttpClient)
 		if err != nil {
 			// Log warning but continue - PGI unavailability should not block GitHub attestation verification
 			config.Logger.VerbosePrintf("Warning: failed to initialize Sigstore Public Good verifier: %v\n", err)
@@ -86,7 +86,7 @@ func NewLiveSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, erro
 		}
 	}
 
-	github, err := newGitHubVerifier(config.TrustDomain, config.TUFMetadataDir, config.HttpClient)
+	github, err := newGitHubVerifier(config.TrustDomain, config.TUFMetadataDir, config.ExternalHttpClient)
 	if err != nil {
 		config.Logger.VerbosePrintf("Warning: failed to initialize GitHub verifier: %v\n", err)
 	} else {

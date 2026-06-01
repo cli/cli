@@ -27,7 +27,7 @@ require (
 	github.com/digitorus/timestamp v0.0.0-20250524132541-c45532741eea
 	github.com/distribution/reference v0.6.0
 	github.com/gabriel-vasile/mimetype v1.4.13
-	github.com/gdamore/tcell/v2 v2.13.9
+	github.com/gdamore/tcell/v2 v2.13.10
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.21.6
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510

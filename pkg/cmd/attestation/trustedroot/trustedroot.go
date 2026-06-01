@@ -71,6 +71,12 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 			if err != nil {
 				return err
 			}
+
+			externalClient, err := f.ExternalHttpClient()
+			if err != nil {
+				return err
+			}
+
 			if ghauth.IsTenancy(opts.Hostname) {
 				c, err := f.Config()
 				if err != nil {
@@ -81,7 +87,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 					return fmt.Errorf("not authenticated with %s", opts.Hostname)
 				}
 				logger := io.NewHandler(f.IOStreams)
-				apiClient := api.NewLiveClient(hc, opts.Hostname, logger)
+				apiClient := api.NewLiveClient(hc, externalClient, opts.Hostname, logger)
 				td, err := apiClient.GetTrustDomain()
 				if err != nil {
 					return err
@@ -93,7 +99,7 @@ func NewTrustedRootCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Com
 				return runF(opts)
 			}
 
-			if err := getTrustedRoot(tuf.New, opts, hc); err != nil {
+			if err := getTrustedRoot(tuf.New, opts, externalClient); err != nil {
 				return fmt.Errorf("Failed to verify the TUF repository: %w", err)
 			}
 

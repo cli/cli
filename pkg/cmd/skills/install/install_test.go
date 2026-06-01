@@ -46,6 +46,11 @@ func TestNewCmdInstall(t *testing.T) {
 			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Scope: "project"},
 		},
 		{
+			name:     "repo and all flag",
+			cli:      "monalisa/skills-repo --all",
+			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", All: true, Scope: "project"},
+		},
+		{
 			name: "all flags",
 			cli:  "monalisa/skills-repo git-commit --agent github-copilot --scope user --pin v1.0.0 --force",
 			wantOpts: InstallOptions{
@@ -75,6 +80,11 @@ func TestNewCmdInstall(t *testing.T) {
 		{
 			name:    "pin conflicts with inline version",
 			cli:     "monalisa/skills-repo git-commit@v1.0.0 --pin v2.0.0",
+			wantErr: true,
+		},
+		{
+			name:    "all conflicts with skill name",
+			cli:     "monalisa/skills-repo git-commit --all",
 			wantErr: true,
 		},
 		{
@@ -171,6 +181,7 @@ func TestNewCmdInstall(t *testing.T) {
 			assert.Equal(t, tt.wantOpts.Scope, gotOpts.Scope)
 			assert.Equal(t, tt.wantOpts.Pin, gotOpts.Pin)
 			assert.Equal(t, tt.wantOpts.Dir, gotOpts.Dir)
+			assert.Equal(t, tt.wantOpts.All, gotOpts.All)
 			assert.Equal(t, tt.wantOpts.Force, gotOpts.Force)
 			assert.Equal(t, tt.wantOpts.FromLocal, gotOpts.FromLocal)
 			assert.Equal(t, tt.wantOpts.AllowHiddenDirs, gotOpts.AllowHiddenDirs)
@@ -194,7 +205,7 @@ func TestNewCmdInstall(t *testing.T) {
 		assert.NotEmpty(t, cmd.Example)
 		assert.Contains(t, cmd.Aliases, "add")
 
-		for _, flag := range []string{"agent", "scope", "pin", "dir", "force"} {
+		for _, flag := range []string{"agent", "scope", "pin", "dir", "all", "force"} {
 			assert.NotNil(t, cmd.Flags().Lookup(flag), "missing flag: --%s", flag)
 		}
 	})
@@ -263,6 +274,14 @@ var gitCommitContent = heredoc.Doc(`
 	description: Writes commits
 	---
 	# Git Commit
+`)
+
+var codeReviewContent = heredoc.Doc(`
+	---
+	name: code-review
+	description: Reviews code
+	---
+	# Code Review
 `)
 
 // singleSkillTreeJSON returns tree entries for a single skill with the given name.
@@ -1527,6 +1546,45 @@ func TestInstallRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInstallRun_AllInstallsRemoteSkills(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+	stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+		singleSkillTreeJSON("code-review", "tree-cr", "blob-cr")+", "+
+			singleSkillTreeJSON("git-commit", "tree-gc", "blob-gc"))
+	stubInstallFiles(reg, "monalisa", "skills-repo", "tree-cr", "blob-cr", codeReviewContent)
+	stubInstallFiles(reg, "monalisa", "skills-repo", "tree-gc", "blob-gc", gitCommitContent)
+
+	ios, _, stdout, stderr := iostreams.Test()
+	targetDir := t.TempDir()
+
+	err := installRun(&InstallOptions{
+		IO:           ios,
+		HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		GitClient:    &git.Client{RepoDir: t.TempDir()},
+		SkillSource:  "monalisa/skills-repo",
+		All:          true,
+		Force:        true,
+		Agent:        "github-copilot",
+		Scope:        "project",
+		ScopeChanged: true,
+		Dir:          targetDir,
+		Telemetry:    &telemetry.NoOpService{},
+	})
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "Installed code-review")
+	assert.Contains(t, stdout.String(), "Installed git-commit")
+	assert.NotContains(t, stderr.String(), "must specify a skill name")
+	require.FileExists(t, filepath.Join(targetDir, "code-review", "SKILL.md"))
+	require.FileExists(t, filepath.Join(targetDir, "git-commit", "SKILL.md"))
 }
 
 func TestInstallProgress(t *testing.T) {
