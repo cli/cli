@@ -283,6 +283,7 @@ func Test_runBrowse(t *testing.T) {
 		baseRepo      ghrepo.Interface
 		defaultBranch string
 		expectedURL   string
+		expectedErr   string
 		wantsErr      bool
 	}{
 		{
@@ -383,6 +384,21 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("kevin", "MinTy"),
 			expectedURL: "https://github.com/kevin/MinTy/issues/1234567",
+		},
+		{
+			name: "ambiguous decimal-only commit lookup error returns error",
+			opts: BrowseOptions{
+				SelectorArg: "1234567",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/kevin/MinTy/commits/1234567"),
+					httpmock.StatusStringResponse(500, `{"message":"server error"}`),
+				)
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedErr: "HTTP 500",
+			wantsErr:    true,
 		},
 		{
 			name: "hashtag decimal-only argument forces issue",
@@ -743,6 +759,9 @@ func Test_runBrowse(t *testing.T) {
 			err := runBrowse(&opts)
 			if tt.wantsErr {
 				assert.Error(t, err)
+				if tt.expectedErr != "" {
+					assert.ErrorContains(t, err, tt.expectedErr)
+				}
 			} else {
 				assert.NoError(t, err)
 			}
