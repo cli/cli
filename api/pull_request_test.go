@@ -411,3 +411,51 @@ func statusContextNode(state string) string {
 		"state": "%s"
 	}`, state)
 }
+
+// TestChecksStatus_DeduplicatesCancelledRuns reproduces the scenario from
+// https://github.com/cli/cli/issues/12895: when a CI job is re-triggered
+// after a cancellation, the stale cancelled run should not be counted as a
+// failure alongside the newer successful run.
+func TestChecksStatus_DeduplicatesCancelledRuns(t *testing.T) {
+	t.Parallel()
+
+	// Two runs for the same check: an older cancelled run and a newer
+	// successful one. Only the successful one should count.
+	payload := `
+	{ "statusCheckRollup": { "nodes": [{ "commit": {
+		"statusCheckRollup": {
+			"contexts": {
+				"nodes": [
+					{
+						"__typename": "CheckRun",
+						"name": "test / unit",
+						"status": "COMPLETED",
+						"conclusion": "CANCELLED",
+						"startedAt": "2024-01-01T00:00:00Z",
+						"checkSuite": { "workflowRun": { "event": "push", "workflow": { "name": "CI" } } }
+					},
+					{
+						"__typename": "CheckRun",
+						"name": "test / unit",
+						"status": "COMPLETED",
+						"conclusion": "SUCCESS",
+						"startedAt": "2024-01-01T01:00:00Z",
+						"checkSuite": { "workflowRun": { "event": "push", "workflow": { "name": "CI" } } }
+					}
+				]
+			}
+		}
+	} }] } }
+	`
+
+	var pr PullRequest
+	require.NoError(t, json.Unmarshal([]byte(payload), &pr))
+
+	// Only the newer successful run should be counted; the stale cancelled
+	// run must be ignored.
+	expectedChecksStatus := PullRequestChecksStatus{
+		Passing: 1,
+		Total:   1,
+	}
+	require.Equal(t, expectedChecksStatus, pr.ChecksStatus())
+}

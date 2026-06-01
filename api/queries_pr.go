@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -366,8 +367,9 @@ func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
 		return summary
 	}
 
-	// If we don't have the counts by state, then we'll need to summarise by looking at the more detailed contexts
-	for _, c := range contexts.Nodes {
+	// If we don't have the counts by state, then we'll need to summarise by looking at the more detailed contexts.
+	// Deduplicate first so that stale cancelled runs do not inflate the failure count when a newer run succeeded.
+	for _, c := range deduplicateCheckContexts(contexts.Nodes) {
 		// Nodes are a discriminated union of CheckRun or StatusContext and we can match on
 		// the TypeName to narrow the type.
 		if c.TypeName == "CheckRun" {
@@ -402,6 +404,50 @@ func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
 	}
 
 	return summary
+}
+
+// deduplicateCheckContexts returns a deduplicated copy of contexts, keeping
+// only the most recent run per unique check. This prevents stale cancelled
+// runs from being counted alongside a newer successful run for the same check,
+// matching the behaviour of pkg/cmd/pr/checks/aggregate.go's eliminateDuplicates.
+//
+// Deduplication keys:
+//   - StatusContext: the Context field (check name in the CI context)
+//   - CheckRun: composite of Name + workflow name + event
+//
+// Contexts that have no identifying fields are always included without
+// deduplication.
+func deduplicateCheckContexts(contexts []CheckContext) []CheckContext {
+	sorted := make([]CheckContext, len(contexts))
+	copy(sorted, contexts)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].StartedAt.After(sorted[j].StartedAt)
+	})
+
+	seenChecks := make(map[string]struct{})
+	seenContexts := make(map[string]struct{})
+	unique := make([]CheckContext, 0, len(sorted))
+
+	for _, ctx := range sorted {
+		if ctx.Context != "" {
+			// StatusContext: deduplicate by context name.
+			if _, exists := seenContexts[ctx.Context]; exists {
+				continue
+			}
+			seenContexts[ctx.Context] = struct{}{}
+		} else if ctx.Name != "" {
+			// CheckRun: deduplicate by name + workflow + event.
+			key := fmt.Sprintf("%s/%s/%s", ctx.Name, ctx.CheckSuite.WorkflowRun.Workflow.Name, ctx.CheckSuite.WorkflowRun.Event)
+			if _, exists := seenChecks[key]; exists {
+				continue
+			}
+			seenChecks[key] = struct{}{}
+		}
+		// No identifying fields: include unconditionally.
+		unique = append(unique, ctx)
+	}
+
+	return unique
 }
 
 type checkStatus int
