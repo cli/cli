@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -26,6 +27,14 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/text/transform"
 )
+
+// ansiEscapeRe matches ANSI/VT100 terminal escape sequences so they can be
+// stripped from log output before display. This covers the most common cases:
+//   - CSI sequences (e.g. color codes): ESC [ ... final-byte
+//   - OSC sequences (e.g. title changes): ESC ] ... BEL or ST
+//   - Screen window title sequences: ESC k ... ST
+//   - Two-character Fe escape sequences: ESC followed by a final byte
+var ansiEscapeRe = regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[^\x1b].*?\x1b\\|[@-Z\\-_])`)
 
 type RunLogCache struct {
 	cacheDir string
@@ -581,10 +590,17 @@ func displayLogSegments(w io.Writer, segments []logSegment) error {
 }
 
 func copyLogWithLinePrefix(w io.Writer, r io.Reader, prefix string) error {
-	sanitized := transform.NewReader(r, &asciisanitizer.Sanitizer{})
-	scanner := bufio.NewScanner(sanitized)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
+		// Strip ANSI escape sequences before sanitizing. Without this step, the
+		// sanitizer converts the ESC byte to the visible string "^[", leaving
+		// the rest of the escape sequence (e.g. "[32m") as readable garbage.
+		stripped := ansiEscapeRe.ReplaceAllLiteral(scanner.Bytes(), nil)
+		sanitized, err := io.ReadAll(transform.NewReader(bytes.NewReader(stripped), &asciisanitizer.Sanitizer{}))
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(w, "%s%s\n", prefix, sanitized)
 	}
 	return nil
 }

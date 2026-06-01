@@ -2761,28 +2761,34 @@ var expectedLegacyRunLogOutputWithNoSteps = fmt.Sprintf("%s%s", legacyCoolJobRun
 
 func TestCopyLogWithLinePrefix_TerminalEscapeSequences(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
+		name     string
+		input    string
+		wantText string // expected text content after stripping (without prefix)
 	}{
 		{
-			name:  "OSC title set sequence",
-			input: "normal prefix\x1b]0;HIJACKED TITLE\x07trailing text\n",
+			name:     "OSC title set sequence",
+			input:    "normal prefix\x1b]0;HIJACKED TITLE\x07trailing text\n",
+			wantText: "normal prefix trailing text",
 		},
 		{
-			name:  "CSI color sequence",
-			input: "\x1b[31mRED TEXT\x1b[0m normal text\n",
+			name:     "CSI color sequence",
+			input:    "\x1b[31mRED TEXT\x1b[0m normal text\n",
+			wantText: "RED TEXT normal text",
 		},
 		{
-			name:  "screen title set sequence used in original report",
-			input: "\x1bk;echo this is an arbitrary command;\x1b\\\n",
+			name:     "screen title set sequence used in original report",
+			input:    "\x1bk;echo this is an arbitrary command;\x1b\\\n",
+			wantText: "",
 		},
 		{
-			name:  "CSI window title query",
-			input: "before\x1b[21tafter\n",
+			name:     "CSI window title query",
+			input:    "before\x1b[21tafter\n",
+			wantText: "beforeafter",
 		},
 		{
-			name:  "multiple escape sequences",
-			input: "\x1b]0;title\x07\x1b[31mred\x1b[0m\x1b[21t\n",
+			name:     "multiple escape sequences",
+			input:    "\x1b]0;title\x07\x1b[31mred\x1b[0m\x1b[21t\n",
+			wantText: "red",
 		},
 	}
 
@@ -2795,6 +2801,10 @@ func TestCopyLogWithLinePrefix_TerminalEscapeSequences(t *testing.T) {
 			output := buf.String()
 			assert.NotContains(t, output, "\x1b",
 				"output should not contain raw ESC (0x1b) bytes, got: %q", output)
+			assert.NotContains(t, output, "^[",
+				"output should not contain sanitizer-escaped ESC sequences (^[), got: %q", output)
+			assert.Equal(t, "jobname\tstep\t"+tt.wantText+"\n", output,
+				"output should contain only the plain text content")
 		})
 	}
 }
