@@ -831,6 +831,39 @@ func Test_createRun(t *testing.T) {
 			errMsg:  "some-dir is not a git repository. Run `git -C \"some-dir\" init` to initialize it",
 		},
 		{
+			name: "noninteractive create from source with gitfile",
+			opts: &CreateOptions{
+				Interactive: false,
+				Source:      ".",
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -C . rev-parse --git-dir`, 0, "/Users/user/main-repo/.git/worktrees/wt")
+				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
+				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
+			},
+			wantStdout: "https://github.com/OWNER/REPO\n",
+		},
+		{
 			name: "noninteractive clone from scratch",
 			opts: &CreateOptions{
 				Interactive: false,

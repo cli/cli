@@ -794,10 +794,12 @@ func localRepoType(gitClient *git.Client) (repoType, error) {
 	switch projectDir {
 	case ".":
 		return bare, nil
-	case ".git":
-		return working, nil
 	default:
-		return unknown, nil
+		// Any other successful output from git rev-parse --git-dir means
+		// the directory is a valid git repository. This covers normal repos
+		// (.git), gitfile-based repos (e.g. submodules), and worktrees where
+		// the command returns an absolute path to the actual git directory.
+		return working, nil
 	}
 }
 
