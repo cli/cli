@@ -660,6 +660,55 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	`), output.Stderr())
 }
 
+// Regression for #12980: --delete-branch on a PR that is already merged must
+// still issue the remote DELETE rather than silently skipping it while
+// printing "Deleted remote branch".
+func TestPrMerge_deleteBranch_alreadyMerged(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"",
+		&api.PullRequest{
+			ID:               "PR_10",
+			Number:           10,
+			State:            "MERGED",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			BaseRefName:      "main",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	// No PullRequestMerge mutation is expected because the PR is already merged.
+	// The DELETE call must still fire; that is the bug fix.
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
+	cs.Register(`git checkout main`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
+
+	output, err := runCommand(http, nil, "blueberries", true, `pr merge --delete-branch`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		! Pull request OWNER/REPO#10 was already merged
+		✓ Deleted local branch blueberries and switched to branch main
+		✓ Deleted remote branch blueberries
+	`), output.Stderr())
+}
+
 func TestPrMerge_deleteBranch_apiError(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -1195,6 +1244,10 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 		baseRepo("OWNER", "REPO", "main"),
 	)
 
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.StringResponse(`{}`))
+
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
@@ -1263,17 +1316,22 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 			ID:                  "THE-ID",
 			Number:              4,
 			State:               "MERGED",
+			HeadRefName:         "blueberries",
 			HeadRepositoryOwner: api.Owner{Login: "OWNER"},
 			MergeStateStatus:    "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "main"),
 	)
 
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.StringResponse(`{}`))
+
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
-	cs.Register(`git branch -D `, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
 
 	pm := &prompter.PrompterMock{
 		ConfirmFunc: func(p string, d bool) (bool, error) {
@@ -1285,13 +1343,13 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 		},
 	}
 
-	output, err := runCommand(http, pm, "blueberries", true, "pr merge 4 --merge")
+	output, err := runCommand(http, pm, "main", true, "pr merge 4 --merge")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Deleted local branch \n✓ Deleted remote branch \n", output.Stderr())
+	assert.Equal(t, "✓ Deleted local branch blueberries\n✓ Deleted remote branch blueberries\n", output.Stderr())
 }
 
 func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {

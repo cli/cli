@@ -457,25 +457,24 @@ func (m *mergeContext) deleteRemoteBranch() error {
 		return nil
 	}
 
-	if !m.merged {
-		apiClient := api.NewClientFromHTTP(m.httpClient)
-		err := api.BranchDeleteRemote(apiClient, m.baseRepo, m.pr.HeadRefName)
-		if err != nil {
-			// Normally, the API returns 422, with the message "Reference does not exist"
-			// when the branch has already been deleted. It also returns 404 with the same
-			// message, but that rarely happens. In both cases, we should not return an
-			// error because the goal is already achieved.
+	// Issue the delete unconditionally; the 422/404 handling below absorbs the case where the branch is already gone (e.g. repo's "auto-delete head branches" setting handled it).
+	apiClient := api.NewClientFromHTTP(m.httpClient)
+	err := api.BranchDeleteRemote(apiClient, m.baseRepo, m.pr.HeadRefName)
+	if err != nil {
+		// Normally, the API returns 422, with the message "Reference does not exist"
+		// when the branch has already been deleted. It also returns 404 with the same
+		// message, but that rarely happens. In both cases, we should not return an
+		// error because the goal is already achieved.
 
-			var isAlreadyDeletedError bool
-			if httpErr := (api.HTTPError{}); errors.As(err, &httpErr) {
-				// TODO: since the API returns 422 for a couple of other reasons, for more accuracy
-				// we might want to check the error message against "Reference does not exist".
-				isAlreadyDeletedError = httpErr.StatusCode == http.StatusUnprocessableEntity || httpErr.StatusCode == http.StatusNotFound
-			}
+		var isAlreadyDeletedError bool
+		if httpErr := (api.HTTPError{}); errors.As(err, &httpErr) {
+			// TODO: since the API returns 422 for a couple of other reasons, for more accuracy
+			// we might want to check the error message against "Reference does not exist".
+			isAlreadyDeletedError = httpErr.StatusCode == http.StatusUnprocessableEntity || httpErr.StatusCode == http.StatusNotFound
+		}
 
-			if !isAlreadyDeletedError {
-				return fmt.Errorf("failed to delete remote branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
-			}
+		if !isAlreadyDeletedError {
+			return fmt.Errorf("failed to delete remote branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
 		}
 	}
 
