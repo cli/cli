@@ -457,7 +457,6 @@ func (m *mergeContext) deleteRemoteBranch() error {
 		return nil
 	}
 
-	// Issue the delete unconditionally; the 422/404 handling below absorbs the case where the branch is already gone (e.g. repo's "auto-delete head branches" setting handled it).
 	apiClient := api.NewClientFromHTTP(m.httpClient)
 	err := api.BranchDeleteRemote(apiClient, m.baseRepo, m.pr.HeadRefName)
 	if err != nil {

@@ -660,9 +660,6 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	`), output.Stderr())
 }
 
-// Regression for #12980: --delete-branch on a PR that is already merged must
-// still issue the remote DELETE rather than silently skipping it while
-// printing "Deleted remote branch".
 func TestPrMerge_deleteBranch_alreadyMerged(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
@@ -681,8 +678,6 @@ func TestPrMerge_deleteBranch_alreadyMerged(t *testing.T) {
 		baseRepo("OWNER", "REPO", "main"),
 	)
 
-	// No PullRequestMerge mutation is expected because the PR is already merged.
-	// The DELETE call must still fire; that is the bug fix.
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))
