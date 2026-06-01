@@ -32,11 +32,20 @@ type mergePayload struct {
 	pullRequestID   string
 	method          PullRequestMergeMethod
 	auto            bool
+	mergeQueue      bool
 	commitSubject   string
 	commitBody      string
 	setCommitBody   bool
 	expectedHeadOid string
 	authorEmail     string
+}
+
+// enqueuePullRequestInput holds the fields required by the enqueuePullRequest
+// GraphQL mutation. It is defined here because the shurcooL/githubv4 package
+// does not yet expose this type.
+type enqueuePullRequestInput struct {
+	PullRequestID   githubv4.ID           `json:"pullRequestId"`
+	ExpectedHeadOid *githubv4.GitObjectID `json:"expectedHeadOid,omitempty"`
 }
 
 // TODO: drop after githubv4 gets updated
@@ -84,6 +93,32 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 	}
 
 	gql := api.NewClientFromHTTP(client)
+
+	// When adding to a merge queue, use enqueuePullRequest directly. This is
+	// necessary for repositories where auto-merge is disabled
+	// (autoMergeAllowed=false) but a merge queue is still configured: the
+	// enablePullRequestAutoMerge mutation requires auto-merge to be allowed,
+	// while enqueuePullRequest works regardless of that setting.
+	if payload.mergeQueue {
+		queueInput := enqueuePullRequestInput{
+			PullRequestID: githubv4.ID(payload.pullRequestID),
+		}
+		if payload.expectedHeadOid != "" {
+			oid := githubv4.GitObjectID(payload.expectedHeadOid)
+			queueInput.ExpectedHeadOid = &oid
+		}
+		var queueMutation struct {
+			EnqueuePullRequest struct {
+				MergeQueueEntry struct {
+					ID string
+				}
+			} `graphql:"enqueuePullRequest(input: $input)"`
+		}
+		queueVars := map[string]interface{}{
+			"input": queueInput,
+		}
+		return gql.Mutate(payload.repo.RepoHost(), "PullRequestEnqueue", &queueMutation, queueVars)
+	}
 
 	if payload.auto {
 		var mutation struct {

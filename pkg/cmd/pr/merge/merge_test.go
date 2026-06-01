@@ -1823,10 +1823,11 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 		baseRepo("OWNER", "REPO", "main"),
 	)
 	http.Register(
-		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
+		httpmock.GraphQL(`mutation PullRequestEnqueue\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
-			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			// enqueuePullRequest does not take a mergeMethod; the queue decides
+			assert.NotContains(t, input, "mergeMethod")
 		}),
 	)
 
@@ -1862,10 +1863,9 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 	)
 
 	http.Register(
-		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
+		httpmock.GraphQL(`mutation PullRequestEnqueue\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
-			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}),
 	)
 
@@ -1902,10 +1902,54 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 	)
 
 	http.Register(
-		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
+		httpmock.GraphQL(`mutation PullRequestEnqueue\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
-			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+		}),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge 1")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Pull request OWNER/REPO#1 will be added to the merge queue for main when ready\n", output.Stderr())
+}
+
+// TestPrAddToMergeQueueAutoMergeDisabled reproduces the scenario from
+// https://github.com/cli/cli/issues/13398: the repository has a merge queue
+// configured but auto-merge is disabled (allow_auto_merge=false). Previously
+// the CLI called enablePullRequestAutoMerge which requires auto-merge to be
+// allowed, causing an API error. It should call enqueuePullRequest instead.
+func TestPrAddToMergeQueueAutoMergeDisabled(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.StubFinderForRunCommandStyleTests(t,
+		"1",
+		&api.PullRequest{
+			ID:                  "THE-ID",
+			Number:              1,
+			State:               "OPEN",
+			Title:               "The title of the PR",
+			MergeStateStatus:    "CLEAN",
+			IsInMergeQueue:      false,
+			IsMergeQueueEnabled: true,
+			BaseRefName:         "main",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	// enqueuePullRequest must be used regardless of the allow_auto_merge setting
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestEnqueue\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 		}),
 	)
 

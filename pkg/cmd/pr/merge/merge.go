@@ -300,8 +300,11 @@ func (m *mergeContext) merge() error {
 			// only warn for now
 			_ = m.warnf("%s The merge strategy for %s is set by the merge queue\n", m.cs.Yellow("!"), m.pr.BaseRefName)
 		}
-		// auto merge will either enable auto merge or add to the merge queue
-		payload.auto = true
+		// Use enqueuePullRequest directly so that repositories with merge
+		// queues but auto-merge disabled (allow_auto_merge=false) are
+		// handled correctly. enablePullRequestAutoMerge requires auto-merge
+		// to be allowed and would fail in that configuration.
+		payload.mergeQueue = true
 	} else {
 		// get user input if not already given
 		if m.opts.MergeStrategyEmpty {
