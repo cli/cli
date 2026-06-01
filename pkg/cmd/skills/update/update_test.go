@@ -1164,7 +1164,6 @@ func TestUpdateRun(t *testing.T) {
 			wantStdout: "pinned-skill",
 		},
 		{
-			// Regression for #13542.
 			name: "updates skill installed from a hidden directory",
 			setup: func(t *testing.T, dir string) {
 				t.Helper()

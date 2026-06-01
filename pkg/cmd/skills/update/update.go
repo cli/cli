@@ -282,7 +282,6 @@ func updateRun(opts *UpdateOptions) error {
 			}
 			repoRefs[key] = resolved
 
-			// Include hidden-dir skills so installs made via --allow-hidden-dirs remain updatable.
 			skills, discoverErr := discovery.DiscoverSkillsWithOptions(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA, discovery.DiscoverOptions{})
 			if discoverErr != nil {
 				if !isRecoverableDiscoveryErr(discoverErr) {
@@ -620,7 +619,6 @@ func promptForSkillOrigin(p prompter.Prompter, skillName string) (owner, repo, r
 	return r.RepoOwner(), r.RepoName(), "", true, nil
 }
 
-// isRecoverableDiscoveryErr reports whether bulk discovery can be retried per-skill via DiscoverSkillByPath.
 func isRecoverableDiscoveryErr(err error) bool {
 	var treeTooLarge *discovery.TreeTooLargeError
 	if errors.As(err, &treeTooLarge) {
