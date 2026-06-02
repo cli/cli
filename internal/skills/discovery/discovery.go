@@ -396,6 +396,10 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 		return nil
 	}
 
+	if entry.Path == "SKILL.md" {
+		return &skillMatch{entry: entry, skillDir: ".", convention: "root"}
+	}
+
 	dir := path.Dir(entry.Path)
 	parentDir := path.Dir(dir)
 	skillName := path.Base(dir)
@@ -542,6 +546,9 @@ func DiscoverSkillsWithOptions(client *api.Client, host, owner, repo, commitSHA 
 	}
 
 	treeSHAs := make(map[string]string)
+	if tree.SHA != "" {
+		treeSHAs["."] = tree.SHA
+	}
 	for _, entry := range tree.Tree {
 		if entry.Type == "tree" {
 			treeSHAs[entry.Path] = entry.SHA
@@ -581,13 +588,24 @@ func DiscoverSkillsWithOptions(client *api.Client, host, owner, repo, commitSHA 
 
 	var skills []Skill
 	for _, m := range matches {
+		name := m.name
+		description := ""
+		if name == "" {
+			var ok bool
+			name, description, ok = rootSkillNameAndDescription(client, host, owner, repo, m.entry)
+			if !ok {
+				continue
+			}
+		}
+
 		skills = append(skills, Skill{
-			Name:       m.name,
-			Namespace:  m.namespace,
-			Path:       m.skillDir,
-			BlobSHA:    m.entry.SHA,
-			TreeSHA:    treeSHAs[m.skillDir],
-			Convention: m.convention,
+			Name:        name,
+			Namespace:   m.namespace,
+			Description: description,
+			Path:        m.skillDir,
+			BlobSHA:     m.entry.SHA,
+			TreeSHA:     treeSHAs[m.skillDir],
+			Convention:  m.convention,
 		})
 	}
 
@@ -596,6 +614,25 @@ func DiscoverSkillsWithOptions(client *api.Client, host, owner, repo, commitSHA 
 	})
 
 	return skills, nil
+}
+
+func rootSkillNameAndDescription(client *api.Client, host, owner, repo string, entry treeEntry) (string, string, bool) {
+	name := repo
+	description := ""
+	if entry.SHA != "" {
+		content, err := FetchBlob(client, host, owner, repo, entry.SHA)
+		if err == nil {
+			result, err := frontmatter.Parse(content)
+			if err == nil {
+				if result.Metadata.Name != "" {
+					name = result.Metadata.Name
+				}
+				description = result.Metadata.Description
+			}
+		}
+	}
+
+	return name, description, validateName(name)
 }
 
 // fetchDescription fetches and parses the frontmatter description for a skill.
@@ -657,8 +694,12 @@ func FetchDescriptionsConcurrent(client *api.Client, host, owner, repo string, s
 
 // DiscoverSkillByPath looks up a single skill by its exact path in the repository.
 func DiscoverSkillByPath(client *api.Client, host, owner, repo, commitSHA, skillPath string) (*Skill, error) {
-	skillPath = strings.TrimSuffix(skillPath, "/SKILL.md")
 	skillPath = strings.TrimSuffix(skillPath, "/")
+	if skillPath == "." || skillPath == "SKILL.md" {
+		return discoverRootSkillByPath(client, host, owner, repo, commitSHA)
+	}
+
+	skillPath = strings.TrimSuffix(skillPath, "/SKILL.md")
 
 	skillName := path.Base(skillPath)
 	if !validateName(skillName) {
@@ -742,9 +783,47 @@ func DiscoverSkillByPath(client *api.Client, host, owner, repo, commitSHA, skill
 	return skill, nil
 }
 
+func discoverRootSkillByPath(client *api.Client, host, owner, repo, commitSHA string) (*Skill, error) {
+	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(commitSHA))
+	var tree treeResponse
+	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
+		return nil, fmt.Errorf("could not fetch repository tree: %w", err)
+	}
+
+	var skillEntry treeEntry
+	for _, entry := range tree.Tree {
+		if entry.Path == "SKILL.md" && entry.Type == "blob" {
+			skillEntry = entry
+			break
+		}
+	}
+	if skillEntry.SHA == "" {
+		return nil, fmt.Errorf("no SKILL.md found at repository root in %s/%s", owner, repo)
+	}
+
+	name, description, ok := rootSkillNameAndDescription(client, host, owner, repo, skillEntry)
+	if !ok {
+		return nil, fmt.Errorf("invalid skill name %q in SKILL.md", name)
+	}
+
+	return &Skill{
+		Name:        name,
+		Description: description,
+		Path:        ".",
+		BlobSHA:     skillEntry.SHA,
+		TreeSHA:     tree.SHA,
+		Convention:  "root",
+	}, nil
+}
+
 // DiscoverSkillFiles returns all file paths belonging to a skill directory
 // by fetching the skill's subtree directly using its tree SHA.
 func DiscoverSkillFiles(client *api.Client, host, owner, repo, treeSHA, skillPath string) ([]SkillFile, error) {
+	prefix := skillPath
+	if prefix == "." {
+		prefix = ""
+	}
+
 	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s?recursive=true", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(treeSHA))
 	var tree treeResponse
 	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
@@ -753,14 +832,18 @@ func DiscoverSkillFiles(client *api.Client, host, owner, repo, treeSHA, skillPat
 
 	if tree.Truncated {
 		// Recursive fetch was truncated. Fall back to walking subtrees individually.
-		return walkTree(client, host, owner, repo, treeSHA, skillPath, 0)
+		return walkTree(client, host, owner, repo, treeSHA, prefix, 0)
 	}
 
 	var files []SkillFile
 	for _, entry := range tree.Tree {
 		if entry.Type == "blob" {
+			filePath := entry.Path
+			if prefix != "" {
+				filePath = prefix + "/" + entry.Path
+			}
 			files = append(files, SkillFile{
-				Path: skillPath + "/" + entry.Path,
+				Path: filePath,
 				SHA:  entry.SHA,
 				Size: entry.Size,
 			})

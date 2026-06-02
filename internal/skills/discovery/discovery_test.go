@@ -91,6 +91,11 @@ func TestMatchSkillConventions(t *testing.T) {
 			wantConvention: "root",
 		},
 		{
+			name:           "root-level SKILL.md single-skill repo",
+			path:           "SKILL.md",
+			wantConvention: "root",
+		},
+		{
 			name:    "root convention excludes skills dir",
 			path:    "skills/SKILL.md",
 			wantNil: true,
@@ -862,6 +867,27 @@ func TestDiscoverSkills(t *testing.T) {
 			wantSkills: []string{"code-review", "issue-triage"},
 		},
 		{
+			name: "discovers root-level SKILL.md from frontmatter",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/abc123"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "root-tree-sha", "truncated": false,
+						"tree": []map[string]interface{}{
+							{"path": "SKILL.md", "type": "blob", "sha": "root-blob-sha"},
+							{"path": "README.md", "type": "blob", "sha": "readme"},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/root-blob-sha"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "root-blob-sha", "encoding": "base64",
+						"content": "LS0tCm5hbWU6IGh1bWFuaXplcgpkZXNjcmlwdGlvbjogSHVtYW5pemVzIHRleHQKLS0tCiMgSHVtYW5pemVyCg==",
+					}))
+			},
+			wantSkills: []string{"humanizer"},
+		},
+		{
 			name: "truncated tree returns error",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -1156,6 +1182,28 @@ func TestDiscoverSkillByPath(t *testing.T) {
 					}))
 			},
 			wantName: "code-review",
+		},
+		{
+			name:      "discovers root-level SKILL.md by explicit path",
+			skillPath: "SKILL.md",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/abc123"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "root-tree-sha", "truncated": false,
+						"tree": []map[string]interface{}{
+							{"path": "SKILL.md", "type": "blob", "sha": "root-blob-sha"},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/root-blob-sha"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "root-blob-sha", "encoding": "base64",
+						"content": "LS0tCm5hbWU6IHJvb3Qtc2tpbGwKZGVzY3JpcHRpb246IFJvb3QgbGV2ZWwgc2tpbGwKLS0tCiMgUm9vdAo=",
+					}))
+			},
+			wantName:       "root-skill",
+			wantConvention: "root",
 		},
 		{
 			name:      "invalid skill name",
@@ -1492,12 +1540,14 @@ func TestMatchSkillPath(t *testing.T) {
 func TestDiscoverSkillFiles(t *testing.T) {
 	tests := []struct {
 		name      string
+		skillPath string
 		stubs     func(*httpmock.Registry)
 		wantPaths []string
 		wantErr   string
 	}{
 		{
-			name: "returns files with skill path prefix",
+			name:      "returns files with skill path prefix",
+			skillPath: "skills/code-review",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree123"),
@@ -1513,7 +1563,8 @@ func TestDiscoverSkillFiles(t *testing.T) {
 			wantPaths: []string{"skills/code-review/SKILL.md", "skills/code-review/scripts/setup.sh"},
 		},
 		{
-			name: "truncated tree falls back to walkTree",
+			name:      "truncated tree falls back to walkTree",
+			skillPath: "skills/code-review",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree123"),
@@ -1532,7 +1583,24 @@ func TestDiscoverSkillFiles(t *testing.T) {
 			wantPaths: []string{"skills/code-review/SKILL.md"},
 		},
 		{
-			name: "API error",
+			name:      "root skill paths are not prefixed",
+			skillPath: ".",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree123"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "tree123", "truncated": false,
+						"tree": []map[string]interface{}{
+							{"path": "SKILL.md", "type": "blob", "sha": "sha1", "size": 10},
+							{"path": "README.md", "type": "blob", "sha": "sha2", "size": 20},
+						},
+					}))
+			},
+			wantPaths: []string{"SKILL.md", "README.md"},
+		},
+		{
+			name:      "API error",
+			skillPath: "skills/code-review",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree123"),
@@ -1548,7 +1616,7 @@ func TestDiscoverSkillFiles(t *testing.T) {
 			tt.stubs(reg)
 			client := api.NewClientFromHTTP(&http.Client{Transport: reg})
 
-			files, err := DiscoverSkillFiles(client, "github.com", "monalisa", "octocat-skills", "tree123", "skills/code-review")
+			files, err := DiscoverSkillFiles(client, "github.com", "monalisa", "octocat-skills", "tree123", tt.skillPath)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)

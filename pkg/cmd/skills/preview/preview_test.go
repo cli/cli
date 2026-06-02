@@ -109,6 +109,50 @@ func TestNewCmdPreview(t *testing.T) {
 	}
 }
 
+func TestSelectSkillMatchesPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		skills   []discovery.Skill
+		wantName string
+		wantPath string
+	}{
+		{
+			name:  "root SKILL.md path",
+			input: "SKILL.md",
+			skills: []discovery.Skill{
+				{Name: "humanizer", Path: ".", Convention: "root"},
+			},
+			wantName: "humanizer",
+			wantPath: ".",
+		},
+		{
+			name:  "regular SKILL.md path",
+			input: "skills/code-review/SKILL.md",
+			skills: []discovery.Skill{
+				{Name: "code-review", Path: "skills/code-review"},
+			},
+			wantName: "code-review",
+			wantPath: "skills/code-review",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := &PreviewOptions{
+				repo:      ghrepo.New("owner", "repo"),
+				SkillName: tt.input,
+			}
+
+			skill, err := selectSkill(opts, tt.skills)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantName, skill.Name)
+			assert.Equal(t, tt.wantPath, skill.Path)
+		})
+	}
+}
+
 func TestPreviewRun(t *testing.T) {
 	skillContent := heredoc.Doc(`
 		---

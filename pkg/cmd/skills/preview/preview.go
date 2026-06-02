@@ -443,6 +443,11 @@ func selectSkill(opts *PreviewOptions, skills []discovery.Skill) (discovery.Skil
 				return s, nil
 			}
 		}
+		for _, s := range skills {
+			if skillPathMatches(s, opts.SkillName) {
+				return s, nil
+			}
+		}
 		return discovery.Skill{}, fmt.Errorf("skill %q not found in %s", opts.SkillName, ghrepo.FullName(opts.repo))
 	}
 
@@ -461,6 +466,17 @@ func selectSkill(opts *PreviewOptions, skills []discovery.Skill) (discovery.Skil
 	}
 
 	return skills[idx], nil
+}
+
+func skillPathMatches(skill discovery.Skill, input string) bool {
+	input = strings.TrimSuffix(input, "/")
+	if input == "SKILL.md" {
+		input = "."
+	} else {
+		input = strings.TrimSuffix(input, "/SKILL.md")
+	}
+
+	return input == skill.Path
 }
 
 // treeNode represents a file or directory in the tree for rendering.

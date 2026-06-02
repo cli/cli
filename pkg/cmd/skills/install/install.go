@@ -1239,9 +1239,13 @@ func filterHiddenDirSkills(opts *InstallOptions, allSkills []discovery.Skill) ([
 // installs from the re-publisher.
 // Returns (repo to redirect to, whether upstream was detected, error).
 func checkUpstreamProvenance(opts *InstallOptions, client *api.Client, hostname string, skill discovery.Skill, commitSHA string) (ghrepo.Interface, bool, error) {
+	skillFilePath := skill.Path + "/SKILL.md"
+	if skill.Path == "." {
+		skillFilePath = "SKILL.md"
+	}
 	apiPath := fmt.Sprintf("repos/%s/%s/contents/%s?ref=%s",
 		opts.repo.RepoOwner(), opts.repo.RepoName(),
-		skill.Path+"/SKILL.md", commitSHA)
+		skillFilePath, commitSHA)
 	var fileResp struct {
 		Content  string `json:"content"`
 		Encoding string `json:"encoding"`
