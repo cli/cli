@@ -394,16 +394,22 @@ func extractZip(path, destDir string) error {
 		}
 	}
 
-	if err := ghzip.ExtractZip(&zipReader.Reader, absPath); err != nil {
+	if err := ghzip.ExtractZipWithLimit(&zipReader.Reader, absPath, maxCopilotExtractedBytes); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+// maxCopilotExtractedBytes bounds the cumulative uncompressed size of the
+// Copilot CLI archive to guard against decompression bombs. It is far larger
+// than the CLI itself while preventing a malicious release from exhausting disk.
+const maxCopilotExtractedBytes int64 = 2 << 30 // 2 GiB
+
 // extractTarGz reads a TAR.GZ archive from r and extracts its contents into destDir.
 // It returns an error if the archive cannot be read,
-// or if any file or directory within the archive cannot be created or written.
+// or if any file or directory within the archive cannot be created or written,
+// or if the cumulative uncompressed size exceeds maxCopilotExtractedBytes.
 func extractTarGz(r io.Reader, destDir string) error {
 	gzr, err := gzip.NewReader(r)
 	if err != nil {
@@ -416,6 +422,7 @@ func extractTarGz(r io.Reader, destDir string) error {
 		return err
 	}
 
+	var totalWritten int64
 	tr := tar.NewReader(gzr)
 	for {
 		header, err := tr.Next()
@@ -436,29 +443,52 @@ func extractTarGz(r io.Reader, destDir string) error {
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return fmt.Errorf("failed to create parent directory: %w", err)
 			}
-			if err := extractFile(target, os.FileMode(header.Mode)&0777, tr); err != nil {
+			written, err := extractFile(target, os.FileMode(header.Mode)&0777, header.Size, maxCopilotExtractedBytes-totalWritten, tr)
+			if err != nil {
 				return err
 			}
+			totalWritten += written
 		}
 	}
 	return nil
 }
 
-// extractFile creates a file at target with the given mode and copies content from r.
-func extractFile(target string, mode os.FileMode, r io.Reader) (err error) {
+// extractFile creates a file at target with the given mode and copies from r,
+// returning the number of bytes written. The copy is bounded both by the entry's
+// declared size (from the tar header) and by maxBytes (the remaining whole-archive
+// budget); exceeding either aborts extraction rather than writing unbounded data
+// to disk. Both bounds are decompression-bomb guards that count bytes actually
+// written rather than trusting the header.
+func extractFile(target string, mode os.FileMode, size, maxBytes int64, r io.Reader) (written int64, err error) {
 	out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
+		return 0, fmt.Errorf("failed to create file: %w", err)
 	}
 	defer func() {
 		if cerr := out.Close(); err == nil && cerr != nil {
 			err = fmt.Errorf("failed to close file: %w", cerr)
 		}
 	}()
-	if _, err := io.Copy(out, r); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
+
+	limit := size
+	if maxBytes < limit {
+		limit = maxBytes
 	}
-	return nil
+	if limit < 0 {
+		limit = 0
+	}
+
+	written, err = io.Copy(out, io.LimitReader(r, limit+1))
+	if err != nil {
+		return written, fmt.Errorf("failed to write file: %w", err)
+	}
+	if written > size {
+		return written, fmt.Errorf("file %q exceeds its declared size of %d bytes", target, size)
+	}
+	if written > maxBytes {
+		return written, fmt.Errorf("file %q would exceed the maximum allowed uncompressed archive size", target)
+	}
+	return written, nil
 }
 
 func removeCopilot(installDir string) error {

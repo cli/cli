@@ -269,6 +269,41 @@ func TestExtractTarGz(t *testing.T) {
 	})
 }
 
+func TestExtractFile(t *testing.T) {
+	t.Run("writes content within the declared size and budget", func(t *testing.T) {
+		content := []byte("hello world")
+		target := filepath.Join(t.TempDir(), "out")
+
+		n, err := extractFile(target, 0644, int64(len(content)), 1<<20, bytes.NewReader(content))
+		require.NoError(t, err)
+		require.Equal(t, int64(len(content)), n)
+
+		got, err := os.ReadFile(target)
+		require.NoError(t, err)
+		require.Equal(t, content, got)
+	})
+
+	t.Run("rejects a stream larger than the declared size (decompression bomb guard)", func(t *testing.T) {
+		// The reader yields more bytes than the declared size, simulating a
+		// decompressed stream that overruns what its archive header advertises.
+		target := filepath.Join(t.TempDir(), "out")
+
+		_, err := extractFile(target, 0644, 4, 1<<20, bytes.NewReader([]byte("way too much data")))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "exceeds its declared size")
+	})
+
+	t.Run("rejects content exceeding the remaining archive budget", func(t *testing.T) {
+		// The declared per-file size is generous, but only a few bytes of the
+		// whole-archive budget remain, so extraction must abort.
+		target := filepath.Join(t.TempDir(), "out")
+
+		_, err := extractFile(target, 0644, 1<<20, 4, bytes.NewReader([]byte("too much for the budget")))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "maximum allowed uncompressed")
+	})
+}
+
 func TestExtractZip(t *testing.T) {
 	t.Run("extracts files correctly", func(t *testing.T) {
 		zipDir := t.TempDir()
