@@ -15,6 +15,7 @@ import (
 	gitIgnoreCmd "github.com/cli/cli/v2/pkg/cmd/repo/gitignore"
 	licenseCmd "github.com/cli/cli/v2/pkg/cmd/repo/license"
 	repoListCmd "github.com/cli/cli/v2/pkg/cmd/repo/list"
+	readFileCmd "github.com/cli/cli/v2/pkg/cmd/repo/read-file"
 	repoRenameCmd "github.com/cli/cli/v2/pkg/cmd/repo/rename"
 	repoDefaultCmd "github.com/cli/cli/v2/pkg/cmd/repo/setdefault"
 	repoSyncCmd "github.com/cli/cli/v2/pkg/cmd/repo/sync"
@@ -57,6 +58,7 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 		repoDefaultCmd.NewCmdSetDefault(f, nil),
 		repoSyncCmd.NewCmdSync(f, nil),
 		repoEditCmd.NewCmdEdit(f, nil),
+		readFileCmd.NewCmdReadFile(f, nil),
 		deployKeyCmd.NewCmdDeployKey(f),
 		licenseCmd.NewCmdLicense(f),
 		gitIgnoreCmd.NewCmdGitIgnore(f),
