@@ -219,6 +219,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				authentication token for API requests to GitHub Enterprise.
 
 				GH_HOST: make the request to a GitHub host other than %[1]sgithub.com%[1]s.
+
+				GH_READ_ONLY: set to a truthy value to block requests that would modify data on the
+				server. Read requests are allowed; REST writes and GraphQL mutations are rejected
+				before they are sent.
 			`, "`"),
 		},
 		Args: cobra.ExactArgs(1),

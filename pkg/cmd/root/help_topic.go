@@ -107,6 +107,11 @@ var HelpTopics = []helpTopic{
 
 			%[1]sGH_PROMPT_DISABLED%[1]s: set to any value to disable interactive prompting in the terminal.
 
+			%[1]sGH_READ_ONLY%[1]s: set to a truthy value to block any operation that would modify data on
+			the server. Requests that read data are allowed; REST writes and GraphQL mutations are
+			rejected before they are sent. This is useful when granting an automated agent broad
+			permission to inspect resources without the ability to change them.
+
 			%[1]sGH_PATH%[1]s: set the path to the gh executable, useful for when gh can not properly determine
 			its own path such as in the cygwin terminal.
 

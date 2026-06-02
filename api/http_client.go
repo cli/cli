@@ -1,9 +1,14 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -81,6 +86,12 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 			wrappedTransport:  client.Transport,
 			telemetryDisabler: opts.TelemetryDisabler,
 		}
+	}
+
+	// Consulted here, in the single client constructor, so callers that build
+	// their own options (e.g. `gh api`) can't bypass it.
+	if ghenv.ReadOnly() {
+		client.Transport = ReadOnlyMiddleware(client.Transport)
 	}
 
 	return client, nil
@@ -168,6 +179,160 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 		}
 		return rt.RoundTrip(req)
 	}}
+}
+
+var ErrReadOnly = errors.New("gh is in read-only mode (GH_READ_ONLY): this operation would modify data and was blocked")
+
+func ReadOnlyMiddleware(rt http.RoundTripper) http.RoundTripper {
+	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		if err := checkReadOnly(req); err != nil {
+			return nil, err
+		}
+		return rt.RoundTrip(req)
+	}}
+}
+
+func checkReadOnly(req *http.Request) error {
+	// HTTP methods are case-sensitive per the spec but GitHub treats them
+	// case-insensitively, and `gh api -X get` reaches here as "get", so
+	// normalize before comparing to avoid blocking a lowercase read.
+	switch strings.ToUpper(req.Method) {
+	case http.MethodGet, http.MethodHead:
+		return nil
+	}
+
+	if isGraphQLEndpoint(req.URL.Path) {
+		isMutation, err := requestIsGraphQLMutation(req)
+		if err != nil {
+			// Fail closed: if we cannot determine the operation type, block it.
+			return ErrReadOnly
+		}
+		if !isMutation {
+			return nil
+		}
+	}
+
+	return ErrReadOnly
+}
+
+// "/graphql" on github.com, "/api/graphql" on GHES
+func isGraphQLEndpoint(path string) bool {
+	return path == "/graphql" || path == "/api/graphql"
+}
+
+// Reads and restores req.Body, so the request stays sendable afterward.
+func requestIsGraphQLMutation(req *http.Request) (bool, error) {
+	if req.Body == nil {
+		return false, nil
+	}
+
+	defer req.Body.Close()
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return false, err
+	}
+
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	req.ContentLength = int64(len(body))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(body)), nil
+	}
+
+	var payload struct {
+		Query string `json:"query"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return false, err
+	}
+
+	return containsTopLevelMutation(payload.Query), nil
+}
+
+// containsTopLevelMutation detects a mutation *operation* — not merely the word
+// "mutation", which may also be a field or operation name.
+func containsTopLevelMutation(query string) bool {
+	depth := 0
+	// expectKeyword is true at the start of the document and after a top-level
+	// definition closes, i.e. exactly where an operation/fragment keyword would
+	// appear next.
+	expectKeyword := true
+
+	for i := 0; i < len(query); {
+		c := query[i]
+
+		switch {
+		case c == '#':
+			// Comment runs to end of line.
+			for i < len(query) && query[i] != '\n' {
+				i++
+			}
+		case c == '"':
+			i = skipGraphQLString(query, i)
+		case c == '{':
+			depth++
+			expectKeyword = false
+			i++
+		case c == '}':
+			if depth > 0 {
+				depth--
+			}
+			if depth == 0 {
+				expectKeyword = true
+			}
+			i++
+		case isNameByte(c):
+			start := i
+			for i < len(query) && isNameByte(query[i]) {
+				i++
+			}
+			if depth == 0 && expectKeyword {
+				if query[start:i] == "mutation" {
+					return true
+				}
+				// The definition keyword has been seen; do not treat later
+				// top-level identifiers (e.g. the operation name) as keywords.
+				expectKeyword = false
+			}
+		default:
+			i++
+		}
+	}
+
+	return false
+}
+
+// skipGraphQLString returns the index just past the string literal at query[i].
+func skipGraphQLString(query string, i int) int {
+	if strings.HasPrefix(query[i:], `"""`) {
+		i += 3
+		for i < len(query) {
+			if strings.HasPrefix(query[i:], `"""`) {
+				return i + 3
+			}
+			i++
+		}
+		return i
+	}
+
+	i++ // opening quote
+	for i < len(query) {
+		switch query[i] {
+		case '\\':
+			i += 2
+		case '"':
+			return i + 1
+		default:
+			i++
+		}
+	}
+	return i
+}
+
+func isNameByte(c byte) bool {
+	return c == '_' ||
+		(c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9')
 }
 
 // ExtractHeader extracts a named header from any response received by this client and,
