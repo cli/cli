@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -593,7 +594,7 @@ func Test_writeToOutput(t *testing.T) {
 				}
 				return nil, fs.ErrNotExist
 			},
-			wantDest:  "out/README.md",
+			wantDest:  filepath.Join("out", "README.md"),
 			wantWrite: "hi",
 			wantDir:   "out",
 		},
