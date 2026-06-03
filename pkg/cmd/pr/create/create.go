@@ -478,8 +478,10 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("error checking for existing pull request: %w", err)
 	}
 	if err == nil {
-		return fmt.Errorf("a pull request for branch %q into branch %q already exists:\n%s",
-			ctx.PRRefs.QualifiedHeadRef(), ctx.PRRefs.BaseRef(), existingPR.URL)
+		return &cmdutil.PRAlreadyExistsError{
+			Message: fmt.Sprintf("a pull request for branch %q into branch %q already exists:\n%s",
+				ctx.PRRefs.QualifiedHeadRef(), ctx.PRRefs.BaseRef(), existingPR.URL),
+		}
 	}
 
 	message := "\nCreating pull request for %s into %s in %s\n\n"

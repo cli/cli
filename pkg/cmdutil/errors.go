@@ -40,6 +40,16 @@ var CancelError = errors.New("CancelError")
 // PendingError signals nothing failed but something is pending
 var PendingError = errors.New("PendingError")
 
+// PRAlreadyExistsError signals that a pull request already exists.
+// This uses exit code 32 so scripts can distinguish it from other errors.
+type PRAlreadyExistsError struct {
+	Message string
+}
+
+func (e *PRAlreadyExistsError) Error() string {
+	return e.Message
+}
+
 func IsUserCancellation(err error) bool {
 	return errors.Is(err, CancelError) || errors.Is(err, terminal.InterruptErr)
 }

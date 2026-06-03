@@ -47,6 +47,7 @@ const (
 	exitCancel  exitCode = 2
 	exitAuth    exitCode = 4
 	exitPending exitCode = 8
+	exitPRExists exitCode = 32
 )
 
 func Main() exitCode {
@@ -196,8 +197,12 @@ func Main() exitCode {
 		var noResultsError cmdutil.NoResultsError
 		var extError *root.ExternalCommandExitError
 		var authError *root.AuthError
+		var prExistsError *cmdutil.PRAlreadyExistsError
 		if err == cmdutil.SilentError {
 			return exitError
+		} else if errors.As(err, &prExistsError) {
+			fmt.Fprintln(stderr, prExistsError.Error())
+			return exitPRExists
 		} else if err == cmdutil.PendingError {
 			return exitPending
 		} else if cmdutil.IsUserCancellation(err) {
