@@ -308,7 +308,7 @@ func Test_readFileRun(t *testing.T) {
 				)
 			},
 			opts:       ReadFileOptions{Path: "src"},
-			wantErrMsg: `path "src" is a directory`,
+			wantErrMsg: "path \"src\" is a directory; use `gh repo read-dir` instead",
 		},
 		{
 			name: "broken symlink path errors",

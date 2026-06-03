@@ -134,7 +134,7 @@ func fetchFile(httpClient *http.Client, repo ghrepo.Interface, filePath, ref str
 		// crafted path cannot smuggle terminal escape sequences into our output.
 		switch content.Type {
 		case "dir":
-			return nil, fmt.Errorf("path %q is a directory", content.Path)
+			return nil, fmt.Errorf("path %q is a directory; use `gh repo read-dir` instead", content.Path)
 		case "symlink":
 			return nil, fmt.Errorf("path %q is a symlink to %q which does not exist", content.Path, content.Target)
 		case "submodule":
