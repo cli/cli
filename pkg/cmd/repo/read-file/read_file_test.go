@@ -774,31 +774,3 @@ func Test_containsEscapeSequence(t *testing.T) {
 	assert.False(t, containsEscapeSequence([]byte("plain text")))
 	assert.True(t, containsEscapeSequence([]byte("danger\x1b[31m")))
 }
-
-func Test_humanSize(t *testing.T) {
-	tests := []struct {
-		n    int
-		want string
-	}{
-		{0, "0 B"},
-		{1, "1 B"},
-		{512, "512 B"},
-		{1023, "1023 B"},
-		{1024, "1.0 KB"},
-		{1536, "1.5 KB"},
-		{2048, "2.0 KB"},
-		{10240, "10.0 KB"},
-		{524288, "512.0 KB"},
-		{1048576, "1.0 MB"},
-		{1572864, "1.5 MB"},
-		{5242880, "5.0 MB"},
-		{1073741824, "1.0 GB"},
-		{1610612736, "1.5 GB"},
-		{1099511627776, "1.0 TB"},
-		{1125899906842624, "1.0 PB"},
-	}
-
-	for _, tt := range tests {
-		assert.Equal(t, tt.want, humanSize(tt.n))
-	}
-}

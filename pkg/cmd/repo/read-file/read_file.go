@@ -13,6 +13,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -175,7 +176,7 @@ func readFileRun(opts *ReadFileOptions) error {
 	if mime, ok := binaryContentType(file.Content); ok {
 		if opts.IO.IsStdoutTTY() {
 			return fmt.Errorf("binary file (%s, %s); use --output to save to a file or pipe stdout",
-				mime, humanSize(file.Size))
+				mime, text.FormatSize(file.Size))
 		}
 		_, err = opts.IO.Out.Write(file.Content)
 		return err
@@ -309,23 +310,4 @@ func binaryContentType(content []byte) (string, bool) {
 // which could be used to manipulate the terminal when printed.
 func containsEscapeSequence(content []byte) bool {
 	return bytes.IndexByte(content, 0x1B) >= 0
-}
-
-// humanSize formats a byte count using binary units (KB, MB, GB) for display,
-// with one decimal place of precision for everything above a kilobyte.
-func humanSize(n int) string {
-	const unit = 1024
-	if n < unit {
-		return fmt.Sprintf("%d B", n)
-	}
-
-	div, exp := int64(unit), 0
-	for v := int64(n) / unit; v >= unit; v /= unit {
-		div *= unit
-		exp++
-	}
-
-	units := []string{"KB", "MB", "GB", "TB", "PB"}
-	value := float64(n) / float64(div)
-	return fmt.Sprintf("%.1f %s", value, units[exp])
 }
