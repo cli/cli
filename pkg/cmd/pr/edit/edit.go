@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -243,10 +244,30 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	return cmd
 }
 
+// isSimpleEdit returns true if only title, body, and/or base are being edited.
+// Simple edits can use the REST API which only requires 'repo' scope, avoiding
+// the additional scopes (read:org, read:discussion) that GraphQL queries require
+// when resolving user/team information.
+func isSimpleEdit(e shared.Editable) bool {
+	return !e.Reviewers.Edited &&
+		!e.Assignees.Edited &&
+		!e.Labels.Edited &&
+		!e.Projects.Edited &&
+		!e.Milestone.Edited &&
+		(e.Title.Edited || e.Body.Edited || e.Base.Edited)
+}
+
 func editRun(opts *EditOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
+	}
+
+	// Fast path: for simple edits (only title/body/base), use REST API directly.
+	// This avoids GraphQL queries that require additional OAuth scopes (read:org)
+	// which aren't necessary for editing your own PR's basic fields.
+	if !opts.Interactive && isSimpleEdit(opts.Editable) {
+		return editRunSimple(opts, httpClient)
 	}
 
 	if opts.Detector == nil {
@@ -363,6 +384,64 @@ func editRun(opts *EditOptions) error {
 	fmt.Fprintln(opts.IO.Out, pr.URL)
 
 	return nil
+}
+
+// editRunSimple handles simple edits (title/body/base only) using REST API.
+// This path requires only 'repo' scope, avoiding the additional scopes that
+// GraphQL queries need when resolving user information.
+func editRunSimple(opts *EditOptions, httpClient *http.Client) error {
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	// Parse PR number from selector
+	prNumber, err := parsePRNumber(opts.SelectorArg, baseRepo)
+	if err != nil {
+		return err
+	}
+
+	// Build update params from editable fields
+	params := api.PullRequestUpdateParams{}
+	if opts.Editable.Title.Edited {
+		params.Title = &opts.Editable.Title.Value
+	}
+	if opts.Editable.Body.Edited {
+		params.Body = &opts.Editable.Body.Value
+	}
+	if opts.Editable.Base.Edited {
+		params.Base = &opts.Editable.Base.Value
+	}
+
+	opts.IO.StartProgressIndicator()
+	apiClient := api.NewClientFromHTTP(httpClient)
+	err = api.PullRequestUpdateREST(apiClient, baseRepo, prNumber, params)
+	opts.IO.StopProgressIndicator()
+	if err != nil {
+		return err
+	}
+
+	// Print the PR URL
+	fmt.Fprintf(opts.IO.Out, "https://%s/%s/%s/pull/%d\n",
+		baseRepo.RepoHost(), baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
+
+	return nil
+}
+
+// parsePRNumber extracts the PR number from the selector argument.
+func parsePRNumber(selector string, repo ghrepo.Interface) (int, error) {
+	// If it's a URL, parse it
+	if _, prNumber, _, err := shared.ParseURL(selector); err == nil {
+		return prNumber, nil
+	}
+
+	// Try to parse as a number (with optional # prefix)
+	selector = strings.TrimPrefix(selector, "#")
+	prNumber, err := strconv.Atoi(selector)
+	if err != nil {
+		return 0, fmt.Errorf("could not parse PR number from %q", selector)
+	}
+	return prNumber, nil
 }
 
 // reviewerSearchFunc is intended to be an arg for MultiSelectWithSearch

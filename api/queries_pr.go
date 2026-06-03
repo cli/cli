@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -888,4 +890,27 @@ func ComparePullRequestBaseBranchWith(client *Client, repo ghrepo.Interface, prN
 		return nil, err
 	}
 	return &result.Repository.PullRequest.BaseRef.Compare, nil
+}
+
+// PullRequestUpdateParams contains the parameters for updating a pull request via REST API.
+// Only non-nil fields will be included in the update request.
+type PullRequestUpdateParams struct {
+	Title *string `json:"title,omitempty"`
+	Body  *string `json:"body,omitempty"`
+	Base  *string `json:"base,omitempty"`
+}
+
+// PullRequestUpdateREST updates a pull request using the REST API.
+// This requires only the 'repo' scope, unlike GraphQL mutations which may require
+// additional scopes like 'read:org' when resolving user/team information.
+func PullRequestUpdateREST(client *Client, repo ghrepo.Interface, number int, params PullRequestUpdateParams) error {
+	path := fmt.Sprintf("repos/%s/%s/pulls/%d", repo.RepoOwner(), repo.RepoName(), number)
+
+	body := &bytes.Buffer{}
+	enc := json.NewEncoder(body)
+	if err := enc.Encode(params); err != nil {
+		return err
+	}
+
+	return client.REST(repo.RepoHost(), "PATCH", path, body, nil)
 }

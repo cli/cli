@@ -1464,3 +1464,130 @@ func TestProjectsV1Deprecation(t *testing.T) {
 		reg.Verify(t)
 	})
 }
+
+func TestIsSimpleEdit(t *testing.T) {
+	tests := []struct {
+		name     string
+		editable shared.Editable
+		want     bool
+	}{
+		{
+			name: "only title edited",
+			editable: shared.Editable{
+				Title: shared.EditableString{Edited: true},
+			},
+			want: true,
+		},
+		{
+			name: "only body edited",
+			editable: shared.Editable{
+				Body: shared.EditableString{Edited: true},
+			},
+			want: true,
+		},
+		{
+			name: "title and body edited",
+			editable: shared.Editable{
+				Title: shared.EditableString{Edited: true},
+				Body:  shared.EditableString{Edited: true},
+			},
+			want: true,
+		},
+		{
+			name: "only base edited",
+			editable: shared.Editable{
+				Base: shared.EditableString{Edited: true},
+			},
+			want: true,
+		},
+		{
+			name: "reviewers edited",
+			editable: shared.Editable{
+				Title:     shared.EditableString{Edited: true},
+				Reviewers: shared.EditableSlice{Edited: true},
+			},
+			want: false,
+		},
+		{
+			name: "assignees edited",
+			editable: shared.Editable{
+				Body:      shared.EditableString{Edited: true},
+				Assignees: shared.EditableSlice{Edited: true},
+			},
+			want: false,
+		},
+		{
+			name: "labels edited",
+			editable: shared.Editable{
+				Title:  shared.EditableString{Edited: true},
+				Labels: shared.EditableSlice{Edited: true},
+			},
+			want: false,
+		},
+		{
+			name: "projects edited",
+			editable: shared.Editable{
+				Body:     shared.EditableString{Edited: true},
+				Projects: shared.EditableProjects{Edited: true},
+			},
+			want: false,
+		},
+		{
+			name: "milestone edited",
+			editable: shared.Editable{
+				Title:     shared.EditableString{Edited: true},
+				Milestone: shared.EditableString{Edited: true},
+			},
+			want: false,
+		},
+		{
+			name:     "nothing edited",
+			editable: shared.Editable{},
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isSimpleEdit(tt.editable)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestEditRunSimple_UsesRESTAPI(t *testing.T) {
+	ios, _, stdout, _ := iostreams.Test()
+
+	reg := &httpmock.Registry{}
+	// Expect a REST PATCH call, NOT a GraphQL query
+	reg.Register(
+		httpmock.REST("PATCH", "repos/cli/cli/pulls/123"),
+		httpmock.StringResponse(`{}`),
+	)
+
+	opts := &EditOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("cli", "cli"), nil
+		},
+		SelectorArg: "123",
+		Editable: shared.Editable{
+			Body: shared.EditableString{
+				Value:  "new body content",
+				Edited: true,
+			},
+		},
+	}
+
+	err := editRun(opts)
+	require.NoError(t, err)
+
+	// Verify REST was called, not GraphQL
+	reg.Verify(t)
+
+	// Check output contains the PR URL
+	assert.Contains(t, stdout.String(), "cli/cli/pull/123")
+}
