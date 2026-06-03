@@ -185,13 +185,21 @@ func Test_readDirRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepoReadDir\b`),
-					treeResponse(
-						entry(".github", 0o040000, 0, nil),
-						entry("README.md", 0o100644, 2048, nil),
-						entry("build.sh", 0o100755, 512, nil),
-						entry("latest", 0o120000, 18, nil),
-						entry("vendor", 0o160000, 0, nil),
-					),
+					httpmock.StringResponse(compactJSON(`
+						{
+							"data":{"repository":{"object":{
+								"__typename":"Tree",
+								"oid":"tree-sha",
+								"id":"tree-id",
+								"entries":[
+									{"name":".github","path":".github","nameRaw":".github","pathRaw":".github","type":"tree","mode":16384,"oid":"oid-github","size":0,"submodule":null},
+									{"name":"README.md","path":"README.md","nameRaw":"README.md","pathRaw":"README.md","type":"blob","mode":33188,"oid":"oid-readme","size":2048,"submodule":null},
+									{"name":"build.sh","path":"build.sh","nameRaw":"build.sh","pathRaw":"build.sh","type":"blob","mode":33261,"oid":"oid-build","size":512,"submodule":null},
+									{"name":"latest","path":"latest","nameRaw":"latest","pathRaw":"latest","type":"blob","mode":40960,"oid":"oid-latest","size":18,"submodule":null},
+									{"name":"vendor","path":"vendor","nameRaw":"vendor","pathRaw":"vendor","type":"commit","mode":57344,"oid":"oid-vendor","size":0,"submodule":null}
+								]
+							}}}
+						}`)),
 				)
 			},
 			wantOut: heredoc.Doc(`
@@ -211,7 +219,17 @@ func Test_readDirRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepoReadDir\b`),
-					treeResponse(entry("only.txt", 0o100644, 3, nil)),
+					httpmock.StringResponse(compactJSON(`
+						{
+							"data":{"repository":{"object":{
+								"__typename":"Tree",
+								"oid":"tree-sha",
+								"id":"tree-id",
+								"entries":[
+									{"name":"only.txt","path":"only.txt","nameRaw":"only.txt","pathRaw":"only.txt","type":"blob","mode":33188,"oid":"oid-only","size":3,"submodule":null}
+								]
+							}}}
+						}`)),
 				)
 			},
 			wantOut: heredoc.Doc(`
@@ -231,7 +249,17 @@ func Test_readDirRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query RepoReadDir\b`),
 					httpmock.GraphQLQuery(
-						buildTreeData(entry("baz.txt", 0o100644, 10, nil)),
+						compactJSON(`
+							{
+								"data":{"repository":{"object":{
+									"__typename":"Tree",
+									"oid":"tree-sha",
+									"id":"tree-id",
+									"entries":[
+										{"name":"baz.txt","path":"baz.txt","nameRaw":"baz.txt","pathRaw":"baz.txt","type":"blob","mode":33188,"oid":"oid-baz","size":10,"submodule":null}
+									]
+								}}}
+							}`),
 						func(_ string, vars map[string]interface{}) {
 							assert.Equal(t, "HEAD:foo/bar", vars["expression"])
 						},
@@ -255,7 +283,17 @@ func Test_readDirRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query RepoReadDir\b`),
 					httpmock.GraphQLQuery(
-						buildTreeData(entry("guide.md", 0o100644, 1, nil)),
+						compactJSON(`
+							{
+								"data":{"repository":{"object":{
+									"__typename":"Tree",
+									"oid":"tree-sha",
+									"id":"tree-id",
+									"entries":[
+										{"name":"guide.md","path":"guide.md","nameRaw":"guide.md","pathRaw":"guide.md","type":"blob","mode":33188,"oid":"oid-guide","size":1,"submodule":null}
+									]
+								}}}
+							}`),
 						func(_ string, vars map[string]interface{}) {
 							assert.Equal(t, "v1.2.3:docs", vars["expression"])
 						},
@@ -269,11 +307,19 @@ func Test_readDirRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepoReadDir\b`),
-					treeResponse(
-						entry(".github", 0o040000, 0, nil),
-						entry("build.sh", 0o100755, 512, nil),
-						entry("latest", 0o120000, 18, nil),
-					),
+					httpmock.StringResponse(compactJSON(`
+						{
+							"data":{"repository":{"object":{
+								"__typename":"Tree",
+								"oid":"tree-sha",
+								"id":"tree-id",
+								"entries":[
+									{"name":".github","path":".github","nameRaw":".github","pathRaw":".github","type":"tree","mode":16384,"oid":"oid-github","size":0,"submodule":null},
+									{"name":"build.sh","path":"build.sh","nameRaw":"build.sh","pathRaw":"build.sh","type":"blob","mode":33261,"oid":"oid-build","size":512,"submodule":null},
+									{"name":"latest","path":"latest","nameRaw":"latest","pathRaw":"latest","type":"blob","mode":40960,"oid":"oid-latest","size":18,"submodule":null}
+								]
+							}}}
+						}`)),
 				)
 			},
 			wantOut: "dir\t.github\t040000\t0\n" +
@@ -285,36 +331,58 @@ func Test_readDirRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepoReadDir\b`),
-					treeResponse(
-						entry("a.txt", 0o100644, 5, nil),
-						entry("docs", 0o040000, 0, nil),
-					),
+					httpmock.StringResponse(compactJSON(`
+						{
+							"data":{"repository":{"object":{
+								"__typename":"Tree",
+								"oid":"tree-sha",
+								"id":"tree-id",
+								"entries":[
+									{"name":"a.txt","path":"a.txt","nameRaw":"a.txt","pathRaw":"a.txt","type":"blob","mode":33188,"oid":"oid-a","size":5,"submodule":null},
+									{"name":"docs","path":"docs","nameRaw":"docs","pathRaw":"docs","type":"tree","mode":16384,"oid":"oid-docs","size":0,"submodule":null}
+								]
+							}}}
+						}`)),
 				)
 			},
 			jsonFields: []string{"name", "type", "size", "gitType", "mode", "modeOctal"},
-			wantOut: `{"entries":[` +
-				`{"gitType":"blob","mode":33188,"modeOctal":"100644","name":"a.txt","size":5,"type":"file"},` +
-				`{"gitType":"tree","mode":16384,"modeOctal":"040000","name":"docs","size":0,"type":"dir"}` +
-				`],"gitSHA":"tree-sha","id":"tree-id"}` + "\n",
+			wantOut: compactJSON(`
+				{
+					"entries":[
+						{"gitType":"blob","mode":33188,"modeOctal":"100644","name":"a.txt","size":5,"type":"file"},
+						{"gitType":"tree","mode":16384,"modeOctal":"040000","name":"docs","size":0,"type":"dir"}
+					],
+					"gitSHA":"tree-sha",
+					"id":"tree-id"
+				}`) + "\n",
 		},
 		{
 			name: "json includes submodule details",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepoReadDir\b`),
-					treeResponse(
-						entry("vendor", 0o160000, 0, &submodulePayload{
-							GitURL:              "https://github.com/OWNER/sub",
-							Branch:              "main",
-							SubprojectCommitOid: "abc123",
-						}),
-					),
+					httpmock.StringResponse(compactJSON(`
+						{
+							"data":{"repository":{"object":{
+								"__typename":"Tree",
+								"oid":"tree-sha",
+								"id":"tree-id",
+								"entries":[
+									{"name":"vendor","path":"vendor","nameRaw":"vendor","pathRaw":"vendor","type":"commit","mode":57344,"oid":"oid-vendor","size":0,"submodule":{"gitUrl":"https://github.com/OWNER/sub","branch":"main","subprojectCommitOid":"abc123"}}
+								]
+							}}}
+						}`)),
 				)
 			},
 			jsonFields: []string{"name", "type", "submodule"},
-			wantOut: `{"entries":[` +
-				`{"name":"vendor","submodule":{"branch":"main","gitUrl":"https://github.com/OWNER/sub","subprojectCommitOid":"abc123"},"type":"submodule"}` +
-				`],"gitSHA":"tree-sha","id":"tree-id"}` + "\n",
+			wantOut: compactJSON(`
+				{
+					"entries":[
+						{"name":"vendor","submodule":{"branch":"main","gitUrl":"https://github.com/OWNER/sub","subprojectCommitOid":"abc123"},"type":"submodule"}
+					],
+					"gitSHA":"tree-sha",
+					"id":"tree-id"
+				}`) + "\n",
 		},
 		{
 			name: "empty directory warns and exits zero (tty)",
@@ -325,7 +393,7 @@ func Test_readDirRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepoReadDir\b`),
-					treeResponse(),
+					httpmock.StringResponse(`{"data":{"repository":{"object":{"__typename":"Tree","oid":"tree-sha","id":"tree-id","entries":[]}}}}`),
 				)
 			},
 			wantStderr: "No entries found in OWNER/REPO/empty\n",
@@ -335,25 +403,37 @@ func Test_readDirRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepoReadDir\b`),
-					treeResponse(),
+					httpmock.StringResponse(`{"data":{"repository":{"object":{"__typename":"Tree","oid":"tree-sha","id":"tree-id","entries":[]}}}}`),
 				)
 			},
 			wantStderr: "No entries found in OWNER/REPO\n",
 		},
 		{
-			name: "path or ref not found",
+			name: "path not found",
 			opts: ReadDirOptions{
 				Path: "missing",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepoReadDir\b`),
-					// The API returns a null object for a missing path, a missing ref, or both, so we
-					// cannot tell which one is wrong and infer the message from whether a ref was given.
 					httpmock.StringResponse(`{"data":{"repository":{"object":null}}}`),
 				)
 			},
-			wantErrMsg: `could not find "missing" in OWNER/REPO (the path or ref may not exist)`,
+			wantErrMsg: `could not find "missing" in OWNER/REPO`,
+		},
+		{
+			name: "path or ref not found with ref",
+			opts: ReadDirOptions{
+				Path: "docs",
+				Ref:  "nope",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepoReadDir\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"object":null}}}`),
+				)
+			},
+			wantErrMsg: `could not find "docs" at "nope" in OWNER/REPO (the path or ref may not exist)`,
 		},
 		{
 			name: "repository not found surfaces the graphql error",
@@ -441,72 +521,8 @@ func Test_readDirRun(t *testing.T) {
 	}
 }
 
-type submodulePayload struct {
-	GitURL              string
-	Branch              string
-	SubprojectCommitOid string
-}
-
-// entry builds a single GraphQL TreeEntry payload for use in test responses.
-func entry(name string, mode, size int, sub *submodulePayload) map[string]interface{} {
-	e := map[string]interface{}{
-		"name":    name,
-		"path":    name,
-		"nameRaw": name,
-		"pathRaw": name,
-		"type":    gitTypeFromMode(mode),
-		"mode":    mode,
-		"oid":     "blob-" + name,
-		"size":    size,
-	}
-	if sub != nil {
-		e["submodule"] = map[string]interface{}{
-			"gitUrl":              sub.GitURL,
-			"branch":              sub.Branch,
-			"subprojectCommitOid": sub.SubprojectCommitOid,
-		}
-	} else {
-		e["submodule"] = nil
-	}
-	return e
-}
-
-func gitTypeFromMode(mode int) string {
-	switch mode {
-	case 0o040000:
-		return "tree"
-	case 0o160000:
-		return "commit"
-	default:
-		return "blob"
-	}
-}
-
-// buildTreeData marshals a successful GraphQL response body for the given entries.
-func buildTreeData(entries ...map[string]interface{}) string {
-	if entries == nil {
-		entries = []map[string]interface{}{}
-	}
-	body := map[string]interface{}{
-		"data": map[string]interface{}{
-			"repository": map[string]interface{}{
-				"object": map[string]interface{}{
-					"__typename": "Tree",
-					"oid":        "tree-sha",
-					"id":         "tree-id",
-					"entries":    entries,
-				},
-			},
-		},
-	}
-	out, err := json.Marshal(body)
-	if err != nil {
-		panic(err)
-	}
-	return string(out)
-}
-
-// treeResponse is an httpmock responder that returns a Tree with the given entries.
-func treeResponse(entries ...map[string]interface{}) httpmock.Responder {
-	return httpmock.StringResponse(buildTreeData(entries...))
+func compactJSON(s string) string {
+	var buf bytes.Buffer
+	json.Compact(&buf, []byte(s))
+	return buf.String()
 }
