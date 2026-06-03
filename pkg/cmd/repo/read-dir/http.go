@@ -174,12 +174,12 @@ func fetchTree(httpClient *http.Client, repo ghrepo.Interface, dirPath, ref stri
 
 	obj := query.Repository.Object
 	if obj == nil {
+		// The API returns a null object for both missing paths or refs, so we
+		// cannot tell which one is wrong and infer the message from whether a ref was given.
 		if ref != "" {
-			return nil, fmt.Errorf("could not find %q at %q in %s (the path or ref may not exist)",
-				dirPath, ref, ghrepo.FullName(repo))
+			return nil, fmt.Errorf("could not find %q at %q in %s (the path or ref may not exist)", dirPath, ref, ghrepo.FullName(repo))
 		}
-		return nil, fmt.Errorf("could not find %q in %s (the path or ref may not exist)",
-			dirPath, ghrepo.FullName(repo))
+		return nil, fmt.Errorf("could not find %q in %s", dirPath, ghrepo.FullName(repo))
 	}
 
 	if obj.TypeName != "Tree" {
