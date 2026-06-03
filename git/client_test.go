@@ -1783,6 +1783,40 @@ func TestClientPush(t *testing.T) {
 	}
 }
 
+func TestClientReadOnly(t *testing.T) {
+	t.Run("Push is blocked when GH_READ_ONLY is set", func(t *testing.T) {
+		t.Setenv("GH_READ_ONLY", "1")
+		client := Client{GitPath: "path/to/git"}
+		err := client.Push(context.Background(), "origin", "trunk")
+		require.ErrorContains(t, err, "read-only mode")
+	})
+
+	t.Run("raw push via AuthenticatedCommand is blocked", func(t *testing.T) {
+		t.Setenv("GH_READ_ONLY", "1")
+		client := Client{GitPath: "path/to/git"}
+		_, err := client.AuthenticatedCommand(context.Background(), AllMatchingCredentialsPattern, "push", "origin", "--mirror")
+		require.ErrorContains(t, err, "read-only mode")
+	})
+
+	t.Run("fetch is allowed when GH_READ_ONLY is set", func(t *testing.T) {
+		t.Setenv("GH_READ_ONLY", "1")
+		client := Client{GhPath: "path/to/gh", GitPath: "path/to/git"}
+		cmd, err := client.AuthenticatedCommand(context.Background(), AllMatchingCredentialsPattern, "fetch")
+		require.NoError(t, err)
+		require.NotNil(t, cmd)
+	})
+
+	t.Run("falsey GH_READ_ONLY does not block push", func(t *testing.T) {
+		t.Setenv("GH_READ_ONLY", "0")
+		cmdCtx := createMockedCommandContext(t, map[args]commandResult{
+			`path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential push --set-upstream origin trunk`: {ExitStatus: 0},
+		})
+		client := Client{GitPath: "path/to/git", commandContext: cmdCtx}
+		err := client.Push(context.Background(), "origin", "trunk")
+		require.NoError(t, err)
+	})
+}
+
 func TestClientClone(t *testing.T) {
 	tests := []struct {
 		name          string

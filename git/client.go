@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cli/cli/v2/internal/ghenv"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/safeexec"
 )
@@ -140,6 +141,9 @@ func CredentialPatternFromHost(host string) CredentialPattern {
 // AuthenticatedCommand is a wrapper around Command that included configuration to use gh
 // as the credential helper for git.
 func (c *Client) AuthenticatedCommand(ctx context.Context, credentialPattern CredentialPattern, args ...string) (*Command, error) {
+	if ghenv.ReadOnly() && len(args) > 0 && args[0] == "push" {
+		return nil, errors.New("gh is in read-only mode (GH_READ_ONLY): refusing to run 'git push'")
+	}
 	if c.GhPath == "" {
 		// Assumes that gh is in PATH.
 		c.GhPath = "gh"
