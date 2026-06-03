@@ -266,7 +266,8 @@ func editRun(opts *EditOptions) error {
 	// Fast path: for simple edits (only title/body/base), use REST API directly.
 	// This avoids GraphQL queries that require additional OAuth scopes (read:org)
 	// which aren't necessary for editing your own PR's basic fields.
-	if !opts.Interactive && isSimpleEdit(opts.Editable) {
+	// Only use this path when a PR number is explicitly provided (not current branch mode).
+	if !opts.Interactive && isSimpleEdit(opts.Editable) && opts.SelectorArg != "" {
 		return editRunSimple(opts, httpClient)
 	}
 
@@ -390,13 +391,8 @@ func editRun(opts *EditOptions) error {
 // This path requires only 'repo' scope, avoiding the additional scopes that
 // GraphQL queries need when resolving user information.
 func editRunSimple(opts *EditOptions, httpClient *http.Client) error {
-	baseRepo, err := opts.BaseRepo()
-	if err != nil {
-		return err
-	}
-
-	// Parse PR number from selector
-	prNumber, err := parsePRNumber(opts.SelectorArg, baseRepo)
+	// Parse PR number and repo from selector
+	repo, prNumber, err := parsePRSelector(opts.SelectorArg, opts.BaseRepo)
 	if err != nil {
 		return err
 	}
@@ -415,7 +411,7 @@ func editRunSimple(opts *EditOptions, httpClient *http.Client) error {
 
 	opts.IO.StartProgressIndicator()
 	apiClient := api.NewClientFromHTTP(httpClient)
-	err = api.PullRequestUpdateREST(apiClient, baseRepo, prNumber, params)
+	err = api.PullRequestUpdateREST(apiClient, repo, prNumber, params)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -423,25 +419,32 @@ func editRunSimple(opts *EditOptions, httpClient *http.Client) error {
 
 	// Print the PR URL
 	fmt.Fprintf(opts.IO.Out, "https://%s/%s/%s/pull/%d\n",
-		baseRepo.RepoHost(), baseRepo.RepoOwner(), baseRepo.RepoName(), prNumber)
+		repo.RepoHost(), repo.RepoOwner(), repo.RepoName(), prNumber)
 
 	return nil
 }
 
-// parsePRNumber extracts the PR number from the selector argument.
-func parsePRNumber(selector string, repo ghrepo.Interface) (int, error) {
-	// If it's a URL, parse it
-	if _, prNumber, _, err := shared.ParseURL(selector); err == nil {
-		return prNumber, nil
+// parsePRSelector extracts the repo and PR number from the selector argument.
+// The selector can be a PR number (with optional # prefix) or a full PR URL.
+func parsePRSelector(selector string, baseRepoFn func() (ghrepo.Interface, error)) (ghrepo.Interface, int, error) {
+	// If it's a URL, parse it to get both repo and number
+	if urlRepo, prNumber, _, err := shared.ParseURL(selector); err == nil {
+		return urlRepo, prNumber, nil
+	}
+
+	// Not a URL, so we need the base repo
+	baseRepo, err := baseRepoFn()
+	if err != nil {
+		return nil, 0, err
 	}
 
 	// Try to parse as a number (with optional # prefix)
 	selector = strings.TrimPrefix(selector, "#")
 	prNumber, err := strconv.Atoi(selector)
 	if err != nil {
-		return 0, fmt.Errorf("could not parse PR number from %q", selector)
+		return nil, 0, fmt.Errorf("could not parse PR number from %q", selector)
 	}
-	return prNumber, nil
+	return baseRepo, prNumber, nil
 }
 
 // reviewerSearchFunc is intended to be an arg for MultiSelectWithSearch
