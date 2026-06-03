@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -38,7 +37,6 @@ var fileFields = []string{
 type ReadFileOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	Config     func() (gh.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Exporter   cmdutil.Exporter
 
@@ -54,12 +52,11 @@ func NewCmdReadFile(f *cmdutil.Factory, runF func(*ReadFileOptions) error) *cobr
 	opts := &ReadFileOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "read-file <path>",
+		Use:   "read-file <path> [flags]",
 		Short: "Read a file from a repository (preview)",
 		Long: heredoc.Docf(`
 			Read the contents of a file in a GitHub repository without cloning it.
