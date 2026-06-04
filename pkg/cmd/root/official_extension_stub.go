@@ -39,6 +39,7 @@ func NewCmdOfficialExtensionStub(io *iostreams.IOStreams, p prompter.Prompter, e
 func officialExtensionStubRun(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension) error {
 	stderr := io.ErrOut
 
+	// In CI, skip the prompt so agents and CI runners don't block on Y/n.
 	if !ci.IsCI() {
 		if io.CanPrompt() {
 			prompt := heredoc.Docf(`
