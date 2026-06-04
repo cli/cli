@@ -449,7 +449,7 @@ func deferredUpdateIssueOptions(client *api.Client, baseRepo ghrepo.Interface, i
 			var err error
 			typeID, err = issueShared.ResolveIssueTypeName(client, baseRepo, opts.IssueType)
 			if err != nil {
-				return updateOpts, err
+				return api.DeferredUpdateIssueOptions{}, err
 			}
 		}
 		updateOpts.IssueTypeID = typeID
@@ -458,7 +458,7 @@ func deferredUpdateIssueOptions(client *api.Client, baseRepo ghrepo.Interface, i
 	if opts.Parent != "" {
 		parentID, err := issueShared.ResolveIssueRef(client, baseRepo, opts.Parent)
 		if err != nil {
-			return updateOpts, fmt.Errorf("resolving --parent reference %q: %w", opts.Parent, err)
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --parent reference %q: %w", opts.Parent, err)
 		}
 		updateOpts.ParentID = parentID
 	}
@@ -466,7 +466,7 @@ func deferredUpdateIssueOptions(client *api.Client, baseRepo ghrepo.Interface, i
 	for _, ref := range opts.BlockedBy {
 		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
 		if err != nil {
-			return updateOpts, fmt.Errorf("resolving --blocked-by reference %q: %w", ref, err)
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --blocked-by reference %q: %w", ref, err)
 		}
 		updateOpts.AddBlockedByIDs = append(updateOpts.AddBlockedByIDs, id)
 	}
@@ -474,7 +474,7 @@ func deferredUpdateIssueOptions(client *api.Client, baseRepo ghrepo.Interface, i
 	for _, ref := range opts.Blocking {
 		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
 		if err != nil {
-			return updateOpts, fmt.Errorf("resolving --blocking reference %q: %w", ref, err)
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --blocking reference %q: %w", ref, err)
 		}
 		updateOpts.AddBlockingIDs = append(updateOpts.AddBlockingIDs, id)
 	}
