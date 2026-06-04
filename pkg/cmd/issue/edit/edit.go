@@ -185,6 +185,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				opts.Editable.IssueType.Edited = true
 			}
 
+			// hasDeferredFlags covers edit flags that flow through the
+			// deferred update path rather than the prShared.Editable struct,
+			// so they would otherwise be invisible to Editable.Dirty() below.
+			// Note that --type (set) is intentionally absent: it lights up
+			// opts.Editable.IssueType.Edited above, which Editable.Dirty()
+			// already picks up. Only --remove-type needs to be listed here.
 			hasDeferredFlags := opts.RemoveIssueType ||
 				flags.Changed("parent") || opts.RemoveParent ||
 				len(opts.AddSubIssues) > 0 || len(opts.RemoveSubIssues) > 0 ||
