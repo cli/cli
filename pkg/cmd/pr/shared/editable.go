@@ -23,7 +23,6 @@ type Editable struct {
 	Milestone          EditableString
 	IssueType          EditableString
 	IssueTypeNameToID  map[string]string
-	Parent             EditableString
 	Metadata           api.RepoMetadataResult
 
 	// TODO ApiActorsSupported
@@ -39,7 +38,10 @@ type EditableString struct {
 	Default string
 	Options []string
 	Edited  bool
-	Allowed bool
+	// Selectable controls whether the interactive survey offers this
+	// field as one of the things the user can choose to edit. Flag-only
+	// fields leave it false.
+	Selectable bool
 }
 
 type EditableSlice struct {
@@ -49,7 +51,10 @@ type EditableSlice struct {
 	Default []string
 	Options []string
 	Edited  bool
-	Allowed bool
+	// Selectable controls whether the interactive survey offers this
+	// field as one of the things the user can choose to edit. Flag-only
+	// fields leave it false.
+	Selectable bool
 }
 
 // EditableAssignees is a special case of EditableSlice.
@@ -80,8 +85,7 @@ func (e Editable) Dirty() bool {
 		e.Labels.Edited ||
 		e.Projects.Edited ||
 		e.Milestone.Edited ||
-		e.IssueType.Edited ||
-		e.Parent.Edited
+		e.IssueType.Edited
 }
 
 func (e Editable) TitleValue() *string {
@@ -298,7 +302,6 @@ func (e *Editable) Clone() Editable {
 		Milestone:          e.Milestone.clone(),
 		IssueType:          e.IssueType.clone(),
 		IssueTypeNameToID:  e.IssueTypeNameToID,
-		Parent:             e.Parent.clone(),
 		ApiActorsSupported: e.ApiActorsSupported,
 		// Shallow copy since no mutation.
 		Metadata: e.Metadata,
@@ -307,10 +310,10 @@ func (e *Editable) Clone() Editable {
 
 func (es *EditableString) clone() EditableString {
 	return EditableString{
-		Value:   es.Value,
-		Default: es.Default,
-		Edited:  es.Edited,
-		Allowed: es.Allowed,
+		Value:      es.Value,
+		Default:    es.Default,
+		Edited:     es.Edited,
+		Selectable: es.Selectable,
 		// Shallow copies since no mutation.
 		Options: es.Options,
 	}
@@ -318,8 +321,8 @@ func (es *EditableString) clone() EditableString {
 
 func (es *EditableSlice) clone() EditableSlice {
 	cpy := EditableSlice{
-		Edited:  es.Edited,
-		Allowed: es.Allowed,
+		Edited:     es.Edited,
+		Selectable: es.Selectable,
 		// Shallow copies since no mutation.
 		Options: es.Options,
 		// Copy mutable string slices.
@@ -463,12 +466,6 @@ func EditFieldsSurvey(p EditPrompter, editable *Editable, editorCommand string) 
 			editable.IssueType.Value = editable.IssueType.Options[selected]
 		}
 	}
-	if editable.Parent.Edited {
-		editable.Parent.Value, err = p.Input("Parent (issue number or URL, leave empty to remove)", editable.Parent.Default)
-		if err != nil {
-			return err
-		}
-	}
 	confirm, err := p.Confirm("Submit?", true)
 	if err != nil {
 		return err
@@ -491,15 +488,12 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 	}
 
 	opts := []string{"Title", "Body"}
-	if editable.Reviewers.Allowed {
+	if editable.Reviewers.Selectable {
 		opts = append(opts, "Reviewers")
 	}
 	opts = append(opts, "Assignees", "Labels")
-	if editable.IssueType.Allowed {
+	if editable.IssueType.Selectable {
 		opts = append(opts, "Type")
-	}
-	if editable.Parent.Allowed {
-		opts = append(opts, "Parent")
 	}
 	opts = append(opts, "Projects", "Milestone")
 	results, err := multiSelectSurvey(p, "What would you like to edit?", []string{}, opts)
@@ -524,9 +518,6 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 	}
 	if contains(results, "Type") {
 		editable.IssueType.Edited = true
-	}
-	if contains(results, "Parent") {
-		editable.Parent.Edited = true
 	}
 	if contains(results, "Projects") {
 		editable.Projects.Edited = true

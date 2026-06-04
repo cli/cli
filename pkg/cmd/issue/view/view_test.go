@@ -781,6 +781,48 @@ func TestIssueView_tty_Issues2AllFields(t *testing.T) {
 	assert.Contains(t, out, "View this issue on GitHub: https://github.com/OWNER/REPO/issues/123")
 }
 
+func TestIssueView_nontty_Issues2AllFields(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(issueResponseAllIssues2Fields()),
+	)
+	mockEmptyV2ProjectItems(t, httpReg)
+
+	opts := ViewOptions{
+		IO: ios,
+		Now: func() time.Time {
+			t, _ := time.Parse(time.RFC822, "03 Nov 24 15:04 UTC")
+			return t
+		},
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: httpReg}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		IssueNumber: 123,
+	}
+
+	err := viewRun(&opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, "", stderr.String())
+
+	out := stdout.String()
+
+	assert.Contains(t, out, "issue-type:\tBug\n")
+	assert.Contains(t, out, "parent:\tOWNER/REPO#100\n")
+	assert.Contains(t, out, "sub-issues:\tOWNER/REPO#101, OWNER/REPO#102\n")
+	assert.Contains(t, out, "sub-issues-completed:\t1/2\n")
+	assert.Contains(t, out, "blocked-by:\tOWNER/REPO#200\n")
+	assert.Contains(t, out, "blocking:\tOWNER/REPO#300\n")
+}
+
 func TestIssueView_tty_Issues2NoFields(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(true)
@@ -831,6 +873,50 @@ func TestIssueView_tty_Issues2NoFields(t *testing.T) {
 	assert.NotContains(t, out, "Blocked by:")
 	assert.NotContains(t, out, "Blocking:")
 	assert.NotContains(t, out, "Sub-issues")
+}
+
+func TestIssueView_nontty_Issues2NoFields(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(issueResponseNoIssues2Fields()),
+	)
+	mockEmptyV2ProjectItems(t, httpReg)
+
+	opts := ViewOptions{
+		IO: ios,
+		Now: func() time.Time {
+			t, _ := time.Parse(time.RFC822, "03 Nov 24 15:04 UTC")
+			return t
+		},
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: httpReg}, nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		IssueNumber: 456,
+	}
+
+	err := viewRun(&opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, "", stderr.String())
+
+	out := stdout.String()
+
+	// Issues 2.0 keys appear with empty values to keep line counts stable
+	// for `head | grep` workflows.
+	assert.Contains(t, out, "issue-type:\t\n")
+	assert.Contains(t, out, "parent:\t\n")
+	assert.Contains(t, out, "sub-issues:\t\n")
+	assert.Contains(t, out, "sub-issues-completed:\t\n")
+	assert.Contains(t, out, "blocked-by:\t\n")
+	assert.Contains(t, out, "blocking:\t\n")
 }
 
 func TestIssueView_json_IssueType(t *testing.T) {

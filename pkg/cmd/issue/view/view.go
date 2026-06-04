@@ -213,6 +213,24 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 		milestoneTitle = issue.Milestone.Title
 	}
 	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
+	var issueTypeName string
+	if issue.IssueType != nil {
+		issueTypeName = issue.IssueType.Name
+	}
+	fmt.Fprintf(out, "issue-type:\t%s\n", issueTypeName)
+	var parentRef string
+	if issue.Parent != nil {
+		parentRef = formatLinkedIssueRef(issue.Parent)
+	}
+	fmt.Fprintf(out, "parent:\t%s\n", parentRef)
+	fmt.Fprintf(out, "sub-issues:\t%s\n", formatLinkedIssueRefs(issue.SubIssues.Nodes))
+	var subIssuesCompleted string
+	if issue.SubIssuesSummary.Total > 0 {
+		subIssuesCompleted = fmt.Sprintf("%d/%d", issue.SubIssuesSummary.Completed, issue.SubIssuesSummary.Total)
+	}
+	fmt.Fprintf(out, "sub-issues-completed:\t%s\n", subIssuesCompleted)
+	fmt.Fprintf(out, "blocked-by:\t%s\n", formatLinkedIssueRefs(issue.BlockedBy.Nodes))
+	fmt.Fprintf(out, "blocking:\t%s\n", formatLinkedIssueRefs(issue.Blocking.Nodes))
 	fmt.Fprintf(out, "number:\t%d\n", issue.Number)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
@@ -260,13 +278,13 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 	}
 	if issue.Parent != nil {
 		fmt.Fprint(out, cs.Bold("Parent: "))
-		fmt.Fprintln(out, formatLinkedIssueRef(baseRepo, issue.Parent)+" "+issue.Parent.Title)
+		fmt.Fprintln(out, formatLinkedIssueRef(issue.Parent)+" "+issue.Parent.Title)
 	}
-	if blockedBy := formatLinkedIssueList(baseRepo, issue.BlockedBy.Nodes); blockedBy != "" {
+	if blockedBy := formatLinkedIssueListWithTitle(issue.BlockedBy.Nodes); blockedBy != "" {
 		fmt.Fprint(out, cs.Bold("Blocked by: "))
 		fmt.Fprintln(out, blockedBy)
 	}
-	if blocking := formatLinkedIssueList(baseRepo, issue.Blocking.Nodes); blocking != "" {
+	if blocking := formatLinkedIssueListWithTitle(issue.Blocking.Nodes); blocking != "" {
 		fmt.Fprint(out, cs.Bold("Blocking: "))
 		fmt.Fprintln(out, blocking)
 	}
@@ -311,7 +329,7 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 			}
 			fmt.Fprintf(out, "%s %s %s\n",
 				stateColor(stateLabel),
-				formatLinkedIssueRef(baseRepo, &sub),
+				formatLinkedIssueRef(&sub),
 				sub.Title,
 			)
 		}
@@ -335,23 +353,32 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 }
 
 // formatLinkedIssueRef formats an issue reference as owner/repo#N.
-// Cross-repo references use the issue's own repository; same-repo
-// references use the base repo name for consistency.
-func formatLinkedIssueRef(baseRepo ghrepo.Interface, issue *api.LinkedIssue) string {
-	if issue.Repository.NameWithOwner != "" && issue.Repository.NameWithOwner != ghrepo.FullName(baseRepo) {
-		return fmt.Sprintf("%s#%d", issue.Repository.NameWithOwner, issue.Number)
-	}
-	return fmt.Sprintf("%s#%d", ghrepo.FullName(baseRepo), issue.Number)
+func formatLinkedIssueRef(issue *api.LinkedIssue) string {
+	return fmt.Sprintf("%s#%d", issue.Repository.NameWithOwner, issue.Number)
 }
 
-// formatLinkedIssueList formats a comma-separated list of linked issue references with titles.
-func formatLinkedIssueList(baseRepo ghrepo.Interface, issues []api.LinkedIssue) string {
+// formatLinkedIssueRefs formats a comma-separated list of linked issue
+// references without titles.
+func formatLinkedIssueRefs(issues []api.LinkedIssue) string {
+	return joinLinkedIssues(issues, false)
+}
+
+// formatLinkedIssueListWithTitle formats a comma-separated list of linked
+// issue references with each title appended after the reference.
+func formatLinkedIssueListWithTitle(issues []api.LinkedIssue) string {
+	return joinLinkedIssues(issues, true)
+}
+
+func joinLinkedIssues(issues []api.LinkedIssue, withTitle bool) string {
 	if len(issues) == 0 {
 		return ""
 	}
 	parts := make([]string, len(issues))
 	for i, issue := range issues {
-		parts[i] = formatLinkedIssueRef(baseRepo, &issue) + " " + issue.Title
+		parts[i] = formatLinkedIssueRef(&issue)
+		if withTitle {
+			parts[i] += " " + issue.Title
+		}
 	}
 	return strings.Join(parts, ", ")
 }

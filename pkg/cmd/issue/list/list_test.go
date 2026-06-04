@@ -561,7 +561,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "( type:Bug ) repo:OWNER/REPO state:open type:issue",
+							"query": "repo:OWNER/REPO state:open type:Bug type:issue",
 							"type":  "ISSUE_ADVANCED",
 						}, params)
 					}))

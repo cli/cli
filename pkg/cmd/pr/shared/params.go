@@ -241,18 +241,6 @@ func SearchQueryBuild(options FilterOptions, advancedIssueSearchSyntax bool) str
 		is = "merged"
 	}
 
-	searchTerms := options.Search
-	if options.IssueType != "" {
-		if searchTerms != "" {
-			searchTerms += " "
-		}
-		if strings.Contains(options.IssueType, " ") {
-			searchTerms += fmt.Sprintf(`type:"%s"`, options.IssueType)
-		} else {
-			searchTerms += "type:" + options.IssueType
-		}
-	}
-
 	query := search.Query{
 		Qualifiers: search.Qualifiers{
 			Assignee:  options.Assignee,
@@ -260,6 +248,7 @@ func SearchQueryBuild(options FilterOptions, advancedIssueSearchSyntax bool) str
 			Base:      options.BaseBranch,
 			Draft:     options.Draft,
 			Head:      options.HeadBranch,
+			IssueType: options.IssueType,
 			Label:     options.Labels,
 			Mentions:  options.Mention,
 			Milestone: options.Milestone,
@@ -268,7 +257,7 @@ func SearchQueryBuild(options FilterOptions, advancedIssueSearchSyntax bool) str
 			Is:        []string{is},
 			Type:      options.Entity,
 		},
-		ImmutableKeywords: searchTerms,
+		ImmutableKeywords: options.Search,
 	}
 
 	if !advancedIssueSearchSyntax {

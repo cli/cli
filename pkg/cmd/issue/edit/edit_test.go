@@ -2,7 +2,9 @@ package edit
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -296,17 +298,24 @@ func TestNewCmdEdit(t *testing.T) {
 			},
 		},
 		{
-			name:  "set-parent flag",
-			input: "23 --set-parent 100",
+			name:  "remove-type flag",
+			input: "23 --remove-type",
+			output: EditOptions{
+				IssueNumbers:    []int{23},
+				RemoveIssueType: true,
+			},
+		},
+		{
+			name:     "both type and remove-type flags",
+			input:    "23 --type Bug --remove-type",
+			wantsErr: true,
+		},
+		{
+			name:  "parent flag",
+			input: "23 --parent 100",
 			output: EditOptions{
 				IssueNumbers: []int{23},
-				SetParent:    "100",
-				Editable: prShared.Editable{
-					Parent: prShared.EditableString{
-						Value:  "100",
-						Edited: true,
-					},
-				},
+				Parent:       "100",
 			},
 		},
 		{
@@ -315,17 +324,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				IssueNumbers: []int{23},
 				RemoveParent: true,
-				Editable: prShared.Editable{
-					Parent: prShared.EditableString{
-						Value:  "",
-						Edited: true,
-					},
-				},
 			},
 		},
 		{
-			name:     "both set-parent and remove-parent flags",
-			input:    "23 --set-parent 100 --remove-parent",
+			name:     "both parent and remove-parent flags",
+			input:    "23 --parent 100 --remove-parent",
 			wantsErr: true,
 		},
 		{
@@ -335,6 +338,11 @@ func TestNewCmdEdit(t *testing.T) {
 				IssueNumbers: []int{23},
 				AddSubIssues: []string{"123", "124"},
 			},
+		},
+		{
+			name:     "add-sub-issue rejected with multiple issues",
+			input:    "23 24 --add-sub-issue 123",
+			wantsErr: true,
 		},
 		{
 			name:  "remove-sub-issue flag",
@@ -417,7 +425,7 @@ func TestNewCmdEdit(t *testing.T) {
 			assert.Equal(t, tt.output.IssueNumbers, gotOpts.IssueNumbers)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.Editable, gotOpts.Editable)
-			assert.Equal(t, tt.output.SetParent, gotOpts.SetParent)
+			assert.Equal(t, tt.output.Parent, gotOpts.Parent)
 			assert.Equal(t, tt.output.RemoveParent, gotOpts.RemoveParent)
 			assert.Equal(t, tt.output.AddSubIssues, gotOpts.AddSubIssues)
 			assert.Equal(t, tt.output.RemoveSubIssues, gotOpts.RemoveSubIssues)
@@ -861,6 +869,29 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
 		{
+			name: "remove type",
+			input: &EditOptions{
+				Detector:        &fd.EnabledDetectorMock{},
+				IssueNumbers:    []int{123},
+				Interactive:     false,
+				RemoveIssueType: true,
+				FetchOptions:    prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGet(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "123", inputs["issueId"])
+							assert.Nil(t, inputs["issueTypeId"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
 			name: "interactive edit type prompt",
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
@@ -868,7 +899,7 @@ func Test_editRun(t *testing.T) {
 				Interactive:  true,
 				FieldsToEditSurvey: func(_ prShared.EditPrompter, eo *prShared.Editable) error {
 					// Verify the survey is allowed to offer Type as an option for issue edit.
-					assert.True(t, eo.IssueType.Allowed)
+					assert.True(t, eo.IssueType.Selectable)
 					eo.IssueType.Edited = true
 					return nil
 				},
@@ -907,59 +938,12 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
 		{
-			name: "interactive edit parent prompt",
-			input: &EditOptions{
-				Detector:     &fd.EnabledDetectorMock{},
-				IssueNumbers: []int{123},
-				Interactive:  true,
-				FieldsToEditSurvey: func(_ prShared.EditPrompter, eo *prShared.Editable) error {
-					// Verify the survey is allowed to offer Parent as an option for issue edit.
-					assert.True(t, eo.Parent.Allowed)
-					eo.Parent.Edited = true
-					return nil
-				},
-				EditFieldsSurvey: func(_ prShared.EditPrompter, eo *prShared.Editable, _ string) error {
-					eo.Parent.Value = "100"
-					return nil
-				},
-				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
-					return nil
-				},
-				DetermineEditor: func() (string, error) { return "vim", nil },
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueGet(t, reg)
-				reg.Register(
-					httpmock.GraphQL(`query IssueNodeID\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "issue": { "id": "PARENT_100_ID" } } } }
-					`),
-				)
-				reg.Register(
-					httpmock.GraphQL(`mutation AddSubIssue\b`),
-					httpmock.GraphQLMutation(`
-					{ "data": { "addSubIssue": { "issue": { "id": "PARENT_100_ID" } } } }`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, "PARENT_100_ID", inputs["issueId"])
-							assert.Equal(t, "123", inputs["subIssueId"])
-							assert.Equal(t, true, inputs["replaceParent"])
-						}),
-				)
-			},
-			stdout: "https://github.com/OWNER/REPO/issue/123\n",
-		},
-		{
 			name: "edit set parent",
 			input: &EditOptions{
 				Detector:     &fd.EnabledDetectorMock{},
 				IssueNumbers: []int{123},
 				Interactive:  false,
-				Editable: prShared.Editable{
-					Parent: prShared.EditableString{
-						Value:  "100",
-						Edited: true,
-					},
-				},
+				Parent:       "100",
 				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
 					return nil
 				},
@@ -992,12 +976,6 @@ func Test_editRun(t *testing.T) {
 				IssueNumbers: []int{123},
 				Interactive:  false,
 				RemoveParent: true,
-				Editable: prShared.Editable{
-					Parent: prShared.EditableString{
-						Value:  "",
-						Edited: true,
-					},
-				},
 				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
 					return nil
 				},
@@ -1047,34 +1025,31 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueNumberGet(t, reg, 100)
 				reg.Register(
-					httpmock.GraphQL(`query IssueNodeID\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "issue": { "id": "SUB_123_ID" } } } }
-					`),
+					issueNodeIDByNumberMatcher(123),
+					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "SUB_123_ID" } } } }`),
 				)
 				reg.Register(
-					httpmock.GraphQL(`mutation AddSubIssue\b`),
-					httpmock.GraphQLMutation(`
-					{ "data": { "addSubIssue": { "issue": { "id": "100" } } } }`,
+					issueNodeIDByNumberMatcher(124),
+					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "SUB_124_ID" } } } }`),
+				)
+				reg.Register(
+					httpmock.GraphQLMutationMatcher(`mutation AddSubIssue\b`, func(input map[string]interface{}) bool {
+						return input["subIssueId"] == "SUB_123_ID"
+					}),
+					httpmock.GraphQLMutation(`{ "data": { "addSubIssue": { "issue": { "id": "100" } } } }`,
 						func(inputs map[string]interface{}) {
 							assert.Equal(t, "100", inputs["issueId"])
-							assert.Equal(t, "SUB_123_ID", inputs["subIssueId"])
-							assert.Equal(t, false, inputs["replaceParent"])
+							assert.Equal(t, true, inputs["replaceParent"])
 						}),
 				)
 				reg.Register(
-					httpmock.GraphQL(`query IssueNodeID\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "issue": { "id": "SUB_124_ID" } } } }
-					`),
-				)
-				reg.Register(
-					httpmock.GraphQL(`mutation AddSubIssue\b`),
-					httpmock.GraphQLMutation(`
-					{ "data": { "addSubIssue": { "issue": { "id": "100" } } } }`,
+					httpmock.GraphQLMutationMatcher(`mutation AddSubIssue\b`, func(input map[string]interface{}) bool {
+						return input["subIssueId"] == "SUB_124_ID"
+					}),
+					httpmock.GraphQLMutation(`{ "data": { "addSubIssue": { "issue": { "id": "100" } } } }`,
 						func(inputs map[string]interface{}) {
 							assert.Equal(t, "100", inputs["issueId"])
-							assert.Equal(t, "SUB_124_ID", inputs["subIssueId"])
+							assert.Equal(t, true, inputs["replaceParent"])
 						}),
 				)
 			},
@@ -1221,22 +1196,6 @@ func Test_editRun(t *testing.T) {
 				)
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
-		},
-		{
-			name: "relationships unsupported on GHES",
-			input: &EditOptions{
-				Detector:     &fd.DisabledDetectorMock{},
-				IssueNumbers: []int{123},
-				Interactive:  false,
-				AddBlockedBy: []string{"200"},
-				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
-					return nil
-				},
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				mockIssueGet(t, reg)
-			},
-			wantErr: true,
 		},
 		{
 			name: "batch edit type",
@@ -1512,15 +1471,8 @@ func Test_editRun_crossHostRelationshipRefs(t *testing.T) {
 		input *EditOptions
 	}{
 		{
-			name: "set parent",
-			input: &EditOptions{
-				Editable: prShared.Editable{
-					Parent: prShared.EditableString{
-						Value:  crossHostURL,
-						Edited: true,
-					},
-				},
-			},
+			name:  "set parent",
+			input: &EditOptions{Parent: crossHostURL},
 		},
 		{
 			name:  "add sub-issue",
@@ -1742,4 +1694,31 @@ func TestProjectsV1Deprecation(t *testing.T) {
 		// Verify that our request contained projectCards
 		reg.Verify(t)
 	})
+}
+
+// issueNodeIDByNumberMatcher matches an IssueNodeID GraphQL query whose
+// number variable equals the given value. Used by tests that issue
+// multiple IssueNodeID lookups and need stubs to route by issue number
+// rather than by registration order.
+func issueNodeIDByNumberMatcher(number int) httpmock.Matcher {
+	queryMatcher := httpmock.GraphQL(`query IssueNodeID\b`)
+	return func(req *http.Request) bool {
+		if !queryMatcher(req) {
+			return false
+		}
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return false
+		}
+		req.Body = io.NopCloser(bytes.NewReader(body))
+		var b struct {
+			Variables struct {
+				Number int `json:"number"`
+			} `json:"variables"`
+		}
+		if err := json.Unmarshal(body, &b); err != nil {
+			return false
+		}
+		return b.Variables.Number == number
+	}
 }

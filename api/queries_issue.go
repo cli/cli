@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -479,11 +481,12 @@ func (i Issue) CurrentUserComments() []Comment {
 	return i.Comments.CurrentUserComments()
 }
 
-// UpdateIssueIssueType sets the issue type on an issue.
+// UpdateIssueIssueType sets or clears the issue type on an issue. Pass an
+// empty issueTypeID to clear the issue type.
 func UpdateIssueIssueType(client *Client, hostname string, issueID string, issueTypeID string) error {
 	type UpdateIssueIssueTypeInput struct {
-		IssueID     githubv4.ID `json:"issueId"`
-		IssueTypeID githubv4.ID `json:"issueTypeId"`
+		IssueID     githubv4.ID  `json:"issueId"`
+		IssueTypeID *githubv4.ID `json:"issueTypeId"`
 	}
 
 	var mutation struct {
@@ -494,10 +497,16 @@ func UpdateIssueIssueType(client *Client, hostname string, issueID string, issue
 		} `graphql:"updateIssueIssueType(input: $input)"`
 	}
 
+	var typeID *githubv4.ID
+	if issueTypeID != "" {
+		id := githubv4.ID(issueTypeID)
+		typeID = &id
+	}
+
 	variables := map[string]interface{}{
 		"input": UpdateIssueIssueTypeInput{
 			IssueID:     githubv4.ID(issueID),
-			IssueTypeID: githubv4.ID(issueTypeID),
+			IssueTypeID: typeID,
 		},
 	}
 
@@ -604,6 +613,114 @@ func RemoveBlockedBy(client *Client, hostname string, issueID string, blockingIs
 	}
 
 	return client.Mutate(hostname, "RemoveBlockedBy", &mutation, variables)
+}
+
+// DeferredUpdateIssueOptions updates an issue with mutations unsupported by the
+// standard issue update mutations. All ID fields are node IDs.
+type DeferredUpdateIssueOptions struct {
+	IssueID  string
+	Hostname string
+
+	IssueTypeID     string
+	RemoveIssueType bool
+
+	ParentID              string
+	ReplaceExistingParent bool
+	RemoveParentID        string
+
+	AddSubIssueIDs    []string
+	RemoveSubIssueIDs []string
+
+	AddBlockedByIDs    []string
+	RemoveBlockedByIDs []string
+
+	// AddBlockingIDs / RemoveBlockingIDs name issues that this issue
+	// blocks. They are applied via the addBlockedBy / removeBlockedBy
+	// mutations with the arguments swapped.
+	AddBlockingIDs    []string
+	RemoveBlockingIDs []string
+}
+
+// DeferredUpdateIssue runs issue mutations described by opts in
+// parallel and returns any failures as a single joined error so a single
+// failure does not abort the rest.
+func DeferredUpdateIssue(client *Client, opts DeferredUpdateIssueOptions) error {
+	var mutations []func() error
+
+	if opts.IssueTypeID != "" || opts.RemoveIssueType {
+		mutations = append(mutations, func() error {
+			return UpdateIssueIssueType(client, opts.Hostname, opts.IssueID, opts.IssueTypeID)
+		})
+	}
+
+	if opts.ParentID != "" {
+		mutations = append(mutations, func() error {
+			return AddSubIssue(client, opts.Hostname, opts.ParentID, opts.IssueID, opts.ReplaceExistingParent)
+		})
+	} else if opts.RemoveParentID != "" {
+		mutations = append(mutations, func() error {
+			return RemoveSubIssue(client, opts.Hostname, opts.RemoveParentID, opts.IssueID)
+		})
+	}
+
+	for _, id := range opts.AddSubIssueIDs {
+		mutations = append(mutations, func() error {
+			return AddSubIssue(client, opts.Hostname, opts.IssueID, id, true)
+		})
+	}
+	for _, id := range opts.RemoveSubIssueIDs {
+		mutations = append(mutations, func() error {
+			return RemoveSubIssue(client, opts.Hostname, opts.IssueID, id)
+		})
+	}
+
+	for _, id := range opts.AddBlockedByIDs {
+		mutations = append(mutations, func() error {
+			return AddBlockedBy(client, opts.Hostname, opts.IssueID, id)
+		})
+	}
+	for _, id := range opts.RemoveBlockedByIDs {
+		mutations = append(mutations, func() error {
+			return RemoveBlockedBy(client, opts.Hostname, opts.IssueID, id)
+		})
+	}
+
+	for _, id := range opts.AddBlockingIDs {
+		mutations = append(mutations, func() error {
+			// blocking is the inverse of blocked-by: this issue blocks `id`,
+			// expressed as `id` is blocked by this issue.
+			return AddBlockedBy(client, opts.Hostname, id, opts.IssueID)
+		})
+	}
+	for _, id := range opts.RemoveBlockingIDs {
+		mutations = append(mutations, func() error {
+			return RemoveBlockedBy(client, opts.Hostname, id, opts.IssueID)
+		})
+	}
+
+	if len(mutations) == 0 {
+		return nil
+	}
+
+	errCh := make(chan error, len(mutations))
+	var wg sync.WaitGroup
+	for _, m := range mutations {
+		wg.Add(1)
+		go func(m func() error) {
+			defer wg.Done()
+			if err := m(); err != nil {
+				errCh <- err
+			}
+		}(m)
+	}
+	wg.Wait()
+	close(errCh)
+
+	var errs []error
+	for err := range errCh {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }
 
 // RepoIssueTypes fetches the available issue types for a repository.

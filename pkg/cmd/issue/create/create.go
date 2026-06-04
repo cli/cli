@@ -412,25 +412,12 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		// Post-creation mutations for Issues 2.0 fields
-		err = applyIssueType(apiClient, baseRepo, newIssue, opts)
+		var updateOpts api.DeferredUpdateIssueOptions
+		updateOpts, err = deferredUpdateIssueOptions(apiClient, baseRepo, newIssue, opts)
 		if err != nil {
 			return
 		}
-
-		err = applyParent(apiClient, baseRepo, newIssue, opts)
-		if err != nil {
-			return
-		}
-
-		// TODO IssueRelationshipsCleanup
-		if issueFeatures.IssueRelationshipsSupported {
-			err = applyRelationships(apiClient, baseRepo, newIssue, opts)
-			if err != nil {
-				return
-			}
-		} else if len(opts.BlockedBy) > 0 || len(opts.Blocking) > 0 {
-			err = fmt.Errorf("issue relationships are not supported on this GitHub Enterprise Server version")
+		if err = api.DeferredUpdateIssue(apiClient, updateOpts); err != nil {
 			return
 		}
 
@@ -447,63 +434,50 @@ func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb prS
 	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb, projectsV1Support)
 }
 
-// applyIssueType resolves the --type flag and sets the issue type via mutation.
-func applyIssueType(client *api.Client, baseRepo ghrepo.Interface, issue *api.Issue, opts *CreateOptions) error {
-	if opts.IssueType == "" {
-		return nil
+// deferredUpdateIssueOptions resolves the user-supplied --type / --parent /
+// --blocked-by / --blocking flags into the IDs that DeferredUpdateIssue
+// expects.
+func deferredUpdateIssueOptions(client *api.Client, baseRepo ghrepo.Interface, issue *api.Issue, opts *CreateOptions) (api.DeferredUpdateIssueOptions, error) {
+	updateOpts := api.DeferredUpdateIssueOptions{
+		IssueID:  issue.ID,
+		Hostname: baseRepo.RepoHost(),
 	}
 
-	// Use pre-resolved ID from interactive flow if available
-	typeID := opts.issueTypeID
-	if typeID == "" {
-		var err error
-		typeID, err = issueShared.ResolveIssueTypeName(client, baseRepo, opts.IssueType)
-		if err != nil {
-			return err
+	if opts.IssueType != "" {
+		typeID := opts.issueTypeID
+		if typeID == "" {
+			var err error
+			typeID, err = issueShared.ResolveIssueTypeName(client, baseRepo, opts.IssueType)
+			if err != nil {
+				return updateOpts, err
+			}
 		}
+		updateOpts.IssueTypeID = typeID
 	}
 
-	return api.UpdateIssueIssueType(client, baseRepo.RepoHost(), issue.ID, typeID)
-}
-
-// applyParent resolves the --parent flag and adds the issue as a sub-issue.
-func applyParent(client *api.Client, baseRepo ghrepo.Interface, issue *api.Issue, opts *CreateOptions) error {
-	if opts.Parent == "" {
-		return nil
+	if opts.Parent != "" {
+		parentID, err := issueShared.ResolveIssueRef(client, baseRepo, opts.Parent)
+		if err != nil {
+			return updateOpts, fmt.Errorf("resolving --parent reference %q: %w", opts.Parent, err)
+		}
+		updateOpts.ParentID = parentID
 	}
-
-	parentID, err := issueShared.ResolveIssueRef(client, baseRepo, opts.Parent)
-	if err != nil {
-		return fmt.Errorf("resolving parent: %w", err)
-	}
-
-	return api.AddSubIssue(client, baseRepo.RepoHost(), parentID, issue.ID, false)
-}
-
-// applyRelationships resolves the --blocked-by and --blocking flags and creates relationships.
-func applyRelationships(client *api.Client, baseRepo ghrepo.Interface, issue *api.Issue, opts *CreateOptions) error {
-	hostname := baseRepo.RepoHost()
 
 	for _, ref := range opts.BlockedBy {
-		blockingID, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
 		if err != nil {
-			return fmt.Errorf("resolving --blocked-by reference %q: %w", ref, err)
+			return updateOpts, fmt.Errorf("resolving --blocked-by reference %q: %w", ref, err)
 		}
-		if err := api.AddBlockedBy(client, hostname, issue.ID, blockingID); err != nil {
-			return err
-		}
+		updateOpts.AddBlockedByIDs = append(updateOpts.AddBlockedByIDs, id)
 	}
 
 	for _, ref := range opts.Blocking {
-		// --blocking swaps the args: the OTHER issue is blocked by THIS issue
-		blockedID, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
 		if err != nil {
-			return fmt.Errorf("resolving --blocking reference %q: %w", ref, err)
+			return updateOpts, fmt.Errorf("resolving --blocking reference %q: %w", ref, err)
 		}
-		if err := api.AddBlockedBy(client, hostname, blockedID, issue.ID); err != nil {
-			return err
-		}
+		updateOpts.AddBlockingIDs = append(updateOpts.AddBlockingIDs, id)
 	}
 
-	return nil
+	return updateOpts, nil
 }
