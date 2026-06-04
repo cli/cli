@@ -665,7 +665,7 @@ func DeferredUpdateIssue(client *Client, opts DeferredUpdateIssueOptions) error 
 
 	for _, id := range opts.AddSubIssueIDs {
 		mutations = append(mutations, func() error {
-			return AddSubIssue(client, opts.Hostname, opts.IssueID, id, false)
+			return AddSubIssue(client, opts.Hostname, opts.IssueID, id, true)
 		})
 	}
 	for _, id := range opts.RemoveSubIssueIDs {

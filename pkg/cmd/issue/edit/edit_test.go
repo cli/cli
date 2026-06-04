@@ -899,7 +899,7 @@ func Test_editRun(t *testing.T) {
 				Interactive:  true,
 				FieldsToEditSurvey: func(_ prShared.EditPrompter, eo *prShared.Editable) error {
 					// Verify the survey is allowed to offer Type as an option for issue edit.
-					assert.True(t, eo.IssueType.Allowed)
+					assert.True(t, eo.IssueType.Selectable)
 					eo.IssueType.Edited = true
 					return nil
 				},
@@ -1039,7 +1039,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQLMutation(`{ "data": { "addSubIssue": { "issue": { "id": "100" } } } }`,
 						func(inputs map[string]interface{}) {
 							assert.Equal(t, "100", inputs["issueId"])
-							assert.Equal(t, false, inputs["replaceParent"])
+							assert.Equal(t, true, inputs["replaceParent"])
 						}),
 				)
 				reg.Register(
@@ -1049,7 +1049,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQLMutation(`{ "data": { "addSubIssue": { "issue": { "id": "100" } } } }`,
 						func(inputs map[string]interface{}) {
 							assert.Equal(t, "100", inputs["issueId"])
-							assert.Equal(t, false, inputs["replaceParent"])
+							assert.Equal(t, true, inputs["replaceParent"])
 						}),
 				)
 			},

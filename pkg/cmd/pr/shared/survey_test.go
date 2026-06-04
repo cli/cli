@@ -287,7 +287,7 @@ func TestFieldsToEditSurvey_IssueOnlyFields(t *testing.T) {
 			})
 
 		editable := &Editable{}
-		editable.IssueType.Allowed = true
+		editable.IssueType.Selectable = true
 		err := FieldsToEditSurvey(pm, editable)
 		require.NoError(t, err)
 		assert.True(t, editable.IssueType.Edited)

@@ -38,7 +38,10 @@ type EditableString struct {
 	Default string
 	Options []string
 	Edited  bool
-	Allowed bool
+	// Selectable controls whether the interactive survey offers this
+	// field as one of the things the user can choose to edit. Flag-only
+	// fields leave it false.
+	Selectable bool
 }
 
 type EditableSlice struct {
@@ -48,7 +51,10 @@ type EditableSlice struct {
 	Default []string
 	Options []string
 	Edited  bool
-	Allowed bool
+	// Selectable controls whether the interactive survey offers this
+	// field as one of the things the user can choose to edit. Flag-only
+	// fields leave it false.
+	Selectable bool
 }
 
 // EditableAssignees is a special case of EditableSlice.
@@ -304,10 +310,10 @@ func (e *Editable) Clone() Editable {
 
 func (es *EditableString) clone() EditableString {
 	return EditableString{
-		Value:   es.Value,
-		Default: es.Default,
-		Edited:  es.Edited,
-		Allowed: es.Allowed,
+		Value:      es.Value,
+		Default:    es.Default,
+		Edited:     es.Edited,
+		Selectable: es.Selectable,
 		// Shallow copies since no mutation.
 		Options: es.Options,
 	}
@@ -315,8 +321,8 @@ func (es *EditableString) clone() EditableString {
 
 func (es *EditableSlice) clone() EditableSlice {
 	cpy := EditableSlice{
-		Edited:  es.Edited,
-		Allowed: es.Allowed,
+		Edited:     es.Edited,
+		Selectable: es.Selectable,
 		// Shallow copies since no mutation.
 		Options: es.Options,
 		// Copy mutable string slices.
@@ -482,11 +488,11 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 	}
 
 	opts := []string{"Title", "Body"}
-	if editable.Reviewers.Allowed {
+	if editable.Reviewers.Selectable {
 		opts = append(opts, "Reviewers")
 	}
 	opts = append(opts, "Assignees", "Labels")
-	if editable.IssueType.Allowed {
+	if editable.IssueType.Selectable {
 		opts = append(opts, "Type")
 	}
 	opts = append(opts, "Projects", "Milestone")
