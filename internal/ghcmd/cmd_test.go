@@ -2,11 +2,15 @@ package ghcmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
+	"os"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
@@ -82,6 +86,52 @@ check your internet connection or https://githubstatus.com
 			}
 		})
 	}
+}
+
+func Test_interruptContext(t *testing.T) {
+	sourceCtx, cancelSource := context.WithCancel(context.Background())
+	defer cancelSource()
+
+	var gotSignals []os.Signal
+	var stopOnce sync.Once
+	stopCalled := make(chan struct{})
+	notify := func(_ context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
+		gotSignals = append(gotSignals, signals...)
+		return sourceCtx, func() {
+			stopOnce.Do(func() {
+				close(stopCalled)
+			})
+		}
+	}
+
+	ctx, stop := interruptContext(context.Background(), notify)
+	defer stop()
+
+	assert.Equal(t, []os.Signal{os.Interrupt}, gotSignals)
+	assert.NoError(t, ctx.Err())
+
+	cancelSource()
+
+	select {
+	case <-stopCalled:
+	case <-time.After(time.Second):
+		t.Fatal("expected interrupt signal notification to stop after context cancellation")
+	}
+	assert.ErrorIs(t, ctx.Err(), context.Canceled)
+}
+
+func Test_contextCanceledUsesCancelExitCode(t *testing.T) {
+	t.Run("context canceled", func(t *testing.T) {
+		assert.True(t, isCancelError(context.Canceled))
+	})
+
+	t.Run("user cancellation", func(t *testing.T) {
+		assert.True(t, isCancelError(cmdutil.CancelError))
+	})
+
+	t.Run("other error", func(t *testing.T) {
+		assert.False(t, isCancelError(errors.New("boom")))
+	})
 }
 
 func Test_newIOStreams_pager(t *testing.T) {

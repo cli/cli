@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -139,7 +140,9 @@ func Main() exitCode {
 		}
 	}
 
-	ctx := context.Background()
+	ctx, stopInterrupts := interruptContext(context.Background(), signal.NotifyContext)
+	defer stopInterrupts()
+
 	updateCtx, updateCancel := context.WithCancel(ctx)
 	defer updateCancel()
 	updateMessageChan := make(chan *update.ReleaseInfo)
@@ -200,7 +203,7 @@ func Main() exitCode {
 			return exitError
 		} else if err == cmdutil.PendingError {
 			return exitPending
-		} else if cmdutil.IsUserCancellation(err) {
+		} else if isCancelError(err) {
 			if errors.Is(err, terminal.InterruptErr) {
 				// ensure the next shell prompt will start on its own line
 				fmt.Fprint(stderr, "\n")
@@ -270,6 +273,21 @@ func Main() exitCode {
 	}
 
 	return exitOK
+}
+
+type signalNotifyContextFunc func(context.Context, ...os.Signal) (context.Context, context.CancelFunc)
+
+func interruptContext(parent context.Context, notify signalNotifyContextFunc) (context.Context, context.CancelFunc) {
+	ctx, stop := notify(parent, os.Interrupt)
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
+	return ctx, stop
+}
+
+func isCancelError(err error) bool {
+	return errors.Is(err, context.Canceled) || cmdutil.IsUserCancellation(err)
 }
 
 // isExtensionCommand returns true if args resolve to an extension command.
