@@ -2,6 +2,7 @@ package browse
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -249,6 +250,17 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		if opts.SelectorArg == "" {
 			return "", nil
 		}
+		// When the selector is all decimal digits and 7+ chars long, it
+		// could be either an issue number or a commit SHA (e.g. 309628980).
+		// Resolve the ambiguity by checking the local git repo: if a
+		// matching commit exists, treat it as a SHA; otherwise fall back
+		// to an issue reference.
+		if isNumber(opts.SelectorArg) && isCommit(opts.SelectorArg) && opts.GitClient != nil {
+			if _, err := opts.GitClient.CommitBody(opts.SelectorArg); err == nil {
+				return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+			}
+			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
+		}
 		if isNumber(opts.SelectorArg) {
 			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 		}
@@ -357,6 +369,7 @@ func isCommit(arg string) bool {
 // gitClient is used to implement functions that can be performed on both local and remote git repositories
 type gitClient interface {
 	LastCommit() (*git.Commit, error)
+	CommitBody(sha string) (string, error)
 }
 
 type localGitClient struct {
@@ -370,6 +383,10 @@ type remoteGitClient struct {
 
 func (gc *localGitClient) LastCommit() (*git.Commit, error) {
 	return gc.client.LastCommit(context.Background())
+}
+
+func (gc *localGitClient) CommitBody(sha string) (string, error) {
+	return gc.client.CommitBody(context.Background(), sha)
 }
 
 func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
@@ -386,4 +403,11 @@ func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
 		return nil, err
 	}
 	return &git.Commit{Sha: commit.OID}, nil
+}
+
+// CommitBody is unsupported for remote repositories because the GraphQL API
+// does not expose a way to verify an arbitrary abbreviated SHA. Returning an
+// error causes callers to fall back to the existing issue-then-commit logic.
+func (gc *remoteGitClient) CommitBody(sha string) (string, error) {
+	return "", errors.New("commit body lookup is not supported for remote repositories")
 }
