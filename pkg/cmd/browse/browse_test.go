@@ -357,6 +357,45 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/kevin/MinTy/issues/217",
 		},
 		{
+			name: "decimal-only short hash in selector arg resolves to remote commit",
+			opts: BrowseOptions{
+				SelectorArg: "309628980",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/bchadwic/test/commits/309628980"),
+					httpmock.StringResponse("309628980abcdef"),
+				)
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/commit/309628980",
+			wantsErr:    false,
+		},
+		{
+			name: "decimal-only short hash in selector arg falls back to issue when remote commit does not exist",
+			opts: BrowseOptions{
+				SelectorArg: "1234567",
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/bchadwic/test/commits/1234567"),
+					httpmock.StatusStringResponse(422, "Unprocessable Entity"),
+				)
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/issues/1234567",
+			wantsErr:    false,
+		},
+		{
+			name: "issue with hashtag forces issue over decimal-only short hash",
+			opts: BrowseOptions{
+				SelectorArg: "#309628980",
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/issues/309628980",
+			wantsErr:    false,
+		},
+		{
 			name: "branch flag",
 			opts: BrowseOptions{
 				Branch: "trunk",

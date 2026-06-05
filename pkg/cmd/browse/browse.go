@@ -3,6 +3,7 @@ package browse
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -249,6 +251,24 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		if opts.SelectorArg == "" {
 			return "", nil
 		}
+		if strings.HasPrefix(opts.SelectorArg, "#") && isNumber(opts.SelectorArg) {
+			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
+		}
+		if isNumber(opts.SelectorArg) && isCommit(opts.SelectorArg) {
+			httpClient, err := opts.HttpClient()
+			if err != nil {
+				return "", err
+			}
+
+			isCommitRef, err := commitRefExists(httpClient, baseRepo, opts.SelectorArg)
+			if err != nil {
+				return "", err
+			}
+			if isCommitRef {
+				return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+			}
+			return fmt.Sprintf("issues/%s", opts.SelectorArg), nil
+		}
 		if isNumber(opts.SelectorArg) {
 			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 		}
@@ -352,6 +372,34 @@ var commitHash = regexp.MustCompile(`\A[a-f0-9]{7,64}\z`)
 
 func isCommit(arg string) bool {
 	return commitHash.MatchString(arg)
+}
+
+func commitRefExists(httpClient *http.Client, baseRepo ghrepo.Interface, ref string) (bool, error) {
+	path := fmt.Sprintf("%srepos/%s/%s/commits/%s", ghinstance.RESTPrefix(baseRepo.RepoHost()), baseRepo.RepoOwner(), baseRepo.RepoName(), ref)
+	req, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		return false, err
+	}
+
+	req.Header.Set("Accept", "application/vnd.github.v3.sha")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 || resp.StatusCode == 422 {
+		return false, nil
+	}
+	if resp.StatusCode > 299 {
+		return false, api.HandleHTTPError(resp)
+	}
+
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // gitClient is used to implement functions that can be performed on both local and remote git repositories
