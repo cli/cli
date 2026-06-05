@@ -29,17 +29,18 @@ type ListOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
 
-	Assignee     string
-	Labels       []string
-	State        string
-	LimitResults int
-	Author       string
-	Mention      string
-	Milestone    string
-	Search       string
-	IssueType    string
-	WebMode      bool
-	Exporter     cmdutil.Exporter
+	Assignee      string
+	Labels        []string
+	State         string
+	LimitResults  int
+	Author        string
+	Mention       string
+	Milestone     string
+	Search        string
+	IssueType     string
+	WebMode       bool
+	ShowAssignees bool
+	Exporter      cmdutil.Exporter
 
 	Detector fd.Detector
 	Now      func() time.Time
@@ -79,6 +80,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			$ gh issue list --search "error no:assignee sort:created-asc"
 			$ gh issue list --state all
 			$ gh issue list --type Bug
+			$ gh issue list --show-assignees
 		`),
 		Aliases: []string{"ls"},
 		Args:    cmdutil.NoArgsQuoteReminder,
@@ -116,6 +118,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone number or title")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
 	cmd.Flags().StringVar(&opts.IssueType, "type", "", "Filter by issue type `name`")
+	cmd.Flags().BoolVar(&opts.ShowAssignees, "show-assignees", false, "Show assignees in issue list output")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
 
 	return cmd
@@ -151,6 +154,9 @@ func listRun(opts *ListOptions) error {
 		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
 	}
 	fields := append(defaultFields, "stateReason")
+	if opts.ShowAssignees {
+		fields = append(fields, "assignees")
+	}
 
 	filterOptions := prShared.FilterOptions{
 		Entity:    "issue",
@@ -223,7 +229,7 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
-	issueShared.PrintIssues(opts.IO, opts.Now(), "", len(listResult.Issues), listResult.Issues)
+	issueShared.PrintIssues(opts.IO, opts.Now(), "", len(listResult.Issues), listResult.Issues, opts.ShowAssignees)
 
 	return nil
 }

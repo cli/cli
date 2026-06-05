@@ -41,6 +41,15 @@ func TestNewCmdList(t *testing.T) {
 				LimitResults: 30,
 			},
 		},
+		{
+			name: "show-assignees flag",
+			cli:  "--show-assignees",
+			wants: ListOptions{
+				ShowAssignees: true,
+				State:         "open",
+				LimitResults:  30,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -67,6 +76,7 @@ func TestNewCmdList(t *testing.T) {
 			require.NotNil(t, gotOpts)
 
 			assert.Equal(t, tt.wants.IssueType, gotOpts.IssueType)
+			assert.Equal(t, tt.wants.ShowAssignees, gotOpts.ShowAssignees)
 			assert.Equal(t, tt.wants.State, gotOpts.State)
 			assert.Equal(t, tt.wants.LimitResults, gotOpts.LimitResults)
 		})
@@ -160,6 +170,31 @@ func TestIssueList_tty(t *testing.T) {
 		#1  number won   label   about 1 day ago
 		#2  number too   label   about 1 month ago
 		#4  number fore  label   about 2 years ago
+	`), output.String())
+	assert.Equal(t, ``, output.Stderr())
+}
+
+func TestIssueList_tty_withShowAssignees(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.FileResponse("./fixtures/issueListWithAssignees.json"))
+
+	output, err := runCommand(http, true, "--show-assignees")
+	if err != nil {
+		t.Errorf("error running command `issue list --show-assignees`: %v", err)
+	}
+
+	assert.Equal(t, heredoc.Doc(`
+
+		Showing 3 of 3 open issues in OWNER/REPO
+
+		ID  TITLE                          LABELS  UPDATED            ASSIGNEES
+		#1  issue with no assignees                about 1 day ago    -
+		#2  issue with one assignee                about 1 month ago  alice
+		#3  issue with multiple assignees          about 2 years ago  alice+2
 	`), output.String())
 	assert.Equal(t, ``, output.Stderr())
 }

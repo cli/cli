@@ -1,0 +1,76 @@
+{
+  "data": {
+    "repository": {
+      "hasIssuesEnabled": true,
+      "issues": {
+        "totalCount": 3,
+        "nodes": [
+          {
+            "number": 1,
+            "title": "issue with no assignees",
+            "url": "https://github.com/OWNER/REPO/issues/1",
+            "updatedAt": "2022-08-24T22:01:12Z",
+            "labels": {
+              "nodes": [],
+              "totalCount": 0
+            },
+            "assignees": {
+              "nodes": [],
+              "totalCount": 0
+            }
+          },
+          {
+            "number": 2,
+            "title": "issue with one assignee",
+            "url": "https://github.com/OWNER/REPO/issues/2",
+            "updatedAt": "2022-07-20T19:01:12Z",
+            "labels": {
+              "nodes": [],
+              "totalCount": 0
+            },
+            "assignees": {
+              "nodes": [
+                {
+                  "id": "U_1",
+                  "login": "alice",
+                  "name": "Alice"
+                }
+              ],
+              "totalCount": 1
+            }
+          },
+          {
+            "number": 3,
+            "title": "issue with multiple assignees",
+            "url": "https://github.com/OWNER/REPO/issues/3",
+            "updatedAt": "2020-01-26T19:01:12Z",
+            "labels": {
+              "nodes": [],
+              "totalCount": 0
+            },
+            "assignees": {
+              "nodes": [
+                {
+                  "id": "U_1",
+                  "login": "alice",
+                  "name": "Alice"
+                },
+                {
+                  "id": "U_2",
+                  "login": "bob",
+                  "name": "Bob"
+                },
+                {
+                  "id": "U_3",
+                  "login": "charlie",
+                  "name": "Charlie"
+                }
+              ],
+              "totalCount": 3
+            }
+          }
+        ]
+      }
+    }
+  }
+}

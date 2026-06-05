@@ -112,7 +112,7 @@ func statusRun(opts *StatusOptions) error {
 
 	prShared.PrintHeader(opts.IO, "Issues assigned to you")
 	if issuePayload.Assigned.TotalCount > 0 {
-		issueShared.PrintIssues(opts.IO, time.Now(), "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues)
+		issueShared.PrintIssues(opts.IO, time.Now(), "  ", issuePayload.Assigned.TotalCount, issuePayload.Assigned.Issues, false)
 	} else {
 		message := "  There are no issues assigned to you"
 		prShared.PrintMessage(opts.IO, message)
@@ -121,7 +121,7 @@ func statusRun(opts *StatusOptions) error {
 
 	prShared.PrintHeader(opts.IO, "Issues mentioning you")
 	if issuePayload.Mentioned.TotalCount > 0 {
-		issueShared.PrintIssues(opts.IO, time.Now(), "  ", issuePayload.Mentioned.TotalCount, issuePayload.Mentioned.Issues)
+		issueShared.PrintIssues(opts.IO, time.Now(), "  ", issuePayload.Mentioned.TotalCount, issuePayload.Mentioned.Issues, false)
 	} else {
 		prShared.PrintMessage(opts.IO, "  There are no issues mentioning you")
 	}
@@ -129,7 +129,7 @@ func statusRun(opts *StatusOptions) error {
 
 	prShared.PrintHeader(opts.IO, "Issues opened by you")
 	if issuePayload.Authored.TotalCount > 0 {
-		issueShared.PrintIssues(opts.IO, time.Now(), "  ", issuePayload.Authored.TotalCount, issuePayload.Authored.Issues)
+		issueShared.PrintIssues(opts.IO, time.Now(), "  ", issuePayload.Authored.TotalCount, issuePayload.Authored.Issues, false)
 	} else {
 		prShared.PrintMessage(opts.IO, "  There are no issues opened by you")
 	}
