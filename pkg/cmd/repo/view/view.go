@@ -163,13 +163,19 @@ func viewRun(opts *ViewOptions) error {
 		return nil
 	}
 
+	// Upgraded template using clean, structured spacing, explicit labels, and visual zones
 	repoTmpl := heredoc.Doc(`
-		{{.FullName}}
-		{{.Description}}
+		
+		{{.LabelRepository}} {{.FullName}}
+		{{.LabelAbout}}      {{.Description}}
 
-		{{.Readme}}
+		{{.Divider}}
 
-		{{.View}}
+{{.Readme}}
+
+		{{.Divider}}
+		  {{.View}}
+		
 	`)
 
 	tmpl, err := template.New("repo").Parse(repoTmpl)
@@ -181,7 +187,7 @@ func viewRun(opts *ViewOptions) error {
 
 	var readmeContent string
 	if readme == nil {
-		readmeContent = cs.Muted("This repository does not have a README")
+		readmeContent = "  " + cs.Muted("This repository does not have a README")
 	} else if isMarkdownFile(readme.Filename) {
 		var err error
 		readmeContent, err = markdown.Render(readme.Content,
@@ -200,16 +206,23 @@ func viewRun(opts *ViewOptions) error {
 		description = cs.Muted("No description provided")
 	}
 
+	// Populating our ultra-minimal structured template data
 	repoData := struct {
-		FullName    string
-		Description string
-		Readme      string
-		View        string
+		LabelRepository string
+		LabelAbout      string
+		FullName        string
+		Description     string
+		Divider         string
+		Readme          string
+		View            string
 	}{
-		FullName:    cs.Bold(fullName),
-		Description: description,
-		Readme:      readmeContent,
-		View:        cs.Mutedf("View this repository on GitHub: %s", openURL),
+		LabelRepository: cs.Muted("» repository:"),
+		LabelAbout:      cs.Muted("» about:     "),
+		FullName:        cs.Bold(fullName),
+		Description:     description,
+		Divider:         cs.Muted("────────────────────────────────────────────────────────────"),
+		Readme:          readmeContent,
+		View:            cs.Mutedf("🔗 View on web: %s", openURL),
 	}
 
 	return tmpl.Execute(stdout, repoData)
