@@ -1,0 +1,14 @@
+{
+  "name": "Sample: gh pr view --comments",
+  "savedAt": "2026-06-06T19:17:45.738Z",
+  "content": "[muted]$[/muted] [b]gh pr edit --add-reviewer @copilot[/b]\nhttps://github.com/monalisa/my-project/pull/111\n\n[muted]...[/muted]\n\n[muted]$[/muted] [b]gh pr view --comments[/b]\n[b]Add new feature[/b] [muted]monalisa/my-project#111[/muted]\n[muted]Draft[/muted] • Copilot (AI) wants to merge 2 commits into main from feature-branch • [muted]about 2 hours ago[/muted]\n[brgreen]+47[/brgreen] [brred]-0[/brred] • [muted]No checks[/muted]\n[b]Reviewers:[/b] Copilot (AI) (Commented)\n[b]Assignees:[/b] MonaLisa (Mona Lisa), Copilot (AI)\n\n  [muted]...[/muted]\n\n[b]Copilot (AI)[/b] commented • [b]3m[/b] • [link]Newest comment[/link]\n\n  [muted]...[/muted]\n\n[muted]View this pull request on GitHub: https://github.com/monalisa/my-project/pull/111[/muted]",
+  "options": {
+    "font": "menlo",
+    "fontSize": 14,
+    "width": 800,
+    "chrome": "macos",
+    "backdrop": "grid",
+    "bodyGradient": false,
+    "autoStyle": true
+  }
+}

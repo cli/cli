@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Terminal mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Fira+Code:wght@400;700&family=Source+Code+Pro:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" />
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="title">Terminal mockup</div>
+    <div class="pane-toggles" aria-label="Pane visibility">
+      <button id="toggle-toolbar" type="button" class="pane-toggle" title="Hide toolbar" aria-pressed="false">
+        <span class="pane-toggle-icon" aria-hidden="true">▲</span>
+        <span class="pane-toggle-label">Toolbar</span>
+      </button>
+      <button id="toggle-editor" type="button" class="pane-toggle" title="Hide content editor" aria-pressed="false">
+        <span class="pane-toggle-icon" aria-hidden="true">▼</span>
+        <span class="pane-toggle-label">Content</span>
+      </button>
+    </div>
+  </header>
+  <header class="toolbar">
+    <div class="controls">
+      <label class="ctl" title="Font family used inside the terminal window.">
+        <span>Font</span>
+        <select id="ctl-font">
+          <option value="menlo">Menlo</option>
+          <option value="sfmono">SF Mono</option>
+          <option value="cascadia">Cascadia Code</option>
+          <option value="jetbrains">JetBrains Mono</option>
+          <option value="fira">Fira Code</option>
+          <option value="source">Source Code Pro</option>
+          <option value="roboto">Roboto Mono</option>
+          <option value="consolas">Consolas</option>
+        </select>
+      </label>
+      <label class="ctl" title="Font size in pixels.">
+        <span>Size</span>
+        <input id="ctl-fontsize" type="range" min="10" max="22" step="1" value="14" />
+        <output id="ctl-fontsize-out">14px</output>
+      </label>
+      <label class="ctl" title="Width of the terminal window in pixels.">
+        <span>Width</span>
+        <input id="ctl-width" type="range" min="480" max="1200" step="20" value="800" />
+        <output id="ctl-width-out">800px</output>
+      </label>
+      <label class="ctl" title="Window chrome around the terminal. macOS adds the title bar with traffic-light buttons.">
+        <span>Chrome</span>
+        <select id="ctl-chrome">
+          <option value="macos">macOS</option>
+          <option value="none">None</option>
+        </select>
+      </label>
+      <label class="ctl" title="Background behind the terminal. Grid is the marketing-style blueprint backdrop; Solid is a flat navy; None gives a transparent backdrop in PNG exports.">
+        <span>Backdrop</span>
+        <select id="ctl-backdrop">
+          <option value="grid">Grid (blue)</option>
+          <option value="solid">Solid</option>
+          <option value="none">None</option>
+        </select>
+      </label>
+      <label class="ctl checkbox" title="Adds a subtle dark-to-light gradient inside the terminal body for a more polished look.">
+        <input id="ctl-bodygrad" type="checkbox" />
+        <span>Body gradient</span>
+      </label>
+      <label class="ctl checkbox" title="Adds inferred styling to plain text that you didn&#39;t explicitly mark up:&#10;  • $ prompts: dims the leading $&#10;  • URLs (https://...): dimmed&#10;  • Diff tokens (+12 / -3): green / red&#10;  • Issue/PR refs (#142): blue&#10;Skips any text you&#39;ve already styled with bracket tags ([red], [muted], etc.) or ANSI escapes. Turn off if a pattern is firing where you don&#39;t want it.">
+        <input id="ctl-autostyle" type="checkbox" checked />
+        <span>Auto-style</span>
+      </label>
+      <label class="ctl" title="Export format. PNG keeps transparency (use for inline blog images on a colored background). JPG is smaller but flattens to solid navy.">
+        <span>Format</span>
+        <select id="ctl-format">
+          <option value="png">PNG</option>
+          <option value="jpg">JPG</option>
+        </select>
+      </label>
+      <button id="btn-download" type="button" class="primary" title="Download the current preview as an image, named after the loaded mockup.">Download PNG</button>
+      <span class="ctl-sep" aria-hidden="true"></span>
+      <label class="ctl">
+        <span>Saved</span>
+        <select id="ctl-saved">
+          <option value="">Select a mockup</option>
+        </select>
+      </label>
+      <button id="btn-save" type="button" title="Save as a new mockup in your local library (per-user, not committed)">Save to local…</button>
+      <button id="btn-save-project" type="button" title="Save as a new mockup in the project library (committed to the repo, shared with the team)">Save to project…</button>
+      <button id="btn-save-overwrite" type="button" disabled title="Overwrite the loaded mockup">Save</button>
+      <button id="btn-delete" type="button" disabled title="Delete the loaded mockup">Delete</button>
+    </div>
+  </header>
+
+  <main class="preview-pane">
+    <div id="mockup" class="mockup backdrop-grid">
+      <svg class="grid-svg" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <pattern id="grid-pattern" x="0" y="0" width="96" height="96" patternUnits="userSpaceOnUse">
+            <path d="M96 0L0 0L0 96" stroke="#78AAFF" stroke-opacity="0.38" fill="none" shape-rendering="crispEdges" stroke-width="1"/>
+          </pattern>
+          <linearGradient id="grid-fade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#04060c" stop-opacity="0"/>
+            <stop offset="0.25" stop-color="#04060c" stop-opacity="0"/>
+            <stop offset="0.7" stop-color="#04060c" stop-opacity="0.85"/>
+            <stop offset="1" stop-color="#04060c" stop-opacity="1"/>
+          </linearGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid-pattern)"/>
+        <rect width="100%" height="100%" fill="url(#grid-fade)"/>
+      </svg>
+      <div id="window" class="window has-chrome">
+        <div class="titlebar">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+        </div>
+        <pre id="terminal" class="terminal"></pre>
+      </div>
+    </div>
+  </main>
+
+  <div id="resize-handle" class="resize-handle" role="separator" aria-orientation="horizontal" aria-label="Resize content editor" tabindex="0"></div>
+
+  <section class="editor-pane">
+    <div class="editor-header">
+      <span>Content</span>
+      <span class="hint">Raw ANSI or bracket markup: <code>[b]…[/b]</code> <code>[cyan]…[/cyan]</code> <code>[muted]…[/muted]</code> <code>[link]…[/link]</code></span>
+    </div>
+    <textarea id="editor" spellcheck="false"></textarea>
+  </section>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <dialog id="save-dialog" class="save-dialog">
+    <form id="save-form" method="dialog">
+      <label for="save-name"><span id="save-heading">Save mockup as</span></label>
+      <input id="save-name" type="text" maxlength="80" autocomplete="off" required />
+      <div class="save-dialog-actions">
+        <button type="button" id="save-cancel">Cancel</button>
+        <button type="submit" id="save-confirm" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+
+<script src="./html2canvas.min.js"></script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
