@@ -5,7 +5,7 @@
 // happen client-side in the iframe app.
 
 import { createServer } from "node:http";
-import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
@@ -140,18 +140,34 @@ async function readMockup(slug, scope) {
     return null;
 }
 
+async function refuseSymlink(path) {
+    try {
+        const stat = await lstat(path);
+        if (stat.isSymbolicLink()) {
+            throw new CanvasError("refused_symlink", `Refusing to operate on symlink: ${path}`);
+        }
+    } catch (err) {
+        if (err && err.code === "ENOENT") return;
+        throw err;
+    }
+}
+
 async function writeMockup(slug, doc, scope) {
     if (!isValidSlug(slug)) throw new Error("invalid slug");
     if (!isScope(scope)) throw new Error("invalid scope");
     await ensureDir(scope);
-    await writeFile(join(SCOPE_DIRS[scope], `${slug}.json`), JSON.stringify(doc, null, 2) + "\n", "utf8");
+    const target = join(SCOPE_DIRS[scope], `${slug}.json`);
+    await refuseSymlink(target);
+    await writeFile(target, JSON.stringify(doc, null, 2) + "\n", "utf8");
 }
 
 async function deleteMockup(slug, scope) {
     if (!isValidSlug(slug)) return false;
     if (!isScope(scope)) return false;
+    const target = join(SCOPE_DIRS[scope], `${slug}.json`);
     try {
-        await unlink(join(SCOPE_DIRS[scope], `${slug}.json`));
+        await refuseSymlink(target);
+        await unlink(target);
         return true;
     } catch {
         return false;
@@ -277,7 +293,24 @@ async function handleMockupsApi(req, res, urlPath, instanceId) {
 
 async function startServer(instanceId) {
     const state = ensureInstanceState(instanceId);
+    let port = 0;
     const server = createServer((req, res) => {
+        // Defense against DNS rebinding and same-port cross-origin loopback requests:
+        // reject any request whose Host header does not match the loopback bound port,
+        // or whose Origin (if present) is not loopback. Bound to 127.0.0.1, so the
+        // only way to reach here with a foreign Host is a rebound DNS name.
+        const host = req.headers.host || "";
+        if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) {
+            res.statusCode = 403;
+            res.end("Forbidden");
+            return;
+        }
+        const origin = req.headers.origin;
+        if (origin && !origin.startsWith("http://127.0.0.1:") && !origin.startsWith("http://localhost:")) {
+            res.statusCode = 403;
+            res.end("Forbidden");
+            return;
+        }
         const url = new URL(req.url, "http://127.0.0.1");
         if (url.pathname === "/state") {
             res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -310,7 +343,7 @@ async function startServer(instanceId) {
     });
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
-    const port = typeof address === "object" && address ? address.port : 0;
+    port = typeof address === "object" && address ? address.port : 0;
     return { server, url: `http://127.0.0.1:${port}/` };
 }
 
