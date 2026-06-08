@@ -9,22 +9,25 @@ terminal recordings are impractical.
 
 Open the canvas from a Copilot app session. Pick a starting mockup from the
 library dropdown, edit the content and toolbar options, and export a PNG via
-the download button. Exports are written to `~/Downloads/`.
+the download button. Files download through the browser/runtime, which
+typically lands them in the configured downloads directory.
 
-The toolbar controls font, font size, width, window chrome (macOS traffic
-lights / Windows / none), backdrop (subtle blue glow / grid / none), and an
-"auto-style" toggle that colorizes common `gh` patterns without requiring
-inline tags.
+The toolbar controls font, font size, width, window chrome (macOS or none),
+backdrop (subtle blue glow / grid / none), and an "auto-style" toggle that
+colorizes common `gh` patterns without requiring inline tags.
 
 ## Content markup
 
 Content can be authored as raw ANSI escapes, or with a more readable bracket
 syntax that the renderer maps to the VSCode Dark+ palette:
 
-- Named colors: `[red]`, `[green]`, `[yellow]`, `[blue]`, `[magenta]`, `[cyan]`, `[muted]`
-- Modifiers: `[bold]`, `[dim]`, `[underline]`
-- Custom hex: `[c:#ff7b72]`
-- Reset: `[/]`
+- Named colors: `[red]`, `[green]`, `[yellow]`, `[blue]`, `[magenta]`,
+  `[cyan]`, `[white]`, `[black]` (bright variants prefixed `br`, e.g.
+  `[brblue]`), plus `[muted]` for grayed-out text and `[link]` for blue
+  underlined link styling.
+- Modifiers: `[bold]` (or `[b]`), `[italic]` (or `[i]`), `[underline]`
+  (or `[u]`), `[dim]`.
+- Each tag closes with its matching `[/name]`, e.g. `[red]error[/red]`.
 
 When auto-style is on, the renderer also colorizes PR/issue states, labels,
 checkboxes, timestamps, and similar conventional output without explicit tags.

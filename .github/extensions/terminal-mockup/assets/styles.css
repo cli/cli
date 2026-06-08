@@ -369,7 +369,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .window[data-font="menlo"]    .terminal { font-family: 'Menlo', 'Monaco', 'Courier New', monospace; }
 .window[data-font="sfmono"]   .terminal { font-family: 'SF Mono', 'SFMono-Regular', ui-monospace, Menlo, monospace; }
 .window[data-font="cascadia"] .terminal { font-family: 'Cascadia Code', 'Cascadia Mono', Consolas, monospace; }
-.window[data-font="jetbrains"].terminal { font-family: 'JetBrains Mono', monospace; }
+.window[data-font="jetbrains"] .terminal { font-family: 'JetBrains Mono', monospace; }
 .window[data-font="fira"]     .terminal { font-family: 'Fira Code', monospace; }
 .window[data-font="source"]   .terminal { font-family: 'Source Code Pro', monospace; }
 .window[data-font="roboto"]   .terminal { font-family: 'Roboto Mono', monospace; }

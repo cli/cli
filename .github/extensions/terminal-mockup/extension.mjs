@@ -353,14 +353,16 @@ const session = await joinSession({
                 },
                 {
                     name: "set_options",
-                    description: "Adjust rendering options: chrome (none|macos), backdrop (none|solid|grid), font, width, etc.",
+                    description: "Adjust rendering options: chrome (none|macos), backdrop (none|solid|grid), font, fontSize, width, bodyGradient, autoStyle.",
                     inputSchema: {
                         type: "object",
                         properties: {
                             chrome: { type: "string", enum: ["none", "macos"] },
                             backdrop: { type: "string", enum: ["none", "solid", "grid"] },
                             font: { type: "string" },
+                            fontSize: { type: "number" },
                             width: { type: "number" },
+                            bodyGradient: { type: "boolean" },
                             autoStyle: { type: "boolean" },
                         },
                     },

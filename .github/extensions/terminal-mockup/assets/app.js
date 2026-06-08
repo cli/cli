@@ -340,12 +340,12 @@ function promptSaveName(defaultValue, scope) {
         const onSubmit = (e) => {
             e.preventDefault();
             const value = (input.value || "").trim();
-            dialog.close(value ? "ok" : "");
             settle(value || null);
+            dialog.close(value ? "ok" : "");
         };
         const onCancel = () => {
-            dialog.close("");
             settle(null);
+            dialog.close("");
         };
         const onClose = () => settle(null);
         form.addEventListener("submit", onSubmit);
@@ -464,6 +464,7 @@ downloadBtn.addEventListener("click", async () => {
         const fmt = currentFormat();
         const canvas = await renderToCanvas(fmt.background);
         const blob = await new Promise((resolve) => canvas.toBlob(resolve, fmt.mime, fmt.quality));
+        if (!blob) throw new Error(`Could not encode ${fmt.label}`);
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -510,6 +511,7 @@ async function runBatchExport({ slugs, suffix, format }) {
                 const fmt = fmtOverride || currentFormat();
                 const canvas = await renderToCanvas(fmt.background);
                 const blob = await new Promise((resolve) => canvas.toBlob(resolve, fmt.mime, fmt.quality));
+                if (!blob) throw new Error(`Could not encode ${fmt.label}`);
                 const blobUrl = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = blobUrl;
