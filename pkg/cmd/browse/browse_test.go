@@ -617,23 +617,35 @@ func Test_runBrowse(t *testing.T) {
 			wantsErr:    false,
 		},
 		{
-			name: "ambiguous decimal SHA resolves to commit when SHA exists locally",
-			opts: BrowseOptions{
-				SelectorArg: "6f1a240",
-				GitClient:   &testGitClient{},
-			},
-			baseRepo:    ghrepo.New("bchadwic", "test"),
-			expectedURL: "https://github.com/bchadwic/test/commit/6f1a240",
-			wantsErr:    false,
-		},
-		{
-			name: "ambiguous decimal SHA falls back to issue when not a known commit",
+			name: "ambiguous decimal SHA resolves to issue when commit not found on remote",
 			opts: BrowseOptions{
 				SelectorArg: "309628980",
 				GitClient:   &testGitClient{},
 			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/bchadwic/test/commits/309628980"),
+					httpmock.StatusStringResponse(404, `{"message": "Not Found"}`),
+				)
+			},
 			baseRepo:    ghrepo.New("bchadwic", "test"),
 			expectedURL: "https://github.com/bchadwic/test/issues/309628980",
+			wantsErr:    false,
+		},
+		{
+			name: "ambiguous decimal SHA resolves to commit when found on remote",
+			opts: BrowseOptions{
+				SelectorArg: "309628980",
+				GitClient:   &testGitClient{},
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/bchadwic/test/commits/309628980"),
+					httpmock.StringResponse(`{"sha": "309628980abc123"}`),
+				)
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/commit/309628980",
 			wantsErr:    false,
 		},
 

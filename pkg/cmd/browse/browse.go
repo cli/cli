@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -99,7 +100,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			# Open main.go with the repository at head of bug-fix branch
 			$ gh browse main.go --branch bug-fix
 
-			# Open main.go with the repository at commit 775007cd
+			# Open main.go with repository at commit 775007cd
 			$ gh browse main.go --commit=77507cd94ccafcf568f8560cfecde965fcfa63
 		`),
 		Annotations: map[string]string{
@@ -203,7 +204,7 @@ func runBrowse(opts *BrowseOptions) error {
 	if err != nil {
 		return err
 	}
-	url := ghrepo.GenerateRepoURL(baseRepo, "%s", section)
+	browseURL := ghrepo.GenerateRepoURL(baseRepo, "%s", section)
 
 	if opts.NoBrowserFlag {
 		client, err := opts.HttpClient()
@@ -216,16 +217,16 @@ func runBrowse(opts *BrowseOptions) error {
 			return err
 		}
 		if !exist {
-			return fmt.Errorf("%s doesn't exist", text.DisplayURL(url))
+			return fmt.Errorf("%s doesn't exist", text.DisplayURL(browseURL))
 		}
-		_, err = fmt.Fprintln(opts.IO.Out, url)
+		_, err = fmt.Fprintln(opts.IO.Out, browseURL)
 		return err
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(url))
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(browseURL))
 	}
-	return opts.Browser.Browse(url)
+	return opts.Browser.Browse(browseURL)
 }
 
 func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error) {
@@ -252,14 +253,20 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		}
 		// When the selector is all decimal digits and 7+ chars long, it
 		// could be either an issue number or a commit SHA (e.g. 309628980).
-		// Resolve the ambiguity by checking the local git repo: if a
-		// matching commit exists, treat it as a SHA; otherwise fall back
-		// to an issue reference.
-		if isNumber(opts.SelectorArg) && isCommit(opts.SelectorArg) && opts.GitClient != nil {
-			if _, err := opts.GitClient.CommitBody(opts.SelectorArg); err == nil {
-				return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+		// Resolve the ambiguity by querying the remote repository API:
+		// if the commit exists on the remote, treat it as a SHA; otherwise
+		// fall back to an issue reference. The # prefix forces issue
+		// interpretation regardless.
+		selector := opts.SelectorArg
+		if isNumber(selector) && isCommit(selector) {
+			httpClient, err := opts.HttpClient()
+			if err != nil {
+				return "", err
 			}
-			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
+			if commitExistsOnRemote(api.NewClientFromHTTP(httpClient), baseRepo, selector) {
+				return fmt.Sprintf("commit/%s", selector), nil
+			}
+			return fmt.Sprintf("issues/%s", strings.TrimPrefix(selector, "#")), nil
 		}
 		if isNumber(opts.SelectorArg) {
 			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
@@ -304,6 +311,20 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 	}
 
 	return strings.TrimSuffix(fmt.Sprintf("tree/%s/%s", escapePath(ref), escapePath(filePath)), "/"), nil
+}
+
+// commitExistsOnRemote checks if a commit SHA exists in the remote repository
+// using the GitHub REST API. Returns true only if the API responds with 200.
+func commitExistsOnRemote(client *api.Client, repo ghrepo.Interface, sha string) bool {
+	path := fmt.Sprintf("%srepos/%s/%s/commits/%s",
+		ghinstance.RESTPrefix(repo.RepoHost()),
+		url.PathEscape(repo.RepoOwner()),
+		url.PathEscape(repo.RepoName()),
+		url.PathEscape(sha),
+	)
+	var resp struct{} // We only care about the status code, not the body
+	err := client.REST(repo.RepoHost(), "GET", path, nil, &resp)
+	return err == nil
 }
 
 // escapePath URL-encodes special characters but leaves slashes unchanged
