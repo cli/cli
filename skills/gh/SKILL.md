@@ -61,7 +61,7 @@ Newer `gh issue` subcommands model issue types, sub-issue hierarchy, and
 blocked-by/blocking relationships.
 
 - `gh issue create`: `--type <name>`, `--parent <number|url>` (creates the
-  new issue as a sub-issue), `--blocked-by <n,n>`, `--blocking <n,n>`.
+  new issue as a sub-issue), `--blocked-by <number|url,...>`, `--blocking <number|url,...>`.
 - `gh issue edit` (edits one or more issues in the same repo, e.g.
   `gh issue edit 23 34`): `--type <name>` / `--remove-type`,
   `--parent <n|url>` / `--remove-parent`,
@@ -98,11 +98,11 @@ Preview command set, subject to change. Subcommands:
   and reply listings.
 - `gh discussion create [--title <t>] [--body <b> | --body-file <path>] [--category <name>] [--label <name>,...]`
   creates a discussion. `--title`, a body (`--body` or `--body-file`), and
-  `--category` are required non-interactively; omitting any prompts on a
+  `--category` are required non-interactively; omitting any will prompt on a
   terminal.
 - `gh discussion edit {<number>|<url>} [--title <t>] [--body <b>] [--body-file <path>] [--category <name>] [--add-label <name>,...] [--remove-label <name>,...]`
   edits title, body, category, or labels.
-- `gh discussion comment {<number>|<discussion-url>|<comment-id>|<comment-url>} [--body <t>] [--body-file <path>] [--edit] [--delete] [--yes]`
+- `gh discussion comment {<number>|<discussion-url>|<comment-id>|<comment-url>} [--body <b>] [--body-file <path>] [--edit] [--delete] [--yes]`
   adds a top-level comment (when given a discussion) or a reply (when given a
   comment); `--edit` or `--delete` updates or removes a comment/reply and
   needs a comment ID or URL. `--yes` skips the `--delete` confirmation.
