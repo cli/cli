@@ -55,6 +55,60 @@ Pass `--repo OWNER/REPO` (`-R`) to override the resolved CWD repo.
 - `gh issue list --search "..."` and `gh pr list --search "..."` accept
   the same syntax but are scoped to one repo.
 
+## Issue types, sub-issues, and relationships
+
+Newer `gh issue` subcommands model issue types, sub-issue hierarchy, and
+blocked-by/blocking relationships.
+
+- `gh issue create`: `--type <name>`, `--parent <number|url>` (creates the
+  new issue as a sub-issue), `--blocked-by <n,n>`, `--blocking <n,n>`.
+- `gh issue edit` (edits one or more issues in the same repo, e.g.
+  `gh issue edit 23 34`): `--type <name>` / `--remove-type`,
+  `--parent <n|url>` / `--remove-parent`,
+  `--add-sub-issue <n,n>` / `--remove-sub-issue <n,n>`,
+  `--add-blocked-by <n,n>` / `--remove-blocked-by <n,n>`,
+  `--add-blocking <n,n>` / `--remove-blocking <n,n>`. Relationship and parent
+  refs are issue numbers or URLs; a URL may point to another repo on the same
+  host, but a different host is rejected. `--add-sub-issue` cannot be used
+  when editing more than one issue.
+- `gh issue list --type <name>` filters by issue type.
+- `gh issue view` and `gh issue list` accept these as `--json` fields (prefer
+  them over scraping the default text output): `issueType`, `parent`,
+  `subIssues`, `subIssuesSummary`, `blockedBy`, `blocking`. `subIssues`,
+  `blockedBy`, and `blocking` are objects shaped
+  `{"nodes": [...], "totalCount": N}` (not flat arrays), and `nodes` is capped
+  (`subIssues` at 100, `blockedBy`/`blocking` at 50), so compare the node count
+  against `totalCount` to detect truncation.
+- GHES: issue types and sub-issues need 3.17+; blocked-by/blocking
+  relationships need 3.19+.
+
+## Discussions (`gh discussion`)
+
+Preview command set, subject to change. Subcommands:
+
+- `gh discussion list [--state open|closed|all] [--category <name>] [--author <handle>] [--label <name>,...] [--answered] [--search <query>] [--sort created|updated] [--order asc|desc] [--limit N] [--after <cursor>] [--json <fields>] [--web]`
+  lists a repo's discussions. `--state` defaults to open, `--sort` to updated,
+  `--order` to desc. `--answered` is tri-state (`--answered=false` for
+  unanswered) for Q&A categories.
+- `gh discussion view {<number>|<url>|<comment-id>|<comment-url>} [--comments] [--order oldest|newest] [--limit N] [--after <cursor>] [--json <fields>] [--web]`
+  shows a discussion's body; add `--comments` for its comments, or pass a
+  comment ID/URL as the argument to list that comment's replies (no
+  `--replies` flag; `--comments` is rejected with a comment argument).
+  `--order` (default newest), `--limit`, and `--after` apply only to comment
+  and reply listings.
+- `gh discussion create [--title <t>] [--body <b> | --body-file <path>] [--category <name>] [--label <name>,...]`
+  creates a discussion. `--title`, a body (`--body` or `--body-file`), and
+  `--category` are required non-interactively; omitting any prompts on a
+  terminal.
+- `gh discussion edit {<number>|<url>} [--title <t>] [--body <b>] [--body-file <path>] [--category <name>] [--add-label <name>,...] [--remove-label <name>,...]`
+  edits title, body, category, or labels.
+- `gh discussion comment {<number>|<discussion-url>|<comment-id>|<comment-url>} [--body <t>] [--body-file <path>] [--edit] [--delete] [--yes]`
+  adds a top-level comment (when given a discussion) or a reply (when given a
+  comment); `--edit` or `--delete` updates or removes a comment/reply and
+  needs a comment ID or URL. `--yes` skips the `--delete` confirmation.
+- `--json`/`--jq`/`--template` are available on `list` and `view` only;
+  `create` and `edit` print the discussion URL.
+
 ## Fall back to `gh api` for anything `--json` doesn't expose
 
 Sometimes useful data isn't on the typed commands. Examples:
