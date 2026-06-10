@@ -1,7 +1,6 @@
 package browse
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -274,12 +273,6 @@ func (gc *testGitClient) LastCommit() (*git.Commit, error) {
 	return &git.Commit{Sha: "6f1a2405cace1633d89a79c74c65f22fe78f9659"}, nil
 }
 
-func (gc *testGitClient) CommitBody(sha string) (string, error) {
-	// Delegate to the real git fixture so tests can exercise the
-	// ambiguous-selector resolution path against known commits.
-	repo := &git.Client{}
-	return repo.CommitBody(context.Background(), sha)
-}
 
 func Test_runBrowse(t *testing.T) {
 	s := string(os.PathSeparator)
@@ -648,6 +641,16 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/bchadwic/test/commit/309628980",
 			wantsErr:    false,
 		},
+			{
+				name: "hash prefix forces issue even when ambiguous decimal SHA exists as commit",
+				opts: BrowseOptions{
+					SelectorArg: "#309628980",
+					GitClient:   &testGitClient{},
+				},
+				baseRepo:    ghrepo.New("bchadwic", "test"),
+				expectedURL: "https://github.com/bchadwic/test/issues/309628980",
+				wantsErr:    false,
+			},
 
 		{
 			name: "commit hash with extension",

@@ -2,7 +2,6 @@ package browse
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -322,7 +321,7 @@ func commitExistsOnRemote(client *api.Client, repo ghrepo.Interface, sha string)
 		url.PathEscape(repo.RepoName()),
 		url.PathEscape(sha),
 	)
-	var resp struct{} // We only care about the status code, not the body
+	var resp struct{}
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &resp)
 	return err == nil
 }
@@ -390,7 +389,6 @@ func isCommit(arg string) bool {
 // gitClient is used to implement functions that can be performed on both local and remote git repositories
 type gitClient interface {
 	LastCommit() (*git.Commit, error)
-	CommitBody(sha string) (string, error)
 }
 
 type localGitClient struct {
@@ -404,10 +402,6 @@ type remoteGitClient struct {
 
 func (gc *localGitClient) LastCommit() (*git.Commit, error) {
 	return gc.client.LastCommit(context.Background())
-}
-
-func (gc *localGitClient) CommitBody(sha string) (string, error) {
-	return gc.client.CommitBody(context.Background(), sha)
 }
 
 func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
@@ -424,11 +418,4 @@ func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
 		return nil, err
 	}
 	return &git.Commit{Sha: commit.OID}, nil
-}
-
-// CommitBody is unsupported for remote repositories because the GraphQL API
-// does not expose a way to verify an arbitrary abbreviated SHA. Returning an
-// error causes callers to fall back to the existing issue-then-commit logic.
-func (gc *remoteGitClient) CommitBody(sha string) (string, error) {
-	return "", errors.New("commit body lookup is not supported for remote repositories")
 }
