@@ -107,7 +107,7 @@ Preview command set, subject to change. Subcommands:
   comment); `--edit` or `--delete` updates or removes a comment/reply and
   needs a comment ID or URL. `--yes` skips the `--delete` confirmation.
 - `--json`/`--jq`/`--template` are available on `list` and `view` only;
-  `create` and `edit` print the discussion URL.
+  `create` and `edit` print the discussion URL. `comment` prints the discussion comment (or reply) URL.
 
 ## Fall back to `gh api` for anything `--json` doesn't expose
 
