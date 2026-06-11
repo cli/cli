@@ -35,7 +35,7 @@ type ListOptions struct {
 	BaseBranch string
 	HeadBranch string
 	Labels     []string
-	Author     string
+	Author     []string
 	Assignee   string
 	Search     string
 	Draft      *bool
@@ -99,7 +99,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			}
 
 			if cmd.Flags().Changed("app") {
-				opts.Author = fmt.Sprintf("app/%s", appAuthor)
+				opts.Author = []string{fmt.Sprintf("app/%s", appAuthor)}
 			}
 
 			if runF != nil {
@@ -115,7 +115,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
 	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", `Filter by head branch ("<owner>:<branch>" syntax not supported)`)
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
-	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
+	cmd.Flags().StringSliceVarP(&opts.Author, "author", "A", nil, "Filter by author")
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")

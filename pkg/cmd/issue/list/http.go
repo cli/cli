@@ -52,7 +52,7 @@ func listIssues(client *api.Client, repo ghrepo.Interface, filters prShared.Filt
 	if filters.Assignee != "" {
 		variables["assignee"] = filters.Assignee
 	}
-	if filters.Author != "" {
+	if filters.Author != nil {
 		variables["author"] = filters.Author
 	}
 	if filters.Mention != "" {

@@ -42,7 +42,7 @@ type Query struct {
 type Qualifiers struct {
 	Archived            *bool
 	Assignee            string
-	Author              string
+	Author              []string
 	AuthorDate          string
 	AuthorEmail         string
 	AuthorName          string

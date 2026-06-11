@@ -33,7 +33,7 @@ type ListOptions struct {
 	Labels       []string
 	State        string
 	LimitResults int
-	Author       string
+	Author       []string
 	Mention      string
 	Milestone    string
 	Search       string
@@ -95,7 +95,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			}
 
 			if cmd.Flags().Changed("app") {
-				opts.Author = fmt.Sprintf("app/%s", appAuthor)
+				opts.Author = []string{fmt.Sprintf("app/%s", appAuthor)}
 			}
 
 			if runF != nil {
@@ -110,7 +110,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "all"}, "Filter by state")
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of issues to fetch")
-	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
+	cmd.Flags().StringSliceVarP(&opts.Author, "author", "A", nil, "Filter by author")
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone number or title")
@@ -249,7 +249,7 @@ func issueList(client *http.Client, detector fd.Detector, repo ghrepo.Interface,
 	if err != nil {
 		return nil, err
 	}
-	filters.Author, err = meReplacer.Replace(filters.Author)
+	filters.Author, err = meReplacer.ReplaceSlice(filters.Author)
 	if err != nil {
 		return nil, err
 	}

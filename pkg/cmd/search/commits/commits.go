@@ -103,7 +103,7 @@ func NewCmdCommits(f *cmdutil.Factory, runF func(*CommitsOptions) error) *cobra.
 	cmdutil.StringEnumFlag(cmd, &sort, "sort", "", "best-match", []string{"author-date", "committer-date"}, "Sort fetched commits")
 
 	// Query qualifier flags
-	cmd.Flags().StringVar(&opts.Query.Qualifiers.Author, "author", "", "Filter by author")
+	cmd.Flags().StringSliceVar(&opts.Query.Qualifiers.Author, "author", nil, "Filter by author")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.AuthorDate, "author-date", "", "Filter based on authored `date`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.AuthorEmail, "author-email", "", "Filter on author email")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.AuthorName, "author-name", "", "Filter on author name")

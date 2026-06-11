@@ -78,7 +78,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
 			}
 			if c.Flags().Changed("app") {
-				opts.Query.Qualifiers.Author = fmt.Sprintf("app/%s", appAuthor)
+				opts.Query.Qualifiers.Author = []string{fmt.Sprintf("app/%s", appAuthor)}
 			}
 			if c.Flags().Changed("order") {
 				opts.Query.Order = order
@@ -158,7 +158,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Filter based on the repository archived state {true|false}")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Assignee, "assignee", "", "Filter by assignee")
-	cmd.Flags().StringVar(&opts.Query.Qualifiers.Author, "author", "", "Filter by author")
+	cmd.Flags().StringSliceVar(&opts.Query.Qualifiers.Author, "author", nil, "Filter by author")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Closed, "closed", "", "Filter on closed at `date`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Commenter, "commenter", "", "Filter based on comments by `user`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Comments, "comments", "", "Filter on `number` of comments")

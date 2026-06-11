@@ -11,7 +11,7 @@ import (
 )
 
 func shouldUseSearch(filters prShared.FilterOptions) bool {
-	return filters.Draft != nil || filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0
+	return filters.Draft != nil || filters.Author != nil || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0
 }
 
 func listPullRequests(httpClient *http.Client, detector fd.Detector, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
