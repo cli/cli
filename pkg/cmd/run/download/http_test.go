@@ -105,3 +105,31 @@ func Test_Download(t *testing.T) {
 		filepath.Join("artifact", "src", "util.go"),
 	}, paths)
 }
+
+func Test_Download_NonZip(t *testing.T) {
+	tmpDir := t.TempDir()
+	destDir, err := safepaths.ParseAbsolute(filepath.Join(tmpDir, "artifact"))
+	require.NoError(t, err)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/actions/artifacts/12345/zip"),
+		func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 200,
+				Header:     http.Header{"Content-Type": []string{"application/octet-stream"}},
+				Body:       http.NoBody,
+			}, nil
+		})
+
+	api := &apiPlatform{
+		client: &http.Client{Transport: reg},
+	}
+	require.NoError(t, api.DownloadWithName("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip", "my-artifact.txt", destDir))
+
+	// Verify the file was saved directly (not extracted as zip)
+	_, err = os.Stat(filepath.Join(destDir.String(), "my-artifact.txt"))
+	require.NoError(t, err)
+}
