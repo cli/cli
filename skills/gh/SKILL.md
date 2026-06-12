@@ -58,6 +58,9 @@ Pass `--repo OWNER/REPO` (`-R`) to override the resolved CWD repo.
   anything cross-repo or filtered by author/label.
 - `gh issue list --search "..."` and `gh pr list --search "..."` take the
   query as one quoted string (it is a flag value) and are scoped to one repo.
+- Bots author as GitHub Apps, so `--author dependabot` matches nothing. Use
+  `--app dependabot` (on `pr`/`issue list` and `search prs|issues`; expands
+  to `author:app/<slug>`) or `--author "dependabot[bot]"`.
 
 ## Issue types, sub-issues, and relationships
 
