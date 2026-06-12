@@ -48,12 +48,16 @@ Pass `--repo OWNER/REPO` (`-R`) to override the resolved CWD repo.
 
 - `gh search issues|prs|code|repos|commits|users` uses GitHub's search
   index and accepts the full search syntax (`is:open`, `author:`,
-  `label:`, `repo:owner/name`, `in:title`, ...). Pass the entire query as
-  one quoted string, the same way you would for `--search`:
-  `gh search issues "is:open author:foo repo:cli/cli"`. Prefer it for
+  `label:`, `repo:owner/name`, `in:title`, ...). Pass each qualifier as
+  its own bare token, not as one quoted string:
+  `gh search issues repo:cli/cli is:open author:monalisa` works, but
+  `gh search issues "repo:cli/cli is:open"` is read as a single phrase and
+  fails with `Invalid search query`. Quote only multi-word free text
+  (`gh search issues "broken feature"`). Most qualifiers also have a
+  dedicated flag (`--repo`, `--author`, `--label`, ...). Prefer search for
   anything cross-repo or filtered by author/label.
-- `gh issue list --search "..."` and `gh pr list --search "..."` accept
-  the same syntax but are scoped to one repo.
+- `gh issue list --search "..."` and `gh pr list --search "..."` take the
+  query as one quoted string (it is a flag value) and are scoped to one repo.
 
 ## Issue types, sub-issues, and relationships
 
