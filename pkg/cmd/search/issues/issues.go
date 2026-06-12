@@ -147,7 +147,7 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Filter based on the repository archived state {true|false}")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Assignee, "assignee", "", "Filter by assignee")
-	cmd.Flags().StringVar(&opts.Query.Qualifiers.Author, "author", "", "Filter by author")
+	cmd.Flags().StringVar(&opts.Query.Qualifiers.Author, "author", "", "Filter by author (use --app to filter by a GitHub App)")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Closed, "closed", "", "Filter on closed at `date`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Commenter, "commenter", "", "Filter based on comments by `user`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Comments, "comments", "", "Filter on `number` of comments")

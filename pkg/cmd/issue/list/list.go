@@ -74,6 +74,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Example: heredoc.Doc(`
 			$ gh issue list --label "bug" --label "help wanted"
 			$ gh issue list --author monalisa
+			$ gh issue list --app dependabot
 			$ gh issue list --assignee "@me"
 			$ gh issue list --milestone "The big 1.0"
 			$ gh issue list --search "error no:assignee sort:created-asc"
@@ -110,7 +111,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "all"}, "Filter by state")
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of issues to fetch")
-	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
+	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author (use --app to filter by a GitHub App)")
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone number or title")
