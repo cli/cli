@@ -379,6 +379,31 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if ext, err := checkValidExtension(cmd.Root(), m, repo.RepoName(), repo.RepoOwner()); err != nil {
 						// If an existing extension was found and --force was specified, attempt to upgrade.
 						if forceFlag && ext != nil {
+							if pinFlag != "" {
+								// When --pin is specified, re-install with pinned version instead of going
+								// through the upgrade path which ignores pin.
+								io.StartProgressIndicator()
+								if err := m.Install(repo, pinFlag); err != nil {
+									io.StopProgressIndicator()
+									if errors.Is(err, releaseNotFoundErr) {
+										return fmt.Errorf("%s Could not find a release of %s for %s",
+											cs.FailureIcon(), args[0], cs.Cyan(pinFlag))
+									} else if errors.Is(err, commitNotFoundErr) {
+										return fmt.Errorf("%s %s does not exist in %s",
+											cs.FailureIcon(), cs.Cyan(pinFlag), args[0])
+									} else if errors.Is(err, repositoryNotFoundErr) {
+										return fmt.Errorf("%s Could not find extension '%s' on host %s",
+											cs.FailureIcon(), args[0], repo.RepoHost())
+									}
+									return err
+								}
+								io.StopProgressIndicator()
+								if io.IsStdoutTTY() {
+									fmt.Fprintf(io.Out, "%s Installed extension %s\n", cs.SuccessIcon(), args[0])
+									fmt.Fprintf(io.Out, "%s Pinned extension at %s\n", cs.SuccessIcon(), cs.Cyan(pinFlag))
+								}
+								return nil
+							}
 							return upgradeFunc(ext.Name(), forceFlag)
 						}
 
