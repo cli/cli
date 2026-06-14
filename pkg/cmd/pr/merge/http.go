@@ -28,15 +28,21 @@ const (
 )
 
 type mergePayload struct {
-	repo            ghrepo.Interface
-	pullRequestID   string
-	method          PullRequestMergeMethod
-	auto            bool
-	commitSubject   string
-	commitBody      string
-	setCommitBody   bool
-	expectedHeadOid string
-	authorEmail     string
+	repo               ghrepo.Interface
+	pullRequestID      string
+	method             PullRequestMergeMethod
+	auto               bool
+	enqueueMergeQueue  bool
+	commitSubject      string
+	commitBody         string
+	setCommitBody      bool
+	expectedHeadOid    string
+	authorEmail        string
+}
+
+type EnqueuePullRequestInput struct {
+	PullRequestID   githubv4.ID           `json:"pullRequestId"`
+	ExpectedHeadOid *githubv4.GitObjectID `json:"expectedHeadOid,omitempty"`
 }
 
 // TODO: drop after githubv4 gets updated
@@ -84,6 +90,23 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 	}
 
 	gql := api.NewClientFromHTTP(client)
+
+	if payload.enqueueMergeQueue {
+		enqueueInput := EnqueuePullRequestInput{
+			PullRequestID: githubv4.ID(payload.pullRequestID),
+		}
+		if payload.expectedHeadOid != "" {
+			expectedHeadOid := githubv4.GitObjectID(payload.expectedHeadOid)
+			enqueueInput.ExpectedHeadOid = &expectedHeadOid
+		}
+		var mutation struct {
+			EnqueuePullRequest struct {
+				ClientMutationId string
+			} `graphql:"enqueuePullRequest(input: $input)"`
+		}
+		variables["input"] = enqueueInput
+		return gql.Mutate(payload.repo.RepoHost(), "PullRequestEnqueue", &mutation, variables)
+	}
 
 	if payload.auto {
 		var mutation struct {

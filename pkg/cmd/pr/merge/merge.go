@@ -300,8 +300,9 @@ func (m *mergeContext) merge() error {
 			// only warn for now
 			_ = m.warnf("%s The merge strategy for %s is set by the merge queue\n", m.cs.Yellow("!"), m.pr.BaseRefName)
 		}
-		// auto merge will either enable auto merge or add to the merge queue
-		payload.auto = true
+		// merge queue uses enqueuePullRequest; enablePullRequestAutoMerge fails when
+		// allow_auto_merge is disabled on the repository (#13398).
+		payload.enqueueMergeQueue = true
 	} else {
 		// get user input if not already given
 		if m.opts.MergeStrategyEmpty {

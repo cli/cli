@@ -1823,10 +1823,9 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 		baseRepo("OWNER", "REPO", "main"),
 	)
 	http.Register(
-		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
+		httpmock.GraphQL(`mutation PullRequestEnqueue\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
-			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}),
 	)
 
@@ -1862,10 +1861,9 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 	)
 
 	http.Register(
-		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
+		httpmock.GraphQL(`mutation PullRequestEnqueue\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
-			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}),
 	)
 
@@ -1902,10 +1900,9 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 	)
 
 	http.Register(
-		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
+		httpmock.GraphQL(`mutation PullRequestEnqueue\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
-			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 		}),
 	)
 
