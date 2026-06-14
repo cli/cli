@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -366,8 +367,10 @@ func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
 		return summary
 	}
 
-	// If we don't have the counts by state, then we'll need to summarise by looking at the more detailed contexts
-	for _, c := range contexts.Nodes {
+	// If we don't have the counts by state, then we'll need to summarise by looking at the more detailed
+	// contexts. Deduplicate first to avoid counting cancelled runs alongside their newer successful
+	// counterparts, which can happen with concurrency cancel-in-progress. See issue #12895.
+	for _, c := range eliminateDuplicateContexts(contexts.Nodes) {
 		// Nodes are a discriminated union of CheckRun or StatusContext and we can match on
 		// the TypeName to narrow the type.
 		if c.TypeName == "CheckRun" {
@@ -402,6 +405,36 @@ func (pr *PullRequest) ChecksStatus() PullRequestChecksStatus {
 	}
 
 	return summary
+}
+
+// eliminateDuplicateContexts filters a set of check contexts to only the most
+// recent when duplicate runs exist for the same check (e.g. cancelled runs
+// alongside newer successful ones from concurrency cancel-in-progress).
+// Mirrors pkg/cmd/pr/checks/aggregate.go eliminateDuplicates.
+func eliminateDuplicateContexts(contexts []CheckContext) []CheckContext {
+	sort.Slice(contexts, func(i, j int) bool { return contexts[i].StartedAt.After(contexts[j].StartedAt) })
+
+	mapChecks := make(map[string]struct{})
+	mapContexts := make(map[string]struct{})
+	unique := make([]CheckContext, 0, len(contexts))
+
+	for _, ctx := range contexts {
+		if ctx.Context != "" {
+			if _, exists := mapContexts[ctx.Context]; exists {
+				continue
+			}
+			mapContexts[ctx.Context] = struct{}{}
+		} else {
+			key := fmt.Sprintf("%s/%s/%s", ctx.Name, ctx.CheckSuite.WorkflowRun.Workflow.Name, ctx.CheckSuite.WorkflowRun.Event)
+			if _, exists := mapChecks[key]; exists {
+				continue
+			}
+			mapChecks[key] = struct{}{}
+		}
+		unique = append(unique, ctx)
+	}
+
+	return unique
 }
 
 type checkStatus int

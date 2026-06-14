@@ -411,3 +411,49 @@ func statusContextNode(state string) string {
 		"state": "%s"
 	}`, state)
 }
+
+func TestChecksStatus_DuplicateCheckRunDeduplicatesByMostRecent(t *testing.T) {
+	t.Parallel()
+
+	// Reproduces issue #12895: concurrency cancel-in-progress produces both a
+	// cancelled run and a newer successful run for the same check. Before the
+	// fix, both were counted and the status showed as failing.
+	payload := fmt.Sprintf(`
+	{ "statusCheckRollup": { "nodes": [{ "commit": {
+		"statusCheckRollup": {
+			"contexts": {
+				"nodes": [
+					{
+						"__typename": "CheckRun",
+						"name": "CI",
+						"status": "COMPLETED",
+						"conclusion": "CANCELLED",
+						"startedAt": "2025-01-01T10:00:00Z",
+						"checkSuite": { "workflowRun": { "event": "push", "workflow": { "name": "test" } } }
+					},
+					{
+						"__typename": "CheckRun",
+						"name": "CI",
+						"status": "COMPLETED",
+						"conclusion": "SUCCESS",
+						"startedAt": "2025-01-01T11:00:00Z",
+						"checkSuite": { "workflowRun": { "event": "push", "workflow": { "name": "test" } } }
+					}
+				]
+			}
+		}
+	} }] } }
+	`)
+
+	var pr PullRequest
+	require.NoError(t, json.Unmarshal([]byte(payload), &pr))
+
+	// The older cancelled run is dropped; only the newer successful run counts.
+	expectedChecksStatus := PullRequestChecksStatus{
+		Passing: 1,
+		Failing: 0,
+		Pending: 0,
+		Total:   1,
+	}
+	require.Equal(t, expectedChecksStatus, pr.ChecksStatus())
+}
