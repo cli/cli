@@ -29,7 +29,7 @@ on:
 
 jobs:
   validate-tag-name:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-firewall
     steps:
       - name: Validate tag name format
         env:
@@ -41,7 +41,7 @@ jobs:
           fi
   linux:
     needs: validate-tag-name
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-firewall
     environment: ${{ inputs.environment }}
     if: contains(inputs.platforms, 'linux')
     steps:
@@ -279,7 +279,7 @@ jobs:
             dist/*.msi
 
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-firewall
     needs: [linux, macos, windows]
     environment: ${{ inputs.environment }}
     if: inputs.release
