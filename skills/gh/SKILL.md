@@ -122,11 +122,11 @@ Preview commands, subject to change. They read a repo's contents over the API
 without cloning, and honor `--repo OWNER/REPO` (`-R`) and `--ref <branch|tag|commit>`
 (default branch when omitted).
 
-- `gh repo read-file <path> [--ref <ref>] [--output <path> [--clobber]] [--unsafe] [--json <fields>] [--jq <expr>]`
+- `gh repo read-file <path> [--ref <ref>] [--output <path> [--clobber]] [--allow-escape-sequences] [--json <fields>] [--jq <expr>]`
   prints a file's contents. In non-TTY contexts the raw bytes go straight to
   stdout (pipe-friendly); binary files are written as-is when piped but are
   refused on a TTY. By default a file containing terminal escape sequences is
-  refused; pass `--unsafe` to read it anyway. `--output <path>` (`-o`) writes to
+  refused; pass `--allow-escape-sequences` to read it anyway. `--output <path>` (`-o`) writes to
   disk instead of stdout (a trailing slash writes under a directory using the
   remote file name; `--clobber` allows overwrite). `--output` and `--json` are
   mutually exclusive. `--json` fields include `name`, `path`, `gitSHA`, `size`,

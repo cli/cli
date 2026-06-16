@@ -99,11 +99,11 @@ func TestNewCmdReadFile(t *testing.T) {
 			},
 		},
 		{
-			name: "with unsafe",
-			args: "README.md --unsafe",
+			name: "with allow-escape-sequences",
+			args: "README.md --allow-escape-sequences",
 			wantOpts: ReadFileOptions{
-				Path:   "README.md",
-				Unsafe: true,
+				Path:                 "README.md",
+				AllowEscapeSequences: true,
 			},
 		},
 		{
@@ -155,7 +155,7 @@ func TestNewCmdReadFile(t *testing.T) {
 			assert.Equal(t, tt.wantOpts.Ref, gotOpts.Ref)
 			assert.Equal(t, tt.wantOpts.Output, gotOpts.Output)
 			assert.Equal(t, tt.wantOpts.Clobber, gotOpts.Clobber)
-			assert.Equal(t, tt.wantOpts.Unsafe, gotOpts.Unsafe)
+			assert.Equal(t, tt.wantOpts.AllowEscapeSequences, gotOpts.AllowEscapeSequences)
 		})
 	}
 }
@@ -365,7 +365,7 @@ func Test_readFileRun(t *testing.T) {
 			wantOut: string(pngBytes()),
 		},
 		{
-			name: "escape sequences refused without unsafe (non-tty)",
+			name: "escape sequences refused without allow-escape-sequences (non-tty)",
 			tty:  false,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -374,10 +374,10 @@ func Test_readFileRun(t *testing.T) {
 				)
 			},
 			opts:       ReadFileOptions{Path: "esc.txt"},
-			wantErrMsg: "file contains terminal escape sequences; use --unsafe to read anyway",
+			wantErrMsg: "file contains terminal escape sequences; use --allow-escape-sequences to read anyway",
 		},
 		{
-			name: "escape sequences refused without unsafe (tty)",
+			name: "escape sequences refused without allow-escape-sequences (tty)",
 			tty:  true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -386,10 +386,10 @@ func Test_readFileRun(t *testing.T) {
 				)
 			},
 			opts:       ReadFileOptions{Path: "esc.txt"},
-			wantErrMsg: "file contains terminal escape sequences; use --unsafe to read anyway",
+			wantErrMsg: "file contains terminal escape sequences; use --allow-escape-sequences to read anyway",
 		},
 		{
-			name: "escape sequences allowed with unsafe (non-tty)",
+			name: "escape sequences allowed with allow-escape-sequences (non-tty)",
 			tty:  false,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -397,11 +397,11 @@ func Test_readFileRun(t *testing.T) {
 					httpmock.JSONResponse(fileContentResponse("esc.txt", "danger\x1b[31m")),
 				)
 			},
-			opts:    ReadFileOptions{Path: "esc.txt", Unsafe: true},
+			opts:    ReadFileOptions{Path: "esc.txt", AllowEscapeSequences: true},
 			wantOut: "danger\x1b[31m",
 		},
 		{
-			name: "escape sequences allowed with unsafe (tty)",
+			name: "escape sequences allowed with allow-escape-sequences (tty)",
 			tty:  true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -409,7 +409,7 @@ func Test_readFileRun(t *testing.T) {
 					httpmock.JSONResponse(fileContentResponse("esc.txt", "danger\x1b[31m")),
 				)
 			},
-			opts:    ReadFileOptions{Path: "esc.txt", Unsafe: true},
+			opts:    ReadFileOptions{Path: "esc.txt", AllowEscapeSequences: true},
 			wantOut: "danger\x1b[31m",
 		},
 		{

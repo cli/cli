@@ -44,7 +44,8 @@ type ReadFileOptions struct {
 	Ref     string
 	Output  string
 	Clobber bool
-	Unsafe  bool
+
+	AllowEscapeSequences bool
 }
 
 // NewCmdReadFile creates the `gh repo read-file` command.
@@ -71,7 +72,7 @@ func NewCmdReadFile(f *cmdutil.Factory, runF func(*ReadFileOptions) error) *cobr
 			the %[1]s--output%[1]s flag.
 
 			By default the command refuses to output a file that contains terminal escape sequences,
-			since they could manipulate your terminal. Pass %[1]s--unsafe%[1]s to read such a file anyway.
+			since they could manipulate your terminal. Pass %[1]s--allow-escape-sequences%[1]s to read the file anyway.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Read a file from the default branch
@@ -111,7 +112,7 @@ func NewCmdReadFile(f *cmdutil.Factory, runF func(*ReadFileOptions) error) *cobr
 	cmd.Flags().StringVar(&opts.Ref, "ref", "", "The branch, tag, or commit to read from")
 	cmd.Flags().StringVarP(&opts.Output, "output", "o", "", "Write the file to a `path` instead of stdout")
 	cmd.Flags().BoolVar(&opts.Clobber, "clobber", false, "Overwrite the output path if it already exists")
-	cmd.Flags().BoolVar(&opts.Unsafe, "unsafe", false, "Read the file even if it contains terminal escape sequences")
+	cmd.Flags().BoolVar(&opts.AllowEscapeSequences, "allow-escape-sequences", false, "Allow printing terminal escape sequences")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, fileFields)
 
@@ -182,10 +183,10 @@ func readFileRun(opts *ReadFileOptions) error {
 		return err
 	}
 
-	// Refuse terminal escape sequences unless --unsafe, in both TTY and non-TTY modes,
+	// Refuse terminal escape sequences unless --allow-escape-sequences, in both TTY and non-TTY modes,
 	// so a malicious file cannot manipulate a downstream terminal.
-	if !opts.Unsafe && containsEscapeSequence(file.Content) {
-		return errors.New("file contains terminal escape sequences; use --unsafe to read anyway")
+	if !opts.AllowEscapeSequences && containsEscapeSequence(file.Content) {
+		return errors.New("file contains terminal escape sequences; use --allow-escape-sequences to read anyway")
 	}
 
 	if opts.IO.IsStdoutTTY() {
