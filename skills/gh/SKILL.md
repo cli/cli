@@ -116,6 +116,28 @@ Preview command set, subject to change. Subcommands:
 - `--json`/`--jq`/`--template` are available on `list` and `view` only;
   `create` and `edit` print the discussion URL. `comment` prints the discussion comment (or reply) URL.
 
+## Reading files and directories (`gh repo read-file` / `read-dir`)
+
+Preview commands, subject to change. They read a repo's contents over the API
+without cloning, and honor `--repo OWNER/REPO` (`-R`) and `--ref <branch|tag|commit>`
+(default branch when omitted).
+
+- `gh repo read-file <path> [--ref <ref>] [--output <path> [--clobber]] [--unsafe] [--json <fields>] [--jq <expr>]`
+  prints a file's contents. In non-TTY contexts the raw bytes go straight to
+  stdout (pipe-friendly); binary files are written as-is when piped but are
+  refused on a TTY. By default a file containing terminal escape sequences is
+  refused; pass `--unsafe` to read it anyway. `--output <path>` (`-o`) writes to
+  disk instead of stdout (a trailing slash writes under a directory using the
+  remote file name; `--clobber` allows overwrite). `--output` and `--json` are
+  mutually exclusive. `--json` fields include `name`, `path`, `gitSHA`, `size`,
+  `type`, `encoding`, and `content` (base64 encoded).
+- `gh repo read-dir [<path>] [--ref <ref>] [--json <fields>] [--jq <expr>]`
+  lists a directory; with no path it lists the repo root. Non-TTY output is tab
+  separated as type, name, octal mode, and byte size. `--json` fields include
+  `name`, `path`, `type`, `gitType`, `mode`, `modeOctal`, `gitSHA`, `size`, and
+  `submodule`. A path pointing at a file errors and points you at `read-file`
+  (and vice versa).
+
 ## Fall back to `gh api` for anything `--json` doesn't expose
 
 Sometimes useful data isn't on the typed commands. Examples:
