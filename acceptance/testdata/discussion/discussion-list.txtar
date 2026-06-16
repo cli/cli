@@ -1,0 +1,78 @@
+# Create a repository with a file so it has a default branch
+exec gh repo create $ORG/$SCRIPT_NAME-$RANDOM_STRING --add-readme --private
+
+# Defer repo cleanup
+defer gh repo delete --yes $ORG/$SCRIPT_NAME-$RANDOM_STRING
+
+# Clone the repo
+exec gh repo clone $ORG/$SCRIPT_NAME-$RANDOM_STRING
+cd $SCRIPT_NAME-$RANDOM_STRING
+
+# Explicitly disable discussions
+exec gh api repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING -X PATCH -F has_discussions=false
+
+# Listing discussions should fail when discussions are disabled
+! exec gh discussion list
+stderr 'has discussions disabled'
+
+# Enable discussions
+exec gh api repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING -X PATCH -F has_discussions=true
+
+# List before creating any discussions (empty results)
+exec gh discussion list
+stdout ''
+
+exec gh discussion list --json number,title
+stdout2env EMPTY_JSON
+jq-assert EMPTY_JSON '.totalCount' '^0$'
+jq-assert EMPTY_JSON '.discussions | length' '^0$'
+
+# Create two discussions to list
+exec gh discussion create --title 'First Discussion' --body 'First body' --category 'General' --label bug,enhancement
+exec gh discussion create --title 'Second Discussion' --body 'Second body' --category 'General' --label enhancement
+
+# Create a Q&A discussion and mark it as answered
+exec gh discussion create --title 'QA Discussion' --body 'QA body' --category 'Q&A'
+stdout2env QA_URL
+exec gh discussion comment $QA_URL --body 'This is the answer'
+exec gh discussion view $QA_URL --comments --json comments --jq '.comments.nodes[0].id'
+stdout2env QA_COMMENT_ID
+exec gh api graphql -f query='mutation { markDiscussionCommentAsAnswer(input: {id: "'$QA_COMMENT_ID'"}) { discussion { id } } }'
+
+# List discussions in non-interactive mode
+exec gh discussion list --sort created --order asc
+stdout '^\d+\tOPEN\tFirst Discussion\tGeneral\tbug, enhancement\t\t\d{4}.+$'
+stdout '^\d+\tOPEN\tSecond Discussion\tGeneral\tenhancement\t\t\d{4}.+$'
+stdout '^\d+\tOPEN\tQA Discussion\tQ&A\t\tanswered\t\d{4}.+$'
+
+# List discussions in JSON mode
+exec gh discussion list --sort created --order asc --json id,number,title,labels,answered
+stdout2env LIST_JSON
+jq-assert LIST_JSON '.totalCount' '^3$'
+jq-assert LIST_JSON '.discussions | length' '^3$'
+jq-assert LIST_JSON 'has("cursor")' 'false'
+jq-assert LIST_JSON 'has("next")' 'false'
+jq-assert LIST_JSON '.discussions[0].title' 'First Discussion'
+jq-assert LIST_JSON '.discussions[1].title' 'Second Discussion'
+jq-assert LIST_JSON '.discussions[2].title' 'QA Discussion'
+jq-assert LIST_JSON '.discussions[2].answered' '^true$'
+
+# List with --limit 2 and verify pagination
+exec gh discussion list --sort created --order asc --limit 2 --json number,title
+stdout2env PAGE1_JSON
+jq-assert PAGE1_JSON '.totalCount' '^3$'
+jq-assert PAGE1_JSON '.discussions | length' '^2$'
+jq-assert PAGE1_JSON '.discussions[0].title' 'First Discussion'
+jq-assert PAGE1_JSON '.discussions[1].title' 'Second Discussion'
+jq-assert PAGE1_JSON 'has("cursor")' 'false'
+jq-assert PAGE1_JSON '.next' '.+'
+
+# Fetch the second page using the cursor (only one entry left)
+jq2env PAGE1_JSON '.next' LIST_CURSOR
+exec gh discussion list --sort created --order asc --after $LIST_CURSOR --json number,title
+stdout2env PAGE2_JSON
+jq-assert PAGE2_JSON '.totalCount' '^3$'
+jq-assert PAGE2_JSON '.discussions | length' '^1$'
+jq-assert PAGE2_JSON '.discussions[0].title' 'QA Discussion'
+jq-assert PAGE2_JSON '.cursor' '.+'
+jq-assert PAGE2_JSON 'has("next")' 'false'

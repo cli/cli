@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -29,6 +30,8 @@ const (
 	ScopeUser    Scope = "user"
 
 	DefaultAgentID = "github-copilot"
+
+	claudeConfigDirEnv = "CLAUDE_CONFIG_DIR"
 
 	sharedProjectSkillsDir = ".agents/skills"
 )
@@ -387,6 +390,11 @@ func (h *AgentHost) InstallDir(scope Scope, gitRoot, homeDir string) (string, er
 		}
 		return filepath.Join(gitRoot, h.ProjectDir), nil
 	case ScopeUser:
+		if h.ID == "claude-code" {
+			if configDir := os.Getenv(claudeConfigDirEnv); configDir != "" {
+				return filepath.Join(configDir, "skills"), nil
+			}
+		}
 		if homeDir == "" {
 			return "", fmt.Errorf("could not determine home directory")
 		}

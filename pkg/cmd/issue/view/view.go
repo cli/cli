@@ -15,7 +15,6 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
-	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -58,7 +57,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		`, "`"),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			issueNumber, baseRepo, err := shared.ParseIssueFromArg(args[0])
+			issueNumber, baseRepo, err := issueShared.ParseIssueFromArg(args[0])
 			if err != nil {
 				return err
 			}
@@ -92,6 +91,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 var defaultFields = []string{
 	"number", "url", "state", "createdAt", "title", "body", "author", "milestone",
 	"assignees", "labels", "reactionGroups", "lastComment", "stateReason",
+	"issueType", "parent", "subIssues", "subIssuesSummary",
 }
 
 func viewRun(opts *ViewOptions) error {
@@ -128,6 +128,12 @@ func viewRun(opts *ViewOptions) error {
 		projectsV1Support := opts.Detector.ProjectsV1()
 		if projectsV1Support == gh.ProjectsV1Supported {
 			lookupFields.Add("projectCards")
+		}
+
+		// TODO IssueRelationshipsCleanup
+		issueFeatures, issueErr := opts.Detector.IssueFeatures()
+		if issueErr == nil && issueFeatures.IssueRelationshipsSupported {
+			lookupFields.AddValues([]string{"blockedBy", "blocking"})
 		}
 	}
 
@@ -207,6 +213,24 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 		milestoneTitle = issue.Milestone.Title
 	}
 	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
+	var issueTypeName string
+	if issue.IssueType != nil {
+		issueTypeName = issue.IssueType.Name
+	}
+	fmt.Fprintf(out, "issue-type:\t%s\n", issueTypeName)
+	var parentRef string
+	if issue.Parent != nil {
+		parentRef = formatLinkedIssueRef(issue.Parent)
+	}
+	fmt.Fprintf(out, "parent:\t%s\n", parentRef)
+	fmt.Fprintf(out, "sub-issues:\t%s\n", formatLinkedIssueRefs(issue.SubIssues.Nodes))
+	var subIssuesCompleted string
+	if issue.SubIssuesSummary.Total > 0 {
+		subIssuesCompleted = fmt.Sprintf("%d/%d", issue.SubIssuesSummary.Completed, issue.SubIssuesSummary.Total)
+	}
+	fmt.Fprintf(out, "sub-issues-completed:\t%s\n", subIssuesCompleted)
+	fmt.Fprintf(out, "blocked-by:\t%s\n", formatLinkedIssueRefs(issue.BlockedBy.Nodes))
+	fmt.Fprintf(out, "blocking:\t%s\n", formatLinkedIssueRefs(issue.Blocking.Nodes))
 	fmt.Fprintf(out, "number:\t%d\n", issue.Number)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, issue.Body)
@@ -219,9 +243,15 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 
 	// Header (Title and State)
 	fmt.Fprintf(out, "%s %s#%d\n", cs.Bold(issue.Title), ghrepo.FullName(baseRepo), issue.Number)
+
+	// State line - include issue type prefix when present
+	stateLine := issueStateTitleWithColor(cs, issue)
+	if issue.IssueType != nil {
+		stateLine = cs.Muted(issue.IssueType.Name) + " · " + stateLine
+	}
 	fmt.Fprintf(out,
 		"%s • %s opened %s • %s\n",
-		issueStateTitleWithColor(cs, issue),
+		stateLine,
 		issue.Author.DisplayName(),
 		text.FuzzyAgo(opts.Now(), issue.CreatedAt),
 		text.Pluralize(issue.Comments.TotalCount, "comment"),
@@ -241,6 +271,22 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 	if labels := issueLabelList(issue, cs); labels != "" {
 		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
+	}
+	if issue.IssueType != nil {
+		fmt.Fprint(out, cs.Bold("Type: "))
+		fmt.Fprintln(out, issue.IssueType.Name)
+	}
+	if issue.Parent != nil {
+		fmt.Fprint(out, cs.Bold("Parent: "))
+		fmt.Fprintln(out, formatLinkedIssueRef(issue.Parent)+" "+issue.Parent.Title)
+	}
+	if blockedBy := formatLinkedIssueListWithTitle(issue.BlockedBy.Nodes); blockedBy != "" {
+		fmt.Fprint(out, cs.Bold("Blocked by: "))
+		fmt.Fprintln(out, blockedBy)
+	}
+	if blocking := formatLinkedIssueListWithTitle(issue.Blocking.Nodes); blocking != "" {
+		fmt.Fprint(out, cs.Bold("Blocking: "))
+		fmt.Fprintln(out, blocking)
 	}
 	if projects := issueProjectList(*issue); projects != "" {
 		fmt.Fprint(out, cs.Bold("Projects: "))
@@ -266,6 +312,30 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 	}
 	fmt.Fprintf(out, "\n%s\n", md)
 
+	// Sub-issues section
+	if issue.SubIssuesSummary.Total > 0 {
+		fmt.Fprintf(out, "%s · %d/%d (%d%%)\n",
+			cs.Bold("Sub-issues"),
+			issue.SubIssuesSummary.Completed,
+			issue.SubIssuesSummary.Total,
+			int(issue.SubIssuesSummary.PercentCompleted),
+		)
+		for _, sub := range issue.SubIssues.Nodes {
+			stateColor := cs.Green
+			stateLabel := "Open"
+			if sub.State == "CLOSED" {
+				stateColor = cs.Magenta
+				stateLabel = "Closed"
+			}
+			fmt.Fprintf(out, "%s %s %s\n",
+				stateColor(stateLabel),
+				formatLinkedIssueRef(&sub),
+				sub.Title,
+			)
+		}
+		fmt.Fprintln(out)
+	}
+
 	// Comments
 	if issue.Comments.TotalCount > 0 {
 		preview := !opts.Comments
@@ -280,6 +350,37 @@ func printHumanIssuePreview(opts *ViewOptions, baseRepo ghrepo.Interface, issue 
 	fmt.Fprintf(out, cs.Muted("View this issue on GitHub: %s\n"), issue.URL)
 
 	return nil
+}
+
+// formatLinkedIssueRef formats an issue reference as owner/repo#N.
+func formatLinkedIssueRef(issue *api.LinkedIssue) string {
+	return fmt.Sprintf("%s#%d", issue.Repository.NameWithOwner, issue.Number)
+}
+
+// formatLinkedIssueRefs formats a comma-separated list of linked issue
+// references without titles.
+func formatLinkedIssueRefs(issues []api.LinkedIssue) string {
+	return joinLinkedIssues(issues, false)
+}
+
+// formatLinkedIssueListWithTitle formats a comma-separated list of linked
+// issue references with each title appended after the reference.
+func formatLinkedIssueListWithTitle(issues []api.LinkedIssue) string {
+	return joinLinkedIssues(issues, true)
+}
+
+func joinLinkedIssues(issues []api.LinkedIssue, withTitle bool) string {
+	if len(issues) == 0 {
+		return ""
+	}
+	parts := make([]string, len(issues))
+	for i, issue := range issues {
+		parts[i] = formatLinkedIssueRef(&issue)
+		if withTitle {
+			parts[i] += " " + issue.Title
+		}
+	}
+	return strings.Join(parts, ", ")
 }
 
 func issueStateTitleWithColor(cs *iostreams.ColorScheme, issue *api.Issue) string {

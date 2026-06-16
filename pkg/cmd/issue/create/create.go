@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
+	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -47,6 +48,12 @@ type CreateOptions struct {
 	Projects  []string
 	Milestone string
 	Template  string
+
+	IssueType   string
+	issueTypeID string // resolved during interactive flow to avoid double API call
+	Parent      string
+	BlockedBy   []string
+	Blocking    []string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -84,6 +91,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --assignee "@copilot"
 			$ gh issue create --project "Roadmap"
 			$ gh issue create --template "Bug Report"
+			$ gh issue create --type Bug
+			$ gh issue create --parent 100
+			$ gh issue create --parent https://github.com/cli/go-gh/issues/42
+			$ gh issue create --blocked-by 200,201 --blocking 300
 		`),
 		Args:    cmdutil.NoArgsQuoteReminder,
 		Aliases: []string{"new"},
@@ -141,6 +152,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Add the issue to a milestone by `name`")
 	cmd.Flags().StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 	cmd.Flags().StringVarP(&opts.Template, "template", "T", "", "Template `name` to use as starting body text")
+	cmd.Flags().StringVar(&opts.IssueType, "type", "", "Set the issue type by `name`")
+	cmd.Flags().StringVar(&opts.Parent, "parent", "", "Add the new issue as a sub-issue of the specified parent `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.BlockedBy, "blocked-by", nil, "Mark the new issue as blocked by these issue `numbers` or URLs")
+	cmd.Flags().StringSliceVar(&opts.Blocking, "blocking", nil, "Mark the new issue as blocking these issue `numbers` or URLs")
 
 	return cmd
 }
@@ -289,6 +304,24 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
+		// Interactive issue type selection
+		if opts.IssueType == "" {
+			issueTypes, typesErr := api.RepoIssueTypes(apiClient, baseRepo)
+			if typesErr == nil && len(issueTypes) > 0 {
+				typeNames := make([]string, len(issueTypes))
+				for i, t := range issueTypes {
+					typeNames[i] = t.Name
+				}
+				var selected int
+				selected, err = opts.Prompter.Select("Issue type", "", typeNames)
+				if err != nil {
+					return
+				}
+				opts.IssueType = typeNames[selected]
+				opts.issueTypeID = issueTypes[selected].ID
+			}
+		}
+
 		openURL, err = generatePreviewURL(apiClient, baseRepo, tb, projectsV1Support)
 		if err != nil {
 			return
@@ -379,6 +412,15 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
+		var updateOpts api.DeferredUpdateIssueOptions
+		updateOpts, err = deferredUpdateIssueOptions(apiClient, baseRepo, newIssue, opts)
+		if err != nil {
+			return
+		}
+		if err = api.DeferredUpdateIssue(apiClient, updateOpts); err != nil {
+			return
+		}
+
 		fmt.Fprintln(opts.IO.Out, newIssue.URL)
 	} else {
 		panic("Unreachable state")
@@ -390,4 +432,52 @@ func createRun(opts *CreateOptions) (err error) {
 func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb prShared.IssueMetadataState, projectsV1Support gh.ProjectsV1Support) (string, error) {
 	openURL := ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 	return prShared.WithPrAndIssueQueryParams(apiClient, baseRepo, openURL, tb, projectsV1Support)
+}
+
+// deferredUpdateIssueOptions resolves the user-supplied --type / --parent /
+// --blocked-by / --blocking flags into the IDs that DeferredUpdateIssue
+// expects.
+func deferredUpdateIssueOptions(client *api.Client, baseRepo ghrepo.Interface, issue *api.Issue, opts *CreateOptions) (api.DeferredUpdateIssueOptions, error) {
+	updateOpts := api.DeferredUpdateIssueOptions{
+		IssueID:  issue.ID,
+		Hostname: baseRepo.RepoHost(),
+	}
+
+	if opts.IssueType != "" {
+		typeID := opts.issueTypeID
+		if typeID == "" {
+			var err error
+			typeID, err = issueShared.ResolveIssueTypeName(client, baseRepo, opts.IssueType)
+			if err != nil {
+				return api.DeferredUpdateIssueOptions{}, err
+			}
+		}
+		updateOpts.IssueTypeID = typeID
+	}
+
+	if opts.Parent != "" {
+		parentID, err := issueShared.ResolveIssueRef(client, baseRepo, opts.Parent)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --parent reference %q: %w", opts.Parent, err)
+		}
+		updateOpts.ParentID = parentID
+	}
+
+	for _, ref := range opts.BlockedBy {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --blocked-by reference %q: %w", ref, err)
+		}
+		updateOpts.AddBlockedByIDs = append(updateOpts.AddBlockedByIDs, id)
+	}
+
+	for _, ref := range opts.Blocking {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --blocking reference %q: %w", ref, err)
+		}
+		updateOpts.AddBlockingIDs = append(updateOpts.AddBlockingIDs, id)
+	}
+
+	return updateOpts, nil
 }

@@ -176,6 +176,7 @@ type FilterOptions struct {
 	Entity     string
 	Fields     []string
 	HeadBranch string
+	IssueType  string
 	Labels     []string
 	Mention    string
 	Milestone  string
@@ -212,6 +213,9 @@ func (opts *FilterOptions) IsDefault() bool {
 	if opts.Search != "" {
 		return false
 	}
+	if opts.IssueType != "" {
+		return false
+	}
 	return true
 }
 
@@ -236,6 +240,7 @@ func SearchQueryBuild(options FilterOptions, advancedIssueSearchSyntax bool) str
 	case "merged":
 		is = "merged"
 	}
+
 	query := search.Query{
 		Qualifiers: search.Qualifiers{
 			Assignee:  options.Assignee,
@@ -243,6 +248,7 @@ func SearchQueryBuild(options FilterOptions, advancedIssueSearchSyntax bool) str
 			Base:      options.BaseBranch,
 			Draft:     options.Draft,
 			Head:      options.HeadBranch,
+			IssueType: options.IssueType,
 			Label:     options.Labels,
 			Mentions:  options.Mention,
 			Milestone: options.Milestone,

@@ -1,0 +1,14 @@
+{
+  "name": "Issue view - Mona's Cafe",
+  "savedAt": "2026-06-06T19:23:22.273Z",
+  "content": "[muted]$[/muted] [b]gh issue view 142[/b]\n[b]Ship GitHub sign-in for Mona's Cafe v2[/b] monalisa/monas-cafe#142\n[brgreen]Open[/brgreen] [muted]•[/muted] monalisa (Mona Lisa) opened about 2 hours ago [muted]•[/muted] 4 comments\n[b]Blocked by:[/b] monalisa/monas-cafe#128 Provision staging OAuth app credentials\n[b]Blocking:[/b] monalisa/monas-cafe#161 Enable per-user order history sync\n\n  Let people sign in to [b]Mona's Cafe[/b] with their GitHub account 🚀\n\n\n[b]Sub-issues[/b] [muted]·[/muted] 1/2 (50%)\n[magenta]Closed[/magenta] monalisa/monas-cafe#137 Implement OAuth callback handler\n[brgreen]Open[/brgreen] monalisa/monas-cafe#145 Add sign-in button to landing page\n\n[muted]View this issue on GitHub: https://github.com/monalisa/monas-cafe/issues/142[/muted]",
+  "options": {
+    "font": "menlo",
+    "fontSize": 14,
+    "width": 800,
+    "chrome": "none",
+    "backdrop": "none",
+    "bodyGradient": false,
+    "autoStyle": true
+  }
+}

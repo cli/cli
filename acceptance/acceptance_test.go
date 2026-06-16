@@ -3,10 +3,12 @@
 package acceptance_test
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghcmd"
+	"github.com/cli/go-gh/v2/pkg/jq"
 	"github.com/cli/go-internal/testscript"
 )
 
@@ -72,6 +75,24 @@ func TestIssues(t *testing.T) {
 	}
 
 	testscript.Run(t, testScriptParamsFor(tsEnv, "issue"))
+}
+
+func TestDiscussions(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "discussion"))
+}
+
+func TestIssues2_0(t *testing.T) {
+	var tsEnv testScriptEnv
+	if err := tsEnv.fromEnv(); err != nil {
+		t.Fatal(err)
+	}
+
+	testscript.Run(t, testScriptParamsFor(tsEnv, "issues-2.0"))
 }
 
 func TestLabels(t *testing.T) {
@@ -364,6 +385,57 @@ func sharedCmds(tsEnv testScriptEnv) map[string]func(ts *testscript.TestScript, 
 
 			d := time.Duration(seconds) * time.Second
 			time.Sleep(d)
+		},
+		"jq-assert": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! jq-assert")
+			}
+			if len(args) != 3 {
+				ts.Fatalf("usage: jq-assert ENV_VAR expression regexp")
+			}
+
+			input := ts.Getenv(args[0])
+			if input == "" {
+				ts.Fatalf("jq-assert: environment variable %s is empty or unset", args[0])
+			}
+
+			var buf bytes.Buffer
+			if err := jq.Evaluate(strings.NewReader(input), &buf, args[1]); err != nil {
+				ts.Fatalf("jq-assert: %v", err)
+			}
+
+			result := strings.TrimRight(buf.String(), "\n") // jq.Evaluate adds a newline at the end
+			ts.Logf("jq-assert %s %q => %s", args[0], args[1], result)
+
+			re, err := regexp.Compile(args[2])
+			if err != nil {
+				ts.Fatalf("jq-assert: invalid regexp %q: %v", args[2], err)
+			}
+			if !re.MatchString(result) {
+				ts.Fatalf("jq-assert: result %q does not match %q", result, args[2])
+			}
+		},
+		"jq2env": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg {
+				ts.Fatalf("unsupported: ! jq2env")
+			}
+			if len(args) != 3 {
+				ts.Fatalf("usage: jq2env SRC_ENV expression DST_ENV")
+			}
+
+			input := ts.Getenv(args[0])
+			if input == "" {
+				ts.Fatalf("jq2env: environment variable %s is empty or unset", args[0])
+			}
+
+			var buf bytes.Buffer
+			if err := jq.Evaluate(strings.NewReader(input), &buf, args[1]); err != nil {
+				ts.Fatalf("jq2env: %v", err)
+			}
+
+			result := strings.TrimRight(buf.String(), "\n") // jq.Evaluate adds a newline at the end
+			ts.Logf("jq2env %s %q => %s => %s", args[0], args[1], result, args[2])
+			ts.Setenv(args[2], result)
 		},
 	}
 }

@@ -1,0 +1,14 @@
+{
+  "name": "Discussion view - Mona's Cafe",
+  "savedAt": "2026-06-06T19:21:43.055Z",
+  "content": "[muted]$[/muted] [b]gh discussion view 87 --repo monalisa/monas-cafe[/b]\n[b]Sign-in flow design feedback[/b] [brblue]#87[/brblue]\n[brgreen]Open[/brgreen] [muted]·[/muted] Q&A [muted]·[/muted] Asked by Mona [muted]·[/muted] about 2 days ago [muted]·[/muted] 6 comments\n\n  Finalizing the sign-in flow for [b]Mona's Cafe[/b] v2 and would love\n  community feedback on the OAuth callback design and error states.\n\n\n[muted]View this discussion on GitHub: https://github.com/monalisa/monas-cafe/discussions/87[/muted]",
+  "options": {
+    "font": "menlo",
+    "fontSize": 14,
+    "width": 800,
+    "chrome": "none",
+    "backdrop": "none",
+    "bodyGradient": false,
+    "autoStyle": true
+  }
+}

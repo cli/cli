@@ -96,6 +96,7 @@ type Qualifiers struct {
 	Topics              string
 	Tree                string
 	Type                string
+	IssueType           string `qualifier:"type"`
 	Updated             string
 	User                []string
 }
@@ -234,39 +235,42 @@ func groupWithOR(qualifier string, vs []string) string {
 	return fmt.Sprintf("(%s)", strings.Join(all, " OR "))
 }
 
+// Map turns the qualifiers into a slice-keyed map ready for query
+// formatting. Multiple struct fields can share the same key when
+// tagged with `qualifier:"<name>"`; in that case their values are
+// concatenated under the shared key.
 func (q Qualifiers) Map() map[string][]string {
 	m := map[string][]string{}
 	v := reflect.ValueOf(q)
 	t := reflect.TypeOf(q)
 	for i := 0; i < v.NumField(); i++ {
-		fieldName := t.Field(i).Name
-		key := camelToKebab(fieldName)
-		typ := v.FieldByName(fieldName).Kind()
-		value := v.FieldByName(fieldName)
-		switch typ {
+		field := t.Field(i)
+		key := field.Tag.Get("qualifier")
+		if key == "" {
+			key = camelToKebab(field.Name)
+		}
+		value := v.Field(i)
+		switch value.Kind() {
 		case reflect.Ptr:
 			if value.IsNil() {
 				continue
 			}
-			v := reflect.Indirect(value)
-			m[key] = []string{fmt.Sprintf("%v", v)}
+			m[key] = append(m[key], fmt.Sprintf("%v", reflect.Indirect(value)))
 		case reflect.Slice:
 			if value.IsNil() {
 				continue
 			}
-			s := []string{}
-			for i := 0; i < value.Len(); i++ {
-				if value.Index(i).IsZero() {
+			for j := 0; j < value.Len(); j++ {
+				if value.Index(j).IsZero() {
 					continue
 				}
-				s = append(s, fmt.Sprintf("%v", value.Index(i)))
+				m[key] = append(m[key], fmt.Sprintf("%v", value.Index(j)))
 			}
-			m[key] = s
 		default:
 			if value.IsZero() {
 				continue
 			}
-			m[key] = []string{fmt.Sprintf("%v", value)}
+			m[key] = append(m[key], fmt.Sprintf("%v", value))
 		}
 	}
 	return m

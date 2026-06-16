@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
-	shared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -34,6 +35,17 @@ type EditOptions struct {
 
 	IssueNumbers []int
 	Interactive  bool
+
+	RemoveIssueType bool
+
+	Parent          string
+	RemoveParent    bool
+	AddSubIssues    []string
+	RemoveSubIssues []string
+	AddBlockedBy    []string
+	RemoveBlockedBy []string
+	AddBlocking     []string
+	RemoveBlocking  []string
 
 	prShared.Editable
 }
@@ -76,10 +88,16 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh issue edit 23 --remove-milestone
 			$ gh issue edit 23 --body-file body.txt
 			$ gh issue edit 23 34 --add-label "help wanted"
+			$ gh issue edit 23 --type Bug
+			$ gh issue edit 23 --remove-type
+			$ gh issue edit 23 --parent 100
+			$ gh issue edit 23 --remove-parent
+			$ gh issue edit 100 --add-sub-issue 123,124
+			$ gh issue edit 123 --add-blocked-by 200 --add-blocking 300,301
 		`),
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			issueNumbers, baseRepo, err := shared.ParseIssuesFromArgs(args)
+			issueNumbers, baseRepo, err := issueShared.ParseIssuesFromArgs(args)
 			if err != nil {
 				return err
 			}
@@ -127,6 +145,22 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--type` or `--remove-type`",
+				flags.Changed("type"),
+				opts.RemoveIssueType,
+			); err != nil {
+				return err
+			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of --parent or --remove-parent",
+				flags.Changed("parent"),
+				opts.RemoveParent,
+			); err != nil {
+				return err
+			}
+
 			if flags.Changed("title") {
 				opts.Editable.Title.Edited = true
 			}
@@ -147,8 +181,24 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				// which results in milestone association removal. For reference,
 				// see the `Editable.MilestoneId` method.
 			}
+			if flags.Changed("type") {
+				opts.Editable.IssueType.Edited = true
+			}
 
-			if !opts.Editable.Dirty() {
+			// hasDeferredFlags covers edit flags that flow through the
+			// deferred update path rather than the prShared.Editable struct,
+			// so they would otherwise be invisible to Editable.Dirty() below.
+			// Note that --type (set) is intentionally absent: it lights up
+			// opts.Editable.IssueType.Edited above, which Editable.Dirty()
+			// already picks up. Only --remove-type needs to be listed here.
+			hasDeferredFlags := opts.RemoveIssueType ||
+				flags.Changed("parent") || opts.RemoveParent ||
+				len(opts.AddSubIssues) > 0 || len(opts.RemoveSubIssues) > 0 ||
+				len(opts.AddBlockedBy) > 0 || len(opts.RemoveBlockedBy) > 0 ||
+				len(opts.AddBlocking) > 0 || len(opts.RemoveBlocking) > 0
+
+			// Drop into interactive mode only if the user passed no edit flags at all.
+			if !opts.Editable.Dirty() && !hasDeferredFlags {
 				opts.Interactive = true
 			}
 
@@ -158,6 +208,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			if opts.Interactive && len(opts.IssueNumbers) > 1 {
 				return cmdutil.FlagErrorf("multiple issues cannot be edited interactively")
+			}
+
+			if len(opts.IssueNumbers) > 1 && len(opts.AddSubIssues) > 0 {
+				return cmdutil.FlagErrorf("`--add-sub-issue` cannot be used when editing multiple issues")
 			}
 
 			if runF != nil {
@@ -179,6 +233,16 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the issue from projects by `title`")
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the issue belongs to by `name`")
 	cmd.Flags().BoolVar(&removeMilestone, "remove-milestone", false, "Remove the milestone association from the issue")
+	cmd.Flags().StringVar(&opts.Editable.IssueType.Value, "type", "", "Set the issue type by `name`")
+	cmd.Flags().BoolVar(&opts.RemoveIssueType, "remove-type", false, "Remove the issue type from the issue")
+	cmd.Flags().StringVar(&opts.Parent, "parent", "", "Set the parent issue by `number` or URL")
+	cmd.Flags().BoolVar(&opts.RemoveParent, "remove-parent", false, "Remove the parent issue")
+	cmd.Flags().StringSliceVar(&opts.AddSubIssues, "add-sub-issue", nil, "Add sub-issues by `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.RemoveSubIssues, "remove-sub-issue", nil, "Remove sub-issues by `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.AddBlockedBy, "add-blocked-by", nil, "Add 'blocked by' relationships by issue `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.RemoveBlockedBy, "remove-blocked-by", nil, "Remove 'blocked by' relationships by issue `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.AddBlocking, "add-blocking", nil, "Add 'blocking' relationships by issue `number` or URL")
+	cmd.Flags().StringSliceVar(&opts.RemoveBlocking, "remove-blocking", nil, "Remove 'blocking' relationships by issue `number` or URL")
 
 	return cmd
 }
@@ -196,6 +260,7 @@ func editRun(opts *EditOptions) error {
 
 	// Prompt the user which fields they'd like to edit.
 	editable := opts.Editable
+	editable.IssueType.Selectable = true
 	if opts.Interactive {
 		err = opts.FieldsToEditSurvey(opts.Prompter, &editable)
 		if err != nil {
@@ -239,9 +304,15 @@ func editRun(opts *EditOptions) error {
 	if editable.Milestone.Edited {
 		lookupFields = append(lookupFields, "milestone")
 	}
+	if editable.IssueType.Edited {
+		lookupFields = append(lookupFields, "issueType")
+	}
+	if opts.Parent != "" || opts.RemoveParent {
+		lookupFields = append(lookupFields, "parent")
+	}
 
 	// Get all specified issues and make sure they are within the same repo.
-	issues, err := shared.FindIssuesOrPRs(httpClient, baseRepo, opts.IssueNumbers, lookupFields)
+	issues, err := issueShared.FindIssuesOrPRs(httpClient, baseRepo, opts.IssueNumbers, lookupFields)
 	if err != nil {
 		return err
 	}
@@ -272,6 +343,16 @@ func editRun(opts *EditOptions) error {
 		opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating %d issues", len(issues)))
 	}
 
+	// Resolve issue type ID up front for non-interactive mode; interactive
+	// mode resolves after the survey sets the value (inside the loop).
+	var issueTypeID string
+	if !opts.Interactive {
+		issueTypeID, err = lookupIssueTypeID(&editable)
+		if err != nil {
+			return err
+		}
+	}
+
 	for _, issue := range issues {
 		// Copy variables to capture in the go routine below.
 		editable := editable.Clone()
@@ -297,6 +378,9 @@ func editRun(opts *EditOptions) error {
 		if issue.Milestone != nil {
 			editable.Milestone.Default = issue.Milestone.Title
 		}
+		if issue.IssueType != nil {
+			editable.IssueType.Default = issue.IssueType.Name
+		}
 
 		// Allow interactive prompts for one issue; failed earlier if multiple issues specified.
 		if opts.Interactive {
@@ -308,15 +392,28 @@ func editRun(opts *EditOptions) error {
 			if err != nil {
 				return err
 			}
+			issueTypeID, err = lookupIssueTypeID(&editable)
+			if err != nil {
+				return err
+			}
 		}
 
 		g.Add(1)
 		go func(issue *api.Issue) {
 			defer g.Done()
 
-			err := prShared.UpdateIssue(httpClient, baseRepo, issue.ID, issue.IsPullRequest(), editable)
+			if err := prShared.UpdateIssue(httpClient, baseRepo, issue.ID, issue.IsPullRequest(), editable); err != nil {
+				failedIssueChan <- fmt.Sprintf("failed to update %s: %s", issue.URL, err)
+				return
+			}
+
+			mutations, err := deferredUpdateIssueOptions(apiClient, baseRepo, issue, opts, issueTypeID)
 			if err != nil {
 				failedIssueChan <- fmt.Sprintf("failed to update %s: %s", issue.URL, err)
+				return
+			}
+			if err := api.DeferredUpdateIssue(apiClient, mutations); err != nil {
+				failedIssueChan <- fmt.Sprintf("failed to update %s:\n%s", issue.URL, err)
 				return
 			}
 
@@ -358,4 +455,88 @@ func editRun(opts *EditOptions) error {
 	}
 
 	return nil
+}
+
+// lookupIssueTypeID resolves the chosen issue type to its node ID using the
+// map populated by FetchOptions.
+func lookupIssueTypeID(editable *prShared.Editable) (string, error) {
+	if !editable.IssueType.Edited || editable.IssueType.Value == "" {
+		return "", nil
+	}
+	id, ok := editable.IssueTypeNameToID[editable.IssueType.Value]
+	if !ok {
+		return "", fmt.Errorf("type %q not found; available types: %s",
+			editable.IssueType.Value,
+			strings.Join(editable.IssueType.Options, ", "))
+	}
+	return id, nil
+}
+
+func deferredUpdateIssueOptions(client *api.Client, baseRepo ghrepo.Interface, issue *api.Issue, editOpts *EditOptions, issueTypeID string) (api.DeferredUpdateIssueOptions, error) {
+	updateOpts := api.DeferredUpdateIssueOptions{
+		IssueID:               issue.ID,
+		Hostname:              baseRepo.RepoHost(),
+		IssueTypeID:           issueTypeID,
+		RemoveIssueType:       editOpts.RemoveIssueType,
+		ReplaceExistingParent: true,
+	}
+
+	if editOpts.RemoveParent {
+		if issue.Parent != nil {
+			updateOpts.RemoveParentID = issue.Parent.ID
+		}
+	} else if editOpts.Parent != "" {
+		parentID, err := issueShared.ResolveIssueRef(client, baseRepo, editOpts.Parent)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --parent reference %q: %w", editOpts.Parent, err)
+		}
+		updateOpts.ParentID = parentID
+	}
+
+	for _, ref := range editOpts.AddSubIssues {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --add-sub-issue reference %q: %w", ref, err)
+		}
+		updateOpts.AddSubIssueIDs = append(updateOpts.AddSubIssueIDs, id)
+	}
+	for _, ref := range editOpts.RemoveSubIssues {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --remove-sub-issue reference %q: %w", ref, err)
+		}
+		updateOpts.RemoveSubIssueIDs = append(updateOpts.RemoveSubIssueIDs, id)
+	}
+
+	for _, ref := range editOpts.AddBlockedBy {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --add-blocked-by reference %q: %w", ref, err)
+		}
+		updateOpts.AddBlockedByIDs = append(updateOpts.AddBlockedByIDs, id)
+	}
+	for _, ref := range editOpts.RemoveBlockedBy {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --remove-blocked-by reference %q: %w", ref, err)
+		}
+		updateOpts.RemoveBlockedByIDs = append(updateOpts.RemoveBlockedByIDs, id)
+	}
+
+	for _, ref := range editOpts.AddBlocking {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --add-blocking reference %q: %w", ref, err)
+		}
+		updateOpts.AddBlockingIDs = append(updateOpts.AddBlockingIDs, id)
+	}
+	for _, ref := range editOpts.RemoveBlocking {
+		id, err := issueShared.ResolveIssueRef(client, baseRepo, ref)
+		if err != nil {
+			return api.DeferredUpdateIssueOptions{}, fmt.Errorf("resolving --remove-blocking reference %q: %w", ref, err)
+		}
+		updateOpts.RemoveBlockingIDs = append(updateOpts.RemoveBlockingIDs, id)
+	}
+
+	return updateOpts, nil
 }

@@ -25,6 +25,54 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewCmdList(t *testing.T) {
+	tests := []struct {
+		name     string
+		cli      string
+		wantsErr bool
+		wants    ListOptions
+	}{
+		{
+			name: "type flag",
+			cli:  "--type Bug",
+			wants: ListOptions{
+				IssueType:    "Bug",
+				State:        "open",
+				LimitResults: 30,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &cmdutil.Factory{}
+			var gotOpts *ListOptions
+			cmd := NewCmdList(f, func(opts *ListOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			argv, err := shlex.Split(tt.cli)
+			require.NoError(t, err)
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, gotOpts)
+
+			assert.Equal(t, tt.wants.IssueType, gotOpts.IssueType)
+			assert.Equal(t, tt.wants.State, gotOpts.State)
+			assert.Equal(t, tt.wants.LimitResults, gotOpts.LimitResults)
+		})
+	}
+}
+
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
@@ -479,6 +527,41 @@ func Test_issueList(t *testing.T) {
 							"repo":  "REPO",
 							"limit": float64(30),
 							"query": `label:"one world" label:hello repo:OWNER/REPO state:open type:issue`,
+							"type":  "ISSUE_ADVANCED",
+						}, params)
+					}))
+			},
+		},
+		{
+			name: "with issue type",
+			args: args{
+				// TODO advancedIssueSearchCleanup
+				// No need for feature detection once GHES 3.17 support ends.
+				detector: fd.AdvancedIssueSearchSupportedAsOptIn(),
+				limit:    30,
+				repo:     ghrepo.New("OWNER", "REPO"),
+				filters: prShared.FilterOptions{
+					Entity:    "issue",
+					State:     "open",
+					IssueType: "Bug",
+				},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueSearch\b`),
+					httpmock.GraphQLQuery(`
+					{ "data": {
+						"repository": { "hasIssuesEnabled": true },
+						"search": {
+							"issueCount": 0,
+							"nodes": []
+						}
+					} }`, func(_ string, params map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"owner": "OWNER",
+							"repo":  "REPO",
+							"limit": float64(30),
+							"query": "repo:OWNER/REPO state:open type:Bug type:issue",
 							"type":  "ISSUE_ADVANCED",
 						}, params)
 					}))
