@@ -51,8 +51,8 @@ Pass `--repo OWNER/REPO` (`-R`) to override the resolved CWD repo.
   `label:`, `repo:owner/name`, `in:title`, ...). Pass each qualifier as
   its own bare token, not as one quoted string:
   `gh search issues repo:cli/cli is:open author:monalisa` works, but
-  `gh search issues "repo:cli/cli is:open"` is read as a single phrase and
-  fails with `Invalid search query`. Quote only multi-word free text
+  `gh search issues "repo:cli/cli is:open"` is treated as a single keyword (parsed as `repo:"cli/cli is:open"`)
+  and fails with `Invalid search query`. Quote only multi-word free text
   (`gh search issues "broken feature"`). Most qualifiers also have a
   dedicated flag (`--repo`, `--author`, `--label`, ...). Prefer search for
   anything cross-repo or filtered by author/label.
