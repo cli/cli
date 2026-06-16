@@ -177,7 +177,7 @@ func readFileRun(opts *ReadFileOptions) error {
 	if mime, ok := binaryContentType(file.Content); ok {
 		if opts.IO.IsStdoutTTY() {
 			return fmt.Errorf("binary file (%s, %s); use --output to save to a file or pipe stdout",
-				mime, text.FormatSize(file.Size))
+				mime, text.FormatSize(int64(file.Size)))
 		}
 		_, err = opts.IO.Out.Write(file.Content)
 		return err

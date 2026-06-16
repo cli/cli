@@ -188,7 +188,7 @@ func writeTable(io *iostreams.IOStreams, dir *repoDir) error {
 
 		size := "-"
 		if e.Type == "file" || e.Type == "symlink" {
-			size = text.FormatSize(e.Size)
+			size = text.FormatSize(int64(e.Size))
 		}
 
 		tp.AddField(entryType)

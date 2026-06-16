@@ -1,6 +1,7 @@
 package text
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -184,7 +185,7 @@ func TestDisplayURL(t *testing.T) {
 
 func TestFormatSize(t *testing.T) {
 	tests := []struct {
-		n    int
+		n    int64
 		want string
 	}{
 		{0, "0 B"},
@@ -203,6 +204,8 @@ func TestFormatSize(t *testing.T) {
 		{1610612736, "1.5 GB"},
 		{1099511627776, "1.0 TB"},
 		{1125899906842624, "1.0 PB"},
+		{1152921504606846976, "1024.0 PB"}, // 1 EB clamps to the largest known unit
+		{math.MaxInt64, "8192.0 PB"},       // maximum int never indexes past PB
 	}
 
 	for _, tt := range tests {
