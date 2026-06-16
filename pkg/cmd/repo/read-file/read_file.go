@@ -61,7 +61,7 @@ func NewCmdReadFile(f *cmdutil.Factory, runF func(*ReadFileOptions) error) *cobr
 		Long: heredoc.Docf(`
 			Read the contents of a file in a GitHub repository without cloning it.
 
-			This command is in preview and and subject to change without notice.
+			This command is in preview and subject to change without notice.
 
 			By default the file is read from the default branch. Use the %[1]s--ref%[1]s flag to
 			read from a specific branch, tag, or commit.
