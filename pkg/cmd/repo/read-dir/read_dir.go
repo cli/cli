@@ -69,6 +69,9 @@ func NewCmdReadDir(f *cmdutil.Factory, runF func(*ReadDirOptions) error) *cobra.
 
 			# List a directory at a specific ref
 			$ gh repo read-dir docs --repo cli/cli --ref v2.50.0
+
+			# Print selected fields as JSON
+			$ gh repo read-dir docs --repo cli/cli --json name,path,type,size
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

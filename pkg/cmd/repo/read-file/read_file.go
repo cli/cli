@@ -82,6 +82,9 @@ func NewCmdReadFile(f *cmdutil.Factory, runF func(*ReadFileOptions) error) *cobr
 
 			# Save a file to disk
 			$ gh repo read-file README.md --repo cli/cli --output download/README.md
+
+			# Print selected fields as JSON
+			$ gh repo read-file README.md --repo cli/cli --json name,path,size,type
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
