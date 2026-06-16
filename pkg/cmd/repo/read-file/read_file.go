@@ -260,6 +260,8 @@ func writeToOutput(file *repoFile, output string, clobber bool) (string, error) 
 		if lr.isDir {
 			asDir = true
 		}
+	} else if !os.IsNotExist(err) {
+		return "", err
 	}
 
 	if asDir {
@@ -273,6 +275,8 @@ func writeToOutput(file *repoFile, output string, clobber bool) (string, error) 
 		if !clobber {
 			return "", fmt.Errorf("output path already exists: %q (use --clobber to overwrite)", dest)
 		}
+	} else if !os.IsNotExist(err) {
+		return "", err
 	}
 
 	if dir := filepath.Dir(dest); dir != "" && dir != "." {

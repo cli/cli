@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -620,6 +621,25 @@ func Test_writeToOutput(t *testing.T) {
 			output:  "link.md",
 			lstat:   func(string) (*lstatResult, error) { return &lstatResult{isSymlink: true}, nil },
 			wantErr: "output path is a symlink",
+		},
+		{
+			name:    "initial path lstat error is propagated",
+			file:    &repoFile{Name: "README.md", Content: []byte("hi")},
+			output:  "out/README.md",
+			lstat:   func(string) (*lstatResult, error) { return nil, fmt.Errorf("something went wrong") },
+			wantErr: "something went wrong",
+		},
+		{
+			name:   "final path lstat error is propagated",
+			file:   &repoFile{Name: "README.md", Content: []byte("hi")},
+			output: "out/",
+			lstat: func(path string) (*lstatResult, error) {
+				if path == "out/" {
+					return &lstatResult{isDir: true}, nil
+				}
+				return nil, fmt.Errorf("something went wrong")
+			},
+			wantErr: "something went wrong",
 		},
 	}
 
