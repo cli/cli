@@ -27,6 +27,9 @@ exec git checkout main
 # Create a small binary file (PNG signature) via the Contents API
 exec gh api -X PUT repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING/contents/assets/logo.png -f message='Add binary' -f content=iVBORw0KGgo=
 
+# Create a text file containing ANSI terminal escape sequences via the Contents API
+exec gh api -X PUT repos/$ORG/$SCRIPT_NAME-$RANDOM_STRING/contents/ansi.txt -f message='Add ansi' -f content=G1szMW1oZWxsbxtbMG0K
+
 # Read a file from the default branch: raw content goes to stdout
 exec gh repo read-file docs/guide.md
 cmp stdout $WORK/guide.md
@@ -63,6 +66,13 @@ exec gh repo read-file assets/logo.png
 cmp stdout downloaded.png
 exec gh repo read-file assets/logo.png --json size,type,content --jq '.content'
 stdout '^iVBORw0KGgo=$'
+
+# A file with terminal escape sequences is refused by default, but readable
+# with --allow-escape-sequences
+! exec gh repo read-file ansi.txt
+stderr 'terminal escape sequences'
+exec gh repo read-file ansi.txt --allow-escape-sequences
+stdout 'hello'
 
 # Error: the path is a directory
 ! exec gh repo read-file docs
