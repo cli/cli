@@ -56,7 +56,7 @@ func NewCmdReadDir(f *cmdutil.Factory, runF func(*ReadDirOptions) error) *cobra.
 
 			This command is in preview and subject to change without notice.
 
-			By default the directory is listed from the default branch. Use the %[1]s--ref%[1]s flag to
+			By default, the directory is listed from the default branch. Use the %[1]s--ref%[1]s flag to
 			list from a specific branch, tag, or commit. When no path is given, the repository root
 			is listed.
 		`, "`"),

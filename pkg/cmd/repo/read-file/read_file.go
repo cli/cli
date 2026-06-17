@@ -64,15 +64,17 @@ func NewCmdReadFile(f *cmdutil.Factory, runF func(*ReadFileOptions) error) *cobr
 
 			This command is in preview and subject to change without notice.
 
-			By default the file is read from the default branch. Use the %[1]s--ref%[1]s flag to
+			By default, the file is read from the default branch. Use the %[1]s--ref%[1]s flag to
 			read from a specific branch, tag, or commit.
 
 			When run in TTY mode, the content is shown through your pager. When stdout is piped or
 			redirected, the raw content is written directly. To save the file to disk instead, use
 			the %[1]s--output%[1]s flag.
 
-			By default the command refuses to output a file that contains terminal escape sequences,
+			By default, the command refuses to output a file that contains terminal escape sequences,
 			since they could manipulate your terminal. Pass %[1]s--allow-escape-sequences%[1]s to read the file anyway.
+			This check applies only to terminal and piped output; writing to disk with %[1]s--output%[1]s always
+			includes the raw bytes, as if %[1]s--allow-escape-sequences%[1]s were given.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Read a file from the default branch
@@ -86,6 +88,9 @@ func NewCmdReadFile(f *cmdutil.Factory, runF func(*ReadFileOptions) error) *cobr
 
 			# Print selected fields as JSON
 			$ gh repo read-file README.md --repo cli/cli --json name,path,size,type
+
+			# Read a file that contains terminal escape sequences
+			$ gh repo read-file path/to/file --repo OWNER/REPO --allow-escape-sequences
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
