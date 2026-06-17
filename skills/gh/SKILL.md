@@ -125,10 +125,11 @@ without cloning, and honor `--repo OWNER/REPO` (`-R`) and `--ref <branch|tag|com
 - `gh repo read-file <path> [--ref <ref>] [--output <path> [--clobber]] [--allow-escape-sequences] [--json <fields>] [--jq <expr>]`
   prints a file's contents. In non-TTY contexts the raw bytes go straight to
   stdout (pipe-friendly); binary files are written as-is when piped but are
-  refused on a TTY. By default a file containing terminal escape sequences is
+  refused on a TTY. By default, a file containing terminal escape sequences is
   refused; pass `--allow-escape-sequences` to read it anyway. `--output <path>` (`-o`) writes to
   disk instead of stdout (a trailing slash writes under a directory using the
-  remote file name; `--clobber` allows overwrite). `--output` and `--json` are
+  remote file name; `--clobber` allows overwrite); writing to disk always
+  includes the raw bytes regardless of escape sequences. `--output` and `--json` are
   mutually exclusive. `--json` fields include `name`, `path`, `gitSHA`, `size`,
   `type`, `encoding`, and `content` (base64 encoded).
 - `gh repo read-dir [<path>] [--ref <ref>] [--json <fields>] [--jq <expr>]`
