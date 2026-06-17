@@ -390,6 +390,28 @@ func MatchSkillPath(filePath string) (name, namespace string) {
 	return m.name, m.namespace
 }
 
+// IsSkillPath reports whether a skill selector looks like a repo-relative path
+// rather than a simple skill name.
+func IsSkillPath(name string) bool {
+	name = strings.TrimSuffix(name, "/")
+	if name == "" {
+		return false
+	}
+	if strings.HasSuffix(name, "/SKILL.md") {
+		return true
+	}
+	if strings.HasPrefix(name, "skills/") || strings.HasPrefix(name, "plugins/") {
+		return true
+	}
+	if strings.Contains(name, "/skills/") || strings.Contains(name, "/plugins/") {
+		return true
+	}
+	if strings.Count(name, "/") >= 2 {
+		return true
+	}
+	return false
+}
+
 // matchSkillConventions checks if a blob path matches any known skill convention.
 func matchSkillConventions(entry treeEntry) *skillMatch {
 	if path.Base(entry.Path) != "SKILL.md" {
@@ -451,18 +473,22 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 }
 
 // matchHiddenDirConventions checks if a blob path matches a skill convention
-// under a hidden (dot-prefixed) root directory. These patterns mirror the
-// standard skills/ conventions but rooted under .{host}/skills/:
+// under a path that contains a hidden (dot-prefixed) directory. These patterns
+// mirror the standard skills/ conventions, but only when a hidden segment
+// appears anywhere in the ancestor path:
 //
-//   - .{host}/skills/*/SKILL.md         -> "hidden-dir"
-//   - .{host}/skills/{scope}/*/SKILL.md -> "hidden-dir-namespaced"
+//   - {prefix}/.{host}/{suffix}/skills/*/SKILL.md         -> "hidden-dir"
+//   - {prefix}/.{host}/{suffix}/skills/{scope}/*/SKILL.md -> "hidden-dir-namespaced"
 func matchHiddenDirConventions(entry treeEntry) *skillMatch {
 	if path.Base(entry.Path) != "SKILL.md" {
 		return nil
 	}
+	if !hasHiddenSegment(entry.Path) {
+		return nil
+	}
 
-	// .{host}/skills/*
-	// .{host}/skills/{scope}/*
+	// {prefix}/.{host}/{suffix}/skills/*
+	// {prefix}/.{host}/{suffix}/skills/{scope}/*
 	dir := path.Dir(entry.Path)
 	skillName := path.Base(dir)
 
@@ -470,29 +496,23 @@ func matchHiddenDirConventions(entry treeEntry) *skillMatch {
 		return nil
 	}
 
-	// .{host}/skills
-	// .{host}/skills/{scope}
+	// {prefix}/.{host}/{suffix}/skills
+	// {prefix}/.{host}/{suffix}/skills/{scope}
 	parentDir := path.Dir(dir)
 
-	// .{host}/skills/*/SKILL.md
+	// {prefix}/.{host}/{suffix}/skills/*/SKILL.md
 	if path.Base(parentDir) == "skills" {
-		hiddenRoot := path.Dir(parentDir)
-		if path.Dir(hiddenRoot) == "." && strings.HasPrefix(hiddenRoot, ".") {
-			return &skillMatch{entry: entry, name: skillName, skillDir: dir, convention: "hidden-dir"}
-		}
+		return &skillMatch{entry: entry, name: skillName, skillDir: dir, convention: "hidden-dir"}
 	}
 
-	// .{host}/skills/{scope}/*/SKILL.md
+	// {prefix}/.{host}/{suffix}/skills/{scope}/*/SKILL.md
 	grandparentDir := path.Dir(parentDir)
 	if path.Base(grandparentDir) == "skills" {
-		hiddenRoot := path.Dir(grandparentDir)
-		if path.Dir(hiddenRoot) == "." && strings.HasPrefix(hiddenRoot, ".") {
-			namespace := path.Base(parentDir)
-			if !validateName(namespace) {
-				return nil
-			}
-			return &skillMatch{entry: entry, name: skillName, namespace: namespace, skillDir: dir, convention: "hidden-dir-namespaced"}
+		namespace := path.Base(parentDir)
+		if !validateName(namespace) {
+			return nil
 		}
+		return &skillMatch{entry: entry, name: skillName, namespace: namespace, skillDir: dir, convention: "hidden-dir-namespaced"}
 	}
 
 	return nil
@@ -655,8 +675,19 @@ func FetchDescriptionsConcurrent(client *api.Client, host, owner, repo string, s
 	wg.Wait()
 }
 
+// DiscoverSkillByPathOptions controls optional behavior for DiscoverSkillByPathWithOptions.
+type DiscoverSkillByPathOptions struct {
+	SkipDescription bool
+}
+
 // DiscoverSkillByPath looks up a single skill by its exact path in the repository.
 func DiscoverSkillByPath(client *api.Client, host, owner, repo, commitSHA, skillPath string) (*Skill, error) {
+	return DiscoverSkillByPathWithOptions(client, host, owner, repo, commitSHA, skillPath, DiscoverSkillByPathOptions{})
+}
+
+// DiscoverSkillByPathWithOptions looks up a single skill by its exact path in
+// the repository, applying the given options.
+func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commitSHA, skillPath string, opts DiscoverSkillByPathOptions) (*Skill, error) {
 	skillPath = strings.TrimSuffix(skillPath, "/SKILL.md")
 	skillPath = strings.TrimSuffix(skillPath, "/")
 
@@ -737,7 +768,9 @@ func DiscoverSkillByPath(client *api.Client, host, owner, repo, commitSHA, skill
 		TreeSHA:    treeSHA,
 	}
 
-	skill.Description = fetchDescription(client, host, owner, repo, skill)
+	if !opts.SkipDescription {
+		skill.Description = fetchDescription(client, host, owner, repo, skill)
+	}
 
 	return skill, nil
 }

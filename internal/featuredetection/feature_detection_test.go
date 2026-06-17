@@ -12,6 +12,9 @@ import (
 )
 
 func TestIssueFeatures(t *testing.T) {
+	issueFieldsWithRelationships := `{"data":{"Issue":{"fields":[{"name":"title"},{"name":"body"},{"name":"blockedBy"}]}}}`
+	issueFieldsWithoutRelationships := `{"data":{"Issue":{"fields":[{"name":"title"},{"name":"body"}]}}}`
+
 	tests := []struct {
 		name          string
 		hostname      string
@@ -23,7 +26,8 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "github.com",
 			hostname: "github.com",
 			wantFeatures: IssueFeatures{
-				ApiActorsSupported: true,
+				ApiActorsSupported:          true,
+				IssueRelationshipsSupported: true,
 			},
 			wantErr: false,
 		},
@@ -31,15 +35,32 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "ghec data residency (ghe.com)",
 			hostname: "stampname.ghe.com",
 			wantFeatures: IssueFeatures{
-				ApiActorsSupported: true,
+				ApiActorsSupported:          true,
+				IssueRelationshipsSupported: true,
 			},
 			wantErr: false,
 		},
 		{
-			name:     "GHE",
+			name:     "GHE with relationship support",
 			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Issue_fields`: issueFieldsWithRelationships,
+			},
 			wantFeatures: IssueFeatures{
-				ApiActorsSupported: false,
+				ApiActorsSupported:          false,
+				IssueRelationshipsSupported: true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE without relationship support",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Issue_fields`: issueFieldsWithoutRelationships,
+			},
+			wantFeatures: IssueFeatures{
+				ApiActorsSupported:          false,
+				IssueRelationshipsSupported: false,
 			},
 			wantErr: false,
 		},

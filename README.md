@@ -10,6 +10,18 @@ GitHub CLI is supported for users on GitHub.com, GitHub Enterprise Cloud, and Gi
 
 For [installation options see below](#installation), for usage instructions [see the manual](https://cli.github.com/manual/).
 
+## Agent skills
+
+An [agent skill](https://agentskills.io) is available for driving `gh` from coding agents. Install or update it with the built-in `gh skill` command:
+
+```shell
+# Install the skill (user scope recommended)
+gh skill install cli/cli gh --scope user
+
+# Update the skill after a `gh` release
+gh skill update gh
+```
+
 ## Contributing
 
 If anything feels off or if you feel that some functionality is missing, please check out the [contributing page](.github/CONTRIBUTING.md). There you will find instructions for sharing your feedback, building the tool locally, and submitting pull requests to the project.

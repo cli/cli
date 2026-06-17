@@ -208,3 +208,42 @@ func FindIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 
 	return resp.Repository.Issue, nil
 }
+
+// ResolveIssueRef parses an issue reference (number or URL) and returns its
+// node ID. References that point at a different host than baseRepo are
+// rejected because relationship mutations require IDs from the base host.
+func ResolveIssueRef(client *api.Client, baseRepo ghrepo.Interface, ref string) (string, error) {
+	number, repo, err := ParseIssueFromArg(ref)
+	if err != nil {
+		return "", err
+	}
+
+	targetRepo := baseRepo
+	if r, ok := repo.Value(); ok {
+		if r.RepoHost() != baseRepo.RepoHost() {
+			return "", fmt.Errorf("issue reference %q belongs to a different host (%s) than the current repository (%s)", ref, r.RepoHost(), baseRepo.RepoHost())
+		}
+		targetRepo = r
+	}
+
+	return api.IssueNodeID(client, targetRepo, number)
+}
+
+// ResolveIssueTypeName resolves an issue type name to its node ID by
+// fetching the repository's available types.
+func ResolveIssueTypeName(client *api.Client, repo ghrepo.Interface, typeName string) (string, error) {
+	issueTypes, err := api.RepoIssueTypes(client, repo)
+	if err != nil {
+		return "", err
+	}
+
+	typeNames := make([]string, len(issueTypes))
+	for i, t := range issueTypes {
+		typeNames[i] = t.Name
+		if strings.EqualFold(t.Name, typeName) {
+			return t.ID, nil
+		}
+	}
+
+	return "", fmt.Errorf("type %q not found; available types: %s", typeName, strings.Join(typeNames, ", "))
+}

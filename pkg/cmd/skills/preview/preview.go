@@ -69,6 +69,12 @@ func NewCmdPreview(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			When run with only a repository argument, lists available skills and
 			prompts for selection.
 
+			The skill argument can be a name, a namespaced name (%[1]sauthor/skill%[1]s),
+			or an exact path within the repository (%[1]sskills/author/skill%[1]s,
+			%[1]spackages/agent-skills/code-review%[1]s, or any %[1]s.../SKILL.md%[1]s path).
+			Namespaced names with one slash are matched by name. Use a %[1]sSKILL.md%[1]s
+			suffix to force a one-directory path outside the standard conventions.
+
 			To preview a specific version of the skill, append %[1]s@VERSION%[1]s to the
 			skill name. The version is resolved as a git tag, branch, or commit SHA.
 		`, "`"),
@@ -81,6 +87,9 @@ func NewCmdPreview(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 
 			# Preview a skill at a specific commit SHA
 			$ gh skill preview github/awesome-copilot documentation-writer@abc123def456
+
+			# Preview from a non-standard nested path (efficient, skips full discovery)
+			$ gh skill preview monalisa/skills-repo packages/agent-skills/code-review
 
 			# Browse and preview interactively
 			$ gh skill preview github/awesome-copilot
@@ -153,25 +162,36 @@ func previewRun(opts *PreviewOptions) error {
 		return fmt.Errorf("could not resolve version: %w", err)
 	}
 
-	opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
-	allSkills, err := discovery.DiscoverSkillsWithOptions(apiClient, hostname, owner, repoName, resolved.SHA, discovery.DiscoverOptions{})
-	opts.IO.StopProgressIndicator()
-	if err != nil {
-		return err
-	}
+	var skill discovery.Skill
+	if discovery.IsSkillPath(opts.SkillName) {
+		opts.IO.StartProgressIndicatorWithLabel("Looking up skill")
+		found, err := discovery.DiscoverSkillByPathWithOptions(apiClient, hostname, owner, repoName, resolved.SHA, opts.SkillName, discovery.DiscoverSkillByPathOptions{SkipDescription: true})
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		skill = *found
+	} else {
+		opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
+		allSkills, err := discovery.DiscoverSkillsWithOptions(apiClient, hostname, owner, repoName, resolved.SHA, discovery.DiscoverOptions{})
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
 
-	skills, err := filterHiddenDirSkills(opts, allSkills)
-	if err != nil {
-		return err
-	}
+		skills, err := filterHiddenDirSkills(opts, allSkills)
+		if err != nil {
+			return err
+		}
 
-	sort.Slice(skills, func(i, j int) bool {
-		return skills[i].DisplayName() < skills[j].DisplayName()
-	})
+		sort.Slice(skills, func(i, j int) bool {
+			return skills[i].DisplayName() < skills[j].DisplayName()
+		})
 
-	skill, err := selectSkill(opts, skills)
-	if err != nil {
-		return err
+		skill, err = selectSkill(opts, skills)
+		if err != nil {
+			return err
+		}
 	}
 
 	opts.IO.StartProgressIndicatorWithLabel("Fetching skill content")

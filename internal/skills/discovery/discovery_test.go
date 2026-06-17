@@ -203,6 +203,19 @@ func TestMatchHiddenDirConventions(t *testing.T) {
 			wantConvention: "hidden-dir-namespaced",
 		},
 		{
+			name:           "nested hidden dir skills directory",
+			path:           "foo/bar/.claude/skills/code-review/SKILL.md",
+			wantName:       "code-review",
+			wantConvention: "hidden-dir",
+		},
+		{
+			name:           "nested hidden dir namespaced skill",
+			path:           "foo/bar/.claude/skills/monalisa/code-review/SKILL.md",
+			wantName:       "code-review",
+			wantNamespace:  "monalisa",
+			wantConvention: "hidden-dir-namespaced",
+		},
+		{
 			name:    "not a SKILL.md file",
 			path:    ".claude/skills/code-review/README.md",
 			wantNil: true,
@@ -228,9 +241,17 @@ func TestMatchHiddenDirConventions(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			name:    "too deeply nested hidden dir",
-			path:    ".claude/nested/skills/code-review/SKILL.md",
-			wantNil: true,
+			name:           "hidden dir with nested skills directory",
+			path:           ".claude/nested/skills/code-review/SKILL.md",
+			wantName:       "code-review",
+			wantConvention: "hidden-dir",
+		},
+		{
+			name:           "hidden dir with nested namespaced skills directory",
+			path:           ".claude/nested/skills/monalisa/code-review/SKILL.md",
+			wantName:       "code-review",
+			wantNamespace:  "monalisa",
+			wantConvention: "hidden-dir-namespaced",
 		},
 		{
 			name:    "invalid skill name",
@@ -992,6 +1013,16 @@ func TestDiscoverSkillsWithOptions(t *testing.T) {
 		},
 	}
 
+	nestedHiddenTree := map[string]interface{}{
+		"sha": "abc123", "truncated": false,
+		"tree": []map[string]interface{}{
+			{"path": "foo/bar/.claude/skills/hidden-skill", "type": "tree", "sha": "tree-sha-1"},
+			{"path": "foo/bar/.claude/skills/hidden-skill/SKILL.md", "type": "blob", "sha": "blob-1"},
+			{"path": "foo/bar/.claude/nested/skills/deep-hidden-skill", "type": "tree", "sha": "tree-sha-2"},
+			{"path": "foo/bar/.claude/nested/skills/deep-hidden-skill/SKILL.md", "type": "blob", "sha": "blob-2"},
+		},
+	}
+
 	emptyTree := map[string]interface{}{
 		"sha": "abc123", "truncated": false,
 		"tree": []map[string]interface{}{
@@ -1014,6 +1045,11 @@ func TestDiscoverSkillsWithOptions(t *testing.T) {
 			name:       "mixed tree returns all skills",
 			tree:       mixedTree,
 			wantSkills: []string{"hidden-skill", "standard-skill"},
+		},
+		{
+			name:       "nested hidden-dir tree returns hidden skill",
+			tree:       nestedHiddenTree,
+			wantSkills: []string{"deep-hidden-skill", "hidden-skill"},
 		},
 		{
 			name:    "no skills at all",
@@ -1298,6 +1334,32 @@ func TestDiscoverSkillByPath(t *testing.T) {
 	}
 }
 
+func TestDiscoverSkillByPathWithOptionsSkipsDescription(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/monalisa/octocat-skills/contents/skills"),
+		httpmock.JSONResponse([]map[string]interface{}{
+			{"name": "code-review", "path": "skills/code-review", "sha": "tree-sha", "type": "dir"},
+		}))
+	reg.Register(
+		httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree-sha"),
+		httpmock.JSONResponse(map[string]interface{}{
+			"sha": "tree-sha", "truncated": false,
+			"tree": []map[string]interface{}{
+				{"path": "SKILL.md", "type": "blob", "sha": "blob-sha"},
+			},
+		}))
+
+	client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+	skill, err := DiscoverSkillByPathWithOptions(client, "github.com", "monalisa", "octocat-skills", "abc123", "skills/code-review", DiscoverSkillByPathOptions{SkipDescription: true})
+
+	require.NoError(t, err)
+	assert.Equal(t, "code-review", skill.Name)
+	assert.Empty(t, skill.Description)
+}
+
 func TestDiscoverLocalSkills(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -1416,6 +1478,20 @@ func TestDiscoverLocalSkillsWithOptions(t *testing.T) {
 			wantSkills: []string{"standard", "hidden"},
 		},
 		{
+			name: "nested hidden dir returns skill",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "foo", "bar", ".claude", "skills", "hidden")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# hidden"), 0o644))
+
+				deepDir := filepath.Join(dir, "foo", "bar", ".claude", "nested", "skills", "deep-hidden")
+				require.NoError(t, os.MkdirAll(deepDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(deepDir, "SKILL.md"), []byte("# deep-hidden"), 0o644))
+			},
+			wantSkills: []string{"deep-hidden", "hidden"},
+		},
+		{
 			name:    "no skills at all",
 			setup:   func(t *testing.T, _ string) { t.Helper() },
 			wantErr: "no skills found",
@@ -1485,6 +1561,34 @@ func TestMatchSkillPath(t *testing.T) {
 			name, namespace := MatchSkillPath(tt.path)
 			assert.Equal(t, tt.wantName, name)
 			assert.Equal(t, tt.wantNamespace, namespace)
+		})
+	}
+}
+
+func TestIsSkillPath(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{name: "empty string", path: "", want: false},
+		{name: "plain skill name", path: "git-commit", want: false},
+		{name: "bare SKILL.md", path: "SKILL.md", want: false},
+		{name: "SKILL.md suffix", path: "skills/code-review/SKILL.md", want: true},
+		{name: "starts with skills/", path: "skills/code-review", want: true},
+		{name: "starts with plugins/", path: "plugins/hubot/skills/pr-summary", want: true},
+		{name: "nested skills/ path", path: "terraform/code-generation/skills/terraform-style-guide", want: true},
+		{name: "deeply nested skills/ path", path: "a/b/c/skills/my-skill", want: true},
+		{name: "nested plugins/ path", path: "vendor/plugins/hubot/skills/pr-summary", want: true},
+		{name: "arbitrary nested skill path", path: "packages/agent-skills/netsuite-ai-connector-instructions", want: true},
+		{name: "arbitrary nested skill path with trailing slash", path: "skills-catalog/matlab-core/matlab-debugging/", want: true},
+		{name: "name containing skills substring", path: "myskills", want: false},
+		{name: "namespaced skill name", path: "monalisa/code-review", want: false},
+		{name: "namespaced path", path: "skills/monalisa/issue-triage", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsSkillPath(tt.path))
 		})
 	}
 }

@@ -103,6 +103,19 @@ The following custom commands are defined within [`acceptance_test.go`](./accept
   stdout2env PR_URL
   ```
 
+- `jq-assert`: evaluate a jq expression on a JSON environment variable and assert the result matches a regexp
+
+  ```txtar
+  jq-assert ISSUE_JSON '.title' 'Expected Title'
+  jq-assert DISCUSSION_JSON '.comments | length' '^2$'
+  ```
+
+- `jq2env`: evaluate a jq expression on a JSON environment variable and store the result in another environment variable
+
+  ```txtar
+  jq2env ISSUE_JSON '.title' ISSUE_TITLE
+  ```
+
 ### Acceptance Test VS Code Support
 
 Due to the `//go:build acceptance` build constraint, some functionality is limited because `gopls` isn't being informed about the tag. To resolve this, set the following in your `settings.json`:

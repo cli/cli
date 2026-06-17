@@ -262,6 +262,43 @@ func TestPreviewRun(t *testing.T) {
 			wantStdout: "My Skill",
 		},
 		{
+			name: "preview by arbitrary nested skill path skips full discovery",
+			tty:  true,
+			opts: &PreviewOptions{
+				repo:      ghrepo.New("owner", "repo"),
+				SkillName: "packages/agent-skills/code-review",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/releases/latest"),
+					httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/contents/packages%2Fagent-skills"),
+					httpmock.StringResponse(`[
+						{"name": "code-review", "path": "packages/agent-skills/code-review", "sha": "treeSHA4", "type": "dir"}
+					]`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/git/trees/treeSHA4"),
+					httpmock.StringResponse(`{
+						"tree": [
+							{"path": "SKILL.md", "type": "blob", "sha": "blob999", "size": 50}
+						]
+					}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/owner/repo/git/blobs/blob999"),
+					httpmock.StringResponse(`{"sha": "blob999", "content": "`+encodedContent+`", "encoding": "base64"}`),
+				)
+			},
+			wantStdout: "My Skill",
+		},
+		{
 			name: "skill not found",
 			tty:  true,
 			opts: &PreviewOptions{

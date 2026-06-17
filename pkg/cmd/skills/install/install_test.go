@@ -311,6 +311,7 @@ func TestInstallRun(t *testing.T) {
 		wantErr    string
 		wantStdout string
 		wantStderr string
+		assert     func(t *testing.T)
 	}{
 		{
 			name:  "non-interactive without repo errors",
@@ -816,6 +817,34 @@ func TestInstallRun(t *testing.T) {
 				}
 			},
 			wantStdout: "Installed terraform-style-guide",
+		},
+		{
+			name:  "remote install by arbitrary nested skill path skips full discovery",
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubSkillByPath(reg, "monalisa", "skills-repo", "abc123",
+					"packages/agent-skills/code-review", "code-review", "treeSHA")
+				// DiscoverSkillByPath: tree + blob (for fetchDescription)
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+				// installer.Install: tree + blob (again, for writing files)
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: t.TempDir()},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "packages/agent-skills/code-review",
+					Agent:        "github-copilot",
+					Scope:        "project",
+					ScopeChanged: true,
+					Dir:          t.TempDir(),
+				}
+			},
+			wantStdout: "Installed code-review",
 		},
 		{
 			name:  "remote install with URL repo argument",
@@ -1499,6 +1528,37 @@ func TestInstallRun(t *testing.T) {
 			wantStdout: "Installed hidden-skill",
 			wantStderr: "Skills in hidden directories",
 		},
+		{
+			name: "respect claude code config dir env var for user scope",
+			setup: func(t *testing.T) {
+				t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+			},
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: t.TempDir()},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "git-commit",
+					Agent:        "claude-code",
+					Scope:        "user",
+					ScopeChanged: true,
+					Telemetry:    &telemetry.NoOpService{},
+				}
+			},
+			assert: func(t *testing.T) {
+				assert.FileExists(t, filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "skills", "git-commit", "SKILL.md"))
+				assert.NoFileExists(t, filepath.Join(os.Getenv("HOME"), ".claude", "skills", "git-commit", "SKILL.md"))
+			},
+			wantStdout: "Installed git-commit",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1543,6 +1603,9 @@ func TestInstallRun(t *testing.T) {
 			}
 			if tt.verify != nil {
 				tt.verify(t)
+			}
+			if tt.assert != nil {
+				tt.assert(t)
 			}
 		})
 	}
@@ -2157,31 +2220,6 @@ func TestRunLocalInstall(t *testing.T) {
 			if tt.verify != nil {
 				tt.verify(t, targetDir)
 			}
-		})
-	}
-}
-
-func Test_isSkillPath(t *testing.T) {
-	tests := []struct {
-		name string
-		path string
-		want bool
-	}{
-		{name: "empty string", path: "", want: false},
-		{name: "plain skill name", path: "git-commit", want: false},
-		{name: "SKILL.md at root", path: "SKILL.md", want: true},
-		{name: "SKILL.md suffix", path: "skills/code-review/SKILL.md", want: true},
-		{name: "starts with skills/", path: "skills/code-review", want: true},
-		{name: "starts with plugins/", path: "plugins/hubot/skills/pr-summary", want: true},
-		{name: "nested skills/ path", path: "terraform/code-generation/skills/terraform-style-guide", want: true},
-		{name: "deeply nested skills/ path", path: "a/b/c/skills/my-skill", want: true},
-		{name: "nested plugins/ path", path: "vendor/plugins/hubot/skills/pr-summary", want: true},
-		{name: "name containing skills substring", path: "myskills", want: false},
-		{name: "namespaced path", path: "skills/monalisa/issue-triage", want: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, isSkillPath(tt.path))
 		})
 	}
 }

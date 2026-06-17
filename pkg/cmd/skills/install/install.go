@@ -116,8 +116,10 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			see: https://agentskills.io/specification
 
 			The skill argument can be a name, a namespaced name (%[1]sauthor/skill%[1]s),
-			or an exact path within the repository (%[1]sskills/author/skill%[1]s or
-			%[1]sskills/author/skill/SKILL.md%[1]s).
+			or an exact path within the repository (%[1]sskills/author/skill%[1]s,
+			%[1]spackages/agent-skills/code-review%[1]s, or any %[1]s.../SKILL.md%[1]s path).
+			Namespaced names with one slash are matched by name. Use a %[1]sSKILL.md%[1]s
+			suffix to force a one-directory path outside the standard conventions.
 
 			Performance tip: when installing from a large repository with many
 			skills, providing an exact path instead of a skill name avoids a
@@ -158,6 +160,9 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 
 			# Install from a large namespaced repo by path (efficient, skips full discovery)
 			$ gh skill install github/awesome-copilot skills/monalisa/code-review
+
+			# Install from a non-standard nested path (efficient, skips full discovery)
+			$ gh skill install monalisa/skills-repo packages/agent-skills/code-review
 
 			# Install from a local directory
 			$ gh skill install ./my-skills-repo --from-local
@@ -285,7 +290,7 @@ func installRun(opts *InstallOptions) error {
 
 	var selectedSkills []discovery.Skill
 
-	if isSkillPath(opts.SkillName) {
+	if discovery.IsSkillPath(opts.SkillName) {
 		opts.IO.StartProgressIndicatorWithLabel("Looking up skill")
 		skill, err := discovery.DiscoverSkillByPath(apiClient, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA, opts.SkillName)
 		opts.IO.StopProgressIndicator()
@@ -550,24 +555,6 @@ func runLocalInstall(opts *InstallOptions) error {
 	}
 
 	return nil
-}
-
-// isSkillPath returns true if the argument looks like a repo-relative path
-// rather than a simple skill name.
-func isSkillPath(name string) bool {
-	if name == "" {
-		return false
-	}
-	if name == "SKILL.md" || strings.HasSuffix(name, "/SKILL.md") {
-		return true
-	}
-	if strings.HasPrefix(name, "skills/") || strings.HasPrefix(name, "plugins/") {
-		return true
-	}
-	if strings.Contains(name, "/skills/") || strings.Contains(name, "/plugins/") {
-		return true
-	}
-	return false
 }
 
 func resolveRepoArg(skillSource string, canPrompt bool, p prompter.Prompter) (ghrepo.Interface, string, error) {

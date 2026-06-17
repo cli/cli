@@ -38,8 +38,11 @@ func TestFindByID(t *testing.T) {
 }
 
 func TestInstallDir(t *testing.T) {
+	t.Setenv(claudeConfigDirEnv, "")
+
 	tests := []struct {
 		name    string
+		setup   func(*testing.T)
 		hostID  string
 		scope   Scope
 		gitRoot string
@@ -70,6 +73,25 @@ func TestInstallDir(t *testing.T) {
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
 			wantDir: filepath.Join("/tmp/monalisa-repo", ".claude", "skills"),
+		},
+		{
+			name:    "claude code user scope",
+			hostID:  "claude-code",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home/monalisa", ".claude", "skills"),
+		},
+		{
+			name: "claude code user scope, respect env var",
+			setup: func(t *testing.T) {
+				t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join("/home", "monalisa", ".config", "claude"))
+			},
+			hostID:  "claude-code",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/home", "monalisa", ".config", "claude", "skills"),
 		},
 		{
 			name:    "cursor project scope",
@@ -130,6 +152,10 @@ func TestInstallDir(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup(t)
+			}
+
 			host, err := FindByID(tt.hostID)
 			require.NoError(t, err)
 

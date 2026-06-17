@@ -283,7 +283,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	editable := opts.Editable
-	editable.Reviewers.Allowed = true
+	editable.Reviewers.Selectable = true
 	editable.Title.Default = pr.Title
 	editable.Body.Default = pr.Body
 	editable.Base.Default = pr.BaseRefName

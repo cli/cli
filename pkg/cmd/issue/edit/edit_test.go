@@ -2,7 +2,9 @@ package edit
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -281,6 +284,106 @@ func TestNewCmdEdit(t *testing.T) {
 			input:    "23 34",
 			wantsErr: true,
 		},
+		{
+			name:  "type flag",
+			input: "23 --type Bug",
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				Editable: prShared.Editable{
+					IssueType: prShared.EditableString{
+						Value:  "Bug",
+						Edited: true,
+					},
+				},
+			},
+		},
+		{
+			name:  "remove-type flag",
+			input: "23 --remove-type",
+			output: EditOptions{
+				IssueNumbers:    []int{23},
+				RemoveIssueType: true,
+			},
+		},
+		{
+			name:     "both type and remove-type flags",
+			input:    "23 --type Bug --remove-type",
+			wantsErr: true,
+		},
+		{
+			name:  "parent flag",
+			input: "23 --parent 100",
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				Parent:       "100",
+			},
+		},
+		{
+			name:  "remove-parent flag",
+			input: "23 --remove-parent",
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				RemoveParent: true,
+			},
+		},
+		{
+			name:     "both parent and remove-parent flags",
+			input:    "23 --parent 100 --remove-parent",
+			wantsErr: true,
+		},
+		{
+			name:  "add-sub-issue flag",
+			input: "23 --add-sub-issue 123,124",
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				AddSubIssues: []string{"123", "124"},
+			},
+		},
+		{
+			name:     "add-sub-issue rejected with multiple issues",
+			input:    "23 24 --add-sub-issue 123",
+			wantsErr: true,
+		},
+		{
+			name:  "remove-sub-issue flag",
+			input: "23 --remove-sub-issue 50",
+			output: EditOptions{
+				IssueNumbers:    []int{23},
+				RemoveSubIssues: []string{"50"},
+			},
+		},
+		{
+			name:  "add-blocked-by flag",
+			input: "23 --add-blocked-by 200",
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				AddBlockedBy: []string{"200"},
+			},
+		},
+		{
+			name:  "remove-blocked-by flag",
+			input: "23 --remove-blocked-by 201",
+			output: EditOptions{
+				IssueNumbers:    []int{23},
+				RemoveBlockedBy: []string{"201"},
+			},
+		},
+		{
+			name:  "add-blocking flag",
+			input: "23 --add-blocking 300,301",
+			output: EditOptions{
+				IssueNumbers: []int{23},
+				AddBlocking:  []string{"300", "301"},
+			},
+		},
+		{
+			name:  "remove-blocking flag",
+			input: "23 --remove-blocking 300",
+			output: EditOptions{
+				IssueNumbers:   []int{23},
+				RemoveBlocking: []string{"300"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -322,6 +425,14 @@ func TestNewCmdEdit(t *testing.T) {
 			assert.Equal(t, tt.output.IssueNumbers, gotOpts.IssueNumbers)
 			assert.Equal(t, tt.output.Interactive, gotOpts.Interactive)
 			assert.Equal(t, tt.output.Editable, gotOpts.Editable)
+			assert.Equal(t, tt.output.Parent, gotOpts.Parent)
+			assert.Equal(t, tt.output.RemoveParent, gotOpts.RemoveParent)
+			assert.Equal(t, tt.output.AddSubIssues, gotOpts.AddSubIssues)
+			assert.Equal(t, tt.output.RemoveSubIssues, gotOpts.RemoveSubIssues)
+			assert.Equal(t, tt.output.AddBlockedBy, gotOpts.AddBlockedBy)
+			assert.Equal(t, tt.output.RemoveBlockedBy, gotOpts.RemoveBlockedBy)
+			assert.Equal(t, tt.output.AddBlocking, gotOpts.AddBlocking)
+			assert.Equal(t, tt.output.RemoveBlocking, gotOpts.RemoveBlocking)
 			if tt.expectedBaseRepo != nil {
 				baseRepo, err := gotOpts.BaseRepo()
 				require.NoError(t, err)
@@ -720,6 +831,415 @@ func Test_editRun(t *testing.T) {
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
+		{
+			name: "edit type",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Interactive:  false,
+				Editable: prShared.Editable{
+					IssueType: prShared.EditableString{
+						Value:  "Bug",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGet(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issueTypes": { "nodes": [
+						{ "id": "BUG_TYPE_ID", "name": "Bug", "description": "", "color": "" },
+						{ "id": "FEATURE_TYPE_ID", "name": "Feature", "description": "", "color": "" }
+					] } } } }
+					`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "123", inputs["issueId"])
+							assert.Equal(t, "BUG_TYPE_ID", inputs["issueTypeId"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "remove type",
+			input: &EditOptions{
+				Detector:        &fd.EnabledDetectorMock{},
+				IssueNumbers:    []int{123},
+				Interactive:     false,
+				RemoveIssueType: true,
+				FetchOptions:    prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGet(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "123", inputs["issueId"])
+							assert.Nil(t, inputs["issueTypeId"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "interactive edit type prompt",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Interactive:  true,
+				FieldsToEditSurvey: func(_ prShared.EditPrompter, eo *prShared.Editable) error {
+					// Verify the survey is allowed to offer Type as an option for issue edit.
+					assert.True(t, eo.IssueType.Selectable)
+					eo.IssueType.Edited = true
+					return nil
+				},
+				EditFieldsSurvey: func(_ prShared.EditPrompter, eo *prShared.Editable, _ string) error {
+					// FetchOptions populated Options and IssueTypeNameToID from
+					// the RepositoryIssueTypes stub below.
+					assert.Equal(t, []string{"Bug", "Feature"}, eo.IssueType.Options)
+					assert.Equal(t, "FEATURE_TYPE_ID", eo.IssueTypeNameToID["Feature"])
+					eo.IssueType.Value = "Feature"
+					return nil
+				},
+				FetchOptions:    prShared.FetchOptions,
+				DetermineEditor: func() (string, error) { return "vim", nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGet(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issueTypes": { "nodes": [
+						{ "id": "BUG_TYPE_ID", "name": "Bug", "description": "", "color": "" },
+						{ "id": "FEATURE_TYPE_ID", "name": "Feature", "description": "", "color": "" }
+					] } } } }
+					`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "123", inputs["issueId"])
+							assert.Equal(t, "FEATURE_TYPE_ID", inputs["issueTypeId"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "edit set parent",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Interactive:  false,
+				Parent:       "100",
+				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
+					return nil
+				},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGet(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`query IssueNodeID\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issue": { "id": "PARENT_100_ID" } } } }
+					`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation AddSubIssue\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "addSubIssue": { "issue": { "id": "PARENT_100_ID" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "PARENT_100_ID", inputs["issueId"])
+							assert.Equal(t, "123", inputs["subIssueId"])
+							assert.Equal(t, true, inputs["replaceParent"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "edit remove parent",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Interactive:  false,
+				RemoveParent: true,
+				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
+					return nil
+				},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+						"id": "123",
+						"number": 123,
+						"url": "https://github.com/OWNER/REPO/issue/123",
+						"parent": {
+							"id": "PARENT_100_ID",
+							"number": 100,
+							"title": "Parent Issue",
+							"url": "https://github.com/OWNER/REPO/issues/100",
+							"state": "OPEN",
+							"repository": { "nameWithOwner": "OWNER/REPO" }
+						}
+					} } } }
+					`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation RemoveSubIssue\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "removeSubIssue": { "issue": { "id": "PARENT_100_ID" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "PARENT_100_ID", inputs["issueId"])
+							assert.Equal(t, "123", inputs["subIssueId"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "edit add sub-issues",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{100},
+				Interactive:  false,
+				AddSubIssues: []string{"123", "124"},
+				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
+					return nil
+				},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueNumberGet(t, reg, 100)
+				reg.Register(
+					issueNodeIDByNumberMatcher(123),
+					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "SUB_123_ID" } } } }`),
+				)
+				reg.Register(
+					issueNodeIDByNumberMatcher(124),
+					httpmock.StringResponse(`{ "data": { "repository": { "issue": { "id": "SUB_124_ID" } } } }`),
+				)
+				reg.Register(
+					httpmock.GraphQLMutationMatcher(`mutation AddSubIssue\b`, func(input map[string]interface{}) bool {
+						return input["subIssueId"] == "SUB_123_ID"
+					}),
+					httpmock.GraphQLMutation(`{ "data": { "addSubIssue": { "issue": { "id": "100" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "100", inputs["issueId"])
+							assert.Equal(t, true, inputs["replaceParent"])
+						}),
+				)
+				reg.Register(
+					httpmock.GraphQLMutationMatcher(`mutation AddSubIssue\b`, func(input map[string]interface{}) bool {
+						return input["subIssueId"] == "SUB_124_ID"
+					}),
+					httpmock.GraphQLMutation(`{ "data": { "addSubIssue": { "issue": { "id": "100" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "100", inputs["issueId"])
+							assert.Equal(t, true, inputs["replaceParent"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/100\n",
+		},
+		{
+			name: "edit remove sub-issue",
+			input: &EditOptions{
+				Detector:        &fd.EnabledDetectorMock{},
+				IssueNumbers:    []int{100},
+				Interactive:     false,
+				RemoveSubIssues: []string{"123"},
+				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
+					return nil
+				},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueNumberGet(t, reg, 100)
+				reg.Register(
+					httpmock.GraphQL(`query IssueNodeID\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issue": { "id": "SUB_123_ID" } } } }
+					`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation RemoveSubIssue\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "removeSubIssue": { "issue": { "id": "100" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "100", inputs["issueId"])
+							assert.Equal(t, "SUB_123_ID", inputs["subIssueId"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/100\n",
+		},
+		{
+			name: "edit add and remove blocked-by",
+			input: &EditOptions{
+				Detector:        &fd.EnabledDetectorMock{},
+				IssueNumbers:    []int{123},
+				Interactive:     false,
+				AddBlockedBy:    []string{"200"},
+				RemoveBlockedBy: []string{"201"},
+				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
+					return nil
+				},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGet(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`query IssueNodeID\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issue": { "id": "BLOCKING_200_ID" } } } }
+					`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation AddBlockedBy\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "addBlockedBy": { "issue": { "id": "123" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "123", inputs["issueId"])
+							assert.Equal(t, "BLOCKING_200_ID", inputs["blockingIssueId"])
+						}),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueNodeID\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issue": { "id": "BLOCKING_201_ID" } } } }
+					`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation RemoveBlockedBy\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "removeBlockedBy": { "issue": { "id": "123" } } } }`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, "123", inputs["issueId"])
+							assert.Equal(t, "BLOCKING_201_ID", inputs["blockingIssueId"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "edit add blocking swaps args",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123},
+				Interactive:  false,
+				AddBlocking:  []string{"300"},
+				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
+					return nil
+				},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGet(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`query IssueNodeID\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issue": { "id": "BLOCKED_300_ID" } } } }
+					`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation AddBlockedBy\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "addBlockedBy": { "issue": { "id": "BLOCKED_300_ID" } } } }`,
+						func(inputs map[string]interface{}) {
+							// --add-blocking swaps: OTHER issue is blocked BY this issue
+							assert.Equal(t, "BLOCKED_300_ID", inputs["issueId"])
+							assert.Equal(t, "123", inputs["blockingIssueId"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "edit remove blocking swaps args",
+			input: &EditOptions{
+				Detector:       &fd.EnabledDetectorMock{},
+				IssueNumbers:   []int{123},
+				Interactive:    false,
+				RemoveBlocking: []string{"300"},
+				FetchOptions: func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
+					return nil
+				},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueGet(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`query IssueNodeID\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issue": { "id": "BLOCKED_300_ID" } } } }
+					`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation RemoveBlockedBy\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "removeBlockedBy": { "issue": { "id": "BLOCKED_300_ID" } } } }`,
+						func(inputs map[string]interface{}) {
+							// --remove-blocking swaps: OTHER issue is no longer blocked BY this issue
+							assert.Equal(t, "BLOCKED_300_ID", inputs["issueId"])
+							assert.Equal(t, "123", inputs["blockingIssueId"])
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "batch edit type",
+			input: &EditOptions{
+				Detector:     &fd.EnabledDetectorMock{},
+				IssueNumbers: []int{123, 456},
+				Interactive:  false,
+				Editable: prShared.Editable{
+					IssueType: prShared.EditableString{
+						Value:  "Bug",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryIssueTypes\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "issueTypes": { "nodes": [
+						{ "id": "BUG_TYPE_ID", "name": "Bug", "description": "", "color": "" }
+					] } } } }
+					`),
+				)
+				mockIssueNumberGet(t, reg, 123)
+				mockIssueNumberGet(t, reg, 456)
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "updateIssueIssueType": { "issue": { "id": "123" } } } }`,
+						func(inputs map[string]interface{}) {}),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateIssueIssueType\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "updateIssueIssueType": { "issue": { "id": "456" } } } }`,
+						func(inputs map[string]interface{}) {}),
+				)
+			},
+			stdout: heredoc.Doc(`
+				https://github.com/OWNER/REPO/issue/123
+				https://github.com/OWNER/REPO/issue/456
+			`),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -935,6 +1455,83 @@ func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
 	)
 }
 
+// Test_editRun_crossHostRelationshipRefs verifies that every relationship
+// flag rejects a cross-host issue URL with the same clear error. Lives as
+// its own table rather than additional cases in Test_editRun because each
+// case shares identical setup and asserts the same error, varying only in
+// which input field carries the cross-host URL.
+func Test_editRun_crossHostRelationshipRefs(t *testing.T) {
+	const crossHostURL = "https://example.com/OWNER/REPO/issues/9"
+
+	// Each case exercises one relationship-bearing flag with a cross-host
+	// URL. ResolveIssueRef should short-circuit before any GraphQL request,
+	// and the per-issue failure must surface to stderr.
+	tests := []struct {
+		name  string
+		input *EditOptions
+	}{
+		{
+			name:  "set parent",
+			input: &EditOptions{Parent: crossHostURL},
+		},
+		{
+			name:  "add sub-issue",
+			input: &EditOptions{AddSubIssues: []string{crossHostURL}},
+		},
+		{
+			name:  "remove sub-issue",
+			input: &EditOptions{RemoveSubIssues: []string{crossHostURL}},
+		},
+		{
+			name:  "add blocked-by",
+			input: &EditOptions{AddBlockedBy: []string{crossHostURL}},
+		},
+		{
+			name:  "remove blocked-by",
+			input: &EditOptions{RemoveBlockedBy: []string{crossHostURL}},
+		},
+		{
+			name:  "add blocking",
+			input: &EditOptions{AddBlocking: []string{crossHostURL}},
+		},
+		{
+			name:  "remove blocking",
+			input: &EditOptions{RemoveBlocking: []string{crossHostURL}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, stderr := iostreams.Test()
+			ios.SetStdoutTTY(true)
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			mockIssueGet(t, reg)
+			// No IssueNodeID stub on purpose: the cross-host guard must
+			// short-circuit before any resolution request goes out.
+
+			tt.input.Detector = &fd.EnabledDetectorMock{}
+			tt.input.IssueNumbers = []int{123}
+			tt.input.Interactive = false
+			tt.input.FetchOptions = func(_ *api.Client, _ ghrepo.Interface, _ *prShared.Editable, _ gh.ProjectsV1Support) error {
+				return nil
+			}
+			tt.input.IO = ios
+			tt.input.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			tt.input.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			}
+
+			err := editRun(tt.input)
+			require.Error(t, err)
+			assert.Regexp(t, `belongs to a different host \(example\.com\) than the current repository \(github\.com\)`, stderr.String())
+		})
+	}
+}
+
 func TestApiActorsSupported(t *testing.T) {
 	t.Run("when actors are assignable, query includes assignedActors", func(t *testing.T) {
 		ios, _, _, _ := iostreams.Test()
@@ -1097,4 +1694,31 @@ func TestProjectsV1Deprecation(t *testing.T) {
 		// Verify that our request contained projectCards
 		reg.Verify(t)
 	})
+}
+
+// issueNodeIDByNumberMatcher matches an IssueNodeID GraphQL query whose
+// number variable equals the given value. Used by tests that issue
+// multiple IssueNodeID lookups and need stubs to route by issue number
+// rather than by registration order.
+func issueNodeIDByNumberMatcher(number int) httpmock.Matcher {
+	queryMatcher := httpmock.GraphQL(`query IssueNodeID\b`)
+	return func(req *http.Request) bool {
+		if !queryMatcher(req) {
+			return false
+		}
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return false
+		}
+		req.Body = io.NopCloser(bytes.NewReader(body))
+		var b struct {
+			Variables struct {
+				Number int `json:"number"`
+			} `json:"variables"`
+		}
+		if err := json.Unmarshal(body, &b); err != nil {
+			return false
+		}
+		return b.Variables.Number == number
+	}
 }
