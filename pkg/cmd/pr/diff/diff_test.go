@@ -576,3 +576,21 @@ func Test_sanitizedReader(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestChangedFileNames_HandlesRunTogetherHeaders(t *testing.T) {
+	// Regression test for issue #13022: after --exclude filtering,
+	// the last line of a kept section can run directly into the
+	// next section's "diff --git" header without an intervening
+	// newline. The strict diffHeaderRegexp (requiring "(?:^|\n)"
+	// before the header) would then miss that header, dropping the
+	// corresponding file from --name-only output.
+	diff := "diff --git a/.gitignore b/.gitignore\nfoo\ndiff --git a/auth.go b/auth.go\nbar\ndiff --git a/context.go b/context.go\nbaz\n"
+	filtered, err := filterDiff(strings.NewReader(diff), []string{"*.md"})
+	require.NoError(t, err)
+	var buf bytes.Buffer
+	require.NoError(t, changedFilesNames(&buf, filtered))
+	names := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	want := []string{".gitignore", "auth.go", "context.go"}
+	assert.Equal(t, want, names)
+}
+

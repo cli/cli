@@ -320,7 +320,11 @@ func changedFilesNames(w io.Writer, r io.Reader) error {
 	// `"`` + hello-\360\237\230\200-world"
 	//
 	// Where I'm using the `` to indicate a string to avoid confusion with the " character.
-	matches := diffHeaderRegexp.FindAllStringSubmatch(string(diff), -1)
+	// Use the relaxed regex that does not require a leading newline
+	// before the "diff --git" header. After --exclude filtering, the
+	// last line of one kept section can run directly into the next
+	// section's header without an intervening newline (issue #13022).
+	matches := diffHeaderRelaxedRegexp.FindAllStringSubmatch(string(diff), -1)
 
 	for _, val := range matches {
 		name := strings.TrimSpace(val[1] + val[2])
@@ -386,6 +390,11 @@ func isPrint(r rune) bool {
 }
 
 var diffHeaderRegexp = regexp.MustCompile(`(?:^|\n)diff\s--git.*\s("?)b/(.*)`)
+// diffHeaderRelaxedRegexp matches a "diff --git" header without
+// requiring a leading newline. Used by extractFileName so the
+// header is still found when splitDiffSections produces a section
+// that lost the separator's leading newline (see issue #13022).
+var diffHeaderRelaxedRegexp = regexp.MustCompile(`diff\s--git.*\s("?)b/(.*)`)
 
 // filterDiff reads a unified diff and returns a new reader with file entries
 // matching any of the exclude patterns removed.
@@ -429,7 +438,15 @@ func splitDiffSections(diff string) []string {
 }
 
 func extractFileName(section string) string {
-	m := diffHeaderRegexp.FindStringSubmatch(section)
+	// Use a relaxed regex that does not require a leading newline
+	// before the "diff --git" header. splitDiffSections may place
+	// the header at the start of a non-first section without the
+	// separator's leading newline (the separator was consumed by
+	// the split), and the joiner may emit a section whose last line
+	// runs directly into the next section's "diff --git" header when
+	// the previous section lacked a trailing newline. The file path
+	// is on the same line as the header, so a relaxed match is safe.
+	m := diffHeaderRelaxedRegexp.FindStringSubmatch(section)
 	if m == nil {
 		return ""
 	}
