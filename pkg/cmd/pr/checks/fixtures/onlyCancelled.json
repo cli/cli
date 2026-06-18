@@ -1,0 +1,29 @@
+{
+  "data": {
+    "node": {
+      "statusCheckRollup": {
+        "nodes": [
+          {
+            "commit": {
+              "oid": "abc",
+              "statusCheckRollup": {
+                "contexts": {
+                  "nodes": [
+                    {
+                      "conclusion": "CANCELLED",
+                      "status": "COMPLETED",
+                      "name": "sad tests",
+                      "completedAt": "2020-08-27T19:00:12Z",
+                      "startedAt": "2020-08-27T18:58:46Z",
+                      "detailsUrl": "sweet link"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

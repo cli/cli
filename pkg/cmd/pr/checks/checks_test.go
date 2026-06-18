@@ -205,6 +205,35 @@ func Test_checksRun(t *testing.T) {
 			wantErr: "",
 		},
 		{
+			name: "only cancelled tty",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/onlyCancelled.json"),
+				)
+			},
+			wantOut: heredoc.Doc(`
+				Some checks were cancelled
+				1 cancelled, 0 failing, 0 successful, 0 skipped, and 0 pending checks
+
+				   NAME       DESCRIPTION  ELAPSED  URL
+				-  sad tests               1m26s    sweet link
+			`),
+			wantErr: "",
+		},
+		{
+			name: "only cancelled",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/onlyCancelled.json"),
+				)
+			},
+			wantOut: "sad tests\tfail\t1m26s\tsweet link\t\n",
+			wantErr: "",
+		},
+		{
 			name: "some pending tty",
 			tty:  true,
 			httpStubs: func(reg *httpmock.Registry) {

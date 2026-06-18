@@ -68,7 +68,7 @@ func addRow(tp *tableprinter.TablePrinter, io *iostreams.IOStreams, o check) {
 
 func printSummary(io *iostreams.IOStreams, counts checkCounts) {
 	summary := ""
-	if counts.Failed+counts.Passed+counts.Skipping+counts.Pending > 0 {
+	if counts.Failed+counts.Passed+counts.Skipping+counts.Pending+counts.Canceled > 0 {
 		if counts.Failed > 0 {
 			summary = "Some checks were not successful"
 		} else if counts.Pending > 0 {
