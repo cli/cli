@@ -33,7 +33,8 @@ We generally follow this structure:
   - File names
 - The possible flag values depend on the flag:
   - `--state` takes `{closed | open | merged}`
-  - `--clone` is a boolean flag
+  - `--clone` is a boolean flag.
+  - Use `--clone`, `--clone=true`, or `--clone=false` to make the choice explicit.
   - `--title` takes a string
   - `--limit` takes an integer
 
