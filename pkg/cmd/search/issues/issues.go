@@ -59,6 +59,9 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 			# Search issues with numerous comments
 			$ gh search issues --comments=">100"
 
+			# Search closed issues in the cli organization that mention OAuth
+			$ gh search issues "OAuth" --owner=cli --state=closed
+
 			# Search issues without label "bug"
 			$ gh search issues -- -label:bug
 

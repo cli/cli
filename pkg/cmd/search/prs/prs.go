@@ -61,6 +61,9 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			# Search pull requests with numerous reactions
 			$ gh search prs --reactions=">100"
 
+			# Search merged pull requests in cli repository that mention release notes
+			$ gh search prs "release notes" --repo=cli/cli --merged
+
 			# Search pull requests without label "bug"
 			$ gh search prs -- -label:bug
 
