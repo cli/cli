@@ -3,7 +3,11 @@ package codespaces
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -154,10 +158,11 @@ func checkParseResult(t *testing.T, tcase parseTestCase, gotArgs, gotCmd []strin
 	}
 }
 
-// TestNewSSHCommandUsesEndOfOptionsSeparator verifies that the ssh argv
-// includes the "--" end-of-options separator immediately before the
-// destination, so the destination is always parsed as a positional argument.
+// TestNewSSHCommandUsesEndOfOptionsSeparator asserts that "--" is placed
+// immediately before the destination in the ssh argv.
 func TestNewSSHCommandUsesEndOfOptionsSeparator(t *testing.T) {
+	stubExecutablesOnPath(t, "ssh")
+
 	cmd, _, err := newSSHCommand(context.Background(), 1234, "user@localhost", []string{"-v"}, []string{"echo", "hello"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -181,10 +186,11 @@ func TestNewSSHCommandUsesEndOfOptionsSeparator(t *testing.T) {
 	}
 }
 
-// TestNewSCPCommandUsesEndOfOptionsSeparator verifies that the scp argv
-// includes the "--" end-of-options separator before the file arguments,
-// so file paths are always parsed as positional arguments.
+// TestNewSCPCommandUsesEndOfOptionsSeparator asserts that "--" precedes
+// the file arguments in the scp argv.
 func TestNewSCPCommandUsesEndOfOptionsSeparator(t *testing.T) {
+	stubExecutablesOnPath(t, "scp")
+
 	cmd, err := newSCPCommand(context.Background(), 1234, "user@localhost", []string{"local/file", "remote:file"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -205,4 +211,28 @@ func TestNewSCPCommandUsesEndOfOptionsSeparator(t *testing.T) {
 	if dashDashIdx > localIdx {
 		t.Errorf("expected \"--\" to precede file arguments, got args: %v", args)
 	}
+}
+
+// stubExecutablesOnPath creates empty executable files for names in a temp
+// dir and prepends it to PATH for the test, so safeexec.LookPath resolves
+// without requiring the real binaries on the host.
+func stubExecutablesOnPath(t *testing.T, names ...string) {
+	t.Helper()
+
+	dir := t.TempDir()
+	for _, name := range names {
+		if runtime.GOOS == "windows" {
+			name += ".exe"
+		}
+		path := filepath.Join(dir, name)
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0755)
+		if err != nil {
+			t.Fatalf("failed to create stub %s: %v", name, err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatalf("failed to close stub %s: %v", name, err)
+		}
+	}
+
+	t.Setenv("PATH", strings.Join([]string{dir, os.Getenv("PATH")}, string(os.PathListSeparator)))
 }

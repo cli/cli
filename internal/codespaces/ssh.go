@@ -71,10 +71,8 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string, 
 
 	cmdArgs = append(cmdArgs, connArgs...)
 	cmdArgs = append(cmdArgs, "-C") // Compression
-	// End of ssh options. Ensures the destination is treated as a positional
-	// argument and never parsed as an option.
-	cmdArgs = append(cmdArgs, "--")
-	cmdArgs = append(cmdArgs, dst) // user@host
+	cmdArgs = append(cmdArgs, "--") // end of ssh options
+	cmdArgs = append(cmdArgs, dst)  // user@host
 
 	if command != nil {
 		cmdArgs = append(cmdArgs, command...)
@@ -121,9 +119,7 @@ func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 	}
 
 	cmdArgs = append(cmdArgs, connArgs...)
-	// End of scp options. Ensures the following file arguments are treated as
-	// positional and never parsed as options.
-	cmdArgs = append(cmdArgs, "--")
+	cmdArgs = append(cmdArgs, "--") // end of scp options
 
 	for _, arg := range command {
 		// Replace "remote:" prefix with (e.g.) "root@localhost:".
