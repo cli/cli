@@ -208,8 +208,8 @@ func TestNewSCPCommandUsesEndOfOptionsSeparator(t *testing.T) {
 		t.Fatalf("expected file arg in scp args, got: %v", args)
 	}
 
-	if dashDashIdx > localIdx {
-		t.Errorf("expected \"--\" to precede file arguments, got args: %v", args)
+	if dashDashIdx+1 != localIdx {
+		t.Errorf("expected \"--\" to immediately precede file arguments, got args: %v", args)
 	}
 }
 
