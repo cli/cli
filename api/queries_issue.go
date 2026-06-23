@@ -57,6 +57,43 @@ type Issue struct {
 	Blocking         LinkedIssueConnection
 
 	ClosedByPullRequestsReferences ClosedByPullRequestsReferences
+
+	IssueFieldValues IssueFieldValues
+}
+
+// IssueFieldValues is a connection of native repository-level issue field
+// values set on an issue (e.g. Priority, Estimate). These are distinct from
+// ProjectV2 custom fields.
+type IssueFieldValues struct {
+	Nodes []IssueFieldValue `json:"nodes"`
+}
+
+// IssueFieldValue is the flattened representation of a single repository-level
+// issue field value. Only the fields relevant to the underlying union variant
+// are populated; the rest are zero values.
+type IssueFieldValue struct {
+	Typename string             `json:"__typename"`
+	Field    IssueFieldValueRef `json:"field"`
+
+	// SingleSelect
+	Name     string `json:"name,omitempty"`
+	OptionID string `json:"optionId,omitempty"`
+	Color    string `json:"color,omitempty"`
+
+	// Text
+	Text string `json:"text,omitempty"`
+
+	// Number
+	Number float64 `json:"number,omitempty"`
+
+	// Date (ISO 8601 string from the API)
+	Date string `json:"date,omitempty"`
+}
+
+// IssueFieldValueRef identifies the field a value belongs to.
+type IssueFieldValueRef struct {
+	Name     string `json:"name"`
+	DataType string `json:"dataType"`
 }
 
 // IssueType represents an issue type configured for a repository.
