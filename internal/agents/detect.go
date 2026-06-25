@@ -56,7 +56,7 @@ func detectWith(lookup func(string) (string, bool)) AgentName {
 		return v
 	}
 
-	// Generic agent identifiers — checked first because they are the most specific signal.
+	// Generic agent identifiers - checked first because they are the most specific signal.
 	if v, ok := lookup("AI_AGENT"); ok && v != "" {
 		if name, err := parseAgentName(v); err == nil {
 			return name
@@ -70,7 +70,7 @@ func detectWith(lookup func(string) (string, bool)) AgentName {
 		return agentAmp
 	}
 
-	// OpenAI Codex CLI — https://github.com/openai/codex
+	// OpenAI Codex CLI - https://github.com/openai/codex
 	// CODEX_SANDBOX: https://github.com/openai/codex/blob/95e1d5993985019ce0ce0d10689caf1375f95120/codex-rs/core/src/spawn.rs#L25
 	// CODEX_THREAD_ID: https://github.com/openai/codex/blob/95e1d5993985019ce0ce0d10689caf1375f95120/codex-rs/core/src/exec_env.rs#L8
 	// CODEX_CI: https://github.com/openai/codex/blob/95e1d5993985019ce0ce0d10689caf1375f95120/codex-rs/core/src/unified_exec/process_manager.rs#L64
@@ -78,7 +78,7 @@ func detectWith(lookup func(string) (string, bool)) AgentName {
 		return agentCodex
 	}
 
-	// Google Gemini CLI — https://github.com/google-gemini/gemini-cli
+	// Google Gemini CLI - https://github.com/google-gemini/gemini-cli
 	// GEMINI_CLI: https://github.com/google-gemini/gemini-cli/blob/46fd7b4864111032a1c7dfa1821b2000fc7531da/docs/tools/shell.md#L96-L97
 	if isSet("GEMINI_CLI") {
 		return agentGeminiCLI
@@ -90,7 +90,7 @@ func detectWith(lookup func(string) (string, bool)) AgentName {
 		return agentCopilotCLI
 	}
 
-	// OpenCode — https://github.com/anomalyco/opencode
+	// OpenCode - https://github.com/anomalyco/opencode
 	// OPENCODE: https://github.com/anomalyco/opencode/blob/fde201c286a83ff32dda9b41d61d734a4449fe70/packages/opencode/src/index.ts#L78-L80
 	if isSet("OPENCODE") {
 		return agentOpencode
@@ -116,7 +116,7 @@ func detectWith(lookup func(string) (string, bool)) AgentName {
 		return agentReplit
 	}
 
-	// Anthropic Claude Code — https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview
+	// Anthropic Claude Code - https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview
 	// CLAUDECODE: https://code.claude.com/docs/en/env-vars (CLAUDECODE section)
 	// CLAUDE_CODE, CLAUDE_CODE_IS_COWORK: no first-party docs
 	//
