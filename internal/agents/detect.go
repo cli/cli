@@ -160,8 +160,10 @@ func detectWith(lookup func(string) (string, bool)) AgentName {
 	// Pi
 	// No first-party docs
 	// Anchored to a path separator so it only matches ".pi/agent" as a real
-	// path segment, not an incidental substring.
-	if strings.Contains(valueOf("PATH"), "/.pi/agent") {
+	// path segment, not an incidental substring. The Windows separator is
+	// matched too, though confidence there is lower since it is unconfirmed
+	// that pi uses this layout on Windows.
+	if strings.Contains(valueOf("PATH"), "/.pi/agent") || strings.Contains(valueOf("PATH"), `\.pi\agent`) {
 		return agentPi
 	}
 

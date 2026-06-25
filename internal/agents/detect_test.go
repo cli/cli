@@ -228,6 +228,11 @@ func TestDetectWith(t *testing.T) {
 			env:       map[string]string{"PATH": "/usr/bin:/home/user/x.pi/agent"},
 			wantAgent: "",
 		},
+		{
+			name:      "PATH with Windows .pi\\agent separators detected as pi",
+			env:       map[string]string{"PATH": `C:\Windows;C:\Users\user\.pi\agent\bin`},
+			wantAgent: "pi",
+		},
 	}
 
 	for _, tt := range tests {
