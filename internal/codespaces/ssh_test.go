@@ -72,6 +72,21 @@ func TestParseSSHArgs(t *testing.T) {
 			Command:    []string{"echo", "-b", "test"},
 		},
 		{
+			Args:       []string{"-v", "--", "echo", "hi"},
+			ParsedArgs: []string{"-v"},
+			Command:    []string{"echo", "hi"},
+		},
+		{
+			Args:       []string{"--", "-Fconfig", "arg"},
+			ParsedArgs: []string{},
+			Command:    []string{"-Fconfig", "arg"},
+		},
+		{
+			Args:       []string{"-v", "--"},
+			ParsedArgs: []string{"-v"},
+			Command:    nil,
+		},
+		{
 			Args:       []string{"-b"},
 			ParsedArgs: nil,
 			Command:    nil,
@@ -113,6 +128,11 @@ func TestParseSCPArgs(t *testing.T) {
 			Args:       []string{"local/file", "remote:file"},
 			ParsedArgs: []string{},
 			Command:    []string{"local/file", "remote:file"},
+		},
+		{
+			Args:       []string{"--", "-Fconfig", "remote:file"},
+			ParsedArgs: []string{},
+			Command:    []string{"-Fconfig", "remote:file"},
 		},
 		{
 			Args:       []string{"-c"},
