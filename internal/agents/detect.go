@@ -92,6 +92,8 @@ func detectWith(lookup func(string) (string, bool)) AgentName {
 
 	// OpenCode - https://github.com/anomalyco/opencode
 	// OPENCODE: https://github.com/anomalyco/opencode/blob/fde201c286a83ff32dda9b41d61d734a4449fe70/packages/opencode/src/index.ts#L78-L80
+	// Not OPENCODE_CALLER or OPENCODE_CLIENT: they name the client that launched
+	// opencode (e.g. the VS Code extension), not the running agent.
 	if isSet("OPENCODE") {
 		return agentOpencode
 	}
