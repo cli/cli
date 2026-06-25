@@ -228,7 +228,7 @@ func TestAddFormatFlags(t *testing.T) {
 			name:        "invalid format field",
 			args:        []string{"--format", "idontexist"},
 			wantsExport: nil,
-			wantsError:  "invalid argument \"idontexist\" for \"--format\" flag: valid values are {json}",
+			wantsError:  "invalid argument \"idontexist\" for \"--format\" flag: expected one of \"json\"",
 		},
 		{
 			name:        "cannot combine --format with --web",

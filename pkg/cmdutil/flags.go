@@ -66,7 +66,11 @@ func RegisterBranchCompletionFlags(gitc gitClient, cmd *cobra.Command, flags ...
 }
 
 func formatValuesForUsageDocs(values []string) string {
-	return fmt.Sprintf("{%s}", strings.Join(values, "|"))
+	quoted := make([]string, len(values))
+	for i, v := range values {
+		quoted[i] = fmt.Sprintf("%q", v)
+	}
+	return fmt.Sprintf("one of %s", strings.Join(quoted, ", "))
 }
 
 type stringValue struct {
@@ -131,7 +135,7 @@ type enumValue struct {
 
 func (e *enumValue) Set(value string) error {
 	if !isIncluded(value, e.options) {
-		return fmt.Errorf("valid values are %s", formatValuesForUsageDocs(e.options))
+		return fmt.Errorf("expected %s", formatValuesForUsageDocs(e.options))
 	}
 	*e.string = value
 	return nil
@@ -154,7 +158,7 @@ func (e *enumMultiValue) Set(value string) error {
 	items := strings.Split(value, ",")
 	for _, item := range items {
 		if !isIncluded(item, e.options) {
-			return fmt.Errorf("valid values are %s", formatValuesForUsageDocs(e.options))
+			return fmt.Errorf("expected %s", formatValuesForUsageDocs(e.options))
 		}
 	}
 	*e.value = append(*e.value, items...)

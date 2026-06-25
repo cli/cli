@@ -63,7 +63,7 @@ func TestNewCmdList(t *testing.T) {
 			name:    "sort invalid flag",
 			input:   "--sort invalid",
 			wantErr: true,
-			errMsg:  `invalid argument "invalid" for "--sort" flag: valid values are {created|name}`,
+			errMsg:  `invalid argument "invalid" for "--sort" flag: expected one of "created", "name"`,
 		},
 		{
 			name:   "order asc flag",
@@ -79,7 +79,7 @@ func TestNewCmdList(t *testing.T) {
 			name:    "order invalid flag",
 			input:   "--order invalid",
 			wantErr: true,
-			errMsg:  `invalid argument "invalid" for "--order" flag: valid values are {asc|desc}`,
+			errMsg:  `invalid argument "invalid" for "--order" flag: expected one of "asc", "desc"`,
 		},
 		{
 			name:    "search flag with sort flag",

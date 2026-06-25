@@ -111,7 +111,7 @@ func Test_NewCmdDiff(t *testing.T) {
 			name:    "invalid --color argument",
 			args:    "--color doublerainbow",
 			isTTY:   true,
-			wantErr: "invalid argument \"doublerainbow\" for \"--color\" flag: valid values are {always|never|auto}",
+			wantErr: "invalid argument \"doublerainbow\" for \"--color\" flag: expected one of \"always\", \"never\", \"auto\"",
 		},
 		{
 			name:  "web mode",

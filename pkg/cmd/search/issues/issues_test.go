@@ -87,7 +87,7 @@ func TestNewCmdIssues(t *testing.T) {
 			name:    "invalid order flag",
 			input:   "--order invalid",
 			wantErr: true,
-			errMsg:  "invalid argument \"invalid\" for \"--order\" flag: valid values are {asc|desc}",
+			errMsg:  "invalid argument \"invalid\" for \"--order\" flag: expected one of \"asc\", \"desc\"",
 		},
 		{
 			name:  "include-prs flag",
