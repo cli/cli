@@ -92,9 +92,7 @@ func detectWith(lookup func(string) (string, bool)) AgentName {
 
 	// OpenCode — https://github.com/anomalyco/opencode
 	// OPENCODE: https://github.com/anomalyco/opencode/blob/fde201c286a83ff32dda9b41d61d734a4449fe70/packages/opencode/src/index.ts#L78-L80
-	// OPENCODE_CALLER: https://github.com/anomalyco/opencode/blob/31b58b470465977f9b9b6bd9a17bfe3d76f1a229/packages/opencode/src/ide/index.ts#L40
-	// OPENCODE_CLIENT: https://github.com/anomalyco/opencode/blob/31b58b470465977f9b9b6bd9a17bfe3d76f1a229/packages/core/src/flag/flag.ts#L75-L76
-	if isSet("OPENCODE") || isSet("OPENCODE_CALLER") || isSet("OPENCODE_CLIENT") {
+	if isSet("OPENCODE") {
 		return agentOpencode
 	}
 

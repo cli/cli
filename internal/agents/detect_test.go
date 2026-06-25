@@ -139,16 +139,6 @@ func TestDetectWith(t *testing.T) {
 			wantAgent: "gemini-cli",
 		},
 		{
-			name:      "OPENCODE_CALLER",
-			env:       map[string]string{"OPENCODE_CALLER": "1"},
-			wantAgent: "opencode",
-		},
-		{
-			name:      "OPENCODE_CLIENT",
-			env:       map[string]string{"OPENCODE_CLIENT": "1"},
-			wantAgent: "opencode",
-		},
-		{
 			name:      "ANTIGRAVITY_AGENT",
 			env:       map[string]string{"ANTIGRAVITY_AGENT": "1"},
 			wantAgent: "antigravity",
